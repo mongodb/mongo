@@ -152,7 +152,7 @@ Status ChangeStreamOptionsParameter::reset() {
         .getStatus();
 }
 
-const LogicalTime ChangeStreamOptionsParameter::getClusterParameterTime() const {
+LogicalTime ChangeStreamOptionsParameter::getClusterParameterTime() const {
     ChangeStreamOptionsManager& changeStreamOptionsManager =
         ChangeStreamOptionsManager::get(getGlobalServiceContext());
     return changeStreamOptionsManager.getClusterParameterTime();

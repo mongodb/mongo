@@ -344,9 +344,7 @@ public:
      * Typically invoked by {getParameter:...} or {getClusterParameter:...} to produce a dictionary
      * of SCP settings.
      */
-    void append(OperationContext* opCtx,
-                BSONObjBuilder& b,
-                const std::string& name) override final {
+    void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) final {
         if (isRedact()) {
             b.append(name, "###");
         } else if constexpr (paramType == SPT::kClusterWide) {
@@ -377,7 +375,7 @@ public:
         return newValue;
     }
 
-    Status validate(const BSONElement& newValueElement) const override final {
+    Status validate(const BSONElement& newValueElement) const final {
         StatusWith<element_type> swNewValue = parseElement(newValueElement);
         if (!swNewValue.isOK()) {
             return swNewValue.getStatus();
@@ -392,7 +390,7 @@ public:
      * Allows setting non-basic values (e.g. vector<string>)
      * via the {setParameter: ...} call or {setClusterParameter: ...} call.
      */
-    Status set(const BSONElement& newValueElement) override final {
+    Status set(const BSONElement& newValueElement) final {
         StatusWith<element_type> swNewValue = parseElement(newValueElement);
         if (!swNewValue.isOK()) {
             return swNewValue.getStatus();
@@ -404,7 +402,7 @@ public:
     /**
      * Resets the current storage value in storage_wrapper with the default value.
      */
-    Status reset() override final {
+    Status reset() final {
         _storage.reset();
         if (_onUpdate) {
             return _onUpdate(_storage.load());
@@ -419,7 +417,7 @@ public:
      * Typically invoked from commandline --setParameter usage. Prohibited for cluster server
      * parameters.
      */
-    Status setFromString(const std::string& str) override final {
+    Status setFromString(const std::string& str) final {
         if constexpr (paramType == SPT::kClusterWide) {
             return {ErrorCodes::BadValue,
                     "Unable to set a cluster-wide server parameter from the command line or config "
@@ -438,7 +436,7 @@ public:
      * Retrieves the cluster parameter time from the chained ClusterServerParameter struct in
      * storage. All other server parameters simply return the uninitialized LogicalTime.
      */
-    const LogicalTime getClusterParameterTime() const override final {
+    LogicalTime getClusterParameterTime() const final {
         if constexpr (hasClusterServerParameter<T>) {
             return getValue().getClusterParameterTime();
         } else {

@@ -112,21 +112,9 @@ class CppTypeBase(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def is_const_type(self):
-        # type: () -> bool
-        """Return True if the type should be returned by const."""
-        pass
-
-    @abstractmethod
     def return_by_reference(self):
         # type: () -> bool
         """Return True if the type should be returned by reference."""
-        pass
-
-    @abstractmethod
-    def disable_xvalue(self):
-        # type: () -> bool
-        """Return True if the type should have the xvalue getter disabled."""
         pass
 
     @abstractmethod
@@ -175,31 +163,9 @@ class _CppTypeBasic(CppTypeBase):
         # type: () -> str
         return self.get_type_name()
 
-    def is_const_type(self):
-        # type: () -> bool
-        # Enum types are never const since they are mapped to primitive types, and coverity warns.
-        if self._field.type.is_enum:
-            return False
-
-        type_name = self.get_type_name().replace(' ', '')
-
-        # If it is not a primitive type, then it is const.
-        if not is_primitive_type(type_name):
-            return True
-
-        # Arrays of bytes should also be const though.
-        if type_name == _STD_ARRAY_UINT8_16:
-            return True
-
-        return False
-
     def return_by_reference(self):
         # type: () -> bool
         return not is_primitive_type(self.get_type_name()) and not self._field.type.is_enum
-
-    def disable_xvalue(self):
-        # type: () -> bool
-        return False
 
     def is_view_type(self):
         # type: () -> bool
@@ -246,17 +212,9 @@ class _CppTypeView(CppTypeBase):
         # type: () -> str
         return self._view_type
 
-    def is_const_type(self):
-        # type: () -> bool
-        return True
-
     def return_by_reference(self):
         # type: () -> bool
         return False
-
-    def disable_xvalue(self):
-        # type: () -> bool
-        return True
 
     def is_view_type(self):
         # type: () -> bool
@@ -305,17 +263,9 @@ class _CppTypeVector(CppTypeBase):
         # type: () -> str
         return 'ConstDataRange'
 
-    def is_const_type(self):
-        # type: () -> bool
-        return True
-
     def return_by_reference(self):
         # type: () -> bool
         return False
-
-    def disable_xvalue(self):
-        # type: () -> bool
-        return True
 
     def is_view_type(self):
         # type: () -> bool
@@ -366,17 +316,9 @@ class _CppTypeDelegating(CppTypeBase):
         # type: () -> str
         return self._base.get_getter_setter_type()
 
-    def is_const_type(self):
-        # type: () -> bool
-        return True
-
     def return_by_reference(self):
         # type: () -> bool
         return self._base.return_by_reference()
-
-    def disable_xvalue(self):
-        # type: () -> bool
-        return self._base.disable_xvalue()
 
     def is_view_type(self):
         # type: () -> bool
@@ -414,10 +356,6 @@ class _CppTypeArray(_CppTypeDelegating):
         # type: () -> bool
         if self._base.is_view_type():
             return False
-        return True
-
-    def disable_xvalue(self):
-        # type: () -> bool
         return True
 
     def get_getter_body(self, member_name):
@@ -466,10 +404,6 @@ class _CppTypeOptional(_CppTypeDelegating):
     def get_getter_setter_type(self):
         # type: () -> str
         return _qualify_optional_type(self._base.get_getter_setter_type())
-
-    def disable_xvalue(self):
-        # type: () -> bool
-        return True
 
     def return_by_reference(self):
         # type: () -> bool

@@ -52,17 +52,17 @@ public:
     SpecializedClusterServerParameterData(const std::string& newStrData, std::uint32_t newIntData)
         : _strData(newStrData), _intData(newIntData) {}
 
-    const LogicalTime getClusterParameterTime() const {
+    LogicalTime getClusterParameterTime() const {
         stdx::lock_guard<Latch> lg(_mutex);
         return _clusterParameterTime;
     }
 
-    const StringData getStrData() const {
+    StringData getStrData() const {
         stdx::lock_guard<Latch> lg(_mutex);
         return _strData;
     }
 
-    const std::uint32_t getIntData() const {
+    std::uint32_t getIntData() const {
         stdx::lock_guard<Latch> lg(_mutex);
         return _intData;
     }
@@ -94,7 +94,7 @@ public:
         _intData = updatedObj["intData"].Int();
     }
 
-    const void serialize(BSONObjBuilder* builder) const {
+    void serialize(BSONObjBuilder* builder) const {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_id.is_initialized()) {
             builder->append("_id"_sd, _id.get());

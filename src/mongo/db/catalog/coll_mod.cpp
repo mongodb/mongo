@@ -174,7 +174,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
             parsed.cappedMax = cmr.getCappedMax();
         }
 
-        if (auto& cappedSize = cmr.getCappedSize()) {
+        if (const auto& cappedSize = cmr.getCappedSize()) {
             static constexpr long long minCappedSize = 4096;
             auto swCappedSize = CollectionOptions::checkAndAdjustCappedSize(*cappedSize);
             if (!swCappedSize.isOK()) {
@@ -184,7 +184,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
                 (swCappedSize.getValue() < minCappedSize) ? minCappedSize : swCappedSize.getValue();
             oplogEntryBuilder.append(CollMod::kCappedSizeFieldName, *cappedSize);
         }
-        if (auto& cappedMax = cmr.getCappedMax()) {
+        if (const auto& cappedMax = cmr.getCappedMax()) {
             auto swCappedMaxDocs = CollectionOptions::checkAndAdjustCappedMaxDocs(*cappedMax);
             if (!swCappedMaxDocs.isOK()) {
                 return swCappedMaxDocs.getStatus();
@@ -438,7 +438,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
         oplogEntryBuilder.append(CollMod::kValidatorFieldName, validatorObj);
     }
 
-    if (auto& validationLevel = cmr.getValidationLevel()) {
+    if (const auto& validationLevel = cmr.getValidationLevel()) {
         if (isView) {
             return getNotSupportedOnViewError(CollMod::kValidationLevelFieldName);
         }
@@ -451,7 +451,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
                                  ValidationLevel_serializer(*validationLevel));
     }
 
-    if (auto& validationAction = cmr.getValidationAction()) {
+    if (const auto& validationAction = cmr.getValidationAction()) {
         if (isView) {
             return getNotSupportedOnViewError(CollMod::kValidationActionFieldName);
         }
@@ -472,7 +472,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
         oplogEntryBuilder.append(CollMod::kPipelineFieldName, *pipeline);
     }
 
-    if (auto& viewOn = cmr.getViewOn()) {
+    if (const auto& viewOn = cmr.getViewOn()) {
         parsed.numModifications++;
         if (!isView) {
             return getOnlySupportedOnViewError(CollMod::kViewOnFieldName);
@@ -481,7 +481,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
         oplogEntryBuilder.append(CollMod::kViewOnFieldName, *viewOn);
     }
 
-    if (auto& recordPreImages = cmr.getRecordPreImages()) {
+    if (const auto& recordPreImages = cmr.getRecordPreImages()) {
         if (isView) {
             return getNotSupportedOnViewError(CollMod::kRecordPreImagesFieldName);
         }
@@ -554,7 +554,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
         timeseries->serialize(&subObjBuilder);
     }
 
-    if (auto& dryRun = cmr.getDryRun()) {
+    if (const auto& dryRun = cmr.getDryRun()) {
         parsed.dryRun = *dryRun;
         // The dry run option should never be included in a collMod oplog entry.
     }

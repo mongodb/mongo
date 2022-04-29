@@ -186,7 +186,7 @@ public:
      * implement a mechanism for atomically setting the clusterParameterTime in the set() method and
      * retrieving it via this method.
      */
-    virtual const LogicalTime getClusterParameterTime() const {
+    virtual LogicalTime getClusterParameterTime() const {
         return LogicalTime();
     }
 

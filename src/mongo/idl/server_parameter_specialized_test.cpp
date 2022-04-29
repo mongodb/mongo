@@ -469,7 +469,7 @@ Status SpecializedClusterServerParameter::reset() {
     return Status::OK();
 }
 
-const LogicalTime SpecializedClusterServerParameter::getClusterParameterTime() const {
+LogicalTime SpecializedClusterServerParameter::getClusterParameterTime() const {
     return _data.getClusterParameterTime();
 }
 

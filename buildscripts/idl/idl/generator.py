@@ -514,48 +514,32 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
     def gen_getter(self, struct, field):
         # type: (ast.Struct, ast.Field) -> None
         """Generate the C++ getter definition for a field."""
+        method_name = _get_field_member_getter_name(field)
+        if field.chained_struct_field:
+            ch = _get_field_member_name(field.chained_struct_field)
+            ch_get = _get_field_member_getter_name(field)
+            self._writer.write_line(
+                f'decltype(auto) {method_name}() const {{ return {ch}.{ch_get}(); }}')
+            return
+
         cpp_type_info = cpp_types.get_cpp_type(field)
-        param_type = cpp_type_info.get_getter_setter_type()
-        member_name = _get_field_member_name(field)
+        body = cpp_type_info.get_getter_body(_get_field_member_name(field))
 
+        add_const = lambda t: f'std::add_const_t<{t}>'
+        add_ref = lambda t: f'std::add_lvalue_reference_t<{t}>'
+        ret = cpp_type_info.get_getter_setter_type()
+        cret = ret
+        nonconst = False
         if cpp_type_info.return_by_reference():
-            param_type += "&"
-
-        template_params = {
-            'method_name': _get_field_member_getter_name(field),
-            'param_type': param_type,
-            'body': cpp_type_info.get_getter_body(member_name),
-            'const_type': 'const ' if cpp_type_info.is_const_type() else '',
-        }
-
-        # Generate a getter that disables xvalue for view types (i.e. StringData), constructed
-        # optional types, and non-primitive types.
-        with self._with_template(template_params):
-
-            if field.chained_struct_field:
-                self._writer.write_template(
-                    '${const_type} ${param_type} ${method_name}() const { return %s.%s(); }' % (
-                        (_get_field_member_name(field.chained_struct_field),
-                         _get_field_member_getter_name(field))))
-
-            elif cpp_type_info.disable_xvalue():
-                self._writer.write_template(
-                    'const ${param_type} ${method_name}() const& { ${body} }')
-                self._writer.write_template('void ${method_name}() && = delete;')
-
-            elif field.type.is_struct:
-                # Support mutable accessors
-                self._writer.write_template(
-                    'const ${param_type} ${method_name}() const { ${body} }')
-
-                if not struct.immutable:
-                    self._writer.write_template('${param_type} ${method_name}() { ${body} }')
+            ret, cret = add_ref(ret), add_ref(add_const(ret))
+            if field.type.is_struct:
+                nonconst = not struct.immutable
             else:
-                self._writer.write_template(
-                    '${const_type}${param_type} ${method_name}() const { ${body} }')
+                nonconst = field.non_const_getter
 
-                if field.non_const_getter:
-                    self._writer.write_template('${param_type} ${method_name}() { ${body} }')
+        self._writer.write_line(f'{cret} {method_name}() const {{ {body} }}')
+        if nonconst:
+            self._writer.write_line(f'{ret} {method_name}() {{ {body} }}')
 
     def gen_validators(self, field):
         # type: (ast.Field) -> None
@@ -586,29 +570,13 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         """Generate the C++ setter definition for a field."""
         cpp_type_info = cpp_types.get_cpp_type(field)
         param_type = cpp_type_info.get_getter_setter_type()
-        member_name = _get_field_member_name(field)
-
-        post_body = ''
-        if _is_required_serializer_field(field):
-            post_body = '%s = true;' % (_get_has_field_member_name(field))
-
-        validator_method_name = ''
-        if field.validator is not None:
-            validator_method_name = _get_field_member_validator_name(field)
-
-        template_params = {
-            'method_name': _get_field_member_setter_name(field),
-            'member_name': member_name,
-            'param_type': param_type,
-            'body': cpp_type_info.get_setter_body(member_name, validator_method_name),
-            'post_body': post_body,
-        }
-
-        with self._with_template(template_params):
-            self._writer.write_template(
-                'void ${method_name}(${param_type} value) & { ${body} ${post_body} }')
-
-        self._writer.write_empty_line()
+        is_serial = _is_required_serializer_field(field)
+        memfn = _get_field_member_setter_name(field)
+        body = cpp_type_info.get_setter_body(
+            _get_field_member_name(field),
+            _get_field_member_validator_name(field) if field.validator is not None else '')
+        set_has = f'{_get_has_field_member_name(field)} = true;' if is_serial else ''
+        self._writer.write_line(f'void {memfn}({param_type} value) {{ {body} {set_has} }}')
 
     def gen_member(self, field):
         # type: (ast.Field) -> None
@@ -855,7 +823,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             # specialized cluster server parameters. Provide the declarations here.
             if scp.set_at == 'ServerParameterType::kClusterWide':
                 self._writer.write_line('Status reset() final;')
-                self._writer.write_line('const LogicalTime getClusterParameterTime() const final;')
+                self._writer.write_line('LogicalTime getClusterParameterTime() const final;')
 
             if cls.data is not None:
                 self.write_empty_line()

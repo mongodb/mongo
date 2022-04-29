@@ -97,10 +97,6 @@ ListSessionsUser getUserNameForLoggedInUser(const OperationContext* opCtx) {
     }
     return user;
 }
-
-bool operator==(const ListSessionsUser& user1, const ListSessionsUser& user2) {
-    return std::tie(user1.getUser(), user1.getDb()) == std::tie(user2.getUser(), user2.getDb());
-}
 }  // namespace
 
 }  // namespace mongo
