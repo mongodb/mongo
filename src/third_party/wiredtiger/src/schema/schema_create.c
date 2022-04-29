@@ -1068,6 +1068,42 @@ __create_parse_export(
 }
 
 /*
+ * __schema_create_config_check --
+ *     Detects any invalid config combinations for schema create.
+ */
+static int
+__schema_create_config_check(
+  WT_SESSION_IMPL *session, const char *uri, const char *config, bool import)
+{
+    WT_CONFIG_ITEM cval;
+    bool is_tiered, tiered_name_set;
+
+    if (import && !WT_PREFIX_MATCH(uri, "file:") && !WT_PREFIX_MATCH(uri, "table:"))
+        WT_RET_MSG(session, ENOTSUP,
+          "%s: import is only supported for 'file' and 'table' data sources", uri);
+
+    /*
+     * If tiered storage is configured at the connection level and the user has not configured
+     * tiered_storage.name to be none, then the object being created is a tiered object.
+     */
+    tiered_name_set =
+      __wt_config_getones(session, config, "tiered_storage.name", &cval) == 0 && cval.len != 0;
+    is_tiered = S2C(session)->bstorage != NULL &&
+      (!tiered_name_set || !WT_STRING_MATCH("none", cval.str, cval.len));
+
+    /*
+     * If the type configuration is set to anything but "file" while using tiered storage we must
+     * fail the operation.
+     */
+    if (is_tiered && __wt_config_getones(session, config, "type", &cval) == 0 &&
+      !WT_STRING_MATCH("file", cval.str, cval.len))
+        WT_RET_MSG(
+          session, ENOTSUP, "unsupported type configuration: type must be file for tiered storage");
+
+    return (0);
+}
+
+/*
  * __schema_create --
  *     Process a WT_SESSION::create operation for all supported types.
  */
@@ -1088,9 +1124,7 @@ __schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config)
     exclusive = __wt_config_getones(session, config, "exclusive", &cval) == 0 && cval.val != 0;
     import = __wt_config_getones(session, config, "import.enabled", &cval) == 0 && cval.val != 0;
 
-    if (import && !WT_PREFIX_MATCH(uri, "file:") && !WT_PREFIX_MATCH(uri, "table:"))
-        WT_RET_MSG(session, ENOTSUP,
-          "%s: import is only supported for 'file' and 'table' data sources", uri);
+    WT_RET(__schema_create_config_check(session, uri, config, import));
 
     /*
      * We track create operations: if we fail in the middle of creating a complex object, we want to
