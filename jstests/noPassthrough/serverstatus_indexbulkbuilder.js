@@ -86,5 +86,19 @@ assert.gte(indexBulkBuilderSection.count, 3, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 1, tojson(indexBulkBuilderSection));
 
+// Building multiple indexes in a single createIndex command increases count by the number of
+// indexes requested.
+// The compound index is the only index that will cause the sorter to use the disk because it
+// indexes large values in the field 'a'.
+// The expected values in the server status should add to the numbers at the end of the resumable
+// index build test case.
+assert.commandWorked(coll.createIndexes([{c: 1}, {d: 1}, {e: 1, a: 1}]));
+IndexBuildTest.assertIndexes(newNodeColl, 6, ['_id_', 'a_1', 'b_1', 'c_1', 'd_1', 'e_1_a_1']);
+indexBulkBuilderSection = testDB.serverStatus().indexBulkBuilder;
+assert.eq(indexBulkBuilderSection.count, 4, tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.resumed, 1, tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 2, tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 2, tojson(indexBulkBuilderSection));
+
 replSet.stopSet();
 })();
