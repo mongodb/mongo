@@ -59,6 +59,11 @@ void ReshardingOplogApplierMetrics::onDeleteApplied() {
     _metricsNew->onDeleteApplied();
 }
 
+void ReshardingOplogApplierMetrics::onBatchRetrievedDuringOplogApplying(int64_t numEntries,
+                                                                        Milliseconds elapsed) {
+    _metricsNew->onBatchRetrievedDuringOplogApplying(numEntries, elapsed);
+}
+
 void ReshardingOplogApplierMetrics::onOplogEntriesApplied(int64_t numEntries) {
     _oplogEntriesApplied += numEntries;
     _metricsNew->onOplogEntriesApplied(numEntries);

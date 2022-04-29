@@ -33,6 +33,7 @@
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/sharding_data_transform_metrics.h"
 #include "mongo/db/s/sharding_data_transform_metrics_observer_interface.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
@@ -68,14 +69,18 @@ public:
     void onCopyingEnd();
     void onApplyingBegin();
     void onApplyingEnd();
-    void onDocumentsCopied(int64_t documentCount, int64_t totalDocumentsSizeBytes);
+    void onDocumentsCopied(int64_t documentCount,
+                           int64_t totalDocumentsSizeBytes,
+                           Milliseconds elapsed);
     void setDocumentsToCopyCounts(int64_t documentCount, int64_t totalDocumentsSizeBytes);
     void setCoordinatorHighEstimateRemainingTimeMillis(Milliseconds milliseconds);
     void setCoordinatorLowEstimateRemainingTimeMillis(Milliseconds milliseconds);
     void onInsertApplied();
     void onUpdateApplied();
     void onDeleteApplied();
-    void onOplogEntriesFetched(int64_t numEntries);
+    void onOplogEntriesFetched(int64_t numEntries, Milliseconds elapsed);
+    void onLocalInsertDuringOplogFetching(Milliseconds elapsed);
+    void onBatchRetrievedDuringOplogApplying(int64_t numEntries, Milliseconds elapsed);
     void onOplogEntriesApplied(int64_t numEntries);
     void onWriteToStashedCollections();
 

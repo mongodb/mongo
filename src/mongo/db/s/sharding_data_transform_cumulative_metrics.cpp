@@ -28,8 +28,11 @@
  */
 
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
-#include "mongo/util/assert_util.h"
+
 #include <cstdint>
+
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
@@ -249,14 +252,19 @@ void ShardingDataTransformCumulativeMetrics::reportLatencies(BSONObjBuilder* bob
     BSONObjBuilder s(bob->subobjStart(kLatencies));
     s.append(kCollectionCloningTotalRemoteBatchRetrievalTimeMillis, kPlaceholderLong);
     s.append(kCollectionCloningTotalRemoteBatchesRetrieved, kPlaceholderLong);
-    s.append(kCollectionCloningTotalLocalInsertTimeMillis, kPlaceholderLong);
-    s.append(kCollectionCloningTotalLocalInserts, kPlaceholderLong);
-    s.append(kOplogFetchingTotalRemoteBatchRetrievalTimeMillis, kPlaceholderLong);
-    s.append(kOplogFetchingTotalRemoteBatchesRetrieved, kPlaceholderLong);
-    s.append(kOplogFetchingTotalLocalInsertTimeMillis, kPlaceholderLong);
-    s.append(kOplogFetchingTotalLocalInserts, kPlaceholderLong);
-    s.append(kOplogApplyingTotalLocalBatchRetrievalTimeMillis, kPlaceholderLong);
-    s.append(kOplogApplyingTotalLocalBatchesRetrieved, kPlaceholderLong);
+    s.append(kCollectionCloningTotalLocalInsertTimeMillis,
+             _collectionCloningTotalLocalInsertTimeMillis.load());
+    s.append(kCollectionCloningTotalLocalInserts, _collectionCloningTotalLocalInserts.load());
+    s.append(kOplogFetchingTotalRemoteBatchRetrievalTimeMillis,
+             _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis.load());
+    s.append(kOplogFetchingTotalRemoteBatchesRetrieved,
+             _oplogFetchingTotalRemoteBatchesRetrieved.load());
+    s.append(kOplogFetchingTotalLocalInsertTimeMillis,
+             _oplogFetchingTotalLocalInsertTimeMillis.load());
+    s.append(kOplogFetchingTotalLocalInserts, _oplogFetchingTotalLocalInserts.load());
+    s.append(kOplogApplyingTotalLocalBatchRetrievalTimeMillis,
+             _oplogApplyingTotalBatchesRetrievalTimeMillis.load());
+    s.append(kOplogApplyingTotalLocalBatchesRetrieved, _oplogApplyingTotalBatchesRetrieved.load());
     s.append(kOplogApplyingTotalLocalBatchApplyTimeMillis, kPlaceholderLong);
     s.append(kOplogApplyingTotalLocalBatchesApplied, kPlaceholderLong);
 }
@@ -417,6 +425,33 @@ const char* ShardingDataTransformCumulativeMetrics::fieldNameFor(
     }
 
     MONGO_UNREACHABLE;
+}
+
+void ShardingDataTransformCumulativeMetrics::onInsertsDuringCloning(
+    int64_t count, const Milliseconds& elapsedTime) {
+    _collectionCloningTotalLocalInserts.fetchAndAdd(count);
+    _collectionCloningTotalLocalInsertTimeMillis.fetchAndAdd(
+        durationCount<Milliseconds>(elapsedTime));
+}
+
+void ShardingDataTransformCumulativeMetrics::onRemoteBatchRetrievedDuringOplogFetching(
+    int64_t count, const Milliseconds& elapsedTime) {
+    _oplogFetchingTotalRemoteBatchesRetrieved.fetchAndAdd(count);
+    _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis.fetchAndAdd(
+        durationCount<Milliseconds>(elapsedTime));
+}
+
+void ShardingDataTransformCumulativeMetrics::onLocalInsertDuringOplogFetching(
+    const Milliseconds& elapsedTime) {
+    _oplogFetchingTotalLocalInserts.fetchAndAdd(1);
+    _oplogFetchingTotalLocalInsertTimeMillis.fetchAndAdd(durationCount<Milliseconds>(elapsedTime));
+}
+
+void ShardingDataTransformCumulativeMetrics::onBatchRetrievedDuringOplogApplying(
+    int64_t count, const Milliseconds& elapsedTime) {
+    _oplogApplyingTotalBatchesRetrieved.fetchAndAdd(count);
+    _oplogApplyingTotalBatchesRetrievalTimeMillis.fetchAndAdd(
+        durationCount<Milliseconds>(elapsedTime));
 }
 
 }  // namespace mongo

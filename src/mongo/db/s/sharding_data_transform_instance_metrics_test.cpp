@@ -35,6 +35,7 @@
 #include "mongo/db/s/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/sharding_data_transform_metrics_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace {
@@ -254,7 +255,7 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientIncrementFetchedOplogE
 
     auto report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("oplogEntriesFetched"), 0);
-    metrics->onOplogEntriesFetched(50);
+    metrics->onOplogEntriesFetched(50, Milliseconds(1));
 
     report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("oplogEntriesFetched"), 50);
@@ -293,7 +294,7 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientIncrementsDocumentsAnd
     auto report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("documentsCopied"), 0);
     ASSERT_EQ(report.getIntField("bytesCopied"), 0);
-    metrics->onDocumentsCopied(5, 1000);
+    metrics->onDocumentsCopied(5, 1000, Milliseconds(1));
 
     report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("documentsCopied"), 5);
@@ -308,7 +309,7 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientReportsRemainingTime) 
     const auto kIncrementSecs = durationCount<Seconds>(kIncrement);
     const auto kExpectedTotal = kIncrementSecs * 8;
     metrics->setDocumentsToCopyCounts(0, kOpsPerIncrement * 4);
-    metrics->onOplogEntriesFetched(kOpsPerIncrement * 4);
+    metrics->onOplogEntriesFetched(kOpsPerIncrement * 4, Milliseconds(1));
 
     // Before cloning.
     auto report = metrics->reportForCurrentOp();
@@ -316,20 +317,20 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientReportsRemainingTime) 
 
     // During cloning.
     metrics->onCopyingBegin();
-    metrics->onDocumentsCopied(0, kOpsPerIncrement);
+    metrics->onDocumentsCopied(0, kOpsPerIncrement, Milliseconds(1));
     clock->advance(kIncrement);
     report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"),
               kExpectedTotal - kIncrementSecs);
 
-    metrics->onDocumentsCopied(0, kOpsPerIncrement * 2);
+    metrics->onDocumentsCopied(0, kOpsPerIncrement * 2, Milliseconds(1));
     clock->advance(kIncrement * 2);
     report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"),
               kExpectedTotal - (kIncrementSecs * 3));
 
     // During applying.
-    metrics->onDocumentsCopied(0, kOpsPerIncrement);
+    metrics->onDocumentsCopied(0, kOpsPerIncrement, Milliseconds(1));
     clock->advance(kIncrement);
     metrics->onCopyingEnd();
     metrics->onApplyingBegin();

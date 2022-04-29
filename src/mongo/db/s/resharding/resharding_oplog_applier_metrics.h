@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
@@ -45,6 +46,8 @@ public:
     void onInsertApplied();
     void onUpdateApplied();
     void onDeleteApplied();
+
+    void onBatchRetrievedDuringOplogApplying(int64_t numEntries, Milliseconds elapsed);
     void onOplogEntriesApplied(int64_t numEntries);
     void onWriteToStashCollections();
 

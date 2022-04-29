@@ -166,6 +166,7 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
         ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
             opCtx->lockState());
 
+        Timer fetchTimer;
         if (_pipeline) {
             _pipeline->reattachToOperationContext(opCtx.get());
         } else {

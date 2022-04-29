@@ -134,18 +134,25 @@ SemiFuture<void> ReshardingOplogApplier::run(
     CancelableOperationContextFactory factory) {
     struct ChainContext {
         std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIter;
+        Timer fetchTimer;
     };
 
     auto chainCtx = std::make_shared<ChainContext>();
     chainCtx->oplogIter = std::move(_oplogIter);
 
     return AsyncTry([this, chainCtx, executor, cancelToken, factory] {
+               chainCtx->fetchTimer.reset();
                return chainCtx->oplogIter->getNextBatch(executor, cancelToken, factory)
                    .thenRunOn(executor)
-                   .then([this, executor, cancelToken, factory](OplogBatch batch) {
+                   .then([this, chainCtx, executor, cancelToken, factory](OplogBatch batch) {
                        LOGV2_DEBUG(5391002, 3, "Starting batch", "batchSize"_attr = batch.size());
-                       _currentBatchToApply = std::move(batch);
 
+                       if (ShardingDataTransformMetrics::isEnabled()) {
+                           _env->applierMetrics()->onBatchRetrievedDuringOplogApplying(
+                               batch.size(), Milliseconds(chainCtx->fetchTimer.millis()));
+                       }
+
+                       _currentBatchToApply = std::move(batch);
                        return _applyBatch(executor, cancelToken, factory);
                    })
                    .then([this, executor, cancelToken, factory] {

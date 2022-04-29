@@ -35,6 +35,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include <set>
 
@@ -84,6 +85,10 @@ public:
                                       boost::optional<CoordinatorStateEnum> after);
 
     static const char* fieldNameFor(CoordinatorStateEnum state);
+    void onInsertsDuringCloning(int64_t count, const Milliseconds& elapsedTime);
+    void onRemoteBatchRetrievedDuringOplogFetching(int64_t count, const Milliseconds& elapsedTime);
+    void onLocalInsertDuringOplogFetching(const Milliseconds& elapsedTime);
+    void onBatchRetrievedDuringOplogApplying(int64_t count, const Milliseconds& elapsedTime);
 
 private:
     struct MetricsComparer {
@@ -125,6 +130,15 @@ private:
 
     std::array<AtomicWord<int64_t>, static_cast<size_t>(CoordinatorStateEnum::kNumStates)>
         _coordinatorStateList;
+
+    AtomicWord<int64_t> _collectionCloningTotalLocalInserts{0};
+    AtomicWord<int64_t> _collectionCloningTotalLocalInsertTimeMillis{0};
+    AtomicWord<int64_t> _oplogFetchingTotalRemoteBatchesRetrieved{0};
+    AtomicWord<int64_t> _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis{0};
+    AtomicWord<int64_t> _oplogFetchingTotalLocalInserts{0};
+    AtomicWord<int64_t> _oplogFetchingTotalLocalInsertTimeMillis{0};
+    AtomicWord<int64_t> _oplogApplyingTotalBatchesRetrieved{0};
+    AtomicWord<int64_t> _oplogApplyingTotalBatchesRetrievalTimeMillis{0};
 };
 
 }  // namespace mongo

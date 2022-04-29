@@ -65,6 +65,13 @@ private:
 };
 
 class ShardingDataTransformCumulativeMetricsTest : public ShardingDataTransformMetricsTestFixture {
+public:
+    static BSONObj getLatencySection(const ShardingDataTransformCumulativeMetrics& metrics) {
+        BSONObjBuilder bob;
+        metrics.reportForServerStatus(&bob);
+        auto report = bob.done();
+        return report.getObjectField(kTestMetricsName).getObjectField("latencies").getOwned();
+    }
 };
 
 TEST_F(ShardingDataTransformCumulativeMetricsTest, AddAndRemoveMetrics) {
@@ -295,6 +302,70 @@ TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsLastChunkImbala
         ASSERT_EQ(report.getObjectField(kTestMetricsName).getIntField("lastOpEndingChunkImbalance"),
                   777);
     }
+}
+
+TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsInsertsDuringCloning) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
+    auto ignore = _cumulativeMetrics.registerInstanceMetrics(&recipient);
+
+    auto latencySection = getLatencySection(_cumulativeMetrics);
+    ASSERT_EQ(latencySection.getIntField("collectionCloningTotalLocalInserts"), 0);
+    ASSERT_EQ(latencySection.getIntField("collectionCloningTotalLocalInsertTimeMillis"), 0);
+
+    _cumulativeMetrics.onInsertsDuringCloning(140, Milliseconds(15));
+
+    latencySection = getLatencySection(_cumulativeMetrics);
+    ASSERT_EQ(latencySection.getIntField("collectionCloningTotalLocalInserts"), 140);
+    ASSERT_EQ(latencySection.getIntField("collectionCloningTotalLocalInsertTimeMillis"), 15);
+}
+
+TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsBatchRetrievedDuringFetching) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
+    auto ignore = _cumulativeMetrics.registerInstanceMetrics(&recipient);
+
+    auto latencySection = getLatencySection(_cumulativeMetrics);
+    ASSERT_EQ(latencySection.getIntField("oplogFetchingTotalRemoteBatchesRetrieved"), 0);
+    ASSERT_EQ(latencySection.getIntField("oplogFetchingTotalRemoteBatchRetrievalTimeMillis"), 0);
+
+    _cumulativeMetrics.onRemoteBatchRetrievedDuringOplogFetching(200, Milliseconds(5));
+
+    latencySection = getLatencySection(_cumulativeMetrics);
+    ASSERT_EQ(latencySection.getIntField("oplogFetchingTotalRemoteBatchesRetrieved"), 200);
+    ASSERT_EQ(latencySection.getIntField("oplogFetchingTotalRemoteBatchRetrievalTimeMillis"), 5);
+}
+
+TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsInsertsDuringFetching) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
+    auto ignore = _cumulativeMetrics.registerInstanceMetrics(&recipient);
+
+    auto latencySection = getLatencySection(_cumulativeMetrics);
+    ASSERT_EQ(latencySection.getIntField("oplogFetchingTotalLocalInserts"), 0);
+    ASSERT_EQ(latencySection.getIntField("oplogFetchingTotalLocalInsertTimeMillis"), 0);
+
+    _cumulativeMetrics.onLocalInsertDuringOplogFetching(Milliseconds(17));
+
+    latencySection = getLatencySection(_cumulativeMetrics);
+    ASSERT_EQ(latencySection.getIntField("oplogFetchingTotalLocalInserts"), 1);
+    ASSERT_EQ(latencySection.getIntField("oplogFetchingTotalLocalInsertTimeMillis"), 17);
+}
+
+TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsBatchRetrievedDuringApplying) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
+    auto ignore = _cumulativeMetrics.registerInstanceMetrics(&recipient);
+
+    auto latencySection = getLatencySection(_cumulativeMetrics);
+    ASSERT_EQ(latencySection.getIntField("oplogApplyingTotalLocalBatchesRetrieved"), 0);
+    ASSERT_EQ(latencySection.getIntField("oplogApplyingTotalLocalBatchRetrievalTimeMillis"), 0);
+
+    _cumulativeMetrics.onBatchRetrievedDuringOplogApplying(707, Milliseconds(39));
+
+    latencySection = getLatencySection(_cumulativeMetrics);
+    ASSERT_EQ(latencySection.getIntField("oplogApplyingTotalLocalBatchesRetrieved"), 707);
+    ASSERT_EQ(latencySection.getIntField("oplogApplyingTotalLocalBatchRetrievalTimeMillis"), 39);
 }
 
 class ShardingDataTransformCumulativeStateTest : public ShardingDataTransformCumulativeMetricsTest {

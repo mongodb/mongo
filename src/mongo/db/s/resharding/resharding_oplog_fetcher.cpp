@@ -48,6 +48,7 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
@@ -309,14 +310,20 @@ bool ReshardingOplogFetcher::consume(Client* client,
     auto opCtxRaii = factory.makeOperationContext(client);
     int batchesProcessed = 0;
     bool moreToCome = true;
+    Timer batchFetchTimer;
     // Note that the oplog entries are *not* being copied with a tailable cursor.
     // Shard::runAggregation() will instead return upon hitting the end of the donor's oplog.
     uassertStatusOK(shard->runAggregation(
         opCtxRaii.get(),
         aggRequest,
-        [this, &batchesProcessed, &moreToCome, factory](
+        [this, &batchesProcessed, &moreToCome, &opCtxRaii, &batchFetchTimer, factory](
             const std::vector<BSONObj>& batch,
             const boost::optional<BSONObj>& postBatchResumeToken) {
+            if (ShardingDataTransformMetrics::isEnabled()) {
+                _env->metricsNew()->onOplogEntriesFetched(batch.size(),
+                                                          Milliseconds(batchFetchTimer.millis()));
+            }
+
             ThreadClient client(fmt::format("ReshardingFetcher-{}-{}",
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),
@@ -338,14 +345,18 @@ bool ReshardingOplogFetcher::consume(Client* client,
 
                 auto startAt = ReshardingDonorOplogId::parse(
                     {"OplogFetcherParsing"}, nextOplog.get_id()->getDocument().toBson());
+                Timer insertTimer;
                 uassertStatusOK(toWriteTo->insertDocument(opCtx, InsertStatement{doc}, nullptr));
                 wuow.commit();
+
+                if (ShardingDataTransformMetrics::isEnabled()) {
+                    _env->metricsNew()->onLocalInsertDuringOplogFetching(
+                        Milliseconds(insertTimer.millis()));
+                }
+
                 ++_numOplogEntriesCopied;
 
                 _env->metrics()->onOplogEntriesFetched(1);
-                if (ShardingDataTransformMetrics::isEnabled()) {
-                    _env->metricsNew()->onOplogEntriesFetched(1);
-                }
 
                 auto [p, f] = makePromiseFuture<void>();
                 {
@@ -388,9 +399,11 @@ bool ReshardingOplogFetcher::consume(Client* client,
                         toWriteTo->insertDocument(opCtx, InsertStatement{oplog.toBSON()}, nullptr));
                     wuow.commit();
 
+                    // Also include synthetic oplog in the fetched count so it can match up with the
+                    // total oplog applied count in the end.
                     _env->metrics()->onOplogEntriesFetched(1);
                     if (ShardingDataTransformMetrics::isEnabled()) {
-                        _env->metricsNew()->onOplogEntriesFetched(1);
+                        _env->metricsNew()->onOplogEntriesFetched(1, Milliseconds(0));
                     }
 
                     auto [p, f] = makePromiseFuture<void>();

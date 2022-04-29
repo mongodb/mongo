@@ -30,6 +30,7 @@
 #include "mongo/db/s/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_data_transform_metrics_observer.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
@@ -241,9 +242,11 @@ void ShardingDataTransformInstanceMetrics::onApplyingEnd() {
 }
 
 void ShardingDataTransformInstanceMetrics::onDocumentsCopied(int64_t documentCount,
-                                                             int64_t totalDocumentsSizeBytes) {
+                                                             int64_t totalDocumentsSizeBytes,
+                                                             Milliseconds elapsed) {
     _documentsCopied.addAndFetch(documentCount);
     _bytesCopied.addAndFetch(totalDocumentsSizeBytes);
+    _cumulativeMetrics->onInsertsDuringCloning(documentCount, elapsed);
 }
 
 void ShardingDataTransformInstanceMetrics::setDocumentsToCopyCounts(
@@ -274,8 +277,19 @@ void ShardingDataTransformInstanceMetrics::onDeleteApplied() {
     _deletesApplied.addAndFetch(1);
 }
 
-void ShardingDataTransformInstanceMetrics::onOplogEntriesFetched(int64_t numEntries) {
+void ShardingDataTransformInstanceMetrics::onOplogEntriesFetched(int64_t numEntries,
+                                                                 Milliseconds elapsed) {
     _oplogEntriesFetched.addAndFetch(numEntries);
+    _cumulativeMetrics->onRemoteBatchRetrievedDuringOplogFetching(numEntries, elapsed);
+}
+
+void ShardingDataTransformInstanceMetrics::onLocalInsertDuringOplogFetching(Milliseconds elapsed) {
+    _cumulativeMetrics->onLocalInsertDuringOplogFetching(elapsed);
+}
+
+void ShardingDataTransformInstanceMetrics::onBatchRetrievedDuringOplogApplying(
+    int64_t numEntries, Milliseconds elapsed) {
+    _cumulativeMetrics->onBatchRetrievedDuringOplogApplying(numEntries, elapsed);
 }
 
 void ShardingDataTransformInstanceMetrics::onOplogEntriesApplied(int64_t numEntries) {
