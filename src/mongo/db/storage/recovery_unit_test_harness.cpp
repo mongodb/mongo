@@ -133,8 +133,7 @@ TEST_F(RecoveryUnitTestHarness, CheckIsActiveWithCommit) {
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
     opCtx->lockState()->beginWriteUnitOfWork();
     ru->beginUnitOfWork(opCtx->readOnly());
-    // TODO SERVER-51787: to re-enable this.
-    // ASSERT_TRUE(ru->isActive());
+    ASSERT_TRUE(ru->isActive());
     StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
     ru->commitUnitOfWork();
     opCtx->lockState()->endWriteUnitOfWork();
@@ -146,8 +145,7 @@ TEST_F(RecoveryUnitTestHarness, CheckIsActiveWithAbort) {
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
     opCtx->lockState()->beginWriteUnitOfWork();
     ru->beginUnitOfWork(opCtx->readOnly());
-    // TODO SERVER-51787: to re-enable this.
-    // ASSERT_TRUE(ru->isActive());
+    ASSERT_TRUE(ru->isActive());
     StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
     ru->abortUnitOfWork();
     opCtx->lockState()->endWriteUnitOfWork();
