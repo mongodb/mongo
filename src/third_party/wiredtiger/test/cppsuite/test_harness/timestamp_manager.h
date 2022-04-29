@@ -56,11 +56,10 @@ class timestamp_manager : public component {
     void load() override final;
     void do_work() override final;
 
-    /*
-     * Get a unique timestamp.
-     */
+    /* Get a unique timestamp. */
     wt_timestamp_t get_next_ts();
 
+    /* Get oldest timestamp. */
     wt_timestamp_t get_oldest_ts() const;
 
     private:

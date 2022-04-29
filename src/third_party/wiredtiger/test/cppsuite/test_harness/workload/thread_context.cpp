@@ -111,8 +111,17 @@ transaction_context::commit(const std::string &config)
 {
     WT_DECL_RET;
     testutil_assert(_in_txn && !_needs_rollback);
+
     ret = _session->commit_transaction(_session, config.empty() ? nullptr : config.c_str());
-    testutil_assert(ret == 0 || ret == WT_ROLLBACK);
+    /*
+     * FIXME-WT-9198 Now we are accepting the error code EINVAL because of possible invalid
+     * timestamps as we know it can happen due to the nature of the framework. The framework may set
+     * the stable/oldest timestamps to a more recent date than the commit timestamp of the
+     * transaction which makes the transaction invalid. We only need to check against the stable
+     * timestamp as, by definition, the oldest timestamp is older than the stable one.
+     */
+    testutil_assert(ret == 0 || ret == EINVAL || ret == WT_ROLLBACK);
+
     if (ret != 0)
         logger::log_msg(LOG_WARN,
           "Failed to commit transaction in commit, received error code: " + std::to_string(ret));
@@ -208,13 +217,13 @@ bool
 thread_context::update(scoped_cursor &cursor, uint64_t collection_id, const std::string &key)
 {
     WT_DECL_RET;
-    std::string value;
-    wt_timestamp_t ts = tsm->get_next_ts();
+
     testutil_assert(tracking != nullptr);
     testutil_assert(cursor.get() != nullptr);
 
+    wt_timestamp_t ts = tsm->get_next_ts();
     transaction.set_commit_timestamp(ts);
-    value = random_generator::instance().generate_pseudo_random_string(value_size);
+    std::string value = random_generator::instance().generate_pseudo_random_string(value_size);
     cursor->set_key(cursor.get(), key.c_str());
     cursor->set_value(cursor.get(), value.c_str());
     ret = cursor->update(cursor.get());
@@ -240,30 +249,23 @@ thread_context::update(scoped_cursor &cursor, uint64_t collection_id, const std:
 }
 
 bool
-thread_context::insert(
-  scoped_cursor &cursor, uint64_t collection_id, uint64_t key_id, wt_timestamp_t ts)
+thread_context::insert(scoped_cursor &cursor, uint64_t collection_id, uint64_t key_id)
 {
-    return insert(cursor, collection_id, key_to_string(key_id), ts);
+    return insert(cursor, collection_id, key_to_string(key_id));
 }
 
 bool
-thread_context::insert(
-  scoped_cursor &cursor, uint64_t collection_id, const std::string &key, wt_timestamp_t ts)
+thread_context::insert(scoped_cursor &cursor, uint64_t collection_id, const std::string &key)
 {
     WT_DECL_RET;
-    std::string value;
+
     testutil_assert(tracking != nullptr);
     testutil_assert(cursor.get() != nullptr);
 
-    /*
-     * When no timestamp is specified, get one to apply to the update. We still do this even if the
-     * timestamp manager is not enabled as it will return a value for the tracking table.
-     */
-    if (ts == 0)
-        ts = tsm->get_next_ts();
+    wt_timestamp_t ts = tsm->get_next_ts();
     transaction.set_commit_timestamp(ts);
 
-    value = random_generator::instance().generate_pseudo_random_string(value_size);
+    std::string value = random_generator::instance().generate_pseudo_random_string(value_size);
 
     cursor->set_key(cursor.get(), key.c_str());
     cursor->set_value(cursor.get(), value.c_str());

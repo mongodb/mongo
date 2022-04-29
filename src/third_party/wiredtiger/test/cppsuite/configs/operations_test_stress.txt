@@ -68,7 +68,9 @@ workload_generator=
 ),
 workload_tracking=
 (
-    enabled=true,
+    # FIXME-WT-8640 Enable the tracking again once we have moved to a different host or modified the
+    # workload.
+    enabled=false,
     # Run after checkpoint most of the time.
     op_rate=40s
 )
