@@ -102,7 +102,7 @@ using namespace fmt::literals;
 
 namespace mongo {
 namespace {
-
+MONGO_FAIL_POINT_DEFINE(hangBeforeCheckingMongosShutdownInterrupt);
 const auto kOperationTime = "operationTime"_sd;
 
 /**
@@ -399,6 +399,9 @@ private:
     // invocation and extracting read/write concerns).
     void _parseCommand();
 
+    // updates statistics and applies labels if an error occurs.
+    void _updateStatsAndApplyErrorLabels(const Status& status);
+
     const std::shared_ptr<RequestExecutionContext> _rec;
     const std::shared_ptr<BSONObjBuilder> _errorBuilder;
     const NetworkOp _opType;
@@ -433,9 +436,6 @@ public:
 
 private:
     Status _setup();
-
-    // Logs and updates statistics if an error occurs.
-    void _tapOnError(const Status& status);
 
     ParseAndRunCommand* const _parc;
 
@@ -478,7 +478,34 @@ private:
 
     int _tries = 0;
 };
+void ParseAndRunCommand::_updateStatsAndApplyErrorLabels(const Status& status) {
+    auto opCtx = _rec->getOpCtx();
+    const auto command = _rec->getCommand();
 
+    if (command)
+        command->incrementCommandsFailed();
+    LastError::get(opCtx->getClient()).setLastError(status.code(), status.reason());
+    // NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(status.code());
+    // WriteConcern error (wcCode) is set to boost::none because:
+    // 1. TransientTransaction error label handling for commitTransaction command in mongos is
+    //    delegated to the shards. Mongos simply propagates the shard's response up to the client.
+    // 2. For other commands in a transaction, they shouldn't get a writeConcern error so this
+    //    setting doesn't apply.
+
+    if (_osi.has_value()) {
+
+        auto errorLabels = getErrorLabels(opCtx,
+                                          *_osi,
+                                          command->getName(),
+                                          status.code(),
+                                          boost::none,
+                                          false /* isInternalClient */,
+                                          true /* isMongos */);
+
+
+        _errorBuilder->appendElements(errorLabels);
+    }
+}
 void ParseAndRunCommand::_parseCommand() {
     auto opCtx = _rec->getOpCtx();
     const auto& m = _rec->getMessage();
@@ -521,12 +548,6 @@ void ParseAndRunCommand::_parseCommand() {
     uassert(ErrorCodes::InvalidOptions,
             "no such command option $maxTimeMs; use maxTimeMS instead",
             request.body[query_request_helper::queryOptionMaxTimeMS].eoo());
-    const int maxTimeMS =
-        uassertStatusOK(parseMaxTimeMS(request.body[query_request_helper::cmdOptionMaxTimeMS]));
-    if (maxTimeMS > 0 && command->getLogicalOp() != LogicalOp::opGetMore) {
-        opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS}, ErrorCodes::MaxTimeMSExpired);
-    }
-    opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
     // If the command includes a 'comment' field, set it on the current OpCtx.
     if (auto commentField = request.body["comment"]) {
@@ -592,6 +613,25 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     const auto& request = _parc->_rec->getRequest();
     auto replyBuilder = _parc->_rec->getReplyBuilder();
 
+    const int maxTimeMS =
+        uassertStatusOK(parseMaxTimeMS(request.body[query_request_helper::cmdOptionMaxTimeMS]));
+    if (maxTimeMS > 0 && command->getLogicalOp() != LogicalOp::opGetMore) {
+        opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS}, ErrorCodes::MaxTimeMSExpired);
+    }
+    if (MONGO_unlikely(
+            hangBeforeCheckingMongosShutdownInterrupt.shouldFail([&](const BSONObj& data) {
+                if (data.hasField("cmdName") && data.hasField("ns")) {
+                    std::string cmdNS = _parc->_ns.get();
+                    return ((data.getStringField("cmdName") == _parc->_commandName) &&
+                            (data.getStringField("ns") == cmdNS));
+                }
+                return false;
+            }))) {
+
+        LOGV2(6217501, "Hanging before hangBeforeCheckingMongosShutdownInterrupt is cancelled");
+        hangBeforeCheckingMongosShutdownInterrupt.pauseWhileSet();
+    }
+    opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
     auto appendStatusToReplyAndSkipCommandExecution = [replyBuilder](Status status) -> Status {
         auto responseBuilder = replyBuilder->getBodyBuilder();
         CommandHelpers::appendCommandStatusNoThrow(responseBuilder, status);
@@ -1054,27 +1094,6 @@ void ParseAndRunCommand::RunAndRetry::_onShardCannotRefreshDueToLocksHeldError(S
         iassert(status);
 }
 
-void ParseAndRunCommand::RunInvocation::_tapOnError(const Status& status) {
-    auto opCtx = _parc->_rec->getOpCtx();
-    const auto command = _parc->_rec->getCommand();
-
-    command->incrementCommandsFailed();
-    LastError::get(opCtx->getClient()).setLastError(status.code(), status.reason());
-    // WriteConcern error (wcCode) is set to boost::none because:
-    // 1. TransientTransaction error label handling for commitTransaction command in mongos is
-    //    delegated to the shards. Mongos simply propagates the shard's response up to the client.
-    // 2. For other commands in a transaction, they shouldn't get a writeConcern error so this
-    //    setting doesn't apply.
-    auto errorLabels = getErrorLabels(opCtx,
-                                      *_parc->_osi,
-                                      command->getName(),
-                                      status.code(),
-                                      boost::none,
-                                      false /* isInternalClient */,
-                                      true /* isMongos */);
-    _parc->_errorBuilder->appendElements(errorLabels);
-}
-
 Future<void> ParseAndRunCommand::RunAndRetry::run() {
     return makeReadyFutureWith([&] {
                // Try kMaxNumStaleVersionRetries times. On the last try, exceptions are rethrown.
@@ -1107,11 +1126,10 @@ Future<void> ParseAndRunCommand::RunAndRetry::run() {
 
 Future<void> ParseAndRunCommand::RunInvocation::run() {
     return makeReadyFutureWith([&] {
-               iassert(_setup());
-               return future_util::makeState<RunAndRetry>(_parc).thenWithState(
-                   [](auto* runner) { return runner->run(); });
-           })
-        .tapError([this](Status status) { _tapOnError(status); });
+        iassert(_setup());
+        return future_util::makeState<RunAndRetry>(_parc).thenWithState(
+            [](auto* runner) { return runner->run(); });
+    });
 }
 
 Future<void> ParseAndRunCommand::run() {
@@ -1120,6 +1138,7 @@ Future<void> ParseAndRunCommand::run() {
                return future_util::makeState<RunInvocation>(this).thenWithState(
                    [](auto* runner) { return runner->run(); });
            })
+        .tapError([this](Status status) { _updateStatsAndApplyErrorLabels(status); })
         .onError<ErrorCodes::SkipCommandExecution>([this](Status status) {
             // We've already skipped execution, so no other action is required.
             return Status::OK();
