@@ -251,7 +251,12 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
         WT_WITH_PAGE_INDEX(session, ret = __wt_rec_row_int(session, r, page));
         break;
     case WT_PAGE_ROW_LEAF:
-        ret = __wt_rec_row_leaf(session, r, ref, salvage);
+        /*
+         * It's important we wrap this call in a page index guard, the ikey on the ref may still be
+         * pointing into the internal page's memory. We want to prevent eviction of the internal
+         * page for the duration.
+         */
+        WT_WITH_PAGE_INDEX(session, ret = __wt_rec_row_leaf(session, r, ref, salvage));
         break;
     default:
         ret = __wt_illegal_value(session, page->type);

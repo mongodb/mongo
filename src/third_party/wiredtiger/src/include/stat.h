@@ -827,7 +827,6 @@ struct __wt_connection_stats {
     int64_t txn_checkpoint_prep_min;
     int64_t txn_checkpoint_prep_recent;
     int64_t txn_checkpoint_prep_total;
-    int64_t txn_checkpoint_prep_wait;
     int64_t txn_checkpoint_scrub_target;
     int64_t txn_checkpoint_scrub_time;
     int64_t txn_checkpoint_time_total;
