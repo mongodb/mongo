@@ -881,12 +881,14 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
 }
 
 BSONObj MigrationSourceManager::getMigrationStatusReport() const {
-    return migrationutil::makeMigrationStatusDocument(_args.getCommandParameter(),
-                                                      _args.getFromShard(),
-                                                      _args.getToShard(),
-                                                      true,
-                                                      *_args.getMin(),
-                                                      *_args.getMax());
+    return migrationutil::makeMigrationStatusDocument(
+        _args.getCommandParameter(),
+        _args.getFromShard(),
+        _args.getToShard(),
+        true,
+        // TODO SERVER-64926 do not assume min always present
+        *_args.getMin(),
+        _args.getMax().value_or(BSONObj()));
 }
 
 MigrationSourceManager::ScopedRegisterer::ScopedRegisterer(
