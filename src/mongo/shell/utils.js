@@ -67,6 +67,10 @@ function retryOnNetworkError(func, numRetries, sleepMs) {
     }
 }
 
+const shellGeneratedNetworkErrs = ["network error", "error doing query", "socket exception"];
+
+const networkErrs = ["SocketException", "HostNotFound"];
+const networkErrsPlusShellGeneratedNetworkErrs = [...networkErrs, ...shellGeneratedNetworkErrs];
 /**
  * Determine if a provided object represents a network error
  * @param {object|Error|string|number} errorOrResponse A command response, error or scalar
@@ -80,18 +84,11 @@ function isNetworkError(errorOrResponse) {
         }
     }
 
-    let networkErrs = [
-        "network error",
-        "error doing query",
-        "socket exception",
-        "SocketException",
-        "HostNotFound"
-    ];
-
     // Then check if it's an Error, if so see if any of the known network error strings appear
     // in the given message.
     if (errorOrResponse.message) {
-        if (networkErrs.some(err => errorOrResponse.message.includes(err))) {
+        if (networkErrsPlusShellGeneratedNetworkErrs.some(
+                err => errorOrResponse.message.includes(err))) {
             return true;
         }
     }
@@ -100,17 +97,35 @@ function isNetworkError(errorOrResponse) {
     return ErrorCodes.isNetworkError(errorOrResponse);
 }
 
+const retryableErrs = [
+    "Interrupted",
+    "InterruptedAtShutdown",
+    "InterruptedDueToReplStateChange",
+    "ExceededTimeLimit",
+    "MaxTimeMSExpired",
+    "CursorKilled",
+    "LockTimeout",
+    "ShutdownInProgress",
+    "HostUnreachable",
+    "HostNotFound",
+    "NetworkTimeout",
+    "SocketException",
+    "NotWritablePrimary",
+    "NotPrimaryNoSecondaryOk",
+    "NotPrimaryOrSecondary",
+    "PrimarySteppedDown",
+    "WriteConcernFailed",
+    "WriteConcernLegacyOK",
+    "UnknownReplWriteConcern",
+    "UnsatisfiableWriteConcern"
+];
+const retryableErrsPlusShellGeneratedNetworkErrs = [...retryableErrs, ...shellGeneratedNetworkErrs];
 /**
  * Determine if a provided object represents a retryable error
  * @param {object|Error|string|number} errorOrResponse A command response, error or scalar
  *     representing an error
  */
 function isRetryableError(errorOrResponse) {
-    // Network errors are retryable
-    if (isNetworkError(errorOrResponse)) {
-        return true;
-    }
-
     // First check if this is a command response, if so determine retryability by error code
     if (errorOrResponse.code) {
         if (ErrorCodes.isRetriableError(errorOrResponse.code)) {
@@ -118,33 +133,11 @@ function isRetryableError(errorOrResponse) {
         }
     }
 
-    const retryableErrors = [
-        "Interrupted",
-        "InterruptedAtShutdown",
-        "InterruptedDueToReplStateChange",
-        "ExceededTimeLimit",
-        "MaxTimeMSExpired",
-        "CursorKilled",
-        "LockTimeout",
-        "ShutdownInProgress",
-        "HostUnreachable",
-        "HostNotFound",
-        "NetworkTimeout",
-        "SocketException",
-        "NotWritablePrimary",
-        "NotPrimaryNoSecondaryOk",
-        "NotPrimaryOrSecondary",
-        "PrimarySteppedDown",
-        "WriteConcernFailed",
-        "WriteConcernLegacyOK",
-        "UnknownReplWriteConcern",
-        "UnsatisfiableWriteConcern"
-    ];
-
     // Then check if it's an Error, if so determine retryability by checking the error message
     if (errorOrResponse.message) {
         // See if any of the known network error strings appear in the given message.
-        if (retryableErrors.some(err => errorOrResponse.message.includes(err))) {
+        if (retryableErrsPlusShellGeneratedNetworkErrs.some(
+                err => errorOrResponse.message.includes(err))) {
             return true;
         }
     }

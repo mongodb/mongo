@@ -10,9 +10,11 @@ var TenantMigrationUtil = (function() {
      * Returns true if feature flag 'featureFlagShardMerge' is enabled, false otherwise.
      */
     function isShardMergeEnabled(db) {
-        const admin = db.getSiblingDB("admin");
-        const flagDoc = admin.runCommand({getParameter: 1, featureFlagShardMerge: 1});
-        const fcvDoc = admin.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
+        const adminDB = db.getSiblingDB("admin");
+        const flagDoc =
+            assert.commandWorked(adminDB.adminCommand({getParameter: 1, featureFlagShardMerge: 1}));
+        const fcvDoc = assert.commandWorked(
+            adminDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
         return flagDoc.hasOwnProperty("featureFlagShardMerge") &&
             flagDoc.featureFlagShardMerge.value &&
             MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
@@ -217,34 +219,36 @@ var TenantMigrationUtil = (function() {
                 return primary.adminCommand(localCmdObj);
             };
         }
+
         let res;
         assert.soon(() => {
             try {
+                // Note: assert.commandWorked() considers command responses with embedded
+                // writeErrors and WriteConcernErrors as a failure even if the command returned
+                // "ok: 1". And, admin commands(like, donorStartMigration)
+                // doesn't generate writeConcernErros or WriteErrors. So, it's safe to wrap up
+                // run() with assert.commandWorked() here. However, in few scenarios, like
+                // Mongo.prototype.recordRerouteDueToTenantMigration(), it's not safe to wrap up
+                // run() with commandWorked() as retrying on retryable writeConcernErrors can
+                // cause the retry attempt to fail with writeErrors.
+                res = undefined;
                 res = run();
-
-                if (!res.ok) {
-                    if (retryOnRetryableErrors && isRetryableError(res)) {
-                        jsTestLog(`runTenantMigrationCommand retryable error. Command: ${
-                            tojson(localCmdObj)}, reply: ${tojson(res)}`);
-
-                        primary = rst.getPrimary();
-                        return false;
-                    }
-
-                    jsTestLog(`runTenantMigrationCommand fatal error. Command: ${
-                        tojson(localCmdObj)}, reply: ${tojson(res)}`);
-                    return true;
-                }
-
+                assert.commandWorked(res);
                 return shouldStopFunc(res);
             } catch (e) {
                 if (retryOnRetryableErrors && isRetryableError(e)) {
-                    jsTestLog(`runTenantMigrationCommand retryable error. Command: ${
-                        tojson(localCmdObj)}, reply: ${tojson(res)}`);
+                    jsTestLog(`Retryable error runing runTenantMigrationCommand. Command: ${
+                        tojson(localCmdObj)}, Error: ${tojson(e)}`);
+
+                    primary = rst.getPrimary();
                     return false;
                 }
-                jsTestLog(`runTenantMigrationCommand fatal error. Command: ${
-                    tojson(localCmdObj)}, reply: ${tojson(res)}`);
+                jsTestLog(`Error running runTenantMigrationCommand. Command: ${
+                    tojson(localCmdObj)}, Error: ${tojson(e)}`);
+
+                if (res)
+                    return true;
+
                 throw e;
             }
         });
