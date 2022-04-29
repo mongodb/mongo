@@ -1,7 +1,5 @@
 /**
  * Tests that the validate command detects invalid index options.
- *
- * @tags: [incompatible_with_eft]
  */
 (function() {
 "use strict";

@@ -3,9 +3,6 @@
 // @tags: [
 //   does_not_support_stepdowns,
 //   uses_testing_only_commands,
-//   # SERVER-54754 EphemeralForTest storage engine doesn't support
-//   # an optimized implementation for getting the latest oplog timestamp.
-//   incompatible_with_eft,
 //   no_selinux,
 // ]
 

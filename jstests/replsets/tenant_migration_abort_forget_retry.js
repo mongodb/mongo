@@ -5,7 +5,6 @@
  * the same tenantId as the aborted migration, and expects this second migration to go through.
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,

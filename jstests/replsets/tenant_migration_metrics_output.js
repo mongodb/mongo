@@ -2,7 +2,6 @@
  * Verifies the serverStatus output and FTDC output for tenant migrations.
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,

@@ -6,7 +6,6 @@
  * retryable writes is tested elsewhere.
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   incompatible_with_shard_merge,

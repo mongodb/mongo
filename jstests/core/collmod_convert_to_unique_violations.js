@@ -8,8 +8,6 @@
  *  assumes_no_implicit_collection_creation_after_drop,  # common tag in collMod tests.
  *  requires_fcv_52,
  *  requires_non_retryable_commands, # common tag in collMod tests.
- *  # TODO(SERVER-61181): Fix validation errors under ephemeralForTest.
- *  incompatible_with_eft,
  *  # TODO(SERVER-61182): Fix WiredTigerKVEngine::alterIdentMetadata() under inMemory.
  *  requires_persistence,
  *  # The 'prepareUnique' field may cause the migration to fail.

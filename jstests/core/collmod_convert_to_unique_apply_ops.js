@@ -11,8 +11,6 @@
  *   requires_non_retryable_commands, # common tag in collMod tests.
  *   # applyOps uses the oplog that require replication support
  *   requires_replication,
- *   # TODO(SERVER-61181): Fix validation errors under ephemeralForTest.
- *   incompatible_with_eft,
  *   # TODO(SERVER-61182): Fix WiredTigerKVEngine::alterIdentMetadata() under inMemory.
  *   requires_persistence,
  *   # The 'prepareUnique' field may cause the migration to fail.

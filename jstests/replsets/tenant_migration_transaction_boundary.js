@@ -13,7 +13,6 @@
  * and trying to recover T would fail because the recipient didn't fetch T's oldest entries.
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,

@@ -2,7 +2,6 @@
  * Tests that a recipientForgetMigration is received after the recipient state doc has been deleted.
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,

@@ -4,8 +4,6 @@
  * successfully complete initial sync.
  *
  * @tags: [
- *    # Tenant migrations will not be run with the ephemeralForTest storage engine in production.
- *      incompatible_with_eft,
  *    # Running tenant migrations on macOS depends on plumbing transient SSL params through the
  *    # Apple SSL manager (see SERVER-56100).
  *      incompatible_with_macos,

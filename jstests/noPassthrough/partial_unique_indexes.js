@@ -1,9 +1,6 @@
 /**
  * SERVER-32001: Test that indexing paths for non-unique, partial, unique, partial&unique
  * crud operations correctly handle WriteConflictExceptions.
- *
- * SERVER-50359: Re-enable this test and fix the failure behind it on ephemeralForTest.
- * @tags: [incompatible_with_eft]
  */
 (function() {
 "strict";

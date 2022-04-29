@@ -14,7 +14,6 @@
  * still be present on the recipient during the second migration, leading to errors.
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   incompatible_with_shard_merge,

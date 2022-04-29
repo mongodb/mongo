@@ -6,7 +6,6 @@
  * not used for by Shard Merge, but we should likely test similar behavior, adapt for Shard Merge
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,

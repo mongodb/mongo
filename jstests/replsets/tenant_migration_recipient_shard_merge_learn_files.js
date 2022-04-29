@@ -2,7 +2,6 @@
  * Tests that recipient is able to learn files to be imported from donor for shard merge protocol.
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,

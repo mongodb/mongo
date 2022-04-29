@@ -2,7 +2,6 @@
  * Tests that we don't throw an error when the client performs two-phase index build operations,
  * or inserts docs that contain "commitIndexBuild" or "abortIndexBuild" fields.
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_persistence,

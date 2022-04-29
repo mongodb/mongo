@@ -2,8 +2,6 @@
  * This tests that writes with majority write concern will wait for at least the all durable
  * timestamp to reach the timestamp of the write. This guarantees that once a write is majority
  * committed, reading at the all durable timestamp will read that write.
- *
- * @tags: [incompatible_with_eft]
  */
 (function() {
 "use strict";

@@ -2,7 +2,6 @@
  * Test that tenant migration recipient rejects conflicting recipientSyncData commands.
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   requires_fcv_52,
  *   incompatible_with_windows_tls,

@@ -5,7 +5,6 @@
  * This test is based on "tenant_migration_retryable_write_retry_on_recipient.js".
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,

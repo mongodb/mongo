@@ -2,7 +2,6 @@
  * Tests that tenant migration does not fail if the recipientSyncData takes a long time to return.
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,

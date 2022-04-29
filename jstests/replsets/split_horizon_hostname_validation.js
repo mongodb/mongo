@@ -1,7 +1,5 @@
 /**
  * Ensure that IPs cannot be used as hostnames for split horizon configurations.
- * Incompatible with the ephemeral storage engine; replSetInitiate does not work correctly.
- * @tags: [ incompatible_with_eft ]
  */
 
 (function() {

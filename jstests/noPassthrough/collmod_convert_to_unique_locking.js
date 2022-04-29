@@ -3,8 +3,6 @@
  * between the lock acquisitions.
  *
  * @tags: [
- *  # TODO(SERVER-61181): Fix validation errors under ephemeralForTest.
- *  incompatible_with_eft,
  *  # TODO(SERVER-61182): Fix WiredTigerKVEngine::alterIdentMetadata() under inMemory.
  *  requires_persistence,
  *  # Replication requires journaling support so this tag also implies exclusion from

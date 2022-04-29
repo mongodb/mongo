@@ -5,7 +5,6 @@
  * back HostUnreachable on the donor side.
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   requires_majority_read_concern,
  *   requires_persistence,

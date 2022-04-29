@@ -4,7 +4,6 @@
  * these committed transaction entries in its own 'config.transactions' collection.
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,

@@ -6,12 +6,6 @@
  * Bring secondary back up
  * Add it back as secondary
  * Make sure both nodes are either primary or secondary
- *
- *
- * SERVER-49428: Disable for ephemeralForTest, writeConcernMajorityJournalDefault is not off
- * @tags: [
- *   incompatible_with_eft,
- * ]
  */
 
 load("jstests/replsets/rslib.js");

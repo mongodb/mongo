@@ -2,7 +2,6 @@
  * Tests that the migration still proceeds successfully after a state transition write aborts.
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,

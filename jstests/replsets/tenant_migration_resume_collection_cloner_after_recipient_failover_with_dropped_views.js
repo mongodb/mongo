@@ -2,7 +2,6 @@
  * Tests that in tenant migration, the collection recreated on a dropped view namespace is handled
  * correctly on resuming the logical tenant collection cloning phase due to recipient failover.
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
