@@ -4,15 +4,18 @@
 //   assumes_write_concern_unchanged,
 //   does_not_support_stepdowns,
 //   requires_profiling,
-//   requires_wiredtiger,
 // ]
 
 (function() {
 "use strict";
 
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load("jstests/libs/fail_point_util.js");  // for 'configureFailPoint()'
 load("jstests/libs/profiler.js");         // for 'getLatestProfilerEntry()'
+
+if (jsTestOptions().storageEngine !== "ephemeralForTest") {
+    jsTestLog("This test requires ephemeralForTest - exiting");
+    return 0;
+}
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
@@ -23,15 +26,12 @@ const doc = {
 };
 const writeConflicts = 100;
 
-// If the collection is clustered, there is no _id index.
-const numIdIndexKeys = ClusteredCollectionUtil.areAllCollectionsClustered(testDB) ? 0 : 1;
-
 assert.commandWorked(testDB.setProfilingLevel(2));
 
 {
     // Test insert.
     assert.commandWorked(testDB.createCollection(coll.getName()));
-    const fp = configureFailPoint(db, "WTWriteConflictException", {}, {times: writeConflicts});
+    const fp = configureFailPoint(db, "EFTThrowWCEOnMerge", {}, {times: writeConflicts});
     assert.commandWorked(testDB.runCommand(
         {insert: coll.getName(), documents: [doc], comment: jsTestName() + "-insert"}));
     fp.off();
@@ -40,7 +40,7 @@ assert.commandWorked(testDB.setProfilingLevel(2));
         getLatestProfilerEntry(testDB, {"command.comment": jsTestName() + "-insert"});
 
     assert.eq(profileObj.ninserted, 1, profileObj);
-    assert.eq(profileObj.keysInserted, numIdIndexKeys, profileObj);
+    assert.eq(profileObj.keysInserted, 1, profileObj);
     assert.gt(profileObj.writeConflicts, 0, profileObj);
 }
 
@@ -48,7 +48,7 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     // Test delete.
     coll.drop();
     assert.commandWorked(coll.insert(doc));
-    const fp = configureFailPoint(db, "WTWriteConflictException", {}, {times: writeConflicts});
+    const fp = configureFailPoint(db, "EFTThrowWCEOnMerge", {}, {times: writeConflicts});
     assert.commandWorked(testDB.runCommand({
         delete: coll.getName(),
         deletes: [{q: doc, limit: 0}],
@@ -60,7 +60,7 @@ assert.commandWorked(testDB.setProfilingLevel(2));
         getLatestProfilerEntry(testDB, {"command.comment": jsTestName() + "-delete"});
 
     assert.eq(profileObj.ndeleted, 1, profileObj);
-    assert.eq(profileObj.keysDeleted, numIdIndexKeys, profileObj);
+    assert.eq(profileObj.keysDeleted, 1, profileObj);
     assert.gt(profileObj.writeConflicts, 0, profileObj);
 }
 
@@ -69,7 +69,7 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     coll.drop();
     assert.commandWorked(coll.insert(doc));
     assert.commandWorked(coll.createIndex({a: 1}));
-    const fp = configureFailPoint(db, "WTWriteConflictException", {}, {times: writeConflicts});
+    const fp = configureFailPoint(db, "EFTThrowWCEOnMerge", {}, {times: writeConflicts});
     assert.commandWorked(testDB.runCommand({
         update: coll.getName(),
         updates: [{q: {a: 1}, u: {$set: {c: 1}, $inc: {a: -10}}}],
@@ -92,7 +92,7 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     coll.drop();
     assert.commandWorked(coll.insert(doc));
     assert.commandWorked(coll.createIndex({a: 1}));
-    const fp = configureFailPoint(db, "WTWriteConflictException", {}, {times: writeConflicts});
+    const fp = configureFailPoint(db, "EFTThrowWCEOnMerge", {}, {times: writeConflicts});
     assert.commandWorked(testDB.runCommand({
         update: coll.getName(),
         updates: [{q: {a: 1}, u: {$set: {c: 1}, $inc: {a: -10}}, upsert: true}],
@@ -116,7 +116,7 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     coll.drop();
     assert.commandWorked(coll.insert(doc));
     assert.commandWorked(coll.createIndex({a: 1}));
-    const fp = configureFailPoint(db, "WTWriteConflictException", {}, {times: writeConflicts});
+    const fp = configureFailPoint(db, "EFTThrowWCEOnMerge", {}, {times: writeConflicts});
     assert.commandWorked(testDB.runCommand({
         update: coll.getName(),
         updates: [{q: {a: 2}, u: {$set: {c: 1}, $inc: {a: -10}}, upsert: true}],
@@ -127,7 +127,7 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     const profileObj =
         getLatestProfilerEntry(testDB, {"command.comment": jsTestName() + "-upserti"});
 
-    assert.eq(profileObj.keysInserted, numIdIndexKeys + 1, profileObj);
+    assert.eq(profileObj.keysInserted, 2, profileObj);
     assert.eq(profileObj.nMatched, 0, profileObj);
     assert.eq(profileObj.nModified, 0, profileObj);
     assert.eq(profileObj.nUpserted, 1, profileObj);
@@ -138,7 +138,7 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     // Test findAndModify - delete.
     coll.drop();
     assert.commandWorked(coll.insert(doc));
-    const fp = configureFailPoint(db, "WTWriteConflictException", {}, {times: writeConflicts});
+    const fp = configureFailPoint(db, "EFTThrowWCEOnMerge", {}, {times: writeConflicts});
     assert.commandWorked(testDB.runCommand({
         findAndModify: coll.getName(),
         query: doc,
@@ -151,7 +151,7 @@ assert.commandWorked(testDB.setProfilingLevel(2));
         getLatestProfilerEntry(testDB, {"command.comment": jsTestName() + "-fnmdel"});
 
     assert.eq(profileObj.ndeleted, 1, profileObj);
-    assert.eq(profileObj.keysDeleted, numIdIndexKeys, profileObj);
+    assert.eq(profileObj.keysDeleted, 1, profileObj);
     assert.gt(profileObj.writeConflicts, 0, profileObj);
 }
 
@@ -160,7 +160,7 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     coll.drop();
     assert.commandWorked(coll.insert(doc));
     assert.commandWorked(coll.createIndex({a: 1}));
-    const fp = configureFailPoint(db, "WTWriteConflictException", {}, {times: writeConflicts});
+    const fp = configureFailPoint(db, "EFTThrowWCEOnMerge", {}, {times: writeConflicts});
     assert.commandWorked(testDB.runCommand({
         findAndModify: coll.getName(),
         query: doc,
@@ -184,7 +184,7 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     coll.drop();
     assert.commandWorked(coll.insert(doc));
     assert.commandWorked(coll.createIndex({a: 1}));
-    const fp = configureFailPoint(db, "WTWriteConflictException", {}, {times: writeConflicts});
+    const fp = configureFailPoint(db, "EFTThrowWCEOnMerge", {}, {times: writeConflicts});
     assert.commandWorked(testDB.runCommand({
         findAndModify: coll.getName(),
         query: doc,
@@ -210,7 +210,7 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     coll.drop();
     assert.commandWorked(coll.insert(doc));
     assert.commandWorked(coll.createIndex({a: 1}));
-    const fp = configureFailPoint(db, "WTWriteConflictException", {}, {times: writeConflicts});
+    const fp = configureFailPoint(db, "EFTThrowWCEOnMerge", {}, {times: writeConflicts});
     assert.commandWorked(testDB.runCommand({
         findAndModify: coll.getName(),
         query: {a: 2},
@@ -223,7 +223,7 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     const profileObj =
         getLatestProfilerEntry(testDB, {"command.comment": jsTestName() + "-fnmupsi"});
 
-    assert.eq(profileObj.keysInserted, numIdIndexKeys + 1, profileObj);
+    assert.eq(profileObj.keysInserted, 2, profileObj);
     assert.eq(profileObj.nMatched, 0, profileObj);
     assert.eq(profileObj.nModified, 0, profileObj);
     assert.eq(profileObj.nUpserted, 1, profileObj);
