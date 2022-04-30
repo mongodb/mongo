@@ -109,7 +109,7 @@ public:
      * Creates a WiredTiger table suitable for implementing a MongoDB index.
      * 'config' should be created with generateCreateString().
      */
-    static Status Create(OperationContext* opCtx,
+    static Status create(OperationContext* opCtx,
                          const std::string& uri,
                          const std::string& config);
 

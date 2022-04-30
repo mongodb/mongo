@@ -52,6 +52,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_index_cursor_generic.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -210,7 +211,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(
     return StatusWith<std::string>(ss);
 }
 
-Status WiredTigerIndex::Create(OperationContext* opCtx,
+Status WiredTigerIndex::create(OperationContext* opCtx,
                                const std::string& uri,
                                const std::string& config) {
     // Don't use the session from the recovery unit: create should not be used in a transaction
@@ -905,16 +906,15 @@ std::unique_ptr<SortedDataBuilderInterface> WiredTigerIdIndex::makeBulkBuilder(
 }
 
 namespace {
-
 /**
  * Implements the basic WT_CURSOR functionality used by both unique and standard indexes.
  */
-class WiredTigerIndexCursorBase : public SortedDataInterface::Cursor {
+class WiredTigerIndexCursorBase : public SortedDataInterface::Cursor,
+                                  public WiredTigerIndexCursorGeneric {
 public:
     WiredTigerIndexCursorBase(const WiredTigerIndex& idx, OperationContext* opCtx, bool forward)
-        : _opCtx(opCtx),
+        : WiredTigerIndexCursorGeneric(opCtx, forward),
           _idx(idx),
-          _forward(forward),
           _key(idx.getKeyStringVersion()),
           _typeBits(idx.getKeyStringVersion()),
           _query(idx.getKeyStringVersion()) {
@@ -974,13 +974,7 @@ public:
     }
 
     void save() override {
-        try {
-            if (_cursor)
-                _cursor->reset();
-        } catch (const WriteConflictException&) {
-            // Ignore since this is only called when we are about to kill our transaction
-            // anyway.
-        }
+        WiredTigerIndexCursorGeneric::resetCursor();
 
         // Our saved position is wherever we were when we last called updatePosition().
         // Any partially completed repositions should not effect our saved position.
@@ -1013,28 +1007,25 @@ public:
         }
     }
 
-    void detachFromOperationContext() final {
-        _opCtx = nullptr;
-
-        if (!_saveStorageCursorOnDetachFromOperationContext) {
-            _cursor = boost::none;
-        }
-    }
-
-    void reattachToOperationContext(OperationContext* opCtx) final {
-        _opCtx = opCtx;
-        // _cursor recreated in restore() to avoid risk of WT_ROLLBACK issues.
-    }
-
-    void setSaveStorageCursorOnDetachFromOperationContext(bool saveCursor) override {
-        _saveStorageCursorOnDetachFromOperationContext = saveCursor;
-    }
-
     bool isRecordIdAtEndOfKeyString() const override {
         return true;
     }
 
+    void detachFromOperationContext() override {
+        WiredTigerIndexCursorGeneric::detachFromOperationContext();
+    }
+    void reattachToOperationContext(OperationContext* opCtx) override {
+        WiredTigerIndexCursorGeneric::reattachToOperationContext(opCtx);
+    }
+    void setSaveStorageCursorOnDetachFromOperationContext(bool detach) {
+        WiredTigerIndexCursorGeneric::setSaveStorageCursorOnDetachFromOperationContext(detach);
+    }
+
 protected:
+    void advanceWTCursor() {
+        _cursorAtEof = WiredTigerIndexCursorGeneric::advanceWTCursor();
+    }
+
     // Called after _key has been filled in, ie a new key to be processed has been fetched.
     // Must not throw WriteConflictException, throwing a WriteConflictException will retry the
     // operation effectively skipping over this key.
@@ -1055,17 +1046,6 @@ protected:
         invariantWTOK(ret, c->session);
         BufReader br(item.data, item.size);
         _typeBits.resetFromBuffer(&br);
-    }
-
-    void setKey(WT_CURSOR* cursor, const WT_ITEM* item) {
-        cursor->set_key(cursor, item);
-    }
-
-    void getKey(WT_CURSOR* cursor, WT_ITEM* key) {
-        invariantWTOK(cursor->get_key(cursor, key), cursor->session);
-
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-        metricsCollector.incrementOneIdxEntryRead(key->size);
     }
 
     boost::optional<IndexKeyEntry> curr(RequestedInfo parts) const {
@@ -1108,17 +1088,6 @@ protected:
         }
     }
 
-    void advanceWTCursor() {
-        WT_CURSOR* c = _cursor->get();
-        int ret = wiredTigerPrepareConflictRetry(
-            _opCtx, [&] { return _forward ? c->next(c) : c->prev(c); });
-        if (ret == WT_NOTFOUND) {
-            _cursorAtEof = true;
-            return;
-        }
-        invariantWTOK(ret, c->session);
-        _cursorAtEof = false;
-    }
 
     // Seeks to query. Returns true on exact match.
     bool seekWTCursor(const KeyString::Value& query) {
@@ -1309,17 +1278,17 @@ protected:
         return KeyStringEntry(_key.getValueCopy(), _id);
     }
 
-    OperationContext* _opCtx;
-    boost::optional<WiredTigerCursor> _cursor;
     const WiredTigerIndex& _idx;  // not owned
-    const bool _forward;
 
     // These are where this cursor instance is. They are not changed in the face of a failing
     // next().
     KeyString::Builder _key;
     KeyString::TypeBits _typeBits;
     RecordId _id;
-    bool _eof = true;
+
+    KeyString::Builder _query;
+
+    std::unique_ptr<KeyString::Builder> _endPosition;
 
     // This differs from _eof in that it always reflects the result of the most recent call to
     // reposition _cursor.
@@ -1329,12 +1298,9 @@ protected:
     // false by any operation that moves the cursor, other than subsequent save/restore pairs.
     bool _lastMoveSkippedKey = false;
 
-    KeyString::Builder _query;
-
-    std::unique_ptr<KeyString::Builder> _endPosition;
-
-    bool _saveStorageCursorOnDetachFromOperationContext = false;
+    bool _eof = true;
 };
+}  // namespace
 
 // The Standard Cursor doesn't need anything more than the base has.
 using WiredTigerIndexStandardCursor = WiredTigerIndexCursorBase;
@@ -1473,7 +1439,7 @@ public:
         }
     }
 };
-}  // namespace
+//}  // namespace
 
 WiredTigerIndexUnique::WiredTigerIndexUnique(OperationContext* ctx,
                                              const std::string& uri,

@@ -30,6 +30,7 @@ wtEnv.Library(
     source=[
         'oplog_stones_server_status_section.cpp',
         'wiredtiger_begin_transaction_block.cpp',
+        'wiredtiger_column_store.cpp',
         'wiredtiger_cursor.cpp',
         'wiredtiger_cursor_helpers.cpp',
         'wiredtiger_global_options.cpp',
@@ -218,6 +219,7 @@ wtEnv.CppUnitTest(
     target='storage_wiredtiger_record_store_and_index_test',
     source=[
         'wiredtiger_record_store_test.cpp',
+        'wiredtiger_column_store_test.cpp',
         'wiredtiger_standard_index_test.cpp',
         'wiredtiger_standard_record_store_test.cpp',
     ],

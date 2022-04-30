@@ -1661,7 +1661,7 @@ Status WiredTigerKVEngine::createSortedDataInterface(OperationContext* opCtx,
         "collection_uuid"_attr = collOptions.uuid,
         "ident"_attr = ident,
         "config"_attr = config);
-    return WiredTigerIndex::Create(opCtx, _uri(ident), config);
+    return WiredTigerIndex::create(opCtx, _uri(ident), config);
 }
 
 Status WiredTigerKVEngine::importSortedDataInterface(OperationContext* opCtx,
@@ -1686,7 +1686,7 @@ Status WiredTigerKVEngine::importSortedDataInterface(OperationContext* opCtx,
                 "WiredTigerKVEngine::importSortedDataInterface",
                 "ident"_attr = ident,
                 "config"_attr = config);
-    return WiredTigerIndex::Create(opCtx, _uri(ident), config);
+    return WiredTigerIndex::create(opCtx, _uri(ident), config);
 }
 
 Status WiredTigerKVEngine::dropSortedDataInterface(OperationContext* opCtx, StringData ident) {

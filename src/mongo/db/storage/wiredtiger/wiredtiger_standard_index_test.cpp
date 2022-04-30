@@ -97,7 +97,7 @@ public:
         ASSERT_OK(result.getStatus());
 
         string uri = "table:" + ns;
-        invariant(Status::OK() == WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
+        invariant(Status::OK() == WiredTigerIndex::create(&opCtx, uri, result.getValue()));
 
         return std::make_unique<WiredTigerIdIndex>(&opCtx, uri, "" /* ident */, &desc, isLogged);
     }
@@ -130,7 +130,7 @@ public:
         ASSERT_OK(result.getStatus());
 
         string uri = "table:" + ns;
-        invariant(Status::OK() == WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
+        invariant(Status::OK() == WiredTigerIndex::create(&opCtx, uri, result.getValue()));
 
         if (unique) {
             return std::make_unique<WiredTigerIndexUnique>(&opCtx,
