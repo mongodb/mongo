@@ -121,6 +121,7 @@ var $config = (function() {
     }
 
     function teardown(db, collName, cluster) {
+        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
         cluster.executeOnConfigNodes((db) => {
             assert.commandWorked(db.adminCommand({
                 setParameter: 1,
