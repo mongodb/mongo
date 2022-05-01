@@ -63,7 +63,7 @@ std::string errnoWithDescription(int errNumber) {
 
 #if defined(__GNUC__) && defined(_GNU_SOURCE) && \
     (!defined(__ANDROID_API__) || !(__ANDROID_API__ <= 22)) && !defined(EMSCRIPTEN)
-    msg = strerror_r(errNumber, buf, kBuflen);
+    msg = strerror_s(buf, kBuflen, errNumber);
 #elif defined(_WIN32)
 
     LPWSTR errorText = nullptr;
@@ -95,7 +95,7 @@ std::string errnoWithDescription(int errNumber) {
         msg = buf;
     }
 #else /* XSI strerror_r */
-    if (strerror_r(errNumber, buf, kBuflen) == 0) {
+    if (strerror_s(buf, kBuflen, errNumber) == 0) {
         msg = buf;
     }
 #endif
