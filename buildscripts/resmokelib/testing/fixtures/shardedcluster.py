@@ -357,6 +357,9 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         """Return options that may be passed to a mongos."""
         mongos_options = self.mongos_options.copy()
         mongos_options["configdb"] = self.configsvr.get_internal_connection_string()
+        mongos_options["set_parameters"] = mongos_options.get("set_parameters",
+                                                              self.fixturelib.make_historic(
+                                                                  {})).copy()
         return {"dbpath_prefix": self._dbpath_prefix, "mongos_options": mongos_options}
 
     def install_mongos(self, mongos):
