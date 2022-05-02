@@ -248,9 +248,9 @@ config_string(
     DEFAULT "\"${WT_VERSION_STRING}\""
 )
 
-if(HAVE_DIAGNOSTIC AND (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug"))
-    # Avoid setting diagnostic flags if we are building with Debug mode.
-    # CMakes Debug config sets compilation with debug symbols by default.
+# Diagnostic mode requires diagnostic flags. These are set by default in debug mode, otherwise set
+# them manually.
+if(HAVE_DIAGNOSTIC AND NOT "${CMAKE_BUILD_TYPE}" MATCHES "^(Debug|RelWithDebInfo)$")
     if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
         # Produce full symbolic debugging information.
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /Z7")
@@ -273,6 +273,18 @@ if(WT_WIN)
     else()
         # Use the multithread, static version of the run-time library.
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /MT")
+    endif()
+endif()
+
+# For the RelWithDebInfo build, the optimisation level is set to 02 by default, we want to remove it
+# as we want to use CC_OPTIMIZE_LEVEL instead.
+if("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
+    if("${WT_OS}" STREQUAL "windows")
+        string(REPLACE "/O2" "" CMAKE_C_FLAGS_RELWITHDEBINFO ${CMAKE_C_FLAGS_RELWITHDEBINFO})
+        string(REPLACE "/O2" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
+    else()
+        string(REPLACE "-O2" "" CMAKE_C_FLAGS_RELWITHDEBINFO ${CMAKE_C_FLAGS_RELWITHDEBINFO})
+        string(REPLACE "-O2" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
     endif()
 endif()
 

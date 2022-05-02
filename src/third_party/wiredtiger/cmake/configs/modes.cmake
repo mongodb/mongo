@@ -5,7 +5,7 @@ include(CheckCXXCompilerFlag)
 include(${CMAKE_SOURCE_DIR}/cmake/helpers.cmake)
 
 # Establish an internal cache variable to track our custom build modes.
-set(BUILD_MODES None Debug Release CACHE INTERNAL "")
+set(BUILD_MODES None Debug Release RelWithDebInfo CACHE INTERNAL "")
 
 if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
     set(MSVC_C_COMPILER 1)
