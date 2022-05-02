@@ -13,13 +13,14 @@
  *     Handle pages with leaf pages in the WT_REF_DELETED state.
  */
 static int
-__rec_child_deleted(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_CHILD_STATE *statep)
+__rec_child_deleted(
+  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_CHILD_MODIFY_STATE *cmsp)
 {
     WT_PAGE_DELETED *page_del;
     WT_TXN *txn;
     uint8_t prepare_state;
 
-    *statep = WT_CHILD_IGNORE;
+    cmsp->state = WT_CHILD_IGNORE;
 
     txn = session->txn;
 
@@ -44,7 +45,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_C
             WT_RET_PANIC(session, EINVAL, "reconciliation illegally skipped an update");
         if (F_ISSET(r, WT_REC_CLEAN_AFTER_REC))
             return (__wt_set_return(session, EBUSY));
-        *statep = WT_CHILD_ORIGINAL;
+        cmsp->state = WT_CHILD_ORIGINAL;
         return (0);
     }
 
@@ -61,7 +62,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_C
     if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED) {
         WT_ASSERT(session, !F_ISSET(r, WT_REC_EVICT));
 
-        *statep = WT_CHILD_ORIGINAL;
+        cmsp->state = WT_CHILD_ORIGINAL;
         return (0);
     }
 
@@ -69,9 +70,13 @@ __rec_child_deleted(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_C
      * Deal with underlying disk blocks. If there are readers that might want to see the page's
      * state before it's deleted, or the fast-delete can be undone by RTS, we can't discard the
      * pages. Write a cell to the internal page with information describing the fast-delete.
+     *
+     * We have the WT_REF locked, but that lock is released before returning to the function writing
+     * cells to the page. Copy out the current fast-truncate information for that function.
      */
     if (__wt_page_del_active(session, ref, true)) {
-        *statep = WT_CHILD_PROXY;
+        cmsp->del = *ref->ft_info.del;
+        cmsp->state = WT_CHILD_PROXY;
         return (0);
     }
 
@@ -94,16 +99,16 @@ __rec_child_deleted(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_C
  */
 int
 __wt_rec_child_modify(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, bool *hazardp, WT_CHILD_STATE *statep)
+  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_CHILD_MODIFY_STATE *cmsp)
 {
     WT_DECL_RET;
     WT_PAGE_MODIFY *mod;
 
     /* We may acquire a hazard pointer our caller must release. */
-    *hazardp = false;
+    cmsp->hazard = false;
 
     /* Default to using the original child address. */
-    *statep = WT_CHILD_ORIGINAL;
+    cmsp->state = WT_CHILD_ORIGINAL;
 
     /*
      * This function is called when walking an internal page to decide how to handle child pages
@@ -132,7 +137,7 @@ __wt_rec_child_modify(
              */
             if (!WT_REF_CAS_STATE(session, ref, WT_REF_DELETED, WT_REF_LOCKED))
                 break;
-            ret = __rec_child_deleted(session, r, ref, statep);
+            ret = __rec_child_deleted(session, r, ref, cmsp);
             WT_REF_SET_STATE(ref, WT_REF_DELETED);
             goto done;
 
@@ -187,7 +192,7 @@ __wt_rec_child_modify(
                 break;
             }
             WT_RET(ret);
-            *hazardp = true;
+            cmsp->hazard = true;
             goto in_memory;
 
         case WT_REF_SPLIT:
@@ -231,10 +236,10 @@ in_memory:
      */
     mod = ref->page->modify;
     if (mod != NULL && mod->rec_result != 0)
-        *statep = WT_CHILD_MODIFIED;
+        cmsp->state = WT_CHILD_MODIFIED;
     else if (ref->addr == NULL) {
-        *statep = WT_CHILD_IGNORE;
-        WT_CHILD_RELEASE(session, *hazardp, ref);
+        cmsp->state = WT_CHILD_IGNORE;
+        WT_CHILD_RELEASE(session, cmsp->hazard, ref);
     }
 
 done:

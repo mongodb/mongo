@@ -284,7 +284,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     WT_BTREE *btree;
     WT_CELL *cell;
     WT_CELL_UNPACK_ADDR *kpack, _kpack, *vpack, _vpack;
-    WT_CHILD_STATE state;
+    WT_CHILD_MODIFY_STATE cms;
     WT_DECL_RET;
     WT_IKEY *ikey;
     WT_PAGE *child;
@@ -293,12 +293,10 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     WT_REF *ref;
     WT_TIME_AGGREGATE ft_ta, *source_ta, ta;
     size_t size;
-    bool hazard;
     const void *p;
 
     btree = S2BT(session);
     child = NULL;
-    hazard = false;
     WT_TIME_AGGREGATE_INIT(&ft_ta);
 
     key = &r->k;
@@ -352,16 +350,16 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
                 WT_ERR(__wt_ovfl_discard_add(session, page, kpack->cell));
         }
 
-        WT_ERR(__wt_rec_child_modify(session, r, ref, &hazard, &state));
+        WT_ERR(__wt_rec_child_modify(session, r, ref, &cms));
         addr = ref->addr;
         child = ref->page;
 
-        switch (state) {
+        switch (cms.state) {
         case WT_CHILD_IGNORE:
             /*
              * Ignored child.
              */
-            WT_CHILD_RELEASE_ERR(session, hazard, ref);
+            WT_CHILD_RELEASE_ERR(session, cms.hazard, ref);
             continue;
 
         case WT_CHILD_MODIFIED:
@@ -370,11 +368,11 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
              */
             switch (child->modify->rec_result) {
             case WT_PM_REC_EMPTY:
-                WT_CHILD_RELEASE_ERR(session, hazard, ref);
+                WT_CHILD_RELEASE_ERR(session, cms.hazard, ref);
                 continue;
             case WT_PM_REC_MULTIBLOCK:
                 WT_ERR(__rec_row_merge(session, r, child));
-                WT_CHILD_RELEASE_ERR(session, hazard, ref);
+                WT_CHILD_RELEASE_ERR(session, cms.hazard, ref);
                 continue;
             case WT_PM_REC_REPLACE:
                 /*
@@ -400,13 +398,13 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
          */
         page_del = NULL;
         if (__wt_off_page(page, addr)) {
-            page_del = state == WT_CHILD_PROXY ? ref->ft_info.del : NULL;
+            page_del = cms.state == WT_CHILD_PROXY ? &cms.del : NULL;
             __wt_rec_cell_build_addr(session, r, addr, NULL, WT_RECNO_OOB, page_del);
             source_ta = &addr->ta;
-        } else if (state == WT_CHILD_PROXY) {
+        } else if (cms.state == WT_CHILD_PROXY) {
             /* Proxy cells require additional information in the address cell. */
             __wt_cell_unpack_addr(session, page->dsk, ref->addr, vpack);
-            page_del = ref->ft_info.del;
+            page_del = &cms.del;
             __wt_rec_cell_build_addr(session, r, NULL, vpack, WT_RECNO_OOB, page_del);
             source_ta = &vpack->ta;
         } else {
@@ -416,7 +414,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
              * information in the address cell, be sure to propagate the original fast-truncate
              * information.
              */
-            WT_ASSERT(session, state == WT_CHILD_ORIGINAL);
+            WT_ASSERT(session, cms.state == WT_CHILD_ORIGINAL);
             __wt_cell_unpack_addr(session, page->dsk, ref->addr, vpack);
             if (F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED)) {
                 page_del = vpack->type == WT_CELL_ADDR_DEL ? &vpack->page_del : NULL;
@@ -443,7 +441,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
             ft_ta.newest_stop_ts = page_del->timestamp;
             ft_ta.newest_stop_txn = page_del->txnid;
         }
-        WT_CHILD_RELEASE_ERR(session, hazard, ref);
+        WT_CHILD_RELEASE_ERR(session, cms.hazard, ref);
 
         /* Build key cell. Truncate any 0th key, internal pages don't need 0th keys. */
         __wt_ref_key(page, ref, &p, &size);
@@ -472,7 +470,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     return (__wt_rec_split_finish(session, r));
 
 err:
-    WT_CHILD_RELEASE(session, hazard, ref);
+    WT_CHILD_RELEASE(session, cms.hazard, ref);
     return (ret);
 }
 

@@ -315,8 +315,8 @@ typedef struct {
 
 /*
  * WT_CHILD_RELEASE, WT_CHILD_RELEASE_ERR --
- *	Macros to clean up during internal-page reconciliation, releasing the
- *	hazard pointer we're holding on child pages.
+ *	Macros to clean up during internal-page reconciliation, releasing the hazard pointer we're
+ * holding on a child page.
  */
 #define WT_CHILD_RELEASE(session, hazard, ref)                          \
     do {                                                                \
@@ -331,12 +331,23 @@ typedef struct {
         WT_ERR(ret);                               \
     } while (0)
 
-typedef enum {
-    WT_CHILD_IGNORE,   /* Ignored child */
-    WT_CHILD_MODIFIED, /* Modified child */
-    WT_CHILD_ORIGINAL, /* Original child */
-    WT_CHILD_PROXY     /* Deleted child: proxy */
-} WT_CHILD_STATE;
+/*
+ * WT_CHILD_MODIFY_STATE --
+ *	We review child pages (while holding the child page's WT_REF lock), during internal-page
+ * reconciliation. This structure encapsulates the child page's returned information/state.
+ */
+typedef struct {
+    enum {
+        WT_CHILD_IGNORE,   /* Ignored child */
+        WT_CHILD_MODIFIED, /* Modified child */
+        WT_CHILD_ORIGINAL, /* Original child */
+        WT_CHILD_PROXY     /* Deleted child: proxy */
+    } state;               /* Returned child state */
+
+    WT_PAGE_DELETED del; /* WT_CHILD_PROXY state fast-truncate information */
+
+    bool hazard; /* If currently holding a child hazard pointer */
+} WT_CHILD_MODIFY_STATE;
 
 /*
  * Macros from fixed-length entries to/from bytes.
