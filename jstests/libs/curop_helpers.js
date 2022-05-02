@@ -8,8 +8,9 @@ function waitForCurOpByFilter(db, filter, options = {}) {
             return results.length > 0;
         },
         () => {
+            let allResults = adminDB.aggregate([{$currentOp: options}]).toArray();
             return "Failed to find a matching op for filter: " + tojson(filter) +
-                "in currentOp output: " + tojson(results);
+                "in currentOp output: " + tojson(allResults);
         });
     return results;
 }

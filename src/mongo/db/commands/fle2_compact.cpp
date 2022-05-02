@@ -33,6 +33,8 @@
 
 #include "mongo/db/commands/fle2_compact.h"
 
+#include <memory>
+
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands/fle2_compact_gen.h"
@@ -616,9 +618,10 @@ CompactStats processFLECompact(OperationContext* opCtx,
                                const CompactStructuredEncryptionData& request,
                                GetTxnCallback getTxn,
                                const EncryptedStateCollectionsNamespaces& namespaces) {
-    ECOCStats ecocStats;
-    ECStats escStats, eccStats;
-    stdx::unordered_set<ECOCCompactionDocument> c;
+    auto ecocStats = std::make_shared<ECOCStats>();
+    auto escStats = std::make_shared<ECStats>();
+    auto eccStats = std::make_shared<ECStats>();
+    auto c = std::make_shared<stdx::unordered_set<ECOCCompactionDocument>>();
 
     // Read the ECOC documents in a transaction
     {
@@ -626,17 +629,19 @@ CompactStats processFLECompact(OperationContext* opCtx,
 
         // The function that handles the transaction may outlive this function so we need to use
         // shared_ptrs
-        auto argsBlock = std::tie(c, request, namespaces, ecocStats);
+        auto argsBlock = std::make_tuple(request, namespaces);
         auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
 
         auto swResult = trun->runNoThrow(
-            opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            opCtx,
+            [sharedBlock, c, ecocStats](const txn_api::TransactionClient& txnClient,
+                                        ExecutorPtr txnExec) {
                 FLEQueryInterfaceImpl queryImpl(txnClient);
 
-                auto [c2, request2, namespaces2, ecocStats2] = *sharedBlock.get();
+                auto [request2, namespaces2] = *sharedBlock.get();
 
-                c2 = getUniqueCompactionDocuments(
-                    &queryImpl, request2, namespaces2.ecocRenameNss, &ecocStats2);
+                *c = getUniqueCompactionDocuments(
+                    &queryImpl, request2, namespaces2.ecocRenameNss, ecocStats.get());
 
                 return SemiFuture<void>::makeReady();
             });
@@ -647,22 +652,25 @@ CompactStats processFLECompact(OperationContext* opCtx,
 
     // Each entry in 'C' represents a unique field/value pair. For each field/value pair,
     // compact the ESC & ECC entries for that field/value pair in one transaction.
-    for (auto& ecocDoc : c) {
+    for (auto& ecocDoc : *c) {
         // start a new transaction
         std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
 
         // The function that handles the transaction may outlive this function so we need to use
         // shared_ptrs
-        auto argsBlock = std::tie(ecocDoc, namespaces, escStats, eccStats);
+        auto argsBlock = std::make_tuple(ecocDoc, namespaces);
         auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
 
         auto swResult = trun->runNoThrow(
-            opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            opCtx,
+            [sharedBlock, escStats, eccStats](const txn_api::TransactionClient& txnClient,
+                                              ExecutorPtr txnExec) {
                 FLEQueryInterfaceImpl queryImpl(txnClient);
 
-                auto [ecocDoc2, namespaces2, escStats2, eccStats2] = *sharedBlock.get();
+                auto [ecocDoc2, namespaces2] = *sharedBlock.get();
 
-                compactOneFieldValuePair(&queryImpl, ecocDoc2, namespaces2, &escStats2, &eccStats2);
+                compactOneFieldValuePair(
+                    &queryImpl, ecocDoc2, namespaces2, escStats.get(), eccStats.get());
 
                 return SemiFuture<void>::makeReady();
             });
@@ -671,7 +679,7 @@ CompactStats processFLECompact(OperationContext* opCtx,
         uassertStatusOK(swResult.getValue().getEffectiveStatus());
     }
 
-    CompactStats stats(ecocStats, eccStats, escStats);
+    CompactStats stats(*ecocStats, *eccStats, *escStats);
     _fleCompactStatsStatusSection.updateStats(stats);
 
     return stats;
