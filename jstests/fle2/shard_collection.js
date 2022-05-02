@@ -10,7 +10,8 @@ load("jstests/fle2/libs/encrypted_client_util.js");
 (function() {
 'use strict';
 
-if (!isFLE2ShardingEnabled()) {
+// Passthrough workaround
+if (!isMongos(db)) {
     return;
 }
 

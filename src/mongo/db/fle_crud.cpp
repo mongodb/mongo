@@ -720,6 +720,7 @@ write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
 
     auto [deleteReply, deletedDocument] =
         queryImpl->deleteWithPreimage(edcNss, ei, newDeleteRequest);
+    checkWriteErrors(deleteReply);
 
     // If the delete did not actually delete anything, we are done
     if (deletedDocument.isEmpty()) {
@@ -1266,19 +1267,24 @@ std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryInterfaceImpl::deleteW
     auto response = _txnClient.runCommand(nss.db(), findAndModifyRequest.toBSON({})).get();
     auto status = getStatusFromWriteCommandReply(response);
 
-    auto reply =
-        write_ops::FindAndModifyCommandReply::parse(IDLParserErrorContext("reply"), response);
-
+    BSONObj returnObj;
     write_ops::DeleteCommandReply deleteReply;
 
     if (!status.isOK()) {
         deleteReply.getWriteCommandReplyBase().setN(0);
         deleteReply.getWriteCommandReplyBase().setWriteErrors(singleStatusToWriteErrors(status));
-    } else if (reply.getLastErrorObject().getNumDocs() > 0) {
-        deleteReply.getWriteCommandReplyBase().setN(1);
+    } else {
+        auto reply =
+            write_ops::FindAndModifyCommandReply::parse(IDLParserErrorContext("reply"), response);
+
+        if (reply.getLastErrorObject().getNumDocs() > 0) {
+            deleteReply.getWriteCommandReplyBase().setN(1);
+        }
+
+        returnObj = reply.getValue().value_or(BSONObj());
     }
 
-    return {deleteReply, reply.getValue().value_or(BSONObj())};
+    return {deleteReply, returnObj};
 }
 
 std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryInterfaceImpl::updateWithPreimage(
@@ -1370,6 +1376,8 @@ write_ops::FindAndModifyCommandReply FLEQueryInterfaceImpl::findAndModify(
     auto ei2 = ei;
     ei2.setCrudProcessed(true);
     newFindAndModifyRequest.setEncryptionInformation(ei2);
+    // WriteConcern is set at the transaction level so strip it out
+    newFindAndModifyRequest.setWriteConcern(boost::none);
 
     auto response = _txnClient.runCommand(nss.db(), newFindAndModifyRequest.toBSON({})).get();
     auto status = getStatusFromWriteCommandReply(response);

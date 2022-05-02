@@ -6,6 +6,8 @@ test_kind: js_test
 selector:
   roots:
   - jstests/core/**/*.js
+  - jstests/fle2/**/*.js
+  - src/mongo/db/modules/*/jstests/fle2/*.js
   exclude_files:
   # Transactions only a readConcern argument on the first command.
   - jstests/core/txns/**/*.js

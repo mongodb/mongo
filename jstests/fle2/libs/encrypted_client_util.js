@@ -14,6 +14,10 @@ class EncryptedClient {
      * @param {string} dbName Name of database to setup key vault in
      */
     constructor(conn, dbName) {
+        // Detect if jstests/libs/override_methods/implicitly_shard_accessed_collections.js is in
+        // use
+        this.useImplicitSharding = !(typeof (ImplicitlyShardAccessCollSettings) === "undefined");
+
         const localKMS = {
             key: BinData(
                 0,
@@ -28,9 +32,8 @@ class EncryptedClient {
             schemaMap: {},
         };
 
-        var currentPort = conn.host.split(":")[1];
-        var host = "localhost:" + currentPort;
-        var shell = Mongo(host, clientSideFLEOptions);
+        let connectionString = conn.host.toString();
+        var shell = Mongo(connectionString, clientSideFLEOptions);
         var edb = shell.getDB(dbName);
 
         var keyVault = shell.getKeyVault();
@@ -84,7 +87,96 @@ class EncryptedClient {
             }
         }
 
-        return this._edb.createEncryptedCollection(name, options);
+        assert.neq(options,
+                   undefined,
+                   `createEncryptedCollection expected an options object, it is undefined`);
+        assert(
+            options.hasOwnProperty("encryptedFields") && typeof options.encryptedFields == "object",
+            `options must contain an encryptedFields document'`);
+
+        const res = assert.commandWorked(this._edb.createCollection(name, options));
+
+        const cis = this._edb.getCollectionInfos({"name": name});
+        assert.eq(cis.length, 1, `Expected to find one collection named '${name}'`);
+
+        const ci = cis[0];
+        assert(ci.hasOwnProperty("options"), `Expected collection '${name}' to have 'options'`);
+        const storedOptions = ci.options;
+        assert(options.hasOwnProperty("encryptedFields"),
+               `Expected collection '${name}' to have 'encryptedFields'`);
+        const ef = storedOptions.encryptedFields;
+
+        // All our tests use "last" as the key to query on so shard on "last" instead of "_id"
+        if (this.useImplicitSharding) {
+            let resShard = this._db.adminCommand({enableSharding: this._db.getName()});
+
+            // enableSharding may only be called once for a database.
+            if (resShard.code !== ErrorCodes.AlreadyInitialized) {
+                assert.commandWorked(
+                    resShard, "enabling sharding on the '" + this._db.getName() + "' db failed");
+            }
+
+            let shardCollCmd = {
+                shardCollection: this._db.getName() + "." + name,
+                key: {last: "hashed"},
+                collation: {locale: "simple"}
+            };
+
+            resShard = this._db.adminCommand(shardCollCmd);
+
+            jsTestLog("Sharding: " + tojson(shardCollCmd));
+        }
+
+        assert.commandWorked(this._edb.getCollection(name).createIndex({__safeContent__: 1}));
+
+        assert.commandWorked(this._edb.createCollection(ef.escCollection));
+        assert.commandWorked(this._edb.createCollection(ef.eccCollection));
+        assert.commandWorked(this._edb.createCollection(ef.ecocCollection));
+
+        return res;
+    }
+
+    /**
+     * Assert the number of documents in the EDC and state collections is correct.
+     *
+     * @param {object} collection Collection object for EDC
+     * @param {number} edc Number of documents in EDC
+     * @param {number} esc Number of documents in ESC
+     * @param {number} ecc Number of documents in ECC
+     * @param {number} ecoc Number of documents in ECOC
+     */
+    assertEncryptedCollectionCountsByObject(
+        sessionDB, name, expectedEdc, expectedEsc, expectedEcc, expectedEcoc) {
+        const cis = this._db.getCollectionInfos({"name": name});
+        assert.eq(cis.length, 1, `Expected to find one collection named '${name}'`);
+
+        const ci = cis[0];
+        assert(ci.hasOwnProperty("options"), `Expected collection '${name}' to have 'options'`);
+        const options = ci.options;
+        assert(options.hasOwnProperty("encryptedFields"),
+               `Expected collection '${name}' to have 'encryptedFields'`);
+
+        const ef = options.encryptedFields;
+
+        const actualEdc = sessionDB.getCollection(name).countDocuments({});
+        assert.eq(actualEdc,
+                  expectedEdc,
+                  `EDC document count is wrong: Actual ${actualEdc} vs Expected ${expectedEdc}`);
+
+        const actualEsc = sessionDB.getCollection(ef.escCollection).countDocuments({});
+        assert.eq(actualEsc,
+                  expectedEsc,
+                  `ESC document count is wrong: Actual ${actualEsc} vs Expected ${expectedEsc}`);
+
+        const actualEcc = sessionDB.getCollection(ef.eccCollection).countDocuments({});
+        assert.eq(actualEcc,
+                  expectedEcc,
+                  `ECC document count is wrong: Actual ${actualEcc} vs Expected ${expectedEcc}`);
+
+        const actualEcoc = sessionDB.getCollection(ef.ecocCollection).countDocuments({});
+        assert.eq(actualEcoc,
+                  expectedEcoc,
+                  `ECOC document count is wrong: Actual ${actualEcoc} vs Expected ${expectedEcoc}`);
     }
 
     /**
@@ -97,36 +189,8 @@ class EncryptedClient {
      * @param {number} ecoc Number of documents in ECOC
      */
     assertEncryptedCollectionCounts(name, expectedEdc, expectedEsc, expectedEcc, expectedEcoc) {
-        const cis = this._edb.getCollectionInfos({"name": name});
-        assert.eq(cis.length, 1, `Expected to find one collection named '${name}'`);
-
-        const ci = cis[0];
-        assert(ci.hasOwnProperty("options"), `Expected collection '${name}' to have 'options'`);
-        const options = ci.options;
-        assert(options.hasOwnProperty("encryptedFields"),
-               `Expected collection '${name}' to have 'encryptedFields'`);
-
-        const ef = options.encryptedFields;
-
-        const actualEdc = this._edb.getCollection(name).count();
-        assert.eq(actualEdc,
-                  expectedEdc,
-                  `EDC document count is wrong: Actual ${actualEdc} vs Expected ${expectedEdc}`);
-
-        const actualEsc = this._edb.getCollection(ef.escCollection).count();
-        assert.eq(actualEsc,
-                  expectedEsc,
-                  `ESC document count is wrong: Actual ${actualEsc} vs Expected ${expectedEsc}`);
-
-        const actualEcc = this._edb.getCollection(ef.eccCollection).count();
-        assert.eq(actualEcc,
-                  expectedEcc,
-                  `ECC document count is wrong: Actual ${actualEcc} vs Expected ${expectedEcc}`);
-
-        const actualEcoc = this._edb.getCollection(ef.ecocCollection).count();
-        assert.eq(actualEcoc,
-                  expectedEcoc,
-                  `ECOC document count is wrong: Actual ${actualEcoc} vs Expected ${expectedEcoc}`);
+        this.assertEncryptedCollectionCountsByObject(
+            this._db, name, expectedEdc, expectedEsc, expectedEcc, expectedEcoc);
     }
 
     /**
