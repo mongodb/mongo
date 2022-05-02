@@ -49,6 +49,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/generic_cursor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -595,6 +596,41 @@ public:
                 newNames.insert(rename.first);
             }
             return newNames;
+        }
+
+        bool canModify(const FieldPath& fieldPath) const {
+            switch (type) {
+                case Type::kAllPaths:
+                    return true;
+                case Type::kNotSupported:
+                    return true;
+                case Type::kFiniteSet:
+                    // If there's a subpath that is modified this path may be modified.
+                    for (size_t i = 0; i < fieldPath.getPathLength(); i++) {
+                        if (paths.count(fieldPath.getSubpath(i).toString()))
+                            return true;
+                    }
+
+                    for (auto&& path : paths) {
+                        // If there's a superpath that is modified this path may be modified.
+                        if (expression::isPathPrefixOf(fieldPath.fullPath(), path)) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                case Type::kAllExcept:
+                    // If one of the subpaths is unmodified return false.
+                    for (size_t i = 0; i < fieldPath.getPathLength(); i++) {
+                        if (paths.count(fieldPath.getSubpath(i).toString()))
+                            return false;
+                    }
+
+                    // Otherwise return true;
+                    return true;
+            }
+            // Cannot hit.
+            MONGO_UNREACHABLE_TASSERT(6434901);
         }
 
         Type type;
