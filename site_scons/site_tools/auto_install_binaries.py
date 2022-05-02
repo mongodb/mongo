@@ -270,8 +270,8 @@ def scan_for_transitive_install(node, env, _path):
 
     installed_children = set(
         grandchild
-        for child in node.children()
-        for direct_children in child.children()
+        for source in node.sources
+        for direct_children in source.children()
         for grandchild in direct_children.get_executor().get_all_targets()
         if direct_children.get_executor() and grandchild.has_builder()
     )
@@ -286,20 +286,9 @@ def scan_for_transitive_install(node, env, _path):
             child_component = get_component(child)
             child_entry = get_alias_map_entry(env, child_component, child_role)
 
-            # This is where component inheritance happens. We need a default
-            # component for everything so we can store it but if during
-            # transitive scanning we see a child with the default component here
-            # we will move that file to our component. This prevents
-            # over-stepping the DAG bounds since the default component is likely
-            # to be large and an explicitly tagged file is unlikely to depend on
-            # everything in it.
-            if child_component == env.get(DEFAULT_COMPONENT):
-                setattr(node.attributes, COMPONENT, component)
-                for f in auto_installed_files:
-                    child_entry.files.discard(f)
-                entry.files.update(auto_installed_files)
-            elif component != child_component:
-                entry.dependencies.add(child_entry)
+            if component != child_component:
+                if child_component != env.get(DEFAULT_COMPONENT):
+                    entry.dependencies.add(child_entry)
 
             results.update(auto_installed_files)
 

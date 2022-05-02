@@ -358,6 +358,7 @@ buildvariants:
   - name: compile_ninja_TG
     distros:
     - rhel80-build
+  - name: ninja_determinism_TG
 
 - &enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
   name: enterprise-rhel80-dynamic-v4gcc-debug-experimental
@@ -1045,6 +1046,9 @@ buildvariants:
   - name: compile_ninja_TG
     distros:
     - windows-vsCurrent-large
+  - name: ninja_determinism_TG
+    distros:
+    - windows-vsCurrent-large
 
 - name: enterprise-windows-cxx20-debug-experimental
   display_name: "~ Enterprise Windows C++20 DEBUG"
@@ -1176,6 +1180,7 @@ buildvariants:
   tasks:
   - name: compile_ninja_next_TG
   - name: compile_ninja_TG
+  - name: ninja_determinism_TG
 
 - name: enterprise-macos-rosetta-2
   display_name: "Enterprise macOS Via Rosetta 2"
@@ -1482,6 +1487,7 @@ buildvariants:
   - name: compile_ninja_TG
     distros:
     - rhel80-xlarge
+  - name: ninja_determinism_TG
 
 - &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
   name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
