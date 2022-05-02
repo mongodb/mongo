@@ -48,13 +48,6 @@
 namespace mongo {
 namespace repl {
 
-/**
- * Test fixture for both 3.4 and 3.6 rollback unit tests.
- * The fixture makes available to tests:
- * - an "ephemeralForTest" storage engine for checking results of the rollback algorithm at the
- *   storage layer. The storage engine is initialized as part of the ServiceContextForMongoD test
- *   fixture.
- */
 class RollbackTest : public ServiceContextMongoDTest {
 public:
     explicit RollbackTest(Options options = {}) : ServiceContextMongoDTest(std::move(options)) {}

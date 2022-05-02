@@ -148,12 +148,6 @@ TEST_F(DatabaseTest, CreateCollectionThrowsExceptionWhenDatabaseIsInADropPending
 
             WriteUnitOfWork wuow(_opCtx.get());
 
-            // If createCollection() unexpectedly succeeds, we need to commit the collection
-            // creation to
-            // avoid leaving the ephemeralForTest storage engine in a bad state for subsequent
-            // tests.
-            ON_BLOCK_EXIT([&wuow] { wuow.commit(); });
-
             ASSERT_THROWS_CODE_AND_WHAT(db->createCollection(_opCtx.get(), _nss),
                                         AssertionException,
                                         ErrorCodes::DatabaseDropPending,

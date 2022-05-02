@@ -150,8 +150,7 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
     }
 
     // This should be set once during startup.
-    if (storageGlobalParams.engine != "ephemeralForTest" &&
-        (initFlags & StorageEngineInitFlags::kForRestart) == StorageEngineInitFlags{}) {
+    if ((initFlags & StorageEngineInitFlags::kForRestart) == StorageEngineInitFlags{}) {
         auto readTransactions = gConcurrentReadTransactions.load();
         static constexpr auto DEFAULT_TICKETS_VALUE = 128;
         readTransactions = readTransactions == 0 ? DEFAULT_TICKETS_VALUE : readTransactions;

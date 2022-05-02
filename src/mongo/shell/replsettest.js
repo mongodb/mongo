@@ -236,8 +236,7 @@ var ReplSetTest = function(opts) {
                 if (!serverStatus.storageEngine.persistent) {
                     return true;
                 }
-            } else if (serverStatus.storageEngine.name == 'inMemory' ||
-                       serverStatus.storageEngine.name == 'ephemeralForTest') {
+            } else if (serverStatus.storageEngine.name == 'inMemory') {
                 return true;
             }
             var cmdLineOpts = assert.commandWorked(conn.adminCommand({getCmdLineOpts: 1}));

@@ -15,16 +15,6 @@ load('jstests/libs/parallel_shell_helpers.js');
 let conn = MongoRunner.runMongod({});
 assert(conn);
 
-// Lock-free reads is disabled with the ephemeralForTest storage engine that uses
-// enableMajorityReadConcern=false, which automatically disables lock-free reads.
-const isLockFreeReadsEnabled = jsTest.options().storageEngine !== "ephemeralForTest";
-
-if (!isLockFreeReadsEnabled) {
-    jsTestLog("Exiting test because lock-free reads are not enabled.");
-    MongoRunner.stopMongod(conn);
-    return;
-}
-
 const dbName = 'testDatabase';
 const collName = 'testCollection';
 

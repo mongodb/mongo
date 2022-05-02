@@ -77,9 +77,8 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
         std::exchange(storageGlobalParams.repair, (options._repair == RepairAction::kRepair));
     _stashedServerParams.enableMajorityReadConcern = serverGlobalParams.enableMajorityReadConcern;
 
-    if (storageGlobalParams.engine == "ephemeralForTest" ||
-        storageGlobalParams.engine == "devnull") {
-        // The ephemeralForTest and devnull storage engines do not support majority read concern.
+    if (storageGlobalParams.engine == "devnull") {
+        // The devnull storage engine does not support majority read concern.
         LOGV2(4939201,
               "Disabling majority read concern as it isn't supported by the storage engine",
               "storageEngine"_attr = storageGlobalParams.engine);

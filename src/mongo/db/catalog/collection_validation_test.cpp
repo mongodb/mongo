@@ -204,7 +204,6 @@ int setUpInvalidData(OperationContext* opCtx) {
 // Verify that calling validate() on an empty collection with different validation levels returns an
 // OK status.
 TEST_F(CollectionValidationTest, ValidateEmpty) {
-    // Running on the ephemeralForTest storage engine.
     foregroundValidate(operationContext(),
                        /*valid*/ true,
                        /*numRecords*/ 0,
@@ -212,7 +211,6 @@ TEST_F(CollectionValidationTest, ValidateEmpty) {
                        /*numErrors*/ 0);
 }
 TEST_F(CollectionValidationTest, BackgroundValidateEmpty) {
-    // Running on the WT storage engine.
     backgroundValidate(operationContext(),
                        /*valid*/ true,
                        /*numRecords*/ 0,

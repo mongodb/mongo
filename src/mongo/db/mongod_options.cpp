@@ -547,9 +547,7 @@ Status storeMongodOptions(const moe::Environment& params) {
 
     serverGlobalParams.enableMajorityReadConcern = true;
 
-    if (storageGlobalParams.engineSetByUser &&
-        (storageGlobalParams.engine == "ephemeralForTest" ||
-         storageGlobalParams.engine == "devnull")) {
+    if (storageGlobalParams.engineSetByUser && (storageGlobalParams.engine == "devnull")) {
         LOGV2(5324701,
               "Test storage engine does not support enableMajorityReadConcern=true, forcibly "
               "setting to false",

@@ -1,8 +1,6 @@
 /**
  * Tests currentOp command during a tenant migration.
  *
- * Tenant migrations are not expected to be run on servers with ephemeralForTest.
- *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,

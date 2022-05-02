@@ -214,10 +214,6 @@ OpTime _logOpNoopWithMsg(OperationContext* opCtx,
                          Mutex* mtx,
                          OpTimeNamespaceStringMap* opTimeNssMap,
                          const NamespaceString& nss) {
-    stdx::lock_guard<Latch> lock(*mtx);
-
-    // logOp() must be called while holding lock because ephemeralForTest storage engine does not
-    // support concurrent updates to its internal state.
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
     oplogEntry.setNss(nss);
@@ -226,6 +222,7 @@ OpTime _logOpNoopWithMsg(OperationContext* opCtx,
     auto opTime = logOp(opCtx, &oplogEntry);
     ASSERT_FALSE(opTime.isNull());
 
+    stdx::lock_guard<Latch> lock(*mtx);
     ASSERT(opTimeNssMap->find(opTime) == opTimeNssMap->end())
         << "Unable to add namespace " << nss << " to map - map contains duplicate entry for optime "
         << opTime;

@@ -4,8 +4,6 @@
  *
  * kStarted ---> kLearnedFilenames ---> kConsistent ---> kDone.
  *
- * Tenant migrations are not expected to be run on servers with ephemeralForTest.
- *
  * @tags: [
  *   featureFlagShardMerge,
  *   incompatible_with_macos,

@@ -16,8 +16,7 @@ function runInitialSyncTest() {
     // ReplSetTest cannot be done automatically without the shell performing such authentication, so
     // in this test we must make the choice explicitly, based on the global test options.
     var wcMajorityJournalDefault;
-    if (jsTestOptions().noJournal || jsTestOptions().storageEngine == "ephemeralForTest" ||
-        jsTestOptions().storageEngine == "inMemory") {
+    if (jsTestOptions().noJournal || jsTestOptions().storageEngine == "inMemory") {
         wcMajorityJournalDefault = false;
     } else {
         wcMajorityJournalDefault = true;

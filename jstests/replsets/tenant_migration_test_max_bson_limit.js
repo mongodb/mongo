@@ -1,8 +1,6 @@
 /**
  * Tests that large write error results from bulk write operations are within the BSON size limit.
  *
- * Tenant migrations are not expected to be run on servers with ephemeralForTest.
- *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,

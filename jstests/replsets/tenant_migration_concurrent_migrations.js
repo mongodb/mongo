@@ -1,11 +1,6 @@
 /**
  * Test that multiple concurrent tenant migrations are supported.
  *
- * Tenant migrations are not expected to be run on servers with ephemeralForTest, and in particular
- * this test fails on ephemeralForTest because the donor has to wait for the write to set the
- * migration state to "committed" and "aborted" to be majority committed but it cannot do that on
- * ephemeralForTest.
- *
  * Incompatible with shard merge, which can't handle concurrent migrations.
  *
  * @tags: [

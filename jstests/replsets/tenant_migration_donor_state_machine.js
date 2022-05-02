@@ -2,11 +2,6 @@
  * Tests the TenantMigrationAccessBlocker and donor state document are updated correctly at each
  * stage of the migration, and are eventually removed after the donorForgetMigration has returned.
  *
- * Tenant migrations are not expected to be run on servers with ephemeralForTest, and in particular
- * this test fails on ephemeralForTest because the donor has to wait for the write to set the
- * migration state to "committed" and "aborted" to be majority committed but it cannot do that on
- * ephemeralForTest.
- *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,

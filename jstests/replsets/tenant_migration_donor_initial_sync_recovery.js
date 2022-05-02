@@ -2,8 +2,6 @@
  * Tests that tenant migration donor's in memory state is initialized correctly on initial sync.
  * This test randomly selects a point during the migration to add a node to the donor replica set.
  *
- * Tenant migrations are not expected to be run on servers with ephemeralForTest.
- *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,

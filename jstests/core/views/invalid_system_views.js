@@ -104,8 +104,7 @@ function runTest(badViewDefinition) {
     }
 
     const storageEngine = jsTest.options().storageEngine;
-    if (isMongos || storageEngine === "ephemeralForTest" || storageEngine === "inMemory" ||
-        storageEngine === "biggie") {
+    if (isMongos || storageEngine === "inMemory") {
         print("Not testing compact command on mongos or ephemeral storage engine");
     } else {
         assert.commandWorked(viewsDB.runCommand({compact: "collection", force: true}),

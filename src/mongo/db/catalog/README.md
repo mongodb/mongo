@@ -23,11 +23,9 @@ directory.
 [**sorter/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/sorter
 [**timeseries/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/timeseries
 
-For more information on the Storage Engine API, see the [storage/README][]. For additional
-specifics on the Ephemeral for Test storage engine, see the [ephemeral_for_test/README][].
+For more information on the Storage Engine API, see the [storage/README][].
 
 [storage/README]: https://github.com/mongodb/mongo/blob/master/src/mongo/db/storage/README.md
-[ephemeral_for_test/README]: https://github.com/mongodb/mongo/blob/master/src/mongo/db/storage/ephemeral_for_test/README.md
 
 # The Catalog
 

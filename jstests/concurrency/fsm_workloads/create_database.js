@@ -12,7 +12,6 @@
  * @tags: [creates_background_indexes]
  */
 
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeralForTest
 load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
 
 var $config = (function() {

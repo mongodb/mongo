@@ -2,8 +2,6 @@
  * Tests that tenant migration recipient's in memory state is recovered correctly on startup. This
  * test randomly selects a point during the migration to shutdown the recipient.
  *
- * Tenant migrations are not expected to be run on servers with ephemeralForTest.
- *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_shard_merge,

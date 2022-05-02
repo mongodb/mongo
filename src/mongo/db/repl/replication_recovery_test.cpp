@@ -175,17 +175,6 @@ private:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
 
-        // Replaying prepared transactions requires 'enableMajorityReadConcern' to be set to true.
-        // This test uses ephemeralForTest under the hood and is ran in standalone mode. Given that,
-        // to satisfy the tests requirements, we forcefully set 'enableMajorityReadConcern' to true
-        // for these tests.
-        //
-        // Switching the storage engine to use WiredTiger comes with its own complications.
-        // 1. Transaction prepare is not supported with logged tables in debug builds.
-        // 2. Transactions cannot be assigned a log record if WT_CONN_LOG_DEBUG mode is not enabled.
-        _stashedEnableMajorityReadConcern =
-            std::exchange(serverGlobalParams.enableMajorityReadConcern, true);
-
         auto service = getServiceContext();
         StorageInterface::set(service, std::make_unique<StorageInterfaceRecovery>());
         _storageInterface = static_cast<StorageInterfaceRecovery*>(StorageInterface::get(service));
@@ -219,8 +208,6 @@ private:
         _opCtx.reset(nullptr);
         _consistencyMarkers.reset();
 
-        serverGlobalParams.enableMajorityReadConcern = _stashedEnableMajorityReadConcern;
-
         ServiceContextMongoDTest::tearDown();
         gTakeUnstableCheckpointOnShutdown = false;
     }
@@ -232,7 +219,6 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
     StorageInterfaceRecovery* _storageInterface = nullptr;
     std::unique_ptr<ReplicationConsistencyMarkersMock> _consistencyMarkers;
-    bool _stashedEnableMajorityReadConcern = false;
 };
 
 /**

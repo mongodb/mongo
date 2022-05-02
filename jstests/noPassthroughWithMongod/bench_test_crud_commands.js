@@ -73,7 +73,7 @@ function testWriteConcern() {
     testInsert(docs, {"w": "majority"});
     testInsert(docs, {"w": 1, "j": false});
 
-    var storageEnginesWithoutJournaling = new Set(["ephemeralForTest", "inMemory"]);
+    var storageEnginesWithoutJournaling = new Set(["inMemory"]);
     var runningWithoutJournaling = TestData.noJournal ||
         storageEnginesWithoutJournaling.has(db.serverStatus().storageEngine.name);
     if (!runningWithoutJournaling) {

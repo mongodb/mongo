@@ -1,10 +1,5 @@
 /**
  * Tests that unique indexes can be built with a large number of unique values.
- *
- * @tags: [
- *  // This workload is too impactful on ephemeralForTest
- *  requires_wiredtiger,
- * ]
  */
 
 (function() {

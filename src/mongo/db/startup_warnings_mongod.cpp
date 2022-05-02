@@ -376,13 +376,6 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
 
 #endif  // #ifdef _WIN32
 
-    if (storageParams.engine == "ephemeralForTest") {
-        LOGV2_OPTIONS(
-            22197,
-            {logv2::LogTag::kStartupWarnings},
-            "The ephemeralForTest storage engine is for testing only. Do not use in production");
-    }
-
     if (storageParams.restore) {
         LOGV2_OPTIONS(
             6260401,

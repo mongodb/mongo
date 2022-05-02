@@ -36,9 +36,6 @@
 
 namespace mongo {
 
-/**
- * Test fixture class for tests that use the "ephemeralForTest" storage engine.
- */
 class ServiceContextMongoDTest : public virtual ServiceContextTest {
 public:
     constexpr static StorageEngineInitFlags kDefaultStorageEngineInitFlags =

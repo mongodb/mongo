@@ -2,11 +2,6 @@
  * Tests that the donor blocks writes that are executed while the migration in the blocking state,
  * then rejects the writes when the migration completes.
  *
- * Tenant migrations are not expected to be run on servers with ephemeralForTest, and in particular
- * this test fails on ephemeralForTest because the donor has to wait for the write to set the
- * migration state to "committed" and "aborted" to be majority committed but it cannot do that on
- * ephemeralForTest.
- *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,

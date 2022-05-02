@@ -34,7 +34,6 @@ build_variant_large_distro_exceptions:
   - enterprise-ubuntu1804-s390x
   - enterprise-ubuntu2004-arm64
   - hot_backups-rhel-70-64-bit
-  - linux-64-ephemeralForTest
   - macos
   - macos-arm64
   - macos-debug-suggested

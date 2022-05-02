@@ -365,7 +365,7 @@ assert.commandWorked(db.adminCommand({addshard: st.getConnNames()[0], maxSize: 5
 assert.commandWorked(db.adminCommand({addshard: st.getConnNames()[1], maxSize: 1}));
 
 // SERVER-17070 Auto split moves to shard node running WiredTiger, if exceeding maxSize
-var unsupported = ["wiredTiger", "rocksdb", "inMemory", "ephemeralForTest"];
+var unsupported = ["wiredTiger", "rocksdb", "inMemory"];
 if (unsupported.indexOf(st.rs0.getPrimary().adminCommand({serverStatus: 1}).storageEngine.name) ==
         -1 &&
     unsupported.indexOf(st.rs1.getPrimary().adminCommand({serverStatus: 1}).storageEngine.name) ==

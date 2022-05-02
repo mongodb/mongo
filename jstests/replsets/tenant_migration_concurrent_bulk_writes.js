@@ -2,8 +2,6 @@
  * Tests that bulk writes during a tenant migration correctly report write errors and
  * retries writes that returned TenantMigrationCommitted.
  *
- * Tenant migrations are not expected to be run on servers with ephemeralForTest.
- *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,

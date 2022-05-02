@@ -124,15 +124,6 @@ public:
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
         bool background = cmdObj["background"].trueValue();
 
-        // Background validation is not supported on the ephemeralForTest storage engine due to its
-        // lack of support for timestamps. Switch the mode to foreground validation instead.
-        if (background && storageGlobalParams.engine == "ephemeralForTest") {
-            LOGV2(4775400,
-                  "ephemeralForTest does not support background validation, switching to "
-                  "foreground validation");
-            background = false;
-        }
-
         const bool fullValidate = cmdObj["full"].trueValue();
         if (background && fullValidate) {
             uasserted(ErrorCodes::InvalidOptions,

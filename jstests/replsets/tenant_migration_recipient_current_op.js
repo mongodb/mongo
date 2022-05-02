@@ -5,8 +5,6 @@
  *
  * kStarted ---> kConsistent ---> kDone.
  *
- * Tenant migrations are not expected to be run on servers with ephemeralForTest.
- *
  * @tags: [
  *   incompatible_with_shard_merge,
  *   incompatible_with_macos,

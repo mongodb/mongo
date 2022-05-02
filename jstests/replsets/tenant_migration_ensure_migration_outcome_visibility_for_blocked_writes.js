@@ -2,8 +2,6 @@
  * Tests that writes that are blocked during a tenant migration will still be able to find out
  * migration outcome even if the migration's in memory state has been garbage collected.
  *
- * Tenant migrations are not expected to be run on servers with ephemeralForTest.
- *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,

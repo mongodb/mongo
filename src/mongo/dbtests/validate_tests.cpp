@@ -87,8 +87,6 @@ public:
     explicit ValidateBase(bool full, bool background, bool clustered)
         : _full(full), _background(background), _nss(_ns), _autoDb(nullptr), _db(nullptr) {
 
-        _supportsBackgroundValidation = storageGlobalParams.engine != "ephemeralForTest";
-
         CollectionOptions options;
         if (clustered) {
             options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
@@ -212,7 +210,6 @@ protected:
     const NamespaceString _nss;
     unique_ptr<AutoGetDb> _autoDb;
     Database* _db;
-    bool _supportsBackgroundValidation;
 };
 
 template <bool full, bool background>
@@ -221,7 +218,7 @@ public:
     ValidateIdIndexCount() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -279,7 +276,7 @@ class ValidateSecondaryIndexCount : public ValidateBase {
 public:
     ValidateSecondaryIndexCount() : ValidateBase(full, background) {}
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -345,7 +342,7 @@ class ValidateSecondaryIndex : public ValidateBase {
 public:
     ValidateSecondaryIndex() : ValidateBase(full, background) {}
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -403,7 +400,7 @@ public:
     ValidateIdIndex() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -478,7 +475,7 @@ public:
     ValidateMultiKeyIndex() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -559,7 +556,7 @@ public:
     ValidateSparseIndex() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -618,7 +615,7 @@ public:
     ValidatePartialIndex() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -683,7 +680,7 @@ public:
     ValidatePartialIndexOnCollectionWithNonIndexableFields() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -742,7 +739,7 @@ public:
     ValidateCompoundIndex() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -821,7 +818,7 @@ public:
     ValidateIndexEntry() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -940,7 +937,7 @@ public:
     ValidateWildCardIndex() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -1060,7 +1057,7 @@ public:
     ValidateWildCardIndexWithProjection() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -1155,7 +1152,7 @@ public:
     ValidateMissingAndExtraIndexEntryResults() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -1246,7 +1243,7 @@ public:
     ValidateMissingIndexEntryResults() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -1364,7 +1361,7 @@ public:
     ValidateExtraIndexEntryResults() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -3080,7 +3077,7 @@ public:
     ValidateDuplicateKeysUniqueIndex() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -3269,7 +3266,7 @@ public:
     ValidateInvalidBSONResults() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -4074,7 +4071,7 @@ public:
         : ValidateBase(/*full=*/false, background, /*clustered=*/true) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -4134,7 +4131,7 @@ public:
         : ValidateBase(/*full=*/false, background, /*clustered=*/true) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -4229,7 +4226,7 @@ public:
         : ValidateBase(/*full=*/false, /*background=*/false, /*clustered=*/true) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
@@ -4366,7 +4363,7 @@ public:
           _withSecondaryIndex(withSecondaryIndex) {}
 
     void run() {
-        if (_background && !_supportsBackgroundValidation) {
+        if (_background) {
             return;
         }
 
