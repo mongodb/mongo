@@ -1158,10 +1158,6 @@ backup(WT_SESSION *session)
       session, "backup:", NULL, "incremental=(enabled,src_id=ID0,this_id=ID1)", &cursor));
     /*! [incremental block backup]*/
     error_check(cursor->close(cursor));
-
-    /*! [backup of a checkpoint]*/
-    error_check(session->checkpoint(session, "drop=(from=June01),name=June01"));
-    /*! [backup of a checkpoint]*/
 }
 
 int

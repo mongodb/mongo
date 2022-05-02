@@ -91,13 +91,6 @@ to closing the parent backup cursor.
 
 @snippet ex_all.c backup log duplicate
 
-In cases where the backup is desired for a checkpoint other than the
-most recent, applications can discard all checkpoints subsequent to the
-checkpoint they want using the WT_SESSION::checkpoint method.  For
-example:
-
-@snippet ex_all.c backup of a checkpoint
-
 @section backup_util Backup from the command line
 
 The @ref_single util_backup command may also be used to create backups:
