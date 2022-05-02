@@ -83,4 +83,4 @@ db-contrib-tool setup-repro-env \
   --platform $platform \
   --architecture $architecture \
   $last_lts_arg \
-  $last_continuous_arg 4.4 5.1
+  $last_continuous_arg 4.4 5.0 5.1
