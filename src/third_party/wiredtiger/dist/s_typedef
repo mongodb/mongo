@@ -27,7 +27,7 @@ build() {
 	        -e 's/WT_COMPILER_TYPE_ALIGN(.*)[ ]*//' \
 	        -e 's/^[ ]*//' -e 's/[ ]*{.*//' | sort -u | \
 	while read t n; do
-		upper=`echo $n | sed -e 's/^__//' | tr [a-z] [A-Z]`
+		upper=`echo $n | sed -e 's/^__//' | tr '[a-z]' '[A-Z]'`
 		echo "$t $n;"
 		echo "    typedef $t $n $upper;"
 	done
