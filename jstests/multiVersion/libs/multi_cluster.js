@@ -79,6 +79,64 @@ ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
     }
 };
 
+ShardingTest.prototype.downgradeCluster = function(binVersion, options) {
+    options = options || {};
+    if (options.downgradeShards == undefined)
+        options.downgradeShards = true;
+    if (options.downgradeConfigs == undefined)
+        options.downgradeConfigs = true;
+    if (options.downgradeMongos == undefined)
+        options.downgradeMongos = true;
+    if (options.waitUntilStable == undefined)
+        options.waitUntilStable = false;
+
+    if (options.downgradeMongos) {
+        // Downgrade all mongos hosts if specified
+        var numMongoses = this._mongos.length;
+
+        for (var i = 0; i < numMongoses; i++) {
+            var mongos = this._mongos[i];
+            MongoRunner.stopMongos(mongos);
+
+            mongos = MongoRunner.runMongos(
+                {restart: mongos, binVersion: binVersion, appendOptions: true});
+
+            this["s" + i] = this._mongos[i] = mongos;
+            if (i == 0)
+                this.s = mongos;
+        }
+
+        this.config = this.s.getDB("config");
+        this.admin = this.s.getDB("admin");
+    }
+
+    if (options.downgradeShards) {
+        // Downgrade shards
+        this._rs.forEach((rs) => {
+            rs.test.upgradeSet({binVersion: binVersion});
+        });
+    }
+
+    if (options.downgradeConfigs) {
+        // Downgrade config servers
+        const numConfigs = this.configRS.nodes.length;
+
+        for (var i = 0; i < numConfigs; i++) {
+            var configSvr = this.configRS.nodes[i];
+
+            MongoRunner.stopMongod(configSvr);
+            configSvr = MongoRunner.runMongod(
+                {restart: configSvr, binVersion: binVersion, appendOptions: true});
+
+            this["config" + i] = this["c" + i] = this.configRS.nodes[i] = configSvr;
+        }
+    }
+
+    if (options.waitUntilStable) {
+        this.waitUntilStable();
+    }
+};
+
 ShardingTest.prototype.waitUntilStable = function() {
     // Wait for the config server and shards to become available.
     this.configRS.awaitSecondaryNodes();

@@ -123,7 +123,7 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
     // Downgrade back
 
     jsTest.log('downgrading mongos servers');
-    st.upgradeCluster(oldVersion, {upgradeConfigs: false, upgradeShards: false});
+    st.downgradeCluster(oldVersion, {downgradeConfigs: false, downgradeShards: false});
 
     testCRUDAndAgg(st.s.getDB('unsharded'));
     testCRUDAndAgg(st.s.getDB('sharded'));
@@ -135,7 +135,7 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
     testCRUDAndAgg(st.s.getDB('sharded'));
 
     jsTest.log('downgrading shard servers');
-    st.upgradeCluster(oldVersion, {upgradeMongos: false, upgradeConfigs: false});
+    st.downgradeCluster(oldVersion, {downgradeMongos: false, downgradeConfigs: false});
 
     awaitRSClientHosts(st.s, st.rs0.getPrimary(), {ok: true, ismaster: true});
     awaitRSClientHosts(st.s, st.rs1.getPrimary(), {ok: true, ismaster: true});
@@ -150,7 +150,7 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
     testCRUDAndAgg(st.s.getDB('sharded'));
 
     jsTest.log('downgrading config servers');
-    st.upgradeCluster(oldVersion, {upgradeMongos: false, upgradeShards: false});
+    st.downgradeCluster(oldVersion, {downgradeMongos: false, downgradeShards: false});
 
     testCRUDAndAgg(st.s.getDB('unsharded'));
     testCRUDAndAgg(st.s.getDB('sharded'));

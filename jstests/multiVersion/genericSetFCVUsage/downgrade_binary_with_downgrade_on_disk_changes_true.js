@@ -76,7 +76,7 @@ function testShardingDowngrade() {
     checkFCV(shardPrimaryAdminDB, lastContinuousFCV);
 
     jsTestLog("Downgrading binary to last-continuous");
-    st.upgradeCluster('last-continuous');
+    st.downgradeCluster('last-continuous');
     configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
     shardPrimaryAdminDB = st.rs0.getPrimary().getDB("admin");
     checkFCV(configPrimaryAdminDB, lastContinuousFCV);
