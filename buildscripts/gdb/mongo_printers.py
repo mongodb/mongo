@@ -821,10 +821,9 @@ class SbeCodeFragmentPrinter(object):
             instr_count if not error else '? (successfully parsed {})'.format(instr_count)
 
 
-def eval_print_fn(val, print_fn_name):
+def eval_print_fn(val, print_fn):
     """Evaluate a print function, and return the resulting string."""
-    print_fn_symbol = gdb.lookup_symbol(print_fn_name)[0]
-    print_fn = print_fn_symbol.value()
+
     # The generated output from explain contains the string "\n" (two characters)
     # replace them with a single EOL character so that GDB prints multi-line
     # explains nicely.
@@ -839,25 +838,40 @@ class ABTPrinter(object):
     def __init__(self, val):
         """Initialize ABTPrinter."""
         self.val = val
+        (print_fn_symbol, _) = gdb.lookup_symbol("_printNode")
+        if print_fn_symbol is None:
+            raise gdb.GdbError("Could not find ABT print function")
+        self.print_fn = print_fn_symbol.value()
 
     @staticmethod
     def display_hint():
         """Display hint."""
-        return 'ABT'
+        # Return None here to allow formatting of the resulting string with newline characters.
+        return None
 
     def to_string(self):
         """Return ABT for printing."""
+        # Do not enable these printers when printing of frame-arguments is enabled, as it can crash
+        # GDB or lead to stack overflow. See https://sourceware.org/bugzilla/show_bug.cgi?id=28856
+        # for more details.
+        if gdb.parameter("print frame-arguments") != "none":
+            print("\nWarning: ABT pretty printers disabled, run `set print frame-arguments none`" +
+                  " and `source mongo_printers.py` to enable\n")
+            return "%s" % "<ABT>"
+
         # Python will truncate/compress certain strings that contain many repeated characters.
         # For an ABT, this is quite common when indenting nodes to represent children, so
-        # disable it for now.
-        prior_repeats = gdb.parameter("print repeats")
-        prior_elements = gdb.parameter("print elements")
-        gdb.execute("set print repeats 0")  # for "<repeats N times>"
-        gdb.execute("set print elements 0")  # for ... on long strings
-        res = eval_print_fn(self.val, "_printNode")
-        gdb.execute("set print repeats " + str(prior_repeats))
-        gdb.execute("set print elements " + str(prior_elements))
-        return res
+        # warn the user depending on the current settings.
+        print_repeats = gdb.parameter("print repeats")
+        print_repeats = "unlimited" if print_repeats is None else print_repeats
+        print_elements = gdb.parameter("print elements")
+        print_elements = "unlimited" if print_elements is None else print_elements
+        if print_repeats not in (0, "unlimited") or print_elements not in (0, "unlimited"):
+            print(
+                "\n**Warning: recommend setting `print repeats` and `print elements` to 0 when printing an ABT**\n"
+            )
+        res = eval_print_fn(self.val, self.print_fn)
+        return "%s" % (res)
 
 
 def build_pretty_printer():
@@ -882,10 +896,9 @@ def build_pretty_printer():
     pp.add('__wt_update', '__wt_update', False, WtUpdateToBsonPrinter)
     pp.add('CodeFragment', 'mongo::sbe::vm::CodeFragment', False, SbeCodeFragmentPrinter)
 
-    # TODO: enable with SERVER-62044.
     # Optimizer/ABT related pretty printers that can be used only with a running process.
-    # abt_type = gdb.lookup_type("mongo::optimizer::ABT").strip_typedefs()
-    # pp.add("ABT", abt_type.name, True, ABTPrinter)
+    abt_type = gdb.lookup_type("mongo::optimizer::ABT").strip_typedefs()
+    pp.add('ABT', abt_type.name, True, ABTPrinter)
 
     return pp
 
