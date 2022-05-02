@@ -58,7 +58,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
         config = ''
         # S3 store is built as an optional loadable extension, not all test environments build S3.
         if self.ss_name == 's3_store':
-            #config = '=(config=\"(verbose=1)\")'
+            #config = '=(config=\"(verbose=[api:1,version,tiered:1])\")'
             extlist.skip_if_missing = True
         #if self.ss_name == 'dir_store':
             #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
@@ -104,22 +104,14 @@ class test_tiered06(wttest.WiredTigerTestCase):
             self.get_fs_config(prefix))
 
         # The object doesn't exist yet.
-        if self.ss_name == 's3_store':
-            with self.expectedStderrPattern('.*HTTP response code: 404.*'):
-                self.assertFalse(fs.fs_exist(session, 'foobar'))
-        else:
-            self.assertFalse(fs.fs_exist(session, 'foobar'))
+        self.assertFalse(fs.fs_exist(session, 'foobar'))
 
         # We cannot use the file system to create files, it is readonly.
         # So use python I/O to build up the file.
         f = open('foobar', 'wb')
 
         # The object still doesn't exist yet.
-        if self.ss_name == 's3_store':
-            with self.expectedStderrPattern('.*HTTP response code: 404.*'):
-                self.assertFalse(fs.fs_exist(session, 'foobar'))
-        else:
-            self.assertFalse(fs.fs_exist(session, 'foobar'))
+        self.assertFalse(fs.fs_exist(session, 'foobar'))
 
         outbytes = ('MORE THAN ENOUGH DATA\n'*100000).encode()
         f.write(outbytes)
