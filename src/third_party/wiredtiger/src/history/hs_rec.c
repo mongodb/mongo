@@ -950,7 +950,8 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
              * Use the original start time window's timestamps if it's timestamp is less than to the
              * mixed mode new update.
              */
-            if (hs_cbt->upd_value->tw.start_ts >= ts)
+            if (hs_cbt->upd_value->tw.start_ts >= ts ||
+              hs_cbt->upd_value->tw.durable_start_ts >= ts)
                 hs_insert_tw.start_ts = hs_insert_tw.durable_start_ts = mm_tombstone ? ts : ts - 1;
             else {
                 hs_insert_tw.start_ts = hs_cbt->upd_value->tw.start_ts;
