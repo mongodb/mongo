@@ -181,10 +181,17 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         simulate_crash_restart(self, ".", "RESTART")
 
         # Make sure we did get an inconsistent checkpoint.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        inconsistent_ckpt = stat_cursor[stat.conn.txn_rts_inconsistent_ckpt][2]
-        stat_cursor.close()
-        self.assertGreater(inconsistent_ckpt, 0)
+        #
+        # Disable this crosscheck until we have a more reliable way to generate inconsistent
+        # checkpoints (checkpoints with a torn transaction) on demand. The current method
+        # waits until the checkpoint has started to begin committing, but there's still a
+        # race where the checkpoint thread starts another checkpoint after the commit is
+        # finished. Consequently, occasional failures occur in the testbed, which are a waste
+        # of everyone's time.
+        #stat_cursor = self.session.open_cursor('statistics:', None, None)
+        #inconsistent_ckpt = stat_cursor[stat.conn.txn_rts_inconsistent_ckpt][2]
+        #stat_cursor.close()
+        #self.assertGreater(inconsistent_ckpt, 0)
 
 
 if __name__ == '__main__':
