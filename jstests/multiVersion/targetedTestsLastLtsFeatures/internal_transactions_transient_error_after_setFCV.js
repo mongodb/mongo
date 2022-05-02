@@ -92,8 +92,7 @@ function runTest(lsid) {
         autocommit: false,
     }),
                                            ErrorCodes.InternalTransactionNotSupported);
-
-    assert(ErrorCodes.isRetriableError(res.code));
+    assert(ErrorCodes.isRetriableError(res.writeErrors[0].code));
 
     docVal++;
 }
