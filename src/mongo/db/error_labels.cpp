@@ -189,6 +189,18 @@ BSONObj getErrorLabels(OperationContext* opCtx,
 bool isTransientTransactionError(ErrorCodes::Error code,
                                  bool hasWriteConcernError,
                                  bool isCommitOrAbort) {
+    if (code == ErrorCodes::InternalTransactionNotSupported) {
+        // InternalTransactionNotSupported is a retryable write error. This allows a retryable
+        // WouldChangeOwningShard update or findAndModify statement that fails to execute using an
+        // internal transaction during downgrade to be retried by the drivers; the retry would use
+        // the legacy way of handling WouldChangeOwningShard errors which does not require an
+        // internal transaction. Don't label InternalTransactionNotSupported as a transient
+        // transaction error since otherwise the transaction API would retry the internal
+        // transaction until it exhausts the maximum number of retries before returning an error to
+        // the drivers.
+        return false;
+    }
+
     bool isTransient;
     switch (code) {
         case ErrorCodes::WriteConflict:
