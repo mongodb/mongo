@@ -101,8 +101,10 @@ public:
     void onDeleteApplied();
     void onOplogEntriesFetched(int64_t numEntries, Milliseconds elapsed);
     void onLocalInsertDuringOplogFetching(Milliseconds elapsed);
-    void onBatchRetrievedDuringOplogApplying(int64_t numEntries, Milliseconds elapsed);
+    void onBatchRetrievedDuringOplogApplying(Milliseconds elapsed);
     void onOplogEntriesApplied(int64_t numEntries);
+    void onCloningTotalRemoteBatchRetrieval(Milliseconds elapsed);
+    void onOplogLocalBatchApplied(Milliseconds elapsed);
     void onWriteToStashedCollections();
 
     void onReadDuringCriticalSection();

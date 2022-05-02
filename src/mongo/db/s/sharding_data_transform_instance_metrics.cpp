@@ -262,7 +262,7 @@ void ShardingDataTransformInstanceMetrics::onDocumentsCopied(int64_t documentCou
                                                              Milliseconds elapsed) {
     _documentsCopied.addAndFetch(documentCount);
     _bytesCopied.addAndFetch(totalDocumentsSizeBytes);
-    _cumulativeMetrics->onInsertsDuringCloning(documentCount, elapsed);
+    _cumulativeMetrics->onInsertsDuringCloning(documentCount, totalDocumentsSizeBytes, elapsed);
 }
 
 int64_t ShardingDataTransformInstanceMetrics::getDocumentsCopiedCount() const {
@@ -297,20 +297,23 @@ void ShardingDataTransformInstanceMetrics::setCoordinatorLowEstimateRemainingTim
 
 void ShardingDataTransformInstanceMetrics::onInsertApplied() {
     _insertsApplied.addAndFetch(1);
+    _cumulativeMetrics->onInsertApplied();
 }
 
 void ShardingDataTransformInstanceMetrics::onUpdateApplied() {
     _updatesApplied.addAndFetch(1);
+    _cumulativeMetrics->onUpdateApplied();
 }
 
 void ShardingDataTransformInstanceMetrics::onDeleteApplied() {
     _deletesApplied.addAndFetch(1);
+    _cumulativeMetrics->onDeleteApplied();
 }
 
 void ShardingDataTransformInstanceMetrics::onOplogEntriesFetched(int64_t numEntries,
                                                                  Milliseconds elapsed) {
     _oplogEntriesFetched.addAndFetch(numEntries);
-    _cumulativeMetrics->onRemoteBatchRetrievedDuringOplogFetching(numEntries, elapsed);
+    _cumulativeMetrics->onOplogEntriesFetched(numEntries, elapsed);
 }
 
 void ShardingDataTransformInstanceMetrics::onLocalInsertDuringOplogFetching(Milliseconds elapsed) {
@@ -318,12 +321,13 @@ void ShardingDataTransformInstanceMetrics::onLocalInsertDuringOplogFetching(Mill
 }
 
 void ShardingDataTransformInstanceMetrics::onBatchRetrievedDuringOplogApplying(
-    int64_t numEntries, Milliseconds elapsed) {
-    _cumulativeMetrics->onBatchRetrievedDuringOplogApplying(numEntries, elapsed);
+    Milliseconds elapsed) {
+    _cumulativeMetrics->onBatchRetrievedDuringOplogApplying(elapsed);
 }
 
 void ShardingDataTransformInstanceMetrics::onOplogEntriesApplied(int64_t numEntries) {
     _oplogEntriesApplied.addAndFetch(numEntries);
+    _cumulativeMetrics->onOplogEntriesApplied(numEntries);
 }
 
 void ShardingDataTransformInstanceMetrics::onWriteDuringCriticalSection() {
@@ -373,6 +377,15 @@ void ShardingDataTransformInstanceMetrics::accumulateValues(int64_t insertsAppli
     _updatesApplied.fetchAndAdd(updatesApplied);
     _deletesApplied.fetchAndAdd(deletesApplied);
     _writesToStashCollections.fetchAndAdd(writesToStashCollections);
+}
+
+void ShardingDataTransformInstanceMetrics::onCloningTotalRemoteBatchRetrieval(
+    Milliseconds elapsed) {
+    _cumulativeMetrics->onCloningTotalRemoteBatchRetrieval(elapsed);
+}
+
+void ShardingDataTransformInstanceMetrics::onOplogLocalBatchApplied(Milliseconds elapsed) {
+    _cumulativeMetrics->onOplogLocalBatchApplied(elapsed);
 }
 
 }  // namespace mongo

@@ -240,13 +240,13 @@ void ShardingDataTransformCumulativeMetrics::reportForServerStatus(BSONObjBuilde
 
 void ShardingDataTransformCumulativeMetrics::reportActive(BSONObjBuilder* bob) const {
     BSONObjBuilder s(bob->subobjStart(kActive));
-    s.append(kDocumentsProcessed, kPlaceholderLong);
-    s.append(kBytesWritten, kPlaceholderLong);
-    s.append(kOplogEntriesFetched, kPlaceholderLong);
-    s.append(kOplogEntriesApplied, kPlaceholderLong);
-    s.append(kInsertsApplied, kPlaceholderLong);
-    s.append(kUpdatesApplied, kPlaceholderLong);
-    s.append(kDeletesApplied, kPlaceholderLong);
+    s.append(kDocumentsProcessed, _documentsProcessed.load());
+    s.append(kBytesWritten, _bytesWritten.load());
+    s.append(kOplogEntriesFetched, _oplogEntriesFetched.load());
+    s.append(kOplogEntriesApplied, _oplogEntriesApplied.load());
+    s.append(kInsertsApplied, _insertsApplied.load());
+    s.append(kUpdatesApplied, _updatesApplied.load());
+    s.append(kDeletesApplied, _deletesApplied.load());
     s.append(kCountWritesToStashCollections, _writesToStashedCollections.load());
     s.append(kCountWritesDuringCriticalSection, _writesDuringCriticalSection.load());
     s.append(kCountReadsDuringCriticalSection, _readsDuringCriticalSection.load());
@@ -264,11 +264,12 @@ void ShardingDataTransformCumulativeMetrics::reportOldestActive(BSONObjBuilder* 
 
 void ShardingDataTransformCumulativeMetrics::reportLatencies(BSONObjBuilder* bob) const {
     BSONObjBuilder s(bob->subobjStart(kLatencies));
-    s.append(kCollectionCloningTotalRemoteBatchRetrievalTimeMillis, kPlaceholderLong);
-    s.append(kCollectionCloningTotalRemoteBatchesRetrieved, kPlaceholderLong);
+    s.append(kCollectionCloningTotalRemoteBatchRetrievalTimeMillis,
+             _totalBatchRetrievedDuringCloneMillis.load());
+    s.append(kCollectionCloningTotalRemoteBatchesRetrieved, _totalBatchRetrievedDuringClone.load());
     s.append(kCollectionCloningTotalLocalInsertTimeMillis,
              _collectionCloningTotalLocalInsertTimeMillis.load());
-    s.append(kCollectionCloningTotalLocalInserts, _collectionCloningTotalLocalInserts.load());
+    s.append(kCollectionCloningTotalLocalInserts, _collectionCloningTotalLocalBatchInserts.load());
     s.append(kOplogFetchingTotalRemoteBatchRetrievalTimeMillis,
              _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis.load());
     s.append(kOplogFetchingTotalRemoteBatchesRetrieved,
@@ -279,8 +280,8 @@ void ShardingDataTransformCumulativeMetrics::reportLatencies(BSONObjBuilder* bob
     s.append(kOplogApplyingTotalLocalBatchRetrievalTimeMillis,
              _oplogApplyingTotalBatchesRetrievalTimeMillis.load());
     s.append(kOplogApplyingTotalLocalBatchesRetrieved, _oplogApplyingTotalBatchesRetrieved.load());
-    s.append(kOplogApplyingTotalLocalBatchApplyTimeMillis, kPlaceholderLong);
-    s.append(kOplogApplyingTotalLocalBatchesApplied, kPlaceholderLong);
+    s.append(kOplogApplyingTotalLocalBatchApplyTimeMillis, _oplogBatchAppliedMillis.load());
+    s.append(kOplogApplyingTotalLocalBatchesApplied, _oplogBatchApplied.load());
 }
 
 void ShardingDataTransformCumulativeMetrics::reportCurrentInSteps(BSONObjBuilder* bob) const {
@@ -423,16 +424,11 @@ const char* ShardingDataTransformCumulativeMetrics::fieldNameFor(
 }
 
 void ShardingDataTransformCumulativeMetrics::onInsertsDuringCloning(
-    int64_t count, const Milliseconds& elapsedTime) {
-    _collectionCloningTotalLocalInserts.fetchAndAdd(count);
+    int64_t count, int64_t bytes, const Milliseconds& elapsedTime) {
+    _collectionCloningTotalLocalBatchInserts.fetchAndAdd(1);
+    _documentsProcessed.fetchAndAdd(count);
+    _bytesWritten.fetchAndAdd(bytes);
     _collectionCloningTotalLocalInsertTimeMillis.fetchAndAdd(
-        durationCount<Milliseconds>(elapsedTime));
-}
-
-void ShardingDataTransformCumulativeMetrics::onRemoteBatchRetrievedDuringOplogFetching(
-    int64_t count, const Milliseconds& elapsedTime) {
-    _oplogFetchingTotalRemoteBatchesRetrieved.fetchAndAdd(count);
-    _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis.fetchAndAdd(
         durationCount<Milliseconds>(elapsedTime));
 }
 
@@ -443,8 +439,8 @@ void ShardingDataTransformCumulativeMetrics::onLocalInsertDuringOplogFetching(
 }
 
 void ShardingDataTransformCumulativeMetrics::onBatchRetrievedDuringOplogApplying(
-    int64_t count, const Milliseconds& elapsedTime) {
-    _oplogApplyingTotalBatchesRetrieved.fetchAndAdd(count);
+    const Milliseconds& elapsedTime) {
+    _oplogApplyingTotalBatchesRetrieved.fetchAndAdd(1);
     _oplogApplyingTotalBatchesRetrievalTimeMillis.fetchAndAdd(
         durationCount<Milliseconds>(elapsedTime));
 }
@@ -538,6 +534,41 @@ const ShardingDataTransformCumulativeMetrics::RecipientStateArray*
 ShardingDataTransformCumulativeMetrics::getStateArrayFor(
     ShardingDataTransformCumulativeMetrics::RecipientStateEnum state) const {
     return &_recipientStateList;
+}
+
+void ShardingDataTransformCumulativeMetrics::onInsertApplied() {
+    _insertsApplied.fetchAndAdd(1);
+}
+
+void ShardingDataTransformCumulativeMetrics::onUpdateApplied() {
+    _updatesApplied.fetchAndAdd(1);
+}
+
+void ShardingDataTransformCumulativeMetrics::onDeleteApplied() {
+    _deletesApplied.fetchAndAdd(1);
+}
+
+void ShardingDataTransformCumulativeMetrics::onOplogEntriesFetched(int64_t numEntries,
+                                                                   Milliseconds elapsed) {
+    _oplogEntriesFetched.fetchAndAdd(numEntries);
+    _oplogFetchingTotalRemoteBatchesRetrieved.fetchAndAdd(1);
+    _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis.fetchAndAdd(
+        durationCount<Milliseconds>(elapsed));
+}
+
+void ShardingDataTransformCumulativeMetrics::onOplogEntriesApplied(int64_t numEntries) {
+    _oplogEntriesApplied.fetchAndAdd(numEntries);
+}
+
+void ShardingDataTransformCumulativeMetrics::onCloningTotalRemoteBatchRetrieval(
+    Milliseconds elapsed) {
+    _totalBatchRetrievedDuringClone.fetchAndAdd(1);
+    _totalBatchRetrievedDuringCloneMillis.fetchAndAdd(durationCount<Milliseconds>(elapsed));
+}
+
+void ShardingDataTransformCumulativeMetrics::onOplogLocalBatchApplied(Milliseconds elapsed) {
+    _oplogBatchApplied.fetchAndAdd(1);
+    _oplogBatchAppliedMillis.fetchAndAdd(durationCount<Milliseconds>(elapsed));
 }
 
 }  // namespace mongo

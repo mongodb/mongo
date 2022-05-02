@@ -122,6 +122,11 @@ SemiFuture<void> ReshardingOplogApplier::_applyBatch(
         .onCompletion([this, latencyTimer](Status status) {
             _env->metrics()->onOplogApplierApplyBatch(
                 duration_cast<Milliseconds>(latencyTimer.elapsed()));
+
+            if (ShardingDataTransformMetrics::isEnabled()) {
+                _env->applierMetrics()->onOplogLocalBatchApplied(
+                    duration_cast<Milliseconds>(latencyTimer.elapsed()));
+            }
             return status;
         })
         .semi();
@@ -149,7 +154,7 @@ SemiFuture<void> ReshardingOplogApplier::run(
 
                        if (ShardingDataTransformMetrics::isEnabled()) {
                            _env->applierMetrics()->onBatchRetrievedDuringOplogApplying(
-                               batch.size(), Milliseconds(chainCtx->fetchTimer.millis()));
+                               duration_cast<Milliseconds>(chainCtx->fetchTimer.elapsed()));
                        }
 
                        _currentBatchToApply = std::move(batch);

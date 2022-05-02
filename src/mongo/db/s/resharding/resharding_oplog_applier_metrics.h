@@ -47,7 +47,8 @@ public:
     void onUpdateApplied();
     void onDeleteApplied();
 
-    void onBatchRetrievedDuringOplogApplying(int64_t numEntries, Milliseconds elapsed);
+    void onBatchRetrievedDuringOplogApplying(Milliseconds elapsed);
+    void onOplogLocalBatchApplied(Milliseconds elapsed);
     void onOplogEntriesApplied(int64_t numEntries);
     void onWriteToStashCollections();
 

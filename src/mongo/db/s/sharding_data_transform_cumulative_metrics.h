@@ -112,14 +112,21 @@ public:
     void onWriteDuringCriticalSection();
     void onWriteToStashedCollections();
 
+    void onInsertApplied();
+    void onUpdateApplied();
+    void onDeleteApplied();
+    void onOplogEntriesFetched(int64_t numEntries, Milliseconds elapsed);
+    void onOplogEntriesApplied(int64_t numEntries);
+    void onCloningTotalRemoteBatchRetrieval(Milliseconds elapsed);
+    void onOplogLocalBatchApplied(Milliseconds elapsed);
+
     static const char* fieldNameFor(CoordinatorStateEnum state);
     static const char* fieldNameFor(DonorStateEnum state);
     static const char* fieldNameFor(RecipientStateEnum state);
 
-    void onInsertsDuringCloning(int64_t count, const Milliseconds& elapsedTime);
-    void onRemoteBatchRetrievedDuringOplogFetching(int64_t count, const Milliseconds& elapsedTime);
+    void onInsertsDuringCloning(int64_t count, int64_t bytes, const Milliseconds& elapsedTime);
     void onLocalInsertDuringOplogFetching(const Milliseconds& elapsedTime);
-    void onBatchRetrievedDuringOplogApplying(int64_t count, const Milliseconds& elapsedTime);
+    void onBatchRetrievedDuringOplogApplying(const Milliseconds& elapsedTime);
 
 private:
     struct MetricsComparer {
@@ -173,6 +180,19 @@ private:
     AtomicWord<int64_t> _countFailed{0};
     AtomicWord<int64_t> _countCancelled{0};
 
+    AtomicWord<int64_t> _insertsApplied{0};
+    AtomicWord<int64_t> _updatesApplied{0};
+    AtomicWord<int64_t> _deletesApplied{0};
+    AtomicWord<int64_t> _oplogEntriesApplied{0};
+    AtomicWord<int64_t> _oplogEntriesFetched{0};
+
+    AtomicWord<int64_t> _totalBatchRetrievedDuringClone{0};
+    AtomicWord<int64_t> _totalBatchRetrievedDuringCloneMillis{0};
+    AtomicWord<int64_t> _oplogBatchApplied{0};
+    AtomicWord<int64_t> _oplogBatchAppliedMillis{0};
+    AtomicWord<int64_t> _documentsProcessed{0};
+    AtomicWord<int64_t> _bytesWritten{0};
+
     AtomicWord<int64_t> _lastOpEndingChunkImbalance{0};
     AtomicWord<int64_t> _readsDuringCriticalSection{0};
     AtomicWord<int64_t> _writesDuringCriticalSection{0};
@@ -181,7 +201,7 @@ private:
     DonorStateArray _donorStateList;
     RecipientStateArray _recipientStateList;
 
-    AtomicWord<int64_t> _collectionCloningTotalLocalInserts{0};
+    AtomicWord<int64_t> _collectionCloningTotalLocalBatchInserts{0};
     AtomicWord<int64_t> _collectionCloningTotalLocalInsertTimeMillis{0};
     AtomicWord<int64_t> _oplogFetchingTotalRemoteBatchesRetrieved{0};
     AtomicWord<int64_t> _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis{0};
