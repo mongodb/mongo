@@ -48,17 +48,17 @@ assert.commandWorked(
 sleep(1.1 * PROGRESS_TIMEOUT_SECONDS * 1000);
 
 // Servers should be still be alive.
-jsTestLog("Expect monogs processes to still be alive");
+jsTestLog("Expect mongos processes to still be alive");
 pingServers([st.s0, st.s1]);
 
 jsTestLog("Change observer to critical");
 changeObserverIntensity(st.s1, 'test', 'critical');
 
 // Wait for the progress monitor timeout to elapse.
-sleep(1.1 * PROGRESS_TIMEOUT_SECONDS * 1000);
+sleep((1.1 * PROGRESS_TIMEOUT_SECONDS * 1000) + 1000);
 
 jsTestLog("Done sleeping");
-// Servers should be still be alive.
+// Server should be still be alive.
 pingServers([st.s0]);
 
 let pingNetworkError = false;
