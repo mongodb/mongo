@@ -31,7 +31,7 @@ from wtscenario import make_scenarios
 from wiredtiger import stat
 
 # test_hs31.py
-# Ensure that tombstone with out of order timestamp clear the history store records.
+# Ensure that tombstone with no timestamp clear the history store records.
 class test_hs31(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=5MB,statistics=(all)'
     format_values = [
@@ -41,17 +41,12 @@ class test_hs31(wttest.WiredTigerTestCase):
         ('string-row', dict(key_format='S', value_format='S')),
     ]
 
-    ooo_values = [
-        ('out-of-order', dict(ooo_value=True)),
-        ('mixed-mode', dict(ooo_value=False)),
-    ]
-
     globally_visible_before_ckpt_values = [
         ('globally_visible_before_ckpt', dict(globally_visible_before_ckpt=True)),
         ('no_globally_visible_before_ckpt', dict(globally_visible_before_ckpt=False)),
     ]
 
-    scenarios = make_scenarios(format_values, ooo_values, globally_visible_before_ckpt_values)
+    scenarios = make_scenarios(format_values, globally_visible_before_ckpt_values)
     nrows = 1000
 
     def create_key(self, i):
@@ -65,9 +60,9 @@ class test_hs31(wttest.WiredTigerTestCase):
         stat_cursor.close()
         return val
 
-    def test_ooo_tombstone_clear_hs(self):
+    def test_mm_tombstone_clear_hs(self):
         uri = 'file:test_hs31'
-        create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        create_params = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 
         if self.value_format == '8t':
@@ -101,44 +96,39 @@ class test_hs31(wttest.WiredTigerTestCase):
             cursor2.reset()
         self.session.rollback_transaction()
 
-        if not self.ooo_value:
-            self.session.breakpoint()
-            # Start a long running transaction to stop the oldest id being advanced.
-            session2 = self.conn.open_session()
-            session2.begin_transaction()
-            long_cursor = session2.open_cursor(uri, None)
-            long_cursor[self.create_key(self.nrows + 10)] = value1
-            long_cursor.reset()
-            long_cursor.close()
+        self.session.breakpoint()
+        # Start a long running transaction to stop the oldest id being advanced.
+        session2 = self.conn.open_session()
+        session2.begin_transaction()
+        long_cursor = session2.open_cursor(uri, None)
+        long_cursor[self.create_key(self.nrows + 10)] = value1
+        long_cursor.reset()
+        long_cursor.close()
 
         # Remove the key with an ooo or mm timestamp.
         for i in range(1, self.nrows):
             self.session.begin_transaction()
             cursor.set_key(self.create_key(i))
             cursor.remove()
-            if self.ooo_value:
-                self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
-            else:
-                self.session.commit_transaction()
+            self.session.commit_transaction()
 
         if not self.globally_visible_before_ckpt:
             # Reconcile to write the stop time window.
             self.session.checkpoint()
 
-        if not self.ooo_value:
-            self.session.breakpoint()
-            # Ensure that old reader can read the history content.
-            long_cursor = session2.open_cursor(uri, None)
-            for i in range(1, self.nrows):
-                long_cursor.set_key(self.create_key(i))
-                self.assertEqual(long_cursor.search(), 0)
-                self.assertEqual(long_cursor.get_value(), value1)
-            long_cursor.reset()
-            long_cursor.close()
+        self.session.breakpoint()
+        # Ensure that old reader can read the history content.
+        long_cursor = session2.open_cursor(uri, None)
+        for i in range(1, self.nrows):
+            long_cursor.set_key(self.create_key(i))
+            self.assertEqual(long_cursor.search(), 0)
+            self.assertEqual(long_cursor.get_value(), value1)
+        long_cursor.reset()
+        long_cursor.close()
 
-            # Rollback the long running transaction.
-            session2.rollback_transaction()
-            session2.close()
+        # Rollback the long running transaction.
+        session2.rollback_transaction()
+        session2.close()
 
         # Pin oldest and stable to timestamp 5 so that the ooo tombstone is globally visible.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
@@ -179,4 +169,3 @@ class test_hs31(wttest.WiredTigerTestCase):
 
         hs_truncate = self.get_stat(stat.conn.cache_hs_key_truncate_onpage_removal)
         self.assertGreater(hs_truncate, 0)
-

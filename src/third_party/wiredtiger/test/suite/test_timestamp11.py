@@ -46,7 +46,7 @@ class test_timestamp11(wttest.WiredTigerTestCase, suite_subprocess):
     def test_timestamp_range(self):
         base = 'timestamp11'
         uri = 'file:' + base
-        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
 
         if self.key_format == 'r':

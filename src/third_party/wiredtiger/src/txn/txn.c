@@ -848,22 +848,13 @@ __txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *
     name = btree->dhandle->name;
     txn_has_ts = F_ISSET(txn, WT_TXN_HAS_TS_COMMIT | WT_TXN_HAS_TS_DURABLE);
 
-    /*
-     * Skip timestamp usage checks unless a usage configuration is set.
-     *
-     * FIXME: WT-9055 Once WT-9055 goes in, there are no more cases where usage configurations are
-     * not set, as ordered will be the default.
-     */
-    if (!LF_ISSET(WT_DHANDLE_TS_MIXED_MODE | WT_DHANDLE_TS_NEVER | WT_DHANDLE_TS_ORDERED))
-        return (0);
-
     /* Timestamps are ignored on logged files. */
     if (F_ISSET(btree, WT_BTREE_LOGGED))
         return (0);
 
     /*
      * Do not check for timestamp usage in recovery. We don't expect recovery to be using timestamps
-     * when applying commits, and it is possible that timestamps may be out of order in log replay.
+     * when applying commits, and it is possible that timestamps may be mixed mode in log replay.
      */
     if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
         return (0);

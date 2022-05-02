@@ -77,9 +77,9 @@ class test_rollback_to_stable11(test_rollback_to_stable_base):
             ',stable_timestamp=' + self.timestamp_str(10))
 
         # Perform several updates.
-        self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
-        self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
-        self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
+        self.large_updates(uri, value_a, ds, nrows, self.prepare, 12)
+        self.large_updates(uri, value_a, ds, nrows, self.prepare, 14)
+        self.large_updates(uri, value_a, ds, nrows, self.prepare, 16)
         self.large_updates(uri, value_b, ds, nrows, self.prepare, 20)
 
         # Verify data is visible and correct.
@@ -104,12 +104,12 @@ class test_rollback_to_stable11(test_rollback_to_stable_base):
 
         # Perform several updates.
         self.large_updates(uri, value_c, ds, nrows, self.prepare, 30)
-        self.large_updates(uri, value_c, ds, nrows, self.prepare, 30)
-        self.large_updates(uri, value_c, ds, nrows, self.prepare, 30)
-        self.large_updates(uri, value_d, ds, nrows, self.prepare, 30)
+        self.large_updates(uri, value_c, ds, nrows, self.prepare, 32)
+        self.large_updates(uri, value_c, ds, nrows, self.prepare, 34)
+        self.large_updates(uri, value_d, ds, nrows, self.prepare, 36)
 
         # Verify data is visible and correct.
-        self.check(value_d, uri, nrows, None, 31 if self.prepare else 30)
+        self.check(value_d, uri, nrows, None, 37 if self.prepare else 36)
 
         # Checkpoint to ensure that all the updates are flushed to disk.
         self.session.checkpoint()

@@ -2717,8 +2717,8 @@ err:
  *     history store contents associated with that key.
  */
 int
-__wt_rec_hs_clear_on_tombstone(WT_SESSION_IMPL *session, WT_RECONCILE *r, wt_timestamp_t ts,
-  uint64_t recno, WT_ITEM *rowkey, bool reinsert)
+__wt_rec_hs_clear_on_tombstone(
+  WT_SESSION_IMPL *session, WT_RECONCILE *r, uint64_t recno, WT_ITEM *rowkey, bool reinsert)
 {
     WT_BTREE *btree;
     WT_ITEM hs_recno_key, *key;
@@ -2746,13 +2746,12 @@ __wt_rec_hs_clear_on_tombstone(WT_SESSION_IMPL *session, WT_RECONCILE *r, wt_tim
     /*
      * From WT_TS_NONE delete/reinsert all the history store content of the key. The test of
      * WT_REC_CHECKPOINT_RUNNING asks the function to fail with EBUSY if we are trying to evict an
-     * out of order or mixed-mode update while a checkpoint is in progress; such eviction can race
-     * with the checkpoint itself and lead to history store inconsistency. (Note:
-     * WT_REC_CHECKPOINT_RUNNING is set only during evictions, and never in the checkpoint thread
-     * itself.)
+     * mixed-mode update while a checkpoint is in progress; such eviction can race with the
+     * checkpoint itself and lead to history store inconsistency. (Note: WT_REC_CHECKPOINT_RUNNING
+     * is set only during evictions, and never in the checkpoint thread itself.)
      */
-    WT_RET(__wt_hs_delete_key_from_ts(session, r->hs_cursor, btree->id, key, ts, reinsert, true,
-      F_ISSET(r, WT_REC_CHECKPOINT_RUNNING)));
+    WT_RET(__wt_hs_delete_key_from_ts(
+      session, r->hs_cursor, btree->id, key, reinsert, F_ISSET(r, WT_REC_CHECKPOINT_RUNNING)));
 
     /* Fail 0.01% of the time. */
     if (F_ISSET(r, WT_REC_EVICT) &&

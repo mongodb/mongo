@@ -5312,25 +5312,25 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! cache: eviction empty score */
 #define	WT_STAT_CONN_CACHE_EVICTION_EMPTY_SCORE		1063
 /*!
- * cache: eviction gave up due to detecting an out of order on disk value
+ * cache: eviction gave up due to detecting a mixed mode on disk value
  * behind the last update on the chain
  */
-#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_OOO_CHECKPOINT_RACE_1	1064
+#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_MM_CHECKPOINT_RACE_1	1064
 /*!
- * cache: eviction gave up due to detecting an out of order tombstone
- * ahead of the selected on disk update
+ * cache: eviction gave up due to detecting a mixed mode tombstone ahead
+ * of the selected on disk update
  */
-#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_OOO_CHECKPOINT_RACE_2	1065
+#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_MM_CHECKPOINT_RACE_2	1065
 /*!
- * cache: eviction gave up due to detecting an out of order tombstone
- * ahead of the selected on disk update after validating the update chain
+ * cache: eviction gave up due to detecting a mixed mode tombstone ahead
+ * of the selected on disk update after validating the update chain
  */
-#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_OOO_CHECKPOINT_RACE_3	1066
+#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_MM_CHECKPOINT_RACE_3	1066
 /*!
- * cache: eviction gave up due to detecting out of order timestamps on
- * the update chain after the selected on disk update
+ * cache: eviction gave up due to detecting mixed mode timestamps on the
+ * update chain after the selected on disk update
  */
-#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_OOO_CHECKPOINT_RACE_4	1067
+#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_MM_CHECKPOINT_RACE_4	1067
 /*! cache: eviction passes of a file */
 #define	WT_STAT_CONN_CACHE_EVICTION_WALK_PASSES		1068
 /*! cache: eviction server candidate queue empty when topping up */
@@ -5467,18 +5467,18 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_HS_INSERT_RESTART		1119
 /*! cache: history store table max on-disk size */
 #define	WT_STAT_CONN_CACHE_HS_ONDISK_MAX		1120
-/*! cache: history store table on-disk size */
-#define	WT_STAT_CONN_CACHE_HS_ONDISK			1121
 /*!
- * cache: history store table out-of-order resolved updates that lose
- * their durable timestamp
+ * cache: history store table mixed mode resolved updates that lose their
+ * durable timestamp
  */
-#define	WT_STAT_CONN_CACHE_HS_ORDER_LOSE_DURABLE_TIMESTAMP	1122
+#define	WT_STAT_CONN_CACHE_HS_ORDER_LOSE_DURABLE_TIMESTAMP	1121
 /*!
- * cache: history store table out-of-order updates that were fixed up by
+ * cache: history store table mixed mode updates that were fixed up by
  * reinserting with the fixed timestamp
  */
-#define	WT_STAT_CONN_CACHE_HS_ORDER_REINSERT		1123
+#define	WT_STAT_CONN_CACHE_HS_ORDER_REINSERT		1122
+/*! cache: history store table on-disk size */
+#define	WT_STAT_CONN_CACHE_HS_ONDISK			1123
 /*! cache: history store table reads */
 #define	WT_STAT_CONN_CACHE_HS_READ			1124
 /*! cache: history store table reads missed */
@@ -5504,7 +5504,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE_ONPAGE_REMOVAL	1130
 /*!
  * cache: history store table truncation to remove range of updates due
- * to out-of-order timestamp update on data page
+ * to mixed mode timestamp update on data page
  */
 #define	WT_STAT_CONN_CACHE_HS_ORDER_REMOVE		1131
 /*! cache: history store table writes requiring squashed modifies */
@@ -5586,9 +5586,9 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_EVICTION_FAIL_IN_RECONCILIATION	1165
 /*!
  * cache: pages selected for eviction unable to be evicted because of
- * race between checkpoint and out of order timestamps handling
+ * race between checkpoint and mixed mode timestamps handling
  */
-#define	WT_STAT_CONN_CACHE_EVICTION_FAIL_CHECKPOINT_OUT_OF_ORDER_TS	1166
+#define	WT_STAT_CONN_CACHE_EVICTION_FAIL_CHECKPOINT_MM_TS	1166
 /*! cache: pages walked for eviction */
 #define	WT_STAT_CONN_CACHE_EVICTION_WALK		1167
 /*! cache: pages written from cache */
@@ -6565,25 +6565,25 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! cache: data source pages selected for eviction unable to be evicted */
 #define	WT_STAT_DSRC_CACHE_EVICTION_FAIL		2051
 /*!
- * cache: eviction gave up due to detecting an out of order on disk value
+ * cache: eviction gave up due to detecting a mixed mode on disk value
  * behind the last update on the chain
  */
-#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_OOO_CHECKPOINT_RACE_1	2052
+#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_MM_CHECKPOINT_RACE_1	2052
 /*!
- * cache: eviction gave up due to detecting an out of order tombstone
- * ahead of the selected on disk update
+ * cache: eviction gave up due to detecting a mixed mode tombstone ahead
+ * of the selected on disk update
  */
-#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_OOO_CHECKPOINT_RACE_2	2053
+#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_MM_CHECKPOINT_RACE_2	2053
 /*!
- * cache: eviction gave up due to detecting an out of order tombstone
- * ahead of the selected on disk update after validating the update chain
+ * cache: eviction gave up due to detecting a mixed mode tombstone ahead
+ * of the selected on disk update after validating the update chain
  */
-#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_OOO_CHECKPOINT_RACE_3	2054
+#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_MM_CHECKPOINT_RACE_3	2054
 /*!
- * cache: eviction gave up due to detecting out of order timestamps on
- * the update chain after the selected on disk update
+ * cache: eviction gave up due to detecting mixed mode timestamps on the
+ * update chain after the selected on disk update
  */
-#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_OOO_CHECKPOINT_RACE_4	2055
+#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_MM_CHECKPOINT_RACE_4	2055
 /*! cache: eviction walk passes of a file */
 #define	WT_STAT_DSRC_CACHE_EVICTION_WALK_PASSES		2056
 /*! cache: eviction walk target pages histogram - 0-9 */
@@ -6630,12 +6630,12 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! cache: history store table insert calls that returned restart */
 #define	WT_STAT_DSRC_CACHE_HS_INSERT_RESTART		2073
 /*!
- * cache: history store table out-of-order resolved updates that lose
- * their durable timestamp
+ * cache: history store table mixed mode resolved updates that lose their
+ * durable timestamp
  */
 #define	WT_STAT_DSRC_CACHE_HS_ORDER_LOSE_DURABLE_TIMESTAMP	2074
 /*!
- * cache: history store table out-of-order updates that were fixed up by
+ * cache: history store table mixed mode updates that were fixed up by
  * reinserting with the fixed timestamp
  */
 #define	WT_STAT_DSRC_CACHE_HS_ORDER_REINSERT		2075
@@ -6664,7 +6664,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE_ONPAGE_REMOVAL	2082
 /*!
  * cache: history store table truncation to remove range of updates due
- * to out-of-order timestamp update on data page
+ * to mixed mode timestamp update on data page
  */
 #define	WT_STAT_DSRC_CACHE_HS_ORDER_REMOVE		2083
 /*! cache: history store table writes requiring squashed modifies */

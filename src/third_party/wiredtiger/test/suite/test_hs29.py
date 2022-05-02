@@ -33,7 +33,7 @@ import wttest
 # occurs:
 # - The reconciliation process opens one history store cursor.
 # - The function hs_delete_reinsert_from_pos creates a history store cursor too. This means we need
-# an update with an OOO timestamp to trigger that function.
+# an update with an mixed mode timestamp which is not globally visible to trigger that function.
 # - The function wt_rec_hs_clear_on_tombstone creates a history store cursor as well. This means we
 # need a tombstone to trigger the function, i.e a deleted key.
 class test_hs29(wttest.WiredTigerTestCase):
@@ -42,8 +42,12 @@ class test_hs29(wttest.WiredTigerTestCase):
 
         # Create a table.
         uri = "table:test_hs_cursor"
-        self.session.create(uri, 'key_format=S,value_format=S')
-        
+        self.session.create(uri, 'key_format=S,value_format=S,write_timestamp_usage=mixed_mode')
+
+        # Pin oldest and stable to timestamp 1.
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
+
         # Open one cursor to operate on the table and another one to perform eviction.
         cursor = self.session.open_cursor(uri)
         cursor2 = self.session.open_cursor(uri, None, "debug=(release_evict=true)")
@@ -76,16 +80,24 @@ class test_hs29(wttest.WiredTigerTestCase):
         self.assertEqual(cursor2.get_value(), '22')
         self.assertEqual(cursor2.reset(), 0)
 
+        old_reader_session = self.conn.open_session()
+        old_reader_cursor = old_reader_session.open_cursor(uri)
+        old_reader_session.begin_transaction('read_timestamp=' + self.timestamp_str(2))
+
         # Remove the first key without giving a ts.
         self.session.begin_transaction()
         cursor.set_key('1')
         cursor.remove()
         self.session.commit_transaction()
 
-        # Update the second key with out of order timestamp.
+        # Update the second key with mixed mode timestamp.
         self.session.begin_transaction()
         cursor['2'] = '222'
-        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
+        self.session.commit_transaction()
+
+        # Pin stable to timestamp 20.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
+        self.session.checkpoint()
 
         # Close the connection to trigger a final checkpoint and reconciliation.
         self.conn.close()

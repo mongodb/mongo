@@ -71,7 +71,7 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
         # Then alter the setting and verify the inconsistent usage is detected.
         uri = 'file:assert06'
         self.session.create(uri,
-            'key_format={},value_format={}'.format(self.key_format, self.value_format))
+            'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format))
         c = self.session.open_cursor(uri)
 
         # Insert a data item at timestamp 2.
@@ -81,10 +81,9 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
         self.apply_timestamps(2, True)
         self.session.commit_transaction()
 
-        # Modify the data item at timestamp 1, illegally moving the timestamp backward.
+        # Modify the data item at non timestamp, illegally moving the timestamp backward.
         self.session.begin_transaction()
         c[key] = ds.value(2)
-        self.apply_timestamps(1, True)
         self.session.commit_transaction()
 
         # Insert a non-timestamped item.

@@ -47,7 +47,7 @@ class test_hs16(wttest.WiredTigerTestCase):
 
     def test_hs16(self):
         uri = 'table:test_hs16'
-        create_params = 'key_format={}, value_format={}'.format(self.key_format, self.value_format)
+        create_params = 'key_format={}, value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
         cursor = self.session.open_cursor(uri)
 

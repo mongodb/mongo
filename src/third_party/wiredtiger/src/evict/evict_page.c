@@ -669,7 +669,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
 
     /*
      * If checkpoint is running concurrently, set the checkpoint running flag and we will abort the
-     * eviction if we detect out of order timestamp updates.
+     * eviction if we detect any mixed mode timestamp updates.
      */
     if (conn->txn_global.checkpoint_running)
         LF_SET(WT_REC_CHECKPOINT_RUNNING);

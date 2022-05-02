@@ -85,8 +85,7 @@ isolation level and doesn't hold a valid snapshot.
 @section arch_hs_reconciliation History store and reconciliation
 When a dirty page is reconciled on a user file btree, the update chain is examined and the latest
 committed update is chosen as the on-disk value. All older updates are added to the history store
-table assuming they are not yet obsolete. Additionally any out of order timestamps will
-be corrected.
+table assuming they are not yet obsolete. Additionally any mixed mode timestamps will be applied.
 
 Consider the following update chain for a user table with btree id 1000 and data store key "AAA":
 

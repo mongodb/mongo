@@ -30,7 +30,7 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 # test_timestamp20.py
-# Exercise fixing up of out-of-order updates in the history store.
+# Exercise fixing up of mixed mode updates in the history store.
 class test_timestamp20(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
 
@@ -44,9 +44,22 @@ class test_timestamp20(wttest.WiredTigerTestCase):
     def get_key(self, i):
         return str(i) if self.key_format == 'S' else i
 
+    def evict(self, uri):
+        s = self.conn.open_session()
+        s.begin_transaction()
+        # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
+        evict_cursor = s.open_cursor(uri, None, "debug=(release_evict)")
+        for i in range(1, 10000):
+            evict_cursor.set_key(self.get_key(i))
+            self.assertEquals(evict_cursor.search(), 0)
+            evict_cursor.reset()
+        s.rollback_transaction()
+        evict_cursor.close()
+        s.close()
+
     def test_timestamp20_standard(self):
         uri = 'table:test_timestamp20'
-        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
@@ -83,23 +96,24 @@ class test_timestamp20(wttest.WiredTigerTestCase):
         old_reader_cursor = old_reader_session.open_cursor(uri)
         old_reader_session.begin_transaction('read_timestamp=' + self.timestamp_str(20))
 
-        # Now put two updates out of order. 5 will go to the history store and will trigger a
+        # Now put two updates mixed mode. no timestamp will go to the history store and will trigger a
         # correction to the existing contents.
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor[self.get_key(i)] = value4
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(25))
+            self.session.commit_transaction()
             self.session.begin_transaction()
             cursor[self.get_key(i)] = value5
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(40))
 
+        self.evict(uri)
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(30))
         for i in range(1, 10000):
             self.assertEqual(cursor[self.get_key(i)], value4)
         self.session.rollback_transaction()
 
         for i in range(1, 10000):
-            self.assertEqual(old_reader_cursor[self.get_key(i)], value2)
+            self.assertEqual(old_reader_cursor[self.get_key(i)], value3)
         old_reader_session.rollback_transaction()
 
     # In this test we're using modifies since they are more sensitive to corruptions.
@@ -113,7 +127,7 @@ class test_timestamp20(wttest.WiredTigerTestCase):
             return
 
         uri = 'table:test_timestamp20'
-        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
@@ -157,18 +171,19 @@ class test_timestamp20(wttest.WiredTigerTestCase):
             self.assertEqual(cursor.modify([wiredtiger.Modify('D', 300, 1)]), 0)
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(40))
 
-        # Now put two updates out of order. 5 will go to the history store and will trigger a
+        # Now put two updates mixed mode. no timestamp will go to the history store and will trigger a
         # correction to the existing contents.
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor[self.get_key(i)] = value2
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(25))
+            self.session.commit_transaction()
             self.session.begin_transaction()
             cursor[self.get_key(i)] = value3
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(50))
 
+        self.evict(uri)
         # Open up a new transaction and read at 30.
-        # We shouldn't be able to see past 5 due to txnid visibility.
+        # We shouldn't be able to see past no timestamp due to txnid visibility.
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(30))
         for i in range(1, 10000):
             self.assertEqual(cursor[self.get_key(i)], value2)
@@ -177,6 +192,7 @@ class test_timestamp20(wttest.WiredTigerTestCase):
         # Put together expected value.
         expected = list(value1)
         expected[100] = 'B'
+        expected[200] = 'C'
         expected = str().join(expected)
 
         # On the other hand, this older transaction SHOULD be able to read past the 5.

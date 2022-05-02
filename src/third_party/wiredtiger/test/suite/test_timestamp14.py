@@ -50,7 +50,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         # In the absence of prepared transactions, all_durable is identical to
         # all_committed so let's enforce the all_durable values instead.
         all_durable_uri = self.uri + '_all_durable'
-        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
         session1 = self.setUpSessionOpen(self.conn)
         session2 = self.setUpSessionOpen(self.conn)
         session1.create(all_durable_uri, format)

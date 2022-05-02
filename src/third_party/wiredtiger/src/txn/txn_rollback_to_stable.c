@@ -445,16 +445,16 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
 
         /*
          * Verify the history store timestamps are in order. The start timestamp may be equal to the
-         * stop timestamp if the original update's commit timestamp is out of order. We may see
-         * records newer than or equal to the onpage value if eviction runs concurrently with
-         * checkpoint. In that case, don't verify the first record.
+         * stop timestamp if the original update's commit timestamp is in order. We may see records
+         * newer than or equal to the onpage value if eviction runs concurrently with checkpoint. In
+         * that case, don't verify the first record.
          *
          * It is possible during a prepared transaction rollback, the history store update that have
          * its own stop timestamp doesn't get removed leads to duplicate records in history store
          * after further operations on that same key. Rollback to stable should ignore such records
          * for timestamp ordering verification.
          *
-         * If we have fixed the out-of-order timestamps, then the newer update reinserted with an
+         * If we have fixed the mixed mode timestamps, then the newer update reinserted with an
          * older timestamp may have a durable timestamp that is smaller than the current stop
          * durable timestamp.
          *
@@ -558,7 +558,7 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
           hs_stop_durable_ts <= rollback_timestamp) {
             /*
              * The restoring tombstone timestamp must be zero or less than previous update start
-             * timestamp or the on-disk update is an out of order prepared.
+             * timestamp.
              */
             WT_ASSERT(session,
               hs_stop_durable_ts == WT_TS_NONE || hs_stop_durable_ts < newer_hs_durable_ts ||

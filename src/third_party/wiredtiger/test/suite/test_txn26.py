@@ -35,7 +35,7 @@ from wtscenario import make_scenarios
 
 # test_txn26.py
 #   Test that commit should fail if commit timestamp is smaller or equal to the active timestamp.
-#   Our handling of out of order timestamp relies on this to ensure repeated reads are working as
+#   Our handling of mixed mode timestamp relies on this to ensure repeated reads are working as
 #   expected.
 class test_txn26(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'

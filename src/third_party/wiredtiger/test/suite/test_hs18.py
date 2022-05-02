@@ -66,7 +66,7 @@ class test_hs18(wttest.WiredTigerTestCase):
 
     def test_base_scenario(self):
         uri = 'table:test_base_scenario'
-        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
         session2 = self.setUpSessionOpen(self.conn)
         cursor = self.session.open_cursor(uri)
@@ -133,7 +133,7 @@ class test_hs18(wttest.WiredTigerTestCase):
     # Test that we don't get the wrong value if we read with a timestamp originally.
     def test_read_timestamp_weirdness(self):
         uri = 'table:test_hs18'
-        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
         cursor = self.session.open_cursor(uri)
         session2 = self.setUpSessionOpen(self.conn)
@@ -204,7 +204,7 @@ class test_hs18(wttest.WiredTigerTestCase):
     # Test that forces us to ignore tombstone in order to not remove the first non timestamped updated.
     def test_ignore_tombstone(self):
         uri = 'table:test_ignore_tombstone'
-        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
         session2 = self.setUpSessionOpen(self.conn)
         cursor = self.session.open_cursor(uri)
@@ -266,7 +266,7 @@ class test_hs18(wttest.WiredTigerTestCase):
     # Test older readers for each of the updates moved to the history store.
     def test_multiple_older_readers(self):
         uri = 'table:test_multiple_older_readers'
-        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
         cursor = self.session.open_cursor(uri)
 
@@ -336,7 +336,7 @@ class test_hs18(wttest.WiredTigerTestCase):
 
     def test_multiple_older_readers_with_multiple_mixed_mode(self):
         uri = 'table:test_multiple_older_readers'
-        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
         cursor = self.session.open_cursor(uri)
 
@@ -453,7 +453,7 @@ class test_hs18(wttest.WiredTigerTestCase):
             return
 
         uri = 'table:test_modifies'
-        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
         cursor = self.session.open_cursor(uri)
         session_ts_reader = self.setUpSessionOpen(self.conn)

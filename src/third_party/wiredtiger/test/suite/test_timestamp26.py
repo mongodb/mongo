@@ -217,7 +217,7 @@ class test_timestamp26_alter_inconsistent_update(wttest.WiredTigerTestCase):
         # verify the inconsistent usage is detected.
         uri = 'table:ts'
         self.session.create(uri,
-            'key_format={},value_format={}'.format(self.key_format, self.value_format))
+            'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format))
 
         c = self.session.open_cursor(uri)
         key = ds.key(10)
@@ -228,9 +228,8 @@ class test_timestamp26_alter_inconsistent_update(wttest.WiredTigerTestCase):
         c[key] = ds.value(10)
         self.session.commit_transaction()
 
-        # Update the data item at timestamp 1.
+        # Update the data item with no timestamp.
         self.session.begin_transaction()
-        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(1))
         c[key] = ds.value(11)
         self.session.commit_transaction()
 
