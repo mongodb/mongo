@@ -1248,3 +1248,90 @@ waiting for pre-existing DDL coordinators to be re-instantiated in order to avoi
 If a [recoverable error](https://github.com/mongodb/mongo/blob/a1752a0f5300b3a4df10c0a704c07e597c3cd291/src/mongo/db/s/sharding_ddl_coordinator.cpp#L216-L226)
 is caught at execution-time, it will be retried indefinitely; all other errors errors have the effect of stopping and destructing the DDL coordinator and -
 because of that - are never expected to happen after a coordinator performs destructive operations.
+
+# User Write Blocking
+
+User write blocking prevents user initiated writes from being performed on C2C source and destination
+clusters during certain phases of C2C replication, allowing durable state to be propagated from the
+source without experiencing conflicts. Because the source and destination clusters are different
+administrative domains and thus can have separate configurations and metadata, operations which
+affect metadata, such as replset reconfig, are permitted. Also, internal operations which affect user
+collections but leave user data logically unaffected, such as chunk migration, are still permitted.
+Finally, users with certain privileges can bypass user write blocking; this is necessary so that the
+C2C sync daemon itself can write to user data.
+
+User write blocking is enabled and disabled by the command `{setUserWriteBlockMode: 1, global:
+<true/false>}`. On replica sets, this command is invoked on the primary, and enables/disables user
+write blocking replica-set-wide. On sharded clusters, this command is invoked on `mongos`, and
+enables/disables user write blocking cluster-wide. We define a write as a "user write" if the target
+database is not internal (the `admin`, `local`, and `config` databases being defined as internal),
+and if the user that initiated the write cannot perform the `bypassWriteBlockingMode` action on the
+`cluster` resource. By default, only the `restore`, `root`, and `__system` built-in roles have this
+privilege.
+
+The `UserWriteBlockModeOpObserver` is responsible for blocking disallowed writes. Upon any operation
+which writes, this `OpObserver` checks whether the `GlobalUserWriteBlockState` [allows writes to the
+target
+namespace](https://github.com/10gen/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/user_write_block_mode_op_observer.cpp#L276-L283).
+The `GlobalUserWriteBlockState` stores whether user write blocking is enabled in a given
+`ServiceContext`. As part of its write access check, it [checks whether the `WriteBlockBypass`
+associated with the given `OperationContext` is
+enabled](https://github.com/10gen/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/s/global_user_write_block_state.cpp#L59-L67).
+The `WriteBlockBypass` stores whether the user that initiated the write is able to perform writes
+when user write blocking is enabled.  On internal requests (i.e. from other `mongod` or `mongos`
+instances in the sharded cluster/replica set), the request originator propagates `WriteBlockBypass`
+[through the request
+metadata](https://github.com/10gen/mongo/blob/182616b7b45a1e360839c612c9ee8acaa130fe17/src/mongo/rpc/metadata.cpp#L115).
+On external requests, `WriteBlockBypass` is enabled [if the authenticated user is privileged to
+bypass user
+writes](https://github.com/10gen/mongo/blob/07c3d2ebcd3ca8127ed5a5aaabf439b57697b530/src/mongo/db/write_block_bypass.cpp#L60-L63).
+The `AuthorizationSession`, which is responsible for maintaining the authorization state, keeps track
+of whether the user has the privilege to bypass user write blocking by [updating a cached variable
+upon any changes to the authorization
+state](https://github.com/10gen/mongo/blob/e4032fe5c39f1974c76de4cefdc07d98ab25aeef/src/mongo/db/auth/authorization_session_impl.cpp#L1119-L1121).
+This structure enables, for example, sharded writes to work correctly with user write blocking,
+because the `WriteBlockBypass` state is initially set on the `mongos` based on the
+`AuthorizationSession`, which knows the privileges of the user making the write request, and then
+propagates from the `mongos` to the shards involved in the write. Note that this means on requests
+from `mongos`, shard servers don't check their own `AuthorizationSession`s when setting
+`WriteBlockBypass`. This would be incorrect behavior since internal requests have internal
+authorization, which confers all privileges, including the privilege to bypass user write blocking.
+
+The `setUserWriteBlockMode` command, before enabling user write blocking, blocks creation of new
+index builds and aborts all currently running index builds on non-internal databases, and drains the
+index builds it cannot abort. This upholds the invariant that while user write blocking is enabled,
+all running index builds are allowed to bypass write blocking and therefore can commit without
+additional checks.
+
+In sharded clusters, enabling user write blocking is a two-phase operation, coordinated by the config
+server. The first phase disallows creation of new `ShardingDDLCoordinator`s and drains all currently
+running `DDLCoordinator`s. The config server waits for all shards to complete this phase before
+moving onto the second phase, which aborts index builds and enables write blocking. This structure is
+used because enabling write blocking while there are ongoing `ShardingDDLCoordinator`s would prevent
+those operations from completing.
+
+#### Code references
+* The [`UserWriteBlockModeOpObserver`
+  class](https://github.com/10gen/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/user_write_block_mode_op_observer.h#L40)
+* The [`GlobalUserWriteBlockState`
+  class](https://github.com/10gen/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/s/global_user_write_block_state.h#L37)
+* The [`WriteBlockBypass`
+  class](https://github.com/10gen/mongo/blob/07c3d2ebcd3ca8127ed5a5aaabf439b57697b530/src/mongo/db/write_block_bypass.h#L38)
+* The [`abortUserIndexBuildsForUserWriteBlocking`
+  function](https://github.com/10gen/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/index_builds_coordinator.cpp#L850),
+  used to abort and drain all current user index builds
+* The [`SetUserWriteBlockModeCoordinator`
+  class](https://github.com/10gen/mongo/blob/ce908a66890bcdd87e709b584682c6b3a3a851be/src/mongo/db/s/config/set_user_write_block_mode_coordinator.h#L38),
+  used to coordinate the `setUserWriteBlockMode` command for sharded clusters
+* The [`UserWritesRecoverableCriticalSectionService`
+  class](https://github.com/10gen/mongo/blob/1c4e5ba241829145026f8aa0db70707f15fbe7b3/src/mongo/db/s/user_writes_recoverable_critical_section_service.h#L88),
+  used to manage and persist the user write blocking state
+* The `setUserWriteBlockMode` command invocation:
+    - [On a non-sharded
+      `mongod`](https://github.com/10gen/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/commands/set_user_write_block_mode_command.cpp#L68)
+    - [On a shard
+      server](https://github.com/10gen/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/s/shardsvr_set_user_write_block_mode_command.cpp#L61)
+    - [On a config
+      server](https://github.com/10gen/mongo/blob/c96f8dacc4c71b4774c932a07be4fac71b6db628/src/mongo/db/s/config/configsvr_set_user_write_block_mode_command.cpp#L56)
+    - [On a
+      `mongos`](https://github.com/10gen/mongo/blob/4ba31bc8627426538307848866d3165a17aa29fb/src/mongo/s/commands/cluster_set_user_write_block_mode_command.cpp#L61)
