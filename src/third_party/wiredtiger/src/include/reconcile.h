@@ -116,9 +116,9 @@ struct __wt_reconcile {
      * can delete the leaf page without reading it because we don't have to discard any overflow
      * items it might reference.
      *
-     * The test test is per-page reconciliation, that is, once we see an overflow item on the page,
-     * all subsequent leaf pages written for the page will not be leaf-no-overflow type, regardless
-     * of whether or not they contain overflow items. In other words, leaf-no-overflow is not
+     * The test is per-page reconciliation, that is, once we see an overflow item on the page, all
+     * subsequent leaf pages written for the page will not be leaf-no-overflow type, regardless of
+     * whether or not they contain overflow items. In other words, leaf-no-overflow is not
      * guaranteed to be set on every page that doesn't contain an overflow item, only that if it is
      * set, the page contains no overflow items. XXX This was originally done because raw
      * compression couldn't do better, now that raw compression has been removed, we should do

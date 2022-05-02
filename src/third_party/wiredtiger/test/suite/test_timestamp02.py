@@ -135,7 +135,7 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
         # - If both the oldest and the stable are provided in the same call, the test to check if
         #   they are being moved backwards is done first. The value that is being set backwards is
         #   silently dropped, as if not provided at all. This is followed by the test on the oldest
-        #   not being being set ahead of the stable.
+        #   not being set ahead of the stable.
 
         # Confirm that the oldest and the stable timestamps are as expected
         self.assertTimestampsEqual(\

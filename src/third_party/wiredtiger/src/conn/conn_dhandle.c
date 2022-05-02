@@ -787,7 +787,7 @@ __conn_dhandle_close_one(
 
 /*
  * __wt_conn_dhandle_close_all --
- *     Close all data handles handles with matching name (including all checkpoint handles).
+ *     Close all data handles with matching name (including all checkpoint handles).
  */
 int
 __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *uri, bool removed, bool mark_dead)

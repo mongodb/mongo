@@ -64,8 +64,8 @@ compact(void *arg)
          * Compact can return EBUSY if concurrent with alter or if there is eviction pressure, or we
          * collide with checkpoints.
          *
-         * Compact returns ETIMEDOUT if the compaction doesn't finish in in some number of seconds.
-         * We don't configure a timeout and occasionally exceed the default of 1200 seconds.
+         * Compact returns ETIMEDOUT if the compaction doesn't finish in some number of seconds. We
+         * don't configure a timeout and occasionally exceed the default of 1200 seconds.
          */
         table = table_select(NULL);
         ret = session->compact(session, table->uri, NULL);

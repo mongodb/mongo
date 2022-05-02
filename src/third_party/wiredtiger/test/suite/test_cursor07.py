@@ -98,7 +98,7 @@ class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
             keys = c.get_key()
             # txnid, rectype, optype, fileid, logrec_key, logrec_value
             values = c.get_value()
-            # We are only looking for log records that that have a key/value
+            # We are only looking for log records that have a key/value
             # pair.
             if values[4] != b'':
                 if value in values[5]:     # logrec_value

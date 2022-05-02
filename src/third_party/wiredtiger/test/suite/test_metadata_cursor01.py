@@ -124,7 +124,7 @@ class test_metadata_cursor01(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.metauri, None, None)
         self.assertCursorHasNoKeyValue(cursor)
 
-        # Ensure the 'special' metadata metadata is found.
+        # Ensure the 'special' metadata is found.
         value = cursor['metadata:']
         self.assertTrue(value.find('key_format') != -1)
 

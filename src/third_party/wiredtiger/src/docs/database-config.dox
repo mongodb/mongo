@@ -77,7 +77,7 @@ will be saved to the base configuration file so it's easier to write
 general-purpose applications that might not be aware of how a particular
 database was created and configured.
 
-Users should not not edit this file, set the \c WIREDTIGER_CONFIG
+Users should not edit this file, set the \c WIREDTIGER_CONFIG
 environment variable or create a \c WiredTiger.config file instead, as
 those settings override the settings in the base configuration file.
 

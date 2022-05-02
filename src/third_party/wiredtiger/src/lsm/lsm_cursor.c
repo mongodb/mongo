@@ -1574,9 +1574,9 @@ __clsm_remove(WT_CURSOR *cursor)
     WT_ERR(__clsm_put(session, clsm, &cursor->key, &__tombstone, true, false));
 
     /*
-     * If the cursor was positioned, it stays positioned with a key but no no value, otherwise,
-     * there's no position, key or value. This isn't just cosmetic, without a reset, iteration on
-     * this cursor won't start at the beginning/end of the table.
+     * If the cursor was positioned, it stays positioned with a key but no value, otherwise, there's
+     * no position, key or value. This isn't just cosmetic, without a reset, iteration on this
+     * cursor won't start at the beginning/end of the table.
      */
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
     if (positioned)

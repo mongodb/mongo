@@ -1674,7 +1674,7 @@ delete_b:
     ++ss->pages_next;
 
     /*
-     * Third, set its its stop key to be the stop key of the original chunk, and call
+     * Third, set its stop key to be the stop key of the original chunk, and call
      * __slvg_row_trk_update_start. That function will both set the start key to be the first key
      * after the stop key of the middle chunk (that's b_trk), and re-sort the WT_TRACK array as
      * necessary to move our new entry into the right sorted location.

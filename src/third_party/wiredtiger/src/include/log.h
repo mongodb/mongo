@@ -283,7 +283,7 @@ struct __wt_log {
 
 /*
  * Consolidation array information Our testing shows that the more consolidation we generate the
- * better the performance we see which equates to an active slot slot count of one.
+ * better the performance we see which equates to an active slot count of one.
  *
  * Note: this can't be an array, we impose cache-line alignment and gcc doesn't support that for
  * arrays.

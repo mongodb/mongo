@@ -706,8 +706,8 @@ __wt_rec_col_fix(
              * do that explicitly because we need to act on it. So there are three cases: (a) the
              * value has a globally visible stop time, in which case we should delete the value and
              * drop the time window; (b) the time window may have changed but remains nonempty, in
-             * which case we leave the value and write write the time window to the new page; or (c)
-             * the time window has become empty, in which case we leave the value and drop the time
+             * which case we leave the value and write the time window to the new page; or (c) the
+             * time window has become empty, in which case we leave the value and drop the time
              * window, which amounts to doing nothing at all.
              */
 
@@ -828,10 +828,9 @@ __wt_rec_col_fix(
     }
 
     /*
-     * Figure out how much more space is left. This is how many more entries will fit in in the
-     * bitmap data. We have to accommodate the auxiliary data for those entries, even if it becomes
-     * large. We can't split based on the auxiliary image size, at least not without a major
-     * rewrite.
+     * Figure out how much more space is left. This is how many more entries will fit in the bitmap
+     * data. We have to accommodate the auxiliary data for those entries, even if it becomes large.
+     * We can't split based on the auxiliary image size, at least not without a major rewrite.
      */
     nrecs = maxrecs - entry;
     r->recno += entry;

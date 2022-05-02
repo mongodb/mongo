@@ -246,7 +246,7 @@ __modify_fast_path(WT_ITEM *value, const size_t *p, int nentries, int *nappliedp
 
     /*
      * If the modifications are sorted and don't overlap in the old or new values, we can do a fast
-     * application of all the modifications modifications in a single pass.
+     * application of all the modifications in a single pass.
      *
      * The requirement for ordering is unfortunate, but modifications are performed in order, and
      * applications specify byte offsets based on that. In other words, byte offsets are cumulative,
