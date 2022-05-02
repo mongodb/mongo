@@ -93,7 +93,7 @@ variables:
     distros:
     - windows-vsCurrent-large
   - name: burn_in_tests_gen
-  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+  - name: .aggfuzzer .common
   - name: audit
   - name: auth_audit_gen
   - name: buildscripts_test
@@ -148,7 +148,7 @@ variables:
   - name: compile_build_tools_next_TG
     distros:
     - rhel70
-  #  - name: .aggfuzzer # Disabled for FCV 5.3
+  - name: .aggfuzzer
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
@@ -315,7 +315,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
-  #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+  - name: .aggfuzzer .common
   - name: aggregation
   - name: aggregation_auth
   - name: auth_gen
@@ -387,7 +387,7 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: test_api_version_compatibility
-  #  - name: .aggfuzzer !.multiversion # Disabled for FCV 5.3
+  - name: .aggfuzzer !.multiversion
   - name: .aggregation !.multiversion
   - name: audit
   - name: .auth !.multiversion
@@ -507,7 +507,7 @@ buildvariants:
   # to reduce the overall size of the generated configuration, most of the
   # tasks we would normally include have been disabled. See revert of
   # SERVER-60832
-  #    - name: .aggfuzzer # Disabled for FCV 5.3
+  #- name: .aggfuzzer
   #- name: .aggregation !.unwind
   #- name: audit
   #- name: .auth
@@ -678,7 +678,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
-  #  - name: .aggfuzzer # Disabled for FCV 5.3
+  - name: .aggfuzzer
   - name: .aggregation
   - name: audit
   - name: unittest_shell_hang_analyzer_gen
@@ -1076,7 +1076,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-large
-  #  - name: .aggfuzzer # Disabled for FCV 5.3
+  - name: .aggfuzzer
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -1372,7 +1372,7 @@ buildvariants:
   - name: burn_in_tests_gen
   - name: check_feature_flag_tags
   - name: check_for_todos
-  #  - name: .aggfuzzer # Disabled for FCV 5.3
+  - name: .aggfuzzer
   - name: .aggregation
   - name: audit
   - name: .auth
@@ -1535,7 +1535,7 @@ buildvariants:
     distros:
     - rhel80-large
   - name: burn_in_tests_gen
-  #  - name: .aggfuzzer # Disabled for FCV 5.3
+  - name: .aggfuzzer
   - name: .aggregation
   - name: audit
   - name: .auth
@@ -1645,7 +1645,7 @@ buildvariants:
     test_flags: >-
       --mongodSetParameters="{internalQueryForceClassicEngine: true}"
   tasks:
-  #  - name: .aggfuzzer # Disabled for FCV 5.3
+  - name: .aggfuzzer
   - name: .aggregation
   - name: .auth
   - name: .causally_consistent !.sharding
@@ -1979,7 +1979,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-xlarge
-  #  - name: .aggfuzzer # Disabled for FCV 5.3
+  - name: .aggfuzzer
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
@@ -2070,7 +2070,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel70
-  #  - name: .aggfuzzer # Disabled for FCV 5.3
+  - name: .aggfuzzer
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen

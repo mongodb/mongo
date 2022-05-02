@@ -22,7 +22,7 @@ buildvariants:
     separate_debug: off
   tasks:
     - name: compile_test_and_package_serial_TG
-    #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+    - name: .aggfuzzer .common
     - name: free_monitoring
     - name: .jstestfuzz !.initsync
 
