@@ -43,6 +43,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -55,6 +56,11 @@ Lock::ResourceMutex commandMutex("compactStructuredEncryptionDataCommandMutex");
 
 CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                                                   const CompactStructuredEncryptionData& request) {
+
+    uassert(6583201,
+            str::stream() << CompactStructuredEncryptionData::kCommandName
+                          << " must be run through mongos in a sharded cluster",
+            !ShardingState::get(opCtx)->enabled());
 
     // Only allow one instance of compactStructuredEncryptionData to run at a time.
     Lock::ExclusiveLock fleCompactCommandLock(opCtx->lockState(), commandMutex);
