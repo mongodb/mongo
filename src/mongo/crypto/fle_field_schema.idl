@@ -221,12 +221,12 @@ structs:
             unstable: true
           deleteTokens:
             description: "A map of field paths to FLEDeletePayload"
-            type: object
+            type: object_owned
             optional: true
             unstable: true
           schema:
             description: "A map of NamespaceString to EncryptedFieldConfig"
-            type: object
+            type: object_owned
             unstable: true
           crudProcessed:
             description: "A boolean to indicate whether the CRUD layer has already processed this FLE2 request. Used to prevent infinite recursion."
