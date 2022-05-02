@@ -74,6 +74,19 @@ BSONObj getMinValidDocument(OperationContext* opCtx, const NamespaceString& minV
     });
 }
 
+class JournalListenerWithDurabilityTracking : public JournalListener {
+public:
+    Token getToken(OperationContext* opCtx) {
+        return {};
+    }
+
+    void onDurable(const Token& token) {
+        onDurableCalled = true;
+    }
+
+    bool onDurableCalled = false;
+};
+
 class ReplicationConsistencyMarkersTest : public ServiceContextMongoDTest {
 protected:
     OperationContext* getOperationContext() {
@@ -84,6 +97,10 @@ protected:
         return _storageInterface.get();
     }
 
+    JournalListenerWithDurabilityTracking* getJournalListener() {
+        return &_jl;
+    }
+
 private:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
@@ -91,6 +108,7 @@ private:
         auto replCoord = std::make_unique<ReplicationCoordinatorMock>(getServiceContext());
         ReplicationCoordinator::set(getServiceContext(), std::move(replCoord));
         _storageInterface = std::make_unique<StorageInterfaceImpl>();
+        getServiceContext()->getStorageEngine()->setJournalListener(&_jl);
     }
 
     void tearDown() override {
@@ -105,21 +123,8 @@ private:
 
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<StorageInterfaceImpl> _storageInterface;
+    JournalListenerWithDurabilityTracking _jl;
 };
-
-/**
- * Recovery unit that tracks if waitUntilDurable() is called.
- */
-class RecoveryUnitWithDurabilityTracking : public RecoveryUnitNoop {
-public:
-    bool waitUntilDurable(OperationContext* opCtx) override;
-    bool waitUntilDurableCalled = false;
-};
-
-bool RecoveryUnitWithDurabilityTracking::waitUntilDurable(OperationContext* opCtx) {
-    waitUntilDurableCalled = true;
-    return RecoveryUnitNoop::waitUntilDurable(opCtx);
-}
 
 TEST_F(ReplicationConsistencyMarkersTest, InitialSyncFlag) {
     ReplicationConsistencyMarkersImpl consistencyMarkers(
@@ -222,19 +227,13 @@ TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
     // Check oplog truncate after point document.
     ASSERT_EQUALS(endOpTime.getTimestamp(), consistencyMarkers.getOplogTruncateAfterPoint(opCtx));
 
-    // SERVER-49685: We can't use a RecoveryUnitNoop with ephemeralForTest
-    //// Recovery unit will be owned by "opCtx".
-    // RecoveryUnitWithDurabilityTracking* recoveryUnit = new RecoveryUnitWithDurabilityTracking();
-    // opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(recoveryUnit),
-    //                       WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-
-    //// Set min valid without waiting for the changes to be durable.
-    // OpTime endOpTime2({Seconds(789), 0}, 1LL);
-    // consistencyMarkers.setMinValid(opCtx, endOpTime2);
-    // consistencyMarkers.clearAppliedThrough(opCtx, {});
-    // ASSERT_EQUALS(consistencyMarkers.getAppliedThrough(opCtx), OpTime());
-    // ASSERT_EQUALS(consistencyMarkers.getMinValid(opCtx), endOpTime2);
-    // ASSERT_FALSE(recoveryUnit->waitUntilDurableCalled);
+    // Set min valid without waiting for the changes to be durable.
+    OpTime endOpTime2({Seconds(789), 0}, 1LL);
+    consistencyMarkers.setMinValid(opCtx, endOpTime2, true);
+    consistencyMarkers.clearAppliedThrough(opCtx);
+    ASSERT_EQUALS(consistencyMarkers.getAppliedThrough(opCtx), OpTime());
+    ASSERT_EQUALS(consistencyMarkers.getMinValid(opCtx), endOpTime2);
+    ASSERT_FALSE(getJournalListener()->onDurableCalled);
 }
 
 TEST_F(ReplicationConsistencyMarkersTest, InitialSyncId) {
