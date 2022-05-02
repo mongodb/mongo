@@ -61,7 +61,6 @@ std::vector<repl::ReplOperation>& BatchedWriteContext::getBatchedOperations(
 }
 
 void BatchedWriteContext::clearBatchedOperations(OperationContext* opCtx) {
-    invariant(_batchWrites);
     _batchedOperations.clear();
 }
 

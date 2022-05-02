@@ -2,6 +2,7 @@
  * Verifies change streams operation for batched writes.
  *
  * @tags: [
+ *   featureFlagBatchMultiDeletes,
  *   # Running as a replica set requires journaling.
  *   requires_journaling,
  *   requires_majority_read_concern,
@@ -11,11 +12,8 @@
 (function() {
 "use strict";
 
-// '__internalBatchedDeletesTesting.Collection0' is a special, hardcoded namespace that batches
-// multi-doc deletes if the 'internalBatchUserMultiDeletesForTest' server parameter is set.
-// TODO (SERVER-63044): remove this special handling.
-const dbName = "__internalBatchedDeletesTesting";
-const collName = "Collection0";
+const dbName = "test";
+const collName = "c";
 
 /**
  * Asserts that the expected operation type and documentKey are found on the change stream
@@ -58,10 +56,8 @@ function runTest(conn) {
     const totalNumDocs = 8;
     let changeList = [];
 
-    // Enable batched deletes. For consistent results, disable any batch targeting except for
+    // For consistent results, disable any batch targeting except for
     // 'batchedDeletesTargetBatchDocs'.
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalBatchUserMultiDeletesForTest: 1}));
     assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: 0}));
     assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetStagedDocBytes: 0}));
     assert.commandWorked(

@@ -10,9 +10,10 @@ t.drop();
 
 var explain;
 
+// TODO (SERVER-66071): make BATCHED_DELETE the only expected delete stage.
 /**
- * Verify that the explain command output 'explain' shows a DELETE stage with an nWouldDelete
- * value equal to 'nWouldDelete'.
+ * Verify that the explain command output 'explain' shows a [BATCHED_]DELETE stage with an
+ * nWouldDelete value equal to 'nWouldDelete'.
  */
 function checkNWouldDelete(explain, nWouldDelete) {
     assert.commandWorked(explain);
@@ -20,19 +21,20 @@ function checkNWouldDelete(explain, nWouldDelete) {
     var executionStats = explain.executionStats;
     assert("executionStages" in executionStats);
 
-    // If passed through mongos, then DELETE stage(s) should be below the SHARD_WRITE mongos
-    // stage.  Otherwise the DELETE stage is the root stage.
+    // If passed through mongos, then [BATCHED_]DELETE stage(s) should be below the SHARD_WRITE
+    // mongos stage.  Otherwise the [BATCHED_]DELETE stage is the root stage.
     var execStages = executionStats.executionStages;
     if ("SHARD_WRITE" === execStages.stage) {
         let totalToBeDeletedAcrossAllShards = 0;
         execStages.shards.forEach(function(shardExplain) {
             const rootStageName = shardExplain.executionStages.stage;
-            assert.eq(rootStageName, "DELETE", tojson(execStages));
+            assert(rootStageName === "DELETE" || rootStageName === "BATCHED_DELETE",
+                   tojson(execStages));
             totalToBeDeletedAcrossAllShards += shardExplain.executionStages.nWouldDelete;
         });
         assert.eq(totalToBeDeletedAcrossAllShards, nWouldDelete, explain);
     } else {
-        assert.eq(execStages.stage, "DELETE", explain);
+        assert(execStages.stage === "DELETE" || execStages.stage === "BATCHED_DELETE", explain);
         assert.eq(execStages.nWouldDelete, nWouldDelete, explain);
     }
 }

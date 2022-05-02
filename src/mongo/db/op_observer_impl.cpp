@@ -873,6 +873,10 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
     OpTimeBundle opTime;
     if (inBatchedWrite) {
+        if (nss == NamespaceString::kSessionTransactionsTableNamespace) {
+            MongoDSessionCatalog::observeDirectWriteToConfigTransactions(opCtx,
+                                                                         documentKey.getId());
+        }
         auto operation =
             MutableOplogEntry::makeDeleteOperation(nss, uuid, documentKey.getShardKeyAndId());
         operation.setDestinedRecipient(destinedRecipientDecoration(opCtx));

@@ -2,6 +2,7 @@
  * Tests that data is consistent after a failover, clean, or unclean shutdown occurs in the middle
  * of a batched delete.
  * @tags: [
+ *  featureFlagBatchMultiDeletes,
  *  # TODO (SERVER-55909): make WUOW 'groupOplogEntries' the only mode of operation.
  *  does_not_support_transactions,
  *  exclude_from_large_txns,
@@ -92,13 +93,10 @@ const rst = new ReplSetTest({
 });
 const nodes = rst.startSet();
 rst.initiate();
+rst.awaitNodesAgreeOnPrimary();
 
-// '__internalBatchedDeletesTesting.Collection0' is a special, hardcoded namespace that batches
-// multi-doc deletes if the 'internalBatchUserMultiDeletesForTest' server parameter is set.
-// TODO (SERVER-63044): remove this special handling - but preserve a test specific namespace do the
-// failpoint does not interfere with other background operations.
-const dbName = "__internalBatchedDeletesTesting";
-const collName = "Collection0";
+const dbName = "test";
+const collName = "collHangBatchedDelete";
 
 function runTest(failoverFn, clustered, expectNetworkErrorOnDelete) {
     let primary = rst.getPrimary();
@@ -128,9 +126,6 @@ function runTest(failoverFn, clustered, expectNetworkErrorOnDelete) {
     const hangAfterApproxNDocs = Random.randInt(collCount);
     jsTestLog(`About to hang batched delete after evaluating approximately ${
         hangAfterApproxNDocs} documents`);
-
-    assert.commandWorked(
-        testDB.adminCommand({setParameter: 1, internalBatchUserMultiDeletesForTest: 1}));
 
     // When the delete fails, the failpoint will automatically unpause. If the connection is killed,
     // it is unsafe to try and disable the failpoint tied to testDB's original connection.

@@ -222,7 +222,7 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
         std::terminate();
     }
 
-    std::set<WorkingSetID> recordsThatNoLongerMatch;
+    std::set<WorkingSetID> recordsToSkip;
     Timer batchTimer(opCtx()->getServiceContext()->getTickSource());
 
     unsigned int docsDeleted = 0;
@@ -236,6 +236,7 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
         // Start a WUOW with 'groupOplogEntries' which groups a delete batch into a single timestamp
         // and oplog entry.
         WriteUnitOfWork wuow(opCtx(), true /* groupOplogEntries */);
+        bool groupedWuowActive = true;
         for (; bufferOffset < _stagedDeletesBuffer.size(); ++bufferOffset) {
             if (MONGO_unlikely(throwWriteConflictExceptionInBatchedDeleteStage.shouldFail())) {
                 throw WriteConflictException();
@@ -249,7 +250,49 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
                 collection(), opCtx(), _ws, workingSetMemberID, _params->canonicalQuery);
 
             WorkingSetMember* member = _ws->get(workingSetMemberID);
-            if (docStillMatches) {
+
+            // Determine whether the document being deleted is owned by this shard, and the action
+            // to undertake if it isn't.
+            const auto action = docStillMatches ? _preWriteFilter.computeAction(member->doc.value())
+                                                : write_stage_common::PreWriteFilter::Action::kSkip;
+
+            if (docStillMatches && action == write_stage_common::PreWriteFilter::Action::kSkip) {
+                recordsToSkip.insert(workingSetMemberID);
+            } else if (docStillMatches &&
+                       action == write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate) {
+                // TODO (SERVER-64107): re-use the original WUOW once change streams are able to
+                // handle to filter out 'fromMigrate' applyOps statements.
+                wuow.commit();
+                groupedWuowActive = false;
+                WriteUnitOfWork wuowSingleDoc(opCtx());
+
+                // Committing the original WUOW and creating a new WUOW has the side effect of
+                // allocating a new snapshot, so we have to re-check whether the staged document
+                // still matches the query predicate.
+                if (!write_stage_common::ensureStillMatches(
+                        collection(), opCtx(), _ws, workingSetMemberID, _params->canonicalQuery)) {
+                    recordsToSkip.insert(workingSetMemberID);
+                    break;
+                }
+
+                Snapshotted<Document> memberDoc = member->doc;
+                BSONObj bsonObjDoc = memberDoc.value().toBson();
+                collection()->deleteDocument(opCtx(),
+                                             Snapshotted(memberDoc.snapshotId(), bsonObjDoc),
+                                             _params->stmtId,
+                                             member->recordId,
+                                             _params->opDebug,
+                                             true /* fromMigrate */,
+                                             false,
+                                             _params->returnDeleted
+                                                 ? Collection::StoreDeletedDoc::On
+                                                 : Collection::StoreDeletedDoc::Off);
+
+                docsDeleted++;
+                wuowSingleDoc.commit();
+                break;
+            } else if (docStillMatches &&
+                       action == write_stage_common::PreWriteFilter::Action::kWrite) {
                 Snapshotted<Document> memberDoc = member->doc;
                 BSONObj bsonObjDoc = memberDoc.value().toBson();
                 applyOpsBytes += kApplyOpsArrayEntryPaddingBytes;
@@ -296,8 +339,10 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
                             _specificStats.docsDeleted + docsDeleted >=
                             static_cast<unsigned int>(data.getIntField("nDocs"));
                     });
+            } else if (!docStillMatches) {
+                recordsToSkip.insert(workingSetMemberID);
             } else {
-                recordsThatNoLongerMatch.insert(workingSetMemberID);
+                MONGO_UNREACHABLE;
             }
 
             const Milliseconds elapsedMillis(batchTimer.millis());
@@ -307,10 +352,11 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
                 break;
             }
         }
-
-        wuow.commit();
+        if (groupedWuowActive) {
+            wuow.commit();
+        }
     } catch (const WriteConflictException&) {
-        return _prepareToRetryDrainAfterWCE(out, recordsThatNoLongerMatch);
+        return _prepareToRetryDrainAfterWCE(out, recordsToSkip);
     }
 
     incrementSSSMetricNoOverflow(batchedDeletesSSS.docs, docsDeleted);
@@ -358,24 +404,28 @@ void BatchedDeleteStage::_stageNewDelete(WorkingSetID* workingSetMemberID) {
     // a fetch. We should always get fetched data, and never just key data.
     invariant(member->hasObj());
 
-    if (!_params->isExplain) {
-        // Preserve the member until the delete is committed. Once a delete is staged in the
-        // buffer, its resources are freed when it is removed from the buffer.
-        memberFreer.dismiss();
-
-        // Ensure that the BSONObj underlying the WSM associated with 'id' is owned because
-        // saveState() is allowed to free the memory the BSONObj points to. The BSONObj will be
-        // needed later when it is passed to Collection::deleteDocument(). Note that the call to
-        // makeObjOwnedIfNeeded() will leave the WSM in the RID_AND_OBJ state in case we need to
-        // retry deleting it.
-        member->makeObjOwnedIfNeeded();
-
-        _stagedDeletesBuffer.append(*workingSetMemberID);
-        const auto memberMemFootprintBytes = member->getMemUsage();
-        _stagedDeletesWatermarkBytes += memberMemFootprintBytes;
-        _passTotalDocsStaged += 1;
-        incrementSSSMetricNoOverflow(batchedDeletesSSS.stagedSizeBytes, memberMemFootprintBytes);
+    if (_params->isExplain) {
+        // Populate 'nWouldDelete' for 'executionStats'.
+        _specificStats.docsDeleted += 1;
+        return;
     }
+
+    // Preserve the member until the delete is committed. Once a delete is staged in the
+    // buffer, its resources are freed when it is removed from the buffer.
+    memberFreer.dismiss();
+
+    // Ensure that the BSONObj underlying the WSM associated with 'id' is owned because
+    // saveState() is allowed to free the memory the BSONObj points to. The BSONObj will be
+    // needed later when it is passed to Collection::deleteDocument(). Note that the call to
+    // makeObjOwnedIfNeeded() will leave the WSM in the RID_AND_OBJ state in case we need to
+    // retry deleting it.
+    member->makeObjOwnedIfNeeded();
+
+    _stagedDeletesBuffer.append(*workingSetMemberID);
+    const auto memberMemFootprintBytes = member->getMemUsage();
+    _stagedDeletesWatermarkBytes += memberMemFootprintBytes;
+    _passTotalDocsStaged += 1;
+    incrementSSSMetricNoOverflow(batchedDeletesSSS.stagedSizeBytes, memberMemFootprintBytes);
 }
 
 PlanStage::StageState BatchedDeleteStage::_tryRestoreState(WorkingSetID* out) {
@@ -389,8 +439,8 @@ PlanStage::StageState BatchedDeleteStage::_tryRestoreState(WorkingSetID* out) {
 }
 
 PlanStage::StageState BatchedDeleteStage::_prepareToRetryDrainAfterWCE(
-    WorkingSetID* out, const std::set<WorkingSetID>& recordsThatNoLongerMatch) {
-    _stagedDeletesBuffer.erase(recordsThatNoLongerMatch);
+    WorkingSetID* out, const std::set<WorkingSetID>& recordsToSkip) {
+    _stagedDeletesBuffer.erase(recordsToSkip);
     *out = WorkingSet::INVALID_ID;
     return NEED_YIELD;
 }

@@ -16,6 +16,19 @@ rst.initiate();
 const testDB = rst.getPrimary().getDB(dbName);
 const coll = testDB.getCollection(collName);
 
+// Determine whether deletes are batched.
+const ret = rst.getPrimary().adminCommand({getParameter: 1, featureFlagBatchMultiDeletes: 1});
+assert(ret.ok || (!ret.ok && ret.errmsg === "no option found to get"));
+const batchedDeletesEnabled = ret.ok ? ret.featureFlagBatchMultiDeletes.value : false;
+if (batchedDeletesEnabled) {
+    // For consistent results, generate a single delete (applyOps) batch.
+    assert.commandWorked(
+        testDB.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: 0}));
+    assert.commandWorked(
+        testDB.adminCommand({setParameter: 1, batchedDeletesTargetStagedDocBytes: 0}));
+    assert.commandWorked(testDB.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: 0}));
+}
+
 if (!testDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
     rst.stopSet();
     return;
@@ -99,15 +112,21 @@ request = {
 
 assert.commandWorked(coll.runCommand(request));
 
-ts1 = oplog.findOne({op: 'd', o: {_id: 1}}).ts;
-ts2 = oplog.findOne({op: 'd', o: {_id: 2}}).ts;
-let ts3 = oplog.findOne({op: 'd', o: {_id: 3}}).ts;
-let ts4 = oplog.findOne({op: 'd', o: {_id: 4}}).ts;
+if (batchedDeletesEnabled) {
+    const applyOps = oplog.findOne({op: 'c', ns: 'admin.$cmd', 'o.applyOps.op': 'd'});
+    const ts = applyOps['ts'];
+    check(ts, []);
+} else {
+    ts1 = oplog.findOne({op: 'd', o: {_id: 1}}).ts;
+    ts2 = oplog.findOne({op: 'd', o: {_id: 2}}).ts;
+    const ts3 = oplog.findOne({op: 'd', o: {_id: 3}}).ts;
+    const ts4 = oplog.findOne({op: 'd', o: {_id: 4}}).ts;
 
-check(ts1, [{_id: 2}, {_id: 3, a: 4}, {_id: 4, a: 5}]);
-check(ts2, [{_id: 3, a: 4}, {_id: 4, a: 5}]);
-check(ts3, [{_id: 4, a: 5}]);
-check(ts4, []);
+    check(ts1, [{_id: 2}, {_id: 3, a: 4}, {_id: 4, a: 5}]);
+    check(ts2, [{_id: 3, a: 4}, {_id: 4, a: 5}]);
+    check(ts3, [{_id: 4, a: 5}]);
+    check(ts4, []);
+}
 
 session.endSession();
 rst.stopSet();

@@ -345,11 +345,6 @@ class MongodLauncher(object):
         if "replSet" in mongod_options and "configsvr" in mongod_options:
             mongod_options["storageEngine"] = "wiredTiger"
 
-        # TODO (SERVER-63044): Remove the block below.
-        if executable.endswith("mongod"):
-            if "internalBatchUserMultiDeletesForTest" not in suite_set_parameters:
-                suite_set_parameters["internalBatchUserMultiDeletesForTest"] = 1
-
         return self.fixturelib.mongod_program(logger, job_num, executable, process_kwargs,
                                               mongod_options)
 

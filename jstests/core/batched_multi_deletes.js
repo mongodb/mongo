@@ -2,16 +2,17 @@
  * Tests batch-deleting a large range of data.
  *
  * @tags: [
+ *  # TODO (SERVER-66071): support sharded collections
+ *  assumes_unsharded_collection,
  *  does_not_support_retryable_writes,
  *  # TODO (SERVER-55909): make WUOW 'groupOplogEntries' the only mode of operation.
  *  does_not_support_transactions,
+ *  featureFlagBatchMultiDeletes,
  *  multiversion_incompatible,
  *  no_selinux,
  *  requires_fcv_60,
  *  requires_getmore,
  *  requires_non_retryable_writes,
- *  # TODO (SERVER-63044): namespace for this test is hardcoded, tenant migrations rename it.
- *  tenant_migration_incompatible,
  * ]
  */
 
@@ -19,11 +20,8 @@
 "use strict";
 
 function populateAndMassDelete(queryPredicate) {
-    // '__internalBatchedDeletesTesting.Collection0' is a special, hardcoded namespace that batches
-    // multi-doc deletes if the 'internalBatchUserMultiDeletesForTest' server parameter is set.
-    // TODO (SERVER-63044): remove this special handling.
-    const testDB = db.getSiblingDB('__internalBatchedDeletesTesting');
-    const coll = testDB['Collection0'];
+    const testDB = db.getSiblingDB('test');
+    const coll = testDB['c'];
 
     const collCount =
         54321;  // Intentionally not a multiple of BatchedDeleteStageBatchParams::targetBatchDocs.

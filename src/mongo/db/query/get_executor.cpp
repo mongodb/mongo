@@ -109,7 +109,6 @@
 
 namespace mongo {
 MONGO_FAIL_POINT_DEFINE(includeFakeColumnarIndex);
-MONGO_FAIL_POINT_DEFINE(batchDeletesByDefault);
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
     OperationContext* opCtx, const BSONObj& requestCollation, const NamespaceString& nss) {
@@ -1652,13 +1651,18 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     deleteStageParams->canonicalQuery = cq.get();
 
-    const bool batchDelete =
-        (deleteStageParams->isMulti && !deleteStageParams->fromMigrate &&
-         !deleteStageParams->returnDeleted && deleteStageParams->sort.isEmpty() &&
-         !deleteStageParams->numStatsForDoc) &&
-        ((gInternalBatchUserMultiDeletesForTest.load() &&
-          nss.ns() == "__internalBatchedDeletesTesting.Collection0") ||
-         (batchDeletesByDefault.shouldFail()));
+    // TODO (SERVER-64506): support change streams' pre- and post-images.
+    // TODO (SERVER-66071): support sharding.
+    // TODO (SERVER-66079): allow batched deletions in the config.* namespace.
+    const bool batchDelete = feature_flags::gBatchMultiDeletes.isEnabledAndIgnoreFCV() &&
+        gBatchUserMultiDeletes.load() &&
+        (opCtx->recoveryUnit()->getState() == RecoveryUnit::State::kInactive ||
+         opCtx->recoveryUnit()->getState() == RecoveryUnit::State::kActiveNotInUnitOfWork) &&
+        !opCtx->inMultiDocumentTransaction() && !opCtx->isRetryableWrite() &&
+        !collection->isChangeStreamPreAndPostImagesEnabled() && !collection.isSharded() &&
+        !collection->ns().isConfigDB() && deleteStageParams->isMulti &&
+        !deleteStageParams->fromMigrate && !deleteStageParams->returnDeleted &&
+        deleteStageParams->sort.isEmpty() && !deleteStageParams->numStatsForDoc;
 
     if (batchDelete) {
         root =

@@ -132,6 +132,10 @@ void WriteUnitOfWork::commit() {
         const auto opObserver = _opCtx->getServiceContext()->getOpObserver();
         invariant(opObserver);
         opObserver->onBatchedWriteCommit(_opCtx);
+
+        auto& batchedWriteContext = BatchedWriteContext::get(_opCtx);
+        batchedWriteContext.clearBatchedOperations(_opCtx);
+        batchedWriteContext.setWritesAreBatched(false);
     }
     if (_toplevel) {
         if (MONGO_unlikely(sleepBeforeCommit.shouldFail())) {

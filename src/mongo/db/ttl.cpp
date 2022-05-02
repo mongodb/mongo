@@ -581,8 +581,7 @@ private:
     // Returns BatchedDeleteStageBatchParams pointer only if the feature flag and the server
     // parameter are enabled. Due to current issues with change streams, for sharded collections,
     // returns nullptr to disable batch deletion.
-    // TODO: Remove exclusion of sharded collections after resolution of SERVER-64107 and
-    // SERVER-65644.
+    // TODO (SERVER-66071): Remove exclusion of sharded collections.
 
     std::unique_ptr<BatchedDeleteStageBatchParams> _getBatchedDeleteParamsIfEnabled(
         const CollectionPtr& collection) {

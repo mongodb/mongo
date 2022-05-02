@@ -2,6 +2,7 @@
  * Validate oplog behaviour of batched multi-deletes.
  *
  * @tags: [
+ *  featureFlagBatchMultiDeletes,
  *  # Running as a replica set requires journaling.
  *  requires_journaling,
  * ]
@@ -12,17 +13,12 @@
 
 // Verifies that batches replicate as applyOps entries.
 function validateBatchedDeletesOplogDocsPerBatch(conn) {
-    // '__internalBatchedDeletesTesting.Collection0' is a special, hardcoded namespace that batches
-    // multi-doc deletes if the 'internalBatchUserMultiDeletesForTest' server parameter is set.
-    // TODO (SERVER-63044): remove this special handling.
-    const db = conn.getDB("__internalBatchedDeletesTesting");
-    const coll = db.getCollection('Collection0');
+    const db = conn.getDB("test");
+    const coll = db.getCollection("c");
 
     const docsPerBatch = 100;
     const collCount = 5017;  // Intentionally not a multiple of docsPerBatch.
 
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalBatchUserMultiDeletesForTest: 1}));
     // Disable size-based batching
     assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetStagedDocBytes: 0}));
     // Disable time-based batching
@@ -53,8 +49,8 @@ function validateBatchedDeletesOplogDocsPerBatch(conn) {
 // Verifies the batched deleter cuts batches that stay within the 16MB BSON limit of one applyOps
 // entry.
 function validateBatchedDeletesOplogBatchAbove16MB(conn) {
-    const db = conn.getDB("__internalBatchedDeletesTesting");
-    const coll = db.getCollection('Collection0');
+    const db = conn.getDB("test");
+    const coll = db.getCollection("c");
 
     // With non-clustered collections (_id of ObjectId type) the batched deleter's conservative
     // applyOps estimation would cut a batch at ~63k documents. Create a collection >> 63k
@@ -64,8 +60,6 @@ function validateBatchedDeletesOplogBatchAbove16MB(conn) {
     const collCount = 130000;
     const expectedApplyOpsEntries =
         Math.ceil(collCount / 63600 /* max docs per batch, see comment above. */);
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalBatchUserMultiDeletesForTest: 1}));
     // Disable size-based batching
     assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetStagedDocBytes: 0}));
     // Disable time-based batching

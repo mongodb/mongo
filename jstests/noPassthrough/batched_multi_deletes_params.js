@@ -2,6 +2,7 @@
  * Validate batched multi-deleter's parameters.
  *
  * @tags: [
+ *  featureFlagBatchMultiDeletes,
  *  # Running as a replica set requires journaling.
  *  requires_journaling,
  * ]
@@ -19,13 +20,8 @@ rst.initiate();
 rst.awaitNodesAgreeOnPrimary();
 const conn = rst.getPrimary();
 
-// '__internalBatchedDeletesTesting.Collection0' is a special, hardcoded namespace that batches
-// multi-doc deletes if the 'internalBatchUserMultiDeletesForTest' server parameter is set.
-// TODO (SERVER-63044): remove this special handling.
-const db = conn.getDB("__internalBatchedDeletesTesting");
-const coll = db.getCollection('Collection0');
-
-assert.commandWorked(db.adminCommand({setParameter: 1, internalBatchUserMultiDeletesForTest: 1}));
+const db = conn.getDB("test");
+const coll = db.getCollection("c");
 
 function validateTargetDocsPerBatch() {
     const collCount = 1234;

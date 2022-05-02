@@ -113,9 +113,21 @@ assert.commandWorked(db.un.remove({_id: 10}));
 assert.commandWorked(db.un.remove({_id: 30}));
 
 a = oplog.findOne({ns: 'test.un', op: 'd', 'o._id': 10});
-assert.eq(a.o, {_id: 10});
+if (a) {
+    assert.eq(a.o, {_id: 10});
+} else {
+    // Validate this is a batched delete, which includes the document key.
+    a = oplog.findOne({ns: 'admin.$cmd', op: 'c', 'o.applyOps.o._id': 10});
+    assert.eq(a.o.applyOps[0].o, {_id: 10});
+}
 b = oplog.findOne({ns: 'test.un', op: 'd', 'o._id': 30});
-assert.eq(b.o, {_id: 30});
+if (b) {
+    assert.eq(b.o, {_id: 30});
+} else {
+    // Validate this is a batched delete, which includes the document key.
+    b = oplog.findOne({ns: 'admin.$cmd', op: 'c', 'o.applyOps.o._id': 30});
+    assert.eq(b.o.applyOps[0].o, {_id: 30});
+}
 
 ////////////////////////////////////////////////////////////////////////
 jsTest.log("Test remove command: 'byX'");

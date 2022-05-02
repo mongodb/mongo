@@ -172,6 +172,6 @@ runTestCase(testTTLDeleteWithIndexScanDocByDoc);
 runTestCase(testTTLDeleteWithCollectionScanBatched);
 runTestCase(testTTLDeleteWithCollectionScanDocByDoc);
 // Excluding sharded collections from batched deletes is a temporary measure.
-// TODO: Remove this test after SERVER-64107 and SERVER-65644 are resolved.
+// TODO (SERVER-66071): Remove this test.
 runTestCase(testTTLDeleteWithIndexScanBatchedExcludesShardedCollection, true);
 })();
