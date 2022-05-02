@@ -2408,9 +2408,6 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
                 WT_STAT_CONN_INCR(session, txn_fail_cache);
                 __wt_verbose_debug(
                   session, WT_VERB_TRANSACTION, "%s", session->txn->rollback_reason);
-                if (app_thread)
-                    __wt_verbose_notice(
-                      session, WT_VERB_TRANSACTION, "%s", session->txn->rollback_reason);
             }
             WT_ERR(ret);
         }
