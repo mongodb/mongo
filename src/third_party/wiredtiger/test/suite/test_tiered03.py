@@ -27,13 +27,13 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, re
-from helper_tiered import generate_s3_prefix, get_auth_token, get_bucket1_name
+from helper_tiered import TieredConfigMixin, storage_sources, get_conn_config
 import wtscenario, wttest
 from wtdataset import SimpleDataSet
 
 # test_tiered03.py
 #    Test block-log-structured tree configuration options.
-class test_tiered03(wttest.WiredTigerTestCase):
+class test_tiered03(wttest.WiredTigerTestCase, TieredConfigMixin):
     K = 1024
     M = 1024 * K
     G = 1024 * M
@@ -42,20 +42,11 @@ class test_tiered03(wttest.WiredTigerTestCase):
     # sharing would probably need to be reworked.
     uri = 'file:test_tiered03'
 
-    storage_sources = [
-        ('dirstore', dict(auth_token = get_auth_token('dir_store'),
-            bucket = get_bucket1_name('dir_store'),
-            bucket_prefix = "pfx_",
-            ss_name = 'dir_store')),
-        ('s3', dict(auth_token = get_auth_token('s3_store'),
-           bucket = get_bucket1_name('s3_store'),
-           bucket_prefix = generate_s3_prefix(),
-           ss_name = 's3_store')),
-    ]
     # Occasionally add a lot of records to vary the amount of work flush does.
     record_count_scenarios = wtscenario.quick_scenarios(
         'nrecs', [10, 10000], [0.9, 0.1])
-    scenarios = wtscenario.make_scenarios(storage_sources, record_count_scenarios, prune=100, prunelong=500)
+    scenarios = wtscenario.make_scenarios(storage_sources, record_count_scenarios,\
+         prune=100, prunelong=500)
 
     absolute_bucket_dir = None  # initialied in conn_config to an absolute path
 
@@ -79,28 +70,12 @@ class test_tiered03(wttest.WiredTigerTestCase):
                 self.absolute_bucket_dir = os.path.join(os.getcwd(), self.bucket)
                 os.mkdir(self.absolute_bucket_dir)
             bucket_ret = self.absolute_bucket_dir
-        return \
-          'debug_mode=(flush_checkpoint=true),' + \
-          'tiered_storage=(auth_token=%s,' % self.auth_token + \
-          'bucket=%s,' % bucket_ret  + \
-          'cache_directory=%s,' % cache_dir + \
-          'bucket_prefix=%s,' % self.bucket_prefix + \
-          'name=%s)' % self.ss_name
+        return get_conn_config(self) + 'cache_directory=%s)' % cache_dir
 
     # Load the storage store extension.
     def conn_extensions(self, extlist):
-        config = ''
-        # S3 store is built as an optional loadable extension, not all test environments build S3.
-        if self.ss_name == 's3_store':
-            #config = '=(config=\"(verbose=1)\")'
-            extlist.skip_if_missing = True
-        #if self.ss_name == 'dir_store':
-            #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
-        # Windows doesn't support dynamically loaded extension libraries.
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        extlist.extension('storage_sources', self.ss_name + config)
-
+        TieredConfigMixin.conn_extensions(self, extlist)
+    
     # Test sharing data between a primary and a secondary
     def test_sharing(self):
         # FIXME: WT-8235 Enable the test once file containing transaction ids is supported.

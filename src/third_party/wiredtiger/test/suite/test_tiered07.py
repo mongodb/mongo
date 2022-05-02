@@ -26,28 +26,22 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from helper_tiered import get_auth_token, get_bucket1_name
-from wtscenario import make_scenarios
 import os, wiredtiger, wttest
+from helper_tiered import  TieredConfigMixin, storage_sources, get_check
+from wtscenario import make_scenarios
+
 StorageSource = wiredtiger.StorageSource  # easy access to constants
 
 # test_tiered07.py
 #    Basic tiered storage API for schema operations.
-class test_tiered07(wttest.WiredTigerTestCase):
-    storage_sources = [
-        ('dir_store', dict(auth_token = get_auth_token('dir_store'),
-            bucket = get_bucket1_name('dir_store'),
-            bucket_prefix = "pfx_",
-            ss_name = 'dir_store')),
-        # FIXME-WT-8897 Disabled as S3 directory listing is interpreting a directory to end in a '/',
-        # whereas the code in the tiered storage doesn't expect that. Enable when fixed.
-        #('s3', dict(auth_token = get_auth_token('s3_store'),
-        #    bucket = get_bucket1_name('s3_store'),
-        #    bucket_prefix = generate_s3_prefix(),
-        #    ss_name = 's3_store'))
-    ]
+class test_tiered07(wttest.WiredTigerTestCase, TieredConfigMixin):
+
+    # FIXME-WT-8897 Disabled S3 (only indexing dirstore in storage sources) as S3 directory listing 
+    # is interpreting a directory to end in a '/', whereas the code in the tiered storage doesn't 
+    # expect that. Enable when fixed.
     # Make scenarios for different cloud service providers
-    scenarios = make_scenarios(storage_sources)
+    tiered_storage_dirstore_source = storage_sources[:1]
+    scenarios = make_scenarios(tiered_storage_dirstore_source)
 
     uri = "table:abc"
     uri2 = "table:ab"
@@ -56,36 +50,15 @@ class test_tiered07(wttest.WiredTigerTestCase):
     localuri = "table:local"
     newuri = "table:tier_new"
 
+    # Load the storage store extension.
     def conn_extensions(self, extlist):
-        config = ''
-        # S3 store is built as an optional loadable extension, not all test environments build S3.
-        if self.ss_name == 's3_store':
-            #config = '=(config=\"(verbose=1)\")'
-            extlist.skip_if_missing = True
-        #if self.ss_name == 'dir_store':
-            #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
-        # Windows doesn't support dynamically loaded extension libraries.
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        extlist.extension('storage_sources', self.ss_name + config)
-
+        TieredConfigMixin.conn_extensions(self, extlist)
+    
     def conn_config(self):
-        if self.ss_name == 'dir_store' and not os.path.exists(self.bucket):
-            os.mkdir(self.bucket)
-        #  'verbose=(tiered),' + \
-
-        return \
-          'debug_mode=(flush_checkpoint=true),' + \
-          'tiered_storage=(auth_token=%s,' % self.auth_token + \
-          'bucket=%s,' % self.bucket + \
-          'bucket_prefix=%s,' % self.bucket_prefix + \
-          'name=%s)' % self.ss_name 
-
-    def check(self, tc, n):
-        for i in range(0, n):
-            self.assertEqual(tc[str(i)], str(i))
-        tc.set_key(str(n))
-        self.assertEquals(tc.search(), wiredtiger.WT_NOTFOUND)
+        return TieredConfigMixin.conn_config(self)
+        
+    def check(self, tc, base, n):
+        get_check(self, tc, 0, n)
 
     # Test calling schema APIs with a tiered table.
     def test_tiered(self):
@@ -108,15 +81,15 @@ class test_tiered07(wttest.WiredTigerTestCase):
         self.pr('add one item to all tables')
         c = self.session.open_cursor(self.uri)
         c["0"] = "0"
-        self.check(c, 1)
+        self.check(c, 0, 1)
         c.close()
         c = self.session.open_cursor(self.uri2)
         c["0"] = "0"
-        self.check(c, 1)
+        self.check(c, 0, 1)
         c.close()
         c = self.session.open_cursor(self.uri3)
         c["0"] = "0"
-        self.check(c, 1)
+        self.check(c, 0, 1)
         c.close()
         c = self.session.open_cursor(self.localuri)
         c["0"] = "0"
@@ -157,10 +130,10 @@ class test_tiered07(wttest.WiredTigerTestCase):
         # Make sure there was no problem with overlapping table names.
         self.pr('check original similarly named tables')
         c = self.session.open_cursor(self.uri2)
-        self.check(c, 1)
+        self.check(c, 0, 1)
         c.close()
         c = self.session.open_cursor(self.uri3)
-        self.check(c, 1)
+        self.check(c, 0, 1)
         c.close()
 
         # Create new table with new name.

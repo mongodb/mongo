@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import datetime, inspect, os, random 
+import datetime, inspect, os, random, wiredtiger
 
 # These routines help run the various storage sources. They are required to manage
 # generation of storage source specific configurations.
@@ -55,27 +55,42 @@ s3_buckets = ['s3testext-us;us-east-2', 's3testext;ap-southeast-2']
 # Local buckets do not have a region
 local_buckets = ['bucket1', 'bucket2']
 
-# Get name of the first bucket in the list.
-def get_bucket1_name(storage_source):
+# Get name of the bucket at specified index in the list.
+def get_bucket_name(storage_source, i):
     if storage_source == 's3_store':
-        return s3_buckets[0]
+        return s3_buckets[i]
     if storage_source == 'dir_store':
-        return local_buckets[0]
+        return local_buckets[i]
     return None
 
-# Get name of the second bucket in the list.
-def get_bucket2_name(storage_source):
-    if storage_source == 's3_store':
-        return s3_buckets[1]
-    if storage_source == 'dir_store':
-        return local_buckets[1]
-    return None
+# Set up configuration
+def get_conn_config(storage_source):
+    if not storage_source.is_tiered_scenario():
+            return ''
+    if storage_source.ss_name == 'dir_store' and not os.path.exists(storage_source.bucket):
+            os.mkdir(storage_source.bucket)
+    return \
+        'debug_mode=(flush_checkpoint=true),' + \
+        'statistics=(all),' + \
+        'tiered_storage=(auth_token=%s,' % storage_source.auth_token + \
+        'bucket=%s,' % storage_source.bucket + \
+        'bucket_prefix=%s,' % storage_source.bucket_prefix + \
+        'name=%s,' % storage_source.ss_name
+
+def get_check(storage_source, tc, base, n):
+    for i in range(base, n):
+        storage_source.assertEqual(tc[str(i)], str(i))
+    tc.set_key(str(n))
+    storage_source.assertEquals(tc.search(), wiredtiger.WT_NOTFOUND)
 
 # Generate a unique object prefix for the S3 store. 
 def generate_s3_prefix(test_name = ''):
     # Generates a unique prefix to be used with the object keys, eg:
-    # "s3test/2022-31-01-16-34-10_623843294/"
-    prefix = 's3test/'
+    # "s3test/python/2022-31-01-16-34-10/623843294--".
+    # Objects with the prefex pattern "s3test/*" are deleted after a certain period of time 
+    # according to the lifecycle rule on the S3 bucket. Should you wish to make any changes to the
+    # prefix pattern or lifecycle of the object, please speak to the release manager. 
+    prefix = 's3test/python/'
     prefix += datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
     # Range upto int32_max, matches that of C++'s std::default_random_engine
     prefix += '/' + str(random.randrange(1, 2147483646)) + '--'
@@ -87,25 +102,35 @@ def generate_s3_prefix(test_name = ''):
     if not test_name:
         test_name = inspect.stack()[1][3]
     prefix += test_name + '--'
-
     return prefix
 
-# Storage sources.
+# Storage sources
 tiered_storage_sources = [
     ('dirstore', dict(is_tiered = True,
         is_local_storage = True,
         auth_token = get_auth_token('dir_store'),
-        bucket = get_bucket1_name('dir_store'),
+        bucket = get_bucket_name('dir_store', 0),
+        bucket1 = get_bucket_name('dir_store', 1),
         bucket_prefix = "pfx_",
+        bucket_prefix1 = "pfx1_",
+        bucket_prefix2 = 'pfx2_',
+        num_ops=100,
         ss_name = 'dir_store')),
     ('s3', dict(is_tiered = True,
         is_local_storage = False,
         auth_token = get_auth_token('s3_store'),
-        bucket = get_bucket1_name('s3_store'),
+        bucket = get_bucket_name('s3_store', 0),
+        bucket1 = get_bucket_name('s3_store', 1),
         bucket_prefix = generate_s3_prefix(),
+        bucket_prefix1 = generate_s3_prefix(),
+        bucket_prefix2 = generate_s3_prefix(),
+        num_ops=20,
         ss_name = 's3_store')),
     ('non_tiered', dict(is_tiered = False)),            
 ]
+
+# Sublist to use for the tiered test scenarios as last item on list is not a scenario.  
+storage_sources = tiered_storage_sources[:2]
 
 # This mixin class provides tiered storage configuration methods.
 class TieredConfigMixin:
