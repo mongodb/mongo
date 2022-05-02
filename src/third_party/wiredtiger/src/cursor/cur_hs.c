@@ -972,8 +972,10 @@ __curhs_insert(WT_CURSOR *cursor)
 #ifdef HAVE_DIAGNOSTIC
     /* Do a search again and call next to check the key order. */
     ret = __curhs_file_cursor_search_near(session, file_cursor, &exact);
-    WT_ASSERT(session, ret == 0 && exact == 0);
-    WT_ERR_NOTFOUND_OK(__curhs_file_cursor_next(session, file_cursor), false);
+    WT_ASSERT(session, ret == 0);
+    /* FIXME: WT-9164 Figure out whether we need to assert exact. */
+    if (exact == 0)
+        WT_ERR_NOTFOUND_OK(__curhs_file_cursor_next(session, file_cursor), false);
 #endif
 
     /* Insert doesn't maintain a position across calls, clear resources. */

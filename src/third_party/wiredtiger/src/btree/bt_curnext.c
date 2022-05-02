@@ -903,6 +903,10 @@ err:
         WT_TRET(__cursor_reset(cbt));
     }
     F_CLR(cbt, WT_CBT_ITERATE_RETRY_PREV);
+
+    if (ret == 0)
+        WT_RET(__wt_btcur_evict_reposition(cbt));
+
     return (ret);
 }
 

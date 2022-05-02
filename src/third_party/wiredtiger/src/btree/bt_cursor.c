@@ -446,6 +446,60 @@ __cursor_restart(WT_SESSION_IMPL *session, uint64_t *yield_count, uint64_t *slee
 }
 
 /*
+ * __cursor_search_neighboring --
+ *     Try after the search key, then before. At low isolation levels, new records could appear as
+ *     we are stepping through the tree.
+ */
+static int
+__cursor_search_neighboring(WT_CURSOR_BTREE *cbt, WT_CURFILE_STATE *state, int *exact)
+{
+    WT_BTREE *btree;
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    btree = CUR2BT(cbt);
+    cursor = &cbt->iface;
+    session = CUR2S(cbt);
+
+    while ((ret = __wt_btcur_next_prefix(cbt, &state->key, false)) != WT_NOTFOUND) {
+        WT_RET(ret);
+        if (btree->type == BTREE_ROW)
+            WT_RET(__wt_compare(session, btree->collator, &cursor->key, &state->key, exact));
+        else
+            *exact = cbt->recno < state->recno ? -1 : cbt->recno == state->recno ? 0 : 1;
+        if (*exact >= 0)
+            return (ret);
+    }
+
+    /*
+     * It is not necessary to go backwards when search_near is used with a prefix, as cursor row
+     * search places us on the first key of the prefix range. All the entries before the key we were
+     * placed on will not match the prefix.
+     *
+     * For example, if we search with the prefix "b", the cursor will be positioned at the first key
+     * starting with "b". All the entries before this one will start with "a", hence not matching
+     * the prefix.
+     */
+    if (F_ISSET(cursor, WT_CURSTD_PREFIX_SEARCH))
+        return (ret);
+
+    /*
+     * We walked to the end of the tree without finding a match. Walk backwards instead.
+     */
+    while ((ret = __wt_btcur_prev(cbt, false)) != WT_NOTFOUND) {
+        WT_RET(ret);
+        if (btree->type == BTREE_ROW)
+            WT_RET(__wt_compare(session, btree->collator, &cursor->key, &state->key, exact));
+        else
+            *exact = cbt->recno < state->recno ? -1 : cbt->recno == state->recno ? 0 : 1;
+        if (*exact <= 0)
+            return (ret);
+    }
+    return (ret);
+}
+
+/*
  * __wt_btcur_reset --
  *     Invalidate the cursor position.
  */
@@ -528,6 +582,73 @@ __wt_btcur_search_prepared(WT_CURSOR *cursor, WT_UPDATE **updp)
 
     *updp = upd;
     return (0);
+}
+
+/*
+ * __cursor_reposition_timing_stress --
+ *     Optionally reposition the cursor 10% of times
+ */
+static inline bool
+__cursor_reposition_timing_stress(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+
+    conn = S2C(session);
+
+    if (FLD_ISSET(conn->timing_stress_flags, WT_TIMING_STRESS_EVICT_REPOSITION) &&
+      __wt_random(&session->rnd) % 10 == 0)
+        return (true);
+
+    return (false);
+}
+
+/*
+ * __wt_btcur_evict_reposition --
+ *     Try to evict the page and reposition the cursor on the saved key.
+ */
+int
+__wt_btcur_evict_reposition(WT_CURSOR_BTREE *cbt)
+{
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    cursor = &cbt->iface;
+    session = CUR2S(cbt);
+
+    /* It's not always OK to release the cursor position */
+    if (!F_ISSET(cursor, WT_CURSTD_EVICT_REPOSITION))
+        return (0);
+
+    /*
+     * Try to evict the page and then reposition the cursor back to the page for operations with
+     * snapshot isolation and for pages that require urgent eviction. Snapshot isolation level
+     * maintains a snapshot allowing the cursor to point at the correct value after a reposition
+     * unlike read committed isolation level.
+     */
+    if (session->txn->isolation == WT_ISO_SNAPSHOT && F_ISSET(session->txn, WT_TXN_RUNNING) &&
+      (__wt_page_evict_soon_check(session, cbt->ref, NULL) ||
+        __cursor_reposition_timing_stress(session))) {
+
+        WT_STAT_CONN_DATA_INCR(session, cursor_reposition);
+        WT_ERR(__wt_cursor_localkey(cursor));
+        WT_ERR(__cursor_reset(cbt));
+        WT_WITHOUT_EVICT_REPOSITION(ret = __wt_btcur_search(cbt));
+        WT_ERR(ret);
+    }
+
+err:
+    if (ret != 0) {
+        WT_STAT_CONN_DATA_INCR(session, cursor_reposition_failed);
+        /*
+         * If we got a WT_ROLLBACK it is because there is a lot of cache pressure and the
+         * transaction is being killed - don't panic in that case.
+         */
+        if (ret != WT_ROLLBACK)
+            WT_RET_PANIC(session, ret, "failed to reposition the cursor");
+    }
+
+    return (ret);
 }
 
 /*
@@ -632,6 +753,9 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
     if (ret == 0)
         WT_ERR(__wt_cursor_key_order_init(cbt));
 #endif
+
+    if (ret == 0)
+        WT_ERR(__wt_btcur_evict_reposition(cbt));
 
 err:
     if (ret != 0) {
@@ -771,48 +895,14 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
         F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
         F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
     } else {
-        /*
-         * We didn't find an exact match: try after the search key, then before. We have to loop
-         * here because at low isolation levels, new records could appear as we are stepping through
-         * the tree.
-         */
-        while ((ret = __wt_btcur_next_prefix(cbt, &state.key, false)) != WT_NOTFOUND) {
-            WT_ERR(ret);
-            if (btree->type == BTREE_ROW)
-                WT_ERR(__wt_compare(session, btree->collator, &cursor->key, &state.key, &exact));
-            else
-                exact = cbt->recno < state.recno ? -1 : cbt->recno == state.recno ? 0 : 1;
-            if (exact >= 0)
-                goto done;
-        }
-
-        /*
-         * It is not necessary to go backwards when search_near is used with a prefix, as cursor row
-         * search places us on the first key of the prefix range. All the entries before the key we
-         * were placed on will not match the prefix.
-         *
-         * For example, if we search with the prefix "b", the cursor will be positioned at the first
-         * key starting with "b". All the entries before this one will start with "a", hence not
-         * matching the prefix.
-         */
-        if (F_ISSET(cursor, WT_CURSTD_PREFIX_SEARCH))
-            goto done;
-
-        /*
-         * We walked to the end of the tree without finding a match. Walk backwards instead.
-         */
-        while ((ret = __wt_btcur_prev(cbt, false)) != WT_NOTFOUND) {
-            WT_ERR(ret);
-            if (btree->type == BTREE_ROW)
-                WT_ERR(__wt_compare(session, btree->collator, &cursor->key, &state.key, &exact));
-            else
-                exact = cbt->recno < state.recno ? -1 : cbt->recno == state.recno ? 0 : 1;
-            if (exact <= 0)
-                goto done;
-        }
+        /* We didn't find an exact match, try to find the nearest one. */
+        WT_WITHOUT_EVICT_REPOSITION(ret = __cursor_search_neighboring(cbt, &state, &exact));
+        WT_ERR(ret);
     }
 
 done:
+    if (ret == 0)
+        WT_ERR(__wt_btcur_evict_reposition(cbt));
 err:
     if (ret == 0 && exactp != NULL)
         *exactp = exact;

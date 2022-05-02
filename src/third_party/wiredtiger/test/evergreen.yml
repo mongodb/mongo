@@ -2611,6 +2611,20 @@ tasks:
             set -o verbose
             ${test_env_vars|} ../../../tools/run_parallel.sh 'nice ./recovery-test.sh "${data_validation_stress_test_args} -s 5" WT_TEST.$t test_checkpoint' 120
 
+  - name: data-validation-stress-test-checkpoint-fp-hs-insert-s6
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build/test/checkpoint"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${test_env_vars|} ../../../tools/run_parallel.sh 'nice ./recovery-test.sh "${data_validation_stress_test_args} -x -s 6" WT_TEST.$t test_checkpoint' 120
+
   - name: format-failure-configs-test
     depends_on:
     - name: compile
@@ -3829,6 +3843,7 @@ buildvariants:
     - name: data-validation-stress-test-checkpoint-fp-hs-insert-s4
     - name: data-validation-stress-test-checkpoint-fp-hs-insert-s5
     - name: data-validation-stress-test-checkpoint-fp-hs-insert-s5-no-timestamp
+    - name: data-validation-stress-test-checkpoint-fp-hs-insert-s6
     - name: data-validation-stress-test-checkpoint-no-timestamp
     - name: unittest-test
     - name: tiered-storage-extensions-test

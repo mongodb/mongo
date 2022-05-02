@@ -35,6 +35,16 @@
       0                              /* uint32_t flags */                                       \
     }
 
+/* Call a function without the evict reposition cursor flag, restore afterwards. */
+#define WT_WITHOUT_EVICT_REPOSITION(e)                                              \
+    do {                                                                            \
+        bool __evict_reposition_flag = F_ISSET(cursor, WT_CURSTD_EVICT_REPOSITION); \
+        F_CLR(cursor, WT_CURSTD_EVICT_REPOSITION);                                  \
+        e;                                                                          \
+        if (__evict_reposition_flag)                                                \
+            F_SET(cursor, WT_CURSTD_EVICT_REPOSITION);                              \
+    } while (0)
+
 struct __wt_cursor_backup {
     WT_CURSOR iface;
 
@@ -232,7 +242,7 @@ struct __wt_cursor_btree {
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CBT_ACTIVE 0x001u             /* Active in the tree */
-#define WT_CBT_CACHEABLE_RLE_CELL 0x002u /* Col-store: value in RLE cell valid for all its keys */
+#define WT_CBT_CACHEABLE_RLE_CELL 0x002u /* Col-store: value in RLE cell valid for its keys */
 #define WT_CBT_ITERATE_APPEND 0x004u     /* Col-store: iterating append list */
 #define WT_CBT_ITERATE_NEXT 0x008u       /* Next iteration configuration */
 #define WT_CBT_ITERATE_PREV 0x010u       /* Prev iteration configuration */

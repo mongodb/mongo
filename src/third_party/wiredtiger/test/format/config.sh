@@ -248,6 +248,8 @@ CONFIG configuration_list[] = {
 
 {"stress.checkpoint_prepare", "stress checkpoint prepare", C_BOOL, 2, 0, 0}
 
+{"stress.evict_reposition", "stress evict reposition", C_BOOL, 2, 0, 0}
+
 {"stress.failpoint_hs_delete_key_from_ts", "stress failpoint history store delete key from ts", C_BOOL, 30, 0, 0}
 
 {"stress.hs_checkpoint_delay", "stress history store checkpoint delay", C_BOOL, 2, 0, 0}

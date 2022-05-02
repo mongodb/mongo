@@ -67,6 +67,7 @@ main(int argc, char *argv[])
     g.nops = 100000;
     g.ntables = 3;
     g.nworkers = 1;
+    g.evict_reposition_timing_stress = false;
     g.sweep_stress = g.use_timestamps = false;
     g.failpoint_hs_delete_key_from_ts = false;
     g.hs_checkpoint_timing_stress = g.reserved_txnid_timing_stress = false;
@@ -126,6 +127,9 @@ main(int argc, char *argv[])
                 break;
             case '5':
                 g.checkpoint_slow_timing_stress = true;
+                break;
+            case '6':
+                g.evict_reposition_timing_stress = true;
                 break;
             default:
                 return (usage());
@@ -270,11 +274,14 @@ wt_connect(const char *config_open)
 
     fast_eviction = false;
     timing_stress = false;
-    if (g.sweep_stress || g.failpoint_hs_delete_key_from_ts || g.hs_checkpoint_timing_stress ||
-      g.reserved_txnid_timing_stress || g.checkpoint_slow_timing_stress) {
+    if (g.evict_reposition_timing_stress || g.sweep_stress || g.failpoint_hs_delete_key_from_ts ||
+      g.hs_checkpoint_timing_stress || g.reserved_txnid_timing_stress ||
+      g.checkpoint_slow_timing_stress) {
         timing_stress = true;
         testutil_check(__wt_snprintf(timing_stress_config, sizeof(timing_stress_config),
-          ",timing_stress_for_test=[%s%s%s%s%s]", g.sweep_stress ? "aggressive_sweep" : "",
+          ",timing_stress_for_test=[%s%s%s%s%s%s]",
+          g.evict_reposition_timing_stress ? "evict_reposition" : "",
+          g.sweep_stress ? "aggressive_sweep" : "",
           g.failpoint_hs_delete_key_from_ts ? "failpoint_history_store_delete_key_from_ts" : "",
           g.hs_checkpoint_timing_stress ? "history_store_checkpoint_delay" : "",
           g.reserved_txnid_timing_stress ? "checkpoint_reserved_txnid_delay" : "",

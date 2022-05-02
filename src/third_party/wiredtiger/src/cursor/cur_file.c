@@ -179,6 +179,7 @@ __curfile_next(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_API_CALL(cursor, session, next, CUR2BT(cbt));
+    CURSOR_REPOSITION_ENTER(cursor, session);
     WT_ERR(__cursor_copy_release(cursor));
 
     WT_ERR(__curfile_check_cbt_txn(session, cbt));
@@ -192,6 +193,7 @@ __curfile_next(WT_CURSOR *cursor)
         F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:
+    CURSOR_REPOSITION_END(cursor, session);
     API_END_RET(session, ret);
 }
 
@@ -238,6 +240,7 @@ __curfile_prev(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_API_CALL(cursor, session, prev, CUR2BT(cbt));
+    CURSOR_REPOSITION_ENTER(cursor, session);
     WT_ERR(__cursor_copy_release(cursor));
 
     WT_ERR(__curfile_check_cbt_txn(session, cbt));
@@ -251,6 +254,7 @@ __curfile_prev(WT_CURSOR *cursor)
         F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:
+    CURSOR_REPOSITION_END(cursor, session);
     API_END_RET(session, ret);
 }
 
@@ -294,6 +298,7 @@ __curfile_search(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_API_CALL(cursor, session, search, CUR2BT(cbt));
+    CURSOR_REPOSITION_ENTER(cursor, session);
     WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 
@@ -311,6 +316,7 @@ __curfile_search(WT_CURSOR *cursor)
         F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:
+    CURSOR_REPOSITION_END(cursor, session);
     API_END_RET(session, ret);
 }
 
@@ -328,6 +334,7 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_API_CALL(cursor, session, search_near, CUR2BT(cbt));
+    CURSOR_REPOSITION_ENTER(cursor, session);
     WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 
@@ -345,6 +352,7 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
         F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:
+    CURSOR_REPOSITION_END(cursor, session);
     API_END_RET(session, ret);
 }
 

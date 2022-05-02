@@ -67,6 +67,7 @@ typedef struct {
     int ntables_created;                  /* Number tables opened */
     volatile int running;                 /* Whether to stop */
     int status;                           /* Exit status */
+    bool evict_reposition_timing_stress;  /* Reposition the cursor for read operations */
     bool sweep_stress;                    /* Sweep stress test */
     bool failpoint_hs_delete_key_from_ts; /* Failpoint for hs key deletion. */
     bool hs_checkpoint_timing_stress;     /* History store checkpoint timing stress */
