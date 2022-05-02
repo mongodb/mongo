@@ -4171,7 +4171,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    doc_update_branches: develop,mongodb-5.0,mongodb-4.4,mongodb-4.2,mongodb-4.0
+    doc_update_branches: develop,mongodb-6.0,mongodb-5.0,mongodb-4.4,mongodb-4.2,mongodb-4.0
   tasks:
     - name: doc-update
 
