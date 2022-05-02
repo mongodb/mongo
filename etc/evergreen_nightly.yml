@@ -202,7 +202,7 @@ buildvariants:
   - name: burn_in_tests_gen
   - name: check_feature_flag_tags
   - name: check_for_todos
-  #  - name: .aggfuzzer # Disabled for FCV 5.3
+  - name: .aggfuzzer
   - name: .aggregation
   - name: audit
   - name: .auth

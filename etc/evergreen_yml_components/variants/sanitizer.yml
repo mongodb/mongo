@@ -23,7 +23,7 @@ buildvariants:
   tasks:
     - name: compile_test_and_package_serial_TG
     - name: build_variant_gen
-    #  - name: .aggfuzzer .common # Disabled for FCV 5.3
+    - name: .aggfuzzer .common
     - name: free_monitoring
     - name: .jstestfuzz !.initsync
 
