@@ -98,10 +98,11 @@ using std::string;
 using std::stringstream;
 using std::unique_ptr;
 
+Counter64 allowDiskUseFalseCounter;
+
 namespace {
-Counter64 allowDiskUseCounter;
-ServerStatusMetricField<Counter64> allowDiskUseMetric{"commands.aggregate.allowDiskUseTrue",
-                                                      &allowDiskUseCounter};
+ServerStatusMetricField<Counter64> allowDiskUseMetric{"query.allowDiskUseFalse",
+                                                      &allowDiskUseFalseCounter};
 
 /**
  * If a pipeline is empty (assuming that a $cursor stage hasn't been created yet), it could mean
@@ -907,8 +908,8 @@ Status runAggregate(OperationContext* opCtx,
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
         expCtx->stopExpressionCounters();
 
-        if (request.getAllowDiskUse()) {
-            allowDiskUseCounter.increment();
+        if (!request.getAllowDiskUse().value_or(true)) {
+            allowDiskUseFalseCounter.increment();
         }
 
         // Check that the view's collation matches the collation of any views involved in the

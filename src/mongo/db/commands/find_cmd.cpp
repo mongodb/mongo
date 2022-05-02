@@ -559,6 +559,10 @@ public:
                 return;
             }
 
+            if (!cq->getFindCommandRequest().getAllowDiskUse().value_or(true)) {
+                allowDiskUseFalseCounter.increment();
+            }
+
             // Check whether we are allowed to read from this node after acquiring our locks.
             uassertStatusOK(replCoord->checkCanServeReadsFor(
                 opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));

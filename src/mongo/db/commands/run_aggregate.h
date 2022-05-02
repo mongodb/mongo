@@ -69,4 +69,8 @@ Status runAggregate(OperationContext* opCtx,
                     const PrivilegeVector& privileges,
                     rpc::ReplyBuilderInterface* result);
 
+/**
+ * Tracks explicit use of allowDiskUse:false with find and aggregate commands.
+ */
+extern Counter64 allowDiskUseFalseCounter;
 }  // namespace mongo
