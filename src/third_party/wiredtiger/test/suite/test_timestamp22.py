@@ -352,8 +352,6 @@ class test_timestamp22(wttest.WiredTigerTestCase):
         if oldest >= 0 and stable < 0:
             expected = expected_newer(expected, self.stable_ts, oldest, self.oldest_ts)
         expected = expected_newer(expected, stable, oldest, self.oldest_ts)
-        expected = expected_newer(expected, durable, oldest, self.oldest_ts)
-        expected = expected_newer(expected, durable, stable, self.stable_ts)
 
         return expected
 

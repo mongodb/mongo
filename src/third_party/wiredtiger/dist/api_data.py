@@ -1944,14 +1944,15 @@ methods = {
 
 'WT_CONNECTION.query_timestamp' : Method([
     Config('get', 'all_durable', r'''
-        specify which timestamp to query: \c all_durable returns the largest timestamp such that
-        all timestamps up to that value have been made durable; \c last_checkpoint returns the
+        specify which timestamp to query: \c all_durable returns the largest timestamp such
+        that all timestamps up to and including that value have been committed (possibly
+        bounded by the application-set \c durable timestamp); \c last_checkpoint returns the
         timestamp of the most recent stable checkpoint; \c oldest_timestamp returns the most
         recent \c oldest_timestamp set with WT_CONNECTION::set_timestamp; \c oldest_reader
         returns the minimum of the read timestamps of all active readers; \c pinned returns
         the minimum of the \c oldest_timestamp and the read timestamps of all active readers;
-        \c recovery returns the timestamp of the most recent stable checkpoint taken prior
-        to a shutdown; \c stable_timestamp returns the most recent \c stable_timestamp set with
+        \c recovery returns the timestamp of the most recent stable checkpoint taken prior to
+        a shutdown; \c stable_timestamp returns the most recent \c stable_timestamp set with
         WT_CONNECTION::set_timestamp. (The \c oldest and \c stable arguments are deprecated
         short-hand for \c oldest_timestamp and \c stable_timestamp, respectively.) See @ref
         timestamp_global_api''',
@@ -1961,17 +1962,14 @@ methods = {
 
 'WT_CONNECTION.set_timestamp' : Method([
     Config('durable_timestamp', '', r'''
-        reset the maximum durable timestamp tracked by WiredTiger.  This will
-        cause future calls to WT_CONNECTION::query_timestamp to ignore durable
-        timestamps greater than the specified value until the next durable
-        timestamp moves the tracked durable timestamp forwards.  This is only
-        intended for use where the application is rolling back locally committed
-        transactions. The value must not be older than the current
-        oldest and stable timestamps.  See @ref timestamp_global_api'''),
+        temporarily set the system's maximum durable timestamp, bounding the timestamp returned
+        by WT_CONNECTION::query_timestamp with the \c all_durable configuration. Calls to
+        WT_CONNECTION::query_timestamp will ignore durable timestamps greater than the specified
+        value until a subsequent transaction commit advances the maximum durable timestamp, or
+        rollback-to-stable resets the value. See @ref timestamp_global_api'''),
     Config('force', 'false', r'''
-        set timestamps even if they violate normal ordering requirements.
-        For example allow the \c oldest_timestamp to move backwards''',
-        type='boolean'),
+        set the oldest and stable timestamps even if it violates normal ordering constraints.''',
+        type='boolean', undoc=True),
     Config('oldest_timestamp', '', r'''
         future commits and queries will be no earlier than the specified
         timestamp. Values must be monotonically increasing, any

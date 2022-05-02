@@ -2501,19 +2501,19 @@ struct __wt_connection {
 	 * enough to hold a NUL terminated, hex-encoded 8B timestamp (17 bytes).
 	 * @configstart{WT_CONNECTION.query_timestamp, see dist/api_data.py}
 	 * @config{get, specify which timestamp to query: \c all_durable returns the largest
-	 * timestamp such that all timestamps up to that value have been made durable; \c
-	 * last_checkpoint returns the timestamp of the most recent stable checkpoint; \c
-	 * oldest_timestamp returns the most recent \c oldest_timestamp set with
-	 * WT_CONNECTION::set_timestamp; \c oldest_reader returns the minimum of the read timestamps
-	 * of all active readers; \c pinned returns the minimum of the \c oldest_timestamp and the
-	 * read timestamps of all active readers; \c recovery returns the timestamp of the most
-	 * recent stable checkpoint taken prior to a shutdown; \c stable_timestamp returns the most
-	 * recent \c stable_timestamp set with WT_CONNECTION::set_timestamp.  (The \c oldest and \c
-	 * stable arguments are deprecated short-hand for \c oldest_timestamp and \c
-	 * stable_timestamp\, respectively.) See @ref timestamp_global_api., a string\, chosen from
-	 * the following options: \c "all_durable"\, \c "last_checkpoint"\, \c "oldest"\, \c
-	 * "oldest_reader"\, \c "oldest_timestamp"\, \c "pinned"\, \c "recovery"\, \c "stable"\, \c
-	 * "stable_timestamp"; default \c all_durable.}
+	 * timestamp such that all timestamps up to and including that value have been committed
+	 * (possibly bounded by the application-set \c durable timestamp); \c last_checkpoint
+	 * returns the timestamp of the most recent stable checkpoint; \c oldest_timestamp returns
+	 * the most recent \c oldest_timestamp set with WT_CONNECTION::set_timestamp; \c
+	 * oldest_reader returns the minimum of the read timestamps of all active readers; \c pinned
+	 * returns the minimum of the \c oldest_timestamp and the read timestamps of all active
+	 * readers; \c recovery returns the timestamp of the most recent stable checkpoint taken
+	 * prior to a shutdown; \c stable_timestamp returns the most recent \c stable_timestamp set
+	 * with WT_CONNECTION::set_timestamp.  (The \c oldest and \c stable arguments are deprecated
+	 * short-hand for \c oldest_timestamp and \c stable_timestamp\, respectively.) See @ref
+	 * timestamp_global_api., a string\, chosen from the following options: \c "all_durable"\,
+	 * \c "last_checkpoint"\, \c "oldest"\, \c "oldest_reader"\, \c "oldest_timestamp"\, \c
+	 * "pinned"\, \c "recovery"\, \c "stable"\, \c "stable_timestamp"; default \c all_durable.}
 	 * @configend
 	 *
 	 * A timestamp of 0 is returned if the timestamp is not available or has not been set.
@@ -2533,16 +2533,12 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @configstart{WT_CONNECTION.set_timestamp, see dist/api_data.py}
-	 * @config{durable_timestamp, reset the maximum durable timestamp tracked by WiredTiger.
-	 * This will cause future calls to WT_CONNECTION::query_timestamp to ignore durable
-	 * timestamps greater than the specified value until the next durable timestamp moves the
-	 * tracked durable timestamp forwards.  This is only intended for use where the application
-	 * is rolling back locally committed transactions.  The value must not be older than the
-	 * current oldest and stable timestamps.  See @ref timestamp_global_api., a string; default
-	 * empty.}
-	 * @config{force, set timestamps even if they violate normal ordering requirements.  For
-	 * example allow the \c oldest_timestamp to move backwards., a boolean flag; default \c
-	 * false.}
+	 * @config{durable_timestamp, temporarily set the system's maximum durable timestamp\,
+	 * bounding the timestamp returned by WT_CONNECTION::query_timestamp with the \c all_durable
+	 * configuration.  Calls to WT_CONNECTION::query_timestamp will ignore durable timestamps
+	 * greater than the specified value until a subsequent transaction commit advances the
+	 * maximum durable timestamp\, or rollback-to-stable resets the value.  See @ref
+	 * timestamp_global_api., a string; default empty.}
 	 * @config{oldest_timestamp, future commits and queries will be no earlier than the
 	 * specified timestamp.  Values must be monotonically increasing\, any attempt to set the
 	 * value to older than the current is silently ignored.  The value must not be newer than
