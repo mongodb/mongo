@@ -19,7 +19,9 @@
  * the session get rollback reason API call. Users of the API could have a dependency on the format
  * of these messages so changing them must be done with care.
  */
-#define WT_TXN_ROLLBACK_REASON_CACHE "oldest pinned transaction ID rolled back for eviction"
+#define WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION \
+    "oldest pinned transaction ID rolled back for eviction"
+#define WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW "transaction rolled back because of cache overflow"
 #define WT_TXN_ROLLBACK_REASON_CONFLICT "conflict between concurrent operations"
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */

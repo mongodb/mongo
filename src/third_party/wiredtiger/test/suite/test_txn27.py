@@ -78,8 +78,10 @@ class test_txn27(wttest.WiredTigerTestCase):
         # This is the message that we expect to be raised when a thread is rolled back due to
         # cache pressure.
         msg2 = 'oldest pinned transaction ID rolled back for eviction'
-        # This reason is the default reason for WT_ROLLBACK errors so we need to catch it.
-        self.assertRaisesException(wiredtiger.WiredTigerError, lambda: cursor1.update(), msg1)
+        # Expect stdout to give us the true reason for the rollback.
+        with self.expectedStdoutPattern(msg2):
+            # This reason is the default reason for WT_ROLLBACK errors so we need to catch it.
+            self.assertRaisesException(wiredtiger.WiredTigerError, lambda: cursor1.update(), msg1)
         # Expect the rollback reason to give us the true reason for the rollback.
         self.assertEquals(session1.get_rollback_reason(), msg2)
 

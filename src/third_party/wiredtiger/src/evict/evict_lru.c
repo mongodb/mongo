@@ -2404,10 +2404,13 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
         if (!F_ISSET(conn, WT_CONN_RECOVERING) && __wt_cache_stuck(session)) {
             ret = __wt_txn_is_blocking(session);
             if (ret == WT_ROLLBACK) {
-                __wt_verbose_debug(
-                  session, WT_VERB_TRANSACTION, "Rollback reason: %s", "Cache full");
                 --cache->evict_aggressive_score;
                 WT_STAT_CONN_INCR(session, txn_fail_cache);
+                __wt_verbose_debug(
+                  session, WT_VERB_TRANSACTION, "%s", session->txn->rollback_reason);
+                if (app_thread)
+                    __wt_verbose_notice(
+                      session, WT_VERB_TRANSACTION, "%s", session->txn->rollback_reason);
             }
             WT_ERR(ret);
         }
@@ -2472,8 +2475,10 @@ err:
         WT_STAT_SESSION_INCRV(session, cache_time, elapsed);
         session->cache_wait_us += elapsed;
         if (cache_max_wait_us != 0 && session->cache_wait_us > cache_max_wait_us) {
-            WT_TRET(WT_CACHE_FULL);
+            WT_TRET(__wt_txn_rollback_required(session, WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW));
+            --cache->evict_aggressive_score;
             WT_STAT_CONN_INCR(session, cache_timed_out_ops);
+            __wt_verbose_notice(session, WT_VERB_TRANSACTION, "%s", session->txn->rollback_reason);
         }
     }
 
