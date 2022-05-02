@@ -1,2 +1,0 @@
-include ':embedded-android'
-include ':embedded-jar'
