@@ -22,12 +22,6 @@ if (!isSBEEnabled) {
     return;
 }
 
-// TODO SERVER-64315: re-enable this test
-if (true) {
-    jsTest.log("This test is temporary disabled");
-    return;
-}
-
 function getPlanCacheEntries(query, collection, db) {
     const planCacheKey = getPlanCacheKeyFromShape({query, collection, db});
     return coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey}}]).toArray();

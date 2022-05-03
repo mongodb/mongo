@@ -59,15 +59,11 @@ using std::set;
 using std::string;
 using std::unique_ptr;
 
-/* fetch a single object from collection ns that matches query
-   set your db SavedContext first
-*/
 bool Helpers::findOne(OperationContext* opCtx,
                       const CollectionPtr& collection,
                       const BSONObj& query,
-                      BSONObj& result,
-                      bool requireIndex) {
-    RecordId loc = findOne(opCtx, collection, query, requireIndex);
+                      BSONObj& result) {
+    RecordId loc = findOne(opCtx, collection, query);
     if (loc.isNull())
         return false;
     result = collection->docFor(opCtx, loc).value();
@@ -79,8 +75,7 @@ BSONObj Helpers::findOneForTesting(OperationContext* opCtx,
                                    const BSONObj& query,
                                    const bool invariantOnError) {
     BSONObj ret;
-    const bool requiresIndex = true;
-    bool found = findOne(opCtx, collection, query, ret, requiresIndex);
+    bool found = findOne(opCtx, collection, query, ret);
     if (invariantOnError) {
         invariant(found);
     }
@@ -94,20 +89,18 @@ BSONObj Helpers::findOneForTesting(OperationContext* opCtx,
 */
 RecordId Helpers::findOne(OperationContext* opCtx,
                           const CollectionPtr& collection,
-                          const BSONObj& query,
-                          bool requireIndex) {
+                          const BSONObj& query) {
     if (!collection)
         return RecordId();
 
     auto findCommand = std::make_unique<FindCommandRequest>(collection->ns());
     findCommand->setFilter(query);
-    return findOne(opCtx, collection, std::move(findCommand), requireIndex);
+    return findOne(opCtx, collection, std::move(findCommand));
 }
 
 RecordId Helpers::findOne(OperationContext* opCtx,
                           const CollectionPtr& collection,
-                          std::unique_ptr<FindCommandRequest> findCommand,
-                          bool requireIndex) {
+                          std::unique_ptr<FindCommandRequest> findCommand) {
     if (!collection)
         return RecordId();
 
@@ -125,13 +118,12 @@ RecordId Helpers::findOne(OperationContext* opCtx,
     massertStatusOK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-    size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
     auto exec = uassertStatusOK(getExecutor(opCtx,
                                             &collection,
                                             std::move(cq),
                                             nullptr /* extractAndAttachPipelineStages */,
                                             PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                            options));
+                                            QueryPlannerParams::DEFAULT));
 
     PlanExecutor::ExecState state;
     BSONObj obj;

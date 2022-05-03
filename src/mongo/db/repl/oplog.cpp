@@ -1589,7 +1589,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                              Helpers::findById(opCtx, collection, updateCriteria).isNull()) ||
                             // capped collections won't have an _id index
                             (!indexCatalog->haveIdIndex(opCtx) &&
-                             Helpers::findOne(opCtx, collection, updateCriteria, false).isNull())) {
+                             Helpers::findOne(opCtx, collection, updateCriteria).isNull())) {
                             static constexpr char msg[] = "Couldn't find document";
                             LOGV2_ERROR(21259, msg, "op"_attr = redact(op.toBSONForLogging()));
                             return Status(ErrorCodes::UpdateOperationFailed,

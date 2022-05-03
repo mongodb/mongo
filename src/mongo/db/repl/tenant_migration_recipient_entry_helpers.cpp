@@ -147,11 +147,8 @@ StatusWith<TenantMigrationRecipientDocument> getStateDoc(OperationContext* opCtx
     }
 
     BSONObj result;
-    auto foundDoc = Helpers::findOne(opCtx,
-                                     collection.getCollection(),
-                                     BSON("_id" << migrationUUID),
-                                     result,
-                                     /*requireIndex=*/true);
+    auto foundDoc =
+        Helpers::findOne(opCtx, collection.getCollection(), BSON("_id" << migrationUUID), result);
     if (!foundDoc) {
         return Status(ErrorCodes::NoMatchingDocument,
                       str::stream() << "No matching state doc found with tenant migration UUID: "

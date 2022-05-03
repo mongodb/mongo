@@ -187,8 +187,7 @@ boost::optional<Document> findDocWithHighestInsertedId(OperationContext* opCtx,
     findCommand->setLimit(1);
     findCommand->setSort(BSON("_id" << -1));
 
-    auto recordId =
-        Helpers::findOne(opCtx, collection, std::move(findCommand), true /* requireIndex */);
+    auto recordId = Helpers::findOne(opCtx, collection, std::move(findCommand));
     if (recordId.isNull()) {
         return boost::none;
     }

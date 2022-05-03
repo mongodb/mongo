@@ -198,8 +198,7 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, systemViewsNs);
     invariant(systemViews);
 
-    const bool requireIndex = false;
-    RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << name.ns()), requireIndex);
+    RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << name.ns()));
 
     Snapshotted<BSONObj> oldView;
     if (!id.isValid() || !systemViews->findDoc(opCtx, id, &oldView)) {
@@ -231,8 +230,7 @@ void DurableViewCatalogImpl::remove(OperationContext* opCtx, const NamespaceStri
 
     if (!systemViews)
         return;
-    const bool requireIndex = false;
-    RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << name.ns()), requireIndex);
+    RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << name.ns()));
     if (!id.isValid())
         return;
 

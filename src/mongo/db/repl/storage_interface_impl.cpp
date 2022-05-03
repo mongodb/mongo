@@ -1450,7 +1450,7 @@ Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
     CollectionPtr usersCollection =
         catalog->lookupCollectionByNamespace(opCtx, AuthorizationManager::usersCollectionNamespace);
     const bool hasUsers =
-        usersCollection && !Helpers::findOne(opCtx, usersCollection, BSONObj(), false).isNull();
+        usersCollection && !Helpers::findOne(opCtx, usersCollection, BSONObj()).isNull();
     CollectionPtr adminVersionCollection = catalog->lookupCollectionByNamespace(
         opCtx, AuthorizationManager::versionCollectionNamespace);
     BSONObj authSchemaVersionDocument;

@@ -195,8 +195,7 @@ StatusWith<ShardSplitDonorDocument> getStateDocument(OperationContext* opCtx,
     auto foundDoc = Helpers::findOne(opCtx,
                                      collection.getCollection(),
                                      BSON(ShardSplitDonorDocument::kIdFieldName << shardSplitId),
-                                     result,
-                                     true);
+                                     result);
 
     if (!foundDoc) {
         return Status(ErrorCodes::NoMatchingDocument,

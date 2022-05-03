@@ -544,10 +544,8 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                    opCtx, "TenantMigrationDonorUpdateStateDoc", _stateDocumentsNS.ns(), [&] {
                        WriteUnitOfWork wuow(opCtx);
 
-                       const auto originalRecordId = Helpers::findOne(opCtx,
-                                                                      collection.getCollection(),
-                                                                      originalStateDocBson,
-                                                                      false /* requireIndex */);
+                       const auto originalRecordId = Helpers::findOne(
+                           opCtx, collection.getCollection(), originalStateDocBson);
                        const auto originalSnapshot = Snapshotted<BSONObj>(
                            opCtx->recoveryUnit()->getSnapshotId(), originalStateDocBson);
                        invariant(!originalRecordId.isNull());

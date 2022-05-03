@@ -124,12 +124,9 @@ assert.neq(getPlanCacheKeyFromShape({query: queryWithBNull, collection: coll, db
 // SBE plan cache.
 cacheEntry = getCacheEntryForQuery({a: 1, b: null});
 if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
-    // TODO SERVER-64315: uncomment the following lines once we start caching single solution plans
-    // again
-    // assert.neq(cacheEntry, null);
-    // assert.eq(cacheEntry.isActive, true, cacheEntry);
-    // assert.eq(cacheEntry.isPinned, true, cacheEntry);
-    assert.eq(cacheEntry, null);
+    assert.neq(cacheEntry, null);
+    assert.eq(cacheEntry.isActive, true, cacheEntry);
+    assert.eq(cacheEntry.isPinned, true, cacheEntry);
 } else {
     assert.eq(cacheEntry, null);
 }

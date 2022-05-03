@@ -269,7 +269,7 @@ protected:
                    const ReshardingEnv& env) {
         AutoGetCollection coll(opCtx, nss, MODE_IX);
 
-        RecordId rid = Helpers::findOne(opCtx, coll.getCollection(), query, false);
+        RecordId rid = Helpers::findOne(opCtx, coll.getCollection(), query);
         ASSERT(!rid.isNull());
 
         WriteUnitOfWork wuow(opCtx);

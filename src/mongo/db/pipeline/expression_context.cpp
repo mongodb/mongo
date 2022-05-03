@@ -225,6 +225,8 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
 
     expCtx->originalAggregateCommand = originalAggregateCommand.getOwned();
 
+    expCtx->inLookup = inLookup;
+
     // Note that we intentionally skip copying the value of '_interruptCounter' because 'expCtx' is
     // intended to be used for executing a separate aggregation pipeline.
 
