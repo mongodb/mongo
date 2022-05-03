@@ -701,7 +701,7 @@ void persistUpdatedNumOrphans(OperationContext* opCtx,
                                << BSON("$exists" << true));
     try {
         PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-        ScopedRangeDeleterLock rangeDeleterLock(opCtx);
+        ScopedRangeDeleterLock rangeDeleterLock(opCtx, collectionUuid);
         // TODO (SERVER-54284) Remove writeConflictRetry loop
         writeConflictRetry(
             opCtx, "updateOrphanCount", NamespaceString::kRangeDeletionNamespace.ns(), [&] {
