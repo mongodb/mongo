@@ -29,6 +29,8 @@ const sourceCollection = reshardingTest.createShardedCollection({
 });
 
 assert.commandWorked(sourceCollection.insert({_id: 0, oldKey: -20, newKey: 20, yak: 50}));
+assert.commandWorked(sourceCollection.createIndexes(
+    [{indexToDropDuringResharding: 1}, {indexToDropAfterResharding: 1}]));
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 reshardingTest.withReshardingInBackground(
@@ -80,7 +82,7 @@ reshardingTest.withReshardingInBackground(
 
             jsTestLog("Attempting drop index");
             res = sourceCollection.runCommand(
-                {dropIndexes: collName, index: {oldKey: 1}, maxTimeMS: 5000});
+                {dropIndexes: collName, index: {indexToDropDuringResharding: 1}, maxTimeMS: 5000});
             assert(ErrorCodes.isExceededTimeLimitError(res.code));
 
             jsTestLog("Completed operations");
@@ -107,7 +109,8 @@ assert.commandWorked(sourceCollection.runCommand(
 
 assert.commandWorked(sourceCollection.runCommand({collMod: sourceCollection.getName()}));
 
-assert.commandWorked(sourceCollection.runCommand({dropIndexes: collName, index: {oldKey: 1}}));
+assert.commandWorked(
+    sourceCollection.runCommand({dropIndexes: collName, index: {indexToDropAfterResharding: 1}}));
 
 assert.commandWorked(sourceCollection.runCommand({drop: collName}));
 
