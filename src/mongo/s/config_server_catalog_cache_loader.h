@@ -55,23 +55,9 @@ public:
                                                           ChunkVersion version) override;
     SemiFuture<DatabaseType> getDatabase(StringData dbName) override;
 
-    /**
-     * Don't use outside of unit_tests.
-     * TODO SERVER-54394 Remove this
-     */
-    void setAvoidSnapshotForRefresh_ForTest();
-
 private:
     // Thread pool to be used to perform metadata load
     std::shared_ptr<ThreadPool> _executor;
-
-    /*
-     * If 'true' avoids using snapshot read concern when refreshing the cache. Only to be used by
-     * unit_tests that use the ephemeralForTesting storage engine, because currently it doesn't
-     * support snapshot read concern.
-     * TODO SERVER-54394 Remove this.
-     */
-    bool _avoidSnapshotForRefresh = false;
 };
 
 }  // namespace mongo

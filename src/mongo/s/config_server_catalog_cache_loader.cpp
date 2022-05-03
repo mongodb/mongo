@@ -54,20 +54,13 @@ namespace {
  */
 CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
                                             const NamespaceString& nss,
-                                            ChunkVersion sinceVersion,
-                                            bool avoidSnapshotForRefresh) {
+                                            ChunkVersion sinceVersion) {
     const auto readConcern = [&]() -> repl::ReadConcernArgs {
-        // TODO SERVER-54394 always use snapshot read concern once
-        // ephemeral storage engine supports it
-        const auto readConcernLevel = !avoidSnapshotForRefresh
-            ? repl::ReadConcernLevel::kSnapshotReadConcern
-            : repl::ReadConcernLevel::kLocalReadConcern;
-
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            return {readConcernLevel};
+            return {repl::ReadConcernLevel::kSnapshotReadConcern};
         } else {
             const auto vcTime = VectorClock::get(opCtx)->getTime();
-            return {vcTime.configTime(), readConcernLevel};
+            return {vcTime.configTime(), repl::ReadConcernLevel::kSnapshotReadConcern};
         }
     }();
 
@@ -142,7 +135,7 @@ SemiFuture<CollectionAndChangedChunks> ConfigServerCatalogCacheLoader::getChunks
                             getGlobalServiceContext());
             auto opCtx = tc->makeOperationContext();
 
-            return getChangedChunks(opCtx.get(), nss, version, _avoidSnapshotForRefresh);
+            return getChangedChunks(opCtx.get(), nss, version);
         })
         .semi();
 }
@@ -158,10 +151,6 @@ SemiFuture<DatabaseType> ConfigServerCatalogCacheLoader::getDatabase(StringData 
                 ->getDatabase(opCtx.get(), name, repl::ReadConcernLevel::kMajorityReadConcern);
         })
         .semi();
-}
-
-void ConfigServerCatalogCacheLoader::setAvoidSnapshotForRefresh_ForTest() {
-    _avoidSnapshotForRefresh = true;
 }
 
 }  // namespace mongo

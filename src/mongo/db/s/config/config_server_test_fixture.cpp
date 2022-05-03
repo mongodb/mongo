@@ -144,7 +144,6 @@ void ConfigServerTestFixture::_setUp(std::function<void()> onPreInitGlobalStateF
     _addShardNetworkTestEnv =
         std::make_unique<NetworkTestEnv>(_executorForAddShard, _mockNetworkForAddShard);
     auto configServerCatalogCacheLoader = std::make_unique<ConfigServerCatalogCacheLoader>();
-    configServerCatalogCacheLoader->setAvoidSnapshotForRefresh_ForTest();
     CatalogCacheLoader::set(getServiceContext(), std::move(configServerCatalogCacheLoader));
 
     onPreInitGlobalStateFn();
