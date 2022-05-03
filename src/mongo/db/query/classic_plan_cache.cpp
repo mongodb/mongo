@@ -150,12 +150,12 @@ bool shouldCacheQuery(const CanonicalQuery& query) {
     // don't affect cache state, and it also makes sure that we can always generate information
     // regarding rejected plans and/or trial period execution of candidate plans.
     //
-    // In order to be able to correctly measure 'executionTimeMillis' stats we should only skip
-    // caching top-level plans. Otherwise, if we were to skip caching inner pipelines for $lookup
-    // queries, we could run through the multi-planner for each document coming from the outer side,
-    // completely skewing the 'executionTimeMillis' stats.
+    // There is one exception: $lookup's implementation in the DocumentSource engine relies on
+    // caching the plan on the inner side in order to avoid repeating the planning process for every
+    // document on the outer side. To ensure that the 'executionTimeMillis' value is accurate for
+    // $lookup, we allow the inner side to use the cache even if the query is an explain.
     tassert(6497600, "expCtx is null", query.getExpCtxRaw());
-    if (query.getExplain() && query.getExpCtxRaw()->subPipelineDepth == 0) {
+    if (query.getExplain() && !query.getExpCtxRaw()->inLookup) {
         return false;
     }
 

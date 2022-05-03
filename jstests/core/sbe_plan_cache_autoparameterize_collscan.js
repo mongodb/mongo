@@ -1,6 +1,15 @@
 /**
  * Tests that auto-parameterized collection scan plans are correctly stored and in the SBE plan
  * cache, and that they can be correctly recovered from the cache with new parameter values.
+ *
+ * @tags: [
+ *   assumes_read_concern_unchanged,
+ *   assumes_read_preference_unchanged,
+ *   assumes_unsharded_collection,
+ *   does_not_support_stepdowns,
+ *   # The SBE plan cache was introduced in 6.0.
+ *   requires_fcv_60,
+ * ]
  */
 (function() {
 "use strict";
@@ -8,33 +17,15 @@
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/sbe_util.js");
 
-// TODO SERVER-64315: re-enable this test. This test depends on caching single solution plans,
-// which is disabled temporarily due to a bug.
-//
-// As part of re-enabling the test, we should move it to jstests/core/ so that it can benefit from
-// passthrough testing. This test formerly needed to be in noPassthrough because it required a
-// special flag to enable auto-parameterization, but this is no longer the case.
-if (true) {
-    jsTest.log("This test is temporarily disabled");
-    return;
-}
-
-const conn = MongoRunner.runMongod();
-assert.neq(conn, null, "mongod failed to start up");
-
-const dbName = jsTestName();
-const db = conn.getDB(dbName);
-
 // This test is specifically verifying the behavior of the SBE plan cache. So if either the SBE plan
 // cache or SBE itself are disabled, bail out.
 if (!checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
     jsTestLog("Skipping test because either SBE engine or SBE plan cache is disabled");
-    MongoRunner.stopMongod(conn);
     return;
 }
 
-assert.commandWorked(db.dropDatabase());
-const coll = db.coll;
+const coll = db.sbe_plan_cache_autoparameterize_collscan;
+coll.drop();
 
 let data = [
     {_id: 0, a: 1, c: "foo"},
@@ -352,7 +343,7 @@ runTest({query: {a: {$in: [1, 2]}}, projection: {_id: 1}},
 runTest({query: {a: {$in: [1, 2]}}, projection: {_id: 1}},
         [{_id: 0}, {_id: 1}],
         {query: {a: {$in: [1, 2, /foo/]}}, projection: {_id: 1}},
-        [{_id: 0}, {_id: 1}, {_id: 13}],
+        [{_id: 0}, {_id: 1}, {_id: 13}, {_id: 14}],
         false);
 
 // Adding a nested array to an $in inhibits auto-parameterization.
@@ -404,12 +395,14 @@ runTest({query: {a: /foo/}, projection: {_id: 1}},
         [{_id: 15}],
         true);
 
-// Test auto-parameterization of $type.
+// Test that $type is not auto-parameterized.
+//
+// TODO SERVER-64776: Re-enable auto-parameterization for $type predicates.
 runTest({query: {a: {$type: "double"}}, projection: {_id: 1}},
         [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}],
         {query: {a: {$type: ["string", "regex"]}}, projection: {_id: 1}},
         [{_id: 13}, {_id: 14}, {_id: 15}],
-        true);
+        false);
 
 // Test that $type is not auto-parameterized when the type set includes "array".
 runTest({query: {a: {$type: ["string", "regex"]}}, projection: {_id: 1}},
@@ -417,6 +410,4 @@ runTest({query: {a: {$type: ["string", "regex"]}}, projection: {_id: 1}},
         {query: {a: {$type: ["string", "array"]}}, projection: {_id: 1}},
         [{_id: 5}, {_id: 6}, {_id: 8}, {_id: 11}, {_id: 12}, {_id: 13}, {_id: 15}],
         false);
-
-MongoRunner.stopMongod(conn);
 }());

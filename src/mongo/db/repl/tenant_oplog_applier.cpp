@@ -983,9 +983,7 @@ Status TenantOplogApplier::_applyOplogEntryOrGroupedInserts(
             // During tenant migration oplog application, we only need to apply createIndex on empty
             // collections. Otherwise, the index is guaranteed to be dropped after. This is because
             // we block index builds on the donor for the duration of the tenant migration.
-            if (!Helpers::findOne(
-                     opCtx, autoColl.getCollection(), BSONObj(), false /* requireIndex */)
-                     .isNull()) {
+            if (!Helpers::findOne(opCtx, autoColl.getCollection(), BSONObj()).isNull()) {
                 LOGV2_DEBUG(5652701,
                             2,
                             "Tenant migration ignoring createIndex for non-empty collection",

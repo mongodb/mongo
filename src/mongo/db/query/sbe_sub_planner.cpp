@@ -117,8 +117,7 @@ CandidatePlans SubPlanner::plan(
     // TODO SERVER-61507: do it unconditionally when $group pushdown is integrated with the SBE plan
     // cache.
     if (_cq.pipeline().empty()) {
-        // TODO SERVER-64315: re-enable caching of single solution plans
-        // plan_cache_util::updatePlanCache(_opCtx, mainColl, _cq, *compositeSolution, *root, data);
+        plan_cache_util::updatePlanCache(_opCtx, mainColl, _cq, *compositeSolution, *root, data);
     }
 
     return {makeVector(plan_ranker::CandidatePlan{

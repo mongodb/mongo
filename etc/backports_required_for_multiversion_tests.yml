@@ -210,6 +210,14 @@ last-continuous:
       test_file: jstests/replsets/tenant_migration_recipient_rollback_recovery.js
     - ticket: SERVER-65773
       test_file: jstests/aggregation/agg_infinite_recursion.js
+    - ticket: SERVER-64315
+      test_file: jstests/core/plan_cache_sbe.js
+    - ticket: SERVER-64315
+      test_file: jstests/core/sbe/plan_cache_sbe_with_or_queries.js
+    - ticket: SERVER-64315
+      test_file: jstests/core/sbe_plan_cache_autoparameterize_collscan.js
+    - ticket: SERVER-64315
+      test_file: jstests/core/wildcard_index_cached_plans.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -553,6 +561,14 @@ last-lts:
       test_file: jstests/replsets/tenant_migration_recipient_rollback_recovery.js
     - ticket: SERVER-65773
       test_file: jstests/aggregation/agg_infinite_recursion.js
+    - ticket: SERVER-64315
+      test_file: jstests/core/plan_cache_sbe.js
+    - ticket: SERVER-64315
+      test_file: jstests/core/sbe/plan_cache_sbe_with_or_queries.js
+    - ticket: SERVER-64315
+      test_file: jstests/core/sbe_plan_cache_autoparameterize_collscan.js
+    - ticket: SERVER-64315
+      test_file: jstests/core/wildcard_index_cached_plans.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

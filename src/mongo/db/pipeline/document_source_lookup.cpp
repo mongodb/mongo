@@ -156,6 +156,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     _resolvedPipeline = resolvedNamespace.pipeline;
 
     _fromExpCtx = expCtx->copyForSubPipeline(resolvedNamespace.ns, resolvedNamespace.uuid);
+    _fromExpCtx->inLookup = true;
     if (fromCollator) {
         _fromExpCtx->setCollator(std::move(fromCollator.get()));
         _hasExplicitCollation = true;

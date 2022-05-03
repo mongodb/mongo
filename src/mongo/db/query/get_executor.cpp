@@ -1342,11 +1342,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
         roots[0] = helper.buildExecutableTree(*(solutions[0]));
     }
     auto&& [root, data] = roots[0];
-    // TODO SERVER-64315: re-enable caching of single solution plans
-    // if (!planningResult->recoveredPinnedCacheEntry()) {
-    //    plan_cache_util::updatePlanCache(
-    //        opCtx, collections.getMainCollection(), *cq, *solutions[0], *root, data);
-    // }
+    if (!planningResult->recoveredPinnedCacheEntry()) {
+        plan_cache_util::updatePlanCache(
+            opCtx, collections.getMainCollection(), *cq, *solutions[0], *root, data);
+    }
 
     // Prepare the SBE tree for execution.
     stage_builder::prepareSlotBasedExecutableTree(

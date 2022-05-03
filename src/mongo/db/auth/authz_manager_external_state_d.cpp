@@ -95,7 +95,7 @@ bool AuthzManagerExternalStateMongod::hasOne(OperationContext* opCtx,
                                              const NamespaceString& collectionName,
                                              const BSONObj& query) {
     AutoGetCollectionForReadCommandMaybeLockFree ctx(opCtx, collectionName);
-    return !Helpers::findOne(opCtx, ctx.getCollection(), query, false).isNull();
+    return !Helpers::findOne(opCtx, ctx.getCollection(), query).isNull();
 }
 
 namespace {

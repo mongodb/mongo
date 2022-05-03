@@ -188,45 +188,12 @@ public:
         BSONObj query = fromjson("{$or:[{b:2},{c:3}]}");
         BSONObj ret;
         // Check findOne() returning object.
-        ASSERT(Helpers::findOne(&_opCtx, _collection, query, ret, true));
+        ASSERT(Helpers::findOne(&_opCtx, _collection, query, ret));
         ASSERT_EQUALS(string("b"), ret.firstElement().fieldName());
         // Cross check with findOne() returning location.
         ASSERT_BSONOBJ_EQ(
             ret,
-            _collection->docFor(&_opCtx, Helpers::findOne(&_opCtx, _collection, query, true))
-                .value());
-    }
-};
-
-class FindOneRequireIndex : public Base {
-public:
-    void run() {
-        insert(BSON("b" << 2 << "_id" << 0));
-        BSONObj query = fromjson("{b:2}");
-        BSONObj ret;
-
-        // Check findOne() returning object, allowing unindexed scan.
-        ASSERT(Helpers::findOne(&_opCtx, _collection, query, ret, false));
-        // Check findOne() returning location, allowing unindexed scan.
-        ASSERT_BSONOBJ_EQ(
-            ret,
-            _collection->docFor(&_opCtx, Helpers::findOne(&_opCtx, _collection, query, false))
-                .value());
-
-        // Check findOne() returning object, requiring indexed scan without index.
-        ASSERT_THROWS(Helpers::findOne(&_opCtx, _collection, query, ret, true), AssertionException);
-        // Check findOne() returning location, requiring indexed scan without index.
-        ASSERT_THROWS(Helpers::findOne(&_opCtx, _collection, query, true), AssertionException);
-
-        addIndex(IndexSpec().addKey("b").unique(false));
-
-        // Check findOne() returning object, requiring indexed scan with index.
-        ASSERT(Helpers::findOne(&_opCtx, _collection, query, ret, true));
-        // Check findOne() returning location, requiring indexed scan with index.
-        ASSERT_BSONOBJ_EQ(
-            ret,
-            _collection->docFor(&_opCtx, Helpers::findOne(&_opCtx, _collection, query, true))
-                .value());
+            _collection->docFor(&_opCtx, Helpers::findOne(&_opCtx, _collection, query)).value());
     }
 };
 
@@ -262,12 +229,11 @@ public:
         insert(BSONObj());
         BSONObj query;
         BSONObj ret;
-        ASSERT(Helpers::findOne(&_opCtx, _collection, query, ret, false));
+        ASSERT(Helpers::findOne(&_opCtx, _collection, query, ret));
         ASSERT(ret.isEmpty());
         ASSERT_BSONOBJ_EQ(
             ret,
-            _collection->docFor(&_opCtx, Helpers::findOne(&_opCtx, _collection, query, false))
-                .value());
+            _collection->docFor(&_opCtx, Helpers::findOne(&_opCtx, _collection, query)).value());
     }
 };
 
@@ -1432,7 +1398,7 @@ public:
         ASSERT_EQUALS(50, count());
 
         BSONObj res;
-        ASSERT(Helpers::findOne(&_opCtx, ctx.getCollection(), BSON("_id" << 20), res, true));
+        ASSERT(Helpers::findOne(&_opCtx, ctx.getCollection(), BSON("_id" << 20), res));
         ASSERT_EQUALS(40, res["x"].numberInt());
 
         ASSERT(Helpers::findById(&_opCtx, ctx.db(), ns(), BSON("_id" << 20), res));
@@ -1447,8 +1413,7 @@ public:
         {
             Timer t;
             for (int i = 0; i < n; i++) {
-                ASSERT(
-                    Helpers::findOne(&_opCtx, ctx.getCollection(), BSON("_id" << 20), res, true));
+                ASSERT(Helpers::findOne(&_opCtx, ctx.getCollection(), BSON("_id" << 20), res));
             }
             slow = t.micros();
         }
@@ -1936,7 +1901,6 @@ public:
     void setupTests() {
         add<FindingStart>();
         add<FindOneOr>();
-        add<FindOneRequireIndex>();
         add<FindOneEmptyObj>();
         add<BoundedKey>();
         add<GetMore>();

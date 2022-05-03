@@ -305,11 +305,8 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
     // exceptions and we must protect it from unanticipated write conflicts from reads.
     bool foundObj = writeConflictRetry(
         opCtx, "getIndexBuildEntry", NamespaceString::kIndexBuildEntryNamespace.ns(), [&]() {
-            return Helpers::findOne(opCtx,
-                                    collection.getCollection(),
-                                    BSON("_id" << indexBuildUUID),
-                                    obj,
-                                    /*requireIndex=*/true);
+            return Helpers::findOne(
+                opCtx, collection.getCollection(), BSON("_id" << indexBuildUUID), obj);
         });
 
     if (!foundObj) {

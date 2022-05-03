@@ -436,6 +436,9 @@ public:
     // Tracks the depth of nested aggregation sub-pipelines. Used to enforce depth limits.
     long long subPipelineDepth = 0;
 
+    // True if this 'ExpressionContext' object is for the inner side of a $lookup.
+    bool inLookup = false;
+
     // If set, this will disallow use of features introduced in versions above the provided version.
     boost::optional<multiversion::FeatureCompatibilityVersion> maxFeatureCompatibilityVersion;
 
