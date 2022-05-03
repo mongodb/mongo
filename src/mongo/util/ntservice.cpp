@@ -48,6 +48,8 @@
 #include "mongo/util/text.h"
 #include "mongo/util/winutil.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 using std::string;
 using std::wstring;
 
