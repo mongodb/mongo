@@ -18,7 +18,6 @@
 load("jstests/core/txns/libs/prepare_helpers.js");  // For PrepareHelpers.prepareTransaction.
 load("jstests/libs/change_stream_util.js");         // For getPreImages().
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/retryable_writes_util.js");
 load("jstests/libs/transactions_util.js");  // For TransactionsUtil.runInTransaction.
 
 const testName = jsTestName();
@@ -54,13 +53,6 @@ for (const [collectionName, collectionOptions] of [
     const coll = testDB[collectionName];
 
     function issueRetryableFindAndModifyCommands(testDB) {
-        if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(
-                jsTest.options().storageEngine)) {
-            jsTestLog(
-                "Retryable writes are not supported, skipping retryable findAndModify testing");
-            return;
-        }
-
         // Open a new session with retryable writes set to on.
         const session = testDB.getMongo().startSession({retryWrites: true});
         const coll = session.getDatabase(testName)[collectionName];

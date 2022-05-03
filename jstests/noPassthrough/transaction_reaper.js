@@ -9,13 +9,6 @@
 // implicit sessions.
 TestData.disableImplicitSessions = true;
 
-load("jstests/libs/retryable_writes_util.js");
-
-if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
-    jsTestLog("Retryable writes are not supported, skipping test");
-    return;
-}
-
 function Repl(lifetime) {
     this.rst = new ReplSetTest({
         nodes: 1,

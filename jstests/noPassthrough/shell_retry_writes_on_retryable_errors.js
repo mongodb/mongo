@@ -8,13 +8,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/retryable_writes_util.js");
 load("jstests/libs/write_concern_util.js");
-
-if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
-    jsTestLog("Retryable writes are not supported, skipping test");
-    return;
-}
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();

@@ -13,14 +13,8 @@
 (function() {
 "use strict";
 
-load("jstests/libs/retryable_writes_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/libs/uuid_util.js");  // For extractUUIDFromObject().
-
-if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
-    jsTestLog("Retryable writes are not supported, skipping test");
-    return;
-}
 
 const kParams = {
     ttlMonitorSleepSecs: 1,

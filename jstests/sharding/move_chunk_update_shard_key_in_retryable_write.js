@@ -12,14 +12,8 @@
 
 "use strict";
 
-load("jstests/libs/retryable_writes_util.js");
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 load('./jstests/libs/chunk_manipulation_util.js');
-
-if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
-    jsTestLog("Retryable writes are not supported, skipping test");
-    return;
-}
 
 // For startParallelOps to write its state
 let staticMongod = MongoRunner.runMongod({});

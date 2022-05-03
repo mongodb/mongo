@@ -7,13 +7,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/retryable_writes_util.js");
-
-if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
-    jsTestLog("Retryable writes are not supported, skipping test");
-    return;
-}
-
 const numNodes = 2;
 
 function checkOplogEntry(entry, lsid, txnNum, stmtId, prevTs, retryImageArgs) {

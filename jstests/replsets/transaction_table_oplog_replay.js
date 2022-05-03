@@ -6,11 +6,6 @@
 
 load("jstests/libs/retryable_writes_util.js");
 
-if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
-    jsTestLog("Retryable writes are not supported, skipping test");
-    return;
-}
-
 /**
  * Runs each command on the primary, awaits replication then asserts the secondary's transaction
  * collection has been updated to store the latest txnNumber and lastWriteOpTimeTs for each
