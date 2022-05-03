@@ -2847,6 +2847,8 @@ tasks:
         --enterprise-features=fle
         --js-engine=none
         --link-model=dynamic-sdk
+        --enable-http-client=off
+        --ssl=off
         ${csfle_task_compile_flags}
         DESTDIR='$BUILD_ROOT/csfle-lib-$MONGO_VERSION'
   - command: subprocess.exec
