@@ -41,6 +41,7 @@
 #include "mongo/db/matcher/expression_text_noop.h"
 #include "mongo/db/matcher/expression_where.h"
 #include "mongo/db/matcher/expression_where_noop.h"
+#include "mongo/db/query/analyze_regex.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -93,6 +94,11 @@ const char kEncodeParamMarker = '?';
 // constant is typically encoded as a BSON type byte followed by a BSON value (without the
 // BSONElement's field name).
 const char kEncodeConstantLiteralMarker = ':';
+// Precedes a byte which encodes the bounds tightness associated with a predicate. The structure of
+// the plan (i.e. presence of filters) is affected by bounds tightness. Therefore, if different
+// parameter values can result in different tightnesses, this must be explicitly encoded into the
+// plan cache key.
+const char kEncodeBoundsTightnessDiscriminator = ':';
 
 /**
  * AppendChar provides the compiler with a type for a "appendChar(...)" member function.
@@ -750,6 +756,16 @@ public:
 
             encodeParamMarker(*sourceRegexParam);
             encodeParamMarker(*compiledRegexParam);
+
+            // Encode a discriminator so that a "simple" regex which is exactly convertible into
+            // index bounds has a different shape from a non-simple regex.
+            //
+            // We don't actually need to know the contents of the prefix string, so we ignore the
+            // first member of the pair.
+            auto [_, isExact] = analyze_regex::getRegexPrefixMatch(expr->getString().c_str(),
+                                                                   expr->getFlags().c_str());
+            _builder->appendChar(kEncodeBoundsTightnessDiscriminator);
+            _builder->appendChar(static_cast<char>(isExact));
         } else {
             tassert(6579301,
                     "If source param is not set in $regex expression compiled param must be unset "

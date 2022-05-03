@@ -43,6 +43,7 @@
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
+#include "mongo/db/query/analyze_regex.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/expression_index.h"
@@ -52,8 +53,6 @@
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/ctype.h"
-#include "mongo/util/str.h"
 #include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2regioncoverer.h"
 
@@ -91,34 +90,6 @@ IndexBoundsBuilder::BoundsTightness getInequalityPredicateTightness(const Interv
 
     return Indexability::isExactBoundsGenerating(dataElt) ? IndexBoundsBuilder::EXACT
                                                           : IndexBoundsBuilder::INEXACT_FETCH;
-}
-
-/**
- * Returns true if 'str' contains a non-escaped pipe character '|' on a best-effort basis. This
- * function reports no false negatives, but will return false positives. For example, a pipe
- * character inside of a character class or the \Q...\E escape sequence has no special meaning but
- * may still be reported by this function as being non-escaped.
- */
-bool stringMayHaveUnescapedPipe(StringData str) {
-    if (str.size() > 0 && str[0] == '|') {
-        return true;
-    }
-    if (str.size() > 1 && str[1] == '|' && str[0] != '\\') {
-        return true;
-    }
-
-    for (size_t i = 2U; i < str.size(); ++i) {
-        auto probe = str[i];
-        auto prev = str[i - 1];
-        auto tail = str[i - 2];
-
-        // We consider the pipe to have a special meaning if it is not preceded by a backslash, or
-        // preceded by a backslash that is itself escaped.
-        if (probe == '|' && (prev != '\\' || (prev == '\\' && tail == '\\'))) {
-            return true;
-        }
-    }
-    return false;
 }
 
 const BSONObj kUndefinedElementObj = BSON("" << BSONUndefined);
@@ -184,116 +155,11 @@ string IndexBoundsBuilder::simpleRegex(const char* regex,
         return "";
     }
 
-    *tightnessOut = IndexBoundsBuilder::INEXACT_COVERED;
-
-    bool multilineOK;
-    if (regex[0] == '\\' && regex[1] == 'A') {
-        multilineOK = true;
-        regex += 2;
-    } else if (regex[0] == '^') {
-        multilineOK = false;
-        regex += 1;
-    } else {
-        return "";
-    }
-
-    // A regex with an unescaped pipe character is not considered a simple regex.
-    if (stringMayHaveUnescapedPipe(StringData(regex))) {
-        return "";
-    }
-
-    bool extended = false;
-    while (*flags) {
-        switch (*(flags++)) {
-            case 'm':
-                // Multiline mode.
-                if (multilineOK)
-                    continue;
-                else
-                    return "";
-            case 's':
-                // Single-line mode specified. This just changes the behavior of the '.'
-                // character to match every character instead of every character except '\n'.
-                continue;
-            case 'x':
-                // Extended free-spacing mode.
-                extended = true;
-                break;
-            default:
-                // Cannot use the index.
-                return "";
-        }
-    }
-
-    str::stream ss;
-
-    string r = "";
-    while (*regex) {
-        char c = *(regex++);
-
-        if (c == '*' || c == '?') {
-            // These are the only two symbols that make the last char optional
-            r = ss;
-            r = r.substr(0, r.size() - 1);
-            return r;  // breaking here fails with /^a?/
-        } else if (c == '\\') {
-            c = *(regex++);
-            if (c == 'Q') {
-                // \Q...\E quotes everything inside
-                while (*regex) {
-                    c = (*regex++);
-                    if (c == '\\' && (*regex == 'E')) {
-                        regex++;  // skip the 'E'
-                        break;    // go back to start of outer loop
-                    } else {
-                        ss << c;  // character should match itself
-                    }
-                }
-            } else if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
-                       (c == '\0')) {
-                // don't know what to do with these
-                r = ss;
-                break;
-            } else {
-                // slash followed by non-alphanumeric represents the following char
-                ss << c;
-            }
-        } else if (strchr("^$.[()+{", c)) {
-            // list of "metacharacters" from man pcrepattern
-            // For prefix patterns ending in '.*' (ex. /^abc.*/) we can build exact index bounds.
-            if (!multilineOK && (c == '.')) {
-                c = *(regex++);
-                if (c == '*' && *regex == 0) {
-                    *tightnessOut = IndexBoundsBuilder::EXACT;
-                    return ss;
-                } else {
-                    c = *(regex--);
-                }
-            }
-            r = ss;
-            break;
-        } else if (extended && c == '#') {
-            // comment
-            r = ss;
-            break;
-        } else if (extended && ctype::isSpace(c)) {
-            continue;
-        } else {
-            // self-matching char
-            ss << c;
-        }
-    }
-
-    if (r.empty() && *regex == 0) {
-        r = ss;
-        *tightnessOut = r.empty() ? IndexBoundsBuilder::INEXACT_COVERED : IndexBoundsBuilder::EXACT;
-    }
-
-    return r;
+    auto [prefixStr, isExact] = analyze_regex::getRegexPrefixMatch(regex, flags);
+    *tightnessOut = isExact ? IndexBoundsBuilder::EXACT : IndexBoundsBuilder::INEXACT_COVERED;
+    return prefixStr;
 }
 
-
-// static
 void IndexBoundsBuilder::allValuesForField(const BSONElement& elt, OrderedIntervalList* out) {
     // ARGH, BSONValue would make this shorter.
     BSONObjBuilder bob;
