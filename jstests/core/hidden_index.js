@@ -13,7 +13,7 @@
 load("jstests/libs/analyze_plan.js");              // For getPlanStages.
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
-load("jstests/libs/get_index_helpers.js");         // For GetIndexHelpers.findByName.
+load("jstests/libs/index_catalog_helpers.js");     // For IndexCatalogHelpers.findByName.
 
 const collName = "hidden_index";
 let coll = assertDropAndRecreateCollection(db, collName);
@@ -36,12 +36,12 @@ function validateHiddenIndexBehaviour(query, index_type, wildcard) {
     else
         assert.commandWorked(coll.createIndex({"a": index_type}));
 
-    let idxSpec = GetIndexHelpers.findByName(coll.getIndexes(), index_name);
+    let idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), index_name);
     assert.eq(idxSpec.hidden, undefined);
     assert.gt(numOfUsedIXSCAN(query), 0);
 
     assert.commandWorked(coll.hideIndex(index_name));
-    idxSpec = GetIndexHelpers.findByName(coll.getIndexes(), index_name);
+    idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), index_name);
     assert(idxSpec.hidden);
     if (index_type === "text") {
         assert.commandFailedWithCode(coll.runCommand("find", {filter: query}, {hint: {a: 1}}), 291);
@@ -51,7 +51,7 @@ function validateHiddenIndexBehaviour(query, index_type, wildcard) {
     assert.eq(numOfUsedIXSCAN(query), 0);
 
     assert.commandWorked(coll.unhideIndex(index_name));
-    idxSpec = GetIndexHelpers.findByName(coll.getIndexes(), index_name);
+    idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), index_name);
     assert.eq(idxSpec.hidden, undefined);
     assert.gt(numOfUsedIXSCAN(query), 0);
 
@@ -62,7 +62,7 @@ function validateHiddenIndexBehaviour(query, index_type, wildcard) {
     else
         assert.commandWorked(coll.createIndex({"a": index_type}, {hidden: true}));
 
-    idxSpec = GetIndexHelpers.findByName(coll.getIndexes(), index_name);
+    idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), index_name);
     assert(idxSpec.hidden);
     assert.eq(numOfUsedIXSCAN(query), 0);
     assert.commandWorked(coll.dropIndexes());
@@ -92,7 +92,7 @@ if (!FixtureHelpers.isMongos(db)) {
 // Test that index 'hidden' status can be found in listIndexes command.
 assert.commandWorked(coll.createIndex({lsIdx: 1}, {hidden: true}));
 let res = assert.commandWorked(db.runCommand({"listIndexes": collName}));
-let idxSpec = GetIndexHelpers.findByName(res.cursor.firstBatch, "lsIdx_1");
+let idxSpec = IndexCatalogHelpers.findByName(res.cursor.firstBatch, "lsIdx_1");
 assert.eq(idxSpec.hidden, true);
 
 // Can't hide any index in a system collection.
@@ -114,7 +114,7 @@ assert.commandFailedWithCode(coll.runCommand("find", {hint: {a: 1}}), 2);
 // We can change ttl index and hide info at the same time.
 assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.createIndex({"tm": 1}, {expireAfterSeconds: 10}));
-idxSpec = GetIndexHelpers.findByName(coll.getIndexes(), "tm_1");
+idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), "tm_1");
 assert.eq(idxSpec.hidden, undefined);
 assert.eq(idxSpec.expireAfterSeconds, 10);
 
@@ -122,7 +122,7 @@ db.runCommand({
     "collMod": coll.getName(),
     "index": {"name": "tm_1", "expireAfterSeconds": 1, "hidden": true}
 });
-idxSpec = GetIndexHelpers.findByName(coll.getIndexes(), "tm_1");
+idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), "tm_1");
 assert(idxSpec.hidden);
 assert.eq(idxSpec.expireAfterSeconds, 1);
 
@@ -131,15 +131,15 @@ assert.eq(idxSpec.expireAfterSeconds, 1);
 //
 assert.commandWorked(
     db.runCommand({createIndexes: collName, indexes: [{key: {y: 1}, name: "y", hidden: false}]}));
-idxSpec = GetIndexHelpers.findByName(coll.getIndexes(), "y");
+idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), "y");
 assert.eq(idxSpec.hidden, undefined);
 
 assert.commandWorked(coll.hideIndex("y"));
-idxSpec = GetIndexHelpers.findByName(coll.getIndexes(), "y");
+idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), "y");
 assert(idxSpec.hidden);
 
 // Ensure that unhiding the hidden index won't add 'hidden: false' to the index spec as well.
 assert.commandWorked(coll.unhideIndex("y"));
-idxSpec = GetIndexHelpers.findByName(coll.getIndexes(), "y");
+idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), "y");
 assert.eq(idxSpec.hidden, undefined);
 })();

@@ -54,6 +54,7 @@ const StringMap<IndexType> kIndexNameToType = {
     {IndexNames::GEO_2DSPHERE_BUCKET, INDEX_2DSPHERE_BUCKET},
     {IndexNames::TEXT, INDEX_TEXT},
     {IndexNames::HASHED, INDEX_HASHED},
+    {IndexNames::COLUMN, INDEX_COLUMN},
     {IndexNames::WILDCARD, INDEX_WILDCARD},
 };
 

@@ -1,9 +1,9 @@
 "use strict";
 
 /**
- * Helpers for filtering the index specifications returned by DBCollection.prototype.getIndexes().
+ * Helper functions that help test things to do with the index catalog.
  */
-var GetIndexHelpers = (function() {
+var IndexCatalogHelpers = (function() {
     /**
      * Returns the index specification with the name 'indexName' if it is present in the
      * 'indexSpecs' array, and returns null otherwise.
@@ -61,8 +61,25 @@ var GetIndexHelpers = (function() {
                                                             : null;
     }
 
+    function createSingleIndex(coll, key, parameters) {
+        return coll.getDB().runCommand(
+            {createIndexes: coll.getName(), indexes: [Object.assign({key: key}, parameters)]});
+    }
+
+    function createIndexAndVerifyWithDrop(coll, key, parameters) {
+        coll.dropIndexes();
+        assert.commandWorked(createSingleIndex(coll, key, parameters));
+        assert.neq(
+            null,
+            getIndexSpecByName(coll.getIndexes(), parameters.name),
+            () =>
+                `Could not find index with name ${parameters.name}: ${tojson(coll.getIndexes())}`);
+    }
+
     return {
         findByName: getIndexSpecByName,
         findByKeyPattern: getIndexSpecByKeyPattern,
+        createSingleIndex: createSingleIndex,
+        createIndexAndVerifyWithDrop: createIndexAndVerifyWithDrop,
     };
 })();

@@ -5,7 +5,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/get_index_helpers.js");
+load("jstests/libs/index_catalog_helpers.js");
 
 var conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
@@ -13,7 +13,7 @@ assert.neq(null, conn, "mongod was unable to start up");
 var testDB = conn.getDB("test");
 assert.commandWorked(testDB.runCommand({create: "index_version_autoupgrade"}));
 var allIndexes = testDB.index_version_autoupgrade.getIndexes();
-var spec = GetIndexHelpers.findByKeyPattern(allIndexes, {_id: 1});
+var spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {_id: 1});
 assert.neq(null, spec, "Index with key pattern {_id: 1} not found: " + tojson(allIndexes));
 var defaultIndexVersion = spec.v;
 assert.lte(2, defaultIndexVersion, "Expected the defaultIndexVersion to be at least v=2");
@@ -39,13 +39,13 @@ function testIndexVersionAutoUpgrades(commandFn, doesAutoUpgrade) {
     assert.commandWorked(testDB.createCollection("index_version_autoupgrade",
                                                  {idIndex: {key: {_id: 1}, name: "_id_", v: 1}}));
     var allIndexes = coll.getIndexes();
-    var spec = GetIndexHelpers.findByKeyPattern(allIndexes, {_id: 1});
+    var spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {_id: 1});
     assert.neq(null, spec, "Index with key pattern {_id: 1} not found: " + tojson(allIndexes));
     assert.eq(1, spec.v, "Expected a v=1 index to be built: " + tojson(spec));
 
     assert.commandWorked(coll.createIndex({withoutAnyOptions: 1}));
     allIndexes = coll.getIndexes();
-    spec = GetIndexHelpers.findByKeyPattern(allIndexes, {withoutAnyOptions: 1});
+    spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {withoutAnyOptions: 1});
     assert.neq(null,
                spec,
                "Index with key pattern {withoutAnyOptions: 1} not found: " + tojson(allIndexes));
@@ -55,13 +55,13 @@ function testIndexVersionAutoUpgrades(commandFn, doesAutoUpgrade) {
 
     assert.commandWorked(coll.createIndex({withV1: 1}, {v: 1}));
     allIndexes = coll.getIndexes();
-    spec = GetIndexHelpers.findByKeyPattern(allIndexes, {withV1: 1});
+    spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {withV1: 1});
     assert.neq(null, spec, "Index with key pattern {withV1: 1} not found: " + tojson(allIndexes));
     assert.eq(1, spec.v, "Expected a v=1 index to be built: " + tojson(spec));
 
     assert.commandWorked(coll.createIndex({withV2: 1}, {v: 2}));
     allIndexes = coll.getIndexes();
-    spec = GetIndexHelpers.findByKeyPattern(allIndexes, {withV2: 1});
+    spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {withV2: 1});
     assert.neq(null, spec, "Index with key pattern {withV2: 1} not found: " + tojson(allIndexes));
     assert.eq(2, spec.v, "Expected a v=2 index to be built: " + tojson(spec));
 
@@ -87,7 +87,7 @@ function testIndexVersionAutoUpgrades(commandFn, doesAutoUpgrade) {
 
     expectedResults.forEach(function(expected) {
         var allIndexes = collToVerify.getIndexes();
-        var spec = GetIndexHelpers.findByKeyPattern(allIndexes, expected.keyPattern);
+        var spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, expected.keyPattern);
         assert.neq(null,
                    spec,
                    "Index with key pattern " + tojson(expected.keyPattern) +

@@ -50,6 +50,7 @@ static const std::string kText = "text";
 static const std::string kTTL = "ttl";
 static const std::string kUnique = "unique";
 static const std::string kWildcard = "wildcard";
+static const std::string kColumn = "columnstore";
 
 std::map<std::string, IndexFeatureStats> makeFeatureMap() {
     std::map<std::string, IndexFeatureStats> map;
@@ -68,6 +69,7 @@ std::map<std::string, IndexFeatureStats> makeFeatureMap() {
     map[kTTL];
     map[kUnique];
     map[kWildcard];
+    map[kColumn];
     return map;
 };
 
@@ -158,6 +160,9 @@ void GlobalIndexUsageTracker::_updateStatsForEachFeature(const IndexFeatures& fe
             break;
         case INDEX_WILDCARD:
             update(&_indexFeatureToStats.at(kWildcard));
+            break;
+        case INDEX_COLUMN:
+            update(&_indexFeatureToStats.at(kColumn));
             break;
         default:
             MONGO_UNREACHABLE;

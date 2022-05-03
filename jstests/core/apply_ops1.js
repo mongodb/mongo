@@ -15,7 +15,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/get_index_helpers.js");
+load("jstests/libs/index_catalog_helpers.js");
 
 var t = db.apply_ops1;
 t.drop();

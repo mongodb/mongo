@@ -15,7 +15,7 @@
 
 (function() {
 "use strict";
-load("jstests/libs/get_index_helpers.js");
+load("jstests/libs/index_catalog_helpers.js");
 
 const rst = new ReplSetTest({nodes: 2, nodeOpts: {binVersion: "latest"}});
 rst.startSet();
@@ -105,7 +105,7 @@ validateCollModOplogEntryCount({
                                1);
 
 // Test that the index was successfully modified.
-let idxSpec = GetIndexHelpers.findByName(primaryColl.getIndexes(), "b_1");
+let idxSpec = IndexCatalogHelpers.findByName(primaryColl.getIndexes(), "b_1");
 assert.eq(idxSpec.hidden, undefined);
 assert.eq(idxSpec.expireAfterSeconds, 10);
 
@@ -131,7 +131,7 @@ if (collModIndexUniqueEnabled) {
                                    1);
 
     // Test that the index was successfully modified.
-    idxSpec = GetIndexHelpers.findByName(primaryColl.getIndexes(), "c_1");
+    idxSpec = IndexCatalogHelpers.findByName(primaryColl.getIndexes(), "c_1");
     assert.eq(idxSpec.hidden, undefined);
     assert.eq(idxSpec.expireAfterSeconds, undefined);
     assert(idxSpec.unique, tojson(idxSpec));
@@ -149,7 +149,7 @@ if (collModIndexUniqueEnabled) {
                                    0);
 
     // Test that the index was unchanged.
-    idxSpec = GetIndexHelpers.findByName(primaryColl.getIndexes(), "d_1");
+    idxSpec = IndexCatalogHelpers.findByName(primaryColl.getIndexes(), "d_1");
     assert.eq(idxSpec.hidden, undefined);
     assert.eq(idxSpec.expireAfterSeconds, undefined);
     assert(idxSpec.unique, tojson(idxSpec));
@@ -167,7 +167,7 @@ if (collModIndexUniqueEnabled) {
                                    0);
 
     // Test that the index was unchanged.
-    idxSpec = GetIndexHelpers.findByName(primaryColl.getIndexes(), "e_1");
+    idxSpec = IndexCatalogHelpers.findByName(primaryColl.getIndexes(), "e_1");
     assert(idxSpec.hidden, tojson(idxSpec));
     assert.eq(idxSpec.expireAfterSeconds, undefined);
     assert(idxSpec.unique, tojson(idxSpec));
@@ -190,7 +190,7 @@ if (collModIndexUniqueEnabled) {
                                    1);
 
     // Test that the index was successfully modified.
-    idxSpec = GetIndexHelpers.findByName(primaryColl.getIndexes(), "f_1");
+    idxSpec = IndexCatalogHelpers.findByName(primaryColl.getIndexes(), "f_1");
     assert.eq(idxSpec.hidden, undefined);
     assert.eq(idxSpec.expireAfterSeconds, 20);
     assert(idxSpec.unique, tojson(idxSpec));
@@ -214,7 +214,7 @@ if (collModIndexUniqueEnabled) {
                                    1);
 
     // Test that the index was successfully modified.
-    idxSpec = GetIndexHelpers.findByName(primaryColl.getIndexes(), "g_1");
+    idxSpec = IndexCatalogHelpers.findByName(primaryColl.getIndexes(), "g_1");
     assert(idxSpec.hidden, tojson(idxSpec));
     assert.eq(idxSpec.expireAfterSeconds, 30);
     assert(idxSpec.unique, tojson(idxSpec));
@@ -232,7 +232,7 @@ if (collModIndexUniqueEnabled) {
                                    0);
 
     // Test that the index was unchanged.
-    idxSpec = GetIndexHelpers.findByName(primaryColl.getIndexes(), "h_1");
+    idxSpec = IndexCatalogHelpers.findByName(primaryColl.getIndexes(), "h_1");
     assert.eq(idxSpec.hidden, undefined);
     assert.eq(idxSpec.expireAfterSeconds, undefined);
     assert(idxSpec.prepareUnique, tojson(idxSpec));

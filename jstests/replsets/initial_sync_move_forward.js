@@ -15,7 +15,7 @@
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/get_index_helpers.js");
+load("jstests/libs/index_catalog_helpers.js");
 
 var rst = new ReplSetTest({name: "initial_sync_move_forward", nodes: 1});
 rst.startSet();
@@ -81,7 +81,7 @@ assert.eq(1, secondaryColl.find({_id: 0, x: count}).itcount());
 assert.eq(1, secondaryColl.find({_id: count, x: 1}).itcount());
 
 // Check for unique index on secondary.
-var indexSpec = GetIndexHelpers.findByKeyPattern(secondaryColl.getIndexes(), {x: 1});
+var indexSpec = IndexCatalogHelpers.findByKeyPattern(secondaryColl.getIndexes(), {x: 1});
 assert.neq(null, indexSpec);
 assert.eq(true, indexSpec.unique);
 rst.stopSet();

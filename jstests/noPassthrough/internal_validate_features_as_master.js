@@ -5,7 +5,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/get_index_helpers.js");
+load("jstests/libs/index_catalog_helpers.js");
 
 // internalValidateFeaturesAsMaster can be set via startup parameter.
 let conn = MongoRunner.runMongod({setParameter: "internalValidateFeaturesAsMaster=1"});

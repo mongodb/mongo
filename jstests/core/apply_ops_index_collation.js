@@ -20,7 +20,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/get_index_helpers.js");
+load("jstests/libs/index_catalog_helpers.js");
 load('jstests/libs/uuid_util.js');
 
 const coll = db.apply_ops_index_collation;

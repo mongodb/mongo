@@ -12,7 +12,7 @@ TestData.skipCheckDBHashes = true;
 (function() {
 "use strict";
 
-load("jstests/libs/get_index_helpers.js");
+load("jstests/libs/index_catalog_helpers.js");
 load("jstests/libs/write_concern_util.js");
 load("jstests/replsets/rslib.js");
 

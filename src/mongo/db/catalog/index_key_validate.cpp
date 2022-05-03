@@ -184,12 +184,6 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
                                           << static_cast<int>(indexVersion)};
                 }
 
-                if (pluginName == IndexNames::WILDCARD) {
-                    return {code,
-                            str::stream() << "'" << pluginName
-                                          << "' index plugin is not allowed with index version v:"
-                                          << static_cast<int>(indexVersion)};
-                }
                 break;
             }
             case IndexVersion::kV2: {
@@ -225,10 +219,10 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
                                         << "' index must be a non-zero number, not a string.");
         }
 
-        // Check if the wildcard index is compounded. If it is the key is invalid because
-        // compounded wildcard indexes are disallowed.
-        if (pluginName == IndexNames::WILDCARD && key.nFields() != 1) {
-            return Status(code, "wildcard indexes do not allow compounding");
+        // Some special index types do not support compound indexes.
+        if (key.nFields() != 1 &&
+            (pluginName == IndexNames::WILDCARD || pluginName == IndexNames::COLUMN)) {
+            return Status(code, str::stream() << pluginName << " indexes do not allow compounding");
         }
 
         // Ensure that the fields on which we are building the index are valid: a field must not

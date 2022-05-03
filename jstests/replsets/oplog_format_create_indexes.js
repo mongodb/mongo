@@ -5,7 +5,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/get_index_helpers.js");
+load("jstests/libs/index_catalog_helpers.js");
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -19,7 +19,7 @@ const oplogColl = primary.getDB("local").oplog.rs;
 function testOplogEntryContainsIndexInfoObj(coll, keyPattern, indexOptions) {
     assert.commandWorked(coll.createIndex(keyPattern, indexOptions));
     const allIndexes = coll.getIndexes();
-    const indexSpec = GetIndexHelpers.findByKeyPattern(allIndexes, keyPattern);
+    const indexSpec = IndexCatalogHelpers.findByKeyPattern(allIndexes, keyPattern);
 
     assert.neq(
         null,

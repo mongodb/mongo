@@ -14,7 +14,7 @@
 // Ensures that mongod respects the batch write protocol for inserts
 //
 
-load("jstests/libs/get_index_helpers.js");
+load("jstests/libs/index_catalog_helpers.js");
 
 var coll = db.getCollection("batch_write_insert");
 coll.drop();

@@ -8,56 +8,45 @@
 (function() {
 "use strict";
 
+load("jstests/libs/index_catalog_helpers.js");  // For "IndexCatalogHelpers."
+
 const kCollectionName = "wildcard_validindex";
 const coll = db.getCollection(kCollectionName);
 
 const kIndexName = "wildcard_validindex";
 
-const createIndexHelper = function(key, parameters) {
-    return db.runCommand(
-        {createIndexes: kCollectionName, indexes: [Object.assign({key: key}, parameters)]});
-};
-
-const createIndexAndVerifyWithDrop = function(key, parameters) {
-    coll.dropIndexes();
-    createIndexHelper(key, parameters);
-    assert.eq(coll.getIndexes()
-                  .filter((index) => {
-                      return index.name == parameters.name;
-                  })
-                  .length,
-              1);
-};
-
 // Can create a valid wildcard index.
-createIndexAndVerifyWithDrop({"$**": 1}, {name: kIndexName});
+IndexCatalogHelpers.createIndexAndVerifyWithDrop(coll, {"$**": 1}, {name: kIndexName});
 
 // Can create a valid wildcard index with subpaths.
-createIndexAndVerifyWithDrop({"a.$**": 1}, {name: kIndexName});
+IndexCatalogHelpers.createIndexAndVerifyWithDrop(coll, {"a.$**": 1}, {name: kIndexName});
 
 // Can create a wildcard index with partialFilterExpression.
-createIndexAndVerifyWithDrop({"$**": 1},
-                             {name: kIndexName, partialFilterExpression: {a: {"$gt": 0}}});
+IndexCatalogHelpers.createIndexAndVerifyWithDrop(
+    coll, {"$**": 1}, {name: kIndexName, partialFilterExpression: {a: {"$gt": 0}}});
 
 // Can create a wildcard index with foreground & background construction.
-createIndexAndVerifyWithDrop({"$**": 1}, {background: false, name: kIndexName});
-createIndexAndVerifyWithDrop({"$**": 1}, {background: true, name: kIndexName});
+IndexCatalogHelpers.createIndexAndVerifyWithDrop(
+    coll, {"$**": 1}, {background: false, name: kIndexName});
+IndexCatalogHelpers.createIndexAndVerifyWithDrop(
+    coll, {"$**": 1}, {background: true, name: kIndexName});
 
 // Can create a wildcard index with index level collation.
-createIndexAndVerifyWithDrop({"$**": 1}, {collation: {locale: "fr"}, name: kIndexName});
+IndexCatalogHelpers.createIndexAndVerifyWithDrop(
+    coll, {"$**": 1}, {collation: {locale: "fr"}, name: kIndexName});
 
 // Can create a wildcard index with an inclusion projection.
-createIndexAndVerifyWithDrop({"$**": 1},
-                             {wildcardProjection: {a: 1, b: 1, c: 1}, name: kIndexName});
+IndexCatalogHelpers.createIndexAndVerifyWithDrop(
+    coll, {"$**": 1}, {wildcardProjection: {a: 1, b: 1, c: 1}, name: kIndexName});
 // Can create a wildcard index with an exclusion projection.
-createIndexAndVerifyWithDrop({"$**": 1},
-                             {wildcardProjection: {a: 0, b: 0, c: 0}, name: kIndexName});
+IndexCatalogHelpers.createIndexAndVerifyWithDrop(
+    coll, {"$**": 1}, {wildcardProjection: {a: 0, b: 0, c: 0}, name: kIndexName});
 // Can include _id in an exclusion.
-createIndexAndVerifyWithDrop({"$**": 1},
-                             {wildcardProjection: {_id: 1, a: 0, b: 0, c: 0}, name: kIndexName});
+IndexCatalogHelpers.createIndexAndVerifyWithDrop(
+    coll, {"$**": 1}, {wildcardProjection: {_id: 1, a: 0, b: 0, c: 0}, name: kIndexName});
 // Can exclude _id in an exclusion.
-createIndexAndVerifyWithDrop({"$**": 1},
-                             {wildcardProjection: {_id: 0, a: 1, b: 1, c: 1}, name: kIndexName});
+IndexCatalogHelpers.createIndexAndVerifyWithDrop(
+    coll, {"$**": 1}, {wildcardProjection: {_id: 0, a: 1, b: 1, c: 1}, name: kIndexName});
 
 // Cannot create a wildcard index with a non-positive numeric key value.
 coll.dropIndexes();
@@ -106,39 +95,49 @@ assert.commandFailedWithCode(coll.createIndex({"$**": "hello"}), ErrorCodes.Cann
 
 // Cannot create an wildcard index with mixed inclusion exclusion.
 assert.commandFailedWithCode(
-    createIndexHelper({"$**": 1}, {name: kIndexName, wildcardProjection: {a: 1, b: 0}}), 31254);
+    IndexCatalogHelpers.createSingleIndex(
+        coll, {"$**": 1}, {name: kIndexName, wildcardProjection: {a: 1, b: 0}}),
+    31254);
 // Cannot create an wildcard index with computed fields.
 assert.commandFailedWithCode(
-    createIndexHelper({"$**": 1}, {name: kIndexName, wildcardProjection: {a: 1, b: "string"}}),
+    IndexCatalogHelpers.createSingleIndex(
+        coll, {"$**": 1}, {name: kIndexName, wildcardProjection: {a: 1, b: "string"}}),
     51271);
 // Cannot create an wildcard index with an empty projection.
-assert.commandFailedWithCode(
-    createIndexHelper({"$**": 1}, {name: kIndexName, wildcardProjection: {}}),
-    ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(IndexCatalogHelpers.createSingleIndex(
+                                 coll, {"$**": 1}, {name: kIndexName, wildcardProjection: {}}),
+                             ErrorCodes.FailedToParse);
 // Cannot create another index type with "wildcardProjection" projection.
 assert.commandFailedWithCode(
-    createIndexHelper({"a": 1}, {name: kIndexName, wildcardProjection: {a: 1, b: 1}}),
+    IndexCatalogHelpers.createSingleIndex(
+        coll, {"a": 1}, {name: kIndexName, wildcardProjection: {a: 1, b: 1}}),
     ErrorCodes.BadValue);
 // Cannot create a text index with a "wildcardProjection" projection.
 assert.commandFailedWithCode(
-    createIndexHelper({"$**": "text"}, {name: kIndexName, wildcardProjection: {a: 1, b: 1}}),
+    IndexCatalogHelpers.createSingleIndex(
+        coll, {"$**": "text"}, {name: kIndexName, wildcardProjection: {a: 1, b: 1}}),
     ErrorCodes.BadValue);
 // Cannot create an wildcard index with a non-object "wildcardProjection" projection.
 assert.commandFailedWithCode(
-    createIndexHelper({"a.$**": 1}, {name: kIndexName, wildcardProjection: "string"}),
+    IndexCatalogHelpers.createSingleIndex(
+        coll, {"a.$**": 1}, {name: kIndexName, wildcardProjection: "string"}),
     ErrorCodes.TypeMismatch);
 // Cannot exclude an subfield of _id in an inclusion.
-assert.commandFailedWithCode(createIndexHelper({"_id.id": 0, a: 1, b: 1, c: 1}),
-                             ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    IndexCatalogHelpers.createSingleIndex(coll, {"_id.id": 0, a: 1, b: 1, c: 1}),
+    ErrorCodes.CannotCreateIndex);
 // Cannot include an subfield of _id in an exclusion.
-assert.commandFailedWithCode(createIndexHelper({"_id.id": 1, a: 0, b: 0, c: 0}),
-                             ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    IndexCatalogHelpers.createSingleIndex(coll, {"_id.id": 1, a: 0, b: 0, c: 0}),
+    ErrorCodes.CannotCreateIndex);
 
 // Cannot specify both a subpath and a projection.
 assert.commandFailedWithCode(
-    createIndexHelper({"a.$**": 1}, {name: kIndexName, wildcardProjection: {a: 1}}),
+    IndexCatalogHelpers.createSingleIndex(
+        coll, {"a.$**": 1}, {name: kIndexName, wildcardProjection: {a: 1}}),
     ErrorCodes.FailedToParse);
 assert.commandFailedWithCode(
-    createIndexHelper({"a.$**": 1}, {name: kIndexName, wildcardProjection: {b: 0}}),
+    IndexCatalogHelpers.createSingleIndex(
+        coll, {"a.$**": 1}, {name: kIndexName, wildcardProjection: {b: 0}}),
     ErrorCodes.FailedToParse);
 })();

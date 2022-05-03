@@ -26,6 +26,7 @@ const knownFeatures = [
     "2dsphere",
     "2dsphere_bucket",
     "collation",
+    "columnstore",
     "compound",
     "hashed",
     "id",
@@ -198,10 +199,9 @@ assertStats(db, (stats) => {
 
 lastStats = db.serverStatus().indexStats;
 
-const timeSeriesMetricIndexesEnabled = db.adminCommand({
-                                             getParameter: 1,
-                                             featureFlagTimeseriesMetricIndexes: 1
-                                         }).featureFlagTimeseriesMetricIndexes.value;
+const timeSeriesMetricIndexesEnabled =
+    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagTimeseriesMetricIndexes: 1}))
+        .featureFlagTimeseriesMetricIndexes.value;
 if (timeSeriesMetricIndexesEnabled) {
     assert.commandWorked(db.createCollection('ts', {timeseries: {timeField: 't'}}));
     assert.commandWorked(db.ts.createIndex({loc: '2dsphere'}));
@@ -227,6 +227,24 @@ if (timeSeriesMetricIndexesEnabled) {
         assertFeatureAccessIncrease(lastStats, stats, 'id', 0);
         assertFeatureAccessIncrease(lastStats, stats, 'single', 1);
         assertFeatureAccessIncrease(lastStats, stats, '2dsphere_bucket', 1);
+    });
+}
+
+lastStats = db.serverStatus().indexStats;
+
+const columnstoreIndexesEnabled =
+    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagColumnstoreIndexes: 1}))
+        .featureFlagColumnstoreIndexes.value;
+if (columnstoreIndexesEnabled) {
+    // TODO SERVER-66021 should support having data.
+    // TODO SERVER-61644 (or sooner) should support accessing/using index and seeing that reflected.
+    assert.commandWorked(db.newCollection.createIndex({'$**': 'columnstore'}));
+    assertStats(db, (stats) => {
+        assertCountIncrease(lastStats, stats, 2);  // Includes _id index on new collection.
+        assertFeatureCountIncrease(lastStats, stats, 'columnstore', 1);
+
+        assertFeatureAccessIncrease(lastStats, stats, 'id', 0);
+        assertFeatureAccessIncrease(lastStats, stats, 'columnstore', 0);
     });
 }
 

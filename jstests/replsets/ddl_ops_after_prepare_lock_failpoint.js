@@ -10,7 +10,7 @@
 (function() {
 "use strict";
 load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/get_index_helpers.js");
+load("jstests/libs/index_catalog_helpers.js");
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -80,12 +80,12 @@ let testDDLOps = () => {
         testDB.runCommand(
             {createIndexes: collName, indexes: [{key: {"b": 1}, name: indexToCreate}]}),
         ErrorCodes.LockTimeout);
-    assert.eq(null, GetIndexHelpers.findByName(testColl.getIndexes(), indexToCreate));
+    assert.eq(null, IndexCatalogHelpers.findByName(testColl.getIndexes(), indexToCreate));
 
     // Try dropping the index we created originally. This should also fail.
     assert.commandFailedWithCode(testDB.runCommand({dropIndexes: collName, index: indexToDrop}),
                                  ErrorCodes.LockTimeout);
-    assert.neq(null, GetIndexHelpers.findByName(testColl.getIndexes(), indexToDrop));
+    assert.neq(null, IndexCatalogHelpers.findByName(testColl.getIndexes(), indexToDrop));
 };
 
 /**

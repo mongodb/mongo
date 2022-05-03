@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/client/index_spec.h"
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
 #include "mongo/platform/basic.h"
@@ -66,6 +67,7 @@
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
@@ -533,15 +535,10 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
         engine->getEngine()->alterIdentMetadata(opCtx, ident, desc, isForceUpdateMetadata);
     }
 
-    const auto& collOptions = collection->getCollectionOptions();
-    std::unique_ptr<SortedDataInterface> sdi = engine->getEngine()->getSortedDataInterface(
-        opCtx, collection->ns(), collOptions, ident, desc);
-
     std::unique_ptr<IndexAccessMethod> accessMethod = IndexAccessMethodFactory::get(opCtx)->make(
         opCtx, collection->ns(), collection->getCollectionOptions(), entry.get(), ident);
 
     entry->init(std::move(accessMethod));
-
 
     IndexCatalogEntry* save = entry.get();
     if (isReadyIndex) {
@@ -710,6 +707,53 @@ StatusWith<BSONObj> adjustIndexSpecObject(const BSONObj& obj) {
     return obj;
 }
 
+Status reportInvalidOption(StringData optionName, StringData pluginName) {
+    return Status(ErrorCodes::CannotCreateIndex,
+                  str::stream() << "Index type '" << pluginName << "' does not support the '"
+                                << optionName << "' option");
+}
+
+Status reportInvalidVersion(StringData pluginName, IndexVersion indexVersion) {
+    return Status(ErrorCodes::CannotCreateIndex,
+                  str::stream() << "Index type '" << pluginName
+                                << "' is not allowed with index version v: "
+                                << static_cast<int>(indexVersion));
+}
+
+Status validateWildcardSpec(const BSONObj& spec, IndexVersion indexVersion) {
+    if (spec["sparse"].trueValue())
+        return reportInvalidOption("sparse", IndexNames::WILDCARD);
+
+    if (spec["unique"].trueValue()) {
+        return reportInvalidOption("unique", IndexNames::WILDCARD);
+    }
+
+    if (spec.getField("expireAfterSeconds")) {
+        return reportInvalidOption("expireAfterSeconds", IndexNames::WILDCARD)
+            .withContext("cannot make a TTL index");
+    }
+    if (indexVersion < IndexVersion::kV2) {
+        return reportInvalidVersion(IndexNames::WILDCARD, indexVersion);
+    }
+    return Status::OK();
+}  // namespace
+
+Status validateColumnStoreSpec(const BSONObj& spec, IndexVersion indexVersion) {
+    // TODO SERVER-63123 support 'columnstoreProjection'.
+    for (auto&& notToBeSpecified : {"sparse"_sd,
+                                    "unique"_sd,
+                                    "expireAfterSeconds"_sd,
+                                    "partialFilterExpression"_sd,
+                                    "columnstoreProjection"_sd}) {
+        if (spec.hasField(notToBeSpecified)) {
+            return reportInvalidOption(notToBeSpecified, IndexNames::COLUMN);
+        }
+    }
+    if (indexVersion < IndexVersion::kV2) {
+        return reportInvalidVersion(IndexNames::COLUMN, indexVersion);
+    }
+    return Status::OK();
+}
 }  // namespace
 
 Status IndexCatalogImpl::checkValidFilterExpressions(
@@ -823,22 +867,20 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
     const bool isSparse = spec["sparse"].trueValue();
 
     if (pluginName == IndexNames::WILDCARD) {
-        if (isSparse) {
-            return Status(ErrorCodes::CannotCreateIndex,
-                          str::stream() << "Index type '" << pluginName
-                                        << "' does not support the sparse option");
+        if (auto wildcardSpecStatus = validateWildcardSpec(spec, indexVersion);
+            !wildcardSpecStatus.isOK()) {
+            return wildcardSpecStatus;
         }
-
-        if (spec["unique"].trueValue()) {
-            return Status(ErrorCodes::CannotCreateIndex,
-                          str::stream() << "Index type '" << pluginName
-                                        << "' does not support the unique option");
-        }
-
-        if (spec.getField("expireAfterSeconds")) {
-            return Status(ErrorCodes::CannotCreateIndex,
-                          str::stream()
-                              << "Index type '" << pluginName << "' cannot be a TTL index");
+    } else if (pluginName == IndexNames::COLUMN) {
+        uassert(ErrorCodes::NotImplemented,
+                str::stream() << pluginName
+                              << " indexes are under development and cannot be used without "
+                                 "enabling the feature flag",
+                feature_flags::gFeatureFlagColumnstoreIndexes.isEnabled(
+                    serverGlobalParams.featureCompatibility));
+        if (auto columnSpecStatus = validateColumnStoreSpec(spec, indexVersion);
+            !columnSpecStatus.isOK()) {
+            return columnSpecStatus;
         }
     }
 

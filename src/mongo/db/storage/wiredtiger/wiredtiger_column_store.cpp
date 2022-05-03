@@ -233,7 +233,7 @@ void WiredTigerColumnStore::fullValidate(OperationContext* opCtx,
                                          int64_t* numKeysOut,
                                          IndexValidateResults* fullResults) const {
     // TODO SERVER-65484: Validation for column indexes.
-    uasserted(ErrorCodes::NotImplemented, "WiredTigerColumnStore::fullValidate()");
+    return;
 }
 
 class WiredTigerColumnStore::Cursor final : public ColumnStore::Cursor,

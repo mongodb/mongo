@@ -16,7 +16,7 @@
 (function() {
 'use strict';
 
-load('jstests/libs/get_index_helpers.js');
+load('jstests/libs/index_catalog_helpers.js');
 
 const dbpath = MongoRunner.dataPath + 'skip_level_upgrade';
 resetDbpath(dbpath);
@@ -76,7 +76,7 @@ for (let i = 0; i < versions.length; i++) {
                   tojson(mongodOptions));
     assert.neq(
         null,
-        GetIndexHelpers.findByKeyPattern(testDB[version.testCollection].getIndexes(), {a: 1}),
+        IndexCatalogHelpers.findByKeyPattern(testDB[version.testCollection].getIndexes(), {a: 1}),
         `index from ${version.testCollection} should be available; options: ` +
             tojson(mongodOptions));
 

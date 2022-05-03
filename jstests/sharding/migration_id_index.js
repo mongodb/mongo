@@ -3,7 +3,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/get_index_helpers.js");
+load("jstests/libs/index_catalog_helpers.js");
 
 var st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 var testDB = st.s.getDB("test");
@@ -20,11 +20,11 @@ assert.commandWorked(
 // to finish building on the secondary before returning.
 assert.commandWorked(testDB.coll.insert({a: 6}));
 st.rs0.awaitReplication();
-var spec = GetIndexHelpers.findByName(
+var spec = IndexCatalogHelpers.findByName(
     st.rs0.getPrimary().getDB("test").migration_id_index.getIndexes(), "_id_");
 assert.neq(spec, null, "_id index spec not found");
 assert.eq(spec.v, 1, tojson(spec));
-spec = GetIndexHelpers.findByName(
+spec = IndexCatalogHelpers.findByName(
     st.rs0.getSecondary().getDB("test").migration_id_index.getIndexes(), "_id_");
 assert.neq(spec, null, "_id index spec not found");
 assert.eq(spec.v, 1, tojson(spec));
@@ -36,11 +36,11 @@ assert.commandWorked(
     testDB.adminCommand({moveChunk: coll.getFullName(), find: {a: 6}, to: st.shard1.shardName}));
 
 // Check that the collection was created with a v:1 _id index on the non-primary shard.
-spec = GetIndexHelpers.findByName(st.rs1.getPrimary().getDB("test").migration_id_index.getIndexes(),
-                                  "_id_");
+spec = IndexCatalogHelpers.findByName(
+    st.rs1.getPrimary().getDB("test").migration_id_index.getIndexes(), "_id_");
 assert.neq(spec, null, "_id index spec not found");
 assert.eq(spec.v, 1, tojson(spec));
-spec = GetIndexHelpers.findByName(
+spec = IndexCatalogHelpers.findByName(
     st.rs1.getSecondary().getDB("test").migration_id_index.getIndexes(), "_id_");
 assert.neq(spec, null, "_id index spec not found");
 assert.eq(spec.v, 1, tojson(spec));

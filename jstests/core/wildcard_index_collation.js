@@ -16,7 +16,7 @@
 
 load("jstests/aggregation/extras/utils.js");       // For arrayEq.
 load("jstests/libs/analyze_plan.js");              // For getPlanStages.
-load("jstests/libs/get_index_helpers.js");         // For GetIndexHelpers.
+load("jstests/libs/index_catalog_helpers.js");     // For IndexCatalogHelpers.
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/fixture_helpers.js");           // For isMongos.
 
@@ -54,7 +54,7 @@ function assertWildcardIndexAnswersQuery(query, expectedResults, projection) {
 // Confirms that the index matching the given keyPattern has the specified collation.
 function assertIndexHasCollation(keyPattern, collation) {
     var indexSpecs = coll.getIndexes();
-    var found = GetIndexHelpers.findByKeyPattern(indexSpecs, keyPattern, collation);
+    var found = IndexCatalogHelpers.findByKeyPattern(indexSpecs, keyPattern, collation);
     assert.neq(null,
                found,
                "Index with key pattern " + tojson(keyPattern) + " and collation " +

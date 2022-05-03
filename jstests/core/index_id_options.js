@@ -18,7 +18,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/get_index_helpers.js");
+load("jstests/libs/index_catalog_helpers.js");
 
 // Must use local db for testing because autoIndexId:false collections are not allowed in
 // replicated databases.
@@ -33,7 +33,7 @@ assert.commandFailed(coll.createIndex({_id: -1}, {name: "_id_"}));
 coll.drop();
 assert.commandWorked(coll.runCommand("create", {autoIndexId: false}));
 assert.commandWorked(coll.createIndex({_id: 1}, {name: "bad"}));
-var spec = GetIndexHelpers.findByKeyPattern(coll.getIndexes(), {_id: 1});
+var spec = IndexCatalogHelpers.findByKeyPattern(coll.getIndexes(), {_id: 1});
 assert.neq(null, spec, "_id index spec not found");
 assert.eq("_id_", spec.name, tojson(spec));
 
@@ -69,7 +69,7 @@ assert.commandWorked(
 coll.drop();
 assert.commandWorked(coll.runCommand("create", {autoIndexId: false, collation: {locale: "en_US"}}));
 assert.commandWorked(coll.createIndex({_id: 1}, {name: "_id_"}));
-spec = GetIndexHelpers.findByName(coll.getIndexes(), "_id_");
+spec = IndexCatalogHelpers.findByName(coll.getIndexes(), "_id_");
 assert.neq(null, spec, "_id index spec not found");
 assert.eq("en_US", spec.collation.locale, tojson(spec));
 

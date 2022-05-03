@@ -11,7 +11,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/get_index_helpers.js");
+load("jstests/libs/index_catalog_helpers.js");
 
 // "create" command rejects invalid options.
 db.create_collection.drop();
@@ -75,7 +75,7 @@ assert.commandFailedWithCode(
 db.create_collection.drop();
 assert.commandWorked(
     db.createCollection("create_collection", {idIndex: {key: {_id: 1}, name: "a_1"}}));
-var indexSpec = GetIndexHelpers.findByKeyPattern(db.create_collection.getIndexes(), {_id: 1});
+var indexSpec = IndexCatalogHelpers.findByKeyPattern(db.create_collection.getIndexes(), {_id: 1});
 assert.neq(indexSpec, null);
 assert.eq(indexSpec.name, "_id_", tojson(indexSpec));
 
@@ -90,7 +90,7 @@ assert.commandFailedWithCode(
 db.create_collection.drop();
 assert.commandWorked(
     db.createCollection("create_collection", {idIndex: {key: {_id: 1}, name: "_id_"}}));
-indexSpec = GetIndexHelpers.findByName(db.create_collection.getIndexes(), "_id_");
+indexSpec = IndexCatalogHelpers.findByName(db.create_collection.getIndexes(), "_id_");
 assert.neq(indexSpec, null);
 assert.eq(indexSpec.v, 2, tojson(indexSpec));
 
@@ -98,7 +98,7 @@ assert.eq(indexSpec.v, 2, tojson(indexSpec));
 db.create_collection.drop();
 assert.commandWorked(
     db.createCollection("create_collection", {idIndex: {key: {_id: 1}, name: "_id_", v: 1}}));
-indexSpec = GetIndexHelpers.findByName(db.create_collection.getIndexes(), "_id_");
+indexSpec = IndexCatalogHelpers.findByName(db.create_collection.getIndexes(), "_id_");
 assert.neq(indexSpec, null);
 assert.eq(indexSpec.v, 1, tojson(indexSpec));
 
@@ -106,7 +106,7 @@ assert.eq(indexSpec.v, 1, tojson(indexSpec));
 db.create_collection.drop();
 assert.commandWorked(
     db.createCollection("create_collection", {idIndex: {key: {_id: 1}, name: "_id_", v: 2}}));
-indexSpec = GetIndexHelpers.findByName(db.create_collection.getIndexes(), "_id_");
+indexSpec = IndexCatalogHelpers.findByName(db.create_collection.getIndexes(), "_id_");
 assert.neq(indexSpec, null);
 assert.eq(indexSpec.v, 2, tojson(indexSpec));
 
@@ -136,7 +136,7 @@ assert.commandWorked(db.createCollection("create_collection", {
     collation: {locale: "en_US", strength: 3},
     idIndex: {key: {_id: 1}, name: "_id_", collation: {locale: "en_US"}}
 }));
-indexSpec = GetIndexHelpers.findByName(db.create_collection.getIndexes(), "_id_");
+indexSpec = IndexCatalogHelpers.findByName(db.create_collection.getIndexes(), "_id_");
 assert.neq(indexSpec, null);
 assert.eq(indexSpec.collation.locale, "en_US", tojson(indexSpec));
 
@@ -145,7 +145,7 @@ assert.eq(indexSpec.collation.locale, "en_US", tojson(indexSpec));
 db.create_collection.drop();
 assert.commandWorked(db.createCollection(
     "create_collection", {collation: {locale: "en_US"}, idIndex: {key: {_id: 1}, name: "_id_"}}));
-indexSpec = GetIndexHelpers.findByName(db.create_collection.getIndexes(), "_id_");
+indexSpec = IndexCatalogHelpers.findByName(db.create_collection.getIndexes(), "_id_");
 assert.neq(indexSpec, null);
 assert.eq(indexSpec.collation.locale, "en_US", tojson(indexSpec));
 

@@ -15,7 +15,7 @@
 'use strict';
 
 load("jstests/libs/analyze_plan.js");
-load("jstests/libs/get_index_helpers.js");
+load("jstests/libs/index_catalog_helpers.js");
 // For isWiredTiger.
 load("jstests/concurrency/fsm_workload_helpers/server_types.js");
 // For isReplSet
@@ -39,7 +39,7 @@ var isClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db);
 
 var assertIndexHasCollation = function(keyPattern, collation) {
     var indexSpecs = coll.getIndexes();
-    var found = GetIndexHelpers.findByKeyPattern(indexSpecs, keyPattern, collation);
+    var found = IndexCatalogHelpers.findByKeyPattern(indexSpecs, keyPattern, collation);
     assert.neq(null,
                found,
                "Index with key pattern " + tojson(keyPattern) + " and collation " +

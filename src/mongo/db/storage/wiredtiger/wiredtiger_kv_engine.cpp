@@ -79,6 +79,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/ticketholders.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_column_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
@@ -1719,8 +1720,10 @@ std::unique_ptr<ColumnStore> WiredTigerKVEngine::getColumnStore(
     const NamespaceString& nss,
     const CollectionOptions& collOptions,
     StringData ident,
-    const IndexDescriptor*) {
-    uasserted(ErrorCodes::NotImplemented, "getColumnStore() NYI");
+    const IndexDescriptor* descriptor) {
+    // TODO SERVER-66098 readOnly support.
+    const bool readOnly = false;
+    return std::make_unique<WiredTigerColumnStore>(opCtx, _uri(ident), ident, descriptor, readOnly);
 }
 
 std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,

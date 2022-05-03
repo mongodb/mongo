@@ -44,7 +44,8 @@ namespace mongo {
 ColumnStoreAccessMethod::ColumnStoreAccessMethod(IndexCatalogEntry* ice,
                                                  std::unique_ptr<ColumnStore> store)
     : _store(std::move(store)), _indexCatalogEntry(ice), _descriptor(ice->descriptor()) {
-    uasserted(ErrorCodes::NotImplemented, "ColumnStoreAccessMethod()");
+    // TODO SERVER-66021 for now we enable the creation of a ColumnsAccessMethod, but any further
+    // usage should result in an assertion.
 }
 
 class ColumnStoreAccessMethod::BulkBuilder final : public IndexAccessMethod::BulkBuilder {
@@ -94,7 +95,8 @@ ColumnStoreAccessMethod::BulkBuilder::BulkBuilder(ColumnStoreAccessMethod* index
                                                   size_t maxMemoryUsageBytes,
                                                   StringData dbName)
     : _iam(index) {
-    uasserted(ErrorCodes::NotImplemented, "ColumnStoreAccessMethod::BulkBuilder()");
+    // TODO SERVER-66021 for now we enable the creation of a bulk builder since a replica secondary
+    // may ask to create one. Any further usage should result in an assertion.
 }
 
 ColumnStoreAccessMethod::BulkBuilder::BulkBuilder(ColumnStoreAccessMethod* index,
@@ -102,7 +104,8 @@ ColumnStoreAccessMethod::BulkBuilder::BulkBuilder(ColumnStoreAccessMethod* index
                                                   const IndexStateInfo& stateInfo,
                                                   StringData dbName)
     : _iam(index) {
-    uasserted(ErrorCodes::NotImplemented, "ColumnStoreAccessMethod::BulkBuilder()");
+    // TODO SERVER-66021 for now we enable the creation of a bulk builder since a replica secondary
+    // may ask to create one. Any further usage should result in an assertion.
 }
 
 Status ColumnStoreAccessMethod::BulkBuilder::insert(

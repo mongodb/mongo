@@ -11,12 +11,12 @@
 (function() {
 "use strict";
 
-load("jstests/libs/get_index_helpers.js");  // For GetIndexHelpers.findByName.
+load("jstests/libs/index_catalog_helpers.js");  // For IndexCatalogHelpers.findByName.
 
 const dbName = "test";
 
 function isIndexHidden(indexes, indexName) {
-    const idx = GetIndexHelpers.findByName(indexes, indexName);
+    const idx = IndexCatalogHelpers.findByName(indexes, indexName);
     return idx && idx.hidden;
 }
 
@@ -50,7 +50,7 @@ const secondaryDB = rst.getSecondary().getDB(dbName);
 assert(isIndexHidden(secondaryDB.coll.getIndexes(), "a_1"));
 
 // Test that 'hidden: false' shouldn't be written to the index catalog.
-let idxSpec = GetIndexHelpers.findByName(secondaryDB.coll.getIndexes(), "b_1");
+let idxSpec = IndexCatalogHelpers.findByName(secondaryDB.coll.getIndexes(), "b_1");
 assert.eq(idxSpec.hidden, undefined);
 
 rst.stopSet();
@@ -83,7 +83,7 @@ db = conn.getDB(dbName);
 assert(isIndexHidden(db.coll.getIndexes(), "a_1"));
 
 // Test that 'hidden: false' shouldn't be written to the index catalog.
-idxSpec = GetIndexHelpers.findByName(db.coll.getIndexes(), "b_1");
+idxSpec = IndexCatalogHelpers.findByName(db.coll.getIndexes(), "b_1");
 assert.eq(idxSpec.hidden, undefined);
 
 MongoRunner.stopMongod(conn);
