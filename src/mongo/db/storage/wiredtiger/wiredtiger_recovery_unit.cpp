@@ -450,36 +450,22 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
 
     int wtRet;
     if (commit) {
-        // Avoid heap allocation in favour of a stack allocation for the commit string.
-        static constexpr auto commitTimestampFmtString = "commit_timestamp={:X},";
-        static constexpr auto durableTimestampFmtString = "durable_timestamp={:X}";
-        static constexpr auto bytesRequired =
-            std::char_traits<char>::length(commitTimestampFmtString) +
-            (sizeof(decltype(_commitTimestamp.asULL())) * 2) +
-            std::char_traits<char>::length(durableTimestampFmtString) +
-            (sizeof(decltype(_durableTimestamp.asULL())) * 2) + 1;
-        std::array<char, bytesRequired> conf;
-        auto end = conf.begin();
         if (!_commitTimestamp.isNull()) {
             // There is currently no scenario where it is intentional to commit before the current
             // read timestamp.
             invariant(_readAtTimestamp.isNull() || _commitTimestamp >= _readAtTimestamp);
 
             if (MONGO_likely(!doUntimestampedWritesForIdempotencyTests.shouldFail())) {
-                end = fmt::format_to(
-                    end, FMT_STRING(commitTimestampFmtString), _commitTimestamp.asULL());
+                s->timestamp_transaction_uint(s, WT_TS_TXN_TYPE_COMMIT, _commitTimestamp.asULL());
             }
             _isTimestamped = true;
         }
 
         if (!_durableTimestamp.isNull()) {
-            end = fmt::format_to(
-                end, FMT_STRING(durableTimestampFmtString), _durableTimestamp.asULL());
+            s->timestamp_transaction_uint(s, WT_TS_TXN_TYPE_DURABLE, _durableTimestamp.asULL());
         }
 
-        *end = '\0';
-
-        wtRet = s->commit_transaction(s, conf.data());
+        wtRet = s->commit_transaction(s, nullptr);
 
         LOGV2_DEBUG(
             22412, 3, "WT commit_transaction", "snapshotId"_attr = getSnapshotId().toNumber());
