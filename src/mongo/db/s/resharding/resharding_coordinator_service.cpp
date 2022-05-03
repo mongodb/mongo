@@ -159,6 +159,16 @@ void buildStateDocumentCloneMetricsForUpdate(BSONObjBuilder& bob, ReshardingMetr
 void buildStateDocumentApplyMetricsForUpdate(BSONObjBuilder& bob, ReshardingMetricsNew* metrics) {
     bob.append(getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kDocumentCopyFieldName),
                metrics->getCopyingEnd());
+    bob.append(
+        getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kOplogApplicationFieldName),
+        metrics->getApplyingBegin());
+}
+
+void buildStateDocumentBlockingWritesMetricsForUpdate(BSONObjBuilder& bob,
+                                                      ReshardingMetricsNew* metrics) {
+    bob.append(
+        getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kOplogApplicationFieldName),
+        metrics->getApplyingEnd());
 }
 
 void buildStateDocumentMetricsForUpdate(BSONObjBuilder& bob,
@@ -170,6 +180,9 @@ void buildStateDocumentMetricsForUpdate(BSONObjBuilder& bob,
             return;
         case CoordinatorStateEnum::kApplying:
             buildStateDocumentApplyMetricsForUpdate(bob, metrics);
+            return;
+        case CoordinatorStateEnum::kBlockingWrites:
+            buildStateDocumentBlockingWritesMetricsForUpdate(bob, metrics);
             return;
         default:
             return;

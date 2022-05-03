@@ -263,6 +263,21 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientIncrementFetchedOplogE
     ASSERT_EQ(report.getIntField("oplogEntriesFetched"), 50);
 }
 
+TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientRestoreFetchedOplogEntries) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("oplogEntriesFetched"), 0);
+
+    metrics->restoreOplogEntriesFetched(100);
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("oplogEntriesFetched"), 100);
+
+    metrics->restoreOplogEntriesFetched(50);
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("oplogEntriesFetched"), 50);
+}
+
 TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsCriticalSectionTime) {
     runTimeReportTest(
         "CurrentOpReportsCriticalSectionTime",

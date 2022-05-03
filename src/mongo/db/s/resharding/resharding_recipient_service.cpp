@@ -128,10 +128,20 @@ void buildStateDocumentCloneMetricsForUpdate(BSONObjBuilder& bob, ReshardingMetr
 void buildStateDocumentApplyMetricsForUpdate(BSONObjBuilder& bob, ReshardingMetricsNew* metrics) {
     bob.append(getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kDocumentCopyFieldName),
                metrics->getCopyingEnd());
+    bob.append(
+        getIntervalStartFieldName<DocT>(ReshardingRecipientMetrics::kOplogApplicationFieldName),
+        metrics->getApplyingBegin());
     bob.append(metricsPrefix + ReshardingRecipientMetrics::kFinalDocumentsCopiedCountFieldName,
                metrics->getDocumentsCopiedCount());
     bob.append(metricsPrefix + ReshardingRecipientMetrics::kFinalBytesCopiedCountFieldName,
                metrics->getBytesCopiedCount());
+}
+
+void buildStateDocumentStrictConsistencyMetricsForUpdate(BSONObjBuilder& bob,
+                                                         ReshardingMetricsNew* metrics) {
+    bob.append(
+        getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kOplogApplicationFieldName),
+        metrics->getApplyingEnd());
 }
 
 void buildStateDocumentMetricsForUpdate(BSONObjBuilder& bob,
@@ -143,6 +153,9 @@ void buildStateDocumentMetricsForUpdate(BSONObjBuilder& bob,
             return;
         case RecipientStateEnum::kApplying:
             buildStateDocumentApplyMetricsForUpdate(bob, metrics);
+            return;
+        case RecipientStateEnum::kStrictConsistency:
+            buildStateDocumentStrictConsistencyMetricsForUpdate(bob, metrics);
             return;
         default:
             return;
@@ -1281,6 +1294,10 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
         auto applierMetrics =
             std::make_unique<ReshardingOplogApplierMetrics>(_metricsNew.get(), progressDoc);
         _applierMetricsMap.emplace(shardId, std::move(applierMetrics));
+    }
+
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        _metricsNew->restoreOplogEntriesFetched(oplogEntriesFetched);
     }
 
     _metrics()->restoreForCurrentOp(

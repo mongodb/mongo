@@ -76,7 +76,12 @@ structs:
             documentCopy:
                     type: ReshardingMetricsTimeInterval
                     description: >-
-                        The time interval that it takes to clone documents on this recipient.
+                        The time interval that it takes to clone documents on this coordinator.
+                    optional: true
+            oplogApplication:
+                    type: ReshardingMetricsTimeInterval
+                    description: >-
+                        The time interval that it takes to apply oplog entries on this coordinator.
                     optional: true
 
     ReshardingCoordinatorDocument:

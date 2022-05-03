@@ -241,6 +241,14 @@ void ShardingDataTransformInstanceMetrics::onApplyingEnd() {
     _applyingEndTime.store(_clockSource->now());
 }
 
+void ShardingDataTransformInstanceMetrics::restoreApplyingBegin(Date_t date) {
+    _applyingStartTime.store(date);
+}
+
+void ShardingDataTransformInstanceMetrics::restoreApplyingEnd(Date_t date) {
+    _applyingEndTime.store(date);
+}
+
 void ShardingDataTransformInstanceMetrics::restoreCopyingBegin(Date_t date) {
     _copyingStartTime.store(date);
 }
@@ -255,6 +263,14 @@ Date_t ShardingDataTransformInstanceMetrics::getCopyingBegin() const {
 
 Date_t ShardingDataTransformInstanceMetrics::getCopyingEnd() const {
     return _copyingEndTime.load();
+}
+
+Date_t ShardingDataTransformInstanceMetrics::getApplyingBegin() const {
+    return _applyingStartTime.load();
+}
+
+Date_t ShardingDataTransformInstanceMetrics::getApplyingEnd() const {
+    return _applyingEndTime.load();
 }
 
 void ShardingDataTransformInstanceMetrics::onDocumentsCopied(int64_t documentCount,
@@ -314,6 +330,10 @@ void ShardingDataTransformInstanceMetrics::onOplogEntriesFetched(int64_t numEntr
                                                                  Milliseconds elapsed) {
     _oplogEntriesFetched.addAndFetch(numEntries);
     _cumulativeMetrics->onOplogEntriesFetched(numEntries, elapsed);
+}
+
+void ShardingDataTransformInstanceMetrics::restoreOplogEntriesFetched(int64_t numEntries) {
+    _oplogEntriesFetched.store(numEntries);
 }
 
 void ShardingDataTransformInstanceMetrics::onLocalInsertDuringOplogFetching(Milliseconds elapsed) {

@@ -130,6 +130,17 @@ private:
                 restoreCopyingEnd(*copyingEnd);
             }
         }
+        auto applyDurations = metrics->getOplogApplication();
+        if (applyDurations) {
+            auto applyingBegin = applyDurations->getStart();
+            if (applyingBegin) {
+                restoreApplyingBegin(*applyingBegin);
+            }
+            auto applyingEnd = applyDurations->getStop();
+            if (applyingEnd) {
+                restoreApplyingEnd(*applyingEnd);
+            }
+        }
     }
 
     AtomicWord<State> _state;

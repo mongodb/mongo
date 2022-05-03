@@ -123,21 +123,27 @@ public:
     }
 
     template <typename MetricsDocument, typename Document>
-    void doRestoreOngoingPhaseTest(const std::function<Document()>& createDocument,
-                                   const std::string& fieldName) {
-        doRestorePhaseTestImpl<MetricsDocument>(createDocument, fieldName, false);
+    void doRestoreOngoingPhaseTest(
+        const std::function<Document()>& createDocument,
+        const std::function<void(MetricsDocument&, ReshardingMetricsTimeInterval)>& setInterval,
+        const std::string& fieldName) {
+        doRestorePhaseTestImpl<MetricsDocument>(createDocument, setInterval, fieldName, false);
     }
 
     template <typename MetricsDocument, typename Document>
-    void doRestoreCompletedPhaseTest(const std::function<Document()>& createDocument,
-                                     const std::string& fieldName) {
-        doRestorePhaseTestImpl<MetricsDocument>(createDocument, fieldName, true);
+    void doRestoreCompletedPhaseTest(
+        const std::function<Document()>& createDocument,
+        const std::function<void(MetricsDocument&, ReshardingMetricsTimeInterval)>& setInterval,
+        const std::string& fieldName) {
+        doRestorePhaseTestImpl<MetricsDocument>(createDocument, setInterval, fieldName, true);
     }
 
     template <typename MetricsDocument, typename Document>
-    void doRestorePhaseTestImpl(const std::function<Document()>& createDocument,
-                                const std::string& fieldName,
-                                bool completed) {
+    void doRestorePhaseTestImpl(
+        const std::function<Document()>& createDocument,
+        const std::function<void(MetricsDocument&, ReshardingMetricsTimeInterval)>& setInterval,
+        const std::string& fieldName,
+        bool completed) {
         constexpr auto kInterval = Milliseconds{5000};
         auto clock = getClockSource();
         const auto start = clock->now();
@@ -158,7 +164,7 @@ public:
             finishedPhaseDuration = durationCount<Seconds>(kInterval);
         }
         MetricsDocument metricsDoc;
-        metricsDoc.setDocumentCopy(interval);
+        setInterval(metricsDoc, std::move(interval));
         auto doc = createDocument();
         doc.setMetrics(metricsDoc);
 
@@ -237,13 +243,31 @@ TEST_F(ReshardingMetricsTest, RestoresByteAndDocumentCountsDuringCloning) {
 TEST_F(ReshardingMetricsTest, RestoresOngoingCloningTimeFromRecipientStateDocument) {
     doRestoreOngoingPhaseTest<ReshardingRecipientMetrics, ReshardingRecipientDocument>(
         [this] { return createRecipientDocument(RecipientStateEnum::kCloning, UUID::gen()); },
+        [this](auto& doc, auto interval) { doc.setDocumentCopy(std::move(interval)); },
         "totalCopyTimeElapsedSecs");
 }
 
 TEST_F(ReshardingMetricsTest, RestoresFinishedCloningTimeFromRecipientStateDocument) {
     doRestoreCompletedPhaseTest<ReshardingRecipientMetrics, ReshardingRecipientDocument>(
         [this] { return createRecipientDocument(RecipientStateEnum::kApplying, UUID::gen()); },
+        [this](auto& doc, auto interval) { doc.setDocumentCopy(std::move(interval)); },
         "totalCopyTimeElapsedSecs");
+}
+
+TEST_F(ReshardingMetricsTest, RestoresOngoingApplyingTimeFromRecipientStateDocument) {
+    doRestoreOngoingPhaseTest<ReshardingRecipientMetrics, ReshardingRecipientDocument>(
+        [this] { return createRecipientDocument(RecipientStateEnum::kApplying, UUID::gen()); },
+        [this](auto& doc, auto interval) { doc.setOplogApplication(std::move(interval)); },
+        "totalApplyTimeElapsedSecs");
+}
+
+TEST_F(ReshardingMetricsTest, RestoresFinishedApplyingTimeFromRecipientStateDocument) {
+    doRestoreCompletedPhaseTest<ReshardingRecipientMetrics, ReshardingRecipientDocument>(
+        [this] {
+            return createRecipientDocument(RecipientStateEnum::kStrictConsistency, UUID::gen());
+        },
+        [this](auto& doc, auto interval) { doc.setOplogApplication(std::move(interval)); },
+        "totalApplyTimeElapsedSecs");
 }
 
 TEST_F(ReshardingMetricsTest, RestoresGeneralFieldsFromDonorStateDocument) {
@@ -288,13 +312,31 @@ TEST_F(ReshardingMetricsTest, RestoresFromReshardingApplierProgressDocument) {
 TEST_F(ReshardingMetricsTest, RestoresOngoingCloningTimeFromCoordinatorStateDocument) {
     doRestoreOngoingPhaseTest<ReshardingCoordinatorMetrics, ReshardingCoordinatorDocument>(
         [this] { return createCoordinatorDocument(CoordinatorStateEnum::kCloning, UUID::gen()); },
+        [this](auto& doc, auto interval) { doc.setDocumentCopy(std::move(interval)); },
         "totalCopyTimeElapsedSecs");
 }
 
 TEST_F(ReshardingMetricsTest, RestoresFinishedCloningTimeFromCoordinatorStateDocument) {
     doRestoreCompletedPhaseTest<ReshardingCoordinatorMetrics, ReshardingCoordinatorDocument>(
         [this] { return createCoordinatorDocument(CoordinatorStateEnum::kApplying, UUID::gen()); },
+        [this](auto& doc, auto interval) { doc.setDocumentCopy(std::move(interval)); },
         "totalCopyTimeElapsedSecs");
+}
+
+TEST_F(ReshardingMetricsTest, RestoresOngoingApplyingTimeFromCoordinatorStateDocument) {
+    doRestoreOngoingPhaseTest<ReshardingCoordinatorMetrics, ReshardingCoordinatorDocument>(
+        [this] { return createCoordinatorDocument(CoordinatorStateEnum::kApplying, UUID::gen()); },
+        [this](auto& doc, auto interval) { doc.setOplogApplication(std::move(interval)); },
+        "totalApplyTimeElapsedSecs");
+}
+
+TEST_F(ReshardingMetricsTest, RestoresFinishedApplyingTimeFromCoordinatorStateDocument) {
+    doRestoreCompletedPhaseTest<ReshardingCoordinatorMetrics, ReshardingCoordinatorDocument>(
+        [this] {
+            return createCoordinatorDocument(CoordinatorStateEnum::kBlockingWrites, UUID::gen());
+        },
+        [this](auto& doc, auto interval) { doc.setOplogApplication(std::move(interval)); },
+        "totalApplyTimeElapsedSecs");
 }
 
 }  // namespace
