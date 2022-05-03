@@ -92,7 +92,9 @@ protected:
 
     NetworkInterfaceMock::NetworkOperationIterator performSyncToFinishReconfigHeartbeat();
 
-    void processResponseFromPrimary(const ReplSetConfig& config);
+    void processResponseFromPrimary(const ReplSetConfig& config,
+                                    long long version = -2,
+                                    long long term = OpTime::kInitialTerm);
 };
 
 void ReplCoordHBV1Test::assertMemberState(const MemberState expected, std::string msg) {
@@ -134,7 +136,9 @@ ReplCoordHBV1Test::performSyncToFinishReconfigHeartbeat() {
     return getNet()->getNextReadyRequest();
 }
 
-void ReplCoordHBV1Test::processResponseFromPrimary(const ReplSetConfig& config) {
+void ReplCoordHBV1Test::processResponseFromPrimary(const ReplSetConfig& config,
+                                                   long long version,
+                                                   long long term) {
     NetworkInterfaceMock* net = getNet();
     const Date_t startDate = getNet()->now();
 
@@ -144,8 +148,8 @@ void ReplCoordHBV1Test::processResponseFromPrimary(const ReplSetConfig& config) 
     ReplSetHeartbeatArgsV1 hbArgs;
     ASSERT_OK(hbArgs.initialize(request.cmdObj));
     ASSERT_EQUALS("mySet", hbArgs.getSetName());
-    ASSERT_EQUALS(-2, hbArgs.getConfigVersion());
-    ASSERT_EQUALS(OpTime::kInitialTerm, hbArgs.getTerm());
+    ASSERT_EQUALS(version, hbArgs.getConfigVersion());
+    ASSERT_EQUALS(term, hbArgs.getTerm());
     ReplSetHeartbeatResponse hbResp;
     hbResp.setSetName("mySet");
     hbResp.setState(MemberState::RS_PRIMARY);
@@ -238,6 +242,100 @@ TEST_F(ReplCoordHBV1Test,
 
     performSyncToFinishReconfigHeartbeat();
 
+    assertMemberState(MemberState::RS_STARTUP2);
+    OperationContextNoop opCtx;
+    auto storedConfig = ReplSetConfig::parse(
+        unittest::assertGet(getExternalState()->loadLocalConfigDocument(&opCtx)));
+    ASSERT_OK(storedConfig.validate());
+    ASSERT_EQUALS(3, storedConfig.getConfigVersion());
+    ASSERT_EQUALS(3, storedConfig.getNumMembers());
+    ASSERT_EQUALS("mySet", storedConfig.getReplSetName());
+    exitNetwork();
+
+    ASSERT_TRUE(getExternalState()->threadsStarted());
+}
+
+TEST_F(ReplCoordHBV1Test, NodeRejectsSplitConfigWhenNotInitialized) {
+    ReplSetConfig rsConfig =
+        assertMakeRSConfig(BSON("_id"
+                                << "mySet"
+                                << "version" << 3 << "term" << 1 << "protocolVersion" << 1
+                                << "members"
+                                << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                         << "h1:1")
+                                              << BSON("_id" << 2 << "host"
+                                                            << "h2:1")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "h3:1"))
+                                << "recipientConfig"
+                                << BSON("_id"
+                                        << "recipientSet"
+                                        << "version" << 1 << "term" << 1 << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h4:1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h5:1")
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h6:1")))));
+
+    ReplSettings settings;
+    settings.setServerlessMode();
+    init(settings);
+
+    // Start by adding self as one of the recipient nodes
+    start(HostAndPort("h5", 1));
+
+    enterNetwork();
+    assertMemberState(MemberState::RS_STARTUP);
+    ASSERT_FALSE(getNet()->hasReadyRequests());
+    exitNetwork();
+
+    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+
+    enterNetwork();
+    processResponseFromPrimary(rsConfig);
+    assertMemberState(MemberState::RS_STARTUP);
+    exitNetwork();
+}
+
+TEST_F(ReplCoordHBV1Test, UninitializedDonorNodeAcceptsSplitConfigOnFirstHeartbeat) {
+    ReplSetConfig rsConfig =
+        assertMakeRSConfig(BSON("_id"
+                                << "mySet"
+                                << "version" << 3 << "term" << 1 << "protocolVersion" << 1
+                                << "members"
+                                << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                         << "h1:1")
+                                              << BSON("_id" << 2 << "host"
+                                                            << "h2:1")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "h3:1"))
+                                << "recipientConfig"
+                                << BSON("_id"
+                                        << "recipientSet"
+                                        << "version" << 1 << "term" << 1 << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h4:1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h5:1")
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h6:1")))));
+
+    ReplSettings settings;
+    settings.setServerlessMode();
+    init(settings);
+    start(HostAndPort("h3", 1));
+
+    enterNetwork();
+    assertMemberState(MemberState::RS_STARTUP);
+    ASSERT_FALSE(getNet()->hasReadyRequests());
+    exitNetwork();
+
+    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+
+    enterNetwork();
+    processResponseFromPrimary(rsConfig);
+    performSyncToFinishReconfigHeartbeat();
     assertMemberState(MemberState::RS_STARTUP2);
     OperationContextNoop opCtx;
     auto storedConfig = ReplSetConfig::parse(

@@ -1339,14 +1339,9 @@ private:
     void _scheduleHeartbeatReconfig(WithLock lk, const ReplSetConfig& newConfig);
 
     /**
-     * Check if the node should use the recipientConfig contained within newConfig.
+     * Determines if the provided config is a split config, and validates it for installation.
      */
-    bool _shouldUseRecipientConfig(WithLock lk, const ReplSetConfig& newConfig);
-
-    /**
-     * Check if the recipient config provided can be applied to the current node.
-     */
-    Status _isRecipientConfigValid(WithLock lk, const ReplSetConfig& newConfig);
+    std::tuple<StatusWith<ReplSetConfig>, bool> _resolveConfigToApply(const ReplSetConfig& config);
 
     /**
      * Method to write a configuration transmitted via heartbeat message to stable storage.
@@ -1360,7 +1355,7 @@ private:
     void _heartbeatReconfigFinish(const executor::TaskExecutor::CallbackArgs& cbData,
                                   const ReplSetConfig& newConfig,
                                   StatusWith<int> myIndex,
-                                  bool isSplitRecipientConfig);
+                                  bool isRecipientConfig);
 
     /**
      * Calculates the time (in millis) left in quiesce mode and converts the value to int64.
