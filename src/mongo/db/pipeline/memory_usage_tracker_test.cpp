@@ -99,27 +99,35 @@ TEST_F(MemoryUsageTrackerTest, UpdateUsageUpdatesGlobal) {
     ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
 }
 
-DEATH_TEST_F(MemoryUsageTrackerTest,
-             UpdateGlobalToNegativeIsDisallowed,
-             "Underflow on memory tracking") {
+// TODO SERVER-61281: Need to add back the DEATH_TEST_F removed in SERVER-65473, once
+// MemoryUsageTracker.update() no longer underflows.
+
+TEST_F(MemoryUsageTrackerTest, UpdateFunctionUsageToNegativeIsDisallowed) {
+    _funcTracker.set(50LL);
+    ASSERT_EQ(_funcTracker.currentMemoryBytes(), 50LL);
+    ASSERT_EQ(_funcTracker.maxMemoryBytes(), 50LL);
+    ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
+    ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+
+    // TODO SERVER-61281: This should throw an assertion once accurate tracking is implemented and
+    // no underflow should happen. That assertion would make sure "Underflow in memory tracking"
+    // is reported.
+
+    _funcTracker.update(-100);
+    ASSERT_EQ(_funcTracker.currentMemoryBytes(), 0LL);
+    ASSERT_EQ(_tracker.currentMemoryBytes(), 0LL);
+}
+
+TEST_F(MemoryUsageTrackerTest, UpdateMemUsageToNegativeIsDisallowed) {
     _tracker.set(50LL);
     ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
     ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
 
+    // TODO SERVER-61281: This should throw an assertion once accurate tracking is implemented and
+    // no underflow should happen. That assertion would make sure "Underflow in memory tracking"
+    // is reported.
+
     _tracker.update(-100);
-}
-
-TEST_F(MemoryUsageTrackerTest, UpdateFunctionUsageToNegativeIsDisallowed) {
-    _funcTracker.set(50LL);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
-
-    // TODO SERVER-61281: Temporarily disable the assert (and associated test) in
-    // PerFunctionMemoryTracker.update() to prevent inaccurate tracking to cause underflow errors
-    // Once accurate tracking is implemented and no underflow should happen, this negative test
-    // could be restored to verify that "Underflow on memory tracking" is reported.
-
-    _funcTracker.update(-100);
     ASSERT_EQ(_tracker.currentMemoryBytes(), 0LL);
 }
 

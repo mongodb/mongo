@@ -53,15 +53,8 @@ public:
 
             // TODO SERVER-61281: this is a temporary measure in tackling the problem in this
             // ticket. It prevents the underflow from happening but doesn't address the cause
-            // which is inaccurate tracking.
-            // Once inaccurate tracking is resolved, the underflow assertion below could be
-            // restored.
-            //      tassert(5578603,
-            //              str::stream() << "Underflow on memory tracking, attempting to add " <<
-            //              diff
-            //                            << " but only " << _currentMemoryBytes << " available",
-            //              diff >= 0 || _currentMemoryBytes >= std::abs(diff));
-            //      set(_currentMemoryBytes + diff);
+            // which is inaccurate tracking. Once inaccurate tracking is resolved, the underflow
+            // assertion could be restored. See SERVER-62856 and SERVER-65473 for details.
 
             set(std::max(_currentMemoryBytes + diff, 0LL));
         }
@@ -154,11 +147,13 @@ public:
      * Updates total memory usage.
      */
     void update(long long diff) {
-        tassert(5578602,
-                str::stream() << "Underflow on memory tracking, attempting to add " << diff
-                              << " but only " << _memoryUsageBytes << " available",
-                diff >= 0 || (int)_memoryUsageBytes >= -1 * diff);
-        set(_memoryUsageBytes + diff);
+
+        // TODO SERVER-61281: this is a temporary measure in tackling the problem in this
+        // ticket. It prevents the underflow from happening but doesn't address the cause
+        // which is inaccurate tracking. Once inaccurate tracking is resolved, the underflow
+        // assertion could be restored. See SERVER-62856 and SERVER-65473 for details.
+
+        set(std::max(_memoryUsageBytes + diff, 0LL));
     }
 
     auto currentMemoryBytes() const {
