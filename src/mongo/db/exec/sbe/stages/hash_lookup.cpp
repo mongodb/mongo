@@ -591,11 +591,12 @@ void HashLookupStage::close() {
 
 std::unique_ptr<PlanStageStats> HashLookupStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
+    invariant(ret);
     ret->children.emplace_back(outerChild()->getStats(includeDebugInfo));
     ret->children.emplace_back(innerChild()->getStats(includeDebugInfo));
     ret->specific = std::make_unique<HashLookupStats>(_specificStats);
     if (includeDebugInfo) {
-        BSONObjBuilder bob(StorageAccessStatsVisitor::collectStats(*this, ret.get()).toBSON());
+        BSONObjBuilder bob(StorageAccessStatsVisitor::collectStats(*this, *ret).toBSON());
         // Spilling stats.
         bob.appendBool("usedDisk", _specificStats.usedDisk)
             .appendNumber("spilledRecords", _specificStats.getSpilledRecords())

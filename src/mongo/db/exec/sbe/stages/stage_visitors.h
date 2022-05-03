@@ -56,7 +56,7 @@ public:
      * Collects the storage-related statictics for the given 'root' and 'rootStats'.
      */
     static StorageAccessStatsVisitor collectStats(const PlanStage& root,
-                                                  const PlanStageStats* rootStats) {
+                                                  const PlanStageStats& rootStats) {
         StorageAccessStatsVisitor res;
         root.accumulate(res);
         auto joinSummary = sbe::collectExecutionStatsSummary(rootStats);

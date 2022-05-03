@@ -46,19 +46,17 @@ size_t calculateNumberOfReads(const PlanStageStats* root) {
     return visitor.numReads;
 }
 
-PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats* root) {
-    invariant(root);
-
+PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats& root) {
     PlanSummaryStats summary;
-    summary.nReturned = root->common.advances;
+    summary.nReturned = root.common.advances;
 
-    if (root->common.executionTimeMillis) {
-        summary.executionTimeMillisEstimate = *root->common.executionTimeMillis;
+    if (root.common.executionTimeMillis) {
+        summary.executionTimeMillisEstimate = *root.common.executionTimeMillis;
     }
 
     auto visitor = PlanSummaryStatsVisitor(summary);
     auto walker = PlanStageStatsWalker<true, CommonStats>(nullptr, nullptr, &visitor);
-    tree_walker::walk<true, PlanStageStats>(root, &walker);
+    tree_walker::walk<true, PlanStageStats>(&root, &walker);
     return summary;
 }
 }  // namespace mongo::sbe

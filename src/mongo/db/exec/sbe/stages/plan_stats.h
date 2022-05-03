@@ -340,5 +340,5 @@ size_t calculateNumberOfReads(const PlanStageStats* root);
 /**
  * Accumulates the summary of all execution statistics by walking over the specific-stats of stages.
  */
-PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats* root);
+PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats& root);
 }  // namespace mongo::sbe
