@@ -132,7 +132,7 @@ function runTest(sortSpec) {
                 $_internalBoundedSort: {
                     sortKey: sortSpec,
                     bound: sortSpec.t > 0 ? {base: "min"}
-                                          : {base: "min", offset: bucketMaxSpanSeconds}
+                                          : {base: "min", offsetSeconds: bucketMaxSpanSeconds}
                 }
             },
         ];
@@ -146,7 +146,7 @@ function runTest(sortSpec) {
             {
                 $_internalBoundedSort: {
                     sortKey: sortSpec,
-                    bound: sortSpec.t > 0 ? {base: "max", offset: -bucketMaxSpanSeconds}
+                    bound: sortSpec.t > 0 ? {base: "max", offsetSeconds: -bucketMaxSpanSeconds}
                                           : {base: "max"}
                 }
             },
@@ -175,10 +175,10 @@ function runTest(sortSpec) {
                 $_internalBoundedSort: {
                     sortKey: sortSpec,
                     bound: sortSpec.t > 0 ? {base: "min"}
-                                          : {base: "min", offset: bucketMaxSpanSeconds}
+                                          : {base: "min", offsetSeconds: bucketMaxSpanSeconds},
+                    limit: 100
                 }
-            },
-            {$limit: 100},
+            }
         ];
         const optFromMin = buckets.aggregate(optFromMinQuery).toArray();
         assertSorted(optFromMin, sortSpec);
@@ -191,11 +191,11 @@ function runTest(sortSpec) {
             {
                 $_internalBoundedSort: {
                     sortKey: sortSpec,
-                    bound: sortSpec.t > 0 ? {base: "max", offset: -bucketMaxSpanSeconds}
-                                          : {base: "max"}
+                    bound: sortSpec.t > 0 ? {base: "max", offsetSeconds: -bucketMaxSpanSeconds}
+                                          : {base: "max"},
+                    limit: 100
                 }
-            },
-            {$limit: 100},
+            }
         ];
         const optFromMax = buckets.aggregate(optFromMaxQuery).toArray();
         assertSorted(optFromMax, sortSpec);

@@ -440,6 +440,7 @@ public:
 
     virtual size_t totalDataSizeBytes() const = 0;
     virtual size_t numSpills() const = 0;
+    virtual size_t limit() const = 0;
 
     // By default, uassert that the input meets our assumptions of being almost-sorted.
     // But if _checkInput is false, don't do that check.
@@ -528,6 +529,10 @@ public:
         return _numSpills;
     }
 
+    size_t limit() const {
+        return _opts.limit;
+    }
+
     bool checkInput() const {
         return _checkInput;
     }
@@ -551,7 +556,7 @@ private:
     size_t _numSorted = 0;              // Keeps track of the number of keys sorted.
     uint64_t _totalDataSizeSorted = 0;  // Keeps track of the total size of data sorted.
 
-    SortOptions _opts;
+    const SortOptions _opts;
 
     using KV = std::pair<Key, Value>;
     std::priority_queue<KV, std::vector<KV>, Greater> _heap;

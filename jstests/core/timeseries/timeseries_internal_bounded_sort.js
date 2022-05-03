@@ -86,7 +86,7 @@ function runTest(ascending) {
                         $_internalBoundedSort: {
                             sortKey: {t: ascending ? 1 : -1},
                             bound: ascending ? {base: "min"}
-                                             : {base: "min", offset: bucketMaxSpanSeconds}
+                                             : {base: "min", offsetSeconds: bucketMaxSpanSeconds}
                         }
                     },
                 ])
@@ -102,7 +102,7 @@ function runTest(ascending) {
                     {
                         $_internalBoundedSort: {
                             sortKey: {t: ascending ? 1 : -1},
-                            bound: ascending ? {base: "max", offset: -bucketMaxSpanSeconds}
+                            bound: ascending ? {base: "max", offsetSeconds: -bucketMaxSpanSeconds}
                                              : {base: "max"}
                         }
                     },
@@ -134,10 +134,10 @@ function runTest(ascending) {
                         $_internalBoundedSort: {
                             sortKey: {t: ascending ? 1 : -1},
                             bound: ascending ? {base: "min"}
-                                             : {base: "min", offset: bucketMaxSpanSeconds}
+                                             : {base: "min", offsetSeconds: bucketMaxSpanSeconds},
+                            limit: 100
                         }
                     },
-                    {$limit: 100},
                 ])
                 .toArray();
         assertSorted(optFromMin, ascending);
@@ -152,11 +152,11 @@ function runTest(ascending) {
                     {
                         $_internalBoundedSort: {
                             sortKey: {t: ascending ? 1 : -1},
-                            bound: ascending ? {base: "max", offset: -bucketMaxSpanSeconds}
-                                             : {base: "max"}
+                            bound: ascending ? {base: "max", offsetSeconds: -bucketMaxSpanSeconds}
+                                             : {base: "max"},
+                            limit: 100
                         }
-                    },
-                    {$limit: 100},
+                    }
                 ])
                 .toArray();
         assertSorted(optFromMax, ascending);

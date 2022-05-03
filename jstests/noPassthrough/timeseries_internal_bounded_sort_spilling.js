@@ -156,21 +156,16 @@ function assertSorted(result) {
     assertSorted(naive);
     assert.eq(100, naive.length);
 
-    const opt = buckets
-                    .aggregate(
-                        [
-                            {$sort: {'control.min.t': 1}},
-                            unpackStage,
-                            {
-                                $_internalBoundedSort: {
-                                    sortKey: {t: 1},
-                                    bound: {base: "min"},
-                                }
-                            },
-                            {$limit: 100},
-                        ],
-                        {allowDiskUse: true})
-                    .toArray();
+    const opt =
+        buckets
+            .aggregate(
+                [
+                    {$sort: {'control.min.t': 1}},
+                    unpackStage,
+                    {$_internalBoundedSort: {sortKey: {t: 1}, bound: {base: "min"}, limit: 100}}
+                ],
+                {allowDiskUse: true})
+            .toArray();
     assertSorted(opt);
     assert.eq(100, opt.length);
 

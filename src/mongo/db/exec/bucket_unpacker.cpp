@@ -31,7 +31,6 @@
 
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/db/exec/bucket_unpacker.h"
-#include "mongo/db/timeseries/timeseries_constants.h"
 
 namespace mongo {
 class BucketUnpacker::UnpackingImpl {

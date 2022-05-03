@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/bucket_unpacker.h"
 #include <boost/intrusive_ptr.hpp>
 #include <memory>
 
@@ -240,6 +241,84 @@ private:
                                long long sampleSize,
                                long long numRecords,
                                boost::optional<BucketUnpacker> bucketUnpacker);
+
+    typedef bool IndexSortOrderAgree;
+    typedef bool IndexOrderedByMinTime;
+
+    /*
+     * Takes a leaf plan stage and a sort pattern and returns a pair if they support the Bucket
+Unpacking with Sort Optimization.
+     * The pair includes whether the index order and sort order agree with each other as its first
+     * member and the order of the index as the second parameter.
+     *
+     * Note that the index scan order is different from the index order.
+     */
+    static boost::optional<std::pair<IndexSortOrderAgree, IndexOrderedByMinTime>> supportsSort(
+        const BucketUnpacker& bucketUnpacker, PlanStage* root, const SortPattern& sort);
+
+    /* This is a helper method for supportsSort. It takes the current iterator for the index
+     * keyPattern, the direction of the index scan, the timeField path we're sorting on, and the
+     * direction of the sort. It returns a pair if this data agrees and none if it doesn't.
+     *
+     * The pair contains whether the index order and the sort order agree with each other as the
+     * firstmember and the order of the index as the second parameter.
+     *
+     * Note that the index scan order may be different from the index order.
+     * N.B.: It ASSUMES that there are two members left in the keyPatternIter iterator, and that the
+     * timeSortFieldPath is in fact the path on time.
+     */
+    static boost::optional<std::pair<IndexSortOrderAgree, IndexOrderedByMinTime>> checkTimeHelper(
+        const BucketUnpacker& bucketUnpacker,
+        BSONObj::iterator& keyPatternIter,
+        bool scanIsForward,
+        const FieldPath& timeSortFieldPath,
+        bool sortIsAscending) {
+        bool wasMin = false;
+        bool wasMax = false;
+
+        // Check that the index isn't special.
+        if ((*keyPatternIter).isNumber() && abs((*keyPatternIter).numberInt()) == 1) {
+            bool direction = ((*keyPatternIter).numberInt() == 1);
+            direction = (scanIsForward) ? direction : !direction;
+
+            // Verify the direction and fieldNames match.
+            wasMin = ((*keyPatternIter).fieldName() ==
+                      bucketUnpacker.getMinField(timeSortFieldPath.fullPath()));
+            wasMax = ((*keyPatternIter).fieldName() ==
+                      bucketUnpacker.getMaxField(timeSortFieldPath.fullPath()));
+            // Terminate early if it wasn't max or min or if the directions don't match.
+            if ((wasMin || wasMax) && (sortIsAscending == direction))
+                return std::pair{wasMin ? sortIsAscending : !sortIsAscending, wasMin};
+        }
+
+        return boost::none;
+    }
+
+    static bool sortAndKeyPatternPartAgreeAndOnMeta(const BucketUnpacker& bucketUnpacker,
+                                                    const char* keyPatternFieldName,
+                                                    const FieldPath& sortFieldPath) {
+        FieldPath keyPatternFieldPath = FieldPath(keyPatternFieldName);
+
+        // If they don't have the same path length they cannot agree.
+        if (keyPatternFieldPath.getPathLength() != sortFieldPath.getPathLength())
+            return false;
+
+        // Check these paths are on the meta field.
+        if (keyPatternFieldPath.getSubpath(0) != mongo::timeseries::kBucketMetaFieldName)
+            return false;
+        if (!bucketUnpacker.getMetaField() ||
+            sortFieldPath.getSubpath(0) != *bucketUnpacker.getMetaField()) {
+            return false;
+        }
+
+        // If meta was the only path component then return true.
+        // Note: We already checked that the path lengths are equal.
+        if (keyPatternFieldPath.getPathLength() == 1)
+            return true;
+
+        // Otherwise return if the remaining path components are equal.
+        return (keyPatternFieldPath.tail() == sortFieldPath.tail());
+    }
 };
 
 }  // namespace mongo
