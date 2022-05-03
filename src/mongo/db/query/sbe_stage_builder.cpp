@@ -870,6 +870,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             "'postAssemblyFilter' to be used instead.",
             !csn->filter);
 
+    tassert(6610251, "Expected no filters by path", csn->filtersByPath.empty());
+
     PlanStageSlots outputs;
 
     auto recordSlot = _slotIdGenerator.generate();
@@ -906,7 +908,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     slotMap[rootStr] = rowStoreSlot;
     auto abt = builder.generateABT();
     auto exprOut = abt ? abtToExpr(*abt, slotMap) : emptyExpr->clone();
-    auto stage = std::make_unique<sbe::ColumnScanStage>(
+    std::unique_ptr<sbe::PlanStage> stage = std::make_unique<sbe::ColumnScanStage>(
         getCurrentCollection(reqs)->uuid(),
         csn->indexEntry.catalogName,
         fieldSlotIds,
@@ -918,6 +920,22 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         rowStoreSlot,
         _yieldPolicy,
         csn->nodeId());
+
+    // Generate post assembly filter.
+    if (csn->postAssemblyFilter) {
+        auto relevantSlots = sbe::makeSV(recordSlot);
+        if (ridSlot) {
+            relevantSlots.push_back(*ridSlot);
+        }
+        relevantSlots.insert(relevantSlots.end(), fieldSlotIds.begin(), fieldSlotIds.end());
+
+        auto [_, outputStage] = generateFilter(_state,
+                                               csn->postAssemblyFilter.get(),
+                                               {std::move(stage), std::move(relevantSlots)},
+                                               recordSlot,
+                                               csn->nodeId());
+        stage = std::move(outputStage.stage);
+    }
 
     return {std::move(stage), std::move(outputs)};
 }

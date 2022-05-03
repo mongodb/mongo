@@ -218,9 +218,16 @@ void tryToAddColumnScan(const QueryPlannerParams& params,
     }
 
     // TODO SERVER-63123: Check if the columnar index actually provides the fields we need.
-    auto [filterSplitByColumn, residualPredicate] =
-        expression::splitMatchExpressionForColumns(query.root());
-    auto canPushFilters = filterSplitByColumn.size() > 0;
+    std::unique_ptr<MatchExpression> residualPredicate;
+    StringMap<std::unique_ptr<MatchExpression>> filterSplitByColumn;
+    if (params.options & QueryPlannerParams::GENERATE_PER_COLUMN_FILTERS) {
+        std::tie(filterSplitByColumn, residualPredicate) =
+            expression::splitMatchExpressionForColumns(query.root());
+    } else {
+        residualPredicate = query.root()->shallowClone();
+    }
+    const bool canPushFilters = filterSplitByColumn.size() > 0;
+
     auto columnScan = std::make_unique<ColumnIndexScanNode>(params.columnarIndexes.front(),
                                                             std::move(outputDeps.fields),
                                                             std::move(filterDeps.fields),
@@ -326,6 +333,9 @@ string optionString(size_t options) {
                 break;
             case QueryPlannerParams::RETURN_OWNED_DATA:
                 ss << "RETURN_OWNED_DATA ";
+                break;
+            case QueryPlannerParams::GENERATE_PER_COLUMN_FILTERS:
+                ss << "GENERATE_PER_COLUMN_FILTERS ";
                 break;
             case QueryPlannerParams::DEFAULT:
                 MONGO_UNREACHABLE;

@@ -151,12 +151,20 @@ Status ColumnStoreAccessMethod::BulkBuilder::commit(OperationContext* opCtx,
                                                     const RecordIdHandlerFn& onDuplicateRecord) {
     static constexpr size_t kBufferBlockSize = 1024;
     SharedBufferFragmentBuilder pooledBufferBuilder(kBufferBlockSize);
-    return _columnsAccess->insert(opCtx,
-                                  pooledBufferBuilder,
-                                  collection,
-                                  _deferredInserts,
-                                  InsertDeleteOptions{},
-                                  &_keysInserted);
+
+    WriteUnitOfWork wunit(opCtx);
+    auto status = _columnsAccess->insert(opCtx,
+                                         pooledBufferBuilder,
+                                         collection,
+                                         _deferredInserts,
+                                         InsertDeleteOptions{},
+                                         &_keysInserted);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    wunit.commit();
+    return Status::OK();
 }
 
 void ColumnStoreAccessMethod::insertOne(OperationContext* opCtx,

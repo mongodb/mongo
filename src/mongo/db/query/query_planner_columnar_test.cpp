@@ -67,8 +67,10 @@ protected:
             kInternalQueryMaxNumberOfFieldsToChooseFilteredColumnScanDefault);
     }
 
-    void addColumnarIndex() {
+    void addColumnarIndexAndEnableFilterSplitting() {
         params.columnarIndexes.emplace_back(kIndexName);
+
+        params.options |= QueryPlannerParams::GENERATE_PER_COLUMN_FILTERS;
     }
 
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> makeInnerPipelineStages(
@@ -82,7 +84,7 @@ protected:
 };
 
 TEST_F(QueryPlannerColumnarTest, InclusionProjectionUsesColumnarIndex) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     runQuerySortProj(BSON("a" << BSON("$gt" << 3)), BSONObj(), BSON("a" << 1 << "_id" << 0));
 
@@ -99,7 +101,7 @@ TEST_F(QueryPlannerColumnarTest, InclusionProjectionUsesColumnarIndex) {
 }
 
 TEST_F(QueryPlannerColumnarTest, ExpressionProjectionUsesColumnarIndex) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     runQuerySortProj(BSON("a" << BSON("$gt" << 3)), BSONObj(), fromjson(R"({
                          a: 1,
@@ -124,7 +126,7 @@ TEST_F(QueryPlannerColumnarTest, ExpressionProjectionUsesColumnarIndex) {
 }
 
 TEST_F(QueryPlannerColumnarTest, ImplicitlyIncludedIdIsIncludedInProjectedFields) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     runQuerySortProj(BSON("a" << BSON("$gt" << 3)), BSONObj(), BSON("a" << 1));
 
@@ -144,7 +146,7 @@ TEST_F(QueryPlannerColumnarTest, ImplicitlyIncludedIdIsIncludedInProjectedFields
 }
 
 TEST_F(QueryPlannerColumnarTest, InclusionProjectionWithSortUsesColumnarIndexAndBlockingSort) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     runQuerySortProj(BSONObj(), BSON("a" << 1), BSON("a" << 1 << "_id" << 0));
 
@@ -164,7 +166,7 @@ TEST_F(QueryPlannerColumnarTest, InclusionProjectionWithSortUsesColumnarIndexAnd
 }
 
 TEST_F(QueryPlannerColumnarTest, SortOnSeparateColumnAddsThatColumnToColumnScan) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     runQuerySortProj(BSONObj(), BSON("b" << 1), BSON("a" << 1 << "_id" << 0));
 
@@ -184,7 +186,7 @@ TEST_F(QueryPlannerColumnarTest, SortOnSeparateColumnAddsThatColumnToColumnScan)
 }
 
 TEST_F(QueryPlannerColumnarTest, ExclusionProjectionDoesNotUseColumnarIndex) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 0 << "_id" << 0));
     assertNumSolutions(1U);
@@ -192,7 +194,7 @@ TEST_F(QueryPlannerColumnarTest, ExclusionProjectionDoesNotUseColumnarIndex) {
 }
 
 TEST_F(QueryPlannerColumnarTest, NoProjectionDoesNotUseColumnarIndex) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     runQuerySortProj(BSON("a" << 1), BSONObj(), BSONObj());
     assertNumSolutions(1U);
@@ -200,7 +202,7 @@ TEST_F(QueryPlannerColumnarTest, NoProjectionDoesNotUseColumnarIndex) {
 }
 
 TEST_F(QueryPlannerColumnarTest, ProjectionWithTooManyFieldsDoesNotUseColumnarIndex) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.store(2);
     runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1 << "b" << 1 << "c" << 1));
@@ -209,7 +211,7 @@ TEST_F(QueryPlannerColumnarTest, ProjectionWithTooManyFieldsDoesNotUseColumnarIn
 }
 
 TEST_F(QueryPlannerColumnarTest, ExpressionProjectionWithTooManyFieldsDoesnotUseColumnarIndex) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.store(2);
     // This will need 3 fields for the $concat, so should not be able to use a column scan.
@@ -221,7 +223,7 @@ TEST_F(QueryPlannerColumnarTest, ExpressionProjectionWithTooManyFieldsDoesnotUse
 
 // Test with a number of fields equal to the limit.
 TEST_F(QueryPlannerColumnarTest, ImplicitIdCountsTowardsFieldLimit) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.store(2);
     runQuerySortProj(
@@ -231,7 +233,7 @@ TEST_F(QueryPlannerColumnarTest, ImplicitIdCountsTowardsFieldLimit) {
 }
 
 TEST_F(QueryPlannerColumnarTest, ProjectionWithJustEnoughFieldsDoesUseColumnarIndex) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.store(2);
     // Without the '_id' this should be eligible.
@@ -242,7 +244,7 @@ TEST_F(QueryPlannerColumnarTest, ProjectionWithJustEnoughFieldsDoesUseColumnarIn
 }
 
 TEST_F(QueryPlannerColumnarTest, DottedProjectionTooManyFieldsDoesNotUseColumnarIndex) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.store(2);
     runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1 << "b" << BSON("c" << 1 << "d" << 1)));
@@ -252,7 +254,7 @@ TEST_F(QueryPlannerColumnarTest, DottedProjectionTooManyFieldsDoesNotUseColumnar
 
 TEST_F(QueryPlannerColumnarTest,
        ProjectionWithTooManyFieldsDoesNotUseColumnarIndexUnsupportedPredicate) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.store(2);
     runQuerySortProj(BSON("unsupported" << BSON("$exists" << false)),
@@ -263,7 +265,7 @@ TEST_F(QueryPlannerColumnarTest,
 }
 
 TEST_F(QueryPlannerColumnarTest, StandardIndexPreferredOverColumnarIndex) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
     addIndex(BSON("a" << 1));
 
     runQuerySortProj(BSON("a" << 5), BSONObj(), BSON("a" << 1 << "_id" << 0));
@@ -273,7 +275,7 @@ TEST_F(QueryPlannerColumnarTest, StandardIndexPreferredOverColumnarIndex) {
 }
 
 TEST_F(QueryPlannerColumnarTest, IneligiblePredicateNeedsToBeAppliedAfterAssembly) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     runQuerySortProj(BSON("a" << BSONNULL), BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertNumSolutions(1U);
@@ -293,7 +295,7 @@ TEST_F(QueryPlannerColumnarTest, IneligiblePredicateNeedsToBeAppliedAfterAssembl
 }
 
 TEST_F(QueryPlannerColumnarTest, MultiplePredicatesAllowedWithColumnarIndex) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     runQuerySortProj(BSON("a" << 2 << "b" << 3), BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertNumSolutions(1U);
@@ -313,7 +315,7 @@ TEST_F(QueryPlannerColumnarTest, MultiplePredicatesAllowedWithColumnarIndex) {
 
 TEST_F(QueryPlannerColumnarTest,
        TooManyProjectedFieldsDisqualifiesColumnScanEvenWithEligiblePredicates) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan.store(2);
     runQuerySortProj(BSON("a" << 2 << "b" << 3), BSONObj(), BSON("a" << 1 << "b" << 1 << "c" << 1));
@@ -322,7 +324,7 @@ TEST_F(QueryPlannerColumnarTest,
 }
 
 TEST_F(QueryPlannerColumnarTest, TooManyFilteredFieldsDisqualifiesColumnScan) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan.store(2);
     runQuerySortProj(BSON("a" << 2 << "b" << 3 << "c" << 4),
@@ -333,7 +335,7 @@ TEST_F(QueryPlannerColumnarTest, TooManyFilteredFieldsDisqualifiesColumnScan) {
 }
 
 TEST_F(QueryPlannerColumnarTest, FilterDependingOnWholeDocumentDisqualifiesColumnScan) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     // The projection only needs 1 field, but the match references '$$ROOT' so needs the whole
     // document.
@@ -345,7 +347,7 @@ TEST_F(QueryPlannerColumnarTest, FilterDependingOnWholeDocumentDisqualifiesColum
     assertSolutionExists(R"({proj: {spec: {b: 1, _id: 0}, node: {cscan: {dir: 1}}}})");
 }
 TEST_F(QueryPlannerColumnarTest, CombinationOfProjectedAndMatchedFieldsDisqualifiesColumnScan) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     // Neither the match nor the project mentions 4 fields, but together they exceed the threshhold.
     internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan.store(4);
@@ -357,7 +359,7 @@ TEST_F(QueryPlannerColumnarTest, CombinationOfProjectedAndMatchedFieldsDisqualif
 }
 
 TEST_F(QueryPlannerColumnarTest, NumberOfFieldsComputedUsingSetSize) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     // If there are 3 fields referenced in the match and 3 in the projection, but they overlap, we
     // should be OK to use column scan.
@@ -380,7 +382,7 @@ TEST_F(QueryPlannerColumnarTest, NumberOfFieldsComputedUsingSetSize) {
     })");
 }
 TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitDemo) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     auto complexPredicate = fromjson(R"({
         a: {$gte: 0, $lt: 10},
@@ -410,7 +412,7 @@ TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitDemo) {
 }
 
 TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitsIntoParts) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     // Same predicate as above, except with exists: false, which disqualifies the whole thing.
     auto complexPredicate = fromjson(R"({
@@ -445,7 +447,7 @@ TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitsIntoParts) {
 }
 
 TEST_F(QueryPlannerColumnarTest, EmptyQueryPredicateIsEligible) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertNumSolutions(1U);
@@ -458,7 +460,7 @@ TEST_F(QueryPlannerColumnarTest, EmptyQueryPredicateIsEligible) {
 }
 
 TEST_F(QueryPlannerColumnarTest, GroupTest) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     auto pipeline = Pipeline::parse({fromjson("{$group: {_id: '$foo', s: {$sum: '$x'}}}")}, expCtx);
 
@@ -493,7 +495,7 @@ TEST_F(QueryPlannerColumnarTest, GroupTest) {
 }
 
 TEST_F(QueryPlannerColumnarTest, MatchGroupTest) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     auto pipeline = Pipeline::parse({fromjson("{$group: {_id: '$foo', s: {$sum: '$x'}}}")}, expCtx);
 
@@ -524,7 +526,7 @@ TEST_F(QueryPlannerColumnarTest, MatchGroupTest) {
 }
 
 TEST_F(QueryPlannerColumnarTest, MatchGroupWithOverlappingFieldsTest) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
 
     auto pipeline = Pipeline::parse(
         {fromjson("{$group: {_id: '$foo', s: {$sum: '$x'}, name: {$first: '$name'}}}")}, expCtx);
@@ -557,7 +559,7 @@ TEST_F(QueryPlannerColumnarTest, MatchGroupWithOverlappingFieldsTest) {
 }
 
 TEST_F(QueryPlannerColumnarTest, ShardKeyFieldsIncluded) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
     params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("sk1" << 1 << "sk2.nested" << 1);
 
@@ -587,7 +589,7 @@ TEST_F(QueryPlannerColumnarTest, ShardKeyFieldsIncluded) {
 }
 
 TEST_F(QueryPlannerColumnarTest, ShardKeyFieldsCountTowardsFieldLimit) {
-    addColumnarIndex();
+    addColumnarIndexAndEnableFilterSplitting();
     params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("sk1" << 1 << "sk2.nested" << 1);
 
@@ -612,5 +614,29 @@ TEST_F(QueryPlannerColumnarTest, ShardKeyFieldsCountTowardsFieldLimit) {
             }
         }
     })");
+}
+
+TEST_F(QueryPlannerColumnarTest, FullPredicateOption) {
+    params.columnarIndexes.emplace_back(kIndexName);
+
+    // Filter that could be pushed down, but isn't due to the lack of the
+    // GENERATE_PER_COLUMN_FILTER flag.
+    auto predicate = fromjson(R"({
+        specialAddress: {$exists: true},
+        doNotContact: {$exists: true}
+    })");
+    runQuerySortProj(predicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
+    assertSolutionExists(R"({
+        proj: {
+            spec: {a: 1, _id: 0},
+            node: {
+                column_scan: {
+                    outputFields: ['a'],
+                    postAssemblyFilter: {
+                        specialAddress: {$exists: true},
+                        doNotContact: {$exists: true}
+                    },
+                    matchFields:
+                        ['specialAddress', 'doNotContact']}}}})");
 }
 }  // namespace mongo

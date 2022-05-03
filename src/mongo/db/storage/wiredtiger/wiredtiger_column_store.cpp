@@ -127,7 +127,7 @@ std::string& WiredTigerColumnStore::makeKey(std::string& buffer, PathView path, 
         // If we end up reserving more values, the above check should be changed.
         buffer += '\0';
     }
-    rid.withFormat([](RecordId::Null) { /* do nothing */ },
+    rid.withFormat([](RecordId::Null) { /* Do nothing. */ },
                    [&](int64_t num) {
                        num = endian::nativeToBig(num);
                        buffer.append(reinterpret_cast<const char*>(&num), sizeof(num));
@@ -234,6 +234,7 @@ void WiredTigerColumnStore::fullValidate(OperationContext* opCtx,
                                          int64_t* numKeysOut,
                                          IndexValidateResults* fullResults) const {
     // TODO SERVER-65484: Validation for column indexes.
+    // uasserted(ErrorCodes::NotImplemented, "WiredTigerColumnStore::fullValidate()");
     return;
 }
 
@@ -241,14 +242,17 @@ class WiredTigerColumnStore::Cursor final : public ColumnStore::Cursor,
                                             public WiredTigerIndexCursorGeneric {
 public:
     Cursor(OperationContext* opCtx, const WiredTigerColumnStore* idx)
-        : WiredTigerIndexCursorGeneric(opCtx, true /* forward */), _opCtx(opCtx), _idx(*idx) {
+        : WiredTigerIndexCursorGeneric(opCtx, true /* forward */), _idx(*idx) {
         _cursor.emplace(_idx.uri(), _idx._tableId, false, _opCtx);
     }
     boost::optional<FullCellView> next() override {
-        if (_eof)
+        if (_eof) {
             return {};
-        if (!_lastMoveSkippedKey)
+        }
+        if (!_lastMoveSkippedKey) {
             advanceWTCursor();
+        }
+
         return curr();
     }
     boost::optional<FullCellView> seekAtOrPast(PathView path, RecordId rid) override {
@@ -303,7 +307,6 @@ public:
 private:
     void resetCursor() {
         WiredTigerIndexCursorGeneric::resetCursor();
-        _eof = true;
     }
     bool seekWTCursor(bool exactOnly = false) {
         // Ensure an active transaction is open.
@@ -377,8 +380,6 @@ private:
     // false by any operation that moves the cursor, other than subsequent save/restore pairs.
     bool _lastMoveSkippedKey = false;
 
-    OperationContext* _opCtx;
-    boost::optional<WiredTigerCursor> _cursor;
     const WiredTigerColumnStore& _idx;  // not owned
 };
 

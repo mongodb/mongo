@@ -380,22 +380,29 @@ struct SplitCellView {
     bool hasDoubleNestedArrays = false;
 
     template <class ValueEncoder>
+    struct Cursor {
+        using Out = typename std::remove_reference_t<ValueEncoder>::Out;
+        Out nextValue() {
+            if (elemPtr == end)
+                return Out();
+
+            invariant(elemPtr < end);
+            return decodeAndAdvance(elemPtr, encoder);
+        }
+        bool hasNext() const {
+            return elemPtr != end;
+        }
+
+        const char* elemPtr;
+        const char* end;
+        ValueEncoder encoder;
+    };
+
+
+    template <class ValueEncoder>
     auto subcellValuesGenerator(ValueEncoder&& valEncoder) const {
-        struct Cursor {
-            using Out = typename std::remove_reference_t<ValueEncoder>::Out;
-            Out nextValue() {
-                if (elemPtr == end)
-                    return Out();
-
-                invariant(elemPtr < end);
-                return decodeAndAdvance(elemPtr, encoder);
-            }
-
-            const char* elemPtr;
-            const char* end;
-            ValueEncoder encoder;
-        };
-        return Cursor{firstValuePtr, arrInfo.rawData(), std::forward<ValueEncoder>(valEncoder)};
+        return Cursor<ValueEncoder>{
+            firstValuePtr, arrInfo.rawData(), std::forward<ValueEncoder>(valEncoder)};
     }
 
     static SplitCellView parse(CellView cell) {

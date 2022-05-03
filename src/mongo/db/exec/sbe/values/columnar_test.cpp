@@ -38,13 +38,13 @@
 #include "mongo/db/storage/column_store.h"
 
 namespace mongo::sbe {
-void makeObjFromColumns(std::vector<TranslatedCell>& cells, value::Object& out) {
+void makeObjFromColumns(std::vector<MockTranslatedCell>& cells, value::Object& out) {
     for (auto& cell : cells) {
         addCellToObject(cell, out);
     }
 }
 
-void compareMakeObjWithExpected(std::vector<TranslatedCell>& cells, const BSONObj& expected) {
+void compareMakeObjWithExpected(std::vector<MockTranslatedCell>& cells, const BSONObj& expected) {
     auto [expectedTag, expectedVal] = stage_builder::makeValue(expected);
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
@@ -56,72 +56,73 @@ void compareMakeObjWithExpected(std::vector<TranslatedCell>& cells, const BSONOb
                                             expectedVal);
 }
 
-TranslatedCell makeCellOfIntegers(StringData path,
-                                  StringData arrInfo,
-                                  std::vector<unsigned int> vals) {
-    return TranslatedCell{arrInfo,
-                          path,
-                          std::vector<value::TypeTags>(vals.size(), value::TypeTags::NumberInt32),
-                          std::vector<value::Value>(vals.begin(), vals.end())};
+MockTranslatedCell makeCellOfIntegers(StringData path,
+                                      StringData arrInfo,
+                                      std::vector<unsigned int> vals) {
+    return MockTranslatedCell{
+        arrInfo,
+        path,
+        std::vector<value::TypeTags>(vals.size(), value::TypeTags::NumberInt32),
+        std::vector<value::Value>(vals.begin(), vals.end())};
 }
 
 TEST(ColumnarObjTest, MakeObjNoArrTest) {
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("a.b", "", {32}),
-                                      makeCellOfIntegers("a.d", "", {36})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a.b", "", {32}),
+                                          makeCellOfIntegers("a.d", "", {36})};
     compareMakeObjWithExpected(cells, fromjson("{a: {b: 32, d: 36}}"));
 }
 
 TEST(ColumnarObjTest, MakeObjArrOfScalarsTest) {
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("a", "[", {32, 33, 34, 35, 36})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a", "[", {32, 33, 34, 35, 36})};
     compareMakeObjWithExpected(cells, fromjson("{a: [32, 33, 34, 35, 36]}"));
 }
 
 TEST(ColumnarObjTest, MakeObjSingletonArrayOfObj) {
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("a.b", "[", {32})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a.b", "[", {32})};
     compareMakeObjWithExpected(cells, fromjson("{a: [{b:32}]}"));
 }
 
 TEST(ColumnarObjTest, MakeObjArrOfObjectsTest) {
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("a.b", "[", {1, 2, 3})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a.b", "[", {1, 2, 3})};
 
     compareMakeObjWithExpected(
         cells, BSON("a" << BSON_ARRAY(BSON("b" << 1) << BSON("b" << 2) << BSON("b" << 3))));
 }
 
 TEST(ColumnarObjTest, MakeObjBasicArrOfObjectsWithMultipleFields) {
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("a.b", "[", {1, 2, 3}),
-                                      makeCellOfIntegers("a.c", "[", {101, 102, 103})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a.b", "[", {1, 2, 3}),
+                                          makeCellOfIntegers("a.c", "[", {101, 102, 103})};
     compareMakeObjWithExpected(cells,
                                fromjson("{a: [{b:1, c:101}, {b:2, c: 102}, {b:3, c: 103}]}"));
 }
 
 TEST(ColumnarObjTest, MakeObjComplexLeafArray) {
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("a", "", {}),
-                                      makeCellOfIntegers("a.b", "", {}),
-                                      makeCellOfIntegers("a.b.c", "{{[[|1][|]", {1, 2, 3, 4})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a", "", {}),
+                                          makeCellOfIntegers("a.b", "", {}),
+                                          makeCellOfIntegers("a.b.c", "{{[[|1][|]", {1, 2, 3, 4})};
     compareMakeObjWithExpected(cells, fromjson("{a:{b:{c:[[1,2],[3],4]}}}"));
 }
 
 TEST(ColumnarObjTest, MakeObjArrayOfArrays) {
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("a", "[[|1][[|]", {1, 2, 3, 4})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a", "[[|1][[|]", {1, 2, 3, 4})};
     compareMakeObjWithExpected(cells, fromjson("{a: [[1,2], [[3], 4]]}"));
 }
 
 TEST(ColumnarObjTest, MakeObjArrayOfMixed) {
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("a", "[|+2", {1, 4}),
-                                      makeCellOfIntegers("a.b", "[1", {2}),
-                                      makeCellOfIntegers("a.c", "[2", {3})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a", "[|+2", {1, 4}),
+                                          makeCellOfIntegers("a.b", "[1", {2}),
+                                          makeCellOfIntegers("a.c", "[2", {3})};
     compareMakeObjWithExpected(cells, fromjson("{a: [1, {b:2}, {c: 3}, 4]}"));
 }
 
 TEST(ColumnarObjTest, MakeObjArrayOfMixed2) {
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("a", "[|o", {1, 3}),
-                                      makeCellOfIntegers("a.b", "[1{[", {2})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a", "[|o", {1, 3}),
+                                          makeCellOfIntegers("a.b", "[1{[", {2})};
     compareMakeObjWithExpected(cells, fromjson("{a:[1,{b:[2]},3]}"));
 }
 
 TEST(ColumnarObjTest, MakeObjTopLevelArrayOfMixed) {
-    std::vector<TranslatedCell> cells{
+    std::vector<MockTranslatedCell> cells{
         makeCellOfIntegers("a", "[o1|o5", {99}),
         makeCellOfIntegers("a.b", "[{[|3]+2{[[|]]{[", {101, 0, 101, 1, 2, 3, 4, 5, 6}),
         makeCellOfIntegers("a.c", "[1|+1", {0, 1}),
@@ -140,15 +141,16 @@ TEST(ColumnarObjTest, MakeObjTopLevelArrayOfMixed) {
 }
 
 TEST(ColumnarObjTest, MakeObjTopLevelObjWithMixedArrays) {
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("a", "", {}),
-                                      makeCellOfIntegers("a.b", "{[[|1][o]", {1, 2, 2}),
-                                      makeCellOfIntegers("a.b.c", "{[1[{[[|1][|]", {1, 2, 99, 2}),
-                                      makeCellOfIntegers("a.x", "", {1})};
+    std::vector<MockTranslatedCell> cells{
+        makeCellOfIntegers("a", "", {}),
+        makeCellOfIntegers("a.b", "{[[|1][o]", {1, 2, 2}),
+        makeCellOfIntegers("a.b.c", "{[1[{[[|1][|]", {1, 2, 99, 2}),
+        makeCellOfIntegers("a.x", "", {1})};
     compareMakeObjWithExpected(cells, fromjson("{a:{b:[[1,2],[{c:[[1,2],[99],2]}],2], x:1}}"));
 }
 
 TEST(ColumnarObjTest, MakeObjTopLevelArrayWithSubArrays) {
-    std::vector<TranslatedCell> cells{
+    std::vector<MockTranslatedCell> cells{
         makeCellOfIntegers("a", "[[|1][o]", {1, 2, 2}),
         makeCellOfIntegers("a.b", "[1[{[[|1][o]", {1, 2, 2}),
         makeCellOfIntegers("a.b.c", "[1[{[1[{[[|1][|]", {1, 2, 3, 4})};
@@ -157,46 +159,46 @@ TEST(ColumnarObjTest, MakeObjTopLevelArrayWithSubArrays) {
 }
 
 TEST(ColumnarObjTest, MakeTopLevelArrayOfObjsSparse) {
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("a", "[o1", {}),
-                                      makeCellOfIntegers("a.b", "[o", {1}),
-                                      makeCellOfIntegers("a.b.c", "[", {1})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a", "[o1", {}),
+                                          makeCellOfIntegers("a.b", "[o", {1}),
+                                          makeCellOfIntegers("a.b.c", "[", {1})};
     compareMakeObjWithExpected(cells, fromjson("{a:[{b:{c:1}},{b:1}]}"));
 }
 
 TEST(ColumnarObjTest, MakeObjEmptyTopLevelField) {
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("", "[", {1, 2, 3})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("", "[", {1, 2, 3})};
     compareMakeObjWithExpected(cells, fromjson("{'': [1,2,3]}"));
 }
 
 TEST(ColumnarObjTest, MakeObjEmptyFieldWhichIsObject) {
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("..a", "{{[", {1, 2, 3})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("..a", "{{[", {1, 2, 3})};
     compareMakeObjWithExpected(cells, fromjson("{'': {'': {a: [1,2,3]}}}"));
 }
 
 TEST(ColumnarObjTest, MakeObjEmptyFieldWhichIsLeaf) {
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("a.", "{[", {1, 2, 3})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a.", "{[", {1, 2, 3})};
     compareMakeObjWithExpected(cells, fromjson("{a: {'': [1,2,3]}}"));
 }
 
 TEST(ColumnarObjTest, AddTopLevelNonLeafCellWithoutArrayInfoToObject) {
     // Cell with no array info or values indicates an object.
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("a", "", {})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a", "", {})};
     compareMakeObjWithExpected(cells, fromjson("{a: {}}"));
 }
 
 TEST(ColumnarObjTest, AddNonLeafCellWithoutArrayInfoToObject) {
     // Cell with no array info or values indicates an object.
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("a.b", "", {})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a.b", "", {})};
     compareMakeObjWithExpected(cells, fromjson("{a: {b: {}}}"));
 }
 
 TEST(ColumnarObjTest, AddTopLevelNonLeafCellWithArrayInfoToObject) {
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("a", "[o1", {})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a", "[o1", {})};
     compareMakeObjWithExpected(cells, fromjson("{a: [{}, {}]}"));
 }
 
 TEST(ColumnarObjTest, AddNonLeafCellWithArrayInfoToObject) {
-    std::vector<TranslatedCell> cells{makeCellOfIntegers("a.b", "{[o1", {})};
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a.b", "{[o1", {})};
     compareMakeObjWithExpected(cells, fromjson("{a: {b: [{}, {}]}}"));
 }
 }  // namespace mongo::sbe

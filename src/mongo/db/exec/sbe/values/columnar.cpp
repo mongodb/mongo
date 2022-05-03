@@ -97,9 +97,10 @@ private:
  * Tracks state necessary for reconstructing objects including the array info reader, the values
  * available for extraction, and the path.
  */
+template <class C>
 class AddToDocumentState {
 public:
-    AddToDocumentState(TranslatedCell& translatedCell, ArrInfoReader reader)
+    AddToDocumentState(C& translatedCell, ArrInfoReader reader)
         : cell(translatedCell), arrInfoReader(std::move(reader)) {}
 
     /*
@@ -146,7 +147,7 @@ public:
         return offsetInPath == cell.path.size();
     }
 
-    TranslatedCell& cell;
+    C& cell;
     ArrInfoReader arrInfoReader;
 
 private:
@@ -218,9 +219,10 @@ value::Array* findOrAddArrInArr(size_t idx, sbe::value::Array* arr) {
  * Adds the given tag,val SBE value to the 'out' object, assuming that there are no arrays along
  * the remaining path stored by 'state'.
  */
+template <class C>
 void addToObjectNoArrays(value::TypeTags tag,
                          value::Value val,
-                         AddToDocumentState& state,
+                         AddToDocumentState<C>& state,
                          value::Object& out,
                          size_t idx) {
     state.withNextPathComponent([&](StringData nextPathComponent) {
@@ -235,8 +237,11 @@ void addToObjectNoArrays(value::TypeTags tag,
     });
 }
 
-void addToObject(value::Object& obj, AddToDocumentState& state);
-void addToArray(value::Array& arr, AddToDocumentState& state) {
+template <class C>
+void addToObject(value::Object& obj, AddToDocumentState<C>& state);
+
+template <class C>
+void addToArray(value::Array& arr, AddToDocumentState<C>& state) {
     size_t index = state.arrInfoReader.takeNumber();
     auto ensureArraySize = [&]() {
         while (arr.size() <= index) {
@@ -310,7 +315,8 @@ void addToArray(value::Array& arr, AddToDocumentState& state) {
     }
 }
 
-void addToObject(value::Object& obj, AddToDocumentState& state) {
+template <class C>
+void addToObject(value::Object& obj, AddToDocumentState<C>& state) {
     state.withNextPathComponent([&](StringData field) {
         switch (state.arrInfoReader.takeNextChar()) {
             case '{': {
@@ -332,7 +338,8 @@ void addToObject(value::Object& obj, AddToDocumentState& state) {
     });
 }
 
-void addEmptyObjectIfNotPresent(AddToDocumentState& state, value::Object& out) {
+template <class C>
+void addEmptyObjectIfNotPresent(AddToDocumentState<C>& state, value::Object& out) {
     // Add an object to the path.
     state.withNextPathComponent([&](StringData nextPathComponent) {
         auto* innerObj = findOrAddObjInObj(nextPathComponent, &out);
@@ -342,8 +349,10 @@ void addEmptyObjectIfNotPresent(AddToDocumentState& state, value::Object& out) {
     });
 }
 }  // namespace
-void addCellToObject(TranslatedCell& cell, value::Object& out) {
-    AddToDocumentState state{cell, ArrInfoReader{cell.arrInfo}};
+
+template <class C>
+void addCellToObject(C& cell, value::Object& out) {
+    AddToDocumentState<C> state{cell, ArrInfoReader{cell.arrInfo}};
 
     if (cell.arrInfo.empty()) {
         if (cell.moreValues()) {
@@ -361,4 +370,7 @@ void addCellToObject(TranslatedCell& cell, value::Object& out) {
     addToObject(out, state);
     invariant(!state.arrInfoReader.moreExplicitComponents());
 }
+
+template void addCellToObject<TranslatedCell>(TranslatedCell& cell, value::Object& out);
+template void addCellToObject<MockTranslatedCell>(MockTranslatedCell& cell, value::Object& out);
 }  // namespace mongo::sbe

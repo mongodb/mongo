@@ -32,10 +32,23 @@
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/exec/sbe/values/column_store_encoder.h"
 #include "mongo/db/exec/sbe/values/columnar.h"
+#include "mongo/db/index/columns_access_method.h"
 
 namespace mongo {
 namespace sbe {
+namespace {
+TranslatedCell translateCell(PathView path, const SplitCellView& splitCellView) {
+    value::ColumnStoreEncoder encoder;
+    SplitCellView::Cursor<value::ColumnStoreEncoder> cellCursor =
+        splitCellView.subcellValuesGenerator<value::ColumnStoreEncoder>(std::move(encoder));
+    return TranslatedCell{splitCellView.arrInfo, path, std::move(cellCursor)};
+}
+
+
+}  // namespace
+
 ColumnScanStage::ColumnScanStage(UUID collectionUuid,
                                  StringData columnIndexName,
                                  value::SlotVector fieldSlots,
@@ -84,7 +97,7 @@ void ColumnScanStage::prepare(CompileCtx& ctx) {
 
     for (size_t idx = 0; idx < _outputFields.size(); ++idx) {
         auto [it, inserted] = _outputFieldsMap.emplace(_fieldSlots[idx], &_outputFields[idx]);
-        uassert(6298601, str::stream() << "duplicate slot: " << _fieldSlots[idx], inserted);
+        uassert(6610212, str::stream() << "duplicate slot: " << _fieldSlots[idx], inserted);
     }
 
     if (_recordSlot) {
@@ -104,8 +117,16 @@ void ColumnScanStage::prepare(CompileCtx& ctx) {
         _pathExprsCode.emplace_back(expr->compile(ctx));
     }
 
-    tassert(6298602, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
+    tassert(6610200, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
     std::tie(_coll, _collName, _catalogEpoch) = acquireCollection(_opCtx, _collUuid);
+
+    auto indexCatalog = _coll->getIndexCatalog();
+    auto indexDesc = indexCatalog->findIndexByName(_opCtx, _columnIndexName);
+    tassert(6610201,
+            str::stream() << "could not find index named '" << _columnIndexName
+                          << "' in collection '" << _collName << "'",
+            indexDesc);
+    _weakIndexCatalogEntry = indexCatalog->getEntryShared(indexDesc);
 }
 
 value::SlotAccessor* ColumnScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -128,6 +149,10 @@ value::SlotAccessor* ColumnScanStage::getAccessor(CompileCtx& ctx, value::SlotId
 }
 
 void ColumnScanStage::doSaveState(bool relinquishCursor) {
+    for (auto& cursor : _columnCursors) {
+        cursor.makeOwned();
+    }
+
     if (_rowStoreCursor && relinquishCursor) {
         _rowStoreCursor->save();
     }
@@ -137,10 +162,10 @@ void ColumnScanStage::doSaveState(bool relinquishCursor) {
     }
 
     for (auto& cursor : _columnCursors) {
-        cursor.cursor->save();
+        cursor.cursor().save();
     }
     for (auto& [path, cursor] : _parentPathCursors) {
-        cursor->save();
+        cursor->saveUnpositioned();
     }
 
     _coll.reset();
@@ -155,8 +180,13 @@ void ColumnScanStage::doRestoreState(bool relinquishCursor) {
         return;
     }
 
-    tassert(6298603, "Catalog epoch should be initialized", _catalogEpoch);
+    tassert(6610202, "Catalog epoch should be initialized", _catalogEpoch);
     _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+
+    auto indexCatalogEntry = _weakIndexCatalogEntry.lock();
+    uassert(ErrorCodes::QueryPlanKilled,
+            str::stream() << "query plan killed :: index '" << _columnIndexName << "' dropped",
+            indexCatalogEntry && !indexCatalogEntry->isDropped());
 
     if (_rowStoreCursor) {
         if (relinquishCursor) {
@@ -166,7 +196,7 @@ void ColumnScanStage::doRestoreState(bool relinquishCursor) {
     }
 
     for (auto& cursor : _columnCursors) {
-        cursor.cursor->restore();
+        cursor.cursor().restore();
     }
     for (auto& [path, cursor] : _parentPathCursors) {
         cursor->restore();
@@ -178,7 +208,7 @@ void ColumnScanStage::doDetachFromOperationContext() {
         _rowStoreCursor->detachFromOperationContext();
     }
     for (auto& cursor : _columnCursors) {
-        cursor.cursor->detachFromOperationContext();
+        cursor.cursor().detachFromOperationContext();
     }
     for (auto& [path, cursor] : _parentPathCursors) {
         cursor->detachFromOperationContext();
@@ -190,7 +220,7 @@ void ColumnScanStage::doAttachToOperationContext(OperationContext* opCtx) {
         _rowStoreCursor->reattachToOperationContext(opCtx);
     }
     for (auto& cursor : _columnCursors) {
-        cursor.cursor->reattachToOperationContext(opCtx);
+        cursor.cursor().reattachToOperationContext(opCtx);
     }
     for (auto& [path, cursor] : _parentPathCursors) {
         cursor->reattachToOperationContext(opCtx);
@@ -214,18 +244,18 @@ void ColumnScanStage::open(bool reOpen) {
     invariant(_opCtx);
 
     if (_open) {
-        tassert(6298604, "reopened ColumnScanStage but reOpen=false", reOpen);
-        tassert(6298605, "ColumnScanStage is open but _coll is not null", _coll);
-        tassert(6298606, "ColumnScanStage is open but don't have _rowStoreCursor", _rowStoreCursor);
+        tassert(6610203, "reopened ColumnScanStage but reOpen=false", reOpen);
+        tassert(6610204, "ColumnScanStage is open but _coll is not null", _coll);
+        tassert(6610205, "ColumnScanStage is open but don't have _rowStoreCursor", _rowStoreCursor);
     } else {
-        tassert(6298607, "first open to ColumnScanStage but reOpen=true", !reOpen);
+        tassert(6610206, "first open to ColumnScanStage but reOpen=true", !reOpen);
         if (!_coll) {
             // We're being opened after 'close()'. We need to re-acquire '_coll' in this case and
             // make some validity checks (the collection has not been dropped, renamed, etc.).
             tassert(
-                6298608, "ColumnScanStage is not open but have _rowStoreCursor", !_rowStoreCursor);
-            tassert(6298609, "Collection name should be initialized", _collName);
-            tassert(6298610, "Catalog epoch should be initialized", _catalogEpoch);
+                6610207, "ColumnScanStage is not open but have _rowStoreCursor", !_rowStoreCursor);
+            tassert(6610208, "Collection name should be initialized", _collName);
+            tassert(6610209, "Catalog epoch should be initialized", _catalogEpoch);
             _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
         }
     }
@@ -235,24 +265,29 @@ void ColumnScanStage::open(bool reOpen) {
     }
 
     if (_columnCursors.empty()) {
-        // We fake the special Row ID column by just using _id, for now.
-        _columnCursors.push_back(ColumnCursor{
-            std::make_unique<FakeCursorForPath>("_id", _coll->getCursor(_opCtx, true)),
-            boost::none,
-            false /* add to document */
-        });
+        auto entry = _weakIndexCatalogEntry.lock();
+        tassert(6610210,
+                str::stream() << "expected IndexCatalogEntry for index named: " << _columnIndexName,
+                static_cast<bool>(entry));
+
+        auto iam = static_cast<ColumnStoreAccessMethod*>(entry->accessMethod());
+
+        // Eventually we can not include this column for the cases where a known dense column (_id)
+        // is being read anyway.
+        _columnCursors.push_back(ColumnCursor(iam->storage()->newCursor(_opCtx, "\xFF"_sd),
+                                              false /* add to document */));
 
         for (auto&& path : _paths) {
-            _columnCursors.push_back(ColumnCursor{
-                std::make_unique<FakeCursorForPath>(path, _coll->getCursor(_opCtx, true)),
-                boost::none,
-                true /* add to document */
-            });
+            _columnCursors.push_back(
+                ColumnCursor(iam->storage()->newCursor(_opCtx, path), true /* add to document */));
         }
     }
 
+    for (auto& columnCursor : _columnCursors) {
+        columnCursor.seekAtOrPast(RecordId());
+    }
+
     _open = true;
-    _firstGetNext = true;
 }
 
 void ColumnScanStage::readParentsIntoObj(StringData path,
@@ -282,21 +317,28 @@ void ColumnScanStage::readParentsIntoObj(StringData path,
     // If we inserted a new entry, replace the null with an actual cursor.
     if (inserted) {
         invariant(it->second == nullptr);
-        it->second = std::make_unique<FakeCursorForPath>(*parent, _coll->getCursor(_opCtx, true));
+
+        auto entry = _weakIndexCatalogEntry.lock();
+        tassert(6610211,
+                str::stream() << "expected IndexCatalogEntry for index named: " << _columnIndexName,
+                static_cast<bool>(entry));
+        auto iam = static_cast<ColumnStoreAccessMethod*>(entry->accessMethod());
+        it->second = iam->storage()->newCursor(_opCtx, *parent);
     }
 
-    auto optCell = it->second->seekExact(_recordId);
-    pathsReadSetOut->insert(*parent);
+    boost::optional<SplitCellView> splitCellView;
+    if (auto optCell = it->second->seekExact(_recordId)) {
+        splitCellView = SplitCellView::parse(optCell->value);
+    }
 
-    if (!optCell || optCell->isSparse) {
+    pathsReadSetOut->insert(*parent);
+    if (!splitCellView || splitCellView->isSparse) {
         // We need this cell's parent too.
         readParentsIntoObj(*parent, outObj, pathsReadSetOut, false);
     }
 
-    if (optCell) {
-        auto translatedCell =
-            TranslatedCell{optCell->arrayInfo, *parent, optCell->tags, optCell->vals};
-
+    if (splitCellView) {
+        auto translatedCell = translateCell(*parent, *splitCellView);
         addCellToObject(translatedCell, *outObj);
     }
 }
@@ -311,17 +353,10 @@ PlanState ColumnScanStage::getNext() {
 
     checkForInterrupt(_opCtx);
 
-    if (_firstGetNext) {
-        for (size_t i = 0; i < _columnCursors.size(); ++i) {
-            _columnCursors[i].next();
-        }
-        _firstGetNext = false;
-    }
-
     // Find minimum record ID of all column cursors.
     _recordId = RecordId();
     for (auto& cursor : _columnCursors) {
-        auto& result = cursor.lastCell;
+        auto& result = cursor.lastCell();
         if (result && (_recordId.isNull() || result->rid < _recordId)) {
             _recordId = result->rid;
         }
@@ -338,38 +373,35 @@ PlanState ColumnScanStage::getNext() {
     StringDataSet parentPathsRead;
     bool useRowStore = false;
     for (size_t i = 0; i < _columnCursors.size(); ++i) {
-        auto& lastCell = _columnCursors[i].lastCell;
+        auto& lastCell = _columnCursors[i].lastCell();
+        const auto& path = _columnCursors[i].path();
 
-        const FakeCell* cellForRid =
-            (lastCell && lastCell->rid == _recordId) ? lastCell.get_ptr() : nullptr;
-        const auto& path = _columnCursors[i].cursor->path();
+        boost::optional<SplitCellView> splitCellView;
+        if (lastCell && lastCell->rid == _recordId) {
+            splitCellView = SplitCellView::parse(lastCell->value);
+        }
 
-        if (cellForRid && (cellForRid->hasSubPaths || cellForRid->hasDuplicateFields)) {
+        if (splitCellView && (splitCellView->hasSubPaths || splitCellView->hasDuplicateFields)) {
             useRowStore = true;
-        } else if (!useRowStore && _columnCursors[i].includeInOutput) {
-            if (!cellForRid || cellForRid->isSparse) {
+        } else if (!useRowStore && _columnCursors[i].includeInOutput()) {
+            if (!splitCellView || splitCellView->isSparse) {
                 // Must read in the parent information first.
                 readParentsIntoObj(path, &outObj, &parentPathsRead);
             }
 
-            if (cellForRid) {
-                auto translatedCell = TranslatedCell{cellForRid->arrayInfo,
-                                                     _columnCursors[i].path(),
-                                                     cellForRid->tags,
-                                                     cellForRid->vals};
+            if (splitCellView) {
+                auto translatedCell = translateCell(path, *splitCellView);
 
                 addCellToObject(translatedCell, outObj);
             }
         }
 
-        if (cellForRid) {
+        if (splitCellView) {
             _columnCursors[i].next();
         }
     }
 
     if (useRowStore) {
-        std::cout << "Using row store for rid " << _recordId << std::endl;
-
         // TODO: In some cases we can avoid calling seek() on the row store cursor, and instead do
         // a next() which should be much cheaper.
         auto record = _rowStoreCursor->seekExact(_recordId);

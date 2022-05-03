@@ -31,6 +31,7 @@
 
 #include "mongo/config.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/values/column_store_encoder.h"
 #include "mongo/db/storage/column_store.h"
 
 /**
@@ -43,7 +44,24 @@ namespace mongo::sbe {
  */
 struct TranslatedCell {
     StringData arrInfo;
+    PathView path;
 
+    SplitCellView::Cursor<value::ColumnStoreEncoder> cursor;
+
+    std::pair<value::TypeTags, value::Value> nextValue() {
+        auto next = cursor.nextValue();
+        invariant(next);
+        return *next;
+    }
+
+    bool moreValues() const {
+        return cursor.hasNext();
+    }
+};
+
+// For testing only.
+struct MockTranslatedCell {
+    StringData arrInfo;
     PathView path;
 
     std::vector<value::TypeTags> types;
@@ -64,10 +82,10 @@ struct TranslatedCell {
     }
 };
 
-
 /*
  * Adds translated cell to an object. This must not be called on an object
  * which has a structure that is incompatible with the structure described in the cell.
  */
-void addCellToObject(TranslatedCell& cell, value::Object& out);
+template <class T>
+void addCellToObject(T& cell, value::Object& out);
 }  // namespace mongo::sbe

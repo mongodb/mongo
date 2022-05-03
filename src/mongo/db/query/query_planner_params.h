@@ -139,6 +139,11 @@ struct QueryPlannerParams {
         // Ensure that any plan generated returns data that is "owned." That is, all BSONObjs are
         // in an "owned" state and are not pointing to data that belongs to the storage engine.
         RETURN_OWNED_DATA = 1 << 12,
+
+        // When generating column scan queries, splits match expressions so that the filters can be
+        // applied per-column. This is off by default, since the execution side doesn't support it
+        // yet.
+        GENERATE_PER_COLUMN_FILTERS = 1 << 13,
     };
 
     // See Options enum above.

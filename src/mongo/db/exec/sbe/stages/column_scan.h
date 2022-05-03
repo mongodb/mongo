@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/config.h"
-#include "mongo/db/exec/fake_column_cursor.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/storage/column_store.h"
 
 namespace mongo {
 namespace sbe {
@@ -78,29 +78,72 @@ protected:
         TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) override;
 
 private:
-    struct ColumnCursor {
-        std::unique_ptr<FakeCursorForPath> cursor;
-        boost::optional<FakeCell> lastCell;
-        bool includeInOutput = false;
+    class ColumnCursor {
+    public:
+        ColumnCursor(std::unique_ptr<ColumnStore::CursorForPath> curs, bool includeInResult)
+            : _cursor(std::move(curs)), _includeInOutput(includeInResult) {}
 
-        boost::optional<FakeCell>& next() {
+
+        boost::optional<FullCellView>& next() {
             // TODO For some reason the destructor of 'lastCell' is not called
             // on my local asan build unless we explicitly reset it. Maybe
             // the same compiler bug Nikita ran into?
-            lastCell.reset();
-            lastCell = cursor->next();
-            return lastCell;
+            _lastCell.reset();
+            _lastCell = _cursor->next();
+            clearOwned();
+            return _lastCell;
         }
 
-        boost::optional<FakeCell>& seekAtOrPast(RecordId id) {
-            lastCell.reset();
-            lastCell = cursor->seekAtOrPast(id);
-            return lastCell;
+        boost::optional<FullCellView>& seekAtOrPast(RecordId id) {
+            _lastCell.reset();
+            _lastCell = _cursor->seekAtOrPast(id);
+            clearOwned();
+            return _lastCell;
         }
 
         const PathValue& path() const {
-            return cursor->path();
+            return _cursor->path();
         }
+
+        /*
+         * Copies any data owned by the storage engine into a locally owned buffer.
+         */
+        void makeOwned() {
+            if (_lastCell && _pathOwned.empty() && _cellOwned.empty()) {
+                _pathOwned.insert(
+                    _pathOwned.begin(), _lastCell->path.begin(), _lastCell->path.end());
+                _lastCell->path = StringData(_pathOwned);
+
+                _cellOwned.insert(
+                    _cellOwned.begin(), _lastCell->value.begin(), _lastCell->value.end());
+                _lastCell->value = StringData(_cellOwned.data(), _cellOwned.size());
+            }
+        }
+        ColumnStore::CursorForPath& cursor() {
+            return *_cursor;
+        }
+        bool includeInOutput() const {
+            return _includeInOutput;
+        }
+        boost::optional<FullCellView>& lastCell() {
+            return _lastCell;
+        }
+
+    private:
+        void clearOwned() {
+            _pathOwned.clear();
+            _cellOwned.clear();
+        }
+
+        std::unique_ptr<ColumnStore::CursorForPath> _cursor;
+        bool _includeInOutput = false;
+
+        boost::optional<FullCellView> _lastCell;
+
+        // These members are used to store owned copies of the path and the cell data when preparing
+        // for yield.
+        std::string _pathOwned;
+        std::vector<char> _cellOwned;
     };
 
     void readParentsIntoObj(StringData path,
@@ -140,15 +183,15 @@ private:
 
     CollectionPtr _coll;
 
+    std::weak_ptr<const IndexCatalogEntry> _weakIndexCatalogEntry;
     std::unique_ptr<SeekableRecordCursor> _rowStoreCursor;
 
     std::vector<ColumnCursor> _columnCursors;
-    StringMap<std::unique_ptr<FakeCursorForPath>> _parentPathCursors;
+    StringMap<std::unique_ptr<ColumnStore::CursorForPath>> _parentPathCursors;
 
     RecordId _recordId;
 
     bool _open{false};
-    bool _firstGetNext{false};
 
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.
