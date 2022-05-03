@@ -353,14 +353,34 @@ private:
 
     std::unique_ptr<rpc::EgressMetadataHook> _metadataHook;
 
-    // We start in kDefault, transition to kStarted after startup() is complete and enter kStopped
-    // at the first call to shutdown()
-    enum State : int {
+    // We start in kDefault, transition to kStarted after a call to startup completes.
+    // Enter kStopping at the first call to shutdown and transition to kStopped
+    // when the call completes.
+    enum State {
         kDefault,
         kStarted,
+        kStopping,
         kStopped,
     };
-    AtomicWord<State> _state;
+
+    friend StringData toString(State s) {
+        return std::array{
+            "Default"_sd,
+            "Started"_sd,
+            "Stopping"_sd,
+            "Stopped"_sd,
+        }
+            .at(s);
+    }
+
+    // This condition variable is dedicated to block a thread calling this class
+    // destructor, strictly when another thread is performing the network
+    // interface shutdown which depends on the _ioThread termination and may
+    // take an undeterministic amount of time to return.
+    mutable stdx::mutex _stateMutex;  // NOLINT
+    stdx::condition_variable _stoppedCV;
+    State _state;
+
     stdx::thread _ioThread;
 
     Mutex _inProgressMutex =

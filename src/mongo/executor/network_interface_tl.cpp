@@ -201,8 +201,11 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
 }
 
 NetworkInterfaceTL::~NetworkInterfaceTL() {
-    if (!inShutdown()) {
-        shutdown();
+    shutdown();
+
+    {
+        stdx::unique_lock lk(_stateMutex);
+        _stoppedCV.wait(lk, [&] { return _state == kStopped; });
     }
 
     // Because we quick exit on shutdown, these invariants are usually checked only in ASAN builds
@@ -246,7 +249,9 @@ void NetworkInterfaceTL::startup() {
         _run();
     });
 
-    invariant(_state.swap(kStarted) == kDefault);
+    stdx::lock_guard stateLock(_stateMutex);
+    invariant(_state == kDefault, "Network interface has already started");
+    _state = kStarted;
 }
 
 void NetworkInterfaceTL::_run() {
@@ -267,10 +272,33 @@ void NetworkInterfaceTL::_run() {
 }
 
 void NetworkInterfaceTL::shutdown() {
-    if (_state.swap(kStopped) != kStarted)
-        return;
+
+    {
+        stdx::lock_guard lk(_stateMutex);
+        switch (_state) {
+            case kDefault:
+                _state = kStopped;
+                _stoppedCV.notify_one();
+                return;
+            case kStarted:
+                _state = kStopping;
+                break;
+            case kStopping:
+            case kStopped:
+                LOGV2_INFO(6529201,
+                           "Network interface redundant shutdown",
+                           "state"_attr = toString(_state));
+                return;
+        }
+    }
 
     LOGV2_DEBUG(22594, 2, "Shutting down network interface.");
+
+    const ScopeGuard finallySetStopped = [&] {
+        stdx::lock_guard lk(_stateMutex);
+        _state = kStopped;
+        _stoppedCV.notify_one();
+    };
 
     // Cancel any remaining commands. Any attempt to register new commands will throw.
     auto inProgress = [&] {
@@ -300,7 +328,8 @@ void NetworkInterfaceTL::shutdown() {
 }
 
 bool NetworkInterfaceTL::inShutdown() const {
-    return _state.load() == kStopped;
+    stdx::lock_guard lk(_stateMutex);
+    return _state == kStopping || _state == kStopped;
 }
 
 void NetworkInterfaceTL::waitForWork() {
