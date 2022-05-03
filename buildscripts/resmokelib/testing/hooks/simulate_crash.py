@@ -109,7 +109,7 @@ class SimulateCrash(bghook.BGHook):
                 node.mongod_executable, "--dbpath", path, "--port",
                 str(self.validate_port), "--logpath",
                 node.get_dbpath_prefix() + "/simulateCrashes/validate.log", "--setParameter",
-                "enableTestCommands=1"
+                "enableTestCommands=1", "--setParameter", "testingDiagnosticsEnabled=1"
             ])
             mdb.start()
 
