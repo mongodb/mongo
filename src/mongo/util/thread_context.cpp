@@ -35,7 +35,6 @@
 
 namespace mongo {
 namespace {
-const auto kMainThreadId = stdx::this_thread::get_id();
 AtomicWord<bool> gHasInitializedMain{false};
 }  // namespace
 
@@ -46,9 +45,6 @@ MONGO_INITIALIZER(ThreadContextsInitialized)(InitializerContext*) {
 }
 
 void ThreadContext::initializeMain() {
-    invariant(stdx::this_thread::get_id() == kMainThreadId,
-              "initializeMain() must be called on the main thread");
-
     if (gHasInitializedMain.swap(true)) {
         return;
     }
