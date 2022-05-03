@@ -422,27 +422,22 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
 
     int wtRet;
     if (commit) {
-        StringBuilder conf;
         if (!_commitTimestamp.isNull()) {
             // There is currently no scenario where it is intentional to commit before the current
             // read timestamp.
             invariant(_readAtTimestamp.isNull() || _commitTimestamp >= _readAtTimestamp);
 
             if (MONGO_likely(!doUntimestampedWritesForIdempotencyTests.shouldFail())) {
-                conf << "commit_timestamp=" << unsignedHex(_commitTimestamp.asULL()) << ",";
+                s->timestamp_transaction_uint(s, WT_TS_TXN_TYPE_COMMIT, _commitTimestamp.asULL());
             }
             _isTimestamped = true;
         }
 
         if (!_durableTimestamp.isNull()) {
-            conf << "durable_timestamp=" << unsignedHex(_durableTimestamp.asULL());
+            s->timestamp_transaction_uint(s, WT_TS_TXN_TYPE_DURABLE, _durableTimestamp.asULL());
         }
 
-        if (_mustBeTimestamped) {
-            invariant(_isTimestamped);
-        }
-
-        wtRet = s->commit_transaction(s, conf.str().c_str());
+        wtRet = s->commit_transaction(s, nullptr);
 
         LOGV2_DEBUG(
             22412, 3, "WT commit_transaction", "snapshotId"_attr = getSnapshotId().toNumber());
