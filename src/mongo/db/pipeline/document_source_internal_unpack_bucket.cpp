@@ -1191,5 +1191,4 @@ DocumentSource::GetModPathsReturn DocumentSourceInternalUnpackBucket::getModifie
     }
     return {GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}, {}};
 }
-
 }  // namespace mongo

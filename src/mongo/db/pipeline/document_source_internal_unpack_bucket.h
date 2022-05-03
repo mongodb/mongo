@@ -33,6 +33,9 @@
 #include <vector>
 
 #include "mongo/db/exec/bucket_unpacker.h"
+#include "mongo/db/exec/collection_scan.h"
+#include "mongo/db/exec/index_scan.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_match.h"
 
@@ -103,6 +106,18 @@ public:
         return DepsTracker::State::EXHAUSTIVE_ALL;
     }
 
+    int getBucketMaxSpanSeconds() const {
+        return _bucketMaxSpanSeconds;
+    }
+
+    std::string getMinTimeField() const {
+        return _bucketUnpacker.getMinField(_bucketUnpacker.getTimeField());
+    }
+
+    std::string getMaxTimeField() const {
+        return _bucketUnpacker.getMaxField(_bucketUnpacker.getTimeField());
+    }
+
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
     };
@@ -162,6 +177,14 @@ public:
     void setSampleParameters(long long n, int bucketMaxCount) {
         _sampleSize = n;
         _bucketMaxCount = bucketMaxCount;
+    }
+
+    void setIncludeMinTimeAsMetadata() {
+        _bucketUnpacker.setIncludeMinTimeAsMetadata();
+    }
+
+    void setIncludeMaxTimeAsMetadata() {
+        _bucketUnpacker.setIncludeMaxTimeAsMetadata();
     }
 
     boost::optional<long long> sampleSize() const {
