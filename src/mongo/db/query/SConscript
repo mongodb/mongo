@@ -32,6 +32,7 @@ env.Library(
         "sort_pattern",
     ],
     LIBDEPS_PRIVATE=[
+        "common_query_enums_and_helpers",
     ],
 )
 
@@ -159,8 +160,9 @@ env.Library(
     target="common_query_enums_and_helpers",
     source=[
         "allowed_contexts.cpp",
+        "analyze_regex.cpp",
         "explain_options.cpp",
-        "explain_verbosity.idl"
+        "explain_verbosity.idl",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
