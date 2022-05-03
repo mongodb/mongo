@@ -244,6 +244,10 @@ if (typeof _threadInject != "undefined") {
             "collmod_convert_to_unique_apply_ops.js",
             "collmod_convert_to_unique_violations.js",
             "collmod_convert_to_unique_violations_size_limit.js",
+
+            // TODO (SERVER-55750): Remove the batched_multi_deletes*.js exclusions once the feature
+            // flag is enabled by default.
+            "batched_multi_deletes.js",
         ]);
 
         // Get files, including files in subdirectories.
