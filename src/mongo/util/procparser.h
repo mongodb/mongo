@@ -158,6 +158,30 @@ Status parseProcVMStatFile(StringData filename,
                            const std::vector<StringData>& keys,
                            BSONObjBuilder* builder);
 
+static const StringData kFileHandlesInUseKey = "sys_file_handles_in_use"_sd;
+static const StringData kMaxFileHandlesKey = "sys_max_file_handles"_sd;
+
+enum class FileNrKey {
+    kFileHandlesInUse,
+    kMaxFileHandles,
+};
+
+/**
+ * Read a string matching /proc/fs/sys/file-nr format, and write the specified keys in builder.
+ *
+ * appendFileHandlesInUse - if true, append the number of currently used file handles with the key
+ * kFileHandlesInUseKey.
+ * appendMaxFileHandles - if true, append the maximum number of file handles with the key
+ * kMaxFileHandlesKey.
+ * data - string to parse
+ * builder - BSON output
+ */
+Status parseProcSysFsFileNr(FileNrKey key, StringData data, BSONObjBuilder* builder);
+
+/**
+ * Read from file, and write the specified keys in builder.
+ */
+Status parseProcSysFsFileNrFile(StringData filename, FileNrKey key, BSONObjBuilder* builder);
 
 }  // namespace procparser
 }  // namespace mongo

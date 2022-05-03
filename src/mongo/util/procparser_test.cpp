@@ -113,6 +113,11 @@ StringMap toNestedStringMap(BSONObj& obj) {
     ASSERT_OK(procparser::parseProcVMStat(_keys, _x, &builder)); \
     auto obj = builder.obj();                                    \
     auto stringMap = toStringMap(obj);
+#define ASSERT_PARSE_SYS_FS_FILENR(_key, _x)                         \
+    BSONObjBuilder builder;                                          \
+    ASSERT_OK(procparser::parseProcSysFsFileNr(_key, _x, &builder)); \
+    auto obj = builder.obj();                                        \
+    auto stringMap = toStringMap(obj);
 
 TEST(FTDCProcStat, TestStat) {
 
@@ -876,6 +881,55 @@ TEST(FTDCProcVMStat, TestLocalNonExistentVMStat) {
     BSONObjBuilder builder;
 
     ASSERT_NOT_OK(procparser::parseProcVMStatFile("/proc/does_not_exist", keys, &builder));
+}
+
+TEST(FTDCProcSysFsFileNr, TestSuccess) {
+    // Normal cases
+    {
+        ASSERT_PARSE_SYS_FS_FILENR(procparser::FileNrKey::kMaxFileHandles, "1 0 2\n");
+        ASSERT_KEY_AND_VALUE(procparser::kMaxFileHandlesKey.toString(), 2);
+        ASSERT_NO_KEY(procparser::kFileHandlesInUseKey.toString());
+    }
+    {
+        ASSERT_PARSE_SYS_FS_FILENR(procparser::FileNrKey::kFileHandlesInUse, "1 0 2\n");
+        ASSERT_KEY_AND_VALUE(procparser::kFileHandlesInUseKey.toString(), 1);
+        ASSERT_NO_KEY(procparser::kMaxFileHandlesKey.toString());
+    }
+    // Test that we only parse up to where we need
+    {
+        ASSERT_PARSE_SYS_FS_FILENR(procparser::FileNrKey::kFileHandlesInUse, "1 0\n");
+        ASSERT_KEY_AND_VALUE(procparser::kFileHandlesInUseKey.toString(), 1);
+        ASSERT_NO_KEY(procparser::kMaxFileHandlesKey.toString());
+    }
+    {
+        ASSERT_PARSE_SYS_FS_FILENR(procparser::FileNrKey::kFileHandlesInUse, "1\n");
+        ASSERT_KEY_AND_VALUE(procparser::kFileHandlesInUseKey.toString(), 1);
+        ASSERT_NO_KEY(procparser::kMaxFileHandlesKey.toString());
+    }
+}
+
+TEST(FTDCProcSysFsFileNr, TestFailure) {
+    // Failure cases
+    BSONObjBuilder builder;
+    ASSERT_NOT_OK(
+        procparser::parseProcSysFsFileNr(procparser::FileNrKey::kFileHandlesInUse, "", &builder));
+    ASSERT_NOT_OK(
+        procparser::parseProcSysFsFileNr(procparser::FileNrKey::kMaxFileHandles, "", &builder));
+    ASSERT_NOT_OK(procparser::parseProcSysFsFileNr(
+        procparser::FileNrKey::kMaxFileHandles, "1 2\n", &builder));
+}
+
+TEST(FTDCProcSysFsFileNr, TestFile) {
+    BSONObjBuilder builder;
+    // Normal cases
+    ASSERT_OK(procparser::parseProcSysFsFileNrFile(
+        "/proc/sys/fs/file-nr", procparser::FileNrKey::kFileHandlesInUse, &builder));
+    ASSERT_OK(procparser::parseProcSysFsFileNrFile(
+        "/proc/sys/fs/file-nr", procparser::FileNrKey::kMaxFileHandles, &builder));
+
+    // Non-existent file case
+    ASSERT_NOT_OK(procparser::parseProcSysFsFileNrFile(
+        "/proc/non-existent-file", procparser::FileNrKey::kFileHandlesInUse, &builder));
 }
 
 }  // namespace

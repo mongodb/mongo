@@ -858,5 +858,62 @@ Status parseProcVMStatFile(StringData filename,
     return parseProcVMStat(keys, swString.getValue(), builder);
 }
 
+Status parseProcSysFsFileNr(FileNrKey key, StringData data, BSONObjBuilder* builder) {
+    // Format: HANDLES_IN_USE<whitespace>UNUSED_HANDLES<whitespace>MAX_HANDLES<return>
+    using string_split_iterator = boost::split_iterator<StringData::const_iterator>;
+    string_split_iterator partIt = string_split_iterator(
+        data.begin(),
+        data.end(),
+        boost::token_finder([](char c) { return c == ' ' || c == '\t' || c == '\n'; },
+                            boost::token_compress_on));
+
+    if (partIt == string_split_iterator()) {
+        return Status(ErrorCodes::FailedToParse, "Couldn't find first token");
+    }
+
+    if (key == FileNrKey::kFileHandlesInUse) {
+        StringData stringValue(partIt->begin(), partIt->end());
+        uint64_t value;
+        if (!NumberParser{}(stringValue, &value).isOK()) {
+            return Status(ErrorCodes::FailedToParse, "Couldn't parse first token to number");
+        }
+
+        builder->appendNumber(kFileHandlesInUseKey, static_cast<long long>(value));
+        return Status::OK();
+    }
+    ++partIt;
+
+    if (partIt == string_split_iterator()) {
+        return Status(ErrorCodes::FailedToParse, "Couldn't find second token");
+    }
+    // The second value is the number of allocated but unused file handles, which should always be
+    // 0; we ignore this.
+    ++partIt;
+
+    if (partIt == string_split_iterator()) {
+        return Status(ErrorCodes::FailedToParse, "Couldn't find third token");
+    }
+
+    invariant(key == FileNrKey::kMaxFileHandles);
+    StringData stringValue(partIt->begin(), partIt->end());
+    uint64_t value;
+    if (!NumberParser{}(stringValue, &value).isOK()) {
+        return Status(ErrorCodes::FailedToParse, "Couldn't parse third token to number");
+    }
+
+    builder->appendNumber(kMaxFileHandlesKey, static_cast<long long>(value));
+
+    return Status::OK();
+}
+
+Status parseProcSysFsFileNrFile(StringData filename, FileNrKey key, BSONObjBuilder* builder) {
+    auto swString = readFileAsString(filename);
+    if (!swString.isOK()) {
+        return swString.getStatus();
+    }
+
+    return parseProcSysFsFileNr(key, swString.getValue(), builder);
+}
+
 }  // namespace procparser
 }  // namespace mongo

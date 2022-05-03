@@ -40,6 +40,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/controller.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/procparser.h"
 
@@ -155,6 +156,16 @@ public:
                 &subObjBuilder);
             subObjBuilder.doneFast();
         }
+
+        {
+            BSONObjBuilder subObjBuilder(builder.subobjStart("files"_sd));
+            processStatusErrors(
+                procparser::parseProcSysFsFileNrFile("/proc/sys/fs/file-nr"_sd,
+                                                     procparser::FileNrKey::kFileHandlesInUse,
+                                                     &subObjBuilder),
+                &subObjBuilder);
+            subObjBuilder.doneFast();
+        }
     }
 
 private:
@@ -165,10 +176,40 @@ private:
     std::vector<StringData> _disksStringData;
 };
 
+class SimpleFunctionCollector final : public FTDCCollectorInterface {
+public:
+    SimpleFunctionCollector(StringData name,
+                            unique_function<void(OperationContext*, BSONObjBuilder&)> collectFn)
+        : _name(name.toString()), _collectFn(std::move(collectFn)) {}
+
+    void collect(OperationContext* opCtx, BSONObjBuilder& builder) override {
+        _collectFn(opCtx, builder);
+    }
+
+    std::string name() const override {
+        return _name;
+    }
+
+private:
+    std::string _name;
+    unique_function<void(OperationContext*, BSONObjBuilder&)> _collectFn;
+};
+
 }  // namespace
 
 void installSystemMetricsCollector(FTDCController* controller) {
     controller->addPeriodicCollector(std::make_unique<LinuxSystemMetricsCollector>());
+
+    // Total max open files is only collected on rotate, since it changes infrequently
+    controller->addOnRotateCollector(std::make_unique<SimpleFunctionCollector>(
+        "sysMaxOpenFiles", [](OperationContext* ctx, BSONObjBuilder& builder) {
+            auto status = procparser::parseProcSysFsFileNrFile(
+                "/proc/sys/fs/file-nr", procparser::FileNrKey::kMaxFileHandles, &builder);
+            // Handle errors here similarly to system stats.
+            if (!status.isOK()) {
+                builder.append("error", status.toString());
+            }
+        }));
 }
 
 }  // namespace mongo
