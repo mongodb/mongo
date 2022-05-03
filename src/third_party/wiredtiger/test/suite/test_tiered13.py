@@ -80,8 +80,7 @@ class test_tiered13(test_import_base):
           'create,tiered_storage=(auth_token=%s,' % self.auth_token + \
           'bucket=%s,' % self.bucket + \
           'bucket_prefix=%s,' % self.bucket_prefix + \
-          'name=%s,' % self.ss_name + \
-          'object_target_size=20M),'
+          'name=%s)' % self.ss_name 
         return self.saved_conn
 
     def test_tiered13(self):

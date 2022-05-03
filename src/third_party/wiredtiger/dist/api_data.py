@@ -219,10 +219,6 @@ tiered_config = [
             time in seconds to retain data on tiered storage on the local tier
             for faster read access''',
             min='0', max='10000'),
-        Config('object_target_size', '10M', r'''
-            the approximate size of objects before creating them on the
-            tiered storage tier''',
-            min='100K', max='10TB'),
         ]),
 ]
 

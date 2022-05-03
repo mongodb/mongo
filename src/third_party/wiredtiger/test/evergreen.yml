@@ -3935,6 +3935,9 @@ buildvariants:
 
 - name: ubuntu2004-perf-tests
   display_name: Ubuntu 20.04 Performance tests
+  # Perf tests are NOT expected to be triggered on Evergreen projects
+  # other than "WiredTiger (develop)".
+  activate: false
   batchtime: 1440 # 1 day
   run_on:
     - ubuntu2004-medium
@@ -4064,6 +4067,9 @@ buildvariants:
 
 - name: documentation-update
   display_name: "~ Documentation update"
+  # Documentation update is NOT expected to be triggered on Evergreen projects
+  # other than "WiredTiger (develop)"
+  activate: false
   batchtime: 10080 # 7 days
   run_on:
   - ubuntu2004-test
@@ -4132,6 +4138,9 @@ buildvariants:
 
 - name: code-statistics
   display_name: "Code statistics"
+  # Code coverage and complexity metrics are NOT expected to be triggered on Evergreen projects
+  # other than "WiredTiger (develop)".
+  activate: false
   batchtime: 10080 # 7 days
   run_on:
   - ubuntu2004-test
@@ -4150,6 +4159,9 @@ buildvariants:
 
 - name: compatibility-tests-less-frequent
   display_name: Compatibility tests (less frequent)
+  # Compatibility tests are NOT expected to be triggered on Evergreen projects
+  # other than "WiredTiger (develop)".
+  activate: false
   batchtime: 10080 # 7 days
   run_on:
   - ubuntu1804-test
@@ -4159,6 +4171,9 @@ buildvariants:
 
 - name: compatibility-tests-daily
   display_name: Compatibility tests (daily)
+  # Compatibility tests are NOT expected to be triggered on Evergreen projects
+  # other than "WiredTiger (develop)".
+  activate: false
   batchtime: 1440 # 1 day
   run_on:
   - ubuntu2004-test
@@ -4167,6 +4182,9 @@ buildvariants:
 
 - name: compatibility-tests
   display_name: Compatibility tests
+  # Compatibility tests are NOT expected to be triggered on Evergreen projects
+  # other than "WiredTiger (develop)".
+  activate: false
   run_on:
   - ubuntu2004-test
   tasks:
