@@ -287,6 +287,12 @@ structs:
         fields:
             value: namespacestring
 
+    two_base64string:
+        description: UnitTest for a single base64string
+        fields:
+            basic: base64string
+            url: base64urlstring
+
 ##################################################################################################
 #
 # Test a custom non-BSONElement deserialization and serialization methods for a bindata type

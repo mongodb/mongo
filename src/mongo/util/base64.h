@@ -35,7 +35,8 @@
 
 #include "mongo/base/string_data.h"
 
-namespace mongo::base64 {
+namespace mongo {
+namespace base64 {
 
 std::string encode(StringData in);
 std::string decode(StringData in);
@@ -59,5 +60,31 @@ bool validate(StringData s);
 constexpr std::size_t encodedLength(std::size_t inLen) {
     return (inLen + 2) / 3 * 4;
 }
+}  // namespace base64
 
-}  // namespace mongo::base64
+// base64url encoding is a "url safe" variant of base64.
+// '+' is replaced with '-'
+// '/' is replaced with '_'
+// '=' at the end of the string are optional
+namespace base64url {
+
+std::string encode(StringData in);
+std::string decode(StringData out);
+
+void encode(std::stringstream& ss, StringData in);
+void decode(std::stringstream& ss, StringData in);
+
+void encode(fmt::memory_buffer& buffer, StringData in);
+void decode(fmt::memory_buffer& buffer, StringData in);
+
+inline std::string encode(const void* data, std::size_t len) {
+    return encode(StringData(reinterpret_cast<const char*>(data), len));
+}
+
+bool validate(StringData s);
+
+constexpr std::size_t encodedLength(std::size_t inLen) {
+    return base64::encodedLength(inLen);
+}
+}  // namespace base64url
+}  // namespace mongo
