@@ -48,6 +48,20 @@ workload_validation::validate(const std::string &operation_table_name,
     logger::log_msg(LOG_INFO, "Beginning validation.");
 
     scoped_session session = connection_manager::instance().create_session();
+    scoped_cursor cursor = session.open_scoped_cursor(operation_table_name);
+
+    /*
+     * Default validation depends on specific fields being present in the tracking table. If the
+     * tracking table schema has been modified the user must define their own validation.
+     */
+    const std::string key_format(cursor->key_format);
+    const std::string value_format(cursor->value_format);
+    if (key_format != OPERATION_TRACKING_KEY_FORMAT ||
+      value_format != OPERATION_TRACKING_VALUE_FORMAT) {
+        testutil_die(EINVAL,
+          "Attempting to perform default validation on a test with a user-defined tracking "
+          "table. Please define validation for your test");
+    }
 
     /* Retrieve the collections that were created and deleted during the test. */
     parse_schema_tracking_table(
@@ -87,7 +101,6 @@ workload_validation::validate(const std::string &operation_table_name,
 
     /* Parse the tracking table. */
     validation_collection current_collection_records;
-    scoped_cursor cursor = session.open_scoped_cursor(operation_table_name);
     while ((ret = cursor->next(cursor.get())) == 0) {
         testutil_check(
           cursor->get_key(cursor.get(), &tracked_collection_id, &tracked_key, &tracked_timestamp));

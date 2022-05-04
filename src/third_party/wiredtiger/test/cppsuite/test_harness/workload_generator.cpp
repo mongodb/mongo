@@ -70,7 +70,7 @@ operation_config::get_func(database_operation *dbo)
 workload_generator::workload_generator(configuration *configuration,
   database_operation *db_operation, timestamp_manager *timestamp_manager,
   workload_tracking *tracking, database &database)
-    : component("workload_generator", configuration), _database(database),
+    : component(WORKLOAD_GENERATOR, configuration), _database(database),
       _database_operation(db_operation), _timestamp_manager(timestamp_manager), _tracking(tracking)
 {
 }

@@ -38,7 +38,12 @@ echo "Created $CONFIG."
 # Replace test_template with the new test name.
 SEARCH="test_template"
 sed -i "s/$SEARCH/$1/" "$FILE"
-echo "Updated $FILE."
+echo "Updated test name in $FILE."
+
+# Replace tracking_table_template with the new tracking table name.
+SEARCH="tracking_table_template"
+sed -i "s/$SEARCH/tracking_table_$1/" "$FILE"
+echo "Updated tracking table name in $FILE."
 
 # Replace the first line of the configuration file.
 REPLACE="# Configuration for $1."

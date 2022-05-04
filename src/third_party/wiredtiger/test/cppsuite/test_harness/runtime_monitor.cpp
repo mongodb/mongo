@@ -263,7 +263,7 @@ runtime_monitor::get_stat(scoped_cursor &cursor, int stat_field, int64_t *valuep
 
 runtime_monitor::runtime_monitor(
   const std::string &test_name, configuration *config, database &database)
-    : component("runtime_monitor", config), _test_name(test_name), _database(database)
+    : component(RUNTIME_MONITOR, config), _test_name(test_name), _database(database)
 {
 }
 

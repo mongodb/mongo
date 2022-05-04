@@ -28,18 +28,20 @@
 
 #include "../connection_manager.h"
 #include "../core/configuration.h"
+#include "../util/api_const.h"
 #include "../util/scoped_types.h"
 #include "workload_tracking.h"
 
 namespace test_harness {
-workload_tracking::workload_tracking(configuration *_config,
-  const std::string &operation_table_config, const std::string &operation_table_name,
-  const std::string &schema_table_config, const std::string &schema_table_name,
-  const bool use_compression, timestamp_manager &tsm)
-    : component("workload_tracking", _config), _operation_table_config(operation_table_config),
-      _operation_table_name(operation_table_name), _schema_table_config(schema_table_config),
-      _schema_table_name(schema_table_name), _use_compression(use_compression), _tsm(tsm)
+workload_tracking::workload_tracking(
+  configuration *_config, const bool use_compression, timestamp_manager &tsm)
+    : component(WORKLOAD_TRACKING, _config), _operation_table_name(TABLE_OPERATION_TRACKING),
+      _schema_table_config(SCHEMA_TRACKING_TABLE_CONFIG), _schema_table_name(TABLE_SCHEMA_TRACKING),
+      _use_compression(use_compression), _tsm(tsm)
 {
+    _operation_table_config = "key_format=" + _config->get_string(TRACKING_KEY_FORMAT) +
+      ",value_format=" + _config->get_string(TRACKING_VALUE_FORMAT) +
+      ",log=(enabled=true),write_timestamp_usage=mixed_mode";
 }
 
 const std::string &
@@ -93,6 +95,16 @@ workload_tracking::do_work()
     const char *key, *value;
     char *sweep_key;
     bool globally_visible_update_found;
+
+    /*
+     * This function prunes old data from the tracking table as the default validation logic doesn't
+     * use it. User-defined validation may need this data, so don't allow it to be removed.
+     */
+    const std::string key_format(_sweep_cursor->key_format);
+    const std::string value_format(_sweep_cursor->value_format);
+    if (key_format != OPERATION_TRACKING_KEY_FORMAT ||
+      value_format != OPERATION_TRACKING_VALUE_FORMAT)
+        return;
 
     key = sweep_key = nullptr;
     globally_visible_update_found = false;
@@ -173,4 +185,38 @@ workload_tracking::save_schema_operation(
         testutil_die(EINVAL, error_message.c_str());
     }
 }
+
+int
+workload_tracking::save_operation(const tracking_operation &operation,
+  const uint64_t &collection_id, const std::string &key, const std::string &value,
+  wt_timestamp_t ts, scoped_cursor &op_track_cursor)
+{
+    WT_DECL_RET;
+
+    if (!_enabled)
+        return (0);
+
+    testutil_assert(op_track_cursor.get() != nullptr);
+
+    if (operation == tracking_operation::CREATE_COLLECTION ||
+      operation == tracking_operation::DELETE_COLLECTION) {
+        const std::string error_message =
+          "save_operation: invalid operation " + std::to_string(static_cast<int>(operation));
+        testutil_die(EINVAL, error_message.c_str());
+    } else {
+        set_tracking_cursor(operation, collection_id, key, value, ts, op_track_cursor);
+        ret = op_track_cursor->insert(op_track_cursor.get());
+    }
+    return (ret);
+}
+
+void
+workload_tracking::set_tracking_cursor(const tracking_operation &operation,
+  const uint64_t &collection_id, const std::string &key, const std::string &value,
+  wt_timestamp_t ts, scoped_cursor &op_track_cursor)
+{
+    op_track_cursor->set_key(op_track_cursor.get(), collection_id, key.c_str(), ts);
+    op_track_cursor->set_value(op_track_cursor.get(), static_cast<int>(operation), value.c_str());
+}
+
 } // namespace test_harness

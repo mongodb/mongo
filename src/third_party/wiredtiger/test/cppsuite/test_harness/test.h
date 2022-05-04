@@ -84,6 +84,8 @@ class test : public database_operation {
 
     protected:
     configuration *_config;
+    timestamp_manager *_timestamp_manager = nullptr;
+    workload_tracking *_workload_tracking = nullptr;
 
     private:
     const test_args &_args;
@@ -91,10 +93,7 @@ class test : public database_operation {
     checkpoint_manager *_checkpoint_manager = nullptr;
     runtime_monitor *_runtime_monitor = nullptr;
     thread_manager *_thread_manager = nullptr;
-    timestamp_manager *_timestamp_manager = nullptr;
     workload_generator *_workload_generator = nullptr;
-    workload_tracking *_workload_tracking = nullptr;
-
     std::shared_ptr<scoped_connection> _scoped_conn;
     database _database;
 };
