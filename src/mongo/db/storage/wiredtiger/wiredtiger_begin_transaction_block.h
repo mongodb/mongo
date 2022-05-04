@@ -62,7 +62,8 @@ public:
         WT_SESSION* session,
         PrepareConflictBehavior prepareConflictBehavior,
         RoundUpPreparedTimestamps roundUpPreparedTimestamps,
-        RoundUpReadTimestamp roundUpReadTimestamp = RoundUpReadTimestamp::kNoRoundError);
+        RoundUpReadTimestamp roundUpReadTimestamp,
+        bool allowUntimestampedWrite);
     WiredTigerBeginTxnBlock(WT_SESSION* session, const char* config);
     ~WiredTigerBeginTxnBlock();
 

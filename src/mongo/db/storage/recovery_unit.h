@@ -409,6 +409,8 @@ public:
         return {};
     }
 
+    virtual void allowUntimestampedWrite() {}
+
     /**
      * Fetches the storage level statistics.
      */

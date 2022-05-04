@@ -83,7 +83,8 @@ boost::optional<Timestamp> WiredTigerSnapshotManager::getMinSnapshotForNextCommi
 Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
     WT_SESSION* session,
     PrepareConflictBehavior prepareConflictBehavior,
-    RoundUpPreparedTimestamps roundUpPreparedTimestamps) const {
+    RoundUpPreparedTimestamps roundUpPreparedTimestamps,
+    bool allowUntimestampedWrite) const {
 
     auto committedSnapshot = [this]() {
         stdx::lock_guard<Latch> lock(_committedSnapshotMutex);
@@ -99,8 +100,11 @@ Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
 
     // We need to round up our read timestamp in case the oldest timestamp has advanced past the
     // committedSnapshot we just read.
-    WiredTigerBeginTxnBlock txnOpen(
-        session, prepareConflictBehavior, roundUpPreparedTimestamps, RoundUpReadTimestamp::kRound);
+    WiredTigerBeginTxnBlock txnOpen(session,
+                                    prepareConflictBehavior,
+                                    roundUpPreparedTimestamps,
+                                    RoundUpReadTimestamp::kRound,
+                                    allowUntimestampedWrite);
     auto status = txnOpen.setReadSnapshot(committedSnapshot);
     fassert(30635, status);
 

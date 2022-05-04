@@ -148,6 +148,11 @@ public:
 
     Timestamp getCatalogConflictingTimestamp() const override;
 
+    void allowUntimestampedWrite() override {
+        invariant(!_isActive());
+        _allowUntimestampedWrite = true;
+    }
+
     void setTimestampReadSource(ReadSource source,
                                 boost::optional<Timestamp> provided = boost::none) override;
 
@@ -311,6 +316,7 @@ private:
     boost::optional<Timestamp> _lastTimestampSet;
     Timestamp _readAtTimestamp;
     Timestamp _catalogConflictTimestamp;
+    bool _allowUntimestampedWrite = false;
     std::unique_ptr<Timer> _timer;
     bool _isOplogReader = false;
     boost::optional<int64_t> _oplogVisibleTs = boost::none;

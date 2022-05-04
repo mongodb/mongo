@@ -48,7 +48,8 @@ WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
     WT_SESSION* session,
     PrepareConflictBehavior prepareConflictBehavior,
     RoundUpPreparedTimestamps roundUpPreparedTimestamps,
-    RoundUpReadTimestamp roundUpReadTimestamp)
+    RoundUpReadTimestamp roundUpReadTimestamp,
+    bool allowUntimestampedWrite)
     : _session(session) {
     invariant(!_rollback);
 
@@ -68,6 +69,9 @@ WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
             builder << "read=true";
         }
         builder << "),";
+    }
+    if (allowUntimestampedWrite) {
+        builder << "no_timestamp=true,";
     }
 
     const std::string beginTxnConfigString = builder;
