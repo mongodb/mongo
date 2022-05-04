@@ -28,8 +28,6 @@
  */
 #pragma once
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 #include <functional>
 
 #include "mongo/db/process_health/fault_facet.h"
@@ -38,6 +36,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/timer.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace process_health {
@@ -89,3 +89,5 @@ private:
 
 }  // namespace process_health
 }  // namespace mongo
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT

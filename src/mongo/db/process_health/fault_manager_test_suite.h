@@ -30,17 +30,19 @@
 
 #include <memory>
 
-#include "mongo/db/process_health/fault_manager.h"
-
 #include "mongo/db/concurrency/locker_noop_client_observer.h"
+#include "mongo/db/process_health/fault_manager.h"
 #include "mongo/db/process_health/health_observer_mock.h"
 #include "mongo/db/process_health/health_observer_registration.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/tick_source_mock.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 
@@ -51,7 +53,7 @@ namespace process_health {
 
 namespace test {
 
-static inline std::unique_ptr<FaultManagerConfig> getConfigWithDisabledPeriodicChecks() {
+inline std::unique_ptr<FaultManagerConfig> getConfigWithDisabledPeriodicChecks() {
     auto config = std::make_unique<FaultManagerConfig>();
     config->disablePeriodicChecksForTests();
     return config;
@@ -291,3 +293,5 @@ private:
 }  // namespace test
 }  // namespace process_health
 }  // namespace mongo
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT

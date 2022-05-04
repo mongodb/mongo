@@ -148,8 +148,11 @@ The log system is made available with the following header:
 
     #include "mongo/logv2/log.h"
 
-To be able to include it a default log component needs to be defined in the cpp
-file before including `log.h`:
+The macro `MONGO_LOGV2_DEFAULT_COMPONENT` is expanded by all logging macros.
+This configuration macro must expand at their point of use to a `LogComponent`
+expression, which is implicitly attached to the emitted message.  It is
+conventionally defined near the top of a `.cpp` file before any logging macros
+are invoked. Example:
 
     #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

@@ -32,6 +32,9 @@
 
 #include "mongo/db/process_health/fault_facet_mock.h"
 #include "mongo/db/process_health/health_observer_base.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace process_health {
@@ -101,3 +104,5 @@ private:
 
 }  // namespace process_health
 }  // namespace mongo
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT

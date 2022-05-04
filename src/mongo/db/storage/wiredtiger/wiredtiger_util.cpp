@@ -721,7 +721,7 @@ int mdb_handle_error(WT_EVENT_HANDLER* handler,
 int mdb_handle_message(WT_EVENT_HANDLER* handler, WT_SESSION* session, const char* message) {
     logv2::DynamicAttributes attr;
     logv2::LogSeverity severity = ::mongo::logv2::LogSeverity::Log();
-    logv2::LogOptions options = ::mongo::logv2::LogOptions{MongoLogV2DefaultComponent_component};
+    logv2::LogOptions options = ::mongo::logv2::LogOptions{MONGO_LOGV2_DEFAULT_COMPONENT};
 
     try {
         try {

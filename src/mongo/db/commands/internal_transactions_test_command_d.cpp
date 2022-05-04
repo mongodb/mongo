@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 #include "mongo/db/cluster_transaction_api.h"
 #include "mongo/db/transaction_participant_resource_yielder.h"
 #include "mongo/s/commands/internal_transactions_test_command.h"

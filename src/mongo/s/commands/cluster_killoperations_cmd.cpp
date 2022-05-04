@@ -30,9 +30,12 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands/killoperations_common.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/stdx/unordered_set.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
 
@@ -63,6 +66,6 @@ public:
         LOGV2(
             4664806, "_killOperations command killed cursors", "numKilled"_attr = numCursorsKilled);
     }
-} ClusterKillOperationsCmd;
+} clusterKillOperationsCmd;
 
 }  // namespace mongo

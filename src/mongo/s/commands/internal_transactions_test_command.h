@@ -27,19 +27,15 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/internal_transactions_test_command_gen.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/transaction_api.h"
-#include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/future.h"
 
 namespace mongo {
-namespace {
 
 template <typename Impl>
 class InternalTransactionsTestCommandBase : public TypedCommand<Impl> {
@@ -174,5 +170,4 @@ public:
     }
 };
 
-}  // namespace
 }  // namespace mongo

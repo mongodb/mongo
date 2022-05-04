@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/sharding_data_transform_instance_metrics.h"
 #include "mongo/logv2/log.h"
@@ -41,6 +37,8 @@
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/future.h"
 #include "mongo/util/static_immortal.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 
@@ -234,3 +232,5 @@ protected:
 };
 
 }  // namespace mongo
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT
