@@ -49,15 +49,6 @@ REGISTER_ACCUMULATOR(avg, genericParseSingleExpressionAccumulator<AccumulatorAvg
 REGISTER_STABLE_EXPRESSION(avg, ExpressionFromAccumulator<AccumulatorAvg>::parse);
 REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(avg, AccumulatorAvg, WindowFunctionAvg);
 
-namespace {
-// TODO SERVER-64227 Remove 'subTotal' and 'subTotalError' fields when we branch for 6.1 because all
-// nodes in a sharded cluster would use the new data format.
-const char subTotalName[] = "subTotal";
-const char subTotalErrorName[] = "subTotalError";  // Used for extra precision
-const char partialSumName[] = "ps";                // Used for the full state of partial sum
-const char countName[] = "count";
-}  // namespace
-
 void applyPartialSum(const std::vector<Value>& arr,
                      BSONType& nonDecimalTotalType,
                      BSONType& totalType,
@@ -71,33 +62,21 @@ Value serializePartialSum(BSONType nonDecimalTotalType,
 
 void AccumulatorAvg::processInternal(const Value& input, bool merging) {
     if (merging) {
-        // We expect an object that contains both a subtotal and a count. Additionally there may
-        // be an error value, that allows for additional precision.
-        // 'input' is what getValue(true) produced below.
+        // We expect an object that contains both a partial sum and a count.
         verify(input.getType() == Object);
 
-        // TODO SERVER-64227 Remove 'if' block when we branch for 6.1 because all nodes in a sharded
-        // cluster would use the new data format.
-        if (auto partialSumVal = input[partialSumName]; partialSumVal.missing()) {
-            // We're recursively adding the subtotal to get the proper type treatment, but this only
-            // increments the count by one, so adjust the count afterwards. Similarly for 'error'.
-            processInternal(input[subTotalName], false);
-            _count += input[countName].getLong() - 1;
-            Value error = input[subTotalErrorName];
-            if (!error.missing()) {
-                processInternal(error, false);
-                _count--;  // The error correction only adjusts the total, not the number of items.
-            }
-        } else {
-            // The merge-side must be ready to process the full state of a partial sum from a
-            // shard-side if a shard chooses to do so. See Accumulator::getValue() for details.
-            applyPartialSum(partialSumVal.getArray(),
-                            _nonDecimalTotalType,
-                            _totalType,
-                            _nonDecimalTotal,
-                            _decimalTotal);
-            _count += input[countName].getLong();
-        }
+        auto partialSumVal = input[stage_builder::partialSumName];
+        tassert(6422700, "'ps' field must be present", !partialSumVal.missing());
+        tassert(6422701, "'ps' field must be an array", partialSumVal.isArray());
+
+        // The merge-side must be ready to process the full state of a partial sum from a
+        // shard-side if a shard chooses to do so. See Accumulator::getValue() for details.
+        applyPartialSum(partialSumVal.getArray(),
+                        _nonDecimalTotalType,
+                        _totalType,
+                        _nonDecimalTotal,
+                        _decimalTotal);
+        _count += input[stage_builder::countName].getLong();
 
         return;
     }
@@ -146,17 +125,8 @@ Value AccumulatorAvg::getValue(bool toBeMerged) {
     if (toBeMerged) {
         auto partialSumVal =
             serializePartialSum(_nonDecimalTotalType, _totalType, _nonDecimalTotal, _decimalTotal);
-        if (_totalType == NumberDecimal) {
-            return Value(Document{{subTotalName, _getDecimalTotal()},
-                                  {countName, _count},
-                                  {partialSumName, partialSumVal}});
-        }
-
-        auto [total, error] = _nonDecimalTotal.getDoubleDouble();
-        return Value(Document{{subTotalName, total},
-                              {countName, _count},
-                              {subTotalErrorName, error},
-                              {partialSumName, partialSumVal}});
+        return Value(Document{{stage_builder::countName, _count},
+                              {stage_builder::partialSumName, partialSumVal}});
     }
 
     if (_count == 0)

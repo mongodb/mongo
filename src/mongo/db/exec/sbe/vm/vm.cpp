@@ -1088,9 +1088,6 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDoubleDouble
 
 // This function is necessary because 'aggDoubleDoubleSum()' result is 'Array' type but we need
 // to produce a scalar value out of it.
-//
-// 'keepIntegerPrecision' should be set to true when we want to keep precision for integral values.
-template <bool keepIntegerPrecision>
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSumFinalize(
     ArityType arity) {
     auto [_, fieldTag, fieldValue] = getFromStack(0);
@@ -1132,24 +1129,6 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum
                                 value::TypeTags::NumberInt64,
                                 value::bitcastFrom<int64_t>(longVal)};
                     }
-                }
-
-                if constexpr (keepIntegerPrecision) {
-                    // The value was too large for a NumberInt64, so output an array with two
-                    // values adding up to the desired total. The mongos computes the final sum,
-                    // considering errors.
-                    auto [total, error] = nonDecimalTotal.getDoubleDouble();
-                    auto llerror = static_cast<int64_t>(error);
-                    auto [tag, val] = value::makeNewArray();
-                    value::ValueGuard guard(tag, val);
-                    auto arr = value::getArrayView(val);
-                    arr->reserve(static_cast<size_t>(AggPartialSumElems::kSizeOfArray));
-                    arr->push_back(value::TypeTags::NumberDouble,
-                                   value::bitcastFrom<double>(total));
-                    arr->push_back(value::TypeTags::NumberInt64,
-                                   value::bitcastFrom<int64_t>(llerror));
-                    guard.reset();
-                    return {true, tag, val};
                 }
 
                 // Sum doesn't fit a NumberLong, so return a NumberDouble instead.
@@ -4365,11 +4344,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
         case Builtin::aggDoubleDoubleSum:
             return builtinAggDoubleDoubleSum(arity);
         case Builtin::doubleDoubleSumFinalize:
-            return builtinDoubleDoubleSumFinalize<>(arity);
-        case Builtin::doubleDoubleMergeSumFinalize:
-            // This is for sharding support of aggregations that use 'doubleDoubleSum' algorithm.
-            // We should keep precision for integral values when the partial sum is to be merged.
-            return builtinDoubleDoubleSumFinalize<true /*keepIntegerPrecision*/>(arity);
+            return builtinDoubleDoubleSumFinalize(arity);
         case Builtin::doubleDoublePartialSumFinalize:
             return builtinDoubleDoublePartialSumFinalize(arity);
         case Builtin::aggStdDev:

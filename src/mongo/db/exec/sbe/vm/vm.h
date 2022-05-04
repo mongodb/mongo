@@ -510,7 +510,6 @@ enum class Builtin : uint8_t {
     doubleDoubleSum,     // special double summation
     aggDoubleDoubleSum,
     doubleDoubleSumFinalize,
-    doubleDoubleMergeSumFinalize,
     doubleDoublePartialSumFinalize,
     aggStdDev,
     stdDevPopFinalize,
@@ -1100,8 +1099,6 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinCollAddToSetCapped(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSum(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAggDoubleDoubleSum(ArityType arity);
-    // This is only for compatibility with mongos/sharding and we will revisit this later.
-    template <bool keepIntegerPrecision = false>
     std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSumFinalize(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoublePartialSumFinalize(
         ArityType arity);

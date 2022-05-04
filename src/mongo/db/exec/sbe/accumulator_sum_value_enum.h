@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+
 namespace mongo {
 
 /**
@@ -50,5 +52,12 @@ enum AggSumValueElems {
     // This is actually not an index but represents the maximum number of elements.
     kMaxSizeOfArray
 };
+
+namespace stage_builder {
+
+constexpr StringData partialSumName = "ps"_sd;  // Used for the full state of partial sum
+constexpr StringData countName = "count"_sd;    // Used for number of elements in average
+
+}  // namespace stage_builder
 
 }  // namespace mongo

@@ -56,11 +56,6 @@ REGISTER_ACCUMULATOR_WITH_MIN_VERSION(count,
 
 REGISTER_STABLE_WINDOW_FUNCTION(count, window_function::parseCountWindowFunction);
 
-namespace {
-const char subTotalName[] = "subTotal";
-const char subTotalErrorName[] = "subTotalError";  // Used for extra precision.
-}  // namespace
-
 void applyPartialSum(const std::vector<Value>& arr,
                      BSONType& nonDecimalTotalType,
                      BSONType& totalType,
@@ -109,27 +104,13 @@ void AccumulatorSum::processInternal(const Value& input, bool merging) {
             return;
         }
 
-        switch (input.getType()) {
-            // TODO SERVER-64227: Remove 'Object' case which is no longer necessary when we
-            // branch for 6.1.
-            case Object:
-                // Process merge document, see getValue() below.
-                nonDecimalTotal.addDouble(
-                    input[subTotalName].getDouble());  // Sum without adjusting type.
-                processInternal(input[subTotalErrorName],
-                                false);  // Sum adjusting for type of error.
-                break;
+        if (input.getType() == BSONType::Array) {
             // The merge-side must be ready to process the full state of a partial sum from a
-            // shard-side if a shard chooses to do so. See Accumulator::getValue() for details.
-            case Array:
-                applyPartialSum(input.getArray(),
-                                nonDecimalTotalType,
-                                totalType,
-                                nonDecimalTotal,
-                                decimalTotal);
-                break;
-            default:
-                MONGO_UNREACHABLE;
+            // shard-side.
+            applyPartialSum(
+                input.getArray(), nonDecimalTotalType, totalType, nonDecimalTotal, decimalTotal);
+        } else {
+            MONGO_UNREACHABLE_TASSERT(64227002);
         }
         return;
     }
@@ -192,21 +173,13 @@ Value AccumulatorSum::getValue(bool toBeMerged) {
     // of some of 'NumberDecimal' values and other numeric type values happen to lose precision
     // because 'NumberDecimal' can't represent the partial sum precisely, or the other way around.
     //
-    // For example, [{n: 1e+34}, {n: NumberDecimal("0,1")}, {n: NumberDecimal("0.11")}, {n:
+    // For example, [{n: 1e+34}, {n: NumberDecimal("0.1")}, {n: NumberDecimal("0.11")}, {n:
     // -1e+34}].
     //
     // More fundamentally, addition is neither commutative nor associative on computer. So, it's
     // desirable to keep the full state of the partial sum along the way to maintain the result as
     // close to the real truth as possible until all additions are done.
-    //
-    // This requires changing over-the-wire data format from a shard-side to a merge-side and is
-    // incompatible change and is gated with FCV until 6.0.
-    //
-    // TODO SERVER-64227: Remove FCV gating which is unnecessary when we branch for 6.1.
-    auto&& fcv = serverGlobalParams.featureCompatibility;
-    auto canUseNewPartialResultFormat = fcv.isVersionInitialized() &&
-        fcv.isGreaterThanOrEqualTo(multiversion::FeatureCompatibilityVersion::kVersion_6_0);
-    if (canUseNewPartialResultFormat && toBeMerged) {
+    if (toBeMerged) {
         return serializePartialSum(nonDecimalTotalType, totalType, nonDecimalTotal, decimalTotal);
     }
 
@@ -218,22 +191,7 @@ Value AccumulatorSum::getValue(bool toBeMerged) {
         case NumberLong:
             if (nonDecimalTotal.fitsLong())
                 return Value(nonDecimalTotal.getLong());
-            // TODO SERVER-64227: Remove the following 'if' block which is buggy.
-            if (toBeMerged) {
-                // The value was too large for a NumberLong, so output a document with two values
-                // adding up to the desired total. Older MongoDB versions used to ignore signed
-                // integer overflow and cause undefined behavior, that in practice resulted in
-                // values that would wrap around modulo 2**64. Now an older mongos with a newer
-                // mongod will yield an error that $sum resulted in a non-numeric type, which is
-                // OK for this case. Output the error using the totalType, so in the future we can
-                // determine the correct totalType for the sum. For the error to exceed 2**63,
-                //  more than 2**53 integers would have to be summed, which is impossible.
-                double total;
-                double error;
-                std::tie(total, error) = nonDecimalTotal.getDoubleDouble();
-                long long llerror = static_cast<long long>(error);
-                return Value(DOC(subTotalName << total << subTotalErrorName << llerror));
-            }
+
             // Sum doesn't fit a NumberLong, so return a NumberDouble instead.
             [[fallthrough]];
         case NumberDouble:
