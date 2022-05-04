@@ -225,15 +225,12 @@ ExecutorFuture<CommitResult> TransactionWithRetries::_runCommitHandleErrors(int 
             if (nextStep == Transaction::ErrorHandlingStep::kDoNotRetry) {
                 return ExecutorFuture<CommitResult>(_executor, swCommitResult);
             } else if (nextStep == Transaction::ErrorHandlingStep::kAbortAndDoNotRetry) {
-                return _bestEffortAbort().then([swCommitResult] { return swCommitResult; });
+                MONGO_UNREACHABLE;
             } else if (nextStep == Transaction::ErrorHandlingStep::kRetryTransaction) {
-                return _bestEffortAbort().then([this, swCommitResult]() -> CommitResult {
-                    _internalTxn->primeForTransactionRetry();
-                    iassert(Status(ErrorCodes::TransactionAPIMustRetryTransaction,
-                                   str::stream() << "Must retry body loop on commit error: "
-                                                 << swCommitResult.getStatus()));
-                    MONGO_UNREACHABLE;
-                });
+                _internalTxn->primeForTransactionRetry();
+                iassert(Status(ErrorCodes::TransactionAPIMustRetryTransaction,
+                               str::stream() << "Must retry body loop on commit error: "
+                                             << swCommitResult.getStatus()));
             } else if (nextStep == Transaction::ErrorHandlingStep::kRetryCommit) {
                 _internalTxn->primeForCommitRetry();
                 iassert(Status(ErrorCodes::TransactionAPIMustRetryCommit,
@@ -428,6 +425,7 @@ SemiFuture<BSONObj> Transaction::_commitOrAbort(StringData dbName, StringData cm
                       cmdName == CommitTransaction::kCommandName)));
 
         if (cmdName == CommitTransaction::kCommandName) {
+            invariant(_state != TransactionState::kStartedAbort);
             if (!_isInCommit()) {
                 // Only transition if we aren't already retrying commit.
                 _state = TransactionState::kStartedCommit;
@@ -438,6 +436,7 @@ SemiFuture<BSONObj> Transaction::_commitOrAbort(StringData dbName, StringData cm
                 return SemiFuture<BSONObj>::makeReady(BSON("ok" << 1));
             }
         } else if (cmdName == AbortTransaction::kCommandName) {
+            invariant(!_isInCommit());
             _state = TransactionState::kStartedAbort;
             invariant(_execContext != ExecutionContext::kClientTransaction);
         } else {
@@ -501,7 +500,8 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
 
     if (!MONGO_unlikely(skipTransactionApiRetryCheckInHandleError.shouldFail()) &&
         attemptCounter > kTxnRetryLimit) {
-        return ErrorHandlingStep::kAbortAndDoNotRetry;
+        return _isInCommit() ? ErrorHandlingStep::kDoNotRetry
+                             : ErrorHandlingStep::kAbortAndDoNotRetry;
     }
 
     // The transient transaction error label is always returned in command responses, even for
@@ -524,7 +524,8 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
             }
             return ErrorHandlingStep::kRetryTransaction;
         }
-        return ErrorHandlingStep::kAbortAndDoNotRetry;
+        return _isInCommit() ? ErrorHandlingStep::kDoNotRetry
+                             : ErrorHandlingStep::kAbortAndDoNotRetry;
     }
 
     if (_isInCommit()) {
@@ -538,6 +539,8 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
             ErrorCodes::isRetriableError(commitWCStatus)) {
             return ErrorHandlingStep::kRetryCommit;
         }
+
+        return ErrorHandlingStep::kDoNotRetry;
     }
 
     return ErrorHandlingStep::kAbortAndDoNotRetry;
