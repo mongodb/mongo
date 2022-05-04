@@ -164,6 +164,18 @@ public:
      */
     Collection* lookupCollectionByUUID(OperationContext* opCtx, CollectionUUID uuid) const;
 
+    /**
+     * Like lookupCollectionByUUID but also verifies the namespace under the catalog lock. Used when
+     * not certain we're holding the right Collection lock.
+     *
+     * The optional NamespaceString is set when the Collection was found but did not pass the
+     * namespace check, none otherwise.
+     */
+    std::pair<Collection*, boost::optional<NamespaceString>>
+    lookupCollectionByUUIDAndVerifyNamespace(OperationContext* opCtx,
+                                             CollectionUUID uuid,
+                                             const NamespaceString& nss) const;
+
     void makeCollectionVisible(CollectionUUID uuid);
 
     /**
@@ -308,7 +320,7 @@ public:
 private:
     friend class CollectionCatalog::iterator;
 
-    Collection* _lookupCollectionByUUID(WithLock, CollectionUUID uuid) const;
+    Collection* _lookupCollectionByUUID(WithLock, CollectionUUID uuid, size_t hash) const;
 
     const std::vector<CollectionUUID>& _getOrdering_inlock(const StringData& db,
                                                            const stdx::lock_guard<Latch>&);

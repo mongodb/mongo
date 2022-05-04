@@ -258,25 +258,53 @@ Collection* CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,
         return coll;
     }
 
+    size_t hash = _catalog.hash_function()(uuid);
     stdx::lock_guard<Latch> lock(_catalogLock);
-    auto coll = _lookupCollectionByUUID(lock, uuid);
+    auto coll = _lookupCollectionByUUID(lock, uuid, hash);
     return (coll && coll->isCommitted()) ? coll : nullptr;
 }
 
-void CollectionCatalog::makeCollectionVisible(CollectionUUID uuid) {
+std::pair<Collection*, boost::optional<NamespaceString>>
+CollectionCatalog::lookupCollectionByUUIDAndVerifyNamespace(OperationContext* opCtx,
+                                                            CollectionUUID uuid,
+                                                            const NamespaceString& nss) const {
+    if (auto coll = UncommittedCollections::getForTxn(opCtx, uuid)) {
+        // We don't need to verify namespace in this case. Uncommitted collections can't be renamed.
+        return {coll, boost::none};
+    }
+
+    size_t hash = _catalog.hash_function()(uuid);
     stdx::lock_guard<Latch> lock(_catalogLock);
-    auto coll = _lookupCollectionByUUID(lock, uuid);
+    auto coll = _lookupCollectionByUUID(lock, uuid, hash);
+    if (coll && coll->isCommitted()) {
+        bool renamed = coll->ns() != nss;
+        if (renamed) {
+            return {nullptr, coll->ns()};
+        } else {
+            return {coll, boost::none};
+        }
+    }
+    return {nullptr, boost::none};
+}
+
+void CollectionCatalog::makeCollectionVisible(CollectionUUID uuid) {
+    size_t hash = _catalog.hash_function()(uuid);
+    stdx::lock_guard<Latch> lock(_catalogLock);
+    auto coll = _lookupCollectionByUUID(lock, uuid, hash);
     coll->setCommitted(true);
 }
 
 bool CollectionCatalog::isCollectionAwaitingVisibility(CollectionUUID uuid) const {
+    size_t hash = _catalog.hash_function()(uuid);
     stdx::lock_guard<Latch> lock(_catalogLock);
-    auto coll = _lookupCollectionByUUID(lock, uuid);
+    auto coll = _lookupCollectionByUUID(lock, uuid, hash);
     return coll && !coll->isCommitted();
 }
 
-Collection* CollectionCatalog::_lookupCollectionByUUID(WithLock, CollectionUUID uuid) const {
-    auto foundIt = _catalog.find(uuid);
+Collection* CollectionCatalog::_lookupCollectionByUUID(WithLock,
+                                                       CollectionUUID uuid,
+                                                       size_t hash) const {
+    auto foundIt = _catalog.find(uuid, hash);
     return foundIt == _catalog.end() ? nullptr : foundIt->second.get();
 }
 
@@ -286,8 +314,9 @@ Collection* CollectionCatalog::lookupCollectionByNamespace(OperationContext* opC
         return coll;
     }
 
+    size_t hash = _collections.hash_function()(nss);
     stdx::lock_guard<Latch> lock(_catalogLock);
-    auto it = _collections.find(nss);
+    auto it = _collections.find(nss, hash);
     auto coll = (it == _collections.end() ? nullptr : it->second);
     return (coll && coll->isCommitted()) ? coll : nullptr;
 }
@@ -298,8 +327,9 @@ boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationCon
         return coll->ns();
     }
 
+    size_t hash = _catalog.hash_function()(uuid);
     stdx::lock_guard<Latch> lock(_catalogLock);
-    auto foundIt = _catalog.find(uuid);
+    auto foundIt = _catalog.find(uuid, hash);
     if (foundIt != _catalog.end()) {
         boost::optional<NamespaceString> ns = foundIt->second->ns();
         invariant(!ns.get().isEmpty());
@@ -323,8 +353,9 @@ boost::optional<CollectionUUID> CollectionCatalog::lookupUUIDByNSS(
         return coll->uuid();
     }
 
+    size_t hash = _collections.hash_function()(nss);
     stdx::lock_guard<Latch> lock(_catalogLock);
-    auto it = _collections.find(nss);
+    auto it = _collections.find(nss, hash);
     if (it != _collections.end()) {
         boost::optional<CollectionUUID> uuid = it->second->uuid();
         return it->second->isCommitted() ? uuid : boost::none;
@@ -359,8 +390,9 @@ bool CollectionCatalog::checkIfCollectionSatisfiable(CollectionUUID uuid,
                                                      CollectionInfoFn predicate) const {
     invariant(predicate);
 
+    size_t hash = _catalog.hash_function()(uuid);
     stdx::lock_guard<Latch> lock(_catalogLock);
-    auto collection = _lookupCollectionByUUID(lock, uuid);
+    auto collection = _lookupCollectionByUUID(lock, uuid, hash);
 
     if (!collection) {
         return false;
