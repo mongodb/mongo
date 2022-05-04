@@ -89,6 +89,13 @@ function runTest_SingleForeignRecord(
     const results = localColl.aggregate(pipeline, aggOptions).toArray();
     const explain = localColl.explain().aggregate(pipeline, aggOptions);
 
+    // The foreign record should never duplicate in the results (e.g. see SERVER-66119). That is,
+    // the "matched" field should either be an empty array or contain a single element.
+    for (let i = 0; i < results.length; i++) {
+        assert(results[i].matched.length < 2,
+               testDescription + " Found duplicated match in " + tojson(results[i]));
+    }
+
     // Build the array of ids for the results that have non-empty array in the "matched" field.
     const matchedIds = results
                            .filter(function(x) {

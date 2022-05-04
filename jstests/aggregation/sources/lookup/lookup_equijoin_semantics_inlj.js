@@ -119,4 +119,32 @@ runTests();
         });
     })();
 })();
+
+/**
+ * Other miscelaneous tests for INLJ.
+ */
+(function runMiscelaneousInljTests() {
+    currentJoinAlgorithm = JoinAlgorithm.INLJ_Asc;
+
+    (function testServer66119() {
+        const docs = [
+            {_id: 0, a: {b: [1, 2, 1]}},
+            {_id: 1, a: {b: [1, 3, [1, 2]]}},
+            {_id: 2, a: {b: [1, 3, [2, 1]]}},
+            {_id: 3, a: {b: [1, 3, [1]]}},
+            {_id: 4, a: [{b: 1}, {b: [1, 2]}]},
+            {_id: 5, a: [{b: 1}, {b: [[1], 2]}]},
+            {_id: 6, a: [{b: [1, 2]}, {b: [3, [1]]}]},
+        ];
+
+        runTest_SingleForeignRecord({
+            testDescription: "Nested arrays with the same value as another key value in local",
+            localRecords: docs,
+            localField: "a.b",
+            foreignRecord: {_id: 0, a: 1},
+            foreignField: "a",
+            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6]
+        });
+    })();
+})();
 })();
