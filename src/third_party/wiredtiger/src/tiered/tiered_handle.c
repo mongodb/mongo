@@ -242,7 +242,7 @@ __tiered_restart_work(WT_SESSION_IMPL *session, WT_TIERED *tiered)
     bool exist;
 
     /* If this is a new table and there are no objects there is nothing to do. */
-    if (tiered->current_id == 0)
+    if (tiered->current_id == WT_TIERED_OBJECTID_NONE)
         return (0);
 
     /*
