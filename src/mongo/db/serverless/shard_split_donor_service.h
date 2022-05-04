@@ -155,19 +155,20 @@ public:
 private:
     // Tasks
     ExecutorFuture<void> _enterBlockingOrAbortedState(const ScopedTaskExecutorPtr& executor,
-                                                      const CancellationToken& token);
+                                                      const CancellationToken& primaryToken,
+                                                      const CancellationToken& abortToken);
 
     ExecutorFuture<void> _waitForRecipientToReachBlockTimestamp(
-        const ScopedTaskExecutorPtr& executor, const CancellationToken& token);
+        const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken);
 
     ExecutorFuture<void> _applySplitConfigToDonor(const ScopedTaskExecutorPtr& executor,
-                                                  const CancellationToken& token);
+                                                  const CancellationToken& abortToken);
 
     ExecutorFuture<void> _waitForRecipientToAcceptSplit(const ScopedTaskExecutorPtr& executor,
-                                                        const CancellationToken& token);
+                                                        const CancellationToken& abortToken);
 
-    ExecutorFuture<void> _waitForForgetCmdThenMarkGarbageCollectible(
-        const ScopedTaskExecutorPtr& executor, const CancellationToken& token);
+    ExecutorFuture<void> _waitForForgetCmdThenMarkGarbageCollectable(
+        const ScopedTaskExecutorPtr& executor, const CancellationToken& primaryToken);
 
     ExecutorFuture<DurableState> _handleErrorOrEnterAbortedState(
         StatusWith<DurableState> durableState,

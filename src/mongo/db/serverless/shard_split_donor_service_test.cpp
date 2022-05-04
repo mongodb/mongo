@@ -579,7 +579,7 @@ TEST_F(ShardSplitDonorServiceTest, AbortDueToRecipientNodesValidation) {
 
     auto result = decisionFuture.get();
 
-    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
+    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kAborted);
 
     ASSERT_OK(serviceInstance->completionFuture().getNoThrow());
     ASSERT_FALSE(serviceInstance->isGarbageCollectable());
