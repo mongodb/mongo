@@ -596,7 +596,7 @@ public:
      * - User originating operations are not allowed to perform writes.
      */
     bool readOnly() const {
-        if (!getClient()->isFromUserConnection())
+        if (!(getClient() && getClient()->isFromUserConnection()))
             return false;
         return !getServiceContext()->userWritesAllowed();
     }

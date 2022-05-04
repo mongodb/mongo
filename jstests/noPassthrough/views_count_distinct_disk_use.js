@@ -35,10 +35,8 @@ assert.commandWorked(viewsDB.adminCommand(
     {setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: memoryLimitMb * 1024 * 1024}));
 testDiskUse({count: "largeView"});
 
-// The 'distinct' command involves '$groupBy' stage. This stage needs to spill to disk if the memory
-// limit is reached.
-assert.commandWorked(viewsDB.adminCommand(
-    {setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: memoryLimitMb * 1024 * 1024}));
+// The 'distinct' command executes the view definition pipeline containing the '$sort' stage. This
+// stage needs to spill to disk if the memory limit is reached.
 testDiskUse({distinct: "largeView", key: "largeStr"});
 
 MongoRunner.stopMongod(conn);

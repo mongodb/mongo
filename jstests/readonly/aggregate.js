@@ -75,19 +75,6 @@ runReadOnlyTest(function() {
 
             assert.docEq(readableCollection.aggregate(mostAwardsPipeline).toArray(),
                          [{_id: "Spotlight", count: 3}, {_id: "The Revenant", count: 3}]);
-
-            // Check that pipelines fail with allowDiskUse true. We use runCommand manually because
-            // the helper has conflicting error handling logic.
-            var allowDiskUseCmd = {
-                aggregate: readableCollection.getName(),
-                pipeline: [],
-                cursor: {},
-                allowDiskUse: true
-            };
-
-            assert.commandFailedWithCode(readableCollection.runCommand(allowDiskUseCmd),
-                                         ErrorCodes.IllegalOperation,
-                                         "'allowDiskUse' is not allowed in read-only mode");
         }
     };
 }());

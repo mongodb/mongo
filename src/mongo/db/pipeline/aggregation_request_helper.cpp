@@ -157,7 +157,6 @@ void validate(OperationContext* opCtx,
               const BSONObj& cmdObj,
               const NamespaceString& nss,
               boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
-    bool hasAllowDiskUseElem = cmdObj.hasField(AggregateCommandRequest::kAllowDiskUseFieldName);
     bool hasCursorElem = cmdObj.hasField(AggregateCommandRequest::kCursorFieldName);
     bool hasExplainElem = cmdObj.hasField(AggregateCommandRequest::kExplainFieldName);
     bool hasExplain = explainVerbosity ||
@@ -181,13 +180,6 @@ void validate(OperationContext* opCtx,
             str::stream() << "Cannot specify '" << AggregateCommandRequest::kNeedsMergeFieldName
                           << "' without '" << AggregateCommandRequest::kFromMongosFieldName << "'",
             (!hasNeedsMergeElem || hasFromMongosElem));
-
-    if (opCtx) {
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "The '" << AggregateCommandRequest::kAllowDiskUseFieldName
-                              << "' option is not permitted in read-only mode.",
-                (!hasAllowDiskUseElem || !opCtx->readOnly()));
-    }
 
     auto requestReshardingResumeTokenElem =
         cmdObj[AggregateCommandRequest::kRequestReshardingResumeTokenFieldName];
