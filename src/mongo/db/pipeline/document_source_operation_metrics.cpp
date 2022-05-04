@@ -89,7 +89,7 @@ intrusive_ptr<DocumentSource> DocumentSourceOperationMetrics::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     if (!ResourceConsumption::isMetricsAggregationEnabled()) {
         uasserted(ErrorCodes::CommandNotSupported,
-                  "The aggregateOperationResourceConsumption server parameter is not set");
+                  "The aggregateOperationResourceConsumptionMetrics server parameter is not set");
     }
 
     const NamespaceString& nss = pExpCtx->ns;
