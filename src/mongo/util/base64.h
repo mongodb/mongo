@@ -35,29 +35,88 @@
 
 #include "mongo/base/string_data.h"
 
-namespace mongo::base64 {
-
-std::string encode(StringData in);
-std::string decode(StringData in);
-
-void encode(std::stringstream& ss, StringData in);
-void decode(std::stringstream& ss, StringData in);
-
-void encode(fmt::memory_buffer& buffer, StringData in);
-void decode(fmt::memory_buffer& buffer, StringData in);
-
-inline std::string encode(const void* data, size_t len) {
-    return encode(StringData(reinterpret_cast<const char*>(data), len));
-}
-
-bool validate(StringData s);
+namespace mongo {
+namespace base64_detail {
 
 /**
- * Calculate how large a given input would expand to.
- * Effectively: ceil(inLen * 4 / 3)
+ * Abstract class used to split the translation formats below
+ * into something resembling namespaced implementations.
  */
-constexpr std::size_t encodedLength(std::size_t inLen) {
-    return (inLen + 2) / 3 * 4;
+template <typename Mode>
+class Base64Impl {
+private:
+    Base64Impl() = delete;
+
+public:
+    /**
+     * Encode a payload to base64.
+     */
+    static std::string encode(StringData in);
+    static std::string encode(const void* data, size_t len) {
+        return encode(StringData(reinterpret_cast<const char*>(data), len));
+    }
+    static void encode(std::stringstream& ss, StringData in);
+    static void encode(fmt::memory_buffer& buffer, StringData in);
+
+    /**
+     * Decode a base64 string to its original payload.
+     */
+    static std::string decode(StringData in);
+    static void decode(std::stringstream& ss, StringData in);
+    static void decode(fmt::memory_buffer& buffer, StringData in);
+
+    /**
+     * Determines if a given string appears to be valid base64.
+     */
+    static bool validate(StringData s);
+
+    /**
+     * Calculate how large a given input would expand to.
+     * Effectively: ceil(inLen * 4 / 3)
+     */
+    static constexpr std::size_t encodedLength(std::size_t inLen) {
+        return (inLen + 2) / 3 * 4;
+    }
+};
+
+constexpr unsigned char kInvalid = ~0;
+
+constexpr std::size_t search(StringData table, int c) {
+    for (std::size_t i = 0; i < table.size(); ++i) {
+        if (table[i] == c) {
+            return i;
+        }
+    }
+
+    return kInvalid;
 }
 
-}  // namespace mongo::base64
+template <std::size_t... Cs>
+constexpr auto invertTable(StringData table, std::index_sequence<Cs...>) {
+    return std::array<unsigned char, sizeof...(Cs)>{
+        {static_cast<unsigned char>(search(table, Cs))...}};
+}
+
+struct Standard {
+    static constexpr auto kEncodeTable =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"_sd;
+    static constexpr auto kDecodeTable = invertTable(kEncodeTable, std::make_index_sequence<256>{});
+    static constexpr bool kTerminatorRequired = true;
+};
+
+// base64url encoding is a "url safe" variant of base64.
+// '+' is replaced with '-'
+// '/' is replaced with '_'
+// '=' at the end of the string are optional
+struct URL {
+    static constexpr auto kEncodeTable =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"_sd;
+    static constexpr auto kDecodeTable = invertTable(kEncodeTable, std::make_index_sequence<256>{});
+    static constexpr bool kTerminatorRequired = false;
+};
+}  // namespace base64_detail
+
+using base64 = typename base64_detail::Base64Impl<base64_detail::Standard>;
+using base64url = typename base64_detail::Base64Impl<base64_detail::URL>;
+
+}  // namespace mongo
