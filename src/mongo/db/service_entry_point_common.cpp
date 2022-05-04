@@ -744,14 +744,18 @@ public:
     CheckoutSessionAndInvokeCommand(ExecCommandDatabase* ecd) : _ecd{ecd} {}
 
     ~CheckoutSessionAndInvokeCommand() {
-        _cleanupTransaction();
+        auto opCtx = _ecd->getExecutionContext()->getOpCtx();
+        if (auto txnParticipant = TransactionParticipant::get(opCtx)) {
+            // Only cleanup if we didn't yield the session.
+            _cleanupTransaction(txnParticipant);
+        }
     }
 
     Future<void> run();
 
 private:
-    void _stashTransaction();
-    void _cleanupTransaction();
+    void _stashTransaction(TransactionParticipant::Participant& txnParticipant);
+    void _cleanupTransaction(TransactionParticipant::Participant& txnParticipant);
 
     void _checkOutSession();
     void _tapError(Status);
@@ -760,7 +764,6 @@ private:
     ExecCommandDatabase* const _ecd;
 
     std::unique_ptr<MongoDOperationContextSession> _sessionTxnState;
-    boost::optional<TransactionParticipant::Participant> _txnParticipant;
     bool _shouldCleanUp = false;
 };
 
@@ -793,21 +796,36 @@ Future<void> CheckoutSessionAndInvokeCommand::run() {
                return runCommandInvocation(_ecd->getExecutionContext(), _ecd->getInvocation());
            })
         .onErrorCategory<ErrorCategory::TenantMigrationConflictError>([this](Status status) {
-            // Abort transaction and clean up transaction resources before blocking the
-            // command to allow the stable timestamp on the node to advance.
-            _cleanupTransaction();
+            auto opCtx = _ecd->getExecutionContext()->getOpCtx();
+            if (auto txnParticipant = TransactionParticipant::get(opCtx)) {
+                // If the command didn't yield its session, abort transaction and clean up
+                // transaction resources before blocking the command to allow the stable timestamp
+                // on the node to advance.
+                _cleanupTransaction(txnParticipant);
+            }
 
             uassertStatusOK(tenant_migration_access_blocker::handleTenantMigrationConflict(
-                _ecd->getExecutionContext()->getOpCtx(), std::move(status)));
+                opCtx, std::move(status)));
         })
         .onError<ErrorCodes::WouldChangeOwningShard>([this](Status status) -> Future<void> {
+            auto opCtx = _ecd->getExecutionContext()->getOpCtx();
+            auto txnParticipant = TransactionParticipant::get(opCtx);
+            if (!txnParticipant) {
+                // No code paths that can throw this error should yield their session but uassert
+                // instead of invariant in case that assumption is ever broken since this only needs
+                // to be operation fatal.
+                auto statusWithContext = status.withContext(
+                    "Cannot handle WouldChangeOwningShard error because the operation yielded its "
+                    "session");
+                uasserted(6609000, statusWithContext.reason());
+            }
+
             auto wouldChangeOwningShardInfo = status.extraInfo<WouldChangeOwningShardInfo>();
             invariant(wouldChangeOwningShardInfo);
-            _txnParticipant->handleWouldChangeOwningShardError(
-                _ecd->getExecutionContext()->getOpCtx(), wouldChangeOwningShardInfo);
-            _stashTransaction();
+            txnParticipant.handleWouldChangeOwningShardError(opCtx, wouldChangeOwningShardInfo);
+            _stashTransaction(txnParticipant);
 
-            auto txnResponseMetadata = _txnParticipant->getResponseMetadata();
+            auto txnResponseMetadata = txnParticipant.getResponseMetadata();
             txnResponseMetadata.serialize(_ecd->getExtraFieldsBuilder());
             return status;
         })
@@ -815,29 +833,33 @@ Future<void> CheckoutSessionAndInvokeCommand::run() {
         .then([this] { return _commitInvocation(); });
 }
 
-void CheckoutSessionAndInvokeCommand::_stashTransaction() {
+void CheckoutSessionAndInvokeCommand::_stashTransaction(
+    TransactionParticipant::Participant& txnParticipant) {
+    invariant(txnParticipant);
     if (!_shouldCleanUp) {
         return;
     }
     _shouldCleanUp = false;
 
     auto opCtx = _ecd->getExecutionContext()->getOpCtx();
-    _txnParticipant->stashTransactionResources(opCtx);
+    txnParticipant.stashTransactionResources(opCtx);
 }
 
-void CheckoutSessionAndInvokeCommand::_cleanupTransaction() {
+void CheckoutSessionAndInvokeCommand::_cleanupTransaction(
+    TransactionParticipant::Participant& txnParticipant) {
+    invariant(txnParticipant);
     if (!_shouldCleanUp) {
         return;
     }
     _shouldCleanUp = false;
 
     auto opCtx = _ecd->getExecutionContext()->getOpCtx();
-    const bool isPrepared = _txnParticipant->transactionIsPrepared();
+    const bool isPrepared = txnParticipant.transactionIsPrepared();
     try {
         if (isPrepared)
-            _txnParticipant->stashTransactionResources(opCtx);
-        else if (_txnParticipant->transactionIsOpen())
-            _txnParticipant->abortTransaction(opCtx);
+            txnParticipant.stashTransactionResources(opCtx);
+        else if (txnParticipant.transactionIsOpen())
+            txnParticipant.abortTransaction(opCtx);
     } catch (...) {
         // It is illegal for this to throw so we catch and log this here for diagnosability.
         LOGV2_FATAL(21974,
@@ -862,7 +884,7 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
     // a transaction number will check out the session.
     hangBeforeSessionCheckOut.pauseWhileSet();
     _sessionTxnState = std::make_unique<MongoDOperationContextSession>(opCtx);
-    _txnParticipant.emplace(TransactionParticipant::get(opCtx));
+    auto txnParticipant = TransactionParticipant::get(opCtx);
     hangAfterSessionCheckOut.pauseWhileSet();
 
     // Used for waiting for an in-progress transaction to transition out of the conflicting state.
@@ -881,7 +903,7 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
     };
 
     auto apiParamsFromClient = APIParameters::get(opCtx);
-    auto apiParamsFromTxn = _txnParticipant->getAPIParameters(opCtx);
+    auto apiParamsFromTxn = txnParticipant.getAPIParameters(opCtx);
     uassert(
         ErrorCodes::APIMismatchError,
         "API parameter mismatch: {} used params {}, the transaction's first command used {}"_format(
@@ -896,14 +918,14 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
         // transaction on that session.
         while (!beganOrContinuedTxn) {
             try {
-                _txnParticipant->beginOrContinue(
+                txnParticipant.beginOrContinue(
                     opCtx,
                     {*sessionOptions.getTxnNumber(), sessionOptions.getTxnRetryCounter()},
                     sessionOptions.getAutocommit(),
                     sessionOptions.getStartTransaction());
                 beganOrContinuedTxn = true;
             } catch (const ExceptionFor<ErrorCodes::PreparedTransactionInProgress>&) {
-                auto prevTxnExitedPrepare = _txnParticipant->onExitPrepare();
+                auto prevTxnExitedPrepare = txnParticipant.onExitPrepare();
 
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &waitAfterNewStatementBlocksBehindPrepare,
@@ -913,7 +935,7 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
                 waitForInProgressTxn(opCtx, prevTxnExitedPrepare);
             } catch (const ExceptionFor<ErrorCodes::RetryableTransactionInProgress>&) {
                 auto conflictingTxnCommittedOrAborted =
-                    _txnParticipant->onConflictingInternalTransactionCompletion(opCtx);
+                    txnParticipant.onConflictingInternalTransactionCompletion(opCtx);
 
                 waitAfterNewStatementBlocksBehindOpenInternalTransactionForRetryableWrite
                     .pauseWhileSet();
@@ -936,13 +958,16 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
         // transactions on failure to unstash the transaction resources to opCtx. We don't want to
         // have this error guard for beginOrContinue as it can abort the transaction for any
         // accidental invalid statements in the transaction.
+        //
+        // Unstashing resources can't yield the session so it's safe to capture a reference to the
+        // TransactionParticipant in this scope guard.
         ScopeGuard abortOnError([&] {
-            if (_txnParticipant->transactionIsInProgress()) {
-                _txnParticipant->abortTransaction(opCtx);
+            if (txnParticipant.transactionIsInProgress()) {
+                txnParticipant.abortTransaction(opCtx);
             }
         });
 
-        _txnParticipant->unstashTransactionResources(opCtx, invocation->definition()->getName());
+        txnParticipant.unstashTransactionResources(opCtx, invocation->definition()->getName());
 
         // Unstash success.
         abortOnError.dismiss();
@@ -999,9 +1024,21 @@ void CheckoutSessionAndInvokeCommand::_tapError(Status status) {
             return;
         }
 
+        auto opCtx = _ecd->getExecutionContext()->getOpCtx();
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        if (!txnParticipant) {
+            // No code paths that can throw this error should yield their session but uassert
+            // instead of invariant in case that assumption is ever broken since this only needs to
+            // be operation fatal.
+            auto statusWithContext = status.withContext(
+                "Cannot handle CommandOnShardedViewNotSupportedOnMongod error because the "
+                "operation yielded its session");
+            uasserted(6609001, statusWithContext.reason());
+        }
+
         // If this shard has completed an earlier statement for this transaction, it must already be
         // in the transaction's participant list, so it is guaranteed to learn its outcome.
-        _stashTransaction();
+        _stashTransaction(txnParticipant);
     }
 }
 
@@ -1015,15 +1052,19 @@ Future<void> CheckoutSessionAndInvokeCommand::_commitInvocation() {
         }
     }
 
-    // Stash or commit the transaction when the command succeeds.
-    _stashTransaction();
+    if (auto txnParticipant = TransactionParticipant::get(execContext->getOpCtx())) {
+        // If the command didn't yield its session, stash or commit the transaction when the command
+        // succeeds.
+        _stashTransaction(txnParticipant);
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
-        serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        auto txnResponseMetadata = _txnParticipant->getResponseMetadata();
-        auto bodyBuilder = replyBuilder->getBodyBuilder();
-        txnResponseMetadata.serialize(&bodyBuilder);
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
+            serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            auto txnResponseMetadata = txnParticipant.getResponseMetadata();
+            auto bodyBuilder = replyBuilder->getBodyBuilder();
+            txnResponseMetadata.serialize(&bodyBuilder);
+        }
     }
+
     return Status::OK();
 }
 
