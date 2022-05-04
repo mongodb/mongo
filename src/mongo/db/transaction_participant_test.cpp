@@ -3041,26 +3041,33 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResourcesForARetryableWrite) {
     ASSERT(opCtx()->lockState());
     ASSERT(opCtx()->recoveryUnit());
 
-    MongoDOperationContextSession opCtxSession(opCtx());
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-    txnParticipant.beginOrContinue(opCtx(),
-                                   {*opCtx()->getTxnNumber()},
+    auto clientOwned = getServiceContext()->makeClient("client");
+    AlternativeClientRegion acr(clientOwned);
+    auto opCtxHolder = cc().makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+    opCtx->setLogicalSessionId(_sessionId);
+    opCtx->setTxnNumber(_txnNumber);
+
+    MongoDOperationContextSession opCtxSession(opCtx);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    txnParticipant.beginOrContinue(opCtx,
+                                   {*opCtx->getTxnNumber()},
                                    boost::none /* autocommit */,
                                    boost::none /* startTransaction */);
-    txnParticipant.unstashTransactionResources(opCtx(), "find");
+    txnParticipant.unstashTransactionResources(opCtx, "find");
 
     // Build a BSONObj containing the details which we expect to see reported when we invoke
     // reportUnstashedState. For a retryable write, we should only include the txnNumber.
     BSONObjBuilder reportBuilder;
     BSONObjBuilder transactionBuilder(reportBuilder.subobjStart("transaction"));
     BSONObjBuilder parametersBuilder(transactionBuilder.subobjStart("parameters"));
-    parametersBuilder.append("txnNumber", *opCtx()->getTxnNumber());
+    parametersBuilder.append("txnNumber", *opCtx->getTxnNumber());
     parametersBuilder.done();
     transactionBuilder.done();
 
     // Verify that the Session's report of its own unstashed state aligns with our expectations.
     BSONObjBuilder unstashedStateBuilder;
-    txnParticipant.reportUnstashedState(opCtx(), &unstashedStateBuilder);
+    txnParticipant.reportUnstashedState(opCtx, &unstashedStateBuilder);
     ASSERT_BSONOBJ_EQ(unstashedStateBuilder.obj(), reportBuilder.obj());
 }
 
@@ -5249,5 +5256,181 @@ TEST_F(ShardTxnParticipantTest,
                                    false /* autocommit */,
                                    boost::none /* startTransaction */);
 }
+
+TEST_F(TxnParticipantTest, UnstashTransactionAfterActiveTxnNumberHasChanged) {
+    auto clientOwned = getServiceContext()->makeClient("client");
+    AlternativeClientRegion acr(clientOwned);
+    auto opCtxHolder = cc().makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+    opCtx->setLogicalSessionId(_sessionId);
+    opCtx->setTxnNumber(_txnNumber);
+    opCtx->setInMultiDocumentTransaction();
+
+    {
+        MongoDOperationContextSession opCtxSession(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        txnParticipant.beginOrContinue(
+            opCtx, {*opCtx->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
+    }
+
+    {
+        auto sideClientOwned = getServiceContext()->makeClient("sideClient");
+        AlternativeClientRegion acr(sideClientOwned);
+        auto sideOpCtx = cc().makeOperationContext();
+
+        sideOpCtx.get()->setLogicalSessionId(_sessionId);
+        sideOpCtx.get()->setTxnNumber(_txnNumber + 1);
+        sideOpCtx.get()->setInMultiDocumentTransaction();
+        MongoDOperationContextSession sideOpCtxSession(sideOpCtx.get());
+        auto txnParticipant = TransactionParticipant::get(sideOpCtx.get());
+
+        txnParticipant.beginOrContinue(sideOpCtx.get(),
+                                       {*sideOpCtx.get()->getTxnNumber()},
+                                       false /* autocommit */,
+                                       true /* startTransaction */);
+    }
+
+    {
+        MongoDOperationContextSession opCtxSession(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        ASSERT_THROWS_CODE(txnParticipant.unstashTransactionResources(opCtx, "insert"),
+                           AssertionException,
+                           ErrorCodes::NoSuchTransaction);
+    }
+}
+
+TEST_F(TxnParticipantTest, UnstashRetryableWriteAfterActiveTxnNumberHasChanged) {
+    auto clientOwned = getServiceContext()->makeClient("client");
+    AlternativeClientRegion acr(clientOwned);
+    auto opCtxHolder = cc().makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+    opCtx->setLogicalSessionId(_sessionId);
+    opCtx->setTxnNumber(_txnNumber);
+
+    {
+        MongoDOperationContextSession opCtxSession(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        txnParticipant.beginOrContinue(opCtx,
+                                       {*opCtx->getTxnNumber()},
+                                       boost::none /* autocommit */,
+                                       boost::none /* startTransaction */);
+    }
+
+    {
+        auto sideClientOwned = getServiceContext()->makeClient("sideClient");
+        AlternativeClientRegion acr(sideClientOwned);
+        auto sideOpCtx = cc().makeOperationContext();
+
+        sideOpCtx.get()->setLogicalSessionId(_sessionId);
+        sideOpCtx.get()->setTxnNumber(_txnNumber + 1);
+        sideOpCtx.get()->setInMultiDocumentTransaction();
+        MongoDOperationContextSession sideOpCtxSession(sideOpCtx.get());
+        auto txnParticipant = TransactionParticipant::get(sideOpCtx.get());
+
+        txnParticipant.beginOrContinue(sideOpCtx.get(),
+                                       {*sideOpCtx.get()->getTxnNumber()},
+                                       boost::none /* autocommit */,
+                                       boost::none /* startTransaction */);
+    }
+
+    {
+        MongoDOperationContextSession opCtxSession(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        ASSERT_THROWS_CODE(txnParticipant.unstashTransactionResources(opCtx, "insert"),
+                           AssertionException,
+                           ErrorCodes::NoSuchTransaction);
+    }
+}
+
+TEST_F(TxnParticipantTest, UnstashTransactionAfterActiveTxnNumberNoLongerCorrespondsToTransaction) {
+    auto clientOwned = getServiceContext()->makeClient("client");
+    AlternativeClientRegion acr(clientOwned);
+    auto opCtxHolder = cc().makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+    opCtx->setLogicalSessionId(_sessionId);
+    opCtx->setTxnNumber(_txnNumber);
+    opCtx->setInMultiDocumentTransaction();
+
+    {
+        MongoDOperationContextSession opCtxSession(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        txnParticipant.beginOrContinue(
+            opCtx, {*opCtx->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
+        // Invalidate the TransactionParticipant allow the txnNumber to be reused.
+        txnParticipant.invalidate(opCtx);
+    }
+
+    {
+        auto sideClientOwned = getServiceContext()->makeClient("sideClient");
+        AlternativeClientRegion acr(sideClientOwned);
+        auto sideOpCtx = cc().makeOperationContext();
+
+        sideOpCtx.get()->setLogicalSessionId(_sessionId);
+        sideOpCtx.get()->setTxnNumber(_txnNumber);
+        sideOpCtx.get()->setInMultiDocumentTransaction();
+        MongoDOperationContextSession sideOpCtxSession(sideOpCtx.get());
+        auto txnParticipant = TransactionParticipant::get(sideOpCtx.get());
+
+        txnParticipant.beginOrContinue(sideOpCtx.get(),
+                                       {*sideOpCtx.get()->getTxnNumber()},
+                                       boost::none /* autocommit */,
+                                       boost::none /* startTransaction */);
+    }
+
+    {
+        MongoDOperationContextSession opCtxSession(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        ASSERT_THROWS_CODE(txnParticipant.unstashTransactionResources(opCtx, "insert"),
+                           AssertionException,
+                           6611000);
+    }
+}
+
+TEST_F(TxnParticipantTest,
+       UnstashRetryableWriteAfterActiveTxnNumberNoLongerCorrespondsToRetryableWrite) {
+    auto clientOwned = getServiceContext()->makeClient("client");
+    AlternativeClientRegion acr(clientOwned);
+    auto opCtxHolder = cc().makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+    opCtx->setLogicalSessionId(_sessionId);
+    opCtx->setTxnNumber(_txnNumber);
+
+    {
+        MongoDOperationContextSession opCtxSession(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        txnParticipant.beginOrContinue(opCtx,
+                                       {*opCtx->getTxnNumber()},
+                                       boost::none /* autocommit */,
+                                       boost::none /* startTransaction */);
+        // Invalidate the TransactionParticipant allow the txnNumber to be reused.
+        txnParticipant.invalidate(opCtx);
+    }
+
+    {
+        auto sideClientOwned = getServiceContext()->makeClient("sideClient");
+        AlternativeClientRegion acr(sideClientOwned);
+        auto sideOpCtx = cc().makeOperationContext();
+
+        sideOpCtx.get()->setLogicalSessionId(_sessionId);
+        sideOpCtx.get()->setTxnNumber(_txnNumber);
+        sideOpCtx.get()->setInMultiDocumentTransaction();
+        MongoDOperationContextSession sideOpCtxSession(sideOpCtx.get());
+        auto txnParticipant = TransactionParticipant::get(sideOpCtx.get());
+
+        txnParticipant.beginOrContinue(sideOpCtx.get(),
+                                       {*sideOpCtx.get()->getTxnNumber()},
+                                       false /* autocommit */,
+                                       true /* startTransaction */);
+    }
+
+    {
+        MongoDOperationContextSession opCtxSession(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        ASSERT_THROWS_CODE(txnParticipant.unstashTransactionResources(opCtx, "insert"),
+                           AssertionException,
+                           6611001);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

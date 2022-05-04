@@ -962,6 +962,7 @@ private:
 
             modifiedDoc.setLastWriteDate(Date_t::now());
             modifiedDoc.setTxnNum(txnNumber);
+            modifiedDoc.setState(boost::none);
 
             // We set this timestamp to ensure that retry attempts fail with
             // IncompleteTransactionHistory. This is to stop us from double applying an
