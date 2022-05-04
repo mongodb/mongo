@@ -463,10 +463,11 @@ struct Collector {
                             CollectedInfo filterResult) {
         CollectedInfo result{};
 
+        const ProjectionNameSet& correlatedProjNames =
+            binaryJoinNode.getCorrelatedProjectionNames();
         {
             const ProjectionNameSet& leftProjections = leftChildResult.getProjections();
-            for (const ProjectionName& boundProjectionName :
-                 binaryJoinNode.getCorrelatedProjectionNames()) {
+            for (const ProjectionName& boundProjectionName : correlatedProjNames) {
                 uassert(6624099,
                         "Correlated projections must exist in left child.",
                         leftProjections.find(boundProjectionName) != leftProjections.cend());
@@ -474,7 +475,13 @@ struct Collector {
         }
 
         result.merge(std::move(leftChildResult));
+
+        for (const ProjectionName& correlatedProjName : correlatedProjNames) {
+            rightChildResult.resolveFreeVars(correlatedProjName,
+                                             result.defs.at(correlatedProjName));
+        }
         result.merge(std::move(rightChildResult));
+
         result.mergeNoDefs(std::move(filterResult));
 
         result.nodeDefs[&binaryJoinNode] = result.defs;

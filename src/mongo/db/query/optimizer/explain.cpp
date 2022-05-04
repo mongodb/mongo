@@ -1195,11 +1195,16 @@ public:
             .fieldName("joinType")
             .print(JoinTypeEnum::toString[static_cast<int>(node.getJoinType())]);
 
+        ProjectionNameOrderedSet ordered;
+        for (const ProjectionName& projName : node.getCorrelatedProjectionNames()) {
+            ordered.insert(projName);
+        }
+
         if constexpr (version < ExplainVersion::V3) {
             if (!node.getCorrelatedProjectionNames().empty()) {
                 printer.print(", {");
                 bool first = true;
-                for (const ProjectionName& projectionName : node.getCorrelatedProjectionNames()) {
+                for (const ProjectionName& projectionName : ordered) {
                     if (first) {
                         first = false;
                     } else {
@@ -1211,7 +1216,7 @@ public:
             }
         } else if constexpr (version == ExplainVersion::V3) {
             std::vector<ExplainPrinter> printers;
-            for (const ProjectionName& projectionName : node.getCorrelatedProjectionNames()) {
+            for (const ProjectionName& projectionName : ordered) {
                 ExplainPrinter local;
                 local.print(projectionName);
                 printers.push_back(std::move(local));
