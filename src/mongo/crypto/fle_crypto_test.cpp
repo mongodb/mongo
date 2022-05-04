@@ -512,11 +512,20 @@ public:
     }
 
     uint64_t getDocumentCount() const override {
+        if (_overrideCount) {
+            return *_overrideCount;
+        }
+
         return _docs.size();
+    }
+
+    void setOverrideCount(int64_t count) {
+        _overrideCount = count;
     }
 
 private:
     std::vector<BSONObj> _docs;
+    boost::optional<int64_t> _overrideCount;
 };
 
 // Test Empty Collection
@@ -573,10 +582,19 @@ TEST(FLE_ESC, EmuBinary) {
         coll.insert(doc);
     }
 
-    auto i = ESCCollection::emuBinary(coll, escTwiceTag, escTwiceValue);
 
-    ASSERT_TRUE(i.has_value());
-    ASSERT_EQ(i.value(), 5);
+    // Test with various fake counts to ensure enumBinary works with bad estimates and the original
+    // exact count.
+    int64_t origCount = coll.getDocumentCount();
+    std::vector<int64_t> testVectors{0, 2, 3, 13, 500, origCount};
+
+    for (const auto v : testVectors) {
+        coll.setOverrideCount(v);
+        auto i = ESCCollection::emuBinary(coll, escTwiceTag, escTwiceValue);
+
+        ASSERT_TRUE(i.has_value());
+        ASSERT_EQ(i.value(), 5);
+    }
 }
 
 
@@ -624,15 +642,23 @@ TEST(FLE_ESC, EmuBinary2) {
         coll.insert(doc);
     }
 
-    auto i = ESCCollection::emuBinary(coll, escTwiceTag, escTwiceValue);
+    // Test with various fake counts to ensure enumBinary works with bad estimates and the original
+    // exact count.
+    int64_t origCount = coll.getDocumentCount();
+    std::vector<int64_t> testVectors{0, 2, 5, 13, 19, 500, origCount};
 
-    ASSERT_TRUE(i.has_value());
-    ASSERT_EQ(i.value(), 13);
+    for (const auto v : testVectors) {
+        coll.setOverrideCount(v);
+        auto i = ESCCollection::emuBinary(coll, escTwiceTag, escTwiceValue);
 
-    i = ESCCollection::emuBinary(coll, escTwiceTag2, escTwiceValue2);
+        ASSERT_TRUE(i.has_value());
+        ASSERT_EQ(i.value(), 13);
 
-    ASSERT_TRUE(i.has_value());
-    ASSERT_EQ(i.value(), 5);
+        i = ESCCollection::emuBinary(coll, escTwiceTag2, escTwiceValue2);
+
+        ASSERT_TRUE(i.has_value());
+        ASSERT_EQ(i.value(), 5);
+    }
 }
 
 // Test Emulated Binary with null record

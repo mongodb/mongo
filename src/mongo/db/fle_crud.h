@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/transaction_api.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -313,7 +314,9 @@ public:
  */
 class FLEQueryInterfaceImpl : public FLEQueryInterface {
 public:
-    FLEQueryInterfaceImpl(const txn_api::TransactionClient& txnClient) : _txnClient(txnClient) {}
+    FLEQueryInterfaceImpl(const txn_api::TransactionClient& txnClient,
+                          ServiceContext* serviceContext)
+        : _txnClient(txnClient), _serviceContext(serviceContext) {}
 
     BSONObj getById(const NamespaceString& nss, BSONElement element) final;
 
@@ -348,6 +351,7 @@ public:
 
 private:
     const txn_api::TransactionClient& _txnClient;
+    ServiceContext* _serviceContext;
 };
 
 /**

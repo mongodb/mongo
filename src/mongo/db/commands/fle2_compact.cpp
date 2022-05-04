@@ -630,7 +630,7 @@ CompactStats processFLECompact(OperationContext* opCtx,
             opCtx,
             [sharedBlock, c, ecocStats](const txn_api::TransactionClient& txnClient,
                                         ExecutorPtr txnExec) {
-                FLEQueryInterfaceImpl queryImpl(txnClient);
+                FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
 
                 auto [request2, namespaces2] = *sharedBlock.get();
 
@@ -659,7 +659,7 @@ CompactStats processFLECompact(OperationContext* opCtx,
             opCtx,
             [sharedBlock, escStats, eccStats](const txn_api::TransactionClient& txnClient,
                                               ExecutorPtr txnExec) {
-                FLEQueryInterfaceImpl queryImpl(txnClient);
+                FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
 
                 auto [ecocDoc2, namespaces2] = *sharedBlock.get();
 
