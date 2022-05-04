@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/util/assert_util.h"
@@ -303,7 +304,7 @@ void doFLERewriteInTxn(OperationContext* opCtx,
             };
 
             // Construct FLE rewriter from the transaction client and encryptionInformation.
-            auto queryInterface = FLEQueryInterfaceImpl(txnClient);
+            auto queryInterface = FLEQueryInterfaceImpl(txnClient, getGlobalServiceContext());
             auto escReader = makeCollectionReader(&queryInterface, sharedBlock->esc);
             auto eccReader = makeCollectionReader(&queryInterface, sharedBlock->ecc);
 

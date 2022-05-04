@@ -482,6 +482,12 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
     // step 4, 5: get document count
     uint64_t rho = reader.getDocumentCount();
 
+    // Since fast count() is not reliable, if it says zero, try 1 instead just to be sure the
+    // collection is empty.
+    if (rho == 0) {
+        rho = 1;
+    }
+
 #ifdef DEBUG_ENUM_BINARY
     std::cout << fmt::format("start: lambda: {}, i: {}, rho: {}", lambda, i, rho) << std::endl;
 #endif
