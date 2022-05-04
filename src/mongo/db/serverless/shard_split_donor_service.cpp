@@ -59,6 +59,7 @@ MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterBlocking);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterDecision);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitWaitForSplitAcceptance);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeRecipientCleanup);
+MONGO_FAIL_POINT_DEFINE(skipShardSplitRecipientCleanup);
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
@@ -337,8 +338,6 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
     _markKilledExecutor->startup();
     _cancelableOpCtxFactory.emplace(primaryToken, _markKilledExecutor);
 
-    pauseShardSplitBeforeRecipientCleanup.pauseWhileSet();
-
     const bool shouldRemoveStateDocumentOnRecipient = [&]() {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
         stdx::lock_guard<Latch> lg(_mutex);
@@ -346,12 +345,20 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
     }();
 
     if (shouldRemoveStateDocumentOnRecipient) {
+        if (MONGO_unlikely(pauseShardSplitBeforeRecipientCleanup.shouldFail())) {
+            pauseShardSplitBeforeRecipientCleanup.pauseWhileSet();
+        }
+
         LOGV2(6309000,
               "Cancelling and cleaning up shard split operation on recipient in blocking state.",
               "id"_attr = _migrationId);
         _decisionPromise.setWith([&] {
             return ExecutorFuture(**executor)
                 .then([this, executor, primaryToken, anchor = shared_from_this()] {
+                    if (MONGO_unlikely(skipShardSplitRecipientCleanup.shouldFail())) {
+                        return ExecutorFuture(**executor);
+                    }
+
                     return _cleanRecipientStateDoc(executor, primaryToken);
                 })
                 .then([this, executor, migrationId = _migrationId]() {

@@ -392,6 +392,11 @@ void ShardSplitDonorOpObserver::onDelete(OperationContext* opCtx,
     }
 
     opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
+        // Donor access blockers are removed from donor nodes via the shard split op observer.
+        // Donor access blockers are removed from recipient nodes when the node applies the
+        // recipient config. When the recipient primary steps up it will delete its state
+        // document, the call to remove access blockers there will be a no-op.
+
         auto& registry = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
         for (auto& tenantId : *tenantIdsToDeleteDecoration(opCtx)) {
             registry.remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);

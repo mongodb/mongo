@@ -55,8 +55,7 @@ assert(findMigration(donorPrimary, migrationId), "There must be a config documen
 
 // we do not recover access blockers for kAborted marked for garbage collection
 tenantIds.every(tenantId => {
-    assert.isnull(
-        test.getTenantMigrationAccessBlocker({donorNode: donorPrimary, tenantId: tenantId}));
+    assert.isnull(test.getTenantMigrationAccessBlocker({node: donorPrimary, tenantId}));
 });
 
 test.stop();

@@ -34,6 +34,8 @@
 #define LOGV2_FOR_HEARTBEATS(ID, DLEVEL, MESSAGE, ...) \
     LOGV2_DEBUG_OPTIONS(                               \
         ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
+#define LOGV2_FOR_SHARD_SPLIT(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kTenantMigration}, MESSAGE, ##__VA_ARGS__)
 
 #include "mongo/platform/basic.h"
 
@@ -55,6 +57,7 @@
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/service_context.h"
@@ -843,6 +846,17 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
 
         if (!isArbiter && myIndex.isOK() && myIndex.getValue() != -1) {
             shouldStartDataReplication = true;
+        }
+
+        if (isRecipientConfig) {
+            // Donor access blockers are removed from donor nodes via the shard split op observer.
+            // Donor access blockers are removed from recipient nodes when the node applies the
+            // recipient config. When the recipient primary steps up it will delete its state
+            // document, the call to remove access blockers there will be a no-op.
+
+            LOGV2_FOR_SHARD_SPLIT(8423354, 1, "Removing donor access blockers on recipient node.");
+            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                .removeAll(TenantMigrationAccessBlocker::BlockerType::kDonor);
         }
 
         LOGV2_FOR_HEARTBEATS(

@@ -246,19 +246,15 @@ class BasicServerlessTest {
      * @param {donorNode} donor node on which the request will be sent.
      * @param {tenantId} tenant id to lookup for tenant access blockers.
      */
-    getTenantMigrationAccessBlocker({donorNode, tenantId}) {
-        const res = donorNode.adminCommand({serverStatus: 1});
-        assert.commandWorked(res);
-
+    getTenantMigrationAccessBlocker({node, tenantId}) {
+        const res = assert.commandWorked(node.adminCommand({serverStatus: 1}));
         const tenantMigrationAccessBlocker = res.tenantMigrationAccessBlocker;
-
         if (!tenantMigrationAccessBlocker) {
             return undefined;
         }
 
         tenantMigrationAccessBlocker.donor =
             tenantMigrationAccessBlocker[tenantId] && tenantMigrationAccessBlocker[tenantId].donor;
-
         return tenantMigrationAccessBlocker;
     }
 
@@ -286,8 +282,8 @@ class BasicServerlessTest {
                 node.getCollection(BasicServerlessTest.kConfigSplitDonorsNS).count({
                     _id: migrationId
                 }) === 0;
-            const allAccessBlockersRemoved = tenantIds.every(
-                id => this.getTenantMigrationAccessBlocker({donorNode: node, id}) == null);
+            const allAccessBlockersRemoved =
+                tenantIds.every(id => this.getTenantMigrationAccessBlocker({node, id}) == null);
 
             const result = donorDocumentDeleted && allAccessBlockersRemoved;
             if (!result) {
@@ -301,7 +297,7 @@ class BasicServerlessTest {
 
                 if (!allAccessBlockersRemoved) {
                     const tenantsWithBlockers = tenantIds.filter(
-                        id => this.getTenantMigrationAccessBlocker({donorNode: node, id}) != null);
+                        id => this.getTenantMigrationAccessBlocker({node, id}) != null);
                     status.push(`access blockers to be removed (${tenantsWithBlockers})`);
                 }
             }
@@ -329,7 +325,7 @@ class BasicServerlessTest {
         const stateDoc = findMigration(donorPrimary, migrationId);
         assert.soon(() => tenantIds.every(tenantId => {
             const donorMtab =
-                this.getTenantMigrationAccessBlocker({donorNode: donorPrimary, tenantId}).donor;
+                this.getTenantMigrationAccessBlocker({node: donorPrimary, tenantId}).donor;
             const tenantAccessBlockersBlockRW = donorMtab.state == expectedState;
 
             const tenantAccessBlockersBlockTimestamp =
