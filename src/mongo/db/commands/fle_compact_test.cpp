@@ -600,17 +600,24 @@ TEST_F(FleCompactTest, CompactValueWithECCEntriesWithoutNullAndAllEntriesDeleted
     deleteFieldValues(key, values);
     assertDocumentCounts(0, 10, 10, 20);
 
-    // compact should clear ESC and ECC for each value
+    // compact should still insert null docs in ESC for each value
+    // compact only inserts a null doc in ECC if a merge squashes entries (i.e. only for val2)
     auto testPair = BSON(key << val1);
     auto ecocDoc = generateTestECOCDocument(testPair);
 
     compactOneFieldValuePair(_queryImpl.get(), ecocDoc, _namespaces, &escStats, &eccStats);
-    assertDocumentCounts(0, 9, 9, 20);
+    assertDocumentCounts(0, 10, 10, 20);
+    assertESCNullDocument(testPair, true, 1, 1);
+    assertECCNullDocument(testPair, false, 0);
+    assertECCDocument(testPair, true, 1, 1, 1);
 
     testPair = BSON(key << val2);
     ecocDoc = generateTestECOCDocument(testPair);
     compactOneFieldValuePair(_queryImpl.get(), ecocDoc, _namespaces, &escStats, &eccStats);
-    assertDocumentCounts(0, 0, 0, 20);
+    assertDocumentCounts(0, 2, 3, 20);
+    assertESCNullDocument(testPair, true, 9, 9);
+    assertECCNullDocument(testPair, true, 9);
+    assertECCDocument(testPair, true, 11, 1, 9);
 }
 
 TEST_F(FleCompactTest, CompactValueWithECCEntriesWithNullAndAllEntriesDeleted) {
@@ -626,7 +633,7 @@ TEST_F(FleCompactTest, CompactValueWithECCEntriesWithNullAndAllEntriesDeleted) {
     insertFieldValues(key, values);
     assertDocumentCounts(10, 10, 0, 10);
 
-    // delete entries 1, 4, and 5 (ECC inserts at pos 1 to 3)
+    // delete entries 4, 5, and 1 (ECC inserts at pos 1 to 3)
     values[val].toDeleteRanges = {{4, 5}, {1, 1}};
     deleteFieldValues(key, values);
     assertDocumentCounts(7, 10, 3, 13);
@@ -638,12 +645,13 @@ TEST_F(FleCompactTest, CompactValueWithECCEntriesWithNullAndAllEntriesDeleted) {
     // null doc inserted with pos of 3
     compactOneFieldValuePair(_queryImpl.get(), ecocDoc, _namespaces, &escStats, &eccStats);
     assertDocumentCounts(7, 1, 3, 13);
+    assertESCNullDocument(testPair, true, 10, 10);
     assertECCNullDocument(testPair, true, 3);
     assertECCDocument(testPair, false, 4, 0, 0);
     assertECCDocument(testPair, true, 5, 1, 1);
     assertECCDocument(testPair, true, 6, 4, 5);
 
-    // delete entries 2, 8, and 9 (ECC inserts at pos 7 to 9)
+    // delete entries 8, 9, and 2 (ECC inserts at pos 7 to 9)
     values[val].toDeleteRanges = {{8, 9}, {2, 2}};
     deleteFieldValues(key, values);
     assertDocumentCounts(4, 1, 6, 16);
@@ -670,9 +678,13 @@ TEST_F(FleCompactTest, CompactValueWithECCEntriesWithNullAndAllEntriesDeleted) {
     assertECCDocument(testPair, true, 16, 7, 7);
     assertECCDocument(testPair, true, 17, 10, 10);
 
-    // final compact clears the ESC and ECC
+    // final compact squashes ECC entries (inserts placeholder at 18, merged doc at 19)
+    // and updates null doc
     compactOneFieldValuePair(_queryImpl.get(), ecocDoc, _namespaces, &escStats, &eccStats);
-    assertDocumentCounts(0, 0, 0, 20);
+    assertDocumentCounts(0, 1, 2, 20);
+    assertECCNullDocument(testPair, true, 17);
+    assertECCDocument(testPair, false, 18, 0, 0);
+    assertECCDocument(testPair, true, 19, 1, 10);
 }
 
 TEST_F(FleCompactTest, CompactValueWithECCEntriesThatAreNotMergeable) {
