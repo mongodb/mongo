@@ -120,6 +120,14 @@ class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
         fh.fh_lock(session, False)
         fh.close(session)
 
+        # Attempt to open a file with incorrect name.
+        if self.ss_name == 's3_store':
+            msg = 'No such file or directory'
+            with self.expectedStderrPattern('.*request to S3 failed.*'):
+                self.assertRaisesException(wiredtiger.WiredTigerError, 
+                    lambda: fs.fs_open_file(session, 'foobar2', FileSystem.open_file_type_data, 
+                        FileSystem.open_readonly), msg)
+
         # Files that have been flushed cannot be manipulated.
         with self.expectedStderrPattern('foobar: rename of file not supported'):
             self.assertRaisesException(wiredtiger.WiredTigerError,

@@ -37,6 +37,14 @@
 #include <string>
 #include <vector>
 
+// Mapping between HTTP response codes and corresponding errno values to be used by the S3
+// connection methods to return errno values expected by the filesystem interface.
+static const std::map<Aws::Http::HttpResponseCode, int32_t> toErrno = {
+  {Aws::Http::HttpResponseCode::NOT_FOUND, ENOENT},
+  {Aws::Http::HttpResponseCode::FORBIDDEN, EACCES}, {Aws::Http::HttpResponseCode::CONFLICT, EBUSY},
+  {Aws::Http::HttpResponseCode::BAD_REQUEST, EINVAL},
+  {Aws::Http::HttpResponseCode::INTERNAL_SERVER_ERROR, EAGAIN}};
+
 // This class represents an active connection to the AWS S3 endpoint and allows for interaction with
 // S3-Crt client. The S3Connection exposes an API to list the bucket contents filtered by a
 // directory and a prefix, check for an object's existence in the bucket, put an object to the
