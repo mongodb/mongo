@@ -333,15 +333,6 @@ components:
     is_test_only: true
     team_owner: "Wiredtiger"
 
-  yhirose/cpp-peglib:
-    homepage_url: https://github.com/yhirose/cpp-peglib
-    open_hub_url: N/A
-    release_monitoring_id: -1
-    local_directory_path: src/third_party/peglib
-    team_owner: "Query"
-    # Note: peglib exists in Black Duck, but not OpenHub
-    upgrade_suppression: TODO SERVER-57940
-
   zlib:
     homepage_url: https://www.zlib.net/
     open_hub_url: https://www.openhub.net/p/zlib

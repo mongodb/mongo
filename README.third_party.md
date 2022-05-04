@@ -38,7 +38,6 @@ a notice will be included in
 | [MurmurHash3]              | Public Domain     | Unknown + changes |          ✗           |                ✗                |
 | [ocspbuilder]              | MIT               | 0.10.2            |                      |                                 |
 | [ocspresponder]            | Apache-2.0        | 0.5.0             |                      |                                 |
-| [peglib]                   | MIT               | 0.1.12            |                      |                ✗                |
 | [Pcre]                     | BSD-3-Clause      | 8.42              |                      |                ✗                |
 | [pcre2]                    | BSD-3-Clause      | 10.39             |                      |                ✗                |
 | [S2]                       | Apache-2.0        | Unknown           |          ✗           |                ✗                |
@@ -73,7 +72,6 @@ a notice will be included in
 [MurmurHash3]: https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
 [ocspbuilder]: https://github.com/wbond/ocspbuilder
 [ocspresponder]: https://github.com/threema-ch/ocspresponder
-[peglib]: https://github.com/yhirose/cpp-peglib
 [Pcre]: http://www.pcre.org/
 [pcre2]: http://www.pcre.org/
 [S2]: https://github.com/google/s2geometry
