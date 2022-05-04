@@ -973,7 +973,11 @@ __curhs_insert(WT_CURSOR *cursor)
     /* Do a search again and call next to check the key order. */
     ret = __curhs_file_cursor_search_near(session, file_cursor, &exact);
     WT_ASSERT(session, ret == 0);
-    /* FIXME: WT-9164 Figure out whether we need to assert exact. */
+    /*
+     * If a globally visible tombstone is inserted and the page is evicted during search_near then
+     * the key would be removed. Hence, a search_near would return a non-zero exact value.
+     * Therefore, check that exact is zero before calling next.
+     */
     if (exact == 0)
         WT_ERR_NOTFOUND_OK(__curhs_file_cursor_next(session, file_cursor), false);
 #endif
