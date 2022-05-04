@@ -77,11 +77,11 @@ public:
                                                      ExplainOptions::Verbosity) const final;
 
 private:
-    boost::optional<BSONObj> buildExecPlanDebugInfo(
-        const sbe::PlanStage* root, const stage_builder::PlanStageData* data) const {
+    static boost::optional<BSONObj> buildExecPlanDebugInfo(
+        const sbe::PlanStage* root, const stage_builder::PlanStageData* data) {
         if (root && data) {
             return BSON("slots" << data->debugString() << "stages"
-                                << sbe::DebugPrinter().print(*_root));
+                                << sbe::DebugPrinter().print(*root));
         }
         return boost::none;
     }
