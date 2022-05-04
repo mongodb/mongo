@@ -329,6 +329,7 @@ variables:
   - enterprise-rhel-70-64-bit-kitchen-sink
   - enterprise-rhel-71-ppc64le
   - enterprise-rhel-71-ppc64le-inmem
+  - enterprise-rhel-72-s390x
   - enterprise-rhel-80-64-bit
   - enterprise-rhel-81-ppc64le
   - enterprise-suse12-64
@@ -9648,6 +9649,63 @@ buildvariants:
   - name: .jscore .common !.auth
   - name: jsCore_op_query
   - name: .aggfuzzer .common !.multiversion
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: .read_write_concern
+  - name: replica_sets
+  - name: .replica_sets .common
+  - name: sasl
+  - name: secondary_reads_passthrough_gen
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .common !.mixed_version
+  - name: snmp
+  - name: .stitch
+  - name: .publish
+    distros:
+    - rhel70-small
+
+- name: enterprise-rhel-72-s390x
+  display_name: Enterprise RHEL 7.2 s390x
+  modules:
+  - enterprise
+  run_on:
+  - rhel72-zseries-small
+  batchtime: 10080 # 7 days
+  stepback: false
+  expansions:
+    compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    resmoke_jobs_max: 2
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: s390x
+    packager_distro: rhel72
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: s390x-enterprise-rhel72
+    repo_edition: enterprise
+    tooltags: "ssl sasl gssapi"
+    build_mongoreplay: true
+    multiversion_platform: rhel72
+    multiversion_architecture: s390x
+    multiversion_edition: enterprise
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel72-zseries-large
+  - name: .aggregation .common
+  - name: audit
+  - name: .auth !.multiversion !.jscore
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency_gen
+  - name: .encrypt
+  - name: .integration !.audit
+    distros:
+    - rhel72-zseries-large
+  - name: .jscore .common !.auth
+  - name: jsCore_op_query
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: .read_write_concern
