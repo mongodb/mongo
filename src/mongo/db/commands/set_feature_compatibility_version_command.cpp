@@ -110,6 +110,7 @@ MONGO_FAIL_POINT_DEFINE(failDowngrading);
 MONGO_FAIL_POINT_DEFINE(hangWhileDowngrading);
 MONGO_FAIL_POINT_DEFINE(hangBeforeUpdatingFcvDoc);
 MONGO_FAIL_POINT_DEFINE(hangBeforeDrainingMigrations);
+MONGO_FAIL_POINT_DEFINE(hangBeforeUpdatingSessionDocs);
 
 /**
  * Ensures that only one instance of setFeatureCompatibilityVersion can run at a given time.
@@ -1048,8 +1049,28 @@ private:
     void _updateSessionDocuments(OperationContext* opCtx,
                                  const LogicalSessionIdMap<TxnNumber>& parentLsidToTxnNum) {
         DBDirectClient client(opCtx);
-        write_ops::UpdateCommandRequest updateOp(
-            NamespaceString::kSessionTransactionsTableNamespace);
+
+        auto runUpdates = [&](std::vector<write_ops::UpdateOpEntry> updates) {
+            hangBeforeUpdatingSessionDocs.pauseWhileSet(opCtx);
+
+            write_ops::UpdateCommandRequest updateOp(
+                NamespaceString::kSessionTransactionsTableNamespace);
+            updateOp.setUpdates(updates);
+            updateOp.getWriteCommandRequestBase().setOrdered(false);
+            auto updateReply = client.update(updateOp);
+            if (auto& writeErrors = updateReply.getWriteErrors()) {
+                for (auto&& writeError : *writeErrors) {
+                    if (writeError.getStatus() == ErrorCodes::DuplicateKey) {
+                        // There is a transaction or retryable write with a higher txnNumber that
+                        // committed between when the check below was done and when the write was
+                        // applied.
+                        continue;
+                    }
+                    uassertStatusOK(writeError.getStatus());
+                }
+            }
+        };
+
         std::vector<write_ops::UpdateOpEntry> updates;
         for (const auto& [lsid, txnNumber] : parentLsidToTxnNum) {
             SessionTxnRecord modifiedDoc;
@@ -1083,24 +1104,21 @@ private:
             modifiedDoc.setLastWriteOpTime(repl::OpTime(Timestamp(1, 0), 1));
 
             write_ops::UpdateOpEntry updateEntry;
-            updateEntry.setQ(BSON("_id" << lsid.toBSON()));
+            updateEntry.setQ(BSON("_id" << lsid.toBSON() << "txnNum"
+                                        << BSON("$lte" << modifiedDoc.getTxnNum())));
             updateEntry.setU(
                 write_ops::UpdateModification::parseFromClassicUpdate(modifiedDoc.toBSON()));
             updateEntry.setUpsert(true);
             updates.push_back(updateEntry);
 
             if (updates.size() == write_ops::kMaxWriteBatchSize) {
-                updateOp.setUpdates(updates);
-                auto response = client.runCommand(updateOp.serialize({}));
-                uassertStatusOK(getStatusFromWriteCommandReply(response->getCommandReply()));
+                runUpdates(updates);
                 updates.clear();
             }
         }
 
         if (updates.size() > 0) {
-            updateOp.setUpdates(updates);
-            auto response = client.runCommand(updateOp.serialize({}));
-            uassertStatusOK(getStatusFromWriteCommandReply(response->getCommandReply()));
+            runUpdates(updates);
         }
     }
 
