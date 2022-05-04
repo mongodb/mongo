@@ -76,18 +76,31 @@ def generate_test_execution_aliases(env, test):
             continue
 
         source_name = source_base_name[:dot_idx]
-        if target_name == source_name:
-            continue
 
-        source_command = env.Command(
-            target=f"#+{source_name}",
+        # We currently create two types of commands: legacy and verbose
+        # ex legacy command: cancelable_operation_context_test
+        # ex verbose command: db_unittest_test_cancelable_operation_context_test
+        # i.e. Verbose incorporates the name of the unittest binary, while
+        # legacy only has the source file name.
+        # We always create the verbose command, but we only create the legacy
+        # command if there isn't a conflict between the target_name and
+        # source_name. Legacy commands must be unique
+        verbose_source_command = env.Command(
+            target=f"#+{target_name}-{source_name}",
             source=installed[0],
             action="$( $ICERUN $) ${SOURCES[0]} -fileNameFilter $TEST_SOURCE_FILE_NAME $UNITTEST_FLAGS",
             TEST_SOURCE_FILE_NAME=source_name,
             NINJA_POOL="console",
         )
-        env.Pseudo(source_command)
-        env.Alias('test-execution-aliases', source_command)
+        env.Pseudo(verbose_source_command)
+        env.Alias('test-execution-aliases', verbose_source_command)
+
+        if target_name == source_name:
+            continue
+
+        alias = env.Alias(f'+{source_name}', verbose_source_command)
+        if len(alias[0].children()) > 1:
+            raise SCons.Errors.BuildError(alias[0].children()[0], f"Multiple unit test programs contain a source file named '{source_name}' which would result in an ambiguous test execution alias. Unit test source filenames are required to be globally unique.")
 
     proof_generator_command = env.Command(
         target=[
