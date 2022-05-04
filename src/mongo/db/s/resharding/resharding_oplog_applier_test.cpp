@@ -244,7 +244,6 @@ public:
         return {repl::DurableOplogEntry(opTime,
                                         boost::none /* hash */,
                                         opType,
-                                        boost::none /* tenant id */,
                                         kCrudNs,
                                         kCrudUUID,
                                         false /* fromMigrate */,

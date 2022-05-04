@@ -53,12 +53,9 @@ OplogEntry createOplogEntryForTransactionTableUpdate(repl::OpTime opTime,
                                                      const BSONObj& updateBSON,
                                                      const BSONObj& o2Field,
                                                      Date_t wallClockTime) {
-    // The transaction table (config.transactions) is currently shared by all tenants, so an update
-    // to it is not expected to have a tenant id
     return {repl::DurableOplogEntry(opTime,
                                     boost::none,  // hash
                                     repl::OpTypeEnum::kUpdate,
-                                    boost::none,  // tenant id
                                     NamespaceString::kSessionTransactionsTableNamespace,
                                     boost::none,  // uuid
                                     false,        // fromMigrate

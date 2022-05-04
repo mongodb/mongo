@@ -419,7 +419,6 @@ OplogEntry makeOplogEntry(OpTime opTime,
     return {DurableOplogEntry(opTime,                     // optime
                               boost::none,                // hash
                               opType,                     // opType
-                              boost::none,                // tenant id
                               std::move(nss),             // namespace
                               uuid,                       // uuid
                               fromMigrate,                // fromMigrate

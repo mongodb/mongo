@@ -175,7 +175,6 @@ OplogEntry makeInsertOplogEntry(int t, const NamespaceString& nss, boost::option
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
                               boost::none,                 // hash
                               OpTypeEnum::kInsert,         // op type
-                              boost::none,                 // tenant id
                               nss,                         // namespace
                               uuid,                        // uuid
                               boost::none,                 // fromMigrate
@@ -208,7 +207,6 @@ OplogEntry makeUpdateOplogEntry(int t,
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
                               boost::none,                 // hash
                               OpTypeEnum::kUpdate,         // op type
-                              boost::none,                 // tenant id
                               nss,                         // namespace
                               uuid,                        // uuid
                               boost::none,                 // fromMigrate
@@ -232,7 +230,6 @@ OplogEntry makeNoopOplogEntry(int t, const StringData& msg) {
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
                               boost::none,                 // hash
                               OpTypeEnum::kNoop,           // op type
-                              boost::none,                 // tenant id
                               NamespaceString(""),         // namespace
                               boost::none,                 // uuid
                               boost::none,                 // fromMigrate
@@ -268,7 +265,6 @@ OplogEntry makeApplyOpsOplogEntry(int t, bool prepare, const std::vector<OplogEn
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
                               boost::none,                 // hash
                               OpTypeEnum::kCommand,        // op type
-                              boost::none,                 // tenant id
                               nss,                         // namespace
                               boost::none,                 // uuid
                               boost::none,                 // fromMigrate
@@ -304,7 +300,6 @@ OplogEntry makeCommitTransactionOplogEntry(int t, StringData dbName, bool prepar
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
                               boost::none,                 // hash
                               OpTypeEnum::kCommand,        // op type
-                              boost::none,                 // tenant id
                               nss,                         // namespace
                               boost::none,                 // uuid
                               boost::none,                 // fromMigrate
@@ -367,7 +362,6 @@ OplogEntry makeLargeTransactionOplogEntries(int t,
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
                               boost::none,                 // hash
                               OpTypeEnum::kCommand,        // op type
-                              boost::none,                 // tenant id
                               nss,                         // namespace
                               boost::none,                 // uuid
                               boost::none,                 // fromMigrate

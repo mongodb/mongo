@@ -70,7 +70,6 @@ repl::OplogEntry makeOplogEntry(
         repl::DurableOplogEntry(opTime,                           // optime
                                 boost::none,                      // hash
                                 opType,                           // opType
-                                boost::none,                      // tenant id
                                 nss,                              // namespace
                                 uuid,                             // uuid
                                 boost::none,                      // fromMigrate

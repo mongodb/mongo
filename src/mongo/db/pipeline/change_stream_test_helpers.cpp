@@ -102,7 +102,6 @@ repl::OplogEntry makeOplogEntry(repl::OpTypeEnum opType,
     return {repl::DurableOplogEntry(opTime ? *opTime : kDefaultOpTime,  // optime
                                     hash,                               // hash
                                     opType,                             // opType
-                                    boost::none,                        // tenant id
                                     nss,                                // namespace
                                     uuid,                               // uuid
                                     fromMigrate,                        // fromMigrate

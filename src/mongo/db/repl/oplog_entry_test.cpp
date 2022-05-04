@@ -31,6 +31,7 @@
 
 #include "mongo/db/repl/idempotency_test_fixture.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -55,6 +56,7 @@ TEST(OplogEntryTest, Update) {
     ASSERT_BSONOBJ_EQ(entry.getObjectContainingDocumentKey(), doc);
     ASSERT(entry.getCommandType() == OplogEntry::CommandType::kNotCommand);
     ASSERT_EQ(entry.getOpTime(), entryOpTime);
+    ASSERT(!entry.getTid());
 }
 
 TEST(OplogEntryTest, Insert) {
@@ -70,6 +72,7 @@ TEST(OplogEntryTest, Insert) {
     ASSERT_BSONOBJ_EQ(entry.getObjectContainingDocumentKey(), doc);
     ASSERT(entry.getCommandType() == OplogEntry::CommandType::kNotCommand);
     ASSERT_EQ(entry.getOpTime(), entryOpTime);
+    ASSERT(!entry.getTid());
 }
 
 TEST(OplogEntryTest, Delete) {
@@ -85,6 +88,7 @@ TEST(OplogEntryTest, Delete) {
     ASSERT_BSONOBJ_EQ(entry.getObjectContainingDocumentKey(), doc);
     ASSERT(entry.getCommandType() == OplogEntry::CommandType::kNotCommand);
     ASSERT_EQ(entry.getOpTime(), entryOpTime);
+    ASSERT(!entry.getTid());
 }
 
 TEST(OplogEntryTest, Create) {
@@ -102,6 +106,7 @@ TEST(OplogEntryTest, Create) {
                       BSON("create" << nss.coll() << "capped" << true << "size" << 15));
     ASSERT(entry.getCommandType() == OplogEntry::CommandType::kCreate);
     ASSERT_EQ(entry.getOpTime(), entryOpTime);
+    ASSERT(!entry.getTid());
 }
 
 TEST(OplogEntryTest, OpTimeBaseNonStrictParsing) {
@@ -135,6 +140,20 @@ TEST(OplogEntryTest, OpTimeBaseNonStrictParsing) {
         40414);
 }
 
+TEST(OplogEntryTest, InsertIncludesTidField) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    const BSONObj doc = BSON("_id" << docId << "a" << 5);
+    TenantId tid(OID::gen());
+    NamespaceString nss(tid, "foo", "bar");
+    const auto entry =
+        makeOplogEntry(entryOpTime, OpTypeEnum::kInsert, nss, doc, boost::none, {}, Date_t::now());
+
+    ASSERT(entry.getTid());
+    ASSERT_EQ(*entry.getTid(), tid);
+    ASSERT_EQ(entry.getNss(), nss);
+    ASSERT_BSONOBJ_EQ(entry.getIdElement().wrap("_id"), BSON("_id" << docId));
+    ASSERT_BSONOBJ_EQ(entry.getOperationToApply(), doc);
+}
 
 }  // namespace
 }  // namespace repl

@@ -64,7 +64,6 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         opTime,                           // optime
         0,                                // hash
         repl::OpTypeEnum::kInsert,        // opType
-        boost::none,                      // tenant id
         NamespaceString("a.b"),           // namespace
         boost::none,                      // uuid
         boost::none,                      // fromMigrate

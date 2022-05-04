@@ -87,7 +87,6 @@ BSONObj makeNoopOplogEntry(OpTime opTime) {
         repl::DurableOplogEntry(opTime,                           // optime
                                 boost::none,                      // hash
                                 OpTypeEnum ::kNoop,               // opType
-                                boost::none,                      // tenant id
                                 NamespaceString("test.t"),        // namespace
                                 boost::none,                      // uuid
                                 boost::none,                      // fromMigrate

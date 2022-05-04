@@ -35,6 +35,7 @@
 
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/time_support.h"
 
@@ -49,7 +50,6 @@ namespace {
 BSONObj makeOplogEntryDoc(OpTime opTime,
                           const boost::optional<int64_t> hash,
                           OpTypeEnum opType,
-                          const boost::optional<TenantId>& tid,
                           const NamespaceString& nss,
                           const boost::optional<UUID>& uuid,
                           const boost::optional<bool>& fromMigrate,
@@ -75,8 +75,10 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     builder.append(OplogEntryBase::kTermFieldName, opTime.getTerm());
     builder.append(OplogEntryBase::kVersionFieldName, version);
     builder.append(OplogEntryBase::kOpTypeFieldName, OpType_serializer(opType));
-    if (tid) {
-        builder.append(OplogEntryBase::kTidFieldName, tid.get().toString());
+    // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
+    if (nss.tenantId() &&
+        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+        nss.tenantId()->serializeToBSON(OplogEntryBase::kTidFieldName, &builder);
     }
     builder.append(OplogEntryBase::kNssFieldName, nss.toString());
     builder.append(OplogEntryBase::kWallClockTimeFieldName, wallClockTime);
@@ -319,7 +321,6 @@ DurableOplogEntry::DurableOplogEntry(BSONObj rawInput) : _raw(std::move(rawInput
 DurableOplogEntry::DurableOplogEntry(OpTime opTime,
                                      const boost::optional<int64_t> hash,
                                      OpTypeEnum opType,
-                                     const boost::optional<TenantId>& tid,
                                      const NamespaceString& nss,
                                      const boost::optional<UUID>& uuid,
                                      const boost::optional<bool>& fromMigrate,
@@ -339,7 +340,6 @@ DurableOplogEntry::DurableOplogEntry(OpTime opTime,
     : DurableOplogEntry(makeOplogEntryDoc(opTime,
                                           hash,
                                           opType,
-                                          tid,
                                           nss,
                                           uuid,
                                           fromMigrate,

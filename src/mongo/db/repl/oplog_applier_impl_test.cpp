@@ -2707,7 +2707,6 @@ public:
             opTime,         // optime
             boost::none,    // hash
             opType,         // opType
-            boost::none,    // tenant id
             ns,             // namespace
             boost::none,    // uuid
             boost::none,    // fromMigrate
@@ -2740,7 +2739,6 @@ public:
             opTime,         // optime
             boost::none,    // hash
             opType,         // opType
-            boost::none,    // tenant id
             ns,             // namespace
             boost::none,    // uuid
             true,           // fromMigrate

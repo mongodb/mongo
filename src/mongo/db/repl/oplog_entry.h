@@ -445,7 +445,6 @@ public:
     DurableOplogEntry(OpTime opTime,
                       boost::optional<int64_t> hash,
                       OpTypeEnum opType,
-                      const boost::optional<TenantId>& tid,
                       const NamespaceString& nss,
                       const boost::optional<UUID>& uuid,
                       const boost::optional<bool>& fromMigrate,
