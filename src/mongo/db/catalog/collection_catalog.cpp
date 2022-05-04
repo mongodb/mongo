@@ -234,24 +234,46 @@ void CollectionCatalog::onOpenCatalog(OperationContext* opCtx) {
 }
 
 Collection* CollectionCatalog::lookupCollectionByUUID(CollectionUUID uuid) const {
+    size_t hash = _catalog.hash_function()(uuid);
     stdx::lock_guard<Latch> lock(_catalogLock);
-    return _lookupCollectionByUUID(lock, uuid);
+    return _lookupCollectionByUUID(lock, uuid, hash);
 }
 
-Collection* CollectionCatalog::_lookupCollectionByUUID(WithLock, CollectionUUID uuid) const {
-    auto foundIt = _catalog.find(uuid);
+std::pair<Collection*, boost::optional<NamespaceString>>
+CollectionCatalog::lookupCollectionByUUIDAndVerifyNamespace(CollectionUUID uuid,
+                                                            const NamespaceString& nss) const {
+    size_t hash = _catalog.hash_function()(uuid);
+    stdx::lock_guard<Latch> lock(_catalogLock);
+    auto coll = _lookupCollectionByUUID(lock, uuid, hash);
+    if (coll) {
+        bool renamed = coll->ns() != nss;
+        if (renamed) {
+            return {nullptr, coll->ns()};
+        } else {
+            return {coll, boost::none};
+        }
+    }
+    return {nullptr, boost::none};
+}
+
+Collection* CollectionCatalog::_lookupCollectionByUUID(WithLock,
+                                                       CollectionUUID uuid,
+                                                       size_t hash) const {
+    auto foundIt = _catalog.find(uuid, hash);
     return foundIt == _catalog.end() ? nullptr : foundIt->second.get();
 }
 
 Collection* CollectionCatalog::lookupCollectionByNamespace(const NamespaceString& nss) const {
+    size_t hash = _collections.hash_function()(nss);
     stdx::lock_guard<Latch> lock(_catalogLock);
-    auto it = _collections.find(nss);
+    auto it = _collections.find(nss, hash);
     return it == _collections.end() ? nullptr : it->second;
 }
 
 boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(CollectionUUID uuid) const {
+    size_t hash = _catalog.hash_function()(uuid);
     stdx::lock_guard<Latch> lock(_catalogLock);
-    auto foundIt = _catalog.find(uuid);
+    auto foundIt = _catalog.find(uuid, hash);
     if (foundIt != _catalog.end()) {
         NamespaceString ns = foundIt->second->ns();
         invariant(!ns.isEmpty());
@@ -290,8 +312,9 @@ bool CollectionCatalog::checkIfCollectionSatisfiable(CollectionUUID uuid,
                                                      CollectionInfoFn predicate) const {
     invariant(predicate);
 
+    size_t hash = _catalog.hash_function()(uuid);
     stdx::lock_guard<Latch> lock(_catalogLock);
-    auto collection = _lookupCollectionByUUID(lock, uuid);
+    auto collection = _lookupCollectionByUUID(lock, uuid, hash);
 
     if (!collection) {
         return false;
