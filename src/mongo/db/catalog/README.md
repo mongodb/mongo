@@ -388,8 +388,19 @@ snapshot, and all writes in the scope of a WUOW are transactional; they are eith
 all rolled-back. The WUOW commits writes that took place in its scope by a call to commit(). It
 rolls-back writes when it goes out of scope and its destructor is called before a call to commit().
 
+The WriteUnitOfWork has a [`groupOplogEntries` option](https://github.com/mongodb/mongo/blob/fa32d665bd63de7a9d246fa99df5e30840a931de/src/mongo/db/storage/write_unit_of_work.h#L67)
+to replicate multiple writes transactionally. This option uses the [`BatchedWriteContext` class](https://github.com/mongodb/mongo/blob/9ab71f9b2fac1e384529fafaf2a819ce61834228/src/mongo/db/batched_write_context.h#L46)
+to stage writes and to generate a single applyOps entry at commit, similar to what multi-document
+transactions do via the [`TransactionParticipant` class](https://github.com/mongodb/mongo/blob/9ab71f9b2fac1e384529fafaf2a819ce61834228/src/mongo/db/transaction_participant.h#L82).
+Unlike a multi-document transaction, the applyOps entry lacks the `lsId` and the `txnNumber`
+fields. Callers must ensure that the WriteUnitOfWork does not generate more than 16MB of oplog,
+otherwise the operation will fail with `TransactionTooLarge` code.
+
+As of MongoDB 6.0, the `groupOplogEntries` mode is only used by the [BatchedDeleteStage](https://github.com/mongodb/mongo/blob/9676cf4ad8d537518eb1b570fc79bad4f31d8a79/src/mongo/db/exec/batched_delete_stage.h)
+for efficient mass-deletes.
+
 See
-[WriteUnitOfWork](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/storage/write_unit_of_work.h)
+[WriteUnitOfWork](https://github.com/mongodb/mongo/blob/fa32d665bd63de7a9d246fa99df5e30840a931de/src/mongo/db/storage/write_unit_of_work.h).
 
 ## WriteConflictException
 
