@@ -51,6 +51,7 @@ public:
     static const char kQueryField[];
     static const char kCollationField[];
     static const char kCommentField[];
+    static const char kUnwoundArrayFieldForViewUnwind[];
 
     ParsedDistinct(std::unique_ptr<CanonicalQuery> query, const std::string key)
         : _query(std::move(query)), _key(std::move(key)) {}

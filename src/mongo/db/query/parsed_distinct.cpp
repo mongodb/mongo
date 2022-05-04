@@ -35,6 +35,7 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/distinct_command_gen.h"
 #include "mongo/db/query/query_request_helper.h"
@@ -47,8 +48,29 @@ namespace mongo {
 const char ParsedDistinct::kKeyField[] = "key";
 const char ParsedDistinct::kQueryField[] = "query";
 const char ParsedDistinct::kCollationField[] = "collation";
+const char ParsedDistinct::kUnwoundArrayFieldForViewUnwind[] = "_internalUnwoundArray";
 
 namespace {
+
+/**
+ * Add the stages that pull all values along a path and puts them into an array. Includes the
+ * necessary unwind stage that can turn those into individual documents.
+ */
+void addReplaceRootForDistinct(BSONArrayBuilder* pipelineBuilder, const FieldPath& path) {
+    BSONObjBuilder reshapeStageBuilder(pipelineBuilder->subobjStart());
+    reshapeStageBuilder.append(
+        DocumentSourceReplaceRoot::kStageName,
+        BSON("newRoot" << BSON(ParsedDistinct::kUnwoundArrayFieldForViewUnwind
+                               << BSON("$_internalFindAllValuesAtPath" << path.fullPath()))));
+    reshapeStageBuilder.doneFast();
+    BSONObjBuilder unwindStageBuilder(pipelineBuilder->subobjStart());
+    {
+        BSONObjBuilder unwindBuilder(unwindStageBuilder.subobjStart("$unwind"));
+        unwindBuilder.append(
+            "path", str::stream() << "$" << ParsedDistinct::kUnwoundArrayFieldForViewUnwind);
+        unwindBuilder.append("preserveNullAndEmptyArrays", true);
+    }
+}
 
 /**
  * Helper for when converting a distinct() to an aggregation pipeline. This function will add
@@ -180,27 +202,15 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
     //
     //      [
     //          { $match: { ... } },
-    //          { $unwind: { path: "a", preserveNullAndEmptyArrays: true } },
-    //          { $unwind: { path: "a.b", preserveNullAndEmptyArrays: true } },
-    //          { $unwind: { path: "a.b.c", preserveNullAndEmptyArrays: true } },
-    //          { $match: {"a": {$_internalSchemaType: "object"},
-    //                     "a.b": {$_internalSchemaType: "object"}}}
+    //          { $replaceRoot: {newRoot: {$_internalFindAllValuesAtPath: "a.b.c"}}},
+    //          { $unwind: { path: "_internalUnwoundField", preserveNullAndEmptyArrays: true } },
     //          { $group: { _id: null, distinct: { $addToSet: "$<key>" } } }
     //      ]
     //
-    // The purpose of the intermediate $unwind stages is to deal with cases where there is an array
-    // along the distinct path. For example, if we're distincting on "a.b" and have a document like
-    // {a: [{b: 1}, {b: 2}]}, distinct() should produce two values: 1 and 2. If we were to only
-    // unwind on "a.b", the document would pass through the $unwind unmodified, and the $group
-    // stage would treat the entire array as a key, rather than each element.
-    //
-    // The reason for the $match with $_internalSchemaType is to deal with cases of nested
-    // arrays. The distinct command will not traverse paths inside of nested arrays. For example, a
-    // distinct on "a.b" with the following document will produce no results:
-    // {a: [[{b: 1}]]
-    //
-    // Any arrays remaining after the $unwinds must have been nested arrays, so in order to match
-    // the behavior of the distinct() command, we filter them out before the $group.
+    // The purpose of the intermediate $replaceRoot and $unwind stages is to deal with cases
+    // where there is an array along the distinct path. For example, if we're distincting on "a.b"
+    // and have a document like {a: [{b: 1}, {b: 2}]}, distinct() should produce two values: 1
+    // and 2.
     BSONArrayBuilder pipelineBuilder(aggregationBuilder.subarrayStart("pipeline"));
     if (!findCommand.getFilter().isEmpty()) {
         BSONObjBuilder matchStageBuilder(pipelineBuilder.subobjStart());
@@ -209,8 +219,20 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
     }
 
     FieldPath path(_key);
-    addNestedUnwind(&pipelineBuilder, path);
-    addMatchRemovingNestedArrays(&pipelineBuilder, path);
+    // If we are not fully upgraded to 6.0, fall back to the old path of using multiple $unwind
+    // stages instead of the new expression '$_internalFindAllValuesAtPath'.
+    auto&& fcv = serverGlobalParams.featureCompatibility;
+    std::string groupKey = std::string(kUnwoundArrayFieldForViewUnwind);
+    if (fcv.isVersionInitialized() &&
+        fcv.isGreaterThanOrEqualTo(multiversion::FeatureCompatibilityVersion::kVersion_6_0)) {
+        addReplaceRootForDistinct(&pipelineBuilder, path);
+    } else {
+        addNestedUnwind(&pipelineBuilder, path);
+        // Any arrays remaining after the $unwinds must have been nested arrays, so in order to
+        // match the behavior of the distinct() command, we filter them out before the $group.
+        addMatchRemovingNestedArrays(&pipelineBuilder, path);
+        groupKey = _key;
+    }
 
     BSONObjBuilder groupStageBuilder(pipelineBuilder.subobjStart());
     {
@@ -218,7 +240,7 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
         groupBuilder.appendNull("_id");
         {
             BSONObjBuilder distinctBuilder(groupBuilder.subobjStart("distinct"));
-            distinctBuilder.append("$addToSet", str::stream() << "$" << _key);
+            distinctBuilder.append("$addToSet", str::stream() << "$" << groupKey);
             distinctBuilder.doneFast();
         }
         groupBuilder.doneFast();

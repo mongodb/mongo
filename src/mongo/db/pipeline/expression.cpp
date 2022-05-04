@@ -39,6 +39,7 @@
 #include <utility>
 #include <vector>
 
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -4942,6 +4943,30 @@ REGISTER_STABLE_EXPRESSION(isArray, ExpressionIsArray::parse);
 const char* ExpressionIsArray::getOpName() const {
     return "$isArray";
 }
+
+/* ----------------------- ExpressionInternalFindAllValuesAtPath --------*/
+Value ExpressionInternalFindAllValuesAtPath::evaluate(const Document& root,
+                                                      Variables* variables) const {
+
+    auto fieldPath = getFieldPath();
+    BSONElementSet elts(getExpressionContext()->getCollator());
+    auto bsonRoot = root.toBson();
+    dotted_path_support::extractAllElementsAlongPath(bsonRoot, fieldPath.fullPath(), elts);
+    std::vector<Value> outputVals;
+    for (BSONElementSet::iterator it = elts.begin(); it != elts.end(); ++it) {
+        BSONElement elt = *it;
+        outputVals.push_back(Value(elt));
+    }
+
+    return Value(outputVals);
+}
+// This expression is not part of the stable API, but can always be used. It is
+// an internal expression used only for distinct.
+REGISTER_EXPRESSION_WITH_MIN_VERSION(_internalFindAllValuesAtPath,
+                                     ExpressionInternalFindAllValuesAtPath::parse,
+                                     AllowedWithApiStrict::kAlways,
+                                     AllowedWithClientType::kAny,
+                                     multiversion::FeatureCompatibilityVersion::kVersion_6_0);
 
 /* ----------------------- ExpressionSlice ---------------------------- */
 

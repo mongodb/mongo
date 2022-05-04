@@ -107,6 +107,7 @@ class ExpressionReverseArray;
 class ExpressionSortArray;
 class ExpressionSlice;
 class ExpressionIsArray;
+class ExpressionInternalFindAllValuesAtPath;
 class ExpressionRandom;
 class ExpressionRound;
 class ExpressionSecond;
@@ -266,6 +267,8 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSortArray>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSlice>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionIsArray>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionInternalFindAllValuesAtPath>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionRandom>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionRound>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSplit>) = 0;
@@ -443,6 +446,7 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionSortArray*) override {}
     void visit(const ExpressionSlice*) override {}
     void visit(const ExpressionIsArray*) override {}
+    void visit(const ExpressionInternalFindAllValuesAtPath*) override {}
     void visit(const ExpressionRound*) override {}
     void visit(const ExpressionSplit*) override {}
     void visit(const ExpressionSqrt*) override {}
