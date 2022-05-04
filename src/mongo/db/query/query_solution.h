@@ -512,7 +512,7 @@ struct ColumnIndexScanNode : public QuerySolutionNode {
                         std::unique_ptr<MatchExpression> postAssemblyFilter);
 
     virtual StageType getType() const {
-        return STAGE_COLUMN_IXSCAN;
+        return STAGE_COLUMN_SCAN;
     }
 
     void appendToString(str::stream* ss, int indent) const override;

@@ -52,7 +52,7 @@ enum StageType {
     STAGE_BATCHED_DELETE,
     STAGE_CACHED_PLAN,
     STAGE_COLLSCAN,
-    STAGE_COLUMN_IXSCAN,
+    STAGE_COLUMN_SCAN,
 
     // A virtual scan stage that simulates a collection scan and doesn't depend on underlying
     // storage.

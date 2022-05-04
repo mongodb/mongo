@@ -45,6 +45,7 @@ namespace mongo {
  */
 struct SecondaryCollectionInfo {
     std::vector<IndexEntry> indexes{};
+    std::vector<ColumnIndexEntry> columnIndexes{};
     bool exists{true};
 
     // The number of records in the collection.

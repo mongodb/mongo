@@ -91,7 +91,7 @@ TEST_F(QueryPlannerColumnarTest, InclusionProjectionUsesColumnarIndex) {
         proj: {
             spec: {a: 1, _id: 0},
             node: {
-                column_ixscan:
+                column_scan:
                     {filtersByPath: {a: {a: {$gt: 3}}}, outputFields: ['a'], matchFields: ['a']}
             }
         }
@@ -113,7 +113,7 @@ TEST_F(QueryPlannerColumnarTest, ExpressionProjectionUsesColumnarIndex) {
         proj: {
             spec: {a: 1, scaledA: {$multiply: ["$a", "$multiplier"]}, extra: {$const: 4}, _id: 0},
             node: {
-                column_ixscan: {
+                column_scan: {
                     filtersByPath: {a: {a: {$gt: 3}}},
                     outputFields: ['a', 'multiplier'],
                     matchFields: ['a']
@@ -133,7 +133,7 @@ TEST_F(QueryPlannerColumnarTest, ImplicitlyIncludedIdIsIncludedInProjectedFields
         proj: {
             spec: {a: 1},
             node: {
-                column_ixscan: {
+                column_scan: {
                     filtersByPath: {a: {a: {$gt: 3}}},
                     outputFields: ['a', '_id'],
                     matchFields: ['a']
@@ -156,7 +156,7 @@ TEST_F(QueryPlannerColumnarTest, InclusionProjectionWithSortUsesColumnarIndexAnd
             node: {
                 proj: {
                     spec: {a: 1, _id: 0},
-                    node: {column_ixscan: {outputFields: ['a'], matchFields: []}}
+                    node: {column_scan: {outputFields: ['a'], matchFields: []}}
                 }
             }
         }
@@ -176,7 +176,7 @@ TEST_F(QueryPlannerColumnarTest, SortOnSeparateColumnAddsThatColumnToColumnScan)
                 sort: {
                     pattern: {b: 1},
                     limit: 0,
-                    node: {column_ixscan: {outputFields: ['a', 'b'], matchFields: []}}
+                    node: {column_scan: {outputFields: ['a', 'b'], matchFields: []}}
                 }
             }
         }
@@ -238,7 +238,7 @@ TEST_F(QueryPlannerColumnarTest, ProjectionWithJustEnoughFieldsDoesUseColumnarIn
     runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1 << "b" << 1 << "_id" << 0));
     assertNumSolutions(1U);
     assertSolutionExists(R"(
-        {proj: {spec: {a: 1, b: 1, _id: 0}, node: {column_ixscan: {outputFields: ['a', 'b']}}}})");
+        {proj: {spec: {a: 1, b: 1, _id: 0}, node: {column_scan: {outputFields: ['a', 'b']}}}})");
 }
 
 TEST_F(QueryPlannerColumnarTest, DottedProjectionTooManyFieldsDoesNotUseColumnarIndex) {
@@ -281,7 +281,7 @@ TEST_F(QueryPlannerColumnarTest, IneligiblePredicateNeedsToBeAppliedAfterAssembl
         proj: {
             spec: {a: 1, _id: 0},
             node: {
-                column_ixscan: {
+                column_scan: {
                     filtersByPath: {},
                     outputFields: ['a'],
                     matchFields: ['a'],
@@ -301,7 +301,7 @@ TEST_F(QueryPlannerColumnarTest, MultiplePredicatesAllowedWithColumnarIndex) {
         proj: {
             spec: {a: 1, _id: 0},
             node: {
-                column_ixscan: {
+                column_scan: {
                     filtersByPath: {a: {a: {$eq: 2}}, b: {b: {$eq: 3}}},
                     outputFields: ['a'],
                     matchFields: ['a', 'b']
@@ -370,7 +370,7 @@ TEST_F(QueryPlannerColumnarTest, NumberOfFieldsComputedUsingSetSize) {
         proj: {
             spec: {a: 1, b: 1, _id: 0},
             node: {
-                column_ixscan: {
+                column_scan: {
                     filtersByPath: {a: {a: {$eq: 2}}, b: {b: {$eq: 3}}, c: {c: {$eq: 4}}},
                     outputFields: ['a', 'b'],
                     matchFields: ['a', 'b', 'c']
@@ -394,7 +394,7 @@ TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitDemo) {
         proj: {
             spec: {a: 1, _id: 0},
             node: {
-                column_ixscan: {
+                column_scan: {
                     filtersByPath: {
                         a: {$and: [{a: {$gte: 0}}, {a: {$lt: 10}}]},
                         'addresses.zip': {'addresses.zip': {$in: ['12345', '01234']}},
@@ -425,7 +425,7 @@ TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitsIntoParts) {
         proj: {
             spec: {a: 1, _id: 0},
             node: {
-                column_ixscan: {
+                column_scan: {
                     filtersByPath: {
                         a: {a: {$gte: 0, $lt: 10}},
                         "addresses.zip": {"addresses.zip": {$in: ['12345', '01234']}},
@@ -452,7 +452,7 @@ TEST_F(QueryPlannerColumnarTest, EmptyQueryPredicateIsEligible) {
     assertSolutionExists(R"({
         proj: {
             spec: {a: 1, _id: 0},
-            node: {column_ixscan: {filtersByPath: {}, outputFields: ['a'], matchFields: []}}
+            node: {column_scan: {filtersByPath: {}, outputFields: ['a'], matchFields: []}}
         }
     })");
 }
@@ -468,7 +468,7 @@ TEST_F(QueryPlannerColumnarTest, GroupTest) {
     assertNumSolutions(1U);
     assertSolutionExists(R"(
         {proj: {spec: {foo: 1, x: 1, _id: 0}, node:
-        {column_ixscan: {filtersByPath: {}, outputFields: ['foo', 'x'], matchFields: []}}}})");
+        {column_scan: {filtersByPath: {}, outputFields: ['foo', 'x'], matchFields: []}}}})");
 
     ASSERT(!cq->pipeline().empty());
     auto solution =
@@ -477,7 +477,7 @@ TEST_F(QueryPlannerColumnarTest, GroupTest) {
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
         "{group: {key: {_id: '$foo'}, accs: [{s: {$sum: '$x'}}], node: "
         "{proj: {spec: {foo:1, x:1, _id: 0}, node: "
-        "{column_ixscan: {filtersByPath: {}, outputFields: ['foo', 'x'], matchFields: []}}"
+        "{column_scan: {filtersByPath: {}, outputFields: ['foo', 'x'], matchFields: []}}"
         "}}}}",
         solution->root()))
         << solution->root()->toString();
@@ -496,7 +496,7 @@ TEST_F(QueryPlannerColumnarTest, MatchGroupTest) {
     assertNumSolutions(1U);
     assertSolutionExists(R"(
         {proj: {spec: {foo: 1, x: 1, _id: 0}, node:
-        {column_ixscan: {filtersByPath: {name: {name: {$eq: 'bob'}}},
+        {column_scan: {filtersByPath: {name: {name: {$eq: 'bob'}}},
                          outputFields: ['foo', 'x'],
                          matchFields: ['name']}}}})");
 
@@ -507,7 +507,7 @@ TEST_F(QueryPlannerColumnarTest, MatchGroupTest) {
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
         "{group: {key: {_id: '$foo'}, accs: [{s: {$sum: '$x'}}], node: "
         "{proj: {spec: {foo:1, x:1, _id: 0}, node: "
-        "{column_ixscan: {filtersByPath: {name: {name: {$eq: 'bob'}}}, outputFields: ['foo', 'x'], "
+        "{column_scan: {filtersByPath: {name: {name: {$eq: 'bob'}}}, outputFields: ['foo', 'x'], "
         "matchFields: ['name']}}"
         "}}}}",
         solution->root()))
@@ -528,7 +528,7 @@ TEST_F(QueryPlannerColumnarTest, MatchGroupWithOverlappingFieldsTest) {
     assertNumSolutions(1U);
     assertSolutionExists(R"(
     {proj: {spec: {foo: 1, x: 1, name:1, _id: 0}, node:
-    {column_ixscan: {filtersByPath: {name: {name: {$eq: 'bob'}}},
+    {column_scan: {filtersByPath: {name: {name: {$eq: 'bob'}}},
                      outputFields: ['foo', 'x', 'name'],
                      matchFields: ['name']}}}})");
 
@@ -539,7 +539,7 @@ TEST_F(QueryPlannerColumnarTest, MatchGroupWithOverlappingFieldsTest) {
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
         "{group: {key: {_id: '$foo'}, accs: [{s: {$sum: '$x'}}, {name: {$first: '$name'}}], node: "
         "{proj: {spec: {foo:1, x:1, name:1, _id: 0}, node: "
-        "{column_ixscan: {filtersByPath: {name: {name: {$eq: 'bob'}}}, outputFields: ['foo', 'x', "
+        "{column_scan: {filtersByPath: {name: {name: {$eq: 'bob'}}}, outputFields: ['foo', 'x', "
         "'name'], "
         "matchFields: ['name']}}"
         "}}}}",

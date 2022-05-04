@@ -2967,7 +2967,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             {STAGE_COLLSCAN, &SlotBasedStageBuilder::buildCollScan},
             {STAGE_VIRTUAL_SCAN, &SlotBasedStageBuilder::buildVirtualScan},
             {STAGE_IXSCAN, &SlotBasedStageBuilder::buildIndexScan},
-            {STAGE_COLUMN_IXSCAN, &SlotBasedStageBuilder::buildColumnScan},
+            {STAGE_COLUMN_SCAN, &SlotBasedStageBuilder::buildColumnScan},
             {STAGE_FETCH, &SlotBasedStageBuilder::buildFetch},
             {STAGE_LIMIT, &SlotBasedStageBuilder::buildLimit},
             {STAGE_SKIP, &SlotBasedStageBuilder::buildSkip},

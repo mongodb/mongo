@@ -1096,7 +1096,7 @@ ColumnIndexScanNode::ColumnIndexScanNode(ColumnIndexEntry indexEntry,
 
 void ColumnIndexScanNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
-    *ss << "COLUMN_IX_SCAN\n";
+    *ss << "COLUMN_SCAN\n";
     addIndent(ss, indent + 1);
     *ss << "outputFields = [" << boost::algorithm::join(outputFields, ", ") << "]\n";
     addIndent(ss, indent + 1);

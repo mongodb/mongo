@@ -110,7 +110,6 @@
 
 
 namespace mongo {
-MONGO_FAIL_POINT_DEFINE(includeFakeColumnarIndex);
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
     OperationContext* opCtx, const BSONObj& requestCollation, const NamespaceString& nss) {
@@ -283,7 +282,8 @@ void fillOutIndexEntries(OperationContext* opCtx,
                          bool apiStrict,
                          const CanonicalQuery* canonicalQuery,
                          const CollectionPtr& collection,
-                         std::vector<IndexEntry>& entries) {
+                         std::vector<IndexEntry>& entries,
+                         std::vector<ColumnIndexEntry>& columnEntries) {
     auto ii = collection->getIndexCatalog()->getIndexIterator(opCtx, false);
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
@@ -299,8 +299,13 @@ void fillOutIndexEntries(OperationContext* opCtx,
         // Skip the addition of hidden indexes to prevent use in query planning.
         if (ice->descriptor()->hidden())
             continue;
-        entries.emplace_back(
-            indexEntryFromIndexCatalogEntry(opCtx, collection, *ice, canonicalQuery));
+
+        if (indexType == IndexType::INDEX_COLUMN) {
+            columnEntries.emplace_back(ice->descriptor()->indexName());
+        } else {
+            entries.emplace_back(
+                indexEntryFromIndexCatalogEntry(opCtx, collection, *ice, canonicalQuery));
+        }
     }
 }
 }  // namespace
@@ -313,11 +318,12 @@ void fillOutPlannerParams(OperationContext* opCtx,
     bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
 
     // If it's not NULL, we may have indices. Access the catalog and fill out IndexEntry(s)
-    fillOutIndexEntries(opCtx, apiStrict, canonicalQuery, collection, plannerParams->indices);
-
-    if (includeFakeColumnarIndex.shouldFail()) {
-        plannerParams->columnarIndexes.push_back(ColumnIndexEntry{"fakeColumnIndex"});
-    }
+    fillOutIndexEntries(opCtx,
+                        apiStrict,
+                        canonicalQuery,
+                        collection,
+                        plannerParams->indices,
+                        plannerParams->columnarIndexes);
 
     // If query supports index filters, filter params.indices by indices in query settings.
     // Ignore index filters when it is possible to use the id-hack.
@@ -394,8 +400,13 @@ std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsIn
                                     const CollectionPtr& secondaryColl) {
         auto secondaryInfo = SecondaryCollectionInfo();
         if (secondaryColl) {
-            fillOutIndexEntries(
-                opCtx, apiStrict, canonicalQuery, secondaryColl, secondaryInfo.indexes);
+
+            fillOutIndexEntries(opCtx,
+                                apiStrict,
+                                canonicalQuery,
+                                secondaryColl,
+                                secondaryInfo.indexes,
+                                secondaryInfo.columnIndexes);
             auto recordStore = secondaryColl->getRecordStore();
             secondaryInfo.noOfRecords = recordStore->numRecords(opCtx);
             secondaryInfo.approximateDataSizeBytes = recordStore->dataSize(opCtx);

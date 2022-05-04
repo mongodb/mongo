@@ -15,6 +15,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/analyze_plan.js");
+
 const getParamResponse =
     assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagColumnstoreIndexes: 1}));
 const columnstoreEnabled = getParamResponse.hasOwnProperty("featureFlagColumnstoreIndexes") &&
@@ -43,7 +45,8 @@ assert.commandWorked(coll.insert([{_id: 1}, {_id: 2}, {_id: 3, x: 1}]));
 coll.drop();
 
 // Test building index after there is already data - should enable using a bulk builder.
-assert.commandWorked(coll.insert([{_id: 1}, {_id: 2}, {_id: 3, x: 1}]));
+const allDocs = [{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 1}, {_id: 3, a: 3, b: 1}];
+assert.commandWorked(coll.insert(allDocs));
 assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
 
 // Test returning index stats. TODO SERVER-65980 assert that we get something sensible
@@ -54,6 +57,11 @@ assert.doesNotThrow(() => coll.aggregate([{$collStats: {}}]));
 // Test running validate.
 assert.commandWorked(coll.validate());
 assert.commandWorked(coll.validate({full: true}));
+
+// Test running a query with the index.
+let explain = coll.find({}, {a: 1, b: 1}).explain();
+assert(planHasStage(db, explain, "COLUMN_SCAN"));
+assert.sameMembers(coll.find({}, {a: 1, b: 1}).toArray(), allDocs);
 
 // Test dropping the index.
 assert.commandWorked(coll.dropIndex({"$**": "columnstore"}));

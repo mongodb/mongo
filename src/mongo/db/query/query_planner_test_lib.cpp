@@ -120,7 +120,7 @@ Status columnIxScanFiltersByPathMatch(
         if (expectedElem.type() != BSONType::Object)
             return {ErrorCodes::Error{6412405},
                     str::stream() << "invalid filter for path '" << expectedPath
-                                  << "' given to 'filtersByPath' argument to 'column_ixscan' "
+                                  << "' given to 'filtersByPath' argument to 'column_scan' "
                                      "stage. Please specify an object. Found: "
                                   << expectedElem};
 
@@ -131,12 +131,12 @@ Status columnIxScanFiltersByPathMatch(
             if (!filterMatchStatus.isOK()) {
                 return filterMatchStatus.withContext(
                     str::stream() << "mismatching filter for path '" << expectedPath
-                                  << "' in 'column_ixscan's 'filtersByPath'");
+                                  << "' in 'column_scan's 'filtersByPath'");
             }
         } else {
             return {ErrorCodes::Error{6412406},
                     str::stream() << "did not find an expected filter for path '" << expectedPath
-                                  << "' in 'column_ixscan' stage. Actual filters: "
+                                  << "' in 'column_scan' stage. Actual filters: "
                                   << expression::filterMapToString(actualFiltersByPath)};
         }
     }
@@ -145,7 +145,7 @@ Status columnIxScanFiltersByPathMatch(
         if (!expectedFiltersByPath.hasField(actualPath)) {
             return {ErrorCodes::Error{6412407},
                     str::stream() << "Found an unexpected filter for path '" << actualPath
-                                  << "' in 'column_ixscan' stage. Actual filters: "
+                                  << "' in 'column_scan' stage. Actual filters: "
                                   << expression::filterMapToString(actualFiltersByPath)
                                   << ", expected filters: " << expectedFiltersByPath
                                   << "stage. Please specify an object."};
@@ -1291,13 +1291,13 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                                   << testSoln << " Found: " << actualSentinelNode};
         }
         return Status::OK();
-    } else if (STAGE_COLUMN_IXSCAN == trueSoln->getType()) {
+    } else if (STAGE_COLUMN_SCAN == trueSoln->getType()) {
         const auto* actualColumnIxScanNode = static_cast<const ColumnIndexScanNode*>(trueSoln);
-        auto expectedElem = testSoln["column_ixscan"];
+        auto expectedElem = testSoln["column_scan"];
         if (expectedElem.eoo() || !expectedElem.isABSONObj()) {
             return {ErrorCodes::Error{5842490},
-                    "found a 'column_ixscan' object in the test solution but no corresponding "
-                    "'column_ixscan' object in the expected JSON"};
+                    "found a 'column_scan' object in the test solution but no corresponding "
+                    "'column_scan' object in the expected JSON"};
         }
         auto obj = expectedElem.Obj();
 
@@ -1305,17 +1305,16 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
             if (auto outputStatus =
                     stringSetsMatch(outputFields,
                                     actualColumnIxScanNode->outputFields,
-                                    "mismatching output fields within 'column_ixscan'");
+                                    "mismatching output fields within 'column_scan'");
                 !outputStatus.isOK()) {
                 return outputStatus;
             }
         }
 
         if (auto matchFields = obj["matchFields"]) {
-            if (auto matchStatus =
-                    stringSetsMatch(matchFields,
-                                    actualColumnIxScanNode->matchFields,
-                                    "mismatching match fields within 'column_ixscan'");
+            if (auto matchStatus = stringSetsMatch(matchFields,
+                                                   actualColumnIxScanNode->matchFields,
+                                                   "mismatching match fields within 'column_scan'");
                 !matchStatus.isOK()) {
                 return matchStatus;
             }
@@ -1324,27 +1323,26 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         if (!actualColumnIxScanNode->children.empty()) {
             return {
                 ErrorCodes::Error{5842492},
-                "found a column_ixscan stage with more than zero children in the actual solution:"};
+                "found a column_scan stage with more than zero children in the actual solution:"};
         }
 
         // All QuerySolutionNodes can have a 'filter' option, but the column index stage is special.
         // Make sure the caller doesn't expect this and that the actual solution doesn't store
         // anything in that field either.
         if (auto filter = obj["filter"]) {
-            return {
-                ErrorCodes::Error{6312402},
-                "do not specify 'filter' to a 'column_ixscan', specify 'filtersByPath' instead"};
+            return {ErrorCodes::Error{6312402},
+                    "do not specify 'filter' to a 'column_scan', specify 'filtersByPath' instead"};
         }
         if (actualColumnIxScanNode->filter) {
             return {ErrorCodes::Error{6312403},
-                    "'column_ixscan' solution node found with a non-empty 'filter'. We expect this "
+                    "'column_scan' solution node found with a non-empty 'filter'. We expect this "
                     "to be null and 'filtersByPath' to be used instead."};
         }
 
         if (auto filtersByPath = obj["filtersByPath"]) {
             if (filtersByPath.type() != BSONType::Object) {
                 return {ErrorCodes::Error{6412404},
-                        str::stream() << "invalid 'filtersByPath' specified to 'column_ixscan' "
+                        str::stream() << "invalid 'filtersByPath' specified to 'column_scan' "
                                          "stage. Please specify an object. Found: "
                                       << filtersByPath};
             }
@@ -1353,18 +1351,16 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
             if (auto filtersMatchStatus = columnIxScanFiltersByPathMatch(
                     expectedFiltersByPath, actualColumnIxScanNode->filtersByPath);
                 !filtersMatchStatus.isOK()) {
-                return filtersMatchStatus.withContext(
-                    "mismatching filters in 'column_ixscan' stage");
+                return filtersMatchStatus.withContext("mismatching filters in 'column_scan' stage");
             }
         }
 
         if (auto postAssemblyFilter = obj["postAssemblyFilter"]) {
             if (postAssemblyFilter.type() != BSONType::Object) {
                 return {ErrorCodes::Error{6412408},
-                        str::stream()
-                            << "invalid 'postAssemblyFilter' specified to 'column_ixscan' "
-                               "stage. Please specify an object. Found: "
-                            << postAssemblyFilter};
+                        str::stream() << "invalid 'postAssemblyFilter' specified to 'column_scan' "
+                                         "stage. Please specify an object. Found: "
+                                      << postAssemblyFilter};
             }
 
             const auto expectedPostAssemblyFilter = postAssemblyFilter.Obj();
@@ -1374,7 +1370,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                                   nullptr);
                 !filtersMatchStatus.isOK()) {
                 return filtersMatchStatus.withContext(
-                    "mismatching 'postAssemblyFilter' in 'column_ixscan' stage");
+                    "mismatching 'postAssemblyFilter' in 'column_scan' stage");
             }
         }
 
