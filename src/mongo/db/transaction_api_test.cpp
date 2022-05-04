@@ -847,8 +847,6 @@ TEST_F(TxnAPITest, OwnSession_CommitError) {
             mockClient()->setNextCommandResponse(
                 BSON("ok" << 0 << "code" << ErrorCodes::InternalError));
 
-            // The best effort abort response, the client should ignore this.
-            mockClient()->setNextCommandResponse(kResWithBadValueError);
             return SemiFuture<void>::makeReady();
         });
     ASSERT(swResult.getStatus().isOK());
@@ -856,7 +854,13 @@ TEST_F(TxnAPITest, OwnSession_CommitError) {
     ASSERT(swResult.getValue().wcError.toStatus().isOK());
     ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::InternalError);
 
-    expectSentAbort(0 /* txnNumber */, WriteConcernOptions().toBSON());
+    auto lastRequest = mockClient()->getLastSentRequest();
+    assertTxnMetadata(lastRequest,
+                      0 /* txnNumber */,
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
+    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
 TEST_F(TxnAPITest, OwnSession_TransientCommitError) {
@@ -864,11 +868,6 @@ TEST_F(TxnAPITest, OwnSession_TransientCommitError) {
     auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             attempt += 1;
-            if (attempt > 0) {
-                // Verify an abort was sent in between retries.
-                expectSentAbort(attempt - 1 /* txnNumber */, WriteConcernOptions().toBSON());
-            }
-
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
                                  .runCommand("user"_sd,
@@ -884,10 +883,10 @@ TEST_F(TxnAPITest, OwnSession_TransientCommitError) {
                               true /* startTransaction */);
             assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
 
-            // Set commit and best effort abort response, if necessary.
+            // Set commit response. Initial commit response is kNoSuchTransaction so the transaction
+            // retries.
             if (attempt == 0) {
                 mockClient()->setNextCommandResponse(kNoSuchTransactionResponse);
-                mockClient()->setNextCommandResponse(kOKCommandResponse);
             } else {
                 mockClient()->setNextCommandResponse(kOKCommandResponse);
             }
@@ -968,7 +967,13 @@ TEST_F(TxnAPITest, OwnSession_NonRetryableCommitWCError) {
     ASSERT_EQ(swResult.getValue().wcError.toStatus(), ErrorCodes::WriteConcernFailed);
     ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::WriteConcernFailed);
 
-    expectSentAbort(0 /* txnNumber */, WriteConcernOptions().toBSON());
+    auto lastRequest = mockClient()->getLastSentRequest();
+    assertTxnMetadata(lastRequest,
+                      0 /* txnNumber */,
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
+    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
 TEST_F(TxnAPITest, OwnSession_RetryableCommitWCError) {
@@ -1576,8 +1581,6 @@ TEST_F(TxnAPITest, CommitAfterTransientErrorAfterRetryCommitUsesOriginalWriteCon
     // transient transaction retry.
     mockClient()->setNextCommandResponse(Status(ErrorCodes::HostUnreachable, "Host Unreachable"));
     mockClient()->setNextCommandResponse(kNoSuchTransactionResponse);
-    // Best effort abort response.
-    mockClient()->setNextCommandResponse(kOKCommandResponse);
 
     // Second attempt after transient transaction error.
     mockClient()->setNextCommandResponse(kOKInsertResponse);
@@ -1604,7 +1607,7 @@ TEST_F(TxnAPITest, CommitAfterTransientErrorAfterRetryCommitUsesOriginalWriteCon
     //
 
     auto sentRequests = mockClient()->getSentRequests();
-    ASSERT_EQ(sentRequests.size(), 7);
+    ASSERT_EQ(sentRequests.size(), 6);
 
     // Skip i = 0, which is the intial attempt's insert.
     for (size_t i = 1; i <= 2; ++i) {
@@ -1618,15 +1621,14 @@ TEST_F(TxnAPITest, CommitAfterTransientErrorAfterRetryCommitUsesOriginalWriteCon
         assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
         ASSERT_EQ(sentRequests[i].firstElementFieldNameStringData(), "commitTransaction"_sd);
     }
-    // Skip i = 3, which is the first attempt's best effort abort.
-    // Skip i = 4, which is the second attempt's insert.
-    for (size_t i = 5; i <= 6; ++i) {
+    // Skip i = 3, which is the second attempt's insert.
+    for (size_t i = 4; i <= 5; ++i) {
         assertTxnMetadata(sentRequests[i],
                           2 /* txnNumber */,
                           boost::none /* startTransaction */,
                           boost::none /* readConcern */,
                           // First commit attempt uses the client's WC, retry uses majority.
-                          i == 5 ? opCtx()->getWriteConcern().toBSON()
+                          i == 4 ? opCtx()->getWriteConcern().toBSON()
                                  : CommandHelpers::kMajorityWriteConcern.toBSON());
         assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
         ASSERT_EQ(sentRequests[i].firstElementFieldNameStringData(), "commitTransaction"_sd);
@@ -1802,13 +1804,15 @@ TEST_F(TxnAPITest, OwnSession_CommitTransactionRetryLimitOnTransientErrors) {
     // The transient error should have been propagated.
     ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::PrimarySteppedDown);
     auto lastRequest = mockClient()->getLastSentRequest();
+
+    // Retrying commitTransaction uses majority write concern.
     assertTxnMetadata(lastRequest,
                       0 /* txnNumber */,
                       boost::none /* startTransaction */,
                       boost::none /* readConcern */,
-                      WriteConcernOptions().toBSON() /* writeConcern */);
+                      CommandHelpers::kMajorityWriteConcern.toBSON() /* writeConcern */);
     assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
-    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
+    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
 TEST_F(TxnAPITest, MaxTimeMSIsSetIfOperationContextHasDeadline) {
