@@ -155,6 +155,25 @@ assert.eq(
     coll.aggregate([{$match: {item: "c"}}]).toArray(),
     [{"_id": 5, "item": "c", "price": 5, "quantity": 10, "date": ISODate("2014-02-15T09:05:00Z")}]);
 
+// Run a simple $group with {$sum: 1} accumulator, and check if it gets pushed down.
+assertResultsMatchWithAndWithoutGroupPushdown(
+    coll,
+    [{$group: {_id: "$item", c: {$sum: NumberInt(1)}}}],
+    [{_id: "a", c: NumberInt(2)}, {_id: "b", c: NumberInt(2)}, {_id: "c", c: NumberInt(1)}],
+    1);
+
+assertResultsMatchWithAndWithoutGroupPushdown(
+    coll,
+    [{$group: {_id: "$item", c: {$sum: NumberLong(1)}}}],
+    [{_id: "a", c: NumberLong(2)}, {_id: "b", c: NumberLong(2)}, {_id: "c", c: NumberLong(1)}],
+    1);
+
+assertResultsMatchWithAndWithoutGroupPushdown(
+    coll,
+    [{$group: {_id: "$item", c: {$sum: 1}}}],
+    [{_id: "a", c: 2}, {_id: "b", c: 2}, {_id: "c", c: 1}],
+    1);
+
 // Run a simple $group with supported $sum accumulator, and check if it gets pushed down.
 assertResultsMatchWithAndWithoutGroupPushdown(
     coll,
@@ -576,6 +595,12 @@ assert.neq(null, getAggPlanStage(explain, "GROUP"), explain);
 
 // Verifies that a basic sharded $sum accumulator works.
 assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", s: {$sum: "$quantity"}}}]);
+
+// Verifies that a sharded count-like accumulator works
+assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", s: {$sum: NumberInt(1)}}}]);
+assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", s: {$sum: NumberLong(1)}}}]);
+assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", s: {$sum: 1}}}]);
+assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", s: {$count: {}}}}]);
 
 // When there's overflow for 'NumberLong', the mongod sends back the partial sum as a doc with
 // 'subTotal' and 'subTotalError' fields. So, we need an overflow case to verify such behavior.

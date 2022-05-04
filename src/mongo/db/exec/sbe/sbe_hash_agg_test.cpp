@@ -704,17 +704,17 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
     auto resultAccessors = prepareTree(ctx.get(), stage.get(), makeSV(countsSlot, sumsSlot));
 
     // Read in all of the results.
-    std::set<std::pair<int64_t /*count*/, int64_t /*sum*/>> results;
+    std::set<std::pair<int64_t /*count*/, int32_t /*sum*/>> results;
     while (stage->getNext() == PlanState::ADVANCED) {
         auto [resCountTag, resCountVal] = resultAccessors[0]->getViewOfValue();
         ASSERT_EQ(value::TypeTags::NumberInt64, resCountTag);
 
         auto [resSumTag, resSumVal] = resultAccessors[1]->getViewOfValue();
-        ASSERT_EQ(value::TypeTags::NumberInt64, resSumTag);
+        ASSERT_EQ(value::TypeTags::NumberInt32, resSumTag);
 
         ASSERT_TRUE(results
                         .insert(std::make_pair(value::bitcastFrom<int64_t>(resCountVal),
-                                               value::bitcastFrom<int64_t>(resSumVal)))
+                                               value::bitcastFrom<int32_t>(resSumVal)))
                         .second);
     }
 
@@ -771,17 +771,17 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
     auto resultAccessors = prepareTree(ctx.get(), stage.get(), makeSV(countsSlot, sumsSlot));
 
     // Read in all of the results.
-    std::set<std::pair<int64_t /*count*/, int64_t /*sum*/>> results;
+    std::set<std::pair<int64_t /*count*/, int32_t /*sum*/>> results;
     while (stage->getNext() == PlanState::ADVANCED) {
         auto [resCountTag, resCountVal] = resultAccessors[0]->getViewOfValue();
         ASSERT_EQ(value::TypeTags::NumberInt64, resCountTag);
 
         auto [resSumTag, resSumVal] = resultAccessors[1]->getViewOfValue();
-        ASSERT_EQ(value::TypeTags::NumberInt64, resSumTag);
+        ASSERT_EQ(value::TypeTags::NumberInt32, resSumTag);
 
         ASSERT_TRUE(results
                         .insert(std::make_pair(value::bitcastFrom<int64_t>(resCountVal),
-                                               value::bitcastFrom<int64_t>(resSumVal)))
+                                               value::bitcastFrom<int32_t>(resSumVal)))
                         .second);
     }
 

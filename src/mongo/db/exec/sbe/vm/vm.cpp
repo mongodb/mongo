@@ -1046,8 +1046,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggSum(value::TypeTags
 
     // Initialize the accumulator.
     if (accTag == value::TypeTags::Nothing) {
-        accTag = value::TypeTags::NumberInt64;
-        accValue = value::bitcastFrom<int64_t>(0);
+        accTag = value::TypeTags::NumberInt32;
+        accValue = value::bitcastFrom<int32_t>(0);
     }
 
     return genericAdd(accTag, accValue, fieldTag, fieldValue);
@@ -1161,6 +1161,46 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoublePartialSumFinalize(
     ArityType arity) {
     auto [_, fieldTag, fieldValue] = getFromStack(0);
+
+    // For a count-like accumulator like {$sum: 1}, we use aggSum instruction. In this case, the
+    // result type is guaranteed to be either 'NumberInt32', 'NumberInt64', or 'NumberDouble'. We
+    // should transform the scalar result into an array which is the over-the-wire data format from
+    // a shard to a merging side.
+    if (fieldTag == value::TypeTags::NumberInt32 || fieldTag == value::TypeTags::NumberInt64 ||
+        fieldTag == value::TypeTags::NumberDouble) {
+        auto [tag, val] = value::makeNewArray();
+        value::ValueGuard guard{tag, val};
+        auto newArr = value::getArrayView(val);
+
+        DoubleDoubleSummation res;
+        BSONType resType = BSONType::NumberInt;
+        switch (fieldTag) {
+            case value::TypeTags::NumberInt32:
+                res.addInt(value::bitcastTo<int32_t>(fieldValue));
+                break;
+            case value::TypeTags::NumberInt64:
+                res.addLong(value::bitcastTo<long long>(fieldValue));
+                resType = BSONType::NumberLong;
+                break;
+            case value::TypeTags::NumberDouble:
+                res.addDouble(value::bitcastTo<double>(fieldValue));
+                resType = BSONType::NumberDouble;
+                break;
+            default:
+                MONGO_UNREACHABLE_TASSERT(6546500);
+        }
+        auto [sum, addend] = res.getDoubleDouble();
+
+        // The merge-side expects that the first element is the BSON type, not internal slot type.
+        newArr->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int>(resType));
+        newArr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(sum));
+        newArr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(addend));
+
+        guard.reset();
+        return {true, tag, val};
+    }
+
+    tassert(6546501, "The result slot must be an Array", fieldTag == value::TypeTags::Array);
     auto arr = value::getArrayView(fieldValue);
     tassert(6294000,
             str::stream() << "The result slot must have at least "

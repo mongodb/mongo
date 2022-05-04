@@ -212,6 +212,37 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeAvg(
     }
 }
 
+namespace {
+std::tuple<bool, boost::optional<sbe::value::TypeTags>, boost::optional<sbe::value::Value>>
+getCountAddend(const AccumulationExpression& expr) {
+    auto constArg = dynamic_cast<ExpressionConstant*>(expr.argument.get());
+    if (!constArg) {
+        return {false, boost::none, boost::none};
+    }
+
+    auto value = constArg->getValue();
+    switch (value.getType()) {
+        case BSONType::NumberInt:
+            return {true,
+                    sbe::value::TypeTags::NumberInt32,
+                    sbe::value::bitcastFrom<int>(value.getInt())};
+        case BSONType::NumberLong:
+            return {true,
+                    sbe::value::TypeTags::NumberInt64,
+                    sbe::value::bitcastFrom<long long>(value.getLong())};
+        case BSONType::NumberDouble:
+            return {true,
+                    sbe::value::TypeTags::NumberDouble,
+                    sbe::value::bitcastFrom<double>(value.getDouble())};
+        default:
+            // 'value' is NumberDecimal type in which case, 'sum' function may not be efficient
+            // due to decimal data copying which involves memory allocation. To avoid such
+            // inefficiency, does not support NumberDecimal type for this optimization.
+            return {false, boost::none, boost::none};
+    }
+}
+}  // namespace
+
 std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorSum(
     StageBuilderState& state,
     const AccumulationExpression& expr,
@@ -219,6 +250,13 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     EvalStage inputStage,
     PlanNodeId planNodeId) {
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+
+    // Optimize for a count-like accumulator like {$sum: 1}.
+    if (auto [isCount, addendTag, addendVal] = getCountAddend(expr); isCount) {
+        aggs.push_back(makeFunction("sum", makeConstant(*addendTag, *addendVal)));
+        return {std::move(aggs), std::move(inputStage)};
+    }
+
     aggs.push_back(makeFunction("aggDoubleDoubleSum", std::move(arg)));
     return {std::move(aggs), std::move(inputStage)};
 }
@@ -250,10 +288,15 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeSum(
         // as close to the real truth as possible until all additions are done.
         return {makeFunction("doubleDoublePartialSumFinalize", makeVariable(sumSlots[0])),
                 std::move(inputStage)};
-    } else {
-        auto sumFinalize = makeFunction("doubleDoubleSumFinalize", makeVariable(sumSlots[0]));
-        return {std::move(sumFinalize), std::move(inputStage)};
     }
+
+    if (auto [isCount, tag, val] = getCountAddend(expr); isCount) {
+        // The accumulation result is a scalar value. So, the final project is not necessary.
+        return {nullptr, std::move(inputStage)};
+    }
+
+    return {makeFunction("doubleDoubleSumFinalize", makeVariable(sumSlots[0])),
+            std::move(inputStage)};
 }
 
 std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorAddToSet(
