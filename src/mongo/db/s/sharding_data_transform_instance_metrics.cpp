@@ -357,6 +357,7 @@ Seconds ShardingDataTransformInstanceMetrics::getCriticalSectionElapsedTimeSecs(
 
 void ShardingDataTransformInstanceMetrics::onWriteToStashedCollections() {
     _writesToStashCollections.fetchAndAdd(1);
+    _cumulativeMetrics->onWriteToStashedCollections();
 }
 
 void ShardingDataTransformInstanceMetrics::onReadDuringCriticalSection() {

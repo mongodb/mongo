@@ -170,7 +170,14 @@ ShardingDataTransformCumulativeMetrics::ShardingDataTransformCumulativeMetrics(
                       AtomicWord<int64_t>{0},
                       AtomicWord<int64_t>{0},
                       AtomicWord<int64_t>{0},
-                      AtomicWord<int64_t>{0}} {}
+                      AtomicWord<int64_t>{0}},
+      _recipientStateList{AtomicWord<int64_t>{0},
+                          AtomicWord<int64_t>{0},
+                          AtomicWord<int64_t>{0},
+                          AtomicWord<int64_t>{0},
+                          AtomicWord<int64_t>{0},
+                          AtomicWord<int64_t>{0},
+                          AtomicWord<int64_t>{0}} {}
 
 ShardingDataTransformCumulativeMetrics::DeregistrationFunction
 ShardingDataTransformCumulativeMetrics::registerInstanceMetrics(const InstanceObserver* metrics) {
@@ -240,7 +247,7 @@ void ShardingDataTransformCumulativeMetrics::reportActive(BSONObjBuilder* bob) c
     s.append(kInsertsApplied, kPlaceholderLong);
     s.append(kUpdatesApplied, kPlaceholderLong);
     s.append(kDeletesApplied, kPlaceholderLong);
-    s.append(kCountWritesToStashCollections, kPlaceholderLong);
+    s.append(kCountWritesToStashCollections, _writesToStashedCollections.load());
     s.append(kCountWritesDuringCriticalSection, _writesDuringCriticalSection.load());
     s.append(kCountReadsDuringCriticalSection, _readsDuringCriticalSection.load());
 }
@@ -291,13 +298,13 @@ void ShardingDataTransformCumulativeMetrics::reportCurrentInSteps(BSONObjBuilder
     reportState(CoordinatorStateEnum::kAborting);
     reportState(CoordinatorStateEnum::kCommitting);
 
-    s.append(kCountInstancesInRecipientState1AwaitingFetchTimestamp, kPlaceholderInt);
-    s.append(kCountInstancesInRecipientState2CreatingCollection, kPlaceholderInt);
-    s.append(kCountInstancesInRecipientState3Cloning, kPlaceholderInt);
-    s.append(kCountInstancesInRecipientState4Applying, kPlaceholderInt);
-    s.append(kCountInstancesInRecipientState5Error, kPlaceholderInt);
-    s.append(kCountInstancesInRecipientState6StrictConsistency, kPlaceholderInt);
-    s.append(kCountInstancesInRecipientState7Done, kPlaceholderInt);
+    reportState(RecipientStateEnum::kAwaitingFetchTimestamp);
+    reportState(RecipientStateEnum::kCreatingCollection);
+    reportState(RecipientStateEnum::kCloning);
+    reportState(RecipientStateEnum::kApplying);
+    reportState(RecipientStateEnum::kError);
+    reportState(RecipientStateEnum::kStrictConsistency);
+    reportState(RecipientStateEnum::kDone);
 
     reportState(DonorStateEnum::kPreparingToDonate);
     reportState(DonorStateEnum::kDonatingInitialData);
@@ -482,6 +489,55 @@ void ShardingDataTransformCumulativeMetrics::onReadDuringCriticalSection() {
 
 void ShardingDataTransformCumulativeMetrics::onWriteDuringCriticalSection() {
     _writesDuringCriticalSection.fetchAndAdd(1);
+}
+
+const char* ShardingDataTransformCumulativeMetrics::fieldNameFor(RecipientStateEnum state) {
+    switch (state) {
+        case RecipientStateEnum::kAwaitingFetchTimestamp:
+            return kCountInstancesInRecipientState1AwaitingFetchTimestamp;
+
+        case RecipientStateEnum::kCreatingCollection:
+            return kCountInstancesInRecipientState2CreatingCollection;
+
+        case RecipientStateEnum::kCloning:
+            return kCountInstancesInRecipientState3Cloning;
+
+        case RecipientStateEnum::kApplying:
+            return kCountInstancesInRecipientState4Applying;
+
+        case RecipientStateEnum::kError:
+            return kCountInstancesInRecipientState5Error;
+
+        case RecipientStateEnum::kStrictConsistency:
+            return kCountInstancesInRecipientState6StrictConsistency;
+
+        case RecipientStateEnum::kDone:
+            return kCountInstancesInRecipientState7Done;
+
+        default:
+            uasserted(6438900,
+                      str::stream()
+                          << "no field name for recipient state " << static_cast<int32_t>(state));
+            break;
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+void ShardingDataTransformCumulativeMetrics::onWriteToStashedCollections() {
+    _writesToStashedCollections.fetchAndAdd(1);
+}
+
+ShardingDataTransformCumulativeMetrics::RecipientStateArray*
+ShardingDataTransformCumulativeMetrics::getStateArrayFor(
+    ShardingDataTransformCumulativeMetrics::RecipientStateEnum state) {
+    return &_recipientStateList;
+}
+
+const ShardingDataTransformCumulativeMetrics::RecipientStateArray*
+ShardingDataTransformCumulativeMetrics::getStateArrayFor(
+    ShardingDataTransformCumulativeMetrics::RecipientStateEnum state) const {
+    return &_recipientStateList;
 }
 
 }  // namespace mongo

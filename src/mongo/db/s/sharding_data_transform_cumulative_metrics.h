@@ -68,6 +68,18 @@ public:
         kNumStates
     };
 
+    enum class RecipientStateEnum : int32_t {
+        kUnused = -1,
+        kAwaitingFetchTimestamp,
+        kCreatingCollection,
+        kCloning,
+        kApplying,
+        kError,
+        kStrictConsistency,
+        kDone,
+        kNumStates
+    };
+
     using Role = ShardingDataTransformMetrics::Role;
     using InstanceObserver = ShardingDataTransformMetricsObserverInterface;
     using DeregistrationFunction = unique_function<void()>;
@@ -98,9 +110,11 @@ public:
 
     void onReadDuringCriticalSection();
     void onWriteDuringCriticalSection();
+    void onWriteToStashedCollections();
 
     static const char* fieldNameFor(CoordinatorStateEnum state);
     static const char* fieldNameFor(DonorStateEnum state);
+    static const char* fieldNameFor(RecipientStateEnum state);
 
     void onInsertsDuringCloning(int64_t count, const Milliseconds& elapsedTime);
     void onRemoteBatchRetrievedDuringOplogFetching(int64_t count, const Milliseconds& elapsedTime);
@@ -123,6 +137,8 @@ private:
         std::array<AtomicWord<int64_t>, static_cast<size_t>(CoordinatorStateEnum::kNumStates)>;
     using DonorStateArray =
         std::array<AtomicWord<int64_t>, static_cast<size_t>(DonorStateEnum::kNumStates)>;
+    using RecipientStateArray =
+        std::array<AtomicWord<int64_t>, static_cast<size_t>(RecipientStateEnum::kNumStates)>;
 
     void reportActive(BSONObjBuilder* bob) const;
     void reportOldestActive(BSONObjBuilder* bob) const;
@@ -142,6 +158,8 @@ private:
     const CoordinatorStateArray* getStateArrayFor(CoordinatorStateEnum state) const;
     DonorStateArray* getStateArrayFor(DonorStateEnum state);
     const DonorStateArray* getStateArrayFor(DonorStateEnum state) const;
+    RecipientStateArray* getStateArrayFor(RecipientStateEnum state);
+    const RecipientStateArray* getStateArrayFor(RecipientStateEnum state) const;
 
     MetricsSet::iterator insertMetrics(const InstanceObserver* metrics, MetricsSet& set);
 
@@ -161,6 +179,7 @@ private:
 
     CoordinatorStateArray _coordinatorStateList;
     DonorStateArray _donorStateList;
+    RecipientStateArray _recipientStateList;
 
     AtomicWord<int64_t> _collectionCloningTotalLocalInserts{0};
     AtomicWord<int64_t> _collectionCloningTotalLocalInsertTimeMillis{0};
@@ -170,6 +189,7 @@ private:
     AtomicWord<int64_t> _oplogFetchingTotalLocalInsertTimeMillis{0};
     AtomicWord<int64_t> _oplogApplyingTotalBatchesRetrieved{0};
     AtomicWord<int64_t> _oplogApplyingTotalBatchesRetrievalTimeMillis{0};
+    AtomicWord<int64_t> _writesToStashedCollections{0};
 };
 
 template <typename T>

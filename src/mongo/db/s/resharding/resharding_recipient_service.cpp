@@ -147,6 +147,43 @@ void buildStateDocumentMetricsForUpdate(BSONObjBuilder& bob,
     }
 }
 
+ShardingDataTransformCumulativeMetrics::RecipientStateEnum toMetricsState(
+    RecipientStateEnum enumVal) {
+    using MetricsEnum = ShardingDataTransformCumulativeMetrics::RecipientStateEnum;
+
+    switch (enumVal) {
+        case RecipientStateEnum::kUnused:
+            return MetricsEnum::kUnused;
+
+        case RecipientStateEnum::kAwaitingFetchTimestamp:
+            return MetricsEnum::kAwaitingFetchTimestamp;
+
+        case RecipientStateEnum::kCreatingCollection:
+            return MetricsEnum::kCreatingCollection;
+
+        case RecipientStateEnum::kCloning:
+            return MetricsEnum::kCloning;
+
+        case RecipientStateEnum::kApplying:
+            return MetricsEnum::kApplying;
+
+        case RecipientStateEnum::kError:
+            return MetricsEnum::kError;
+
+        case RecipientStateEnum::kStrictConsistency:
+            return MetricsEnum::kStrictConsistency;
+
+        case RecipientStateEnum::kDone:
+            return MetricsEnum::kDone;
+
+        default:
+            invariant(false,
+                      str::stream() << "Unexpected resharding coordinator state: "
+                                    << RecipientState_serializer(enumVal));
+            MONGO_UNREACHABLE;
+    }
+}
+
 }  // namespace
 
 ThreadPool::Limits ReshardingRecipientService::getThreadPoolLimits() const {
@@ -202,6 +239,10 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
                               }) != _donorShards.end();
       }()) {
     invariant(_externalState);
+
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        _metricsNew->onStateTransition(boost::none, toMetricsState(_recipientCtx.getState()));
+    }
 }
 
 ExecutorFuture<void>
@@ -405,6 +446,12 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMand
                 // Interrupt occurred, ensure the metrics get shut down.
                 _metrics()->onStepDown(ReshardingMetrics::Role::kRecipient);
             }
+
+            if (ShardingDataTransformMetrics::isEnabled()) {
+                _metricsNew->onStateTransition(toMetricsState(_recipientCtx.getState()),
+                                               boost::none);
+            }
+
             // Wait for all of the data replication components to halt. We ignore any data
             // replication errors because resharding is known to have failed already.
             stdx::lock_guard<Latch> lk(_mutex);
@@ -825,6 +872,10 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
         std::move(newRecipientCtx), std::move(cloneDetails), std::move(configStartTime), factory);
 
     _metrics()->setRecipientState(newState);
+
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        _metricsNew->onStateTransition(toMetricsState(oldState), toMetricsState(newState));
+    }
 
     LOGV2_INFO(5279506,
                "Transitioned resharding recipient state",
