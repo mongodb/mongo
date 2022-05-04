@@ -1,4 +1,5 @@
 var defragmentationUtil = (function() {
+    load("jstests/libs/feature_flag_util.js");
     load("jstests/sharding/libs/find_chunks_util.js");
 
     let createFragmentedCollection = function(mongos,
@@ -93,7 +94,37 @@ var defragmentationUtil = (function() {
         assert.commandWorked(bulk.execute());
     };
 
+    let checkForOversizedChunk = function(
+        coll, chunk, shardKey, avgObjSize, oversizedChunkThreshold) {
+        let chunkSize = coll.countDocuments(
+                            {[shardKey]: {$gte: chunk.min[shardKey], $lt: chunk.max[shardKey]}}) *
+            avgObjSize;
+        assert.lte(
+            chunkSize,
+            oversizedChunkThreshold,
+            `Chunk ${tojson(chunk)} has size ${chunkSize} which is greater than max chunk size of ${
+                oversizedChunkThreshold}`);
+    };
+
+    let checkForMergeableChunkSiblings = function(
+        coll, leftChunk, rightChunk, shardKey, avgObjSize, oversizedChunkThreshold) {
+        let combinedDataSize =
+            coll.countDocuments(
+                {[shardKey]: {$gte: leftChunk.min[shardKey], $lt: rightChunk.max[shardKey]}}) *
+            avgObjSize;
+        // The autosplitter should not split chunks whose combined size is < 133% of
+        // maxChunkSize but this threshold may be off by a few documents depending on
+        // rounding of avgObjSize.
+        const autosplitRoundingTolerance = 3 * avgObjSize;
+        assert.gte(combinedDataSize,
+                   oversizedChunkThreshold - autosplitRoundingTolerance,
+                   `Chunks ${tojson(leftChunk)} and ${
+                       tojson(rightChunk)} are mergeable with combined size ${combinedDataSize}`);
+    };
+
     let checkPostDefragmentationState = function(mongos, ns, maxChunkSizeMB, shardKey) {
+        const withAutoSplitActive =
+            !FeatureFlagUtil.isEnabled(mongos.getDB('admin'), 'NoMoreAutoSplitter');
         const oversizedChunkThreshold = maxChunkSizeMB * 1024 * 1024 * 4 / 3;
         const chunks = findChunksUtil.findChunksByNs(mongos.getDB('config'), ns)
                            .sort({[shardKey]: 1})
@@ -111,55 +142,45 @@ var defragmentationUtil = (function() {
                 ? 0
                 : storageStat['storageStats']['avgObjSize'];
         });
-        let checkForOversizedChunk = function(
-            coll, chunk, shardKey, avgObjSize, oversizedChunkThreshold) {
-            let chunkSize =
-                coll.countDocuments(
-                    {[shardKey]: {$gte: chunk.min[shardKey], $lt: chunk.max[shardKey]}}) *
-                avgObjSize;
-            assert.lte(
-                chunkSize,
-                oversizedChunkThreshold,
-                `Chunk ${tojson(chunk)} has size ${
-                    chunkSize} which is greater than max chunk size of ${oversizedChunkThreshold}`);
-        };
         for (let i = 1; i < chunks.length; i++) {
-            let chunk1 = chunks[i - 1];
-            let chunk2 = chunks[i];
+            let leftChunk = chunks[i - 1];
+            let rightChunk = chunks[i];
             // Check for mergeable chunks with combined size less than maxChunkSize
-            if (chunk1["shard"] === chunk2["shard"] &&
-                bsonWoCompare(chunk1["max"], chunk2["min"]) === 0) {
-                let chunk1Zone = getZoneForRange(mongos, ns, chunk1.min, chunk1.max);
-                let chunk2Zone = getZoneForRange(mongos, ns, chunk2.min, chunk2.max);
-                if (bsonWoCompare(chunk1Zone, chunk2Zone) === 0) {
-                    let combinedDataSize =
-                        coll.countDocuments(
-                            {[shardKey]: {$gte: chunk1.min[shardKey], $lt: chunk2.max[shardKey]}}) *
-                        avgObjSizeByShard[chunk1['shard']];
-                    // The autosplitter should not split chunks whose combined size is < 133% of
-                    // maxChunkSize but this threshold may be off by a few documents depending on
-                    // rounding of avgObjSize.
-                    const autosplitRoundingTolerance = 3 * avgObjSizeByShard[chunk1['shard']];
-                    assert.gte(
-                        combinedDataSize,
-                        oversizedChunkThreshold - autosplitRoundingTolerance,
-                        `Chunks ${tojson(chunk1)} and ${
-                            tojson(chunk2)} are mergeable with combined size ${combinedDataSize}`);
+            if (leftChunk["shard"] === rightChunk["shard"] &&
+                bsonWoCompare(leftChunk["max"], rightChunk["min"]) === 0) {
+                let leftChunkZone = getZoneForRange(mongos, ns, leftChunk.min, leftChunk.max);
+                let rightChunkZone = getZoneForRange(mongos, ns, rightChunk.min, rightChunk.max);
+                if (bsonWoCompare(leftChunkZone, rightChunkZone) === 0) {
+                    if (withAutoSplitActive) {
+                        checkForMergeableChunkSiblings(coll,
+                                                       leftChunk,
+                                                       rightChunk,
+                                                       shardKey,
+                                                       avgObjSizeByShard[leftChunk['shard']],
+                                                       oversizedChunkThreshold);
+                    } else {
+                        assert(false,
+                               `Chunks ${leftChunk} and ${rightChunk} should have been merged`);
+                    }
                 }
             }
-            // Check for oversized chunks
+            if (withAutoSplitActive) {
+                checkForOversizedChunk(coll,
+                                       leftChunk,
+                                       shardKey,
+                                       avgObjSizeByShard[leftChunk['shard']],
+                                       oversizedChunkThreshold);
+            }
+        }
+
+        if (withAutoSplitActive) {
+            const lastChunk = chunks[chunks.length - 1];
             checkForOversizedChunk(coll,
-                                   chunk1,
+                                   lastChunk,
                                    shardKey,
-                                   avgObjSizeByShard[chunk1['shard']],
+                                   avgObjSizeByShard[lastChunk['shard']],
                                    oversizedChunkThreshold);
         }
-        const lastChunk = chunks[chunks.length - 1];
-        checkForOversizedChunk(coll,
-                               lastChunk,
-                               shardKey,
-                               avgObjSizeByShard[lastChunk['shard']],
-                               oversizedChunkThreshold);
     };
 
     let getZoneForRange = function(mongos, ns, minKey, maxKey) {
