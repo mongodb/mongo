@@ -569,6 +569,11 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
                   });
     }
 
+    if ((request.target.size() > 1) && !request.hedgeOptions &&
+        !gOpportunisticSecondaryTargeting.load()) {
+        request.target.resize(1);
+    }
+
     auto [cmdState, future] = CommandState::make(this, request, cbHandle);
     if (cmdState->requestOnAny.timeout != cmdState->requestOnAny.kNoTimeout) {
         cmdState->deadline = cmdState->stopwatch.start() + cmdState->requestOnAny.timeout;

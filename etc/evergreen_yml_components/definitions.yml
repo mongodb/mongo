@@ -5732,6 +5732,14 @@ tasks:
     vars:
       use_large_distro: "true"
 
+- <<: *gen_task_template
+  name: sharding_opportunistic_secondary_targeting_gen
+  tags: ["sharding", "common"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
 - <<: *task_template
   name: snmp
   tags: []
