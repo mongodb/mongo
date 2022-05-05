@@ -838,7 +838,7 @@ class ABTPrinter(object):
     def __init__(self, val):
         """Initialize ABTPrinter."""
         self.val = val
-        (print_fn_symbol, _) = gdb.lookup_symbol("_printNode")
+        (print_fn_symbol, _) = gdb.lookup_symbol("ExplainGenerator::explainNode")
         if print_fn_symbol is None:
             raise gdb.GdbError("Could not find ABT print function")
         self.print_fn = print_fn_symbol.value()
@@ -874,6 +874,70 @@ class ABTPrinter(object):
         return "%s" % (res)
 
 
+class OptimizerTypePrinter(object):
+    """Base class that pretty prints via a single argument C++ function."""
+
+    def __init__(self, val, print_fn_name):
+        """Initialize base printer."""
+        self.val = val
+        (print_fn_symbol, _) = gdb.lookup_symbol(print_fn_name)
+        if print_fn_symbol is None:
+            raise gdb.GdbError("Could not find pretty print function: " + print_fn_name)
+        self.print_fn = print_fn_symbol.value()
+
+    @staticmethod
+    def display_hint():
+        """Display hint."""
+        return None
+
+    def to_string(self):
+        """Return string for printing."""
+        return eval_print_fn(self.val, self.print_fn)
+
+
+class IntervalPrinter(OptimizerTypePrinter):
+    """Pretty-printer for mongo::optimizer::IntervalRequirement."""
+
+    def __init__(self, val):
+        """Initialize IntervalPrinter."""
+        super().__init__(val, "ExplainGenerator::explainInterval")
+
+
+class PartialSchemaReqMapPrinter(OptimizerTypePrinter):
+    """Pretty-printer for mongo::optimizer::PartialSchemaRequirements."""
+
+    def __init__(self, val):
+        """Initialize PartialSchemaReqMapPrinter."""
+        super().__init__(val, "ExplainGenerator::explainPartialSchemaReqMap")
+
+
+class MemoPrinter(OptimizerTypePrinter):
+    """Pretty-printer for mongo::optimizer::cascades::Memo."""
+
+    def __init__(self, val):
+        """Initialize MemoPrinter."""
+        super().__init__(val, "ExplainGenerator::explainMemo")
+
+
+def register_abt_printers(pp):
+    """Registers a number of pretty printers related to the CQF optimizer."""
+
+    # ABT printer.
+    abt_type = gdb.lookup_type("mongo::optimizer::ABT").strip_typedefs()
+    pp.add('ABT', abt_type.name, True, ABTPrinter)
+
+    # IntervalRequirement printer.
+    pp.add("Interval", "mongo::optimizer::IntervalRequirement", False, IntervalPrinter)
+
+    # PartialSchemaRequirements printer.
+    schema_req_type = gdb.lookup_type(
+        "mongo::optimizer::PartialSchemaRequirements").strip_typedefs()
+    pp.add("PartialSchemaRequirements", schema_req_type.name, False, PartialSchemaReqMapPrinter)
+
+    # Memo printer.
+    pp.add("Memo", "mongo::optimizer::cascades::Memo", False, MemoPrinter)
+
+
 def build_pretty_printer():
     """Build a pretty printer."""
     pp = MongoPrettyPrinterCollection()
@@ -897,8 +961,7 @@ def build_pretty_printer():
     pp.add('CodeFragment', 'mongo::sbe::vm::CodeFragment', False, SbeCodeFragmentPrinter)
 
     # Optimizer/ABT related pretty printers that can be used only with a running process.
-    abt_type = gdb.lookup_type("mongo::optimizer::ABT").strip_typedefs()
-    pp.add('ABT', abt_type.name, True, ABTPrinter)
+    register_abt_printers(pp)
 
     return pp
 

@@ -2272,6 +2272,13 @@ std::string ExplainGenerator::explainV2(const ABT& node,
     return gen.generate(node).str();
 }
 
+std::string ExplainGenerator::explainNode(const ABT& node) {
+    if (node.empty()) {
+        return "Empty\n";
+    }
+    return explainV2(node);
+}
+
 std::pair<sbe::value::TypeTags, sbe::value::Value> ExplainGenerator::explainBSON(
     const ABT& node,
     const bool displayProperties,
@@ -2388,25 +2395,6 @@ std::string ExplainGenerator::explainInterval(const IntervalRequirement& interva
 std::string ExplainGenerator::explainIntervalExpr(const IntervalReqExpr::Node& intervalExpr) {
     ExplainGeneratorTransporter<ExplainVersion::V2> gen;
     return gen.printIntervalExpr(intervalExpr).str();
-}
-
-std::string _printNode(const ABT& node) {
-    if (node.empty()) {
-        return "Empty\n";
-    }
-    return ExplainGenerator::explainV2(node);
-}
-
-std::string _printInterval(const IntervalRequirement& interval) {
-    return ExplainGenerator::explainInterval(interval);
-}
-
-std::string _printLogicalProps(const properties::LogicalProps& props) {
-    return ExplainGenerator::explainLogicalProps("Logical Properties", props);
-}
-
-std::string _printPhysProps(const properties::PhysProps& props) {
-    return ExplainGenerator::explainPhysProps("Physical Properties", props);
 }
 
 }  // namespace mongo::optimizer

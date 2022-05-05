@@ -75,6 +75,8 @@ public:
                                  const cascades::Memo* memo = nullptr,
                                  const NodeToGroupPropsMap& nodeMap = {});
 
+    static std::string explainNode(const ABT& node);
+
     static std::pair<sbe::value::TypeTags, sbe::value::Value> explainBSON(
         const ABT& node,
         bool displayProperties = false,
@@ -104,15 +106,5 @@ public:
 
     static std::string explainIntervalExpr(const IntervalReqExpr::Node& intervalExpr);
 };
-
-// Functions used by GDB for pretty-printing. For whatever reason GDB cannot find the static
-// methods of ExplainGenerator, while it can find the functions below.
-
-std::string _printNode(const ABT& node);
-
-std::string _printInterval(const IntervalRequirement& interval);
-
-std::string _printLogicalProps(const properties::LogicalProps& props);
-std::string _printPhysProps(const properties::PhysProps& props);
 
 }  // namespace mongo::optimizer
