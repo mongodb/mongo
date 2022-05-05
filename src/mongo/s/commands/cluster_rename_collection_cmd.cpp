@@ -111,7 +111,6 @@ public:
             auto renameCollResp = RenameCollectionResponse::parse(
                 IDLParserErrorContext("renameCollection"), cmdResponse.response);
 
-            // TODO: SERVER-53098 advance the cache by collection version.
             catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
                 toNss, renameCollResp.getCollectionVersion(), dbInfo->getPrimary());
 
