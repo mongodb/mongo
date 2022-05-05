@@ -2978,19 +2978,6 @@ buildvariants:
   tasks:
   - name: win_shared_scons_cache_pruning
 
-- name: selected-tests
-  display_name: "~ Selected Tests"
-  modules:
-  - enterprise
-  run_on:
-  - rhel80-small
-  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
-  stepback: false
-  expansions:
-    selected_tests_buildvariants: enterprise-windows-required linux-64-debug-required enterprise-ubuntu-dynamic-1604-clang rhel80-debug-aubsan-lite-required
-  tasks:
-  - name: selected_tests_gen
-
 - <<: *enterprise-rhel-80-64-bit-dynamic-required-template
   name: commit-queue
   display_name: "~ Commit Queue"

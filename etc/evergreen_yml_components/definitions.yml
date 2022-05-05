@@ -400,19 +400,6 @@ functions:
       args:
       - "src/evergreen/functions/evergreen_api_credentials_configure.sh"
 
-  "configure selected tests credentials": &configure_selected_tests_credentials
-    command: subprocess.exec
-    type: test
-    params:
-      binary: bash
-      silent: true
-      args:
-      - "src/evergreen/functions/selected_tests_credentials_configure.sh"
-      env:
-        project: ${project}
-        selected_tests_auth_user: ${selected_tests_auth_user}
-        selected_tests_auth_token: ${selected_tests_auth_token}
-
   "git get project": &git_get_project
     command: git.get_project
     params:
@@ -994,40 +981,6 @@ functions:
       binary: bash
       args:
       - "./src/evergreen/jstestfuzz_minimize.sh"
-
-  "generate selected tests":
-  - *f_expansions_write
-  - *configure_evergreen_api_credentials
-  - *configure_selected_tests_credentials
-  - command: subprocess.exec
-    type: test
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/selected_tests_generate.sh"
-  - *f_expansions_write
-  - command: archive.targz_pack
-    params:
-      target: generate_tasks_config.tgz
-      source_dir: src/generated_resmoke_config
-      include:
-      - "*"
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: generate_tasks_config.tgz
-      remote_file: ${project}/${revision}/generate_tasks/generated-config-${version_id}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: ${content_type|application/gzip}
-      display_name: Generated Task Config - Execution ${execution}
-      optional: true
-  - command: generate.tasks
-    params:
-      optional: true
-      files:
-      - src/generated_resmoke_config/*.json
 
   "generate version":
   - *f_expansions_write
@@ -4221,18 +4174,6 @@ tasks:
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "generate version"
-
-- name: selected_tests_gen
-  tags: []
-  commands:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - *f_expansions_write
-  - *kill_processes
-  - *cleanup_environment
-  - func: "set up venv"
-  - func: "upload pip requirements"
-  - func: "generate selected tests"
 
 - <<: *gen_task_template
   name: auth_audit_gen
