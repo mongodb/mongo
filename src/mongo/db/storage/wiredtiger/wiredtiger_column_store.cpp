@@ -116,7 +116,7 @@ WiredTigerColumnStore::WiredTigerColumnStore(OperationContext* ctx,
 
 std::string& WiredTigerColumnStore::makeKey(std::string& buffer, PathView path, RecordId rid) {
     const auto ridSize =
-        rid.withFormat([](RecordId::Null) -> unsigned long { MONGO_UNREACHABLE; },
+        rid.withFormat([](RecordId::Null) -> unsigned long { return 0; },
                        [](int64_t) -> unsigned long { return sizeof(int64_t); },
                        [](const char* data, size_t len) -> unsigned long { MONGO_UNREACHABLE; });
     buffer.clear();
@@ -126,7 +126,7 @@ std::string& WiredTigerColumnStore::makeKey(std::string& buffer, PathView path, 
         // If we end up reserving more values, the above check should be changed.
         buffer += '\0';
     }
-    rid.withFormat([](RecordId::Null) { MONGO_UNREACHABLE; },
+    rid.withFormat([](RecordId::Null) { /* do nothing */ },
                    [&](int64_t num) {
                        num = endian::nativeToBig(num);
                        buffer.append(reinterpret_cast<const char*>(&num), sizeof(num));
@@ -433,12 +433,16 @@ bool WiredTigerColumnStore::isEmpty(OperationContext* opCtx) {
 
 long long WiredTigerColumnStore::getSpaceUsedBytes(OperationContext* opCtx) const {
     // TODO: SERVER-65980.
-    uasserted(ErrorCodes::NotImplemented, "WiredTigerColumnStore::getSpaceUsedBytes");
+    // For now we just return  this so that tests can successfully obtain collection-level stats on
+    // a collection with a columnstore index.
+    return 27017;
 }
 
 long long WiredTigerColumnStore::getFreeStorageBytes(OperationContext* opCtx) const {
     // TODO: SERVER-65980.
-    uasserted(ErrorCodes::NotImplemented, "WiredTigerColumnStore::getFreeStorageBytes");
+    // For now we just fake this so that tests can successfully obtain collection-level stats on a
+    // collection with a columnstore index.
+    return 27017;
 }
 
 Status WiredTigerColumnStore::compact(OperationContext* opCtx) {
@@ -449,7 +453,10 @@ bool WiredTigerColumnStore::appendCustomStats(OperationContext* opCtx,
                                               BSONObjBuilder* output,
                                               double scale) const {
     // TODO: SERVER-65980.
-    uasserted(ErrorCodes::NotImplemented, "WiredTigerColumnStore::appendCustomStats");
+    // For now we just skip this so that tests can successfully obtain collection-level stats on a
+    // collection with a columnstore index.
+    output->append("note"_sd, "columnstore stats are not yet implemented"_sd);
+    return true;
 }
 
 }  // namespace mongo

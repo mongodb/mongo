@@ -68,6 +68,7 @@ selector:
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
+  - incompatible_with_clustered_collection
 
 executor:
   archive:

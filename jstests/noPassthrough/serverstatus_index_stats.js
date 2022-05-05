@@ -236,11 +236,10 @@ const columnstoreIndexesEnabled =
     assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagColumnstoreIndexes: 1}))
         .featureFlagColumnstoreIndexes.value;
 if (columnstoreIndexesEnabled) {
-    // TODO SERVER-66021 should support having data.
     // TODO SERVER-61644 (or sooner) should support accessing/using index and seeing that reflected.
-    assert.commandWorked(db.newCollection.createIndex({'$**': 'columnstore'}));
+    assert.commandWorked(db.testColl.createIndex({'$**': 'columnstore'}));
     assertStats(db, (stats) => {
-        assertCountIncrease(lastStats, stats, 2);  // Includes _id index on new collection.
+        assertCountIncrease(lastStats, stats, 1);
         assertFeatureCountIncrease(lastStats, stats, 'columnstore', 1);
 
         assertFeatureAccessIncrease(lastStats, stats, 'id', 0);

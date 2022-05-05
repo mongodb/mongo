@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/index/column_cell.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/storage/column_store.h"
 
@@ -56,26 +57,26 @@ public:
                   const CollectionPtr& coll,
                   const std::vector<BsonRecord>& bsonRecords,
                   const InsertDeleteOptions& options,
-                  int64_t* numInserted) final;
+                  int64_t* keysInsertedOut) final;
 
     void remove(OperationContext* opCtx,
                 SharedBufferFragmentBuilder& pooledBufferBuilder,
                 const CollectionPtr& coll,
                 const BSONObj& obj,
-                const RecordId& loc,
+                const RecordId& rid,
                 bool logIfError,
                 const InsertDeleteOptions& options,
-                int64_t* numDeleted,
+                int64_t* keysDeletedOut,
                 CheckRecordId checkRecordId) final;
     Status update(OperationContext* opCtx,
                   SharedBufferFragmentBuilder& pooledBufferBuilder,
                   const BSONObj& oldDoc,
                   const BSONObj& newDoc,
-                  const RecordId& loc,
+                  const RecordId& rid,
                   const CollectionPtr& coll,
                   const InsertDeleteOptions& options,
-                  int64_t* numInserted,
-                  int64_t* numDeleted) final;
+                  int64_t* keysInsertedOut,
+                  int64_t* keysDeletedOut) final;
 
     Status initializeAsEmpty(OperationContext* opCtx) final;
 
@@ -107,6 +108,12 @@ public:
     class BulkBuilder;
 
 private:
+    void insertOne(OperationContext*,
+                   SharedBufferFragmentBuilder&,
+                   StringData path,
+                   const column_keygen::UnencodedCellView& cell,
+                   const RecordId&);
+
     const std::unique_ptr<ColumnStore> _store;
     IndexCatalogEntry* const _indexCatalogEntry;  // owned by IndexCatalog
     const IndexDescriptor* const _descriptor;

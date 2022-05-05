@@ -8,7 +8,8 @@
 (function() {
 "use strict";
 
-load("jstests/libs/index_catalog_helpers.js");  // For "IndexCatalogHelpers."
+load("jstests/libs/index_catalog_helpers.js");     // For "IndexCatalogHelpers."
+load("jstests/libs/collection_drop_recreate.js");  // For "assertDropCollection."
 
 const kCollectionName = "wildcard_validindex";
 const coll = db.getCollection(kCollectionName);
@@ -140,4 +141,22 @@ assert.commandFailedWithCode(
     IndexCatalogHelpers.createSingleIndex(
         coll, {"a.$**": 1}, {name: kIndexName, wildcardProjection: {b: 0}}),
     ErrorCodes.FailedToParse);
+
+// Test that you can create a wildcard index on a clustered collection.
+const clusteredCollName = "wildcard_clustered";
+const clusteredColl = db[clusteredCollName];
+assertDropCollection(db, clusteredCollName);
+assert.commandWorked(
+    db.runCommand({create: clusteredCollName, clusteredIndex: {key: {_id: 1}, unique: true}}));
+assert.commandWorked(IndexCatalogHelpers.createSingleIndex(coll, {"$**": 1}, {name: kIndexName}));
+
+// Test that you cannot cluster a collection using a wildcard index.
+clusteredColl.drop();
+assertDropCollection(db, clusteredCollName);
+assert.commandFailedWithCode(
+    db.runCommand({create: clusteredCollName, clusteredIndex: {key: {"$**": 1}}}),
+    40414);  // Need to specify 'unique'.
+assert.commandFailedWithCode(
+    db.runCommand({create: clusteredCollName, clusteredIndex: {key: {"$**": 1}, unique: true}}),
+    ErrorCodes.InvalidIndexSpecificationOption);
 })();

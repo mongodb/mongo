@@ -47,5 +47,6 @@ void appendElementToCell(const BSONElement& element, BufBuilder* cellBuffer);
  * path in an indexed document as well as the associated "array info" and flags.
  */
 void writeEncodedCell(const UnencodedCellView& cell, BufBuilder* cellBuffer);
+void writeEncodedCell(const UnencodedCellView& cell, PooledFragmentBuilder* cellBuffer);
 }  // namespace column_keygen
 }  // namespace mongo

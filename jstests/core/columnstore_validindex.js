@@ -5,14 +5,18 @@
  *   requires_background_index,
  *   # Columnstore indexes are new in 6.1.
  *   requires_fcv_61,
- *   # TODO SERVER-66021 replication uses the bulk builder which isn't implemented yet.
- *   assumes_standalone_mongod,
+ *   # Columnstore indexes are incompatible with clustered collections.
+ *   incompatible_with_clustered_collection,
+ *   # We could potentially need to resume an index build in the event of a stepdown, which is not
+ *   # yet implemented.
+ *   does_not_support_stepdowns,
  * ]
  */
 (function() {
 "use strict";
 
-load("jstests/libs/index_catalog_helpers.js");  // For "IndexCatalogHelpers."
+load("jstests/libs/index_catalog_helpers.js");     // For "IndexCatalogHelpers."
+load("jstests/libs/collection_drop_recreate.js");  // For "assertDropCollection."
 
 const getParamResponse =
     assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagColumnstoreIndexes: 1}));
@@ -164,4 +168,30 @@ assertCannotUseColumnstoreProjection({"$**": "text"});
 //     IndexCatalogHelpers.createSingleIndex(
 //         coll, {"a.$**": "columnstore"}, {name: kIndexName, columnstoreProjection: {b: 0}}),
 //     ErrorCodes.FailedToParse);
+
+// Test that you cannot create a columnstore index on a clustered collection.
+const clusteredCollName = "columnstore_clustered";
+const clusteredColl = db[clusteredCollName];
+assertDropCollection(db, clusteredCollName);
+assert.commandWorked(
+    db.runCommand({create: clusteredCollName, clusteredIndex: {key: {_id: 1}, unique: true}}));
+assert.commandFailedWithCode(IndexCatalogHelpers.createSingleIndex(
+                                 clusteredColl, {"$**": "columnstore"}, {name: kIndexName}),
+                             ErrorCodes.InvalidOptions);
+
+// Test that you cannot cluster a collection using a columnstore index.
+// Need to specify 'unique' field.
+assertDropCollection(db, clusteredCollName);
+assert.commandFailedWithCode(
+    db.runCommand({create: clusteredCollName, clusteredIndex: {key: {"$**": "columnstore"}}}),
+    40414);
+// Even with unique it still should not work.
+assert.commandFailedWithCode(
+    db.runCommand(
+        {create: clusteredCollName, clusteredIndex: {key: {"$**": "columnstore"}, unique: true}}),
+    ErrorCodes.InvalidIndexSpecificationOption);
+assert.commandFailedWithCode(
+    db.runCommand(
+        {create: clusteredCollName, clusteredIndex: {key: {"$**": "columnstore"}, unique: false}}),
+    5979700);
 })();
