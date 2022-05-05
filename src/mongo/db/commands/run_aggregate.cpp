@@ -445,6 +445,10 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     expCtx->collationMatchesDefault = collationMatchesDefault;
     expCtx->forPerShardCursor = request.getPassthroughToShard().has_value();
     expCtx->allowDiskUse = request.getAllowDiskUse().value_or(allowDiskUseByDefault.load());
+    if (storageGlobalParams.readOnly) {
+        // Disallow disk use if in read-only mode.
+        expCtx->allowDiskUse = false;
+    }
 
     // If the request specified v2 resume tokens for change streams, set this on the expCtx. On 6.0
     // we only expect this to occur during testing.

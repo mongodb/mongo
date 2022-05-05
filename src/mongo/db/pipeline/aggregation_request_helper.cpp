@@ -152,7 +152,6 @@ Document serializeToCommandDoc(const AggregateCommandRequest& request) {
 void validate(const BSONObj& cmdObj,
               const NamespaceString& nss,
               boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
-    bool hasAllowDiskUseElem = cmdObj.hasField(AggregateCommandRequest::kAllowDiskUseFieldName);
     bool hasCursorElem = cmdObj.hasField(AggregateCommandRequest::kCursorFieldName);
     bool hasExplainElem = cmdObj.hasField(AggregateCommandRequest::kExplainFieldName);
     bool hasExplain = explainVerbosity ||
@@ -176,11 +175,6 @@ void validate(const BSONObj& cmdObj,
             str::stream() << "Cannot specify '" << AggregateCommandRequest::kNeedsMergeFieldName
                           << "' without '" << AggregateCommandRequest::kFromMongosFieldName << "'",
             (!hasNeedsMergeElem || hasFromMongosElem));
-
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "The '" << AggregateCommandRequest::kAllowDiskUseFieldName
-                          << "' option is not permitted in read-only mode.",
-            (!hasAllowDiskUseElem || !storageGlobalParams.readOnly));
 
     auto requestReshardingResumeTokenElem =
         cmdObj[AggregateCommandRequest::kRequestReshardingResumeTokenFieldName];
