@@ -65,7 +65,7 @@ using FLECounter = std::uint64_t;
 /**
  * There are two types of keys that are user supplied.
  * 1. Index, aka S - this encrypts the index structures
- * 2. User, aka K - this encrypts the user data. It can be the same as Index.
+ * 2. User, aka K - this encrypts the user data.
  *
  * These keys only exist on the client, they are never on the server-side.
  */
@@ -128,7 +128,10 @@ using FLEUserKeyAndId = FLEKeyAndId<FLEKeyType::User>;
  * Terminology
  * f = field
  * v = value
- * u == 0 if field has no contention otherwise u = random secure sample {1, .. max contention}.
+ * u =
+ *   - For non-contentious fields, we select the partition number, u, to be equal to 0.
+ *   - For contentious fields, with a contention factor, p, we pick the partition number, u,
+ * uniformly at random from the set {0, ..., p}.
  *
  * CollectionsLevel1Token = HMAC(IndexKey, 1) = K_{f,1}
  * ServerDataEncryptionLevel1Token = HMAC(IndexKey, 3) = K_{f,3} = Fs[f,3]
@@ -376,6 +379,7 @@ public:
  *  pos = uint64_t
  *  count_type = uint64_t
  *  count = uint64_t
+ *  - Note: There is a lifetime limit of 2^64 - 1 count of a value/pairs for an index
  *
  * where type
  *   0 - null record
@@ -456,8 +460,6 @@ public:
 
     /**
      * Get a count of documents in the collection.
-     *
-     * TODO - how perfect does it need to be ? Is too high or too low ok if it is just an estimate?
      */
     virtual uint64_t getDocumentCount() const = 0;
 
@@ -537,14 +539,14 @@ public:
  *
  * {
  *    _id : HMAC(ECCTwiceDerivedTagToken, type || pos )
- *    value : Encrypt(ECCTwiceDerivedValueToken,  count OR start || end)
+ *    value : Encrypt(ECCTwiceDerivedValueToken,  (count || count) OR (start || end))
  * }
  *
  * where
  *  type = uint64_t
  *  pos = uint64_t
  *  value is either:
- *       count = uint64_t  // Null records
+ *       count, count = uint64_t  // Null records
  *    OR
  *       start = uint64_t  // Other records
  *       end = uint64_t
@@ -554,7 +556,7 @@ public:
  *   1 - regular record or compaction record
  *
  * where start and end:
- *   [0..UINT_64_MAX) - regular start and end
+ *   [1..UINT_64_MAX) - regular start and end
  *   UINT64_MAX - compaction placeholder
  *
  * Record types:
@@ -567,7 +569,7 @@ public:
  * Null record:
  * {
  *    _id : HMAC(ECCTwiceDerivedTagToken, null )
- *    value : Encrypt(ECCTwiceDerivedValueToken,  count)
+ *    value : Encrypt(ECCTwiceDerivedValueToken,  count || count)
  * }
  *
  * Regular record:
@@ -591,6 +593,7 @@ public:
  * PlainText of value for null records
  * struct {
  *    uint64_t count;
+ *    uint64_t ignored;
  * }
  *
  * PlainText of value for non-null records
