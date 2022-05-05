@@ -12,18 +12,76 @@ load("jstests/libs/transactions_util.js");
 // Save references to the original methods in the IIFE's scope.
 // This scoping allows the original methods to be called by the overrides below.
 const originalRunCommand = Mongo.prototype.runCommand;
-const originalMarkNodeAsFailed = Mongo.prototype._markNodeAsFailed;
+const originalCloseMethod = Mongo.prototype.close;
 
-function getRoutingConnection(conn) {
-    if (conn._conn == null) {
-        conn._conn = conn;
+// Save a reference to the connection created at shell startup. This will be used as a proxy for
+// multiple internal routing connections for the lifetime of the test execution.
+const initialConn = db.getMongo();
+
+/**
+ * Asserts that the provided connection is an internal routing connection, not the top-level proxy
+ * connection. The proxy connection also has an internal routing connection, so it is excluded from
+ * this check.
+ */
+function assertRoutingConnection(conn) {
+    if (conn !== initialConn) {
+        assert.eq(null,
+                  conn._internalRoutingConnection,
+                  "Expected connection to have no internal routing connection.");
     }
-
-    return conn._conn;
 }
 
+/**
+ * @returns The internal routing connection for a provided connection
+ */
+function getRoutingConnection(conn) {
+    if (conn === initialConn && conn._internalRoutingConnection == null) {
+        conn._internalRoutingConnection = conn;
+    }
+
+    // Since we are patching the prototype below, there must eventually be a "base case" for
+    // determining which connection to run a method on. If the provided `conn` has no internal
+    // routing connection, we assume that it _is_ the internal routing connection, and return
+    // here.
+    if (conn._internalRoutingConnection == null) {
+        return conn;
+    }
+
+    // Sanity check ensuring we have not accidentally created an internal routing connection on an
+    // internal routing connection.
+    assertRoutingConnection(conn._internalRoutingConnection);
+    return conn._internalRoutingConnection;
+}
+
+/**
+ * Assigns a newly establish connection as the internal routing connection for a Mongo instance.
+ *
+ * @param {Mongo} conn The original Mongo connection
+ * @param {Mongo} mongo The newly established, internal connection
+ */
 function setRoutingConnection(conn, mongo) {
-    conn._conn = mongo;
+    assert.neq(null,
+               conn._internalRoutingConnection,
+               "Expected connection to already have an internal routing connection.");
+    conn._internalRoutingConnection = mongo;
+}
+
+function closeRoutingConnection(conn) {
+    if (conn === initialConn) {
+        // We need to close the initial connection differently, since we patch the close method
+        // below to always proxy calls to the internal routing connection.
+        return originalCloseMethod.apply(conn);
+    }
+
+    // For all other connections we are safe to call close directly
+    conn.close();
+}
+
+/**
+ * @returns Whether we are currently running a shard split passthrough.
+ */
+function isShardSplitPassthrough() {
+    return !!TestData.tenantIds;
 }
 
 const kDenylistedDbNames = new Set(["config", "admin", "local"]);
@@ -45,8 +103,8 @@ function prependTenantIdToDbNameIfApplicable(dbName) {
     }
 
     let prefix;
-    // If `TestData.tenantIds` is present, then assign a database to a randomly selected tenant
-    if (TestData.tenantIds) {
+    // If running shard split passthroughs, then assign a database to a randomly selected tenant
+    if (isShardSplitPassthrough()) {
         if (!kTenantPrefixMap[dbName]) {
             const tenantId =
                 TestData.tenantIds[Math.floor(Math.random() * TestData.tenantIds.length)];
@@ -80,7 +138,7 @@ function prependTenantIdToNsIfApplicable(ns) {
  * Remove a tenant prefix from the provided database name, if applicable.
  */
 function extractOriginalDbName(dbName) {
-    if (TestData.tenantIds) {
+    if (isShardSplitPassthrough()) {
         const anyTenantPrefixOnceRegex = new RegExp(Object.values(kTenantPrefixMap).join('|'), '');
         return dbName.replace(anyTenantPrefixOnceRegex, "");
     }
@@ -101,7 +159,7 @@ function extractOriginalNs(ns) {
  * Removes all occurrences of a tenant prefix in the provided string.
  */
 function removeTenantIdFromString(string) {
-    if (TestData.tenantIds) {
+    if (isShardSplitPassthrough()) {
         const anyTenantPrefixGlobalRegex =
             new RegExp(Object.values(kTenantPrefixMap).join('|'), 'g');
         return string.replace(anyTenantPrefixGlobalRegex, "");
@@ -369,7 +427,7 @@ function removeSuccessfulOpIndexesExceptForUpserted(resObj, indexMap, ordered) {
  */
 function convertServerConnectionStringToURI(input) {
     const inputParts = input.split('/');
-    return `mongodb://${inputParts[1]}/${inputParts[0]}`;
+    return `mongodb://${inputParts[1]}/?replicaSet=${inputParts[0]}`;
 }
 
 /**
@@ -377,9 +435,9 @@ function convertServerConnectionStringToURI(input) {
  * that there is only one such operation.
  */
 function getOperationStateDocument(conn) {
-    const collection = TestData.tenantIds ? "tenantSplitDonors" : "tenantMigrationDonors";
+    const collection = isShardSplitPassthrough() ? "tenantSplitDonors" : "tenantMigrationDonors";
     const filter =
-        TestData.tenantIds ? {tenantIds: TestData.tenantIds} : {tenantId: TestData.tenantId};
+        isShardSplitPassthrough() ? {tenantIds: TestData.tenantIds} : {tenantId: TestData.tenantId};
     const findRes = assert.commandWorked(
         originalRunCommand.apply(conn, ["config", {find: collection, filter}, 0]));
     const docs = findRes.cursor.firstBatch;
@@ -387,7 +445,7 @@ function getOperationStateDocument(conn) {
     assert.eq(docs.length, 1, tojson(docs));
 
     const result = docs[0];
-    if (TestData.tenantIds) {
+    if (isShardSplitPassthrough()) {
         result.recipientConnectionString =
             convertServerConnectionStringToURI(result.recipientConnectionString);
     }
@@ -400,7 +458,7 @@ function getOperationStateDocument(conn) {
  * reroute commands by inserting a document for it into the testTenantMigration.rerouted collection.
  */
 function recordRerouteDueToTenantMigration(conn, migrationStateDoc) {
-    assert.neq(null, conn._conn);
+    assertRoutingConnection(conn);
 
     while (true) {
         try {
@@ -481,8 +539,9 @@ function runCommandRetryOnTenantMigrationErrors(
 
     while (true) {
         numAttempts++;
-        let resObj = originalRunCommand.apply(getRoutingConnection(conn),
-                                              [dbNameWithTenantId, cmdObjWithTenantId, options]);
+        const newConn = getRoutingConnection(conn);
+        let resObj =
+            originalRunCommand.apply(newConn, [dbNameWithTenantId, cmdObjWithTenantId, options]);
 
         const migrationCommittedErr =
             extractTenantMigrationError(resObj, ErrorCodes.TenantMigrationCommitted);
@@ -598,6 +657,10 @@ function runCommandRetryOnTenantMigrationErrors(
                 }
 
                 recordRerouteDueToTenantMigration(donorConnection, migrationStateDoc);
+
+                if (isShardSplitPassthrough()) {
+                    closeRoutingConnection(donorConnection);
+                }
             } else if (migrationAbortedErr) {
                 jsTestLog(`Got TenantMigrationAborted for command against database ${
                               dbNameWithTenantId} after trying ${numAttempts} times: ` +
@@ -654,9 +717,37 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     return resObj;
 };
 
-Mongo.prototype._markNodeAsFailed = function() {
-    return originalMarkNodeAsFailed.apply(getRoutingConnection(this), arguments);
-};
+// Override all base methods on the Mongo prototype to try to proxy the call to the underlying
+// internal routing connection, if one exists.
+// NOTE: This list is derived from scripting/mozjs/mongo.cpp:62.
+['auth',
+ 'close',
+ 'compact',
+ 'cursorHandleFromId',
+ 'find',
+ 'generateDataKey',
+ 'getDataKeyCollection',
+ 'logout',
+ 'encrypt',
+ 'decrypt',
+ 'isReplicaSetConnection',
+ '_markNodeAsFailed',
+ 'getMinWireVersion',
+ 'getMaxWireVersion',
+ 'isReplicaSetMember',
+ 'isMongos',
+ 'isTLS',
+ 'getApiParameters',
+ '_startSession',
+ // Don't override this method, since it is never called directly in jstests. The expectation of is
+ // that it will be run on the connection `Mongo.prototype.runCommand` chose.
+ // '_runCommandImpl',
+].forEach(methodName => {
+    const $method = Mongo.prototype[methodName];
+    Mongo.prototype[methodName] = function() {
+        return $method.apply(getRoutingConnection(this), arguments);
+    };
+});
 
 OverrideHelpers.prependOverrideInParallelShell(
     "jstests/libs/override_methods/inject_tenant_prefix.js");

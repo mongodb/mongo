@@ -61,7 +61,7 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
 
         # The default `electionTimeoutMillis` on evergreen is 24hr to prevent spurious
         # elections.  We _want_ elections to occur after split, so reduce the value here.
-        # TODO(SERVER-64935): No longer required once we send replSetStepUp to recipient nodes
+        # TODO(SERVER-64939): No longer required once we send replSetStepUp to recipient nodes
         # when splitting them.
         if "settings" in self.replset_config_options:
             self.replset_config_options["settings"] = self.fixturelib.default_if_none(
@@ -87,19 +87,12 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
                            for _ in range(self.num_nodes_per_replica_set)
                        ]]
 
-        # TODO(SERVER-41031, SERVER-36417): Stop keeping retired donors alive once nodes which are
-        # removed from a replica set stop trying to send heartbeats to the replica set. We keep
-        # them alive for now to prevent a large amount of log lines from failed heartbeats.
-        self._retired_donors = []
-
     def pids(self):
         """:return: pids owned by this fixture if any."""
         out = []
         with self.__lock:
             for fixture in self.fixtures:
                 out.extend(fixture.pids())
-            for retired_donor in self._retired_donors:
-                out.extend(retired_donor.pids())
         if not out:
             self.logger.debug('No fixtures when gathering pids.')
         return out
@@ -137,24 +130,13 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
         # ContinuousShardSplit hook is running, which is the only thing that can modify
         # self.fixtures. Tearing down may take a long time, so taking the lock during that process
         # might result in hangs in other functions which need to take the lock.
-        for retired_donor in self._retired_donors:
-            teardown_handler.teardown(retired_donor, f"replica set '{retired_donor.replset_name}'",
-                                      mode=mode)
-
         for fixture in reversed(self.fixtures):
             type_name = f"replica set '{fixture.replset_name}'" if _is_replica_set_fixture(
                 fixture) else f"standalone on port {fixture.port}"
             teardown_handler.teardown(fixture, type_name, mode=mode)
 
-        # Remove the recipient nodes outright now that they have been torn down
-        self.fixtures = [self.get_donor_rs()]
-
-        # Remove the retired donors, if we restart the active donor it will have no connections
-        # to retired donors and new tests will only connect to the active donor.
-        self._retired_donors = []
-
         if teardown_handler.was_successful():
-            self.logger.info("Successfully stopped donor replica set and all standalone nodes.")
+            self.logger.info("Successfully stopped donor replica set and all recipient nodes.")
         else:
             self.logger.error("Stopping the fixture failed.")
             raise self.fixturelib.ServerFailure(teardown_handler.get_error_message())
@@ -186,14 +168,12 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
         with self.__lock:
             for fixture in self.fixtures:
                 output += fixture.get_node_info()
-            for retired_donor in self._retired_donors:
-                output += retired_donor.get_node_info()
         return output
 
     def get_independent_clusters(self):
         """Return the replica sets involved in the tenant migration."""
         with self.__lock:
-            return self.fixtures.copy() + self._retired_donors.copy()
+            return self.fixtures.copy()
 
     def get_donor_rs(self):
         """:return the donor replica set."""
@@ -231,6 +211,7 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
                     "set_parameters", self.fixturelib.make_historic({})).copy()
                 mongod_options["serverless"] = True
                 mongod_port = self._ports[self._port_index][i]
+
                 self.fixtures.append(
                     self.fixturelib.make_fixture(
                         "MongoDFixture", mongod_logger, self.job_num, mongod_options=mongod_options,
@@ -248,6 +229,14 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
 
         repl_config = donor_client.admin.command({"replSetGetConfig": 1})["config"]
         repl_members = repl_config["members"]
+
+        # Removes recipient tags from donor nodes which were split from a previous donor
+        # TODO(SERVER-64823): Remove this code once the server implementation removes these tags
+        for member in repl_members:
+            if 'tags' in member:
+                if recipient_tag_name in member["tags"]:
+                    del member["tags"][recipient_tag_name]
+
         for recipient_node in recipient_nodes:
             repl_members.append({
                 "host": recipient_node.get_internal_connection_string(), "votes": 0, "priority": 0,
@@ -290,13 +279,6 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
 
     def replace_donor_with_recipient(self, recipient_set_name):
         """Replace the current donor with the newly initiated recipient."""
-        self.logger.info("Replacing donor replica set with recipient replica set.")
-
-        retired_donor_rs = self.get_donor_rs()
-        self.logger.info(f"Retiring old donor replica set '{retired_donor_rs.replset_name}'.")
-        with self.__lock:
-            self._retired_donors.append(retired_donor_rs)
-
         self.logger.info(
             f"Making new donor replica set '{recipient_set_name}' from existing recipient nodes.")
         mongod_options = self.common_mongod_options.copy()
@@ -310,8 +292,12 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
             replicaset_logging_prefix=recipient_set_name, all_nodes_electable=True,
             replset_name=recipient_set_name, existing_nodes=self.get_recipient_nodes())
 
-        new_donor_rs.get_primary()  # Awaits an election of a primary
+        new_donor_rs.get_primary()  # Await an election of a new donor primary
 
         self.logger.info("Replacing internal fixtures with new donor replica set.")
+        retired_donor_rs = self.get_donor_rs()
         with self.__lock:
             self.fixtures = [new_donor_rs]
+
+        self.logger.info(f"Retiring old donor replica set '{retired_donor_rs.replset_name}'.")
+        retired_donor_rs.teardown(finished=True)

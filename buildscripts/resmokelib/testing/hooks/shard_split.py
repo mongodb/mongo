@@ -240,7 +240,7 @@ class _ShardSplitThread(threading.Thread):  # pylint: disable=too-many-instance-
                 if not permitted:
                     break
 
-                if split_count >= 1:  # TODO(SERVER-65042): Remove this check and run multiple splits
+                if split_count >= 3:  # TODO(SERVER-66045): Remove this check and run unbounded splits
                     time.sleep(self.POLL_INTERVAL_SECS)
                     continue
 
@@ -472,18 +472,12 @@ class _ShardSplitThread(threading.Thread):  # pylint: disable=too-many-instance-
                 recipient_node_client = self._create_client(recipient_node)
                 while True:
                     try:
-                        hello = recipient_node_client.admin.command("hello")
-                        print(f"recipient hello: {hello}")
-
                         res = recipient_node_client.config.command({
                             "count": "tenantSplitDonors",
                             "query": {"tenantIds": split_opts.tenant_ids}
                         })
                         if res["n"] == 0:
                             break
-
-                        docs = recipient_node_client.config.tenantSplitDonors.find()
-                        print(f"recipient tenantSplitDonors docs: {list(docs)}")
                     except pymongo.errors.ConnectionFailure:
                         self.logger.info(
                             f"Retrying waiting for shard split '{split_opts.migration_id}' to be garbage collected on recipient node on port {recipient_node.port} of replica set '{split_opts.recipient_set_name}'."
