@@ -150,7 +150,7 @@ to be obsolete by the time the application receives it and applications using
 this value to make operational decisions are responsible for coordinating their
 own actions (for example by using high-level locks) to ensure its validity.
 Specifically, any transaction commit with a durable timestamp (or a commit
-timestamp if no durable timestamp was set), larger than than the current
+timestamp if no durable timestamp was set), larger than the current
 \c durable_timestamp value will set the \c durable_timestamp to the transaction's
 durable (commit) timestamp. Calling the WT_CONNECTION::rollback_to_stable
 method will reset the \c durable_timestamp to the stable timestamp.
