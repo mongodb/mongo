@@ -67,6 +67,11 @@ public:
         }
     }
 
+    AuthorizationContract(const AuthorizationContract& other) {
+        _checks = other._checks;
+        _privilegeChecks = other._privilegeChecks;
+    }
+
     /**
      * Clear the authorization contract
      */
@@ -98,6 +103,8 @@ public:
     bool contains(const AuthorizationContract& other) const;
 
 private:
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("AuthorizationContract::_mutex");
+
     // Set of access checks performed
     std::bitset<kNumAccessCheckEnum> _checks;
 
