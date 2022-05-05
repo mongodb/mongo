@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #include "mongo/db/index/column_cell.h"
 
 #include "mongo/db/storage/column_store.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo {
 namespace column_keygen {

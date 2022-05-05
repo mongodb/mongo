@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/stacktrace_somap.h"
@@ -57,6 +56,9 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 // Given `#define A aaa` and `#define B bbb`, `TOKEN_CAT(A, B)` evaluates to `aaabbb`.
 #define TOKEN_CAT(a, b) TOKEN_CAT_PRIMITIVE(a, b)

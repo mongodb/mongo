@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include <fmt/format.h>
 
@@ -42,6 +41,9 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/histogram.h"
 #include "mongo/util/uuid.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace {

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/dbmessage.h"
@@ -35,6 +34,9 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace {

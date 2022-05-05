@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
 
@@ -63,6 +62,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/util/string_map.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo {
 

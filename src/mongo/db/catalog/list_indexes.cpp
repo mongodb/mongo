@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #include "mongo/platform/basic.h"
 
@@ -46,6 +45,9 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/uuid.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 // Failpoint which causes to hang "listIndexes" cmd after acquiring the DB lock.
 MONGO_FAIL_POINT_DEFINE(hangBeforeListIndexes);

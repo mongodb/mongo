@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include "mongo/transport/session_asio.h"
 
@@ -37,6 +36,9 @@
 #include "mongo/transport/proxy_protocol_header_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo::transport {
 

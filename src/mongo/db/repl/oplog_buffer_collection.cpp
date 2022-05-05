@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 #include "mongo/platform/basic.h"
 
@@ -45,6 +44,9 @@
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/util/assert_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
 
 namespace mongo {
 namespace repl {

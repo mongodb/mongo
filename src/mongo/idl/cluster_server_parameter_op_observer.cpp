@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include "mongo/idl/cluster_server_parameter_op_observer.h"
 
@@ -35,6 +34,9 @@
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 namespace mongo {
 

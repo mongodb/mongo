@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
 #include "mongo/platform/basic.h"
 
@@ -47,6 +46,9 @@
 #include "mongo/s/grid.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/synchronized_value.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
+
 
 namespace mongo {
 

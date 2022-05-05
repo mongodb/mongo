@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #include "mongo/db/storage/durable_catalog_impl.h"
 
@@ -52,6 +51,9 @@
 #include "mongo/platform/bits.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo {
 namespace {

@@ -28,8 +28,6 @@
  */
 
 #include "mongo/db/query/projection_parser.h"
-#include "mongo/db/server_options.h"
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
 
@@ -94,6 +92,9 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/util/time_support.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo {
 

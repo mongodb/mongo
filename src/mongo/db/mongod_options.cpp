@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include "mongo/db/mongod_options.h"
 
@@ -63,6 +62,9 @@
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 namespace mongo {
 

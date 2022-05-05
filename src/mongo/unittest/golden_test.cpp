@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include <boost/filesystem.hpp>
 #include <boost/iostreams/device/file_descriptor.hpp>
@@ -46,6 +45,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/util/ctype.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 namespace mongo::unittest {
 
 namespace fs = ::boost::filesystem;

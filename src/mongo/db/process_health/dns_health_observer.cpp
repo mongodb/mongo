@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
 
 #include "mongo/db/process_health/dns_health_observer.h"
 
@@ -38,6 +37,9 @@
 #include "mongo/util/net/hostname_canonicalization.h"
 #include <algorithm>
 #include <random>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
+
 
 namespace mongo {
 namespace process_health {

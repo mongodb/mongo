@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 #include <algorithm>
 #include <memory>
@@ -39,6 +38,9 @@
 #include "mongo/util/aligned.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/histogram.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
+
 
 namespace mongo {
 

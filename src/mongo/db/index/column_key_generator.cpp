@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
 #include "mongo/platform/basic.h"
 
@@ -40,6 +39,9 @@
 #include "mongo/db/storage/column_store.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/string_map.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
+
 
 namespace mongo::column_keygen {
 namespace {

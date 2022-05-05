@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include <deque>
 
@@ -39,6 +38,9 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/system_clock_source.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 

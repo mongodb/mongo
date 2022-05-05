@@ -27,13 +27,15 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/pipeline/document_source_internal_compute_geo_near_distance.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo {
 

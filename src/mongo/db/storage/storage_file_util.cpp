@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #include "mongo/db/storage/storage_file_util.h"
 
@@ -44,6 +43,9 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/util/file.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo {
 

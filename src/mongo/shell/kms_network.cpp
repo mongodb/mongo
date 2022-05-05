@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include "mongo/platform/basic.h"
 
@@ -37,6 +36,9 @@
 #include "mongo/shell/kms.h"
 #include "mongo/shell/kms_gen.h"
 #include "mongo/util/text.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 namespace mongo {
 

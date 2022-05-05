@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include "mongo/transport/transport_layer_asio.h"
 
@@ -64,6 +63,9 @@
 #include "mongo/util/thread_context.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/waitable.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace {

@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
 
@@ -663,6 +662,9 @@ std::string nextFileName() {
 }  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 template class ::mongo::BoundedSorter<::mongo::DocumentSourceSort::SortableDate,
                                       ::mongo::Document,
                                       ::mongo::CompAsc,

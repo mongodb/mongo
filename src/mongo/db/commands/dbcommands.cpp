@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
 
@@ -102,6 +101,9 @@
 #include "mongo/util/md5.hpp"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/version.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 
 namespace mongo {
 namespace {

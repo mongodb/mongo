@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 
@@ -49,6 +48,9 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 
 namespace mongo {
 namespace {

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 #include "mongo/platform/basic.h"
 
@@ -53,6 +52,9 @@
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
+
 
 namespace mongo {
 namespace {

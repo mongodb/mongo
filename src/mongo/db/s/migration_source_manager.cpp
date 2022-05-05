@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
 
 #include "mongo/db/s/migration_source_manager.h"
 
@@ -67,6 +66,9 @@
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
+
 
 namespace mongo {
 namespace {

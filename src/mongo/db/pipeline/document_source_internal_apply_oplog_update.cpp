@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
 
@@ -42,6 +41,9 @@
 #include "mongo/db/pipeline/document_source_internal_apply_oplog_update_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/update/update_driver.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo {
 

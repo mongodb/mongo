@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #if defined(__linux__)
 #include <sys/vfs.h>
@@ -57,6 +56,9 @@
 #if __has_feature(address_sanitizer)
 #include <sanitizer/lsan_interface.h>
 #endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo {
 

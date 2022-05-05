@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #ifdef _WIN32
 
@@ -48,6 +47,8 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace_windows.h"
 #include "mongo/util/text.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 namespace mongo {
 

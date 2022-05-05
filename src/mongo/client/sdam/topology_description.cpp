@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include "mongo/client/sdam/topology_description.h"
 
@@ -40,6 +39,9 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 // Checkpoint to track when election Id and Set version is changed.
 MONGO_FAIL_POINT_DEFINE(maxElectionIdSetVersionPairUpdated);

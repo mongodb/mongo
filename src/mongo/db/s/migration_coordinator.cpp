@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
 
 #include "mongo/platform/basic.h"
 
@@ -42,6 +41,9 @@
 #include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/fail_point.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
+
 
 namespace mongo {
 

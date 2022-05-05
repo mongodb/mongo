@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include "mongo/config.h"
 #include "mongo/platform/basic.h"
@@ -40,6 +39,9 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace {

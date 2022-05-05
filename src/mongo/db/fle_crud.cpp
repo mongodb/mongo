@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
 #include "mongo/db/fle_crud.h"
 
@@ -56,6 +55,9 @@
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
+
 
 MONGO_FAIL_POINT_DEFINE(fleCrudHangInsert);
 MONGO_FAIL_POINT_DEFINE(fleCrudHangPreInsert);

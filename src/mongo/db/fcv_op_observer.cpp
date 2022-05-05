@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 #include "mongo/platform/basic.h"
 
@@ -47,6 +46,9 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
 
 namespace mongo {
 MONGO_FAIL_POINT_DEFINE(pauseBeforeCloseCxns);

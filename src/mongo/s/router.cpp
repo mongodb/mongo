@@ -27,13 +27,15 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 #include "mongo/s/router.h"
 
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 
 namespace mongo {
 namespace sharding {

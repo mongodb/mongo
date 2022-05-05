@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
 
@@ -35,6 +34,9 @@
 
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/transaction_history_iterator.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 
 namespace mongo {
 namespace {

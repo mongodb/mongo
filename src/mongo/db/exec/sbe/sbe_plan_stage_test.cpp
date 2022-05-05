@@ -30,7 +30,6 @@
 /**
  * This file contains a test framework for testing sbe::PlanStages.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
 
@@ -38,6 +37,9 @@
 
 #include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo::sbe {
 

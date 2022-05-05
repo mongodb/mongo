@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include <fstream>
 
@@ -48,6 +47,8 @@
 #include "mongo/util/net/dh_openssl.h"
 #include "mongo/util/net/ssl/context_openssl.hpp"
 #endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 
 namespace mongo {

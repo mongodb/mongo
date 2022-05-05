@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include "mongo/platform/basic.h"
 
@@ -45,6 +44,9 @@
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/text.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo {
 

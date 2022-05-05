@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "log_domain_global.h"
 
@@ -49,6 +48,9 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/sinks.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo::logv2 {
 

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 #include "mongo/db/repl/oplog_applier_impl.h"
 
@@ -51,6 +50,9 @@
 #include "mongo/platform/basic.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_with_sampling.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
 
 namespace mongo {
 namespace repl {

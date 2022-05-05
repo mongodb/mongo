@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include <cstdlib>
 #include <string>
@@ -45,6 +44,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/scopeguard.h"
 #include "processinfo.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 namespace mongo {
 

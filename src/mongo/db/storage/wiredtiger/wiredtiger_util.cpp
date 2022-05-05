@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
 
 #include "mongo/platform/basic.h"
 
@@ -61,6 +60,9 @@
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
+
 
 // From src/third_party/wiredtiger/src/include/txn.h
 #define WT_TXN_ROLLBACK_REASON_CACHE "oldest pinned transaction ID rolled back for eviction"

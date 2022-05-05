@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kControl
 
 #include "mongo/logv2/log_util.h"
 
@@ -37,6 +36,9 @@
 
 #include <string>
 #include <vector>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kControl
+
 
 namespace mongo::logv2 {
 

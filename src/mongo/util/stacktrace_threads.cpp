@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/util/stacktrace.h"
 
@@ -59,6 +58,8 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/stacktrace_somap.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
 namespace stack_trace_detail {

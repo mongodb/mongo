@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
@@ -50,6 +49,9 @@
 #include "mongo/watchdog/watchdog.h"
 #include "mongo/watchdog/watchdog_mongod_gen.h"
 #include "mongo/watchdog/watchdog_register.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 namespace {

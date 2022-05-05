@@ -28,8 +28,6 @@
  */
 
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/ops/update_result.h"
@@ -37,6 +35,9 @@
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
+
 
 namespace mongo {
 

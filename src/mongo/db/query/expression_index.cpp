@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/db/query/expression_index.h"
 
@@ -43,6 +42,9 @@
 #include "third_party/s2/s2cellid.h"
 #include "third_party/s2/s2region.h"
 #include "third_party/s2/s2regioncoverer.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo {
 

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/create_collection.h"
@@ -38,6 +37,9 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_map.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 
 namespace mongo {
 namespace {

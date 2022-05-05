@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #define LOGV2_FOR_HEARTBEATS(ID, DLEVEL, MESSAGE, ...) \
     LOGV2_DEBUG_OPTIONS(                               \
@@ -68,6 +67,9 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 
 namespace mongo {
 namespace repl {

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
@@ -42,6 +41,9 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 
 namespace mongo {
 namespace {

@@ -37,6 +37,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
+
 namespace mongo {
 
 class ClusterKillOperationsCmd : public KillOperationsCmdBase<ClusterKillOperationsCmd> {

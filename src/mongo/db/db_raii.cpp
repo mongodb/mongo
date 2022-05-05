@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #include "mongo/platform/basic.h"
 
@@ -43,6 +42,9 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeAutoGetShardVersionCheck);
 MONGO_FAIL_POINT_DEFINE(reachedAutoGetLockFreeShardConsistencyRetry);

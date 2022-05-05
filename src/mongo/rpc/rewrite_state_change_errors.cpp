@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include "mongo/rpc/rewrite_state_change_errors.h"
 
@@ -53,6 +52,9 @@
 #include "mongo/s/is_mongos.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/static_immortal.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo::rpc {
 namespace {

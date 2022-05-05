@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include "mongo/platform/basic.h"
 
@@ -57,6 +56,9 @@
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/tick_source_mock.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace transport {

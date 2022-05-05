@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 #include "mongo/platform/basic.h"
 
@@ -36,6 +35,9 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/embedded/not_implemented.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
 
 namespace mongo {
 namespace embedded {

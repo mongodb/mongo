@@ -28,7 +28,6 @@
  */
 
 #include "mongo/util/assert_util.h"
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
 
@@ -39,6 +38,9 @@
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/util/intrusive_counter.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 
 namespace mongo {
 

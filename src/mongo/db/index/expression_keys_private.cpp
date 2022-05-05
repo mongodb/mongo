@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
 #include "mongo/db/index/expression_keys_private.h"
 
@@ -56,6 +55,9 @@
 
 #include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2regioncoverer.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
+
 
 namespace {
 

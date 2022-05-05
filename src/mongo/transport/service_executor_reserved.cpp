@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 
 #include "mongo/platform/basic.h"
 
@@ -40,6 +39,9 @@
 #include "mongo/transport/service_executor_utils.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/thread_safety_context.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
+
 
 namespace mongo {
 namespace transport {

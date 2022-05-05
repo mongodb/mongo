@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include "mongo/db/pipeline/resume_token.h"
 
@@ -39,6 +38,9 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 

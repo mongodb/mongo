@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_id.h"
@@ -40,6 +39,9 @@
 
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/idl/idl_parser.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 namespace {

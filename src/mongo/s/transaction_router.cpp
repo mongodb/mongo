@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 
 #include "mongo/platform/basic.h"
 
@@ -61,6 +60,9 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_with_sampling.h"
 #include "mongo/util/net/socket_utils.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
+
 
 namespace mongo {
 namespace {

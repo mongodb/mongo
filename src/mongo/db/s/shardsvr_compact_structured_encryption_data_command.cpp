@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
@@ -40,6 +39,9 @@
 #include "mongo/db/s/compact_structured_encryption_data_coordinator_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 
 namespace mongo {
 namespace {

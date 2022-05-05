@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
 
 #include "mongo/platform/basic.h"
 
@@ -65,6 +64,9 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
+
 
 namespace mongo {
 

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/db/query/canonical_query_encoder.h"
 
@@ -48,6 +47,9 @@
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/base64.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo {
 

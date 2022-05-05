@@ -29,7 +29,6 @@
 
 #include "kms_message/kms_request.h"
 #include "mongo/shell/kms_gen.h"
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::logv2::LogComponent::kControl
 
 #include "mongo/platform/basic.h"
 
@@ -42,6 +41,9 @@
 #include "mongo/shell/kms.h"
 #include "mongo/shell/kms_network.h"
 #include "mongo/util/net/hostandport.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::logv2::LogComponent::kControl
+
 
 namespace mongo {
 namespace {

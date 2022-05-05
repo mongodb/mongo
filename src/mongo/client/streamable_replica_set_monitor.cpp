@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/streamable_replica_set_monitor.h"
@@ -55,6 +54,9 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo {
 using namespace mongo::sdam;

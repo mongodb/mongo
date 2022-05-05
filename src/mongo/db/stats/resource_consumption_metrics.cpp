@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include <cmath>
 
@@ -37,6 +36,9 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/stats/operation_resource_consumption_gen.h"
 #include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 namespace mongo {
 namespace {

@@ -28,7 +28,6 @@
  */
 
 #include "mongo/client/sdam/server_description.h"
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
@@ -40,6 +39,8 @@
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 
 namespace mongo::sdam {

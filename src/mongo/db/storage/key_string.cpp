@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #include "mongo/platform/basic.h"
 
@@ -45,6 +44,9 @@
 #include "mongo/platform/strnlen.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/hex.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 #define keyStringAssert(msgid, msg, expr) \
     uassert(msgid, str::stream() << "KeyString format error: " << msg, expr)

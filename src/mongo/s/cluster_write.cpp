@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 #include "mongo/logv2/log.h"
 
@@ -39,6 +38,9 @@
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/grid.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 
 namespace mongo {
 namespace cluster {

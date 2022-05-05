@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
 #include "mongo/platform/basic.h"
 
@@ -42,6 +41,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/fail_point.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
+
 
 MONGO_FAIL_POINT_DEFINE(fleCompactHangBeforeESCPlaceholderInsert);
 MONGO_FAIL_POINT_DEFINE(fleCompactHangAfterESCPlaceholderInsert);

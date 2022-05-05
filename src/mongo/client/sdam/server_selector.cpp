@@ -30,12 +30,14 @@
 
 #include <algorithm>
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 #include "mongo/client/sdam/topology_description.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/fail_point.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo::sdam {
 MONGO_FAIL_POINT_DEFINE(sdamServerSelectorIgnoreLatencyWindow);

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include "mongo/platform/basic.h"
 
@@ -68,6 +67,9 @@
 #include <time.h>
 #include <unistd.h>
 #endif  //  __linux__
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 // Needs to have linkage so we can test metadata. Needs to be extern
 // "C" so it doesn't get mangled so we can name it with EXPORT_SYMBOLS

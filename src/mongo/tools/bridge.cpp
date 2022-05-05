@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kBridge
 
 #include "mongo/platform/basic.h"
 
@@ -64,6 +63,9 @@
 #include "mongo/util/text.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kBridge
+
 
 namespace mongo {
 

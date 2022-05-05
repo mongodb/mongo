@@ -29,7 +29,6 @@
 
 // CHECK_LOG_REDACTION
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
@@ -60,6 +59,9 @@
 #include "mongo/util/str.h"
 #include "mongo/util/system_tick_source.h"
 #include <mongo/db/stats/timer_stats.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 

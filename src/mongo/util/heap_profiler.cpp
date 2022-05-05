@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
@@ -45,11 +43,15 @@
 #include <gperftools/malloc_hook.h>
 #include <third_party/murmurhash3/MurmurHash3.h>
 
-// for dlfcn.h and backtrace
 #if defined(_POSIX_VERSION) && defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
-
 #include <dlfcn.h>
 #include <execinfo.h>
+#endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
+// for dlfcn.h and backtrace
+#if defined(_POSIX_VERSION) && defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
 
 //
 // Sampling heap profiler

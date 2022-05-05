@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
 #include "mongo/db/exec/write_stage_common.h"
 
@@ -41,6 +40,9 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
+
 
 namespace mongo {
 

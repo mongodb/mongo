@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 #include "mongo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
@@ -55,6 +54,9 @@
 #include "mongo/db/query/map_reduce_output_format.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 
 namespace mongo::map_reduce_agg {
 

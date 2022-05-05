@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #ifdef _WIN32
 #define NVALGRIND
@@ -43,6 +42,9 @@
 #include "mongo/db/service_context.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/tcmalloc_parameters_gen.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 

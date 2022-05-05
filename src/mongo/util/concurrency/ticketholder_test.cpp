@@ -28,8 +28,6 @@
  */
 
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/concurrency/locker_noop_client_observer.h"
@@ -40,6 +38,9 @@
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/tick_source_mock.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace {
 using namespace mongo;

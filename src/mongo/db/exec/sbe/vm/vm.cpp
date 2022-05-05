@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
 
@@ -56,6 +55,9 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 #include "mongo/util/summation.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 MONGO_FAIL_POINT_DEFINE(failOnPoisonedFieldLookup);
 

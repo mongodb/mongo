@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 
@@ -65,6 +64,9 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/visit_helper.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo {
 namespace sharded_agg_helpers {

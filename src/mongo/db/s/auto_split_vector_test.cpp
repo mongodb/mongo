@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/db_raii.h"
@@ -39,6 +38,9 @@
 #include "mongo/db/s/split_vector.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace {

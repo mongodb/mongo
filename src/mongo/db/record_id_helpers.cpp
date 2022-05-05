@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #include "mongo/db/record_id_helpers.h"
 
@@ -42,6 +41,9 @@
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/debug_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo {
 namespace record_id_helpers {

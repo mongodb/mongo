@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
 #include "mongo/db/index/columns_access_method.h"
 
@@ -41,6 +40,9 @@
 #include "mongo/db/index/column_key_generator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/progress_meter.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
+
 
 namespace mongo {
 ColumnStoreAccessMethod::ColumnStoreAccessMethod(IndexCatalogEntry* ice,

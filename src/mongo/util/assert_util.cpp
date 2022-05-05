@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAssert
 
 #include "mongo/platform/basic.h"
 
@@ -51,6 +50,9 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAssert
+
 
 #define TRIPWIRE_ASSERTION_ID 4457000
 #define STR(x) #x

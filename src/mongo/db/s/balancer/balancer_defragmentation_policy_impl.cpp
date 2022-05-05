@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 #include "mongo/db/s/balancer/balancer_defragmentation_policy_impl.h"
 #include "mongo/db/dbdirectclient.h"
@@ -41,6 +40,9 @@
 
 #include <fmt/format.h>
 #include <tuple>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 
 using namespace fmt::literals;
 

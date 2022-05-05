@@ -33,6 +33,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
+
 namespace mongo {
 
 class KillOperationsCmd : public KillOperationsCmdBase<KillOperationsCmd> {

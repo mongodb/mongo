@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include <math.h>
 #include <sstream>
@@ -45,6 +44,9 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace DocumentTests {
 

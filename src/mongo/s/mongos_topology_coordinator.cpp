@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/logv2/log.h"
 
@@ -36,6 +35,9 @@
 #include "mongo/db/shutdown_in_progress_quiesce_info.h"
 #include "mongo/s/mongos_topology_coordinator.h"
 #include "mongo/util/fail_point.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 
 namespace mongo {
 

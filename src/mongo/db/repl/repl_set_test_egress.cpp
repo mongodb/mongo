@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
@@ -38,6 +37,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo {
 namespace repl {

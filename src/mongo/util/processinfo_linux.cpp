@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include "mongo/platform/basic.h"
 
@@ -61,6 +60,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/file.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 #define KLONG long
 #define KLF "l"

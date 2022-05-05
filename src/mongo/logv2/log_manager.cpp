@@ -29,7 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/logv2/log_manager.h"
 
@@ -40,6 +39,9 @@
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/log_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo::logv2 {
 

@@ -31,7 +31,6 @@
  * This file contains tests for mongo/db/query/plan_cache.h
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include "mongo/db/query/plan_cache.h"
 
@@ -61,6 +60,9 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 using namespace mongo;
 

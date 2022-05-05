@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include "mongo/platform/basic.h"
 
@@ -88,6 +87,9 @@
 #ifdef MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW
 #include <openssl/ec.h>
 #endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 #if OPENSSL_VERSION_NUMBER < 0x1010100FL
 int SSL_CTX_set_ciphersuites(SSL_CTX*, const char*) {

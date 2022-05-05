@@ -58,6 +58,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/s/is_mongos.h"
@@ -65,15 +66,7 @@
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/str.h"
 
-// As this file is included in various places we need to handle the case of having the log header
-// already included
-#ifndef MONGO_LOGV2_DEFAULT_COMPONENT
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-#endif
-
-#ifndef MONGO_UTIL_LOGV2_H_
-#include "mongo/logv2/log.h"
-#endif
 
 namespace mongo {
 
@@ -1597,3 +1590,4 @@ Sorter<Key, Value>* Sorter<Key, Value>::makeFromExistingRanges(
         fileName, ranges, opts, comp, settings);
 }
 }  // namespace mongo
+#undef MONGO_LOGV2_DEFAULT_COMPONENT

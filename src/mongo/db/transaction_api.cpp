@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 
 #include "mongo/db/transaction_api.h"
 
@@ -61,6 +60,9 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
+
 
 // TODO SERVER-65395: Remove failpoint when fle2 tests can reliably support internal transaction
 // retry limit.
