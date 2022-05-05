@@ -305,7 +305,7 @@ std::vector<NamespaceStringOrUUID> QuerySolution::getAllSecondaryNamespaces(
 // CollectionScanNode
 //
 CollectionScanNode::CollectionScanNode()
-    : clusteredIndex(boost::none), tailable(false), direction(1) {}
+    : clusteredIndex(boost::none), hasCompatibleCollation(false), tailable(false), direction(1) {}
 
 void CollectionScanNode::computeProperties() {
     if (clusteredIndex && hasCompatibleCollation) {
