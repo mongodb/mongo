@@ -387,7 +387,7 @@ var $config = extendWorkload($config, function($config, $super) {
         const docToDelete = this.generateRandomDelete(collection);
         const deleteCmdObj = {
             delete: collection.getName(),
-            deletes: [{q: this.getQueryForDocument(collection, docToDelete), limit: 0}]
+            deletes: [{q: this.getQueryForDocument(collection, docToDelete), limit: 1}]
         };
         const checkResponseFunc = (res) => {
             assert.eq(res.n, 1, res);

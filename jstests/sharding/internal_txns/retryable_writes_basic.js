@@ -35,5 +35,16 @@ const transactionTest = new RetryableInternalTransactionTest();
         transactionTest.runInsertUpdateDeleteTests, transactionTest.TestMode.kNonRecovery);
 }
 
+{
+    jsTest.log("Test multi writes are allowed in non retryable transactions");
+    transactionTest.testNonRetryableTxnMultiWrites();
+}
+
+{
+    jsTest.log(
+        "Test multi writes with an initialized statement id are rejected in retryable transactions");
+    transactionTest.testRetryableTxnMultiWrites();
+}
+
 transactionTest.stop();
 })();

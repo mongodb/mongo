@@ -137,8 +137,8 @@ function testDeletes(lsid, txnNumber, testOptions) {
     const deleteCmdObj = {
         delete: kCollName,
         deletes: [
-            {q: {_id: 0, x: 0}, limit: 0},
-            {q: {_id: 1, x: 1}, limit: 0},
+            {q: {_id: 0, x: 0}, limit: 1},
+            {q: {_id: 1, x: 1}, limit: 1},
         ],
     };
     verifyOplogEntries(deleteCmdObj, lsid, txnNumber, deleteCmdObj.deletes.length, testOptions);
