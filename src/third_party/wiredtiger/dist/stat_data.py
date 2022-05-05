@@ -906,7 +906,6 @@ conn_dsrc_stats = [
     ##########################################
     # Tiered storage statistics
     ##########################################
-    StorageStat('tiered_object_size', 'tiered storage object size', 'no_clear,no_scale,size'),
     StorageStat('tiered_retention', 'tiered storage local retention time (secs)', 'no_clear,no_scale,size'),
     StorageStat('tiered_work_units_created', 'tiered operations scheduled'),
     StorageStat('tiered_work_units_dequeued', 'tiered operations dequeued and processed'),

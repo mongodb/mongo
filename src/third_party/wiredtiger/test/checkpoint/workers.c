@@ -195,6 +195,16 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
                 return (WT_ROLLBACK);
             return (log_print_err("cursor.search_near", ret, 1));
         }
+
+        /* Retry the result of search_near again to confirm the result. */
+        if (new_val % 2 == 0) {
+            if ((ret = cursor->search(cursor)) != 0) {
+                if (ret == WT_ROLLBACK)
+                    return (WT_ROLLBACK);
+                return (log_print_err("cursor.search", ret, 1));
+            }
+        }
+
         if (cmp < 0) {
             if ((ret = cursor->next(cursor)) != 0) {
                 if (ret == WT_NOTFOUND)

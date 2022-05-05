@@ -321,6 +321,19 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t recno, bool *vali
         if (cbt->ins != NULL)
             return (0);
 
+        /* Paranoia. */
+        WT_ASSERT(session, recno == WT_RECNO_OOB);
+
+        /*
+         * The key can be NULL only when we didn't find an exact match, copy the search found key
+         * into the temporary buffer for further use.
+         */
+        if (key == NULL) {
+            WT_RET(__wt_row_leaf_key(
+              session, cbt->ref->page, &cbt->ref->page->pg_row[cbt->slot], cbt->tmp, true));
+            key = cbt->tmp;
+        }
+
         /* Check for an update. */
         WT_RET(__wt_txn_read(session, cbt, key, WT_RECNO_OOB,
           (page->modify != NULL && page->modify->mod_row_update != NULL) ?
@@ -662,10 +675,14 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
          * better match. This test is simplistic as we're ignoring append lists (there may be no
          * page slots or we might be legitimately positioned after the last page slot). Ignore those
          * cases, it makes things too complicated.
+         *
+         * If there's an exact match, the row-store search function built the key in the cursor's
+         * temporary buffer.
          */
         if (leaf_found &&
           (cbt->compare == 0 || (cbt->slot != 0 && cbt->slot != cbt->ref->page->entries - 1)))
-            WT_ERR(__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, &valid));
+            WT_ERR(
+              __wt_cursor_valid(cbt, (cbt->compare == 0 ? cbt->tmp : NULL), WT_RECNO_OOB, &valid));
     }
     if (!valid) {
         WT_ERR(__wt_cursor_func_init(cbt, true));
@@ -676,7 +693,12 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
          */
         if (btree->type == BTREE_ROW) {
             WT_ERR(__cursor_row_search(cbt, true, NULL, NULL));
-            WT_ERR(__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, &valid));
+            /*
+             * If there's an exact match, the row-store search function built the key in the
+             * cursor's temporary buffer.
+             */
+            WT_ERR(
+              __wt_cursor_valid(cbt, (cbt->compare == 0 ? cbt->tmp : NULL), WT_RECNO_OOB, &valid));
         } else {
             WT_ERR(__cursor_col_search(cbt, NULL, NULL));
             WT_ERR(__wt_cursor_valid(cbt, NULL, cbt->recno, &valid));
