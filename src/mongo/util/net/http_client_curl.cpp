@@ -602,14 +602,6 @@ public:
         _headers = headers;
     }
 
-    void setTimeout(Seconds timeout) final {
-        _timeout = timeout;
-    }
-
-    void setConnectTimeout(Seconds timeout) final {
-        _connectTimeout = timeout;
-    }
-
     HttpReply request(HttpMethod method,
                       StringData url,
                       ConstDataRange cdr = {nullptr, 0}) const final {
@@ -711,8 +703,6 @@ private:
     HttpConnectionPool _pool;
 
     bool _allowInsecure{false};
-    Seconds _timeout;
-    Seconds _connectTimeout;
 };
 
 class HttpClientProviderImpl : public HttpClientProvider {

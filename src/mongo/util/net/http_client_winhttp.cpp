@@ -147,14 +147,6 @@ public:
         _headers = toNativeString(header.c_str());
     }
 
-    void setConnectTimeout(Seconds timeout) final {
-        _connectTimeout = timeout;
-    }
-
-    void setTimeout(Seconds timeout) final {
-        _timeout = timeout;
-    }
-
     HttpReply request(HttpMethod methodType, StringData urlSD, ConstDataRange cdrData) const final {
         LPCWSTR method = L"GET";
         LPVOID data = const_cast<void*>(static_cast<const void*>(cdrData.data()));
@@ -321,8 +313,6 @@ public:
 private:
     bool _allowInsecureHTTP = false;
     std::wstring _headers;
-    Seconds _connectTimeout = kConnectionTimeout;
-    Seconds _timeout = kTotalRequestTimeout;
 };
 
 class HttpClientProviderImpl : public HttpClientProvider {
