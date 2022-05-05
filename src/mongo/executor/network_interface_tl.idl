@@ -34,3 +34,12 @@ feature_flags:
     description: Suppress network interface transport layer exceptions
     cpp_varname: gSuppressNetworkInterfaceTransportLayerExceptions
     default: false 
+
+server_parameters:
+  opportunisticSecondaryTargeting:
+    description: >-
+        Allows attempting to establish connections to multiple secondaries and directing the request
+        to the first secondary that accepts the connection.
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<bool>
+    cpp_varname: gOpportunisticSecondaryTargeting
