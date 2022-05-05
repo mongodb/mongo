@@ -114,6 +114,17 @@ Status ViewsForDatabase::_insert(OperationContext* opCtx, const BSONObj& view) {
                                                     pipeline,
                                                     std::move(collator.getValue()));
 
+    // Cannot have a secondary view on a system.buckets collection, only the time-series
+    // collection view.
+    if (viewDef->viewOn().isTimeseriesBucketsCollection() &&
+        viewDef->name() != viewDef->viewOn().getTimeseriesViewNamespace()) {
+        return {
+            ErrorCodes::InvalidNamespace,
+            "Invalid view: cannot define a view over a system.buckets namespace except by "
+            "creating a time-series collection",
+        };
+    }
+
     if (!viewName.isOnInternalDb() && !viewName.isSystem()) {
         if (viewDef->timeseries()) {
             stats.userTimeseries += 1;

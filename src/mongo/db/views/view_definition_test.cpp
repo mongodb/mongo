@@ -47,6 +47,7 @@ namespace {
 const NamespaceString viewNss("testdb.testview");
 const NamespaceString backingNss("testdb.testcoll");
 const NamespaceString bucketsColl("testdb.system.buckets.testcoll");
+const NamespaceString timeseriesColl("testdb.testcoll");
 const BSONObj samplePipeline = BSON_ARRAY(BSON("limit" << 9));
 
 TEST(ViewDefinitionTest, ViewDefinitionCreationCorrectlyBuildsNamespaceStrings) {
@@ -130,7 +131,11 @@ TEST(ViewDefinitionTest, SetPipelineSucceedsOnValidArrayBSONElement) {
 TEST(ViewDefinitionTest, ViewDefinitionCreationCorrectlySetsTimeseries) {
     ViewDefinition viewDef(
         viewNss.db(), viewNss.coll(), bucketsColl.coll(), samplePipeline, nullptr);
-    ASSERT(viewDef.timeseries());
+    ASSERT_FALSE(viewDef.timeseries());
+
+    ViewDefinition timeseriesDef(
+        timeseriesColl.db(), timeseriesColl.coll(), bucketsColl.coll(), samplePipeline, nullptr);
+    ASSERT_TRUE(timeseriesDef.timeseries());
 }
 }  // namespace
 }  // namespace mongo

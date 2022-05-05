@@ -95,7 +95,8 @@ public:
      * time-series buckets collection.
      */
     bool timeseries() const {
-        return _viewOnNss.isTimeseriesBucketsCollection();
+        return _viewOnNss.isTimeseriesBucketsCollection() &&
+            _viewOnNss.getTimeseriesViewNamespace() == _viewNss;
     }
 
     void setViewOn(const NamespaceString& viewOnNss);
