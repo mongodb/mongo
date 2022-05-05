@@ -2245,6 +2245,7 @@ buildvariants:
   - rhel80-medium
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    scons_cache_scope: shared
   tasks:
   - name: compile_benchmarks
   - name: .benchmarks
