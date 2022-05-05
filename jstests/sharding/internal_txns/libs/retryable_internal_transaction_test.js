@@ -316,7 +316,7 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
 
         const deleteCmdObj = {
             delete: kCollName,
-            deletes: [{q: {_id: 0, x: 0}, limit: 0}, {q: {_id: 1, x: 1}, limit: 0}],
+            deletes: [{q: {_id: 0, x: 0}, limit: 1}, {q: {_id: 1, x: 1}, limit: 1}],
         };
         const checkFunc = (initialRes, retryRes) => {
             assert.eq(initialRes.n, retryRes.n);
@@ -536,6 +536,158 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
     this.runTestsForAllRetryableInternalTransactionTypes = function(runTestsFunc, testMode) {
         this.runTestsForAllUnpreparedRetryableInternalTransactionTypes(runTestsFunc, testMode);
         this.runTestsForAllPreparedRetryableInternalTransactionTypes(runTestsFunc, testMode);
+    };
+
+    this.testRetryableTxnMultiWrites = function testRetryableTxnMultiWrites() {
+        assert.commandWorked(
+            mongosTestColl.insert([{_id: 0, x: 0}, {_id: 1, x: 0}, {_id: 2, x: 0}]));
+
+        const lsid = {id: UUID(), txnUUID: UUID(), txnNumber: NumberLong(21)};
+        let txnNumber = 1;
+
+        //
+        // Test multi updates.
+        //
+
+        // Updates with an initialized stmtId should fail.
+        const retryableUpdateCmd = {
+            update: kCollName,
+            updates: [{q: {x: 0}, u: {$inc: {x: 10}}, multi: true}],
+            lsid,
+            txnNumber: NumberLong(txnNumber),
+            startTransaction: true,
+            autocommit: false,
+        };
+        const retryableUpdateRes = mongosTestDB.runCommand(retryableUpdateCmd);
+        assert(retryableUpdateRes.hasOwnProperty("writeErrors"));
+        assert.commandFailedWithCode(retryableUpdateRes, ErrorCodes.InvalidOptions);
+
+        assert.commandFailedWithCode(
+            mongosTestDB.adminCommand(makeAbortTransactionCmdObj(lsid, txnNumber)),
+            ErrorCodes.NoSuchTransaction);
+
+        // The documents shouldn't have been updated.
+        assert.eq(3, mongosTestColl.find({x: 0}).itcount());
+
+        // Updates with the uninitialized stmtId should succeed.
+        txnNumber++;
+        const nonRetryableUpdateCmd = {
+            update: kCollName,
+            updates: [{q: {x: 0}, u: {$inc: {x: 10}}, multi: true}],
+            lsid,
+            txnNumber: NumberLong(txnNumber),
+            stmtId: NumberInt(-1),
+            startTransaction: true,
+            autocommit: false,
+        };
+        assert.commandWorked(mongosTestDB.runCommand(nonRetryableUpdateCmd));
+
+        assert.commandWorked(
+            mongosTestDB.adminCommand(makeCommitTransactionCmdObj(lsid, txnNumber)));
+
+        // The documents should have been updated.
+        assert.eq(0, mongosTestColl.find({x: 0}).itcount());
+        assert.eq(3, mongosTestColl.find({x: 10}).itcount());
+
+        assert.commandWorked(mongosTestColl.remove({}));
+        assert.commandWorked(
+            mongosTestColl.insert([{_id: 0, x: 0}, {_id: 1, x: 0}, {_id: 2, x: 0}]));
+
+        //
+        // Test multi deletes.
+        //
+
+        // Deletes with an initialized stmtId should fail.
+        txnNumber++;
+        const retryableDeleteCmd = {
+            delete: kCollName,
+            deletes: [{q: {x: 0}, limit: 0}],
+            lsid,
+            txnNumber: NumberLong(txnNumber),
+            startTransaction: true,
+            autocommit: false,
+        };
+        const retryableDeleteRes = mongosTestDB.runCommand(retryableDeleteCmd);
+        assert(retryableDeleteRes.hasOwnProperty("writeErrors"));
+        assert.commandFailedWithCode(retryableDeleteRes, ErrorCodes.InvalidOptions);
+
+        assert.commandFailedWithCode(
+            mongosTestDB.adminCommand(makeAbortTransactionCmdObj(lsid, txnNumber)),
+            ErrorCodes.NoSuchTransaction);
+
+        // The documents shouldn't have been deleted.
+        assert.eq(3, mongosTestColl.find({x: 0}).itcount());
+
+        // Deletes with the uninitialized stmtId should succeed.
+        txnNumber++;
+        const nonRetryableDeleteCmd = {
+            delete: kCollName,
+            deletes: [{q: {x: 0}, limit: 0}],
+            lsid,
+            txnNumber: NumberLong(txnNumber),
+            stmtId: NumberInt(-1),
+            startTransaction: true,
+            autocommit: false,
+        };
+        assert.commandWorked(mongosTestDB.runCommand(nonRetryableDeleteCmd));
+
+        assert.commandWorked(
+            mongosTestDB.adminCommand(makeCommitTransactionCmdObj(lsid, txnNumber)));
+
+        // The documents should have been deleted.
+        assert.eq(0, mongosTestColl.find().itcount());
+    };
+
+    this.testNonRetryableTxnMultiWrites = function testNonRetryableTxnMultiWrites() {
+        assert.commandWorked(
+            mongosTestColl.insert([{_id: 0, x: 0}, {_id: 1, x: 0}, {_id: 2, x: 0}]));
+
+        const lsid = {id: UUID(), txnUUID: UUID()};
+        let txnNumber = 1;
+
+        //
+        // Test multi updates.
+        //
+
+        const updateCmd = {
+            update: kCollName,
+            updates: [{q: {x: 0}, u: {$inc: {x: 10}}, multi: true}],
+            lsid,
+            txnNumber: NumberLong(txnNumber),
+            startTransaction: true,
+            autocommit: false,
+        };
+        assert.commandWorked(mongosTestDB.runCommand(updateCmd));
+        assert.commandWorked(
+            mongosTestDB.adminCommand(makeCommitTransactionCmdObj(lsid, txnNumber)));
+
+        // The documents should have been updated.
+        assert.eq(0, mongosTestColl.find({x: 0}).itcount());
+        assert.eq(3, mongosTestColl.find({x: 10}).itcount());
+
+        //
+        // Test multi deletes.
+        //
+
+        assert.commandWorked(mongosTestColl.remove({}));
+        assert.commandWorked(
+            mongosTestColl.insert([{_id: 0, x: 0}, {_id: 1, x: 0}, {_id: 2, x: 0}]));
+
+        txnNumber++;
+        const deleteCmd = {
+            delete: kCollName,
+            deletes: [{q: {x: 0}, limit: 0}],
+            lsid,
+            txnNumber: NumberLong(txnNumber),
+            startTransaction: true,
+            autocommit: false,
+        };
+        assert.commandWorked(mongosTestDB.runCommand(deleteCmd));
+        assert.commandWorked(
+            mongosTestDB.adminCommand(makeCommitTransactionCmdObj(lsid, txnNumber)));
+
+        // The documents should have been deleted.
+        assert.eq(0, mongosTestColl.find().itcount());
     };
 
     this.stop = function() {

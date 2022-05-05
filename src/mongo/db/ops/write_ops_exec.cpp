@@ -923,7 +923,9 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
 
     uassert(ErrorCodes::InvalidOptions,
             "Cannot use (or request) retryable writes with multi=true",
-            opCtx->inMultiDocumentTransaction() || !opCtx->getTxnNumber() || !op.getMulti());
+            !opCtx->isRetryableWrite() || !op.getMulti() ||
+                // If the first stmtId is uninitialized, we assume all are.
+                (stmtIds.empty() || stmtIds.front() == kUninitializedStmtId));
 
     UpdateRequest request(op);
     request.setNamespaceString(ns);
@@ -1088,7 +1090,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                                                OperationSource source) {
     uassert(ErrorCodes::InvalidOptions,
             "Cannot use (or request) retryable writes with limit=0",
-            opCtx->inMultiDocumentTransaction() || !opCtx->getTxnNumber() || !op.getMulti());
+            !opCtx->isRetryableWrite() || !op.getMulti() || stmtId == kUninitializedStmtId);
 
     globalOpCounters.gotDelete();
     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForDelete(opCtx->getWriteConcern());
