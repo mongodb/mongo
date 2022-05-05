@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/sharding_state.h"
@@ -84,7 +85,6 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
 
             // Make sure we're as up-to-date as possible with shard information. This catches the
             // case where we might have changed a shard's host by removing/adding a shard with the
@@ -113,7 +113,7 @@ public:
                                 tc->setSystemOperationKillableByStepdown(lk);
                             }
                             auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
-                            auto opCtx = uniqueOpCtx.get();
+                            auto executorOpCtx = uniqueOpCtx.get();
 
                             {
                                 // Ensure that opCtx will get interrupted in the event of a
@@ -121,18 +121,25 @@ public:
                                 // checks that there are no pending migrationCoordinators documents
                                 // (under the ActiveMigrationRegistry lock) on the same term during
                                 // which the migrationCoordinators document will be persisted.
-                                Lock::GlobalLock lk(opCtx, MODE_IX);
+                                Lock::GlobalLock lk(executorOpCtx, MODE_IX);
+                                executorOpCtx->setAlwaysInterruptAtStepDownOrUp();
+                                uassert(ErrorCodes::InterruptedDueToReplStateChange,
+                                        "Not primary while attempting to start chunk migration "
+                                        "donation",
+                                        repl::ReplicationCoordinator::get(executorOpCtx)
+                                            ->getMemberState()
+                                            .primary());
                             }
 
                             // Note: This internal authorization is tied to the lifetime of the
                             // client.
-                            AuthorizationSession::get(opCtx->getClient())
-                                ->grantInternalAuthorization(opCtx->getClient());
+                            AuthorizationSession::get(executorOpCtx->getClient())
+                                ->grantInternalAuthorization(executorOpCtx->getClient());
 
                             Status status = {ErrorCodes::InternalError, "Uninitialized value"};
 
                             try {
-                                _runImpl(opCtx, std::move(req), std::move(writeConcern));
+                                _runImpl(executorOpCtx, std::move(req), std::move(writeConcern));
                                 status = Status::OK();
                             } catch (const DBException& e) {
                                 status = e.toStatus();
@@ -142,7 +149,7 @@ public:
                                               "error"_attr = redact(status));
 
                                 if (status.code() == ErrorCodes::LockTimeout) {
-                                    ShardingStatistics::get(opCtx)
+                                    ShardingStatistics::get(executorOpCtx)
                                         .countDonorMoveChunkLockTimeout.addAndFetch(1);
                                 }
                             }
