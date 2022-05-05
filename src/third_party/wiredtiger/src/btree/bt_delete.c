@@ -276,8 +276,8 @@ __tombstone_update_alloc(
      */
     if (page_del != NULL) {
         upd->txnid = page_del->txnid;
-        upd->durable_ts = page_del->durable_timestamp;
         upd->start_ts = page_del->timestamp;
+        upd->durable_ts = page_del->durable_timestamp;
         upd->prepare_state = page_del->prepare_state;
     }
     *updp = upd;
@@ -315,15 +315,13 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
         WT_STAT_CONN_DATA_INCR(session, cache_read_deleted_prepared);
 
     /*
-     * Give the page a modify structure and mark the page dirty if the tree isn't read-only. If the
-     * tree can be written, the page must be marked dirty because if we discard it as a clean page,
-     * then read it back into memory, we'll have the same problem as when instantiating deleted
-     * pages in read-only trees, re-reading the page won't re-create the fast-truncate information.
-     * If the tree cannot be written (checked in page-modify-set), we don't dirty page and we don't
-     * free the ft_info.del field below.
+     * Give the page a modify structure. If the tree is already dirty and so will be written, mark
+     * the page dirty. (We want to free the deleted pages, but if the handle is read-only or if the
+     * application never modifies the tree, we're not able to do so.)
      */
     WT_RET(__wt_page_modify_init(session, page));
-    __wt_page_modify_set(session, page);
+    if (btree->modified)
+        __wt_page_modify_set(session, page);
 
     /* Allocate the per-page update array if one doesn't already exist. */
     if (page->entries != 0 && page->modify->mod_row_update == NULL)
@@ -345,8 +343,9 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
      * crashed and recovered or we're running inside a checkpoint, and now we're being forced to
      * read that page.
      *
-     * If there's a not yet globally visible page-deleted structure (or reading in a checkpoint),
-     * get a reference and migrate transaction ID and timestamp information to the updates.
+     * If there's a page-deleted structure that's not yet globally visible, get a reference and
+     * migrate transaction ID and timestamp information to the updates (globally visible means the
+     * updates don't require that information).
      *
      * If the truncate operation is not yet resolved, link updates in the page-deleted structure so
      * they can be found when the transaction is aborted or committed, even if they have moved to
