@@ -56,12 +56,12 @@ def get_double_diamond_mock_graph():
     graph = LibdepsGraph()
     graph.graph['build_dir'] = '.'
     graph.graph['graph_schema_version'] = 2
-    graph.graph['deptypes'] = '''{
+    graph.graph['deptypes'] = json.dumps({
         "Global": 0,
         "Public": 1,
         "Private": 2,
         "Interface": 3,
-    }'''
+    })
 
     # builds a graph of mostly public edges that looks like this:
     #
@@ -139,12 +139,12 @@ def get_basic_mock_graph():
     graph = LibdepsGraph()
     graph.graph['build_dir'] = '.'
     graph.graph['graph_schema_version'] = 2
-    graph.graph['deptypes'] = '''{
+    graph.graph['deptypes'] = json.dumps({
         "Global": 0,
         "Public": 1,
         "Private": 2,
         "Interface": 3,
-    }'''
+    })
 
     # builds a graph of mostly public edges:
     #
@@ -285,6 +285,10 @@ class Tests(unittest.TestCase):
         self.run_analysis(expected_result, libdeps_graph, libdeps.analyzer.CriticalEdges, 'lib1.so',
                           'lib5.so')
 
+        expected_result = {"CRITICAL_EDGES": {"('lib5.so', 'lib6.so')": []}}
+        self.run_analysis(expected_result, libdeps_graph, libdeps.analyzer.CriticalEdges, 'lib5.so',
+                          'lib6.so')
+
     def test_critical_paths_double_diamond(self):
         """Test for the CriticalPaths for double diamond graph."""
 
@@ -297,6 +301,10 @@ class Tests(unittest.TestCase):
         expected_result = {"CRITICAL_EDGES": {"('lib2.so', 'lib9.so')": [["lib5.so", "lib6.so"]]}}
         self.run_analysis(expected_result, libdeps_graph, libdeps.analyzer.CriticalEdges, 'lib2.so',
                           'lib9.so')
+
+        expected_result = {"CRITICAL_EDGES": {"('lib7.so', 'lib8.so')": []}}
+        self.run_analysis(expected_result, libdeps_graph, libdeps.analyzer.CriticalEdges, 'lib7.so',
+                          'lib8.so')
 
     def test_direct_depends_basic(self):
         """Test for the DirectDependents for basic graph."""

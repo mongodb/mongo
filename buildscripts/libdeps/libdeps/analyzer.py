@@ -548,10 +548,12 @@ class CriticalEdges(Analyzer):
         # of the direction of the graph, so we we use the reverse graph
         # so that we get a cut nearest our from_node, or the first cut we
         # would encounter on a given path from the from_node to the to_node.
-        min_cut_edges = list(
-            minimum_st_edge_cut(
-                G=self._dependents_graph.get_direct_nonprivate_graph().get_node_tree(self._to_node),
-                s=self._to_node, t=self._from_node))
+        subgraph = self._dependents_graph.get_direct_nonprivate_graph().get_node_tree(self._to_node)
+        if subgraph.has_node(self._from_node):
+            min_cut_edges = list(
+                minimum_st_edge_cut(G=subgraph, s=self._to_node, t=self._from_node))
+        else:
+            min_cut_edges = []
         return [(edge[1], edge[0]) for edge in min_cut_edges]
 
     def report(self, report):

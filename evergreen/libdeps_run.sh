@@ -8,6 +8,7 @@ set -o verbose
 
 activate_venv
 GRAPH_FILE=$(find build -name "libdeps.graphml")
+python buildscripts/libdeps/analyzer_unittests.py
 python buildscripts/libdeps/gacli.py --graph-file $GRAPH_FILE > results.txt
 gzip $GRAPH_FILE
 mv $GRAPH_FILE.gz .
