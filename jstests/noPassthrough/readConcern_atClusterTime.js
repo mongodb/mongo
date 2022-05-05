@@ -1,10 +1,7 @@
 // Test parsing of readConcern option 'atClusterTime'.
 //
-// Only run this test with the WiredTiger storage engine, since we expect other storage engines to
-// return early because they do not support snapshot read concern.
 // @tags: [
 //   requires_persistence,
-//   requires_wiredtiger,
 //   uses_atclustertime,
 //   uses_transactions,
 // ]
@@ -19,11 +16,10 @@ function _getClusterTime(rst) {
 (function() {
 "use strict";
 
-// Skip this test if running with --nojournal and WiredTiger.
-if (jsTest.options().noJournal &&
-    (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger")) {
-    print("Skipping test because running WiredTiger without journaling isn't a valid" +
-          " replica set configuration");
+// Skip this test if running with --nojournal.
+if (jsTest.options().noJournal) {
+    print(
+        "Skipping test because running without journaling isn't a valid replica set configuration");
     return;
 }
 

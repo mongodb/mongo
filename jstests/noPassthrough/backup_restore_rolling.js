@@ -13,7 +13,6 @@
  * not work for ephemeral storage engines, as they do not store any data in the dbpath.
  * @tags: [
  *   requires_persistence,
- *   requires_wiredtiger,
  * ]
  */
 
@@ -31,16 +30,10 @@ if (_isWindows()) {
 // Grab the storage engine, default is wiredTiger
 var storageEngine = jsTest.options().storageEngine || "wiredTiger";
 
-// Skip this test if not running with the "wiredTiger" storage engine.
-if (storageEngine !== 'wiredTiger') {
-    jsTest.log('Skipping test because storageEngine is not "wiredTiger"');
-    return;
-}
-
-// Skip this test if running with --nojournal and WiredTiger.
+// Skip this test if running with --nojournal.
 if (jsTest.options().noJournal) {
-    print("Skipping test because running WiredTiger without journaling isn't a valid" +
-          " replica set configuration");
+    print(
+        "Skipping test because running without journaling isn't a valid replica set configuration");
     return;
 }
 

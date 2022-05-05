@@ -6,8 +6,6 @@
  * Checks that {background:true} can run concurrently with CRUD ops on the same collection.
  *
  * @tags: [
- *   # Background validation is only supported by WT.
- *   requires_wiredtiger,
  *   # inMemory does not have checkpoints; background validation only runs on a checkpoint.
  *   requires_persistence,
  *   # A failpoint is set that only exists on the mongod.

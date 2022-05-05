@@ -1,8 +1,6 @@
 /**
- * Tests for explaining an aggregation pipeline which uses the $sample stage. Only run on WT, since
- * currently only the WT storage engine uses a storage-engine supported random cursor for $sample.
+ * Tests for explaining an aggregation pipeline which uses the $sample stage.
  * @tags: [
- *   requires_wiredtiger,
  *   assumes_read_concern_local,
  * ]
  */
@@ -10,13 +8,6 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
-
-// Although this test is tagged with 'requires_wiredtiger', this is not sufficient for ensuring
-// that the parallel suite runs this test only on WT configurations.
-if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredTiger") {
-    jsTest.log("Skipping test on non-WT storage engine: " + jsTest.options().storageEngine);
-    return;
-}
 
 const coll = db.explain_sample;
 coll.drop();

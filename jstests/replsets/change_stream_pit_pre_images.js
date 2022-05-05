@@ -5,8 +5,6 @@
  * The test relies on a correct change stream pre-image recording on a node in the primary role.
  *
  * @tags: [
- * # Change streams are only supported on WiredTiger.
- * requires_wiredtiger,
  * requires_fcv_60,
  * featureFlagChangeStreamPreAndPostImages,
  * # The test waits for the Checkpointer, but this process runs only for on-disk storage engines.

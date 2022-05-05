@@ -5,7 +5,6 @@
  * @tags: [
  *   multiversion_incompatible,
  *   requires_replication,
- *   requires_wiredtiger,
  * ]
  */
 (function() {

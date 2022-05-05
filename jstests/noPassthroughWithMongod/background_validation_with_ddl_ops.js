@@ -8,8 +8,7 @@
  * the ongoing background validation, like creating new indexes or inserting documents should not
  * cause the validation to be interrupted.
  *
- * Only run this against WiredTiger, which supports background validation.
- * @tags: [requires_wiredtiger, requires_persistence]
+ * @tags: [requires_persistence]
  */
 (function() {
 "use strict";

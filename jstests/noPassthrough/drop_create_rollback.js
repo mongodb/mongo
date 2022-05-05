@@ -3,7 +3,6 @@
  * @tags: [
  *   requires_persistence,
  *   requires_replication,
- *   requires_wiredtiger,
  * ]
  */
 (function() {

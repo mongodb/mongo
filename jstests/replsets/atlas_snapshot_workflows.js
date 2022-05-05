@@ -2,7 +2,7 @@
  * This test simulates workflows which are performed by the Atlas automation agent, where nodes are
  * created or restarted using file system snapshots.
  *
- * @tags: [requires_persistence,requires_wiredtiger]
+ * @tags: [requires_persistence]
  */
 
 // Set up a standard 3-node replica set.  Note the two secondaries are priority 0; this is

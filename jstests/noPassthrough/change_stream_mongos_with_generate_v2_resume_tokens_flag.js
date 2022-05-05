@@ -7,7 +7,6 @@
  *   uses_change_streams,
  *   requires_sharding,
  *   requires_replication,
- *   requires_wiredtiger,
  * ]
  */
 (function() {

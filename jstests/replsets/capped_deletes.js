@@ -1,9 +1,5 @@
 /**
  * Tests user deletes on capped collections.
- *
- * @tags: [
- *     requires_wiredtiger,
- * ]
  */
 (function() {
 "use strict";

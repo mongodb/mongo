@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   assumes_read_concern_unchanged,
- *   requires_wiredtiger,
  *   # We are setting the failpoint only on primaries, so we need to disable reads from secondaries,
  *   # where the failpoint is not enabled.
  *   assumes_read_preference_unchanged,

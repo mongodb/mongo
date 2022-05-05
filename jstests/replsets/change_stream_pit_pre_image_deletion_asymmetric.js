@@ -4,8 +4,6 @@
  * the primary node but does not exist on the secondary.
  *
  * @tags: [
- * # Change streams are only supported on WiredTiger.
- * requires_wiredtiger,
  * requires_fcv_60,
  * featureFlagChangeStreamPreAndPostImages,
  * ]

@@ -1,9 +1,6 @@
 /**
  * Tests inserting sample data into the time-series buckets collection. This test is for the
  * exercising the optimized $sample implementation for $_internalUnpackBucket.
- * @tags: [
- *     requires_wiredtiger,
- * ]
  */
 (function() {
 "use strict";
@@ -11,14 +8,6 @@
 load("jstests/libs/analyze_plan.js");
 
 let conn = MongoRunner.runMongod({setParameter: {timeseriesBucketMaxCount: 100}});
-
-// Although this test is tagged with 'requires_wiredtiger', this is not sufficient for ensuring
-// that the parallel suite runs this test only on WT configurations.
-if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredTiger") {
-    jsTest.log("Skipping test on non-WT storage engine: " + jsTest.options().storageEngine);
-    MongoRunner.stopMongod(conn);
-    return;
-}
 
 const dbName = jsTestName();
 let testDB = conn.getDB(dbName);

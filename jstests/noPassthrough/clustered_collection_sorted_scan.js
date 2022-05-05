@@ -1,10 +1,6 @@
 /**
  * Tests that clustered collections can be used for sorted scanning without inserting
  * a blocking scan operator.
- *
- * @tags: [
- *   requires_wiredtiger, # Other storage engines don't support clustered indexes
- * ]
  */
 (function() {
 "use strict";

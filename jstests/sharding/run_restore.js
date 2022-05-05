@@ -3,7 +3,6 @@
  * referenced in the "local.system.collections_to_restore" collection.
  *
  * @tags: [
- *      requires_wiredtiger,
  *      requires_persistence,
  * ]
  */
