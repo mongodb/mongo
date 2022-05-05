@@ -473,18 +473,19 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildForei
     auto [foreignValueSlot, currentRootStage] =
         buildForeignKeysStream(foreignRecordSlot, foreignFieldName, nodeId, slotIdGenerator);
 
-    currentRootStage = makeLimitTree(
-        makeS<FilterStage<false>>(std::move(currentRootStage),
-                                  collatorSlot ? makeFunction("collIsMember",
-                                                              makeVariable(*collatorSlot),
-                                                              makeVariable(foreignValueSlot),
-                                                              makeVariable(localKeysSetSlot))
-                                               : makeFunction("isMember",
-                                                              makeVariable(foreignValueSlot),
-                                                              makeVariable(localKeysSetSlot)),
-                                  nodeId),
-        nodeId,
-        1 /* take the foreign record once, even if multiple key values match */);
+    currentRootStage =
+        makeLimitTree(makeS<FilterStage<false /*IsConst*/>>(
+                          std::move(currentRootStage),
+                          collatorSlot ? makeFunction("collIsMember",
+                                                      makeVariable(*collatorSlot),
+                                                      makeVariable(foreignValueSlot),
+                                                      makeVariable(localKeysSetSlot))
+                                       : makeFunction("isMember",
+                                                      makeVariable(foreignValueSlot),
+                                                      makeVariable(localKeysSetSlot)),
+                          nodeId),
+                      nodeId,
+                      1 /* take the foreign record once, even if multiple key values match */);
 
     currentRootStage = makeS<LoopJoinStage>(std::move(foreignStage) /* outer */,
                                             std::move(currentRootStage) /* inner */,
@@ -657,8 +658,9 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     // - Array values:
     //   a. If array is empty, [Undefined, Undefined]
     //   b. If array is NOT empty, [array[0], array[0]] (point interval composed from the first
-    //      array element)
-    // - All other types, single point interval [value, value]
+    //      array element). This is needed to match {_id: 0, a: [[1, 2]]} to {_id: 0, b: [1, 2]}.
+    // - All other types, including array itself as a value, single point interval [value, value].
+    //   This is needed for arrays to match {_id: 1, a: [[1, 2]]} to {_id: 0, b: [[1, 2], 42]}.
     //
     // To implement these rules, we use the union stage:
     //   union pointValue [
@@ -669,7 +671,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     //       coscan
     //       ,
     //       // Branch 2
-    //       cfilter isArray(rawValue)
+    //       filter isArray(rawValue) && !isMember(pointValue, localKeyValueSet)
     //       project pointValue = fillEmpty(
     //           getElement(rawValue, 0),
     //           Undefined
@@ -690,7 +692,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                                        nodeId,
                                        nullBranchOutput,
                                        makeConstant(TypeTags::bsonUndefined, 0));
-    nullBranch = makeS<FilterStage<true>>(
+    nullBranch = makeS<FilterStage<true /*IsConst*/>>(
         std::move(nullBranch), makeFunction("isNull", makeVariable(singleLocalValueSlot)), nodeId);
 
     auto arrayBranchOutput = slotIdGenerator.generate();
@@ -703,10 +705,15 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                                                    makeVariable(singleLocalValueSlot),
                                                    makeConstant(TypeTags::NumberInt32, 0)),
                                       makeConstant(TypeTags::bsonUndefined, 0)));
-    arrayBranch =
-        makeS<FilterStage<true>>(std::move(arrayBranch),
-                                 makeFunction("isArray", makeVariable(singleLocalValueSlot)),
-                                 nodeId);
+    auto shouldProduceSeekForArray =
+        makeBinaryOp(EPrimBinary::logicAnd,
+                     makeFunction("isArray", makeVariable(singleLocalValueSlot)),
+                     makeUnaryOp(EPrimUnary::logicNot,
+                                 makeFunction("isMember",
+                                              makeVariable(arrayBranchOutput),
+                                              makeVariable(localKeysSetSlot))));
+    arrayBranch = makeS<FilterStage<false /*IsConst*/>>(
+        std::move(arrayBranch), std::move(shouldProduceSeekForArray), nodeId);
 
     auto valueBranchOutput = slotIdGenerator.generate();
     auto valueBranch = makeProjectStage(makeLimitCoScanTree(nodeId, 1),
