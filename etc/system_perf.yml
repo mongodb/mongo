@@ -1181,12 +1181,60 @@ buildvariants:
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
-    tasks:
+    tasks: &audit-tasks
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: crud_workloads
       - name: smoke_test
+
+  - name: linux-1-node-replSet-audit-log-encryption-no-compression
+    display_name: Linux Single-node Replica Set Audit w/ At-Rest Log Encryption (No compression)
+    batchtime: 10080 # 7 days
+    modules: *modules
+    expansions:
+      mongodb_setup: single-replica-audit-log-encryption-no-compression
+      infrastructure_provisioning: single
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: *audit-tasks
+
+  - name: linux-1-node-replSet-audit
+    display_name: Linux Single-node Replica Set Audit
+    batchtime: 10080 # 7 days
+    modules: *modules
+    expansions:
+      mongodb_setup: single-replica-audit
+      infrastructure_provisioning: single
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: *audit-tasks
+
+  - name: linux-1-node-replSet-audit-log-encryption-compression
+    display_name: Linux Single-node Replica Set Audit w/ At-Rest Log Encryption (With compression)
+    batchtime: 10080 # 7 days
+    modules: *modules
+    expansions:
+      mongodb_setup: single-replica-audit-log-encryption-compression
+      infrastructure_provisioning: single
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: *audit-tasks
 
   - name: linux-1-node-replSet-fle
     display_name: Linux 1-Node ReplSet FLE
