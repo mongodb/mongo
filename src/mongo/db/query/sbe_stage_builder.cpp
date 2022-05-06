@@ -387,23 +387,40 @@ std::unique_ptr<IndexBounds> makeIndexBounds(const IndexBoundsEvaluationInfo& in
     return bounds;
 }
 
-/**
- * Binds index bounds evaluated from IETs to index bounds slots for the given query.
- *
- * - 'cq' is the query
- * - 'indexBoundsInfo' contains the IETs and the slots
- * - runtimeEnvironment SBE runtime environment
- */
-void bindIndexBoundsParams(const CanonicalQuery& cq,
-                           const IndexBoundsEvaluationInfo& indexBoundsInfo,
-                           sbe::RuntimeEnvironment* runtimeEnvironment) {
-    auto bounds = makeIndexBounds(indexBoundsInfo, cq);
-    auto intervals = makeIntervalsFromIndexBounds(*bounds,
-                                                  indexBoundsInfo.direction == 1,
-                                                  indexBoundsInfo.keyStringVersion,
-                                                  indexBoundsInfo.ordering);
+void bindSingleIntervalPlanSlots(const stage_builder::IndexBoundsEvaluationInfo& indexBoundsInfo,
+                                 stage_builder::IndexIntervals intervals,
+                                 sbe::RuntimeEnvironment* runtimeEnvironment) {
+    // If there are no intervals, it means that the solution will be empty and will return EOF
+    // without executing the index scan.
+    if (intervals.empty()) {
+        return;
+    }
+
+    tassert(6584700, "Can only bind a single index interval", intervals.size() == 1);
+    auto&& [lowKey, highKey] = intervals[0];
+    const auto singleInterval =
+        stdx::get<mongo::stage_builder::ParameterizedIndexScanSlots::SingleIntervalPlan>(
+            indexBoundsInfo.slots.slots);
+    runtimeEnvironment->resetSlot(singleInterval.lowKey,
+                                  sbe::value::TypeTags::ksValue,
+                                  sbe::value::bitcastFrom<KeyString::Value*>(lowKey.release()),
+                                  /* owned */ true);
+
+    runtimeEnvironment->resetSlot(singleInterval.highKey,
+                                  sbe::value::TypeTags::ksValue,
+                                  sbe::value::bitcastFrom<KeyString::Value*>(highKey.release()),
+                                  /* owned */ true);
+}
+
+void bindGenericPlanSlots(const stage_builder::IndexBoundsEvaluationInfo& indexBoundsInfo,
+                          stage_builder::IndexIntervals intervals,
+                          std::unique_ptr<IndexBounds> bounds,
+                          sbe::RuntimeEnvironment* runtimeEnvironment) {
+    const auto indexSlots =
+        stdx::get<mongo::stage_builder::ParameterizedIndexScanSlots::GenericPlan>(
+            indexBoundsInfo.slots.slots);
     const bool isGenericScan = intervals.empty();
-    runtimeEnvironment->resetSlot(indexBoundsInfo.slots.isGenericScan,
+    runtimeEnvironment->resetSlot(indexSlots.isGenericScan,
                                   sbe::value::TypeTags::Boolean,
                                   sbe::value::bitcastFrom<bool>(isGenericScan),
                                   /*owned*/ true);
@@ -419,24 +436,53 @@ void bindIndexBoundsParams(const CanonicalQuery& cq,
                     indexBoundsInfo.ordering,
                     indexBoundsInfo.direction == 1));
             runtimeEnvironment->resetSlot(
-                indexBoundsInfo.slots.initialStartKey,
+                indexSlots.initialStartKey,
                 sbe::value::TypeTags::ksValue,
                 sbe::value::bitcastFrom<KeyString::Value*>(startKey.release()),
                 /*owned*/ true);
-            runtimeEnvironment->resetSlot(indexBoundsInfo.slots.indexBounds,
+            runtimeEnvironment->resetSlot(indexSlots.indexBounds,
                                           sbe::value::TypeTags::indexBounds,
                                           sbe::value::bitcastFrom<IndexBounds*>(bounds.release()),
                                           /*owned*/ true);
         } else {
-            runtimeEnvironment->resetSlot(indexBoundsInfo.slots.initialStartKey,
+            runtimeEnvironment->resetSlot(indexSlots.initialStartKey,
                                           sbe::value::TypeTags::Nothing,
                                           0,
                                           /*owned*/ true);
         }
     } else {
-        auto [boundsTag, boundsVal] = packIndexIntervalsInSbeArray(std::move(intervals));
-        runtimeEnvironment->resetSlot(
-            indexBoundsInfo.slots.lowHighKeyIntervals, boundsTag, boundsVal, /*owned*/ true);
+        auto [boundsTag, boundsVal] =
+            stage_builder::packIndexIntervalsInSbeArray(std::move(intervals));
+        runtimeEnvironment->resetSlot(indexSlots.lowHighKeyIntervals,
+                                      boundsTag,
+                                      boundsVal,
+                                      /*owned*/ true);
+    }
+}
+
+/**
+ * Binds index bounds evaluated from IETs to index bounds slots for the given query.
+ *
+ * - 'cq' is the query
+ * - 'indexBoundsInfo' contains the IETs and the slots
+ * - runtimeEnvironment SBE runtime environment
+ */
+void bindIndexBoundsParams(const CanonicalQuery& cq,
+                           const IndexBoundsEvaluationInfo& indexBoundsInfo,
+                           sbe::RuntimeEnvironment* runtimeEnvironment) {
+    auto bounds = makeIndexBounds(indexBoundsInfo, cq);
+    auto intervals = stage_builder::makeIntervalsFromIndexBounds(*bounds,
+                                                                 indexBoundsInfo.direction == 1,
+                                                                 indexBoundsInfo.keyStringVersion,
+                                                                 indexBoundsInfo.ordering);
+    const bool isSingleIntervalSolution = stdx::holds_alternative<
+        mongo::stage_builder::ParameterizedIndexScanSlots::SingleIntervalPlan>(
+        indexBoundsInfo.slots.slots);
+    if (isSingleIntervalSolution) {
+        bindSingleIntervalPlanSlots(indexBoundsInfo, std::move(intervals), runtimeEnvironment);
+    } else {
+        bindGenericPlanSlots(
+            indexBoundsInfo, std::move(intervals), std::move(bounds), runtimeEnvironment);
     }
 }
 }  // namespace

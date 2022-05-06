@@ -228,8 +228,8 @@ public:
     /**
      * Returns true if the MatchExpression is a ComparisonMatchExpression.
      */
-    static bool isComparisonMatchExpression(const MatchExpression* expr) {
-        switch (expr->matchType()) {
+    static bool isComparisonMatchExpression(MatchExpression::MatchType matchType) {
+        switch (matchType) {
             case MatchExpression::LT:
             case MatchExpression::LTE:
             case MatchExpression::EQ:
@@ -239,6 +239,13 @@ public:
             default:
                 return false;
         }
+    }
+
+    /**
+     * Returns true if the MatchExpression is a ComparisonMatchExpression.
+     */
+    static bool isComparisonMatchExpression(const MatchExpression* expr) {
+        return isComparisonMatchExpression(expr->matchType());
     }
 
     ComparisonMatchExpression(MatchType type,

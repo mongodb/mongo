@@ -71,17 +71,31 @@ class PlanStageReqs;
  * populated based on the index bounds.
  */
 struct ParameterizedIndexScanSlots {
-    // Holds the value whether the generic or optimized index scan should be used.
-    sbe::value::SlotId isGenericScan;
+    // Holds the low and high key for the single interval index scan algorithm.
+    struct SingleIntervalPlan {
+        sbe::value::SlotId lowKey;
+        sbe::value::SlotId highKey;
+    };
 
-    // Holds the value of the initial 'startKey' for the generic index scan algorithm.
-    sbe::value::SlotId initialStartKey;
+    // Holds the slots for the generic index scan algorithm.
+    struct GenericPlan {
+        // Holds the value whether the generic or optimized index scan should be used.
+        sbe::value::SlotId isGenericScan;
 
-    // Holds the value of the IndexBounds used for the generic index scan algorithm.
-    sbe::value::SlotId indexBounds;
+        // Holds the value of the initial 'startKey' for the generic index scan algorithm.
+        sbe::value::SlotId initialStartKey;
 
-    // Holds the value of an array of low and high keys for each interval.
-    sbe::value::SlotId lowHighKeyIntervals;
+        // Holds the value of the IndexBounds used for the generic index scan algorithm.
+        sbe::value::SlotId indexBounds;
+
+        // Holds the value of an array of low and high keys for each interval.
+        sbe::value::SlotId lowHighKeyIntervals;
+    };
+
+    // In the case that the parameterized plan will always consist of a single interval index scan,
+    // this holds the SingleInterval struct. Otherwise, holds the necessary slots for a fully
+    // generic parameterized index scan plan.
+    stdx::variant<SingleIntervalPlan, GenericPlan> slots;
 };
 
 /**
