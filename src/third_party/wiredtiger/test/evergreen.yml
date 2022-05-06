@@ -2180,7 +2180,7 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          posix_configure_flags: -DENABLE_STRICT=0 -DHAVE_DIAGNOSTIC=1 -DENABLE_S3=1 -DIMPORT_S3_SDK=external -DENABLE_PYTHON=1 -DCMAKE_CXX_FLAGS="-ggdb"
+          posix_configure_flags: -DENABLE_STRICT=1 -DHAVE_DIAGNOSTIC=1 -DENABLE_S3=1 -DIMPORT_S3_SDK=external -DENABLE_PYTHON=1 -DCMAKE_CXX_FLAGS="-ggdb"
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build"
@@ -2205,7 +2205,7 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          posix_configure_flags: -DENABLE_STRICT=0 -DHAVE_DIAGNOSTIC=1 -DENABLE_S3=1 -DIMPORT_S3_SDK=external -DENABLE_PYTHON=1 -DCMAKE_CXX_FLAGS="-ggdb"
+          posix_configure_flags: -DENABLE_STRICT=1 -DHAVE_DIAGNOSTIC=1 -DENABLE_S3=1 -DIMPORT_S3_SDK=external -DENABLE_PYTHON=1 -DCMAKE_CXX_FLAGS="-ggdb"
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build"

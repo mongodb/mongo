@@ -114,8 +114,6 @@ static int S3GetDirectory(
   const S3Storage &, const std::string &, const std::string &, bool, std::string &);
 static bool S3CacheExists(WT_FILE_SYSTEM *, const std::string &);
 static std::string S3Path(const std::string &, const std::string &);
-static std::string S3HomePath(WT_FILE_SYSTEM *, const char *);
-static std::string S3CachePath(WT_FILE_SYSTEM *, const char *);
 static int S3FileExists(WT_FILE_SYSTEM *, WT_SESSION *, const char *, bool *);
 static int S3CustomizeFileSystem(
   WT_STORAGE_SOURCE *, WT_SESSION *, const char *, const char *, const char *, WT_FILE_SYSTEM **);
@@ -882,7 +880,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
     }
 
     // Set up statistics.
-    s3->statistics = {0};
+    s3->statistics = {};
 
     // Initialize the AWS SDK and logging.
     AwsManager::Init();
