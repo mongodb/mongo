@@ -248,6 +248,9 @@ if (typeof _threadInject != "undefined") {
             // TODO (SERVER-55750): Remove the batched_multi_deletes*.js exclusions once the feature
             // flag is enabled by default.
             "batched_multi_deletes.js",
+
+            // This test sets fail points which can cause other tests to fail.
+            "profile_write_conflict.js",
         ]);
 
         // Get files, including files in subdirectories.
