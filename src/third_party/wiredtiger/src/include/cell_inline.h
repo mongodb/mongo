@@ -872,11 +872,6 @@ copy_cell_restart:
         page_del->prepare_state = 0;                /* No prepare can have been in progress. */
         page_del->previous_ref_state = WT_REF_DISK; /* The leaf page is on disk. */
         page_del->committed = true;                 /* There is no running transaction. */
-
-        /* Avoid a stale transaction ID on restart. */
-        if (dsk->write_gen <= S2BT(session)->base_write_gen &&
-          !F_ISSET(session, WT_SESSION_DEBUG_DO_NOT_CLEAR_TXN_ID))
-            page_del->txnid = WT_TXN_NONE;
     }
 
     /*
@@ -978,8 +973,10 @@ done:
  *     Clean up addr cells loaded from a previous run.
  */
 static inline void
-__cell_addr_window_cleanup(WT_SESSION_IMPL *session, WT_CELL_UNPACK_ADDR *unpack_addr)
+__cell_addr_window_cleanup(
+  WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK_ADDR *unpack_addr)
 {
+    WT_PAGE_DELETED *page_del;
     WT_TIME_AGGREGATE *ta;
 
     /* Tell reconciliation we cleared the transaction ids and the cell needs to be rebuilt. */
@@ -1005,6 +1002,26 @@ __cell_addr_window_cleanup(WT_SESSION_IMPL *session, WT_CELL_UNPACK_ADDR *unpack
             }
         } else
             WT_ASSERT(session, ta->newest_stop_ts == WT_TS_MAX);
+
+        /* Also handle any fast-truncate information. */
+        if (unpack_addr->raw == WT_CELL_ADDR_DEL && F_ISSET(dsk, WT_PAGE_FT_UPDATE)) {
+            page_del = &unpack_addr->page_del;
+
+            /*
+             * The fast-truncate times are a stop time for the whole page; this code should match
+             * the stop txn and stop time logic for KV cells.
+             */
+            if (page_del->txnid != WT_TXN_MAX) {
+                page_del->txnid = WT_TXN_NONE;
+                F_SET(unpack_addr, WT_CELL_UNPACK_TIME_WINDOW_CLEARED);
+                /* As above, only for non-timestamped tables. */
+                if (page_del->timestamp == WT_TS_MAX) {
+                    page_del->timestamp = WT_TS_NONE;
+                    WT_ASSERT(session, page_del->durable_timestamp == WT_TS_NONE);
+                }
+            } else
+                WT_ASSERT(session, page_del->timestamp == WT_TS_MAX);
+        }
     }
 }
 
@@ -1093,7 +1110,7 @@ __cell_unpack_window_cleanup(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk
     if (F_ISSET(session, WT_SESSION_DEBUG_DO_NOT_CLEAR_TXN_ID))
         return;
 
-    __cell_addr_window_cleanup(session, unpack_addr);
+    __cell_addr_window_cleanup(session, dsk, unpack_addr);
     __cell_kv_window_cleanup(session, unpack_kv);
 }
 
