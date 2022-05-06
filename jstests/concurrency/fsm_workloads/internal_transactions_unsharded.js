@@ -40,12 +40,32 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 50;
 
+    $config.data.executionContextTypes =
+        {kNoClientSession: 1, kClientSession: 2, kClientRetryableWrite: 3, kClientTransaction: 4};
+    $config.data.imageTypes = {kPreImage: 1, kPostImage: 2};
+
     // The number of documents assigned to a thread when the workload starts.
     $config.data.partitionSize = 200;
     // The counter values for the documents assigned to a thread. The map is populated during
     // the init state and is updated after every write in the other states. Used to verify that
     // updates aren't double applied.
     $config.data.expectedCounters = {};
+    // Keep track of the documents that a thread has started writing to but does not know if the
+    // write has succeeded, for example, because the write is interrupted. The key of the inner map
+    // is the document id, and the value is command name for the write against that document (i.e.
+    // "insert", "update", "delete" or "findAndModify").
+    $config.data.dirtyDocs = {
+        [$config.data.executionContextTypes.kNoClientSession]: {},
+        [$config.data.executionContextTypes.kClientSession]: {},
+        [$config.data.executionContextTypes.kClientRetryableWrite]: {},
+        [$config.data.executionContextTypes.kClientTransaction]: {},
+    };
+    $config.data.expectDirtyDocs = {
+        [$config.data.executionContextTypes.kNoClientSession]: false,
+        [$config.data.executionContextTypes.kClientSession]: false,
+        [$config.data.executionContextTypes.kClientRetryableWrite]: false,
+        [$config.data.executionContextTypes.kClientTransaction]: false,
+    };
 
     // This workload sets the 'storeFindAndModifyImagesInSideCollection' parameter to a random bool
     // during setup() and restores the original value during teardown().
@@ -66,10 +86,6 @@ var $config = extendWorkload($config, function($config, $super) {
         // Don't use causal consistency in other cases since it should not be necessary.
         return false;
     })();
-
-    const executionContextTypes =
-        {kNoClientSession: 1, kClientSession: 2, kClientRetryableWrite: 3, kClientTransaction: 4};
-    const imageTypes = {kPreImage: 1, kPostImage: 2};
 
     /**
      * Returns a random boolean.
@@ -101,13 +117,13 @@ var $config = extendWorkload($config, function($config, $super) {
         const dbName = db.getName();
 
         switch (executionCtxType) {
-            case executionContextTypes.kNoClientSession:
+            case this.executionContextTypes.kNoClientSession:
                 return db.getMongo().getDB(dbName);
-            case executionContextTypes.kClientSession:
+            case this.executionContextTypes.kClientSession:
                 return this.nonRetryableWriteSession.getDatabase(dbName);
-            case executionContextTypes.kClientRetryableWrite:
+            case this.executionContextTypes.kClientRetryableWrite:
                 return this.retryableWriteSession.getDatabase(dbName);
-            case executionContextTypes.kClientTransaction:
+            case this.executionContextTypes.kClientTransaction:
                 return this.generateRandomBool() ? this.nonRetryableWriteSession.getDatabase(dbName)
                                                  : this.retryableWriteSession.getDatabase(dbName);
             default:
@@ -212,12 +228,12 @@ var $config = extendWorkload($config, function($config, $super) {
      * client 'executionCtxType'.
      */
     $config.data.runInternalTransaction = function runInternalTransaction(
-        db, collection, executionCtxType, writeCmdObj, checkResponseFunc, checkDocsFunc) {
+        db, collection, executionCtxType, writeCmdObj, checkResponseFunc, checkDocsFunc, docId) {
         // The testInternalTransactions command below runs with the session setting defined by
         // 'executionCtxType'.
         fsm.forceRunningOutsideTransaction(this);
 
-        if (executionCtxType == executionContextTypes.kClientRetryableWrite) {
+        if (executionCtxType == this.executionContextTypes.kClientRetryableWrite) {
             writeCmdObj.stmtId = NumberInt(1);
         }
 
@@ -225,7 +241,7 @@ var $config = extendWorkload($config, function($config, $super) {
         // sharded cluster there can be a mix of single-shard and cross-shard transactions.
         const docToInsert = this.generateRandomInsert(collection);
         const insertCmdObj = {insert: collection.getName(), documents: [docToInsert]};
-        if (executionCtxType == executionContextTypes.kClientRetryableWrite) {
+        if (executionCtxType == this.executionContextTypes.kClientRetryableWrite) {
             insertCmdObj.stmtId = NumberInt(-1);
         }
 
@@ -246,8 +262,8 @@ var $config = extendWorkload($config, function($config, $super) {
                 print(`Response: ${tojsononeline(res)}`);
                 assert.commandWorked(res);
             } catch (e) {
-                if ((executionCtxType == executionContextTypes.kClientRetryableWrite) &&
-                    this.isAcceptableRetryError(res)) {
+                if ((executionCtxType == this.executionContextTypes.kClientRetryableWrite) &&
+                    this.isAcceptableRetryError(res, executionCtxType)) {
                     print("Ignoring retry error for retryable write: " + tojsononeline(res));
                     return;
                 }
@@ -257,7 +273,7 @@ var $config = extendWorkload($config, function($config, $super) {
             res.responses.forEach(innerRes => {
                 assert.commandWorked(innerRes);
             });
-            if (executionCtxType == executionContextTypes.kClientRetryableWrite) {
+            if (executionCtxType == this.executionContextTypes.kClientRetryableWrite) {
                 // If the command was retried, 'responses' would only contain the response for
                 // 'writeCmdObj'.
                 assert.lte(res.responses.length, 2);
@@ -272,12 +288,18 @@ var $config = extendWorkload($config, function($config, $super) {
             }
         };
 
-        if (executionCtxType == executionContextTypes.kClientTransaction) {
+        print("Starting internal transaction");
+        this.dirtyDocs[executionCtxType][docId] = Object.keys(writeCmdObj)[0];
+        this.dirtyDocs[executionCtxType][docToInsert._id] = "insert";
+        if (executionCtxType == this.executionContextTypes.kClientTransaction) {
             withTxnAndAutoRetry(
                 db.getSession(), runFunc, {retryOnKilledSession: this.retryOnKilledSession});
         } else {
             runFunc();
         }
+        delete this.dirtyDocs[executionCtxType][docId];
+        delete this.dirtyDocs[executionCtxType][docToInsert._id];
+        print("Finished internal transaction");
 
         checkDocsFunc();
         assert.eq(collection.findOne({_id: docToInsert._id}), docToInsert);
@@ -348,8 +370,13 @@ var $config = extendWorkload($config, function($config, $super) {
             this.expectedCounters[docToInsert._id] = docToInsert.counter;
         };
 
-        this.runInternalTransaction(
-            db, collection, executionCtxType, insertCmdObj, checkResponseFunc, checkDocsFunc);
+        this.runInternalTransaction(db,
+                                    collection,
+                                    executionCtxType,
+                                    insertCmdObj,
+                                    checkResponseFunc,
+                                    checkDocsFunc,
+                                    docToInsert._id);
     };
 
     $config.states.internalTransactionForUpdate = function internalTransactionForUpdate(db,
@@ -374,8 +401,13 @@ var $config = extendWorkload($config, function($config, $super) {
             this.expectedCounters[docToUpdate._id] = updatedDoc.counter;
         };
 
-        this.runInternalTransaction(
-            db, collection, executionCtxType, updateCmdObj, checkResponseFunc, checkDocsFunc);
+        this.runInternalTransaction(db,
+                                    collection,
+                                    executionCtxType,
+                                    updateCmdObj,
+                                    checkResponseFunc,
+                                    checkDocsFunc,
+                                    docToUpdate._id);
     };
 
     $config.states.internalTransactionForDelete = function internalTransactionForDelete(db,
@@ -397,8 +429,13 @@ var $config = extendWorkload($config, function($config, $super) {
             delete this.expectedCounters[docToDelete._id];
         };
 
-        this.runInternalTransaction(
-            db, collection, executionCtxType, deleteCmdObj, checkResponseFunc, checkDocsFunc);
+        this.runInternalTransaction(db,
+                                    collection,
+                                    executionCtxType,
+                                    deleteCmdObj,
+                                    checkResponseFunc,
+                                    checkDocsFunc,
+                                    docToDelete._id);
     };
 
     $config.states.internalTransactionForFindAndModify =
@@ -415,7 +452,7 @@ var $config = extendWorkload($config, function($config, $super) {
             update: update
         };
         findAndModifyCmdObj.upsert = isUpsert;
-        if (imageType == imageTypes.kPostImage) {
+        if (imageType == this.imageTypes.kPostImage) {
             findAndModifyCmdObj.new = true;
         }
         const checkResponseFunc = (res) => {
@@ -425,8 +462,9 @@ var $config = extendWorkload($config, function($config, $super) {
                 assert.eq(res.lastErrorObject.upserted, updatedDoc._id, res);
             } else {
                 assert.eq(res.lastErrorObject.updatedExisting, true, res);
-                assert.eq(
-                    res.value, imageType == imageTypes.kPreImage ? docToUpdate : updatedDoc, res);
+                assert.eq(res.value,
+                          imageType == this.imageTypes.kPreImage ? docToUpdate : updatedDoc,
+                          res);
             }
         };
         const checkDocsFunc = () => {
@@ -440,7 +478,8 @@ var $config = extendWorkload($config, function($config, $super) {
                                     executionCtxType,
                                     findAndModifyCmdObj,
                                     checkResponseFunc,
-                                    checkDocsFunc);
+                                    checkDocsFunc,
+                                    docToUpdate._id);
     };
 
     /**
@@ -448,17 +487,32 @@ var $config = extendWorkload($config, function($config, $super) {
      * expected values.
      */
     $config.states.verifyDocuments = function verifyDocuments(db, collName) {
+        for (const executionCtxType in this.expectDirtyDocs) {
+            const numDirtyDocs = Object.keys(this.dirtyDocs[executionCtxType]).length;
+            print(`Dirty documents: ${tojsononeline({
+                executionCtxType,
+                count: numDirtyDocs,
+                docs: this.dirtyDocs[executionCtxType]
+            })}`);
+            if (!this.expectDirtyDocs[executionCtxType]) {
+                assert.eq(0,
+                          numDirtyDocs,
+                          () => `expected to find no dirty documents for ${
+                              tojsononeline({executionCtxType})} but found ${numDirtyDocs}`);
+            }
+        }
+
         // The read below should not be done inside a transaction (and use readConcern level
         // "snapshot").
         fsm.forceRunningOutsideTransaction(this);
 
         // Run the find command with batch size equal to the number of documents + 1 to avoid
         // running getMore commands as getMore's are not retryable upon network errors.
-        const numDocs = Object.keys(this.expectedCounters).length;
+        const numExpectedDocs = Object.keys(this.expectedCounters).length;
         const findCmdObj = {
             find: collName,
             filter: {tid: this.tid},
-            batchSize: numDocs + 1,
+            batchSize: numExpectedDocs + 1,
         };
         if (this.shouldUseCausalConsistency) {
             findCmdObj.readConcern = {
@@ -470,9 +524,14 @@ var $config = extendWorkload($config, function($config, $super) {
             }
         }
         const docs = assert.commandWorked(db.runCommand(findCmdObj)).cursor.firstBatch;
-        assert.eq(docs.length, numDocs);
+
         docs.forEach(doc => {
-            assert(doc._id in this.expectedCounters);
+            for (const executionCtxType in this.dirtyDocs) {
+                if (doc._id in this.dirtyDocs[executionCtxType]) {
+                    return;
+                }
+            }
+            assert(doc._id in this.expectedCounters, tojson(doc));
             const expectedCounter = this.expectedCounters[doc._id];
             assert.eq(expectedCounter, doc.counter, () => {
                 return 'unexpected counter value, doc: ' + tojson(doc);
