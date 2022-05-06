@@ -129,6 +129,24 @@ __tiered_init_tiers(WT_SESSION_IMPL *session, WT_TIERED *tiered, WT_CONFIG_ITEM 
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     WT_TIERED_TIERS *local_tier;
+    uint32_t object_id;
+    const char *cfg, *name;
+
+    if (session->import_list != NULL) {
+        /* Insert metadata for all tiered objects. */
+        for (object_id = tiered->oldest_id; object_id < tiered->current_id; object_id++) {
+            WT_RET(
+              __wt_tiered_name(session, &tiered->iface, object_id, WT_TIERED_NAME_OBJECT, &name));
+            ret = __wt_find_import_metadata(session, name, &cfg);
+            /*
+             * It's OK if some of the objects are not there. They may have been dropped before
+             * export.
+             */
+            WT_RET_NOTFOUND_OK(ret);
+            if (ret != WT_NOTFOUND)
+                WT_RET(__wt_metadata_insert(session, name, cfg));
+        }
+    }
 
     WT_RET(__wt_scr_alloc(session, 0, &tmp));
     __wt_config_subinit(session, &cparser, tierconf);
@@ -137,6 +155,12 @@ __tiered_init_tiers(WT_SESSION_IMPL *session, WT_TIERED *tiered, WT_CONFIG_ITEM 
         WT_ERR(__wt_buf_fmt(session, tmp, "%.*s", (int)ckey.len, ckey.str));
         __wt_verbose(
           session, WT_VERB_TIERED, "INIT_TIERS: tiered URI dhandle %s", (char *)tmp->data);
+
+        if (session->import_list != NULL) {
+            WT_ERR(__wt_find_import_metadata(session, (const char *)tmp->data, &cfg));
+            WT_ERR(__wt_metadata_insert(session, (const char *)tmp->data, cfg));
+        }
+
         WT_SAVE_DHANDLE(session,
           ret = __tiered_dhandle_setup(
             session, tiered, WT_TIERED_INDEX_INVALID, (const char *)tmp->data));
@@ -334,21 +358,30 @@ __tiered_create_tier_tree(WT_SESSION_IMPL *session, WT_TIERED *tiered)
     WT_TIERED_TIERS *this_tier;
     const char *cfg[3] = {NULL, NULL, NULL};
     const char *config, *name;
+    bool free_config;
 
+    free_config = true;
     config = name = NULL;
     WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
     /* Create tier:example for the new tiered tree. */
     WT_ERR(__wt_tiered_name(session, &tiered->iface, 0, WT_TIERED_NAME_SHARED, &name));
-    cfg[0] = WT_CONFIG_BASE(session, tier_meta);
-    WT_ASSERT(session, tiered->bstorage != NULL);
-    WT_ERR(__wt_buf_fmt(session, tmp,
-      ",readonly=true,tiered_object=true,tiered_storage=(bucket=%s,bucket_prefix=%s)",
-      tiered->bstorage->bucket, tiered->bstorage->bucket_prefix));
-    cfg[1] = tmp->data;
-    WT_ERR(__wt_config_merge(session, cfg, NULL, &config));
-    /* Set up a tier:example metadata for the first time. */
-    __wt_verbose(session, WT_VERB_TIERED, "CREATE_TIER_TREE: schema create: %s : %s", name, config);
+    if (session->import_list != NULL) {
+        WT_ERR(__wt_find_import_metadata(session, name, &config));
+        free_config = false;
+    } else {
+        cfg[0] = WT_CONFIG_BASE(session, tier_meta);
+        WT_ASSERT(session, tiered->bstorage != NULL);
+        WT_ERR(__wt_buf_fmt(session, tmp,
+          ",readonly=true,tiered_object=true,tiered_storage=(bucket=%s,bucket_prefix=%s)",
+          tiered->bstorage->bucket, tiered->bstorage->bucket_prefix));
+        cfg[1] = tmp->data;
+        WT_ERR(__wt_config_merge(session, cfg, NULL, &config));
+        /* Set up a tier:example metadata for the first time. */
+        __wt_verbose(
+          session, WT_VERB_TIERED, "CREATE_TIER_TREE: schema create: %s : %s", name, config);
+    }
+
     WT_ERR(__wt_schema_create(session, name, config));
     this_tier = &tiered->tiers[WT_TIERED_INDEX_SHARED];
     WT_ASSERT(session, this_tier->name == NULL);
@@ -359,7 +392,10 @@ __tiered_create_tier_tree(WT_SESSION_IMPL *session, WT_TIERED *tiered)
 err:
         /* Only free on error. */
         __wt_free(session, name);
-    __wt_free(session, config);
+
+    if (free_config)
+        __wt_free(session, config);
+
     __wt_scr_free(session, &tmp);
     return (ret);
 }
@@ -698,9 +734,12 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ERR_NOTFOUND_OK(ret, true);
 
     /* Open tiers if we have them, otherwise initialize. */
-    if (tiered->current_id != WT_TIERED_OBJECTID_NONE)
+    if (tiered->current_id != WT_TIERED_OBJECTID_NONE) {
         WT_ERR(__tiered_init_tiers(session, tiered, &tierconf));
-    else {
+        /* Switch to the next object if we are importing a table. */
+        if (session->import_list != NULL)
+            WT_ERR(__wt_tiered_switch(session, config));
+    } else {
         /*
          * The tiered table name does not exist. But now check if any shared storage objects exist
          * for this name. A user could have created a tiered table. Later dropped it, which removes
