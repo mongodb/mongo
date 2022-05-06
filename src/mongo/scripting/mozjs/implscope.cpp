@@ -327,8 +327,6 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine,
 
         // We turn on a variety of optimizations if the jit is enabled
         if (engine->isJITEnabled()) {
-            JS_SetGlobalJitCompilerOption(_context.get(), JSJITCOMPILER_BASELINE_ENABLE, 1);
-            JS_SetGlobalJitCompilerOption(_context.get(), JSJITCOMPILER_ION_ENABLE, 1);
             JS::ContextOptionsRef(_context.get())
                 .setAsmJS(true)
                 .setThrowOnAsmJSValidationFailure(true)
@@ -337,8 +335,6 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine,
                 .setWasmIon(true)
                 .setAsyncStack(false);
         } else {
-            JS_SetGlobalJitCompilerOption(_context.get(), JSJITCOMPILER_BASELINE_ENABLE, 0);
-            JS_SetGlobalJitCompilerOption(_context.get(), JSJITCOMPILER_ION_ENABLE, 0);
             JS::ContextOptionsRef(_context.get())
                 .setAsmJS(false)
                 .setThrowOnAsmJSValidationFailure(false)
