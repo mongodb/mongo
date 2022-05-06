@@ -75,6 +75,7 @@ GENERIC_FCV = [
     r'::kUpgradingFromLastLTSToLastContinuous',
 ]
 _RE_GENERIC_FCV_REF = re.compile(r'(' + '|'.join(GENERIC_FCV) + r')\b')
+_RE_HEADER = re.compile(r'\.(h|hpp)$')
 
 
 class Linter:
@@ -115,7 +116,7 @@ class Linter:
         self.file_name = file_name
         self.raw_lines = raw_lines
         self.clean_lines = []
-        self.nolint_supression = []
+        self.nolint_suppression = []
         self.generic_fcv_comments = []
         self._error_count = 0
 
@@ -123,16 +124,21 @@ class Linter:
 
     def lint(self):
         """Run linter, returning error count."""
-        # 3 steps:
-        #  1. Check for header
-        #  2. Check for NOLINT and Strip multi line comments
-        #  3. Run per-line checks
+        # steps:
+        #  - Check for header
+        #  - Check for NOLINT and Strip multi line comments
+        #  - Run file-level checks
+        #  - Run per-line checks
 
         start_line = self._check_for_server_side_public_license()
 
         self._check_newlines()
         self._check_and_strip_comments()
 
+        # File-level checks
+        self._check_macro_definition_leaks()
+
+        # Line-level checks
         for linenum in range(start_line, len(self.clean_lines)):
             if not self.clean_lines[linenum]:
                 continue
@@ -173,7 +179,7 @@ class Linter:
             # // Some explanation NOLINT
             # so we need a regular expression
             if _RE_LINT.search(clean_line):
-                self.nolint_supression.append(linenum)
+                self.nolint_suppression.append(linenum)
 
             if _RE_GENERIC_FCV_COMMENT.search(clean_line):
                 self.generic_fcv_comments.append(linenum)
@@ -196,6 +202,26 @@ class Linter:
                 clean_line = ""
 
             self.clean_lines.append(clean_line)
+
+    def _check_macro_definition_leaks(self):
+        """Some header macros should appear in define/undef pairs."""
+        if not _RE_HEADER.search(self.file_name):
+            return
+        # Naive check: doesn't consider `#if` scoping.
+        # Assumes an #undef matches the nearest #define.
+        for macro in ['MONGO_LOGV2_DEFAULT_COMPONENT']:
+            re_define = re.compile(fr"^\s*#\s*define\s+{macro}\b")
+            re_undef = re.compile(fr"^\s*#\s*undef\s+{macro}\b")
+            def_line = None
+            for idx, line in enumerate(self.clean_lines):
+                if def_line is None:
+                    if re_define.match(line):
+                        def_line = idx
+                else:
+                    if re_undef.match(line):
+                        def_line = None
+            if def_line is not None:
+                self._error(def_line, 'mongodb/undefmacro', f'Missing "#undef {macro}"')
 
     def _check_for_mongo_volatile(self, linenum):
         line = self.clean_lines[linenum]
@@ -318,7 +344,7 @@ class Linter:
                     'before the generic FCV reference.')
 
     def _error(self, linenum, category, message):
-        if linenum in self.nolint_supression:
+        if linenum in self.nolint_suppression:
             return
 
         if category == "legal/license":
