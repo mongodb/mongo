@@ -57,7 +57,45 @@ class BucketCatalog {
         const StripeNumber stripe;
     };
 
-    struct ExecutionStats;
+    struct ExecutionStats {
+        AtomicWord<long long> numBucketInserts;
+        AtomicWord<long long> numBucketUpdates;
+        AtomicWord<long long> numBucketsOpenedDueToMetadata;
+        AtomicWord<long long> numBucketsClosedDueToCount;
+        AtomicWord<long long> numBucketsClosedDueToSchemaChange;
+        AtomicWord<long long> numBucketsClosedDueToSize;
+        AtomicWord<long long> numBucketsClosedDueToTimeForward;
+        AtomicWord<long long> numBucketsClosedDueToTimeBackward;
+        AtomicWord<long long> numBucketsClosedDueToMemoryThreshold;
+        AtomicWord<long long> numCommits;
+        AtomicWord<long long> numWaits;
+        AtomicWord<long long> numMeasurementsCommitted;
+    };
+
+    class ExecutionStatsController {
+    public:
+        ExecutionStatsController(const std::shared_ptr<ExecutionStats>& collectionStats,
+                                 ExecutionStats* globalStats)
+            : _collectionStats(collectionStats), _globalStats(globalStats) {}
+
+        void incNumBucketInserts(long long increment = 1);
+        void incNumBucketUpdates(long long increment = 1);
+        void incNumBucketsOpenedDueToMetadata(long long increment = 1);
+        void incNumBucketsClosedDueToCount(long long increment = 1);
+        void incNumBucketsClosedDueToSchemaChange(long long increment = 1);
+        void incNumBucketsClosedDueToSize(long long increment = 1);
+        void incNumBucketsClosedDueToTimeForward(long long increment = 1);
+        void incNumBucketsClosedDueToTimeBackward(long long increment = 1);
+        void incNumBucketsClosedDueToMemoryThreshold(long long increment = 1);
+        void incNumCommits(long long increment = 1);
+        void incNumWaits(long long increment = 1);
+        void incNumMeasurementsCommitted(long long increment = 1);
+
+    private:
+        std::shared_ptr<ExecutionStats> _collectionStats;
+        ExecutionStats* _globalStats;
+    };
+
     class Bucket;
     struct CreationInfo;
 
@@ -98,9 +136,7 @@ public:
     public:
         WriteBatch() = delete;
 
-        WriteBatch(const BucketHandle& bucketId,
-                   OperationId opId,
-                   const std::shared_ptr<ExecutionStats>& stats);
+        WriteBatch(const BucketHandle& bucketId, OperationId opId, ExecutionStatsController& stats);
 
         /**
          * Attempts to claim the right to commit a batch. If it returns true, rights are
@@ -113,7 +149,7 @@ public:
          * Retrieves the result of the write batch commit. Should be called by any interested party
          * that does not have commit rights. Blocking.
          */
-        StatusWith<CommitInfo> getResult() const;
+        StatusWith<CommitInfo> getResult();
 
         /**
          * Returns a handle which can be used by the BucketCatalog internally to locate its record
@@ -165,7 +201,7 @@ public:
 
         const BucketHandle _bucket;
         OperationId _opId;
-        std::shared_ptr<ExecutionStats> _stats;
+        ExecutionStatsController _stats;
 
         std::vector<BSONObj> _measurements;
         BSONObj _min;  // Batch-local min; full if first batch, updates otherwise.
@@ -262,6 +298,11 @@ public:
      * Appends the execution stats for the given namespace to the builder.
      */
     void appendExecutionStats(const NamespaceString& ns, BSONObjBuilder* builder) const;
+
+    /**
+     * Appends the global execution stats for all namespaces to the builder.
+     */
+    void appendGlobalExecutionStats(BSONObjBuilder* builder) const;
 
 private:
     enum class BucketState {
@@ -442,7 +483,7 @@ private:
      */
     void _expireIdleBuckets(Stripe* stripe,
                             WithLock stripeLock,
-                            ExecutionStats* stats,
+                            ExecutionStatsController& stats,
                             ClosedBuckets* closedBuckets);
 
     /**
@@ -460,8 +501,10 @@ private:
                       Bucket* bucket,
                       const CreationInfo& info);
 
-    std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns);
+    ExecutionStatsController _getExecutionStats(const NamespaceString& ns);
     std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns) const;
+
+    void _appendExecutionStatsToBuilder(const ExecutionStats* stats, BSONObjBuilder* builder) const;
 
     /**
      * Retreives the bucket state if it is tracked in the catalog.
@@ -501,6 +544,9 @@ private:
     // lookup, you can keep the shared_ptr to an individual namespace's stats object and release the
     // lock. The object itself is thread-safe (using atomics).
     stdx::unordered_map<NamespaceString, std::shared_ptr<ExecutionStats>> _executionStats;
+
+    // Global execution stats used to report aggregated metrics in server status.
+    ExecutionStats _globalExecutionStats;
 
     // Approximate memory usage of the bucket catalog.
     AtomicWord<uint64_t> _memoryUsage;
