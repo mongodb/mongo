@@ -150,8 +150,15 @@ class test_checkpoint(wttest.WiredTigerTestCase):
             ckpt = named_checkpoint_thread(self.conn, done, self.second_checkpoint)
         try:
             ckpt.start()
-            # Sleep a bit so that checkpoint starts before committing last transaction.
-            time.sleep(2)
+            
+            # Wait for checkpoint to start before committing.
+            ckpt_started = 0
+            while not ckpt_started:
+                stat_cursor = self.session.open_cursor('statistics:', None, None)
+                ckpt_started = stat_cursor[stat.conn.txn_checkpoint_running][2]
+                stat_cursor.close()
+                time.sleep(1)
+
             session2.commit_transaction()
         finally:
             done.set()

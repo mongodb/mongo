@@ -114,8 +114,14 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         try:
             self.pr("start checkpoint")
             ckpt.start()
-            # Sleep for sometime so that checkpoint starts.
-            time.sleep(2)
+            
+            # Wait for checkpoint to start before committing.
+            ckpt_started = 0
+            while not ckpt_started:
+                stat_cursor = self.session.open_cursor('statistics:', None, None)
+                ckpt_started = stat_cursor[stat.conn.txn_checkpoint_running][2]
+                stat_cursor.close()
+                time.sleep(1)
 
             # Perform several modifies in parallel with checkpoint.
             # Rollbacks may occur when checkpoint is running, so retry as needed.
@@ -221,8 +227,14 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         try:
             self.pr("start checkpoint")
             ckpt.start()
-            # Sleep for sometime so that checkpoint starts.
-            time.sleep(2)
+
+            # Wait for checkpoint to start before committing.
+            ckpt_started = 0
+            while not ckpt_started:
+                stat_cursor = self.session.open_cursor('statistics:', None, None)
+                ckpt_started = stat_cursor[stat.conn.txn_checkpoint_running][2]
+                stat_cursor.close()
+                time.sleep(1)
 
             # Perform several modifies in parallel with checkpoint.
             # Rollbacks may occur when checkpoint is running, so retry as needed.
@@ -326,8 +338,14 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         try:
             self.pr("start checkpoint")
             ckpt.start()
-            # Sleep for sometime so that checkpoint starts.
-            time.sleep(2)
+            
+            # Wait for checkpoint to start before committing.
+            ckpt_started = 0
+            while not ckpt_started:
+                stat_cursor = self.session.open_cursor('statistics:', None, None)
+                ckpt_started = stat_cursor[stat.conn.txn_checkpoint_running][2]
+                stat_cursor.close()
+                time.sleep(1)
 
             # Perform several modifies in parallel with checkpoint.
             # Rollbacks may occur when checkpoint is running, so retry as needed.
