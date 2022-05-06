@@ -103,6 +103,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         if ts is not None:
             cfg += ',debug=(checkpoint_read_timestamp=' + self.timestamp_str(ts) + ')'
         cursor = self.session.open_cursor(ds.uri, None, cfg)
+        #self.session.begin_transaction()
         count = 0
         zcount = 0
         for k, v in cursor:
@@ -111,6 +112,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
             else:
                 self.assertEqual(v, value)
                 count += 1
+        #self.session.rollback_transaction()
         self.assertEqual(count, nrows)
         self.assertEqual(zcount, zeros if self.value_format == '8t' else 0)
         cursor.close()

@@ -156,7 +156,7 @@ skip_read:
      * In the case of a fast delete, move all of the page's records to a deleted state based on the
      * fast-delete information. Skip for special commands that don't care about an in-memory state.
      */
-    if (ref->ft_info.del != NULL &&
+    if (previous_state == WT_REF_DELETED &&
       !F_ISSET(S2BT(session), WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
         WT_ERR(__wt_delete_page_instantiate(session, ref));
 
