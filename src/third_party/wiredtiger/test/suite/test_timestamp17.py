@@ -49,7 +49,7 @@ class test_timestamp17(wttest.WiredTigerTestCase, suite_subprocess):
     scenarios = make_scenarios(format_values)
 
     def test_inconsistent_timestamping(self):
-        format = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(self.uri, format)
         self.session.begin_transaction()
         cur1 = self.session.open_cursor(self.uri)
@@ -76,8 +76,8 @@ class test_timestamp17(wttest.WiredTigerTestCase, suite_subprocess):
             self.assertEqual(search_success, wiredtiger.WT_NOTFOUND)
         self.session.commit_transaction()
 
-        # Add a mixed mode tombstone
-        self.session.begin_transaction()
+        # Add a tombstone without a timestamp
+        self.session.begin_transaction('no_timestamp=true')
         cur1.set_key(1)
         cur1.remove()
         self.session.commit_transaction()

@@ -454,9 +454,9 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
          * after further operations on that same key. Rollback to stable should ignore such records
          * for timestamp ordering verification.
          *
-         * If we have fixed the mixed mode timestamps, then the newer update reinserted with an
-         * older timestamp may have a durable timestamp that is smaller than the current stop
-         * durable timestamp.
+         * If we have fixed the missing timestamps, then the newer update reinserted with an older
+         * timestamp may have a durable timestamp that is smaller than the current stop durable
+         * timestamp.
          *
          * It is possible that there can be an update in the history store with a max stop timestamp
          * in the middle of the same key updates. This occurs when the checkpoint writes the

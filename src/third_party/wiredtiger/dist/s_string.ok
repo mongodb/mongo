@@ -125,6 +125,7 @@ Decrypt
 DeleteFileW
 Destructor
 Deterministically
+DmpvXx
 EACCES
 EAGAIN
 EB

@@ -31,16 +31,16 @@ import wttest, threading
 from helper import simulate_crash_restart
 from wtscenario import make_scenarios
 
-# Test a bug that can occur when a mixed mode update gets insert after a checkpoint begins
-# but before the checkpoint processes the btree. Evict that update before checkpoint but fail the
-# eviction due to mixed mode timestamps.
+# Test a bug that can occur when an update without a timestamp gets inserted after a checkpoint
+# begins but before the checkpoint processes the btree. Evict that update before checkpoint but
+# fail the eviction due to the missing timestamp.
 #
 # Without the related change this test would fail as a result of an inconsistent checkpoint. Due to
 # a flag being set on an update incorrectly. Specific ordering is required to reproduce:
 # 1. Start a checkpoint, sleep the checkpoint after it takes it snapshot and before it
 #    processes our btree.
-# 2. Insert the mixed mode update.
-# 3. Evict the mixed mode update.
+# 2. Insert the update without a timestamp.
+# 3. Evict that update.
 # 4. Complete the checkpoint.
 # 5. Simulate a crash.
 # 6. Read the value and see if it matches the expected value.
@@ -60,7 +60,7 @@ class test_hs_evict_race01(wttest.WiredTigerTestCase):
     value4 = 'ddddd'
 
     def test_mm_ts(self):
-        self.session.create(self.uri, 'key_format={},value_format=S,write_timestamp_usage=mixed_mode'.format(self.key_format))
+        self.session.create(self.uri, 'key_format={},value_format=S'.format(self.key_format))
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
         # Insert a value at timestamp 4
@@ -95,7 +95,7 @@ class test_hs_evict_race01(wttest.WiredTigerTestCase):
         sleep(0.5)
         session = self.setUpSessionOpen(self.conn)
         cursor = session.open_cursor(self.uri)
-        session.begin_transaction()
+        session.begin_transaction('no_timestamp=true')
         cursor[1] = self.value4
         session.commit_transaction()
         cursor.close()

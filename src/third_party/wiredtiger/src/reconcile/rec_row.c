@@ -829,10 +829,10 @@ __wt_rec_row_leaf(
                 /* Take the value from the update. */
                 WT_ERR(__wt_rec_cell_build_val(session, r, upd->data, upd->size, twp, 0));
                 /*
-                 * When a mixed mode tombstone is getting written to disk, remove any historical
+                 * When a tombstone without a timestamp is written to disk, remove any historical
                  * versions that are greater in the history store for that key.
                  */
-                if (upd_select.mm_tombstone && r->hs_clear_on_tombstone) {
+                if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone) {
                     WT_ERR(__wt_row_leaf_key(session, page, rip, tmpkey, true));
                     WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, WT_RECNO_OOB, tmpkey, true));
                 }
@@ -860,10 +860,10 @@ __wt_rec_row_leaf(
                 }
 
                 /*
-                 * When a mixed mode tombstone is getting written to disk, remove any historical
+                 * When a tombstone without a timestamp is written to disk, remove any historical
                  * versions that are greater in the history store for this key.
                  */
-                if (upd_select.mm_tombstone && r->hs_clear_on_tombstone) {
+                if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone) {
                     WT_ERR(__wt_row_leaf_key(session, page, rip, tmpkey, true));
                     WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, WT_RECNO_OOB, tmpkey, false));
                 }

@@ -764,10 +764,10 @@ __wt_rec_col_fix(
 
         if (upd->type == WT_UPDATE_TOMBSTONE) {
             /*
-             * When a mixed mode tombstone is getting written to disk, remove any historical
+             * When a tombstone without a timestamp is written to disk, remove any historical
              * versions that are greater in the history store for this key.
              */
-            if (upd_select.mm_tombstone && r->hs_clear_on_tombstone)
+            if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone)
                 WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, recno, NULL, false));
 
             val = 0;
@@ -781,10 +781,10 @@ __wt_rec_col_fix(
             /* Write the time window. */
             if (!WT_TIME_WINDOW_IS_EMPTY(&upd_select.tw)) {
                 /*
-                 * When a mixed mode tombstone is getting written to disk, remove any historical
+                 * When a tombstone without a timestamp is written to disk, remove any historical
                  * versions that are greater in the history store for this key.
                  */
-                if (upd_select.mm_tombstone && r->hs_clear_on_tombstone)
+                if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone)
                     WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, recno, NULL, true));
 
                 WT_ERR(__wt_rec_col_fix_addtw(
@@ -1419,19 +1419,19 @@ record_loop:
                     data = upd->data;
                     size = upd->size;
                     /*
-                     * When a mixed mode tombstone is getting written to disk, remove any historical
-                     * versions that are greater in the history store for this key.
+                     * When a tombstone without a timestamp is written to disk, remove any
+                     * historical versions that are greater in the history store for this key.
                      */
-                    if (upd_select.mm_tombstone && r->hs_clear_on_tombstone)
+                    if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone)
                         WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, src_recno, NULL, true));
 
                     break;
                 case WT_UPDATE_TOMBSTONE:
                     /*
-                     * When a mixed mode tombstone is getting written to disk, remove any historical
-                     * versions that are greater in the history store for this key.
+                     * When a tombstone without a timestamp is written to disk, remove any
+                     * historical versions that are greater in the history store for this key.
                      */
-                    if (upd_select.mm_tombstone && r->hs_clear_on_tombstone)
+                    if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone)
                         WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, src_recno, NULL, false));
 
                     deleted = true;

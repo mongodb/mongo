@@ -70,7 +70,10 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
         try:
             cursor = session.open_cursor(uri)
             for i in range(1, nrows + 1):
-                session.begin_transaction()
+                if commit_ts == 0:
+                    session.begin_transaction('no_timestamp=true')
+                else:
+                    session.begin_transaction()
                 cursor[ds.key(i)] = value
                 if commit_ts == 0:
                     session.commit_transaction()

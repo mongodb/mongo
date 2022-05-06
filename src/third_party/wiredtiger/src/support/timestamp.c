@@ -270,7 +270,7 @@ __wt_time_aggregate_validate(
           __wt_time_aggregate_to_string(ta, time_string[0]));
 
     /*
-     * In the case of mixed mode timestamps, we assign the start point to the stop point and newest
+     * In the case of missing timestamps, we assign the start point to the stop point and newest
      * start durable timestamp may be larger than newest stop timestamp. Check whether start and
      * stop are equal first.
      */
@@ -429,9 +429,9 @@ __wt_time_value_validate(
           __wt_time_window_to_string(tw, time_string[0]));
 
     /*
-     * In the case of mixed mode timestamps, we assign start time point to the stop point and
-     * durable start timestamp may be larger than stop timestamp. Check whether start and stop are
-     * equal first.
+     * In the case of missing timestamps, we assign start time point to the stop point and durable
+     * start timestamp may be larger than stop timestamp. Check whether start and stop are equal
+     * first.
      */
     if (tw->durable_start_ts != tw->durable_stop_ts && tw->durable_start_ts > tw->stop_ts)
         WT_TIME_VALIDATE_RET(session,

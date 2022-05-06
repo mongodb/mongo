@@ -31,7 +31,7 @@ from wtscenario import make_scenarios
 from wiredtiger import stat
 
 # test_hs31.py
-# Ensure that tombstone with no timestamp clear the history store records.
+# Ensure that removal without a timestamp clears the history store records.
 class test_hs31(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=5MB,statistics=(all)'
     format_values = [
@@ -62,7 +62,7 @@ class test_hs31(wttest.WiredTigerTestCase):
 
     def test_mm_tombstone_clear_hs(self):
         uri = 'file:test_hs31'
-        create_params = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
+        create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 
         if self.value_format == '8t':
@@ -96,7 +96,6 @@ class test_hs31(wttest.WiredTigerTestCase):
             cursor2.reset()
         self.session.rollback_transaction()
 
-        self.session.breakpoint()
         # Start a long running transaction to stop the oldest id being advanced.
         session2 = self.conn.open_session()
         session2.begin_transaction()
@@ -105,9 +104,9 @@ class test_hs31(wttest.WiredTigerTestCase):
         long_cursor.reset()
         long_cursor.close()
 
-        # Remove the key with an ooo or mm timestamp.
+        # Remove the key without setting a timestamp.
         for i in range(1, self.nrows):
-            self.session.begin_transaction()
+            self.session.begin_transaction('no_timestamp=true')
             cursor.set_key(self.create_key(i))
             cursor.remove()
             self.session.commit_transaction()
@@ -116,7 +115,6 @@ class test_hs31(wttest.WiredTigerTestCase):
             # Reconcile to write the stop time window.
             self.session.checkpoint()
 
-        self.session.breakpoint()
         # Ensure that old reader can read the history content.
         long_cursor = session2.open_cursor(uri, None)
         for i in range(1, self.nrows):

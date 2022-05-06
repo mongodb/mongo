@@ -18,44 +18,39 @@ value. Applications can also set commit timestamps on a per-update basis in
 a single transaction, in which case the commit timestamp is the time of the
 visibility of the effected updates.
 
-Updating a key without a commit timestamp creates a value that has "always
-existed" and is visible regardless of timestamp. This makes sense when
-loading initial data into an object or in applications wishing to clear
-historic values, but once timestamps are used to update a particular value,
-subsequent updates will likely also use a commit timestamp. Similarly, because
-implicit transactions have no associated timestamp, implicit transactions
-are generally only useful until timestamps have been used to update a table.
-Updating a key with a commit timestamp and then subsequently updating it
-without a commit timestamp will discard all prior historical values, and
-future reads will read the new value regardless of read timestamp. In other
-words, readers with already acquired snapshots will see prior historical
-values based on their timestamps. Readers acquiring a snapshot after the
-commit of the update without a timestamp will not see prior historical values
-regardless of their read timestamps.
-
 @section timestamp_txn_api_configure Application timestamp configuration
 
-By default, WiredTiger requires timestamps be used in "ordered" mode:
+The WT_SESSION::create method's \c "assert=(read_timestamp)" configuration
+checks that timestamps always or never be used on reads in the table.
+
+By default, WiredTiger requires commit timestamps be used in "ordered" mode:
 updates to a table can be made both with and without a commit timestamp,
 but once a commit timestamp is used to update a key, all future updates to
-the key will require a commit timestamp. Further, each update to a key must
-have a commit timestamp at or after any previous update.
+the key require a commit timestamp. Further, each update to a key must have
+a commit timestamp at or after the previous commit timestamp.
 
-These requirements can be changed on a per-table basis to specify no updates
-to a table have timestamps, or that updates without timestamps be permitted
-even when a key has already been updated using a timestamp. Commit timestamps
-before previously applied timestamps is never permitted.
+Updating a key without a commit timestamp creates a value that has "always
+existed" and is visible regardless of timestamp. This makes sense when
+loading initial data into an object, but once timestamps are used to update
+a particular value, subsequent updates will normally also have a commit
+timestamp. Similarly, because implicit transactions have no associated
+timestamp, implicit transactions are generally only useful until timestamps
+have been used to update a table.
 
-Setting the WT_SESSION::create \c write_timestamp_usage configuration changes
-how timestamps are expected to be used in the table:
+These requirements can be changed on a per-table basis, to specify no updates
+to a table have timestamps, with the WT_SESSION::create method's
+\c "write_timestamp_usage=(never)" configuration.
 
-| Configuration | Description |
-|---------------|-------------|
-| never | Require no updates to the table have a commit timestamp. |
-| mixed_mode | Allow updates both with and without a commit timestamp. Each update must have a commit timestamp at or after the previous update, or no timestamp at all. |
-
-The WT_SESSION::create \c "assert(read_timestamp)" configuration specifies
-that timestamps always or never be used on reads in the table.
+These requirements can be changed on a per-transaction basis, to permit updates
+without timestamps, after a key has already been updated using a timestamp,
+with the WT_SESSION::begin_transaction method's \c no_timestamp configuration.
+Updating a key without a commit timestamp, after making updates with a commit
+timestamp, will discard all prior historical values, and future reads will
+read the new value regardless of read timestamp. In other words, readers
+with already acquired snapshots will see prior historical values based
+on their timestamps. Readers acquiring a snapshot after the commit of the
+update without a timestamp will not see prior historical values regardless
+of their read timestamps.
 
 There are additional timestamp usage checks in diagnostic builds. While
 building in diagnostic mode to enable these usage checks will decrease

@@ -27,7 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # [TEST_TAGS]
-# transactions:mixed_mode_timestamps
 # verify:prepare
 # [END_TAGS]
 #
@@ -57,7 +56,7 @@ class test_timestamp18(wttest.WiredTigerTestCase):
 
     def test_ts_writes_with_non_ts_write(self):
         uri = 'table:test_timestamp18'
-        format = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
@@ -94,11 +93,13 @@ class test_timestamp18(wttest.WiredTigerTestCase):
         # accidentally destroy content from an adjacent key.
         for i in range(1, 10000):
             if i % 2 == 0:
+                self.session.begin_transaction('no_timestamp=true')
                 if self.delete:
                     cursor.set_key(self.get_key(i))
                     cursor.remove()
                 else:
                     cursor[self.get_key(i)] = value4
+                self.session.commit_transaction()
 
         self.session.checkpoint()
 

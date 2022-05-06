@@ -66,12 +66,11 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
         cfg_on = 'write_timestamp_usage=ordered'
         cfg_off = 'write_timestamp_usage=none'
 
-        # Create the table without the key consistency checking turned on.
-        # Create a few items breaking the rules.
+        # Create a few items with and without timestamps.
         # Then alter the setting and verify the inconsistent usage is detected.
         uri = 'file:assert06'
         self.session.create(uri,
-            'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format))
+            'key_format={},value_format={}'.format(self.key_format, self.value_format))
         c = self.session.open_cursor(uri)
 
         # Insert a data item at timestamp 2.
@@ -81,23 +80,23 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
         self.apply_timestamps(2, True)
         self.session.commit_transaction()
 
-        # Modify the data item at non timestamp, illegally moving the timestamp backward.
-        self.session.begin_transaction()
+        # Modify the data item without a timestamp.
+        self.session.begin_transaction('no_timestamp=true')
         c[key] = ds.value(2)
         self.session.commit_transaction()
 
-        # Insert a non-timestamped item.
-        # Then illegally modify with a timestamp.
-        # Then illegally modify without a timestamp.
+        # Insert an item without a timestamp.
+        # Then modify with a timestamp.
+        # Then modify without a timestamp.
         key = ds.key(2)
-        self.session.begin_transaction()
+        self.session.begin_transaction('no_timestamp=true')
         c[key] = ds.value(3)
         self.session.commit_transaction()
         self.session.begin_transaction()
         c[key] = ds.value(4)
         self.apply_timestamps(2, True)
         self.session.commit_transaction()
-        self.session.begin_transaction()
+        self.session.begin_transaction('no_timestamp=true')
         c[key] = ds.value(5)
         self.session.commit_transaction()
 
@@ -119,33 +118,6 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
         c[key] = ds.value(6)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(), self.msg_usage)
-
-        # Detect using a timestamp on a non-timestamp key. We must first use a non-timestamped
-        # operation on the key in order to violate the key consistency condition in the following
-        # transaction.
-        key = ds.key(4)
-        self.session.begin_transaction()
-        c[key] = ds.value(7)
-        self.session.commit_transaction()
-        self.session.begin_transaction()
-        c[key] = ds.value(8)
-        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
-
-        # Test to make sure that key consistency can be turned off after turning it on.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(4))
-        c.close()
-        self.session.alter(uri, cfg_off)
-        c = self.session.open_cursor(uri)
-
-        # Detection is off we can successfully change the same key with and without a timestamp.
-        key = ds.key(5)
-        self.session.begin_transaction()
-        c[key] = ds.value(9)
-        self.session.commit_transaction()
-        self.session.begin_transaction()
-        c[key] = ds.value(1)
-        self.apply_timestamps(6, True)
-        self.session.commit_transaction()
 
     def test_timestamp_usage(self):
         if wiredtiger.diagnostic_build():

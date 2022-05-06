@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_timestamp11.py
-#   Timestamps: mixed timestamp usage
+#   Timestamps: test that mixing transactions with and without timestamps behaves as expected.
 #
 
 from suite_subprocess import suite_subprocess
@@ -46,7 +46,7 @@ class test_timestamp11(wttest.WiredTigerTestCase, suite_subprocess):
     def test_timestamp_range(self):
         base = 'timestamp11'
         uri = 'file:' + base
-        format = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
 
         if self.key_format == 'r':
@@ -65,33 +65,27 @@ class test_timestamp11(wttest.WiredTigerTestCase, suite_subprocess):
             value5 = 'value5'
             valueNOTS = 'valueNOTS'
 
-        # Test that mixed timestamp usage where some transactions use timestamps
-        # and others don't behave in the expected way.
+        # Test that mixing transactions with and without timestamps behaves as expected.
 
         # Insert two data items at timestamp 2
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + self.timestamp_str(2))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(2))
         c[key] = value2
         c[key2] = value2
         self.session.commit_transaction()
         c.close()
 
-        #
-        # Modify one key without a timestamp and modify the other with a
-        # later timestamp.
-        #
+        # Modify one key without a timestamp and modify the other with a later timestamp.
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + self.timestamp_str(5))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(5))
         c[key] = value5
         self.session.commit_transaction()
         c.close()
 
         c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
+        self.session.begin_transaction('no_timestamp=true')
         c[key2] = valueNOTS
         self.session.commit_transaction()
         c.close()
@@ -126,14 +120,13 @@ class test_timestamp11(wttest.WiredTigerTestCase, suite_subprocess):
         #
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + self.timestamp_str(5))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(5))
         c[key2] = value5
         self.session.commit_transaction()
         c.close()
 
         c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
+        self.session.begin_transaction('no_timestamp=true')
         c[key] = valueNOTS
         self.session.commit_transaction()
         c.close()

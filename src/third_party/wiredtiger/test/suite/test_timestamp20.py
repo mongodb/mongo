@@ -30,7 +30,7 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 # test_timestamp20.py
-# Exercise fixing up of mixed mode updates in the history store.
+# Exercise fixing up of updates without timestamps in the history store.
 class test_timestamp20(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
 
@@ -47,7 +47,8 @@ class test_timestamp20(wttest.WiredTigerTestCase):
     def evict(self, uri):
         s = self.conn.open_session()
         s.begin_transaction()
-        # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
+        # Configure debug behavior on a cursor to evict the page positioned on when the reset API
+        # is used.
         evict_cursor = s.open_cursor(uri, None, "debug=(release_evict)")
         for i in range(1, 10000):
             evict_cursor.set_key(self.get_key(i))
@@ -59,7 +60,7 @@ class test_timestamp20(wttest.WiredTigerTestCase):
 
     def test_timestamp20_standard(self):
         uri = 'table:test_timestamp20'
-        format = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
@@ -96,13 +97,13 @@ class test_timestamp20(wttest.WiredTigerTestCase):
         old_reader_cursor = old_reader_session.open_cursor(uri)
         old_reader_session.begin_transaction('read_timestamp=' + self.timestamp_str(20))
 
-        # Now put two updates mixed mode. no timestamp will go to the history store and will trigger a
-        # correction to the existing contents.
+        # Now put two updates without timestamps; no timestamp will go to the history store and
+        # will trigger a correction to the existing contents.
         for i in range(1, 10000):
-            self.session.begin_transaction()
+            self.session.begin_transaction('no_timestamp=true')
             cursor[self.get_key(i)] = value4
             self.session.commit_transaction()
-            self.session.begin_transaction()
+            self.session.begin_transaction('no_timestamp=true')
             cursor[self.get_key(i)] = value5
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(40))
 
@@ -127,7 +128,7 @@ class test_timestamp20(wttest.WiredTigerTestCase):
             return
 
         uri = 'table:test_timestamp20'
-        format = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
@@ -171,10 +172,10 @@ class test_timestamp20(wttest.WiredTigerTestCase):
             self.assertEqual(cursor.modify([wiredtiger.Modify('D', 300, 1)]), 0)
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(40))
 
-        # Now put two updates mixed mode. no timestamp will go to the history store and will trigger a
-        # correction to the existing contents.
+        # Now put two updates without timestamps; no timestamp will go to the history store and will
+        # trigger a correction to the existing contents.
         for i in range(1, 10000):
-            self.session.begin_transaction()
+            self.session.begin_transaction('no_timestamp=true')
             cursor[self.get_key(i)] = value2
             self.session.commit_transaction()
             self.session.begin_transaction()

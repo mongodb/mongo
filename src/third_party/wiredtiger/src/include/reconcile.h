@@ -309,8 +309,8 @@ typedef struct {
 
     WT_TIME_WINDOW tw;
 
-    bool upd_saved;    /* An element on the row's update chain was saved */
-    bool mm_tombstone; /* Mixed mode tombstone */
+    bool upd_saved;       /* An element on the row's update chain was saved */
+    bool no_ts_tombstone; /* Tombstone without a timestamp */
 } WT_UPDATE_SELECT;
 
 /*

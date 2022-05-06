@@ -72,7 +72,7 @@ main(int argc, char *argv[])
     g.failpoint_hs_delete_key_from_ts = false;
     g.hs_checkpoint_timing_stress = g.reserved_txnid_timing_stress = false;
     g.checkpoint_slow_timing_stress = false;
-    g.mixed_mode_deletes = false;
+    g.no_ts_deletes = false;
     runs = 1;
     verify_only = false;
 
@@ -100,7 +100,7 @@ main(int argc, char *argv[])
             }
             break;
         case 'm':
-            g.mixed_mode_deletes = true;
+            g.no_ts_deletes = true;
             break;
         case 'n': /* operations */
             g.nops = (u_int)atoi(__wt_optarg);
@@ -587,8 +587,9 @@ static int
 usage(void)
 {
     fprintf(stderr,
-      "usage: %s [-C wiredtiger-config] [-c checkpoint] [-h home] [-k keys]\n\t[-l log] [-m] "
-      "[-n ops] [-r runs] [-s 1|2|3|4|5] [-T table-config] [-t f|r|v]\n\t[-W workers]\n",
+      "usage: %s\n"
+      "    [-DmpvXx] [-C wiredtiger-config] [-c checkpoint] [-h home] [-k keys] [-l log]\n"
+      "    [-n ops] [-r runs] [-s 1|2|3|4|5] [-T table-config] [-t f|r|v] [-W workers]\n",
       progname);
     fprintf(stderr, "%s",
       "\t-C specify wiredtiger_open configuration arguments\n"
@@ -597,7 +598,7 @@ usage(void)
       "\t-h set a database home directory\n"
       "\t-k set number of keys to load\n"
       "\t-l specify a log file\n"
-      "\t-m run with mixed mode delete operations\n"
+      "\t-m perform delete operations without timestamps\n"
       "\t-n set number of operations each thread does\n"
       "\t-p use prepare\n"
       "\t-r set number of runs (0 for continuous)\n"
@@ -611,7 +612,7 @@ usage(void)
       "\t-t set a file type ( col | mix | row | lsm )\n"
       "\t-v verify only\n"
       "\t-W set number of worker threads\n"
-      "\t-x use timestamps\n"
-      "\t-X race timestamp updates with checkpoints\n");
+      "\t-X race timestamp updates with checkpoints\n"
+      "\t-x use timestamps\n");
     return (EXIT_FAILURE);
 }

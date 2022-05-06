@@ -1051,9 +1051,9 @@ struct __wt_session {
 	 * defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;read_timestamp, check timestamps are \c
 	 * always or \c never used on reads with this table\, writing an error message if policy is
-	 * violated.  If the library was built in diagnostic mode\, drop core at the failing check.
-	 * Should be set to \c none if mixed read use is allowed., a string\, chosen from the
-	 * following options: \c "always"\, \c "never"\, \c "none"; default \c none.}
+	 * violated.  If the library was built in diagnostic mode\, drop core at the failing check.,
+	 * a string\, chosen from the following options: \c "always"\, \c "never"\, \c "none";
+	 * default \c none.}
 	 * @config{ ),,}
 	 * @config{cache_resident, do not ever evict the object's pages from cache.  Not compatible
 	 * with LSM tables; see @ref tuning_cache_resident for more information., a boolean flag;
@@ -1074,16 +1074,13 @@ struct __wt_session {
 	 * @config{readonly, the file is read-only.  All methods that may modify a file are
 	 * disabled.  See @ref readonly for more information., a boolean flag; default \c false.}
 	 * @config{write_timestamp_usage, describe how timestamps are expected to be used on table
-	 * modifications.  This option should be used in conjunction with the corresponding \c
-	 * write_timestamp configuration under the \c assert option to provide errors and assertions
-	 * for incorrect timestamp usage.  The choices are the default\, which ensures that once
-	 * timestamps are used for a key\, they are always used\, and also that multiple updates to
-	 * a key never use decreasing timestamps\, \c mixed_mode\, which additionally allows updates
-	 * with no timestamp even after timestamps are first used\, and \c never which enforces that
-	 * timestamps are never used for a table.  (The \c always\, \c key_consistent and \c ordered
-	 * choices should not be used\, and are retained for backward compatibility.)., a string\,
-	 * chosen from the following options: \c "always"\, \c "key_consistent"\, \c "mixed_mode"\,
-	 * \c "never"\, \c "none"\, \c "ordered"; default \c none.}
+	 * modifications.  The choices are the default\, which ensures that once timestamps are used
+	 * for a key\, they are always used\, and also that multiple updates to a key never use
+	 * decreasing timestamps and \c never which enforces that timestamps are never used for a
+	 * table.  (The \c always\, \c key_consistent\, \c mixed_mode and \c ordered choices should
+	 * not be used\, and are retained for backward compatibility.)., a string\, chosen from the
+	 * following options: \c "always"\, \c "key_consistent"\, \c "mixed_mode"\, \c "never"\, \c
+	 * "none"\, \c "ordered"; default \c none.}
 	 * @configend
 	 * @ebusy_errors
 	 */
@@ -1118,9 +1115,9 @@ struct __wt_session {
 	 * defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;read_timestamp, check timestamps are \c
 	 * always or \c never used on reads with this table\, writing an error message if policy is
-	 * violated.  If the library was built in diagnostic mode\, drop core at the failing check.
-	 * Should be set to \c none if mixed read use is allowed., a string\, chosen from the
-	 * following options: \c "always"\, \c "never"\, \c "none"; default \c none.}
+	 * violated.  If the library was built in diagnostic mode\, drop core at the failing check.,
+	 * a string\, chosen from the following options: \c "always"\, \c "never"\, \c "none";
+	 * default \c none.}
 	 * @config{ ),,}
 	 * @config{block_allocation, configure block allocation.  Permitted values are \c "best" or
 	 * \c "first"; the \c "best" configuration uses a best-fit algorithm\, the \c "first"
@@ -1350,16 +1347,13 @@ struct __wt_session {
 	 * 't' are bitfields\, and when configured with record number type keys\, will be stored
 	 * using a fixed-length store., a format string; default \c u.}
 	 * @config{write_timestamp_usage, describe how timestamps are expected to be used on table
-	 * modifications.  This option should be used in conjunction with the corresponding \c
-	 * write_timestamp configuration under the \c assert option to provide errors and assertions
-	 * for incorrect timestamp usage.  The choices are the default\, which ensures that once
-	 * timestamps are used for a key\, they are always used\, and also that multiple updates to
-	 * a key never use decreasing timestamps\, \c mixed_mode\, which additionally allows updates
-	 * with no timestamp even after timestamps are first used\, and \c never which enforces that
-	 * timestamps are never used for a table.  (The \c always\, \c key_consistent and \c ordered
-	 * choices should not be used\, and are retained for backward compatibility.)., a string\,
-	 * chosen from the following options: \c "always"\, \c "key_consistent"\, \c "mixed_mode"\,
-	 * \c "never"\, \c "none"\, \c "ordered"; default \c none.}
+	 * modifications.  The choices are the default\, which ensures that once timestamps are used
+	 * for a key\, they are always used\, and also that multiple updates to a key never use
+	 * decreasing timestamps and \c never which enforces that timestamps are never used for a
+	 * table.  (The \c always\, \c key_consistent\, \c mixed_mode and \c ordered choices should
+	 * not be used\, and are retained for backward compatibility.)., a string\, chosen from the
+	 * following options: \c "always"\, \c "key_consistent"\, \c "mixed_mode"\, \c "never"\, \c
+	 * "none"\, \c "ordered"; default \c none.}
 	 * @configend
 	 * @errors
 	 */
@@ -1693,6 +1687,9 @@ struct __wt_session {
 	 * \c "read-committed"\, \c "snapshot"; default empty.}
 	 * @config{name, name of the transaction for tracing and debugging., a string; default
 	 * empty.}
+	 * @config{no_timestamp, allow a commit without a timestamp\, creating a value that has
+	 * "always existed" and is visible regardless of timestamp.  See @ref timestamp_txn_api., a
+	 * boolean flag; default \c false.}
 	 * @config{operation_timeout_ms, when non-zero\, a requested limit on the time taken to
 	 * complete operations in this transaction.  Time is measured in real time milliseconds from
 	 * the start of each WiredTiger API call.  There is no guarantee any operation will not take
@@ -5309,25 +5306,26 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! cache: eviction empty score */
 #define	WT_STAT_CONN_CACHE_EVICTION_EMPTY_SCORE		1063
 /*!
- * cache: eviction gave up due to detecting a mixed mode on disk value
- * behind the last update on the chain
+ * cache: eviction gave up due to detecting a disk value without a
+ * timestamp behind the last update on the chain
  */
-#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_MM_CHECKPOINT_RACE_1	1064
+#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_NO_TS_CHECKPOINT_RACE_1	1064
 /*!
- * cache: eviction gave up due to detecting a mixed mode tombstone ahead
- * of the selected on disk update
+ * cache: eviction gave up due to detecting a tombstone without a
+ * timestamp ahead of the selected on disk update
  */
-#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_MM_CHECKPOINT_RACE_2	1065
+#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_NO_TS_CHECKPOINT_RACE_2	1065
 /*!
- * cache: eviction gave up due to detecting a mixed mode tombstone ahead
- * of the selected on disk update after validating the update chain
+ * cache: eviction gave up due to detecting a tombstone without a
+ * timestamp ahead of the selected on disk update after validating the
+ * update chain
  */
-#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_MM_CHECKPOINT_RACE_3	1066
+#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_NO_TS_CHECKPOINT_RACE_3	1066
 /*!
- * cache: eviction gave up due to detecting mixed mode timestamps on the
- * update chain after the selected on disk update
+ * cache: eviction gave up due to detecting update chain entries without
+ * timestamps after the selected on disk update
  */
-#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_MM_CHECKPOINT_RACE_4	1067
+#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_NO_TS_CHECKPOINT_RACE_4	1067
 /*! cache: eviction passes of a file */
 #define	WT_STAT_CONN_CACHE_EVICTION_WALK_PASSES		1068
 /*! cache: eviction server candidate queue empty when topping up */
@@ -5464,46 +5462,46 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_HS_INSERT_RESTART		1119
 /*! cache: history store table max on-disk size */
 #define	WT_STAT_CONN_CACHE_HS_ONDISK_MAX		1120
-/*!
- * cache: history store table mixed mode resolved updates that lose their
- * durable timestamp
- */
-#define	WT_STAT_CONN_CACHE_HS_ORDER_LOSE_DURABLE_TIMESTAMP	1121
-/*!
- * cache: history store table mixed mode updates that were fixed up by
- * reinserting with the fixed timestamp
- */
-#define	WT_STAT_CONN_CACHE_HS_ORDER_REINSERT		1122
 /*! cache: history store table on-disk size */
-#define	WT_STAT_CONN_CACHE_HS_ONDISK			1123
+#define	WT_STAT_CONN_CACHE_HS_ONDISK			1121
 /*! cache: history store table reads */
-#define	WT_STAT_CONN_CACHE_HS_READ			1124
+#define	WT_STAT_CONN_CACHE_HS_READ			1122
 /*! cache: history store table reads missed */
-#define	WT_STAT_CONN_CACHE_HS_READ_MISS			1125
+#define	WT_STAT_CONN_CACHE_HS_READ_MISS			1123
 /*! cache: history store table reads requiring squashed modifies */
-#define	WT_STAT_CONN_CACHE_HS_READ_SQUASH		1126
+#define	WT_STAT_CONN_CACHE_HS_READ_SQUASH		1124
+/*!
+ * cache: history store table resolved updates without timestamps that
+ * lose their durable timestamp
+ */
+#define	WT_STAT_CONN_CACHE_HS_ORDER_LOSE_DURABLE_TIMESTAMP	1125
 /*!
  * cache: history store table truncation by rollback to stable to remove
  * an unstable update
  */
-#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE_RTS_UNSTABLE	1127
+#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE_RTS_UNSTABLE	1126
 /*!
  * cache: history store table truncation by rollback to stable to remove
  * an update
  */
-#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE_RTS		1128
+#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE_RTS		1127
 /*! cache: history store table truncation to remove an update */
-#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE		1129
+#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE		1128
+/*!
+ * cache: history store table truncation to remove range of updates due
+ * to an update without a timestamp on data page
+ */
+#define	WT_STAT_CONN_CACHE_HS_ORDER_REMOVE		1129
 /*!
  * cache: history store table truncation to remove range of updates due
  * to key being removed from the data page during reconciliation
  */
 #define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE_ONPAGE_REMOVAL	1130
 /*!
- * cache: history store table truncation to remove range of updates due
- * to mixed mode timestamp update on data page
+ * cache: history store table updates without timestamps fixed up by
+ * reinserting with the fixed timestamp
  */
-#define	WT_STAT_CONN_CACHE_HS_ORDER_REMOVE		1131
+#define	WT_STAT_CONN_CACHE_HS_ORDER_REINSERT		1131
 /*! cache: history store table writes requiring squashed modifies */
 #define	WT_STAT_CONN_CACHE_HS_WRITE_SQUASH		1132
 /*! cache: in-memory page passed criteria to be split */
@@ -5583,9 +5581,9 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_EVICTION_FAIL_IN_RECONCILIATION	1165
 /*!
  * cache: pages selected for eviction unable to be evicted because of
- * race between checkpoint and mixed mode timestamps handling
+ * race between checkpoint and updates without timestamps
  */
-#define	WT_STAT_CONN_CACHE_EVICTION_FAIL_CHECKPOINT_MM_TS	1166
+#define	WT_STAT_CONN_CACHE_EVICTION_FAIL_CHECKPOINT_NO_TS	1166
 /*! cache: pages walked for eviction */
 #define	WT_STAT_CONN_CACHE_EVICTION_WALK		1167
 /*! cache: pages written from cache */
@@ -6572,25 +6570,26 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! cache: data source pages selected for eviction unable to be evicted */
 #define	WT_STAT_DSRC_CACHE_EVICTION_FAIL		2051
 /*!
- * cache: eviction gave up due to detecting a mixed mode on disk value
- * behind the last update on the chain
+ * cache: eviction gave up due to detecting a disk value without a
+ * timestamp behind the last update on the chain
  */
-#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_MM_CHECKPOINT_RACE_1	2052
+#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_NO_TS_CHECKPOINT_RACE_1	2052
 /*!
- * cache: eviction gave up due to detecting a mixed mode tombstone ahead
- * of the selected on disk update
+ * cache: eviction gave up due to detecting a tombstone without a
+ * timestamp ahead of the selected on disk update
  */
-#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_MM_CHECKPOINT_RACE_2	2053
+#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_NO_TS_CHECKPOINT_RACE_2	2053
 /*!
- * cache: eviction gave up due to detecting a mixed mode tombstone ahead
- * of the selected on disk update after validating the update chain
+ * cache: eviction gave up due to detecting a tombstone without a
+ * timestamp ahead of the selected on disk update after validating the
+ * update chain
  */
-#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_MM_CHECKPOINT_RACE_3	2054
+#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_NO_TS_CHECKPOINT_RACE_3	2054
 /*!
- * cache: eviction gave up due to detecting mixed mode timestamps on the
- * update chain after the selected on disk update
+ * cache: eviction gave up due to detecting update chain entries without
+ * timestamps after the selected on disk update
  */
-#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_MM_CHECKPOINT_RACE_4	2055
+#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_NO_TS_CHECKPOINT_RACE_4	2055
 /*! cache: eviction walk passes of a file */
 #define	WT_STAT_DSRC_CACHE_EVICTION_WALK_PASSES		2056
 /*! cache: eviction walk target pages histogram - 0-9 */
@@ -6636,44 +6635,44 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_CACHE_HS_INSERT			2072
 /*! cache: history store table insert calls that returned restart */
 #define	WT_STAT_DSRC_CACHE_HS_INSERT_RESTART		2073
-/*!
- * cache: history store table mixed mode resolved updates that lose their
- * durable timestamp
- */
-#define	WT_STAT_DSRC_CACHE_HS_ORDER_LOSE_DURABLE_TIMESTAMP	2074
-/*!
- * cache: history store table mixed mode updates that were fixed up by
- * reinserting with the fixed timestamp
- */
-#define	WT_STAT_DSRC_CACHE_HS_ORDER_REINSERT		2075
 /*! cache: history store table reads */
-#define	WT_STAT_DSRC_CACHE_HS_READ			2076
+#define	WT_STAT_DSRC_CACHE_HS_READ			2074
 /*! cache: history store table reads missed */
-#define	WT_STAT_DSRC_CACHE_HS_READ_MISS			2077
+#define	WT_STAT_DSRC_CACHE_HS_READ_MISS			2075
 /*! cache: history store table reads requiring squashed modifies */
-#define	WT_STAT_DSRC_CACHE_HS_READ_SQUASH		2078
+#define	WT_STAT_DSRC_CACHE_HS_READ_SQUASH		2076
+/*!
+ * cache: history store table resolved updates without timestamps that
+ * lose their durable timestamp
+ */
+#define	WT_STAT_DSRC_CACHE_HS_ORDER_LOSE_DURABLE_TIMESTAMP	2077
 /*!
  * cache: history store table truncation by rollback to stable to remove
  * an unstable update
  */
-#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE_RTS_UNSTABLE	2079
+#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE_RTS_UNSTABLE	2078
 /*!
  * cache: history store table truncation by rollback to stable to remove
  * an update
  */
-#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE_RTS		2080
+#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE_RTS		2079
 /*! cache: history store table truncation to remove an update */
-#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE		2081
+#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE		2080
+/*!
+ * cache: history store table truncation to remove range of updates due
+ * to an update without a timestamp on data page
+ */
+#define	WT_STAT_DSRC_CACHE_HS_ORDER_REMOVE		2081
 /*!
  * cache: history store table truncation to remove range of updates due
  * to key being removed from the data page during reconciliation
  */
 #define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE_ONPAGE_REMOVAL	2082
 /*!
- * cache: history store table truncation to remove range of updates due
- * to mixed mode timestamp update on data page
+ * cache: history store table updates without timestamps fixed up by
+ * reinserting with the fixed timestamp
  */
-#define	WT_STAT_DSRC_CACHE_HS_ORDER_REMOVE		2083
+#define	WT_STAT_DSRC_CACHE_HS_ORDER_REINSERT		2083
 /*! cache: history store table writes requiring squashed modifies */
 #define	WT_STAT_DSRC_CACHE_HS_WRITE_SQUASH		2084
 /*! cache: in-memory page passed criteria to be split */

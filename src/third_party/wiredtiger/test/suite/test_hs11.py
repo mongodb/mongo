@@ -60,7 +60,7 @@ class test_hs11(wttest.WiredTigerTestCase):
 
     def test_non_ts_updates_clears_hs(self):
         uri = 'table:test_hs11'
-        create_params = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
+        create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 
         if self.value_format == '8t':
@@ -86,12 +86,14 @@ class test_hs11(wttest.WiredTigerTestCase):
 
         # Apply an update without timestamp.
         for i in range(1, self.nrows):
+            self.session.begin_transaction('no_timestamp=true')
             if i % 2 == 0:
                 if self.update_type == 'deletion':
                     cursor.set_key(self.create_key(i))
                     cursor.remove()
                 else:
                     cursor[self.create_key(i)] = value2
+            self.session.commit_transaction()
 
         # Reconcile and remove the obsolete entries.
         self.session.checkpoint()

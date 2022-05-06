@@ -161,11 +161,11 @@ modify_build(WT_MODIFY *entries, int *nentriesp, u_int seed)
 }
 
 /*
- * worker_mm_delete --
- *     Delete a key with a mixed mode timestamp.
+ * worker_no_ts_delete --
+ *     Delete a key without setting a timestamp.
  */
 static inline int
-worker_mm_delete(WT_CURSOR *cursor, uint64_t keyno)
+worker_no_ts_delete(WT_CURSOR *cursor, uint64_t keyno)
 {
     int ret;
 
@@ -375,10 +375,13 @@ real_worker(void)
         goto err;
     }
 
-    if (g.use_timestamps)
-        begin_cfg = "read_timestamp=1,roundup_timestamps=(read=true)";
-    else
-        begin_cfg = NULL;
+    begin_cfg = NULL;
+    if (g.use_timestamps) {
+        if (g.no_ts_deletes)
+            begin_cfg = "no_timestamp=true,read_timestamp=1,roundup_timestamps=(read=true)";
+        else
+            begin_cfg = "read_timestamp=1,roundup_timestamps=(read=true)";
+    }
 
     __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
 
@@ -399,10 +402,10 @@ real_worker(void)
         }
         keyno = __wt_random(&rnd) % g.nkeys + 1;
         /* If we have specified to run with mix mode deletes we need to do it in it's own txn. */
-        if (g.use_timestamps && g.mixed_mode_deletes && new_txn && __wt_random(&rnd) % 72 == 0) {
+        if (g.use_timestamps && g.no_ts_deletes && new_txn && __wt_random(&rnd) % 72 == 0) {
             new_txn = false;
             for (j = 0; j < g.ntables; j++) {
-                ret = worker_mm_delete(cursors[j], keyno);
+                ret = worker_no_ts_delete(cursors[j], keyno);
                 if (ret == WT_ROLLBACK || ret == WT_PREPARE_CONFLICT)
                     break;
                 else if (ret != 0)
@@ -411,12 +414,12 @@ real_worker(void)
 
             if (ret == 0) {
                 if ((ret = session->commit_transaction(session, NULL)) != 0) {
-                    (void)log_print_err("real_worker:commit_mm_transaction", ret, 1);
+                    (void)log_print_err("real_worker:commit_no_ts_transaction", ret, 1);
                     goto err;
                 }
             } else {
                 if ((ret = session->rollback_transaction(session, NULL)) != 0) {
-                    (void)log_print_err("real_worker:rollback_transaction", ret, 1);
+                    (void)log_print_err("real_worker:rollback_no_ts_transaction", ret, 1);
                     goto err;
                 }
             }

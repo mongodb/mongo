@@ -50,7 +50,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         # In the absence of prepared transactions, all_durable is identical to
         # all_committed so let's enforce the all_durable values instead.
         all_durable_uri = self.uri + '_all_durable'
-        format = 'key_format={},value_format={},write_timestamp_usage=mixed_mode'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         session1 = self.setUpSessionOpen(self.conn)
         session2 = self.setUpSessionOpen(self.conn)
         session1.create(all_durable_uri, format)
@@ -86,16 +86,14 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
 
         # As the original transaction is still running the all_durable
         # timestamp is being held at 1.
-        self.assertTimestampsEqual(
-            self.conn.query_timestamp('get=all_durable'), "1")
+        self.assertTimestampsEqual(self.conn.query_timestamp('get=all_durable'), "1")
         cur1[1] = 2
         session1.commit_transaction()
 
         # Now that the original transaction has finished the all_durable
         # timestamp has moved to 3, skipping 2 as there is a commit with
         # a greater timestamp already existing.
-        self.assertTimestampsEqual(
-            self.conn.query_timestamp('get=all_durable'), "3")
+        self.assertTimestampsEqual(self.conn.query_timestamp('get=all_durable'), "3")
 
         # Senario 3: Commit with a commit timestamp of 5 and then begin a
         # transaction intending to commit at 4, the all_durable timestamp
@@ -103,33 +101,29 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         session1.begin_transaction()
         cur1[1] = 3
         session1.commit_transaction('commit_timestamp=5')
-        self.assertTimestampsEqual(
-            self.conn.query_timestamp('get=all_durable'), "5")
+        self.assertTimestampsEqual(self.conn.query_timestamp('get=all_durable'), "5")
 
         session1.begin_transaction()
         # All committed will now move back to 3 as it is the point at which
         # all transactions up to that point have committed.
         session1.timestamp_transaction('commit_timestamp=4')
 
-        self.assertTimestampsEqual(
-            self.conn.query_timestamp('get=all_durable'), "3")
+        self.assertTimestampsEqual(self.conn.query_timestamp('get=all_durable'), "3")
 
         session1.commit_transaction()
 
         # Now that the transaction at timestamp 4 has completed the
         # all committed timestamp is back at 5.
-        self.assertTimestampsEqual(
-            self.conn.query_timestamp('get=all_durable'), "5")
+        self.assertTimestampsEqual(self.conn.query_timestamp('get=all_durable'), "5")
 
         # Scenario 4: Holding a transaction open without a commit timestamp
         # Will not affect the all_durable timestamp.
-        session1.begin_transaction()
+        session1.begin_transaction('no_timestamp=true')
         session2.begin_transaction()
         cur2[2] = 2
         session2.commit_transaction('commit_timestamp=6')
 
-        self.assertTimestampsEqual(
-            self.conn.query_timestamp('get=all_durable'), "6")
+        self.assertTimestampsEqual(self.conn.query_timestamp('get=all_durable'), "6")
         cur1[1] = 2
         session1.commit_transaction()
 

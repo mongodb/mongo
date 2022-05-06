@@ -33,7 +33,8 @@ from helper import simulate_crash_restart
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 
 # test_rollback_to_stable29.py
-# Test that the rollback to stable to verify the history store order when a mixed mode update inserted to a tombstone.
+# Test that the rollback to stable to verify the history store order when an update without a
+# timestamp inserted to a tombstone.
 class test_rollback_to_stable29(test_rollback_to_stable_base):
     conn_config = 'cache_size=5MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true)'
 
@@ -61,7 +62,7 @@ class test_rollback_to_stable29(test_rollback_to_stable_base):
             value_d = 'd' * 100
 
         # Create our table.
-        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format, config="write_timestamp_usage=mixed_mode")
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
         # Pin oldest and stable to timestamp 1.
@@ -89,7 +90,7 @@ class test_rollback_to_stable29(test_rollback_to_stable_base):
         self.check(value_c, uri, nrows, None, 50)
         self.evict_cursor(uri, nrows, value_c)
 
-        # Insert a mixed mode update.
+        # Insert update without a timestamp.
         self.large_updates(uri, value_d, ds, nrows, False, 0)
 
         self.check(value_d, uri, nrows, None, 10)

@@ -58,8 +58,7 @@ common_runtime_config = [
             check timestamps are \c always or \c never used on reads with
             this table, writing an error message if policy is violated.
             If the library was built in diagnostic mode, drop core at the
-            failing check. Should be set to \c none if mixed read use is
-            allowed''', choices=['always', 'never', 'none']),
+            failing check''', choices=['always', 'never', 'none']),
         Config('write_timestamp', 'off', r'''
             check timestamps are used consistently with the configured
             \c write_timestamp_usage option for this table, writing
@@ -71,16 +70,13 @@ common_runtime_config = [
         this option is no longer supported, retained for backward compatibility''',
         type='list', choices=['write_timestamp'], undoc=True),
     Config('write_timestamp_usage', 'none', r'''
-        describe how timestamps are expected to be used on table modifications. This option should
-        be used in conjunction with the corresponding \c write_timestamp configuration under the
-        \c assert option to provide errors and assertions for incorrect timestamp usage. The
-        choices are the default, which ensures that once timestamps are used for a key, they are
-        always used, and also that multiple updates to a key never use decreasing timestamps,
-        \c mixed_mode, which additionally allows updates with no timestamp even after timestamps
-        are first used, and \c never which enforces that timestamps are never used for a table.
-        (The \c always, \c key_consistent and \c ordered choices should not be used, and are
-        retained for backward compatibility.)''',
-        choices=['always', 'key_consistent', 'mixed_mode', 'never', 'none', 'ordered']),
+        describe how timestamps are expected to be used on table modifications.  The choices are
+        the default, which ensures that once timestamps are used for a key, they are always used,
+        and also that multiple updates to a key never use decreasing timestamps and \c never which
+        enforces that timestamps are never used for a table.  (The \c always, \c key_consistent,
+        \c mixed_mode and \c ordered choices should not be used, and are retained for backward
+        compatibility.)''', choices=['always', 'key_consistent', 'mixed_mode', 'never', 'none',
+        'ordered']),
 ]
 
 # Metadata shared by all schema objects
@@ -1735,6 +1731,10 @@ methods = {
         choices=['read-uncommitted', 'read-committed', 'snapshot']),
     Config('name', '', r'''
         name of the transaction for tracing and debugging'''),
+    Config('no_timestamp', 'false', r'''
+        allow a commit without a timestamp, creating a value that has "always existed" and is
+        visible regardless of timestamp. See @ref timestamp_txn_api''',
+        type='boolean'),
     Config('operation_timeout_ms', '0', r'''
         when non-zero, a requested limit on the time taken to complete operations in this
         transaction. Time is measured in real time milliseconds from the start of each WiredTiger

@@ -33,7 +33,7 @@ import wttest
 # occurs:
 # - The reconciliation process opens one history store cursor.
 # - The function hs_delete_reinsert_from_pos creates a history store cursor too. This means we need
-# an update with an mixed mode timestamp which is not globally visible to trigger that function.
+# an update without a timestamp which is not globally visible to trigger that function.
 # - The function wt_rec_hs_clear_on_tombstone creates a history store cursor as well. This means we
 # need a tombstone to trigger the function, i.e a deleted key.
 class test_hs29(wttest.WiredTigerTestCase):
@@ -42,7 +42,7 @@ class test_hs29(wttest.WiredTigerTestCase):
 
         # Create a table.
         uri = "table:test_hs_cursor"
-        self.session.create(uri, 'key_format=S,value_format=S,write_timestamp_usage=mixed_mode')
+        self.session.create(uri, 'key_format=S,value_format=S')
 
         # Pin oldest and stable to timestamp 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
@@ -84,14 +84,14 @@ class test_hs29(wttest.WiredTigerTestCase):
         old_reader_cursor = old_reader_session.open_cursor(uri)
         old_reader_session.begin_transaction('read_timestamp=' + self.timestamp_str(2))
 
-        # Remove the first key without giving a ts.
-        self.session.begin_transaction()
+        # Remove the first key without a timestamp.
+        self.session.begin_transaction('no_timestamp=true')
         cursor.set_key('1')
         cursor.remove()
         self.session.commit_transaction()
 
-        # Update the second key with mixed mode timestamp.
-        self.session.begin_transaction()
+        # Update the second key without a timestamp.
+        self.session.begin_transaction('no_timestamp=true')
         cursor['2'] = '222'
         self.session.commit_transaction()
 
