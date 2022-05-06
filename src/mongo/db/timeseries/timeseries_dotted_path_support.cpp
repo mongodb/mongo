@@ -37,6 +37,8 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/util/ctype.h"
 
@@ -58,93 +60,130 @@ boost::optional<std::pair<StringData, StringData>> _splitPath(StringData path) {
     return std::make_pair(left, next);
 }
 
-template <typename BSONElementColl>
-void _extractAllElementsAlongBucketPath(const BSONObj& obj,
-                                        StringData path,
-                                        BSONElementColl& elements,
-                                        bool expandArrayOnTrailingField,
-                                        BSONDepthIndex depth,
-                                        MultikeyComponents* arrayComponents) {
-    auto handleElement = [&](BSONElement elem, StringData path) -> void {
-        if (elem.eoo()) {
-            size_t idx = path.find('.');
-            if (idx != std::string::npos) {
-                invariant(depth != std::numeric_limits<BSONDepthIndex>::max());
-                StringData left = path.substr(0, idx);
-                StringData next = path.substr(idx + 1, path.size());
+void _handleElementForExtractAllElementsOnBucketPath(const BSONObj& obj,
+                                                     BSONElement elem,
+                                                     StringData path,
+                                                     BSONElementSet& elements,
+                                                     bool expandArrayOnTrailingField,
+                                                     BSONDepthIndex depth,
+                                                     MultikeyComponents* arrayComponents) {
+    if (elem.eoo()) {
+        size_t idx = path.find('.');
+        if (idx != std::string::npos) {
+            invariant(depth != std::numeric_limits<BSONDepthIndex>::max());
+            StringData left = path.substr(0, idx);
+            StringData next = path.substr(idx + 1, path.size());
 
-                BSONElement e = obj.getField(left);
+            BSONElement e = obj.getField(left);
 
-                if (e.type() == Object) {
-                    _extractAllElementsAlongBucketPath(e.embeddedObject(),
-                                                       next,
-                                                       elements,
-                                                       expandArrayOnTrailingField,
-                                                       depth + 1,
-                                                       arrayComponents);
-                } else if (e.type() == Array) {
-                    bool allDigits = false;
-                    if (next.size() > 0 && ctype::isDigit(next[0])) {
-                        unsigned temp = 1;
-                        while (temp < next.size() && ctype::isDigit(next[temp]))
-                            temp++;
-                        allDigits = temp == next.size() || next[temp] == '.';
-                    }
-                    if (allDigits) {
-                        _extractAllElementsAlongBucketPath(e.embeddedObject(),
-                                                           next,
-                                                           elements,
-                                                           expandArrayOnTrailingField,
-                                                           depth + 1,
-                                                           arrayComponents);
-                    } else {
-                        BSONObjIterator i(e.embeddedObject());
-                        while (i.more()) {
-                            BSONElement e2 = i.next();
-                            if (e2.type() == Object || e2.type() == Array)
-                                _extractAllElementsAlongBucketPath(e2.embeddedObject(),
-                                                                   next,
-                                                                   elements,
-                                                                   expandArrayOnTrailingField,
-                                                                   depth + 1,
-                                                                   arrayComponents);
-                        }
-                        if (arrayComponents) {
-                            arrayComponents->insert(depth);
-                        }
-                    }
+            if (e.type() == Object) {
+                BSONObj embedded = e.embeddedObject();
+                _handleElementForExtractAllElementsOnBucketPath(embedded,
+                                                                embedded.getField(next),
+                                                                next,
+                                                                elements,
+                                                                expandArrayOnTrailingField,
+                                                                depth + 1,
+                                                                arrayComponents);
+            } else if (e.type() == Array) {
+                bool allDigits = false;
+                if (next.size() > 0 && ctype::isDigit(next[0])) {
+                    unsigned temp = 1;
+                    while (temp < next.size() && ctype::isDigit(next[temp]))
+                        temp++;
+                    allDigits = temp == next.size() || next[temp] == '.';
+                }
+                if (allDigits) {
+                    BSONObj embedded = e.embeddedObject();
+                    _handleElementForExtractAllElementsOnBucketPath(embedded,
+                                                                    embedded.getField(next),
+                                                                    next,
+                                                                    elements,
+                                                                    expandArrayOnTrailingField,
+                                                                    depth + 1,
+                                                                    arrayComponents);
                 } else {
-                    // do nothing: no match
-                }
-            }
-        } else {
-            if (elem.type() == Array && expandArrayOnTrailingField) {
-                BSONObjIterator i(elem.embeddedObject());
-                while (i.more()) {
-                    elements.insert(i.next());
-                }
-                if (arrayComponents) {
-                    arrayComponents->insert(depth);
+                    BSONObjIterator i(e.embeddedObject());
+                    while (i.more()) {
+                        BSONElement e2 = i.next();
+                        if (e2.type() == Object || e2.type() == Array) {
+                            BSONObj embedded = e2.embeddedObject();
+                            _handleElementForExtractAllElementsOnBucketPath(
+                                embedded,
+                                embedded.getField(next),
+                                next,
+                                elements,
+                                expandArrayOnTrailingField,
+                                depth + 1,
+                                arrayComponents);
+                        }
+                    }
+                    if (arrayComponents) {
+                        arrayComponents->insert(depth);
+                    }
                 }
             } else {
-                elements.insert(elem);
+                // do nothing: no match
             }
         }
-    };
+    } else {
+        if (elem.type() == Array && expandArrayOnTrailingField) {
+            BSONObjIterator i(elem.embeddedObject());
+            while (i.more()) {
+                elements.insert(i.next());
+            }
+            if (arrayComponents) {
+                arrayComponents->insert(depth);
+            }
+        } else {
+            elements.insert(elem);
+        }
+    }
+}
 
+boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
+    const BSONObj& obj,
+    StringData path,
+    BSONElementSet& elements,
+    bool expandArrayOnTrailingField,
+    bool isCompressed,
+    BSONDepthIndex depth,
+    MultikeyComponents* arrayComponents) {
     switch (depth) {
         case 0:
         case 1: {
             if (auto res = _splitPath(path)) {
                 auto& [left, next] = *res;
                 BSONElement e = obj.getField(left);
-                if (e.type() == Object && (depth > 0 || left == timeseries::kBucketDataFieldName)) {
-                    _extractAllElementsAlongBucketPath(e.embeddedObject(),
-                                                       next,
-                                                       elements,
-                                                       expandArrayOnTrailingField,
-                                                       depth + 1,
-                                                       arrayComponents);
+                if (depth > 0 || left == timeseries::kBucketDataFieldName) {
+                    if (e.type() == Object) {
+                        return _extractAllElementsAlongBucketPath(e.embeddedObject(),
+                                                                  next,
+                                                                  elements,
+                                                                  expandArrayOnTrailingField,
+                                                                  isCompressed,
+                                                                  depth + 1,
+                                                                  arrayComponents);
+                    } else if (isCompressed && e.type() == BinData) {
+                        // Unbucketing magic happens here for nested measurement fields (i.e.
+                        // data.a.b) in compressed buckets.
+                        BSONColumn storage{e};
+                        for (const BSONElement& e2 : storage) {
+                            if (!e2.eoo()) {
+                                BSONObj embedded =
+                                    e2.isABSONObj() ? e2.embeddedObject() : BSONObj();
+                                _handleElementForExtractAllElementsOnBucketPath(
+                                    embedded,
+                                    embedded.getField(next),
+                                    next,
+                                    elements,
+                                    expandArrayOnTrailingField,
+                                    depth,
+                                    arrayComponents);
+                            }
+                        }
+                        return std::move(storage);
+                    }
                 }
             } else {
                 BSONElement e = obj.getField(path);
@@ -153,32 +192,55 @@ void _extractAllElementsAlongBucketPath(const BSONObj& obj,
                                                        StringData(),
                                                        elements,
                                                        expandArrayOnTrailingField,
+                                                       isCompressed,
                                                        depth + 1,
                                                        arrayComponents);
+                } else if (isCompressed && BinData == e.type()) {
+                    // Unbucketing magic happens here for top-level measurement fields (i.e. data.a)
+                    // in compressed buckets.
+                    invariant(depth == 1);
+                    BSONColumn storage{e};
+                    for (const BSONElement& e2 : storage) {
+                        if (!e2.eoo()) {
+                            BSONObj embedded = e2.isABSONObj() ? e2.embeddedObject() : BSONObj();
+                            _handleElementForExtractAllElementsOnBucketPath(
+                                embedded,
+                                e2,
+                                ""_sd,
+                                elements,
+                                expandArrayOnTrailingField,
+                                depth,
+                                arrayComponents);
+                        }
+                    }
+                    return std::move(storage);
                 }
             }
             break;
         }
         case 2: {
-            // Unbucketing magic happens here.
+            // Unbucketing magic happens here for uncompressed buckets.
+            invariant(!isCompressed);
             for (const BSONElement& e : obj) {
                 std::string subPath = e.fieldName();
                 if (!path.empty()) {
                     subPath.append("." + path);
                 }
-                BSONElement sub = obj.getField(subPath);
-                handleElement(sub, subPath);
+                _handleElementForExtractAllElementsOnBucketPath(obj,
+                                                                obj.getField(subPath),
+                                                                subPath,
+                                                                elements,
+                                                                expandArrayOnTrailingField,
+                                                                depth,
+                                                                arrayComponents);
             }
             break;
         }
-        default: {
-            BSONElement e = obj.getField(path);
-            handleElement(e, path);
-            break;
-        }
+        default: { MONGO_UNREACHABLE; }
     }
-}
 
+    return boost::none;
+}
 
 bool _haveArrayAlongBucketDataPath(const BSONObj& obj, StringData path, BSONDepthIndex depth);
 
@@ -198,7 +260,9 @@ bool _handleElementForHaveArrayAlongBucketDataPath(const BSONObj& obj,
             BSONElement e = obj.getField(left);
 
             if (e.type() == Object) {
-                return _haveArrayAlongBucketDataPath(e.embeddedObject(), next, depth + 1);
+                auto embedded = e.embeddedObject();
+                return _handleElementForHaveArrayAlongBucketDataPath(
+                    embedded, embedded.getField(next), next, depth + 1);
             } else if (e.type() == Array) {
                 return true;
             } else {
@@ -214,27 +278,56 @@ bool _handleElementForHaveArrayAlongBucketDataPath(const BSONObj& obj,
     return false;
 }
 
-bool _haveArrayAlongBucketDataPath(const BSONObj& obj, StringData path, BSONDepthIndex depth) {
+bool _haveArrayAlongBucketDataPath(const BSONObj& obj,
+                                   StringData path,
+                                   bool isCompressed,
+                                   BSONDepthIndex depth) {
     switch (depth) {
         case 0:
         case 1: {
             if (auto res = _splitPath(path)) {
                 auto& [left, next] = *res;
                 BSONElement e = obj.getField(left);
-                if (e.type() == Object && (depth > 0 || left == timeseries::kBucketDataFieldName)) {
-                    return _haveArrayAlongBucketDataPath(e.embeddedObject(), next, depth + 1);
+                if (depth > 0 || left == timeseries::kBucketDataFieldName) {
+                    if (e.type() == Object) {
+                        return _haveArrayAlongBucketDataPath(
+                            e.embeddedObject(), next, isCompressed, depth + 1);
+                    } else if (isCompressed && BinData == e.type()) {
+                        // Unbucketing magic happens here for nested measurement fields (i.e.
+                        // data.a.b) in compressed buckets.
+                        BSONColumn column{e};
+                        for (const BSONElement& e2 : column) {
+                            BSONObj embedded = e2.isABSONObj() ? e2.embeddedObject() : BSONObj();
+                            const bool foundArray = _handleElementForHaveArrayAlongBucketDataPath(
+                                embedded, embedded.getField(next), next, depth);
+                            if (foundArray) {
+                                return foundArray;
+                            }
+                        }
+                    }
                 }
             } else {
                 BSONElement e = obj.getField(path);
                 if (Object == e.type()) {
                     return _haveArrayAlongBucketDataPath(
-                        e.embeddedObject(), StringData(), depth + 1);
+                        e.embeddedObject(), StringData(), isCompressed, depth + 1);
+                } else if (BinData == e.type()) {
+                    // Unbucketing magic happens here for top-level measurement fields (i.e. data.a)
+                    // in compressed buckets.
+                    invariant(isCompressed && depth == 1);
+                    BSONColumn column{e};
+                    for (const BSONElement& e2 : column) {
+                        if (e2.type() == Array) {
+                            return true;
+                        }
+                    }
                 }
             }
             return false;
         }
         case 2: {
-            // Unbucketing magic happens here.
+            // Unbucketing magic happens here for uncompressed buckets.
+            invariant(!isCompressed);
             for (const BSONElement& e : obj) {
                 std::string subPath = e.fieldName();
                 if (!path.empty()) {
@@ -367,24 +460,20 @@ Decision _fieldContainsArrayData(const BSONObj& min, const BSONObj& max, StringD
 
 }  // namespace
 
-void extractAllElementsAlongBucketPath(const BSONObj& obj,
-                                       StringData path,
-                                       BSONElementSet& elements,
-                                       bool expandArrayOnTrailingField,
-                                       MultikeyComponents* arrayComponents) {
+boost::optional<BSONColumn> extractAllElementsAlongBucketPath(const BSONObj& obj,
+                                                              StringData path,
+                                                              BSONElementSet& elements,
+                                                              bool expandArrayOnTrailingField,
+                                                              MultikeyComponents* arrayComponents) {
     constexpr BSONDepthIndex initialDepth = 0;
-    _extractAllElementsAlongBucketPath(
-        obj, path, elements, expandArrayOnTrailingField, initialDepth, arrayComponents);
-}
-
-void extractAllElementsAlongBucketPath(const BSONObj& obj,
-                                       StringData path,
-                                       BSONElementMultiSet& elements,
-                                       bool expandArrayOnTrailingField,
-                                       MultikeyComponents* arrayComponents) {
-    constexpr BSONDepthIndex initialDepth = 0;
-    _extractAllElementsAlongBucketPath(
-        obj, path, elements, expandArrayOnTrailingField, initialDepth, arrayComponents);
+    const bool isCompressed = timeseries::isCompressedBucket(obj);
+    return _extractAllElementsAlongBucketPath(obj,
+                                              path,
+                                              elements,
+                                              expandArrayOnTrailingField,
+                                              isCompressed,
+                                              initialDepth,
+                                              arrayComponents);
 }
 
 bool haveArrayAlongBucketDataPath(const BSONObj& bucketObj, StringData path) {
@@ -394,7 +483,8 @@ bool haveArrayAlongBucketDataPath(const BSONObj& bucketObj, StringData path) {
     }
 
     constexpr BSONDepthIndex initialDepth = 0;
-    return _haveArrayAlongBucketDataPath(bucketObj, path, initialDepth);
+    const bool isCompressed = timeseries::isCompressedBucket(bucketObj);
+    return _haveArrayAlongBucketDataPath(bucketObj, path, isCompressed, initialDepth);
 }
 
 std::ostream& operator<<(std::ostream& s, const Decision& i) {

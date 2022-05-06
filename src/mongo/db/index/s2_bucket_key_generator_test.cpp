@@ -137,7 +137,7 @@ struct S2BucketKeyGeneratorTest : public unittest::Test {
 TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeys) {
     BSONObj keyPattern = fromjson("{'data.geo': '2dsphere_bucket'}");
     BSONObj genKeysFrom = fromjson(
-        "{data: {geo: {"
+        "{control: {version: 1}, data: {geo: {"
         "'0': {type: 'Point', coordinates: [0, 0]},"
         "'1': {type: 'Point', coordinates: [3, 3]}"
         "}}}");
@@ -165,7 +165,7 @@ TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeys) {
 TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeysSubField) {
     BSONObj keyPattern = fromjson("{'data.geo.sub': '2dsphere_bucket'}");
     BSONObj genKeysFrom = fromjson(
-        "{data: {geo: {"
+        "{control: {version: 1}, data: {geo: {"
         "'0': {sub: {type: 'Point', coordinates: [0, 0]}},"
         "'1': {sub: {type: 'Point', coordinates: [3, 3]}}"
         "}}}");
@@ -194,7 +194,7 @@ TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeysSubField) {
 TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeysDeepSubField) {
     BSONObj keyPattern = fromjson("{'data.geo.sub1.sub2.sub3': '2dsphere_bucket'}");
     BSONObj genKeysFrom = fromjson(
-        "{data: {geo: {"
+        "{control: {version: 1}, data: {geo: {"
         "'0': {sub1: {sub2: {sub3: {type: 'Point', coordinates: [0, 0]}}}},"
         "'1': {sub1: {sub2: {sub3: {type: 'Point', coordinates: [3, 3]}}}}"
         "}}}");
@@ -223,7 +223,7 @@ TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeysDeepSubField) {
 TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeysSubFieldSomeMissing) {
     BSONObj keyPattern = fromjson("{'data.geo.sub': '2dsphere_bucket'}");
     BSONObj genKeysFrom = fromjson(
-        "{data: {geo: {"
+        "{control: {version: 1}, data: {geo: {"
         "'0': {sub: {type: 'Point', coordinates: [0, 0]}},"
         "'1': {sub: {}},"
         "'2': {sub: null},"

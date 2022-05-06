@@ -342,5 +342,26 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
     return {};
 }
 
+bool isCompressedBucket(const BSONObj& bucketDoc) {
+    auto&& controlField = bucketDoc[timeseries::kBucketControlFieldName];
+    uassert(6540600,
+            "Time-series bucket documents must have 'control' object present",
+            controlField && controlField.type() == BSONType::Object);
+
+    auto&& versionField = controlField.Obj()[timeseries::kBucketControlVersionFieldName];
+    uassert(6540601,
+            "Time-series bucket documents must have 'control.version' field present",
+            versionField && isNumericBSONType(versionField.type()));
+    auto version = versionField.Number();
+
+    if (version == 1) {
+        return false;
+    } else if (version == 2) {
+        return true;
+    } else {
+        uasserted(6540602, "Invalid bucket version");
+    }
+}
+
 }  // namespace timeseries
 }  // namespace mongo

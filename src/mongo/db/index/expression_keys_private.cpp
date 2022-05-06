@@ -706,12 +706,13 @@ void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferB
             std::vector<KeyString::HeapBuilder> updatedKeysToAdd;
 
             if (IndexNames::GEO_2DSPHERE_BUCKET == keyElem.str()) {
-                timeseries::dotted_path_support::extractAllElementsAlongBucketPath(
-                    obj,
-                    keyElem.fieldName(),
-                    fieldElements,
-                    expandArrayOnTrailingField,
-                    arrayComponents);
+                auto elementStorage =
+                    timeseries::dotted_path_support::extractAllElementsAlongBucketPath(
+                        obj,
+                        keyElem.fieldName(),
+                        fieldElements,
+                        expandArrayOnTrailingField,
+                        arrayComponents);
 
                 // null, undefined, {} and [] should all behave like there is no geo field. So we
                 // look for these cases and ignore those measurements if we find them.
