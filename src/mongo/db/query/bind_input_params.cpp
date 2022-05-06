@@ -349,6 +349,79 @@ std::unique_ptr<IndexBounds> makeIndexBounds(
                                     indexBoundsInfo.direction);
     return bounds;
 }
+
+void bindSingleIntervalPlanSlots(const stage_builder::IndexBoundsEvaluationInfo& indexBoundsInfo,
+                                 stage_builder::IndexIntervals intervals,
+                                 sbe::RuntimeEnvironment* runtimeEnvironment) {
+    // If there are no intervals, it means that the solution will be empty and will return EOF
+    // without executing the index scan.
+    if (intervals.empty()) {
+        return;
+    }
+
+    tassert(6584700, "Can only bind a single index interval", intervals.size() == 1);
+    auto&& [lowKey, highKey] = intervals[0];
+    const auto singleInterval =
+        stdx::get<mongo::stage_builder::ParameterizedIndexScanSlots::SingleIntervalPlan>(
+            indexBoundsInfo.slots.slots);
+    runtimeEnvironment->resetSlot(singleInterval.lowKey,
+                                  sbe::value::TypeTags::ksValue,
+                                  sbe::value::bitcastFrom<KeyString::Value*>(lowKey.release()),
+                                  /* owned */ true);
+
+    runtimeEnvironment->resetSlot(singleInterval.highKey,
+                                  sbe::value::TypeTags::ksValue,
+                                  sbe::value::bitcastFrom<KeyString::Value*>(highKey.release()),
+                                  /* owned */ true);
+}
+
+void bindGenericPlanSlots(const stage_builder::IndexBoundsEvaluationInfo& indexBoundsInfo,
+                          stage_builder::IndexIntervals intervals,
+                          std::unique_ptr<IndexBounds> bounds,
+                          sbe::RuntimeEnvironment* runtimeEnvironment) {
+    const auto indexSlots =
+        stdx::get<mongo::stage_builder::ParameterizedIndexScanSlots::GenericPlan>(
+            indexBoundsInfo.slots.slots);
+    const bool isGenericScan = intervals.empty();
+    runtimeEnvironment->resetSlot(indexSlots.isGenericScan,
+                                  sbe::value::TypeTags::Boolean,
+                                  sbe::value::bitcastFrom<bool>(isGenericScan),
+                                  /*owned*/ true);
+    if (isGenericScan) {
+        IndexBoundsChecker checker{
+            bounds.get(), indexBoundsInfo.index.keyPattern, indexBoundsInfo.direction};
+        IndexSeekPoint seekPoint;
+        if (checker.getStartSeekPoint(&seekPoint)) {
+            auto startKey = std::make_unique<KeyString::Value>(
+                IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                    seekPoint,
+                    indexBoundsInfo.keyStringVersion,
+                    indexBoundsInfo.ordering,
+                    indexBoundsInfo.direction == 1));
+            runtimeEnvironment->resetSlot(
+                indexSlots.initialStartKey,
+                sbe::value::TypeTags::ksValue,
+                sbe::value::bitcastFrom<KeyString::Value*>(startKey.release()),
+                /*owned*/ true);
+            runtimeEnvironment->resetSlot(indexSlots.indexBounds,
+                                          sbe::value::TypeTags::indexBounds,
+                                          sbe::value::bitcastFrom<IndexBounds*>(bounds.release()),
+                                          /*owned*/ true);
+        } else {
+            runtimeEnvironment->resetSlot(indexSlots.initialStartKey,
+                                          sbe::value::TypeTags::Nothing,
+                                          0,
+                                          /*owned*/ true);
+        }
+    } else {
+        auto [boundsTag, boundsVal] =
+            stage_builder::packIndexIntervalsInSbeArray(std::move(intervals));
+        runtimeEnvironment->resetSlot(indexSlots.lowHighKeyIntervals,
+                                      boundsTag,
+                                      boundsVal,
+                                      /*owned*/ true);
+    }
+}
 }  // namespace
 
 void bind(const CanonicalQuery& canonicalQuery,
@@ -367,42 +440,14 @@ void bindIndexBounds(const CanonicalQuery& cq,
                                                                  indexBoundsInfo.direction == 1,
                                                                  indexBoundsInfo.keyStringVersion,
                                                                  indexBoundsInfo.ordering);
-    const bool isGenericScan = intervals.empty();
-    runtimeEnvironment->resetSlot(indexBoundsInfo.slots.isGenericScan,
-                                  sbe::value::TypeTags::Boolean,
-                                  sbe::value::bitcastFrom<bool>(isGenericScan),
-                                  /*owned*/ true);
-    if (isGenericScan) {
-        IndexBoundsChecker checker{
-            bounds.get(), indexBoundsInfo.index.keyPattern, indexBoundsInfo.direction};
-        IndexSeekPoint seekPoint;
-        if (checker.getStartSeekPoint(&seekPoint)) {
-            auto startKey = std::make_unique<KeyString::Value>(
-                IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                    seekPoint,
-                    indexBoundsInfo.keyStringVersion,
-                    indexBoundsInfo.ordering,
-                    indexBoundsInfo.direction == 1));
-            runtimeEnvironment->resetSlot(
-                indexBoundsInfo.slots.initialStartKey,
-                sbe::value::TypeTags::ksValue,
-                sbe::value::bitcastFrom<KeyString::Value*>(startKey.release()),
-                /*owned*/ true);
-            runtimeEnvironment->resetSlot(indexBoundsInfo.slots.indexBounds,
-                                          sbe::value::TypeTags::indexBounds,
-                                          sbe::value::bitcastFrom<IndexBounds*>(bounds.release()),
-                                          /*owned*/ true);
-        } else {
-            runtimeEnvironment->resetSlot(indexBoundsInfo.slots.initialStartKey,
-                                          sbe::value::TypeTags::Nothing,
-                                          0,
-                                          /*owned*/ true);
-        }
+    const bool isSingleIntervalSolution = stdx::holds_alternative<
+        mongo::stage_builder::ParameterizedIndexScanSlots::SingleIntervalPlan>(
+        indexBoundsInfo.slots.slots);
+    if (isSingleIntervalSolution) {
+        bindSingleIntervalPlanSlots(indexBoundsInfo, std::move(intervals), runtimeEnvironment);
     } else {
-        auto [boundsTag, boundsVal] =
-            stage_builder::packIndexIntervalsInSbeArray(std::move(intervals));
-        runtimeEnvironment->resetSlot(
-            indexBoundsInfo.slots.lowHighKeyIntervals, boundsTag, boundsVal, /*owned*/ true);
+        bindGenericPlanSlots(
+            indexBoundsInfo, std::move(intervals), std::move(bounds), runtimeEnvironment);
     }
 }
 }  // namespace mongo::input_params
