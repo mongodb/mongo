@@ -292,8 +292,7 @@ private:
                           Record* records,
                           const Timestamp* timestamps,
                           size_t nRecords);
-
-    RecordId _nextId(OperationContext* opCtx);
+    long long _reserveIdBlock(OperationContext* opCtx, size_t nRecords);
     RecordData _getData(const WiredTigerCursor& cursor) const;
 
 

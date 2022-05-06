@@ -1334,6 +1334,8 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
     invariant(nRecords != 0);
 
     if (_keyFormat == KeyFormat::Long) {
+        long long nextId = _isOplog ? 0 : _reserveIdBlock(opCtx, nRecords);
+
         // Non-clustered record stores will extract the RecordId key for the oplog and generate
         // unique int64_t RecordIds if RecordIds are not set.
         for (size_t i = 0; i < nRecords; i++) {
@@ -1348,7 +1350,8 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                 // Some RecordStores, like TemporaryRecordStores, may want to set their own
                 // RecordIds.
                 if (record.id.isNull()) {
-                    record.id = _nextId(opCtx);
+                    record.id = RecordId(nextId++);
+                    invariant(record.id.isValid());
                 }
             }
             dassert(record.id > highestIdRecord.id);
@@ -1958,15 +1961,13 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
     _nextIdNum.store(nextId);
 }
 
-RecordId WiredTigerRecordStore::_nextId(OperationContext* opCtx) {
+long long WiredTigerRecordStore::_reserveIdBlock(OperationContext* opCtx, size_t nRecords) {
     // Clustered record stores do not automatically generate int64 RecordIds. RecordIds are instead
     // constructed as binary strings, KeyFormat::String, from the user-defined cluster key.
     invariant(_keyFormat == KeyFormat::Long);
     invariant(!_isOplog);
     _initNextIdIfNeeded(opCtx);
-    RecordId out = RecordId(_nextIdNum.fetchAndAdd(1));
-    invariant(out.isValid());
-    return out;
+    return _nextIdNum.fetchAndAdd(nRecords);
 }
 
 void WiredTigerRecordStore::_changeNumRecords(OperationContext* opCtx, int64_t diff) {
