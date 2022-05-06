@@ -76,7 +76,7 @@ assert.commandWorked(testColl.runCommand({
 
 // Enable the profiler to log slow queries. We expect a 'find' to hang until the prepare
 // conflict is resolved.
-assert.commandWorked(testDB.runCommand({profile: 1, level: 1, slowms: 100}));
+assert.commandWorked(testDB.runCommand({profile: 1, slowms: 100}));
 
 const session = db.getMongo().startSession({causalConsistency: false});
 const sessionDB = session.getDatabase(dbName);

@@ -47,7 +47,7 @@ commands:
     description: "Parser for the 'profile' command."
     command_name: "profile"
     cpp_name: ProfileCmdRequest
-    strict: false
+    strict: true
     namespace: type
     api_version: ""
     type: safeInt64

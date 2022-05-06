@@ -63,9 +63,18 @@ try {
 } finally {
     let profileCmd = {};
     profileCmd.profile = originalProfilingSettings.was;
-    profileCmd = Object.extend(profileCmd, originalProfilingSettings);
-    delete profileCmd.was;
-    delete profileCmd.ok;
+
+    // The profile command will reject unknown fields, so wee need to populate only the fields
+    // accepted from parser
+    if ('slowms' in originalProfilingSettings)
+        profileCmd.slowms = originalProfilingSettings.slowms;
+
+    if ('sampleRate' in originalProfilingSettings)
+        profileCmd.sampleRate = originalProfilingSettings.sampleRate;
+
+    if ('filter' in originalProfilingSettings)
+        profileCmd.filter = originalProfilingSettings.filter;
+
     assert.commandWorked(profileDB.runCommand(profileCmd));
 }
 }());
