@@ -108,18 +108,8 @@ public:
     }
 
     Status initialize() {
-        auto status = _initializeGlobal();
-        if (!status.isOK()) {
-            return status;
-        }
-
-        return Status::OK();
-    }
-
-private:
-    Status _initializeGlobal() {
         if (_initialized) {
-            return Status::OK();
+            return {ErrorCodes::AlreadyInitialized, "CurlLibraryManager already initialized."};
         }
 
         CURLcode ret = curl_global_init(CURL_GLOBAL_ALL);
@@ -135,6 +125,10 @@ private:
 
         _initialized = true;
         return Status::OK();
+    }
+
+    bool isInitialized() const {
+        return _initialized;
     }
 
 private:
@@ -712,17 +706,17 @@ public:
     }
 
     std::unique_ptr<HttpClient> create() final {
-        uassertStatusOK(curlLibraryManager.initialize());
+        invariant(curlLibraryManager.isInitialized());
         return std::make_unique<CurlHttpClient>(HttpConnectionPool::kUse);
     }
 
     std::unique_ptr<HttpClient> createWithoutConnectionPool() final {
-        uassertStatusOK(curlLibraryManager.initialize());
+        invariant(curlLibraryManager.isInitialized());
         return std::make_unique<CurlHttpClient>(HttpConnectionPool::kDoNotUse);
     }
 
     BSONObj getServerStatus() final {
-
+        invariant(curlLibraryManager.isInitialized());
         BSONObjBuilder info;
         info.append("type", "curl");
 
@@ -747,10 +741,11 @@ public:
 
 }  // namespace
 
-// Transitional API used by blockstore to trigger libcurl init
-// until it's been migrated to use the HTTPClient API.
-Status curlLibraryManager_initialize() {
-    return curlLibraryManager.initialize();
+MONGO_INITIALIZER_GENERAL(CurlLibraryManager,
+                          (),
+                          ("BeginStartupOptionParsing", "NativeSaslClientContext"))
+(InitializerContext* context) {
+    uassertStatusOK(curlLibraryManager.initialize());
 }
 
 
