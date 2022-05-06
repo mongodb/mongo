@@ -3,7 +3,7 @@
  * results to be created.
  *
  * @tags: [
- *     requires_fcv_61,
+ *     requires_fcv_50,
  *     # We need a timeseries collection.
  *     assumes_no_implicit_collection_creation_after_drop,
  *     # Bounded sorter is currently broken w/ sharding.
