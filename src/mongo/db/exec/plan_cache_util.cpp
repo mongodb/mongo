@@ -112,9 +112,9 @@ plan_cache_debug_info::DebugInfo buildDebugInfo(
 
     plan_cache_debug_info::CreatedFromQuery createdFromQuery =
         plan_cache_debug_info::CreatedFromQuery{
-            findCommand.getFilter(),
-            findCommand.getSort(),
-            projBuilder.obj(),
+            findCommand.getFilter().getOwned(),
+            findCommand.getSort().getOwned(),
+            projBuilder.obj().getOwned(),
             query.getCollator() ? query.getCollator()->getSpec().toBSON() : BSONObj()};
 
     return {std::move(createdFromQuery), std::move(decision)};
