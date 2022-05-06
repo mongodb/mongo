@@ -174,7 +174,8 @@ bool hintMatchesClusterKey(const boost::optional<ClusteredCollectionInfo>& clust
  * Returns the dependencies for the CanoncialQuery, split by those needed to answer the filter, and
  * those needed for "everything else" which is the project and sort.
  */
-std::pair<DepsTracker, DepsTracker> computeDeps(const CanonicalQuery& query) {
+std::pair<DepsTracker, DepsTracker> computeDeps(const QueryPlannerParams& params,
+                                                const CanonicalQuery& query) {
     DepsTracker filterDeps;
     query.root()->addDependencies(&filterDeps);
     DepsTracker outputDeps;
@@ -186,6 +187,11 @@ std::pair<DepsTracker, DepsTracker> computeDeps(const CanonicalQuery& query) {
     outputDeps.fields.insert(projectionFields.begin(), projectionFields.end());
     if (auto sortPattern = query.getSortPattern()) {
         sortPattern->addDependencies(&outputDeps);
+    }
+    if (params.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+        for (auto&& field : params.shardKey) {
+            outputDeps.fields.emplace(field.fieldNameStringData());
+        }
     }
     // There's no known way a sort would depend on the whole document, and we already verified that
     // the projection doesn't depend on the whole document.
@@ -201,7 +207,7 @@ void tryToAddColumnScan(const QueryPlannerParams& params,
     }
     invariant(params.columnarIndexes.size() == 1);
 
-    auto [filterDeps, outputDeps] = computeDeps(query);
+    auto [filterDeps, outputDeps] = computeDeps(params, query);
     if (filterDeps.needWholeDocument || outputDeps.needWholeDocument) {
         // We only want to use the columnar index if we can avoid fetching the whole document.
         return;

@@ -466,9 +466,18 @@ TEST_F(QueryPlannerColumnarTest, GroupTest) {
         BSONObj(), BSON("foo" << 1 << "x" << 1 << "_id" << 0), makeInnerPipelineStages(*pipeline));
 
     assertNumSolutions(1U);
-    assertSolutionExists(R"(
-        {proj: {spec: {foo: 1, x: 1, _id: 0}, node:
-        {column_scan: {filtersByPath: {}, outputFields: ['foo', 'x'], matchFields: []}}}})");
+    assertSolutionExists(R"({
+        proj: {
+            spec: {foo: 1, x: 1, _id: 0},
+            node: {
+                column_scan: {
+                    filtersByPath: {},
+                    outputFields: ['foo', 'x'],
+                    matchFields: []
+                }
+            }
+        }
+    })");
 
     ASSERT(!cq->pipeline().empty());
     auto solution =
@@ -545,5 +554,63 @@ TEST_F(QueryPlannerColumnarTest, MatchGroupWithOverlappingFieldsTest) {
         "}}}}",
         solution->root()))
         << solution->root()->toString();
+}
+
+TEST_F(QueryPlannerColumnarTest, ShardKeyFieldsIncluded) {
+    addColumnarIndex();
+    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.shardKey = BSON("sk1" << 1 << "sk2.nested" << 1);
+
+    runQuerySortProj(BSON("name"
+                          << "bob"),
+                     BSONObj(),
+                     BSON("foo" << 1 << "x" << 1 << "name" << 1 << "_id" << 0));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"(
+    {
+        proj: {
+            spec: {foo: 1, x: 1, name:1, _id: 0},
+            node: {
+                sharding_filter: {
+                    node: {
+                        column_scan: {
+                            filtersByPath: {name: {name: {$eq: 'bob'}}},
+                            outputFields: ['foo', 'x', 'name', 'sk1', 'sk2.nested'],
+                            matchFields: ['name']
+                        }
+                    }
+                }
+            }
+        }
+    })");
+}
+
+TEST_F(QueryPlannerColumnarTest, ShardKeyFieldsCountTowardsFieldLimit) {
+    addColumnarIndex();
+    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.shardKey = BSON("sk1" << 1 << "sk2.nested" << 1);
+
+    // Lower the upper bound on number of fields for COLUMN_SCAN eligibility. This should cause us
+    // to choose a COLLSCAN instead of a COLUMN_SCAN.
+    internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan.store(3);
+    runQuerySortProj(BSON("name"
+                          << "bob"),
+                     BSONObj(),
+                     BSON("foo" << 1 << "x" << 1 << "name" << 1 << "_id" << 0));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        proj: {
+            spec: {foo: 1, x: 1, name:1, _id: 0},
+            node: {
+                sharding_filter: {
+                    node: {
+                        cscan: {dir: 1}
+                    }
+                }
+            }
+        }
+    })");
 }
 }  // namespace mongo

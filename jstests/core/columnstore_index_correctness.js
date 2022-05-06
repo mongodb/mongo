@@ -8,8 +8,6 @@
  *   does_not_support_stepdowns,
  *   # Columnstore indexes are incompatible with clustered collections.
  *   incompatible_with_clustered_collection,
- *   # TODO SERVER-66284 Bug with Snapshot ID slot.
- *   assumes_unsharded_collection,
  * ]
  */
 (function() {

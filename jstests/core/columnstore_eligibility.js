@@ -10,8 +10,6 @@
  *   incompatible_with_clustered_collection,
  *   # Cannot run aggregate with explain in a transaction.
  *   does_not_support_transactions,
- *   # TODO SERVER-66284 Bug with Snapshot ID slot.
- *   assumes_unsharded_collection,
  * ]
  */
 (function() {
@@ -144,7 +142,9 @@ explain = coll.explain().aggregate([
 assert(!planHasStage(db, explain, "COLUMN_SCAN"), explain);
 
 // SBE is not supported for update operations. Also this update would require the whole document.
-explain = coll.explain().update({a: 2}, {$set: {b: 2}});
+// Be sure to update by _id to preseve the sharded collection passthrough coverage. Targeting by
+// shard key is required for non-multi updates.
+explain = coll.explain().update({_id: 0, a: 2}, {$set: {b: 2}});
 assert(!planHasStage(db, explain, "COLUMN_SCAN"), explain);
 
 // SBE is not supported for delete operations.
