@@ -39,6 +39,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
@@ -1178,6 +1179,8 @@ uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
     auto client = _serviceContext->makeClient("SEP-int-fle-crud");
     AlternativeClientRegion clientRegion(client);
     auto opCtx = cc().makeOperationContext();
+    auto as = AuthorizationSession::get(cc());
+    as->grantInternalAuthorization(opCtx.get());
 
     CountCommandRequest ccr(nss);
     auto opMsgRequest = ccr.serialize(BSONObj());
