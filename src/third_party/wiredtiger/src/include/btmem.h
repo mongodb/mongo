@@ -960,15 +960,29 @@ struct __wt_ref {
 #define ref_ikey key.ikey
 
     /*
-     * Fast-truncate information. When a WT_REF is included in a fast-truncate operation, WT_REF.del
-     * is allocated and initialized. If the page must be instantiated before the truncate becomes
-     * globally visible, WT_UPDATE structures are created for the page entries, the transaction
-     * information from WT_REF.del is migrated to those WT_UPDATE structures, and the WT_REF.del
-     * field is freed and replaced by the WT_REF.update array (needed for subsequent transaction
-     * commit/abort). Doing anything other than testing if WT_REF.del/update is non-NULL (which
-     * eviction does), requires the WT_REF be locked. If the locked WT_REF's previous state was
-     * WT_REF_DELETED, WT_REF.del is valid, if the WT_REF's previous state was an in-memory state,
-     * then WT_REF.update is valid.
+     * Fast-truncate information, written-to/read-from disk as necessary in the internal page's
+     * deleted page proxy cell. When a WT_REF first becomes part of a fast-truncate operation, the
+     * WT_REF.del field is allocated and initialized.
+     *
+     * If the page must be instantiated before the truncate commits: (1) WT_UPDATE structures are
+     * created for the page entries, (2) the transaction information from WT_REF.del is copied to
+     * those WT_UPDATE structures (making them a match for the truncate operation), and (3) the
+     * WT_REF.del field is freed and replaced by WT_REF.update, an array of references to the
+     * WT_UPDATE structures (needed for subsequent transaction commit/abort). Additionally, the
+     * WT_REF.state switches to WT_REF_MEM.
+     *
+     * If the page must be instantiated after the truncate operation commits but before the truncate
+     * becomes globally visible in the live tree it's the same, except that no WT_REF.update array
+     * is allocated. If the page must be instantiated in a read-only tree (such as a checkpoint
+     * cursor), it's the same except that not only is no WT_REF.update array allocated, the
+     * WT_REF.del field is left in place so the read and instantiation can be repeated as necessary.
+     *
+     * Doing anything other than testing if WT_REF.ft_info.del/update is non-NULL (which eviction
+     * does), requires the WT_REF be locked.
+     *
+     * If the locked WT_REF's previous state was WT_REF_DELETED, WT_REF.del is valid; If the state
+     * was disk or in-memory, from a read-only tree, WT_REF.del is valid or NULL; If the state was
+     * in-memory NOT from a readonly tree, WT_REF.update is valid or NULL.
      */
     union {
         WT_PAGE_DELETED *del; /* Page not instantiated, page-deleted structure */
