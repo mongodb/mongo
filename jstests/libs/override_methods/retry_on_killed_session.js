@@ -14,6 +14,8 @@ Mongo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
     return runWithKilledSessionRetries(this, cmdObj, mongoRunCommandOriginal, arguments);
 };
 
+const kReadCmds = new Set(["find", "count", "aggregate", "distinct"]);
+
 // Returns if the command should retry on killed session errors.
 function shouldRetry(cmdObj) {
     if (cmdObj.hasOwnProperty("autocommit")) {
@@ -21,9 +23,13 @@ function shouldRetry(cmdObj) {
         return false;
     }
 
-    // Assume every other operation can be retried. Callers should guarantee only idempotent
-    // operations are run when this override is active.
-    return true;
+    const cmdName = Object.keys(cmdObj)[0];
+    if (kReadCmds.has(cmdName) || cmdObj.hasOwnProperty("txnNumber")) {
+        // Reads and retryable writes are idempotent so are safe to retry.
+        return true;
+    }
+
+    return TestData.alwaysRetryOnKillSessionErrors;
 }
 
 function runWithKilledSessionRetries(mongo, cmdObj, clientFunction, clientFunctionArguments) {

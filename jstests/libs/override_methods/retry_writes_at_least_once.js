@@ -35,6 +35,7 @@ function runWithRetries(mongo, cmdObj, clientFunction, clientFunctionArguments) 
     let res = clientFunction.apply(mongo, clientFunctionArguments);
 
     if (isRetryableWriteCmd && canRetryWrites) {
+        print("*** Initial response: " + tojsononeline(res));
         let retryAttempt = 1;
         do {
             print("*** Retry attempt: " + retryAttempt + ", for command: " + cmdName +
@@ -42,6 +43,7 @@ function runWithRetries(mongo, cmdObj, clientFunction, clientFunctionArguments) 
                   ", and lsid: " + tojson(cmdObj.lsid));
             ++retryAttempt;
             res = clientFunction.apply(mongo, clientFunctionArguments);
+            print("*** Retry response: " + tojsononeline(res));
         } while (Random.rand() <= kExtraRetryProbability);
     }
 
