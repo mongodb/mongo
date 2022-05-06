@@ -55,6 +55,26 @@ function oplogIsRolledOver(lastOplogEntryTsToBeRemoved) {
                                getFirstOplogEntry(node, {readConcern: "majority"}).ts) <= 0);
 }
 
+// Invokes function 'func()' and returns the invocation result. Retries the action if 'func()'
+// throws an exception with error code CappedPositionLost until a timeout - default timeout of
+// 'assert.soon()'. 'message' is returned in case of timeout.
+function retryOnCappedPositionLostError(func, message) {
+    let result;
+    assert.soon(() => {
+        try {
+            result = func();
+            return true;
+        } catch (e) {
+            if (e.code !== ErrorCodes.CappedPositionLost) {
+                throw e;
+            }
+            jsTestLog(`Retrying on CappedPositionLost error: ${tojson(e)}`);
+            return false;
+        }
+    }, message);
+    return result;
+}
+
 // Tests that the pre-image removal job deletes only the expired pre-images by performing four
 // updates leading to four pre-images being recorded, then the oplog is rolled over, removing the
 // oplog entries of the previously recorded pre-images. Afterwards two updates are performed and
@@ -137,14 +157,24 @@ function testPreImageRemovalJob(batchedDelete) {
         assert.contains(serverStatusBatches, expectedNumberOfBatchesRange);
         assert.eq(serverStatusDocs, preImagesToExpire);
         assert.contains(
-            localDB.oplog.rs
-                .find({ns: 'admin.$cmd', 'o.applyOps.op': 'd', 'o.applyOps.ns': preimagesNs})
-                .itcount(),
+            retryOnCappedPositionLostError(
+                () =>
+                    localDB.oplog.rs
+                        .find(
+                            {ns: 'admin.$cmd', 'o.applyOps.op': 'd', 'o.applyOps.ns': preimagesNs})
+                        .itcount(),
+                "Failed to fetch oplog entries for pre-image deletes"),
             expectedNumberOfBatchesRange);
     } else {
-        assert.eq(preImagesToExpire, localDB.oplog.rs.find({op: 'd', ns: preimagesNs}).itcount());
+        assert.eq(preImagesToExpire,
+                  retryOnCappedPositionLostError(
+                      () => localDB.oplog.rs.find({op: 'd', ns: preimagesNs}).itcount(),
+                      "Failed to fetch oplog entries for pre-image deletes"));
     }
-    assert.eq(0, localDB.oplog.rs.find({op: {'$ne': 'd'}, ns: preimagesNs}).itcount());
+    assert.eq(0,
+              retryOnCappedPositionLostError(
+                  () => localDB.oplog.rs.find({op: {'$ne': 'd'}, ns: preimagesNs}).itcount(),
+                  "Failed to fetch all oplog entries except pre-image deletes"));
 
     // Verify that pre-images collection content on the primary node is the same as on the
     // secondary.
