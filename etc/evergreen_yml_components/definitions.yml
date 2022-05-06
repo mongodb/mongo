@@ -282,7 +282,6 @@ variables:
 - mongocryptd_variants: &mongocryptd_variants
   - enterprise-amazon2
   - enterprise-amazon2-arm64
-  - enterprise-debian92-64
   - enterprise-debian10-64
   - enterprise-debian11-64
   - enterprise-linux-64-amazon-ami
@@ -320,7 +319,6 @@ variables:
 # List of all variants that make mh artifacts.
 # If a variant is listed here and has a push task, the mh artifacts are pushed
 - mh_variants: &mh_variants
-  - enterprise-debian92-64
   - enterprise-macos
   - enterprise-macos-arm64
   - enterprise-rhel-80-64-bit
@@ -343,8 +341,6 @@ variables:
   - debian11
   - enterprise-debian10-64
   - enterprise-debian11-64
-  - debian92
-  - enterprise-debian92-64
   - rhel70
   - rhel76_compile_rhel70
   - enterprise-rhel-70-64-bit

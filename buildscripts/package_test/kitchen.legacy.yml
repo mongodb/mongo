@@ -41,21 +41,6 @@ platforms:
       instance_type: c6g.medium
     transport:
       username: ec2-user
-  - name: debian71-x86-64
-    driver:
-      image_id: ami-4b124a22
-    transport:
-      username: admin
-  - name: debian81-x86-64
-    driver:
-      image_id: ami-896d85e2
-    transport:
-      username: admin
-  - name: debian92-x86-64
-    driver:
-      image_id: ami-71b7750b
-    transport:
-      username: admin
   - name: debian10-x86-64
     driver:
       image_id: ami-0dedf6a6502877301
