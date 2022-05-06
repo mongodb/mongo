@@ -127,6 +127,10 @@ structs:
                 optional: true
                 description: "Identifier of the transaction statement(s) which generated this oplog
                               entry"
+            fromMigrate:
+                type: bool
+                optional: true
+                description: "An operation caused by a chunk migration"
 
     OplogEntryBase:
         description: A document in which the server stores an oplog entry.
@@ -150,10 +154,6 @@ structs:
                 cpp_name: wallClockTime
                 type: date
                 description: "A wallclock time with MS resolution"
-            fromMigrate:
-                type: bool
-                optional: true
-                description: "An operation caused by a chunk migration"
             fromTenantMigration:
                 type: uuid
                 optional: true

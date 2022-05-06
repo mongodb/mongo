@@ -189,6 +189,11 @@ public:
         return variant_util::toVector<StmtId>(DurableReplOperation::getStatementIds());
     }
 
+    void setFromMigrateIfTrue(bool value) & {
+        if (value)
+            setFromMigrate(value);
+    }
+
 private:
     BSONObj _preImageDocumentKey;
 
@@ -338,6 +343,10 @@ public:
      * Returns the OpTime of the oplog entry.
      */
     OpTime getOpTime() const;
+
+    void setFromMigrate(bool value) & {
+        getDurableReplOperation().setFromMigrate(value);
+    }
 
     /**
      * Same as setFromMigrate but only set when it is true.
