@@ -67,6 +67,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query/cluster_aggregation_planner.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
@@ -122,7 +123,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collationObj));
     }
 
-    // Create the expression context, and set 'inMongos' to true. We explicitly do *not* set
+    // Create the expression context, and set the 'inMongos' parameter. We explicitly do *not* set
     // mergeCtx->tempDir.
     auto mergeCtx = make_intrusive<ExpressionContext>(
         opCtx,
@@ -132,8 +133,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor()),
         std::move(resolvedNamespaces),
         uuid);
-
-    mergeCtx->inMongos = true;
+    mergeCtx->inMongos = isMongos();
 
     // If the request explicity specified NOT to use v2 resume tokens for change streams, set this
     // on the expCtx. We only ever expect to see an explicit value during testing.
