@@ -221,6 +221,14 @@ private:
     std::pair<Value, Document> extractSortKey(Document&& doc) const;
 
     /**
+     * Returns the time value used to sort 'doc', as well as the document that should be entered
+     * into the sorter to eventually be returned. If we will need to later merge the sorted results
+     * with other results, this method adds the full sort key as metadata onto 'doc' to speed up the
+     * merge later.
+     */
+    std::pair<Date_t, Document> extractTime(Document&& doc) const;
+
+    /**
      * Peeks at the next document in the input. The next document is cached in _timeSorterNextDoc
      * to support peeking without advancing.
      */

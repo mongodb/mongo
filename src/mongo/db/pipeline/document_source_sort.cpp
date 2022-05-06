@@ -245,13 +245,9 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
                         _timeSorter->getState() != TimeSorterInterface::State::kWait);
                     continue;
                 case GetNextResult::ReturnStatus::kAdvanced:
-                    Document doc = timeSorterGetNext();
-                    auto time =
-                        doc.getField(_sortExecutor->sortPattern().back().fieldPath->fullPath());
-                    uassert(6369909,
-                            "$_internalBoundedSort only handles Date values",
-                            time.getType() == Date);
-                    _timeSorter->add({time.getDate()}, doc);
+                    auto [time, doc] = extractTime(timeSorterGetNext());
+
+                    _timeSorter->add({time}, doc);
                     continue;
             }
         }
@@ -607,6 +603,24 @@ std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) co
     } else {
         return std::make_pair(std::move(sortKey), std::move(doc));
     }
+}
+
+std::pair<Date_t, Document> DocumentSourceSort::extractTime(Document&& doc) const {
+    auto time = doc.getField(_sortExecutor->sortPattern().back().fieldPath->fullPath());
+    uassert(6369909, "$_internalBoundedSort only handles Date values", time.getType() == Date);
+    auto date = time.getDate();
+
+    if (pExpCtx->needsMerge) {
+        // If this sort stage is part of a merged pipeline, make sure that each Document's sort key
+        // gets saved with its metadata.
+        Value sortKey = _sortKeyGen->computeSortKeyFromDocument(doc);
+        MutableDocument toBeSorted(std::move(doc));
+        toBeSorted.metadata().setSortKey(sortKey, _sortKeyGen->isSingleElementKey());
+
+        return std::make_pair(date, toBeSorted.freeze());
+    }
+
+    return std::make_pair(date, std::move(doc));
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSort::distributedPlanLogic() {

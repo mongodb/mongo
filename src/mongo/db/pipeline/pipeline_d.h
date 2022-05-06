@@ -272,53 +272,11 @@ Unpacking with Sort Optimization.
         BSONObj::iterator& keyPatternIter,
         bool scanIsForward,
         const FieldPath& timeSortFieldPath,
-        bool sortIsAscending) {
-        bool wasMin = false;
-        bool wasMax = false;
-
-        // Check that the index isn't special.
-        if ((*keyPatternIter).isNumber() && abs((*keyPatternIter).numberInt()) == 1) {
-            bool direction = ((*keyPatternIter).numberInt() == 1);
-            direction = (scanIsForward) ? direction : !direction;
-
-            // Verify the direction and fieldNames match.
-            wasMin = ((*keyPatternIter).fieldName() ==
-                      bucketUnpacker.getMinField(timeSortFieldPath.fullPath()));
-            wasMax = ((*keyPatternIter).fieldName() ==
-                      bucketUnpacker.getMaxField(timeSortFieldPath.fullPath()));
-            // Terminate early if it wasn't max or min or if the directions don't match.
-            if ((wasMin || wasMax) && (sortIsAscending == direction))
-                return std::pair{wasMin ? sortIsAscending : !sortIsAscending, wasMin};
-        }
-
-        return boost::none;
-    }
+        bool sortIsAscending);
 
     static bool sortAndKeyPatternPartAgreeAndOnMeta(const BucketUnpacker& bucketUnpacker,
                                                     StringData keyPatternFieldName,
-                                                    const FieldPath& sortFieldPath) {
-        FieldPath keyPatternFieldPath = FieldPath(keyPatternFieldName);
-
-        // If they don't have the same path length they cannot agree.
-        if (keyPatternFieldPath.getPathLength() != sortFieldPath.getPathLength())
-            return false;
-
-        // Check these paths are on the meta field.
-        if (keyPatternFieldPath.getSubpath(0) != mongo::timeseries::kBucketMetaFieldName)
-            return false;
-        if (!bucketUnpacker.getMetaField() ||
-            sortFieldPath.getSubpath(0) != *bucketUnpacker.getMetaField()) {
-            return false;
-        }
-
-        // If meta was the only path component then return true.
-        // Note: We already checked that the path lengths are equal.
-        if (keyPatternFieldPath.getPathLength() == 1)
-            return true;
-
-        // Otherwise return if the remaining path components are equal.
-        return (keyPatternFieldPath.tail() == sortFieldPath.tail());
-    }
+                                                    const FieldPath& sortFieldPath);
 };
 
 }  // namespace mongo

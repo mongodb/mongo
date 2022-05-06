@@ -1,5 +1,6 @@
 // Helper functions for testing time-series collections.
 
+load("jstests/aggregation/extras/utils.js");
 var TimeseriesTest = class {
     /**
      * Returns whether time-series collections are supported.
@@ -186,5 +187,57 @@ var TimeseriesTest = class {
 
         testFn(insert(true));
         testFn(insert(false));
+    }
+
+    static ensureDataIsDistributedIfSharded(coll, splitPointDate) {
+        const db = coll.getDB();
+        const buckets = db["system.buckets." + coll.getName()];
+        if (FixtureHelpers.isSharded(buckets)) {
+            const timeFieldName =
+                db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.timeField;
+
+            const splitPoint = {[`control.min.${timeFieldName}`]: splitPointDate};
+            assert.commandWorked(db.adminCommand(
+                {split: `${db.getName()}.${buckets.getName()}`, middle: splitPoint}));
+
+            const allShards = db.getSiblingDB("config").shards.find().sort({_id: 1}).toArray().map(
+                doc => doc._id);
+            const currentShards = buckets
+                                      .aggregate([
+                                          {"$collStats": {storageStats: {}}},
+                                          {$project: {shard: 1}},
+                                          {$sort: {shard: 1}}
+                                      ])
+                                      .toArray()
+                                      .map(doc => doc.shard);
+
+            if (!documentEq(allShards, currentShards)) {
+                let otherShard;
+                for (let i in allShards) {
+                    if (!currentShards.includes(allShards[i])) {
+                        otherShard = allShards[i];
+                        break;
+                    }
+                }
+                assert(otherShard);
+
+                assert.commandWorked(db.adminCommand({
+                    movechunk: `${db.getName()}.${buckets.getName()}`,
+                    find: splitPoint,
+                    to: otherShard,
+                    _waitForDelete: true
+                }));
+
+                const updatedShards = buckets
+                                          .aggregate([
+                                              {"$collStats": {storageStats: {}}},
+                                              {$project: {shard: 1}},
+                                              {$sort: {shard: 1}}
+                                          ])
+                                          .toArray()
+                                          .map(doc => doc.shard);
+                assert.eq(updatedShards.length, currentShards.length + 1);
+            }
+        }
     }
 };

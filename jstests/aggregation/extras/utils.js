@@ -443,7 +443,7 @@ function desugarSingleStageAggregation(db, coll, stage) {
  * optional hint that will get passed on to the aggregation stage. It defaults to undefined.
  */
 function getExplainedPipelineFromAggregation(
-    db, coll, pipeline, {inhibitOptimization = true, hint} = {}) {
+    db, coll, pipeline, {inhibitOptimization = true, postPlanningResults = false, hint} = {}) {
     // Prevent stages from being absorbed into the .find() layer
     if (inhibitOptimization) {
         pipeline.unshift({$_internalInhibitOptimization: {}});
@@ -454,11 +454,13 @@ function getExplainedPipelineFromAggregation(
     const result = coll.explain().aggregate(pipeline, aggOptions);
 
     assert.commandWorked(result);
-    return getExplainPipelineFromAggregationResult(db, result, {inhibitOptimization});
+    return getExplainPipelineFromAggregationResult(
+        db, result, {inhibitOptimization, postPlanningResults});
 }
 
 function getExplainPipelineFromAggregationResult(db, result, {
     inhibitOptimization = true,
+    postPlanningResults = false,
 } = {}) {
     // We proceed by cases based on topology.
     if (!FixtureHelpers.isMongos(db)) {
@@ -475,11 +477,15 @@ function getExplainPipelineFromAggregationResult(db, result, {
     } else {
         if (result.splitPipeline) {
             let shardsPart = null;
+            if (!postPlanningResults) {
+                shardsPart = result.splitPipeline.shardsPart;
+            } else {
+                assert(Array.isArray(result.shards["shard-rs0"].stages), result);
+                shardsPart = result.shards["shard-rs0"].stages;
+            }
             if (inhibitOptimization) {
                 assert(result.splitPipeline.shardsPart[0].$_internalInhibitOptimization, result);
-                shardsPart = result.splitPipeline.shardsPart.slice(1);
-            } else {
-                shardsPart = result.splitPipeline.shardsPart;
+                shardsPart = shardsPart.slice(1);
             }
             assert(result.splitPipeline.mergerPart[0].$mergeCursors, result);
             const mergerPart = result.splitPipeline.mergerPart.slice(1);

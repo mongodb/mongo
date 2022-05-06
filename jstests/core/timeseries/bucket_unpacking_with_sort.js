@@ -6,8 +6,6 @@
  *     requires_fcv_50,
  *     # We need a timeseries collection.
  *     assumes_no_implicit_collection_creation_after_drop,
- *     # Bounded sorter is currently broken w/ sharding.
- *     assumes_unsharded_collection,
  *     # Cannot insert into a time-series collection in a multi-document transaction.
  *     does_not_support_transactions,
  *     # Refusing to run a test that issues an aggregation command with explain because it may
@@ -24,16 +22,15 @@
 (function() {
 "use strict";
 
-const featureEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagBucketUnpackWithSort: 1}))
-        .featureFlagBucketUnpackWithSort.value;
-if (!featureEnabled) {
-    jsTestLog("Skipping test because the BUS feature flag is disabled");
+load("jstests/libs/fixture_helpers.js");             // For FixtureHelpers.
+load("jstests/aggregation/extras/utils.js");         // For getExplainedPipelineFromAggregation.
+load("jstests/core/timeseries/libs/timeseries.js");  // For TimeseriesTest
+
+if (!TimeseriesTest.bucketUnpackWithSortEnabled(db.getMongo())) {
+    jsTestLog("Skipping test because 'BucketUnpackWithSort' is disabled.");
     return;
 }
 
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
-load("jstests/aggregation/extras/utils.js");  // For getExplainedPipelineFromAggregation.
 const collName = "bucket_unpacking_with_sort";
 const coll = db[collName];
 const metaCollName = "bucket_unpacking_with_sort_with_meta";
@@ -80,6 +77,9 @@ const setupColl = (coll, collName, usesMeta, subFields = null) => {
         }
     }
     assert.commandWorked(coll.insert(docs));
+
+    TimeseriesTest.ensureDataIsDistributedIfSharded(coll,
+                                                    new Date((numberOfItemsPerBucket / 2) * 6000));
 };
 
 setupColl(coll, collName, false);
@@ -208,12 +208,18 @@ const runRewritesTest = (sortSpec,
 
     // Check contains stage
     const optExplain = getExplainedPipelineFromAggregation(
-        db, testColl, optPipeline, {inhibitOptimization: false, hint: fixHint(hint)});
+        db,
+        testColl,
+        optPipeline,
+        {inhibitOptimization: false, hint: fixHint(hint), postPlanningResults: true});
     assert(hasInternalBoundedSort(optExplain), optExplainFull);
 
     // Check doesn't contain stage
     const ogExplain = getExplainedPipelineFromAggregation(
-        db, testColl, ogPipeline, {inhibitOptimization: false, hint: fixHint(hint)});
+        db,
+        testColl,
+        ogPipeline,
+        {inhibitOptimization: false, hint: fixHint(hint), postPlanningResults: true});
     assert(!hasInternalBoundedSort(ogExplain), ogExplainFull);
 
     // For some queries we expect to see an extra predicate, to defend against bucketMaxSpanSeconds
@@ -247,7 +253,10 @@ const runDoesntRewriteTest = (sortSpec, createIndex, hint, testColl, intermediar
 
     // Check doesn't contain stage
     const optExplain = getExplainedPipelineFromAggregation(
-        db, testColl, optPipeline, {inhibitOptimization: false, hint: fixHint(hint)});
+        db,
+        testColl,
+        optPipeline,
+        {inhibitOptimization: false, hint: fixHint(hint), postPlanningResults: true});
     const optExplainFull = testColl.explain().aggregate(optPipeline, {hint: fixHint(hint)});
     const containsOptimization = hasInternalBoundedSort(optExplain);
     assert(!containsOptimization, optExplainFull);

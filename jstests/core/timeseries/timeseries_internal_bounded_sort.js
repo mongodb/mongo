@@ -29,24 +29,30 @@ assert.commandWorked(
 const bucketMaxSpanSeconds =
     db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.bucketMaxSpanSeconds;
 
+// Create a descending time index to allow sorting by control.max.t
+assert.commandWorked(coll.createIndex({t: -1}));
+
 // Insert some data.
 {
     const numBatches = 10;
     const batchSize = 1000;
+    const intervalMillis = 100000;  // 100 seconds
+    const batchOffset = Math.floor(intervalMillis / (numBatches + 1));
     const start = new Date();
-    const intervalMillis = 1000;  // 1 second
     for (let i = 0; i < numBatches; ++i) {
-        const batch = Array.from(
-            {length: batchSize},
-            (_, j) =>
-                ({t: new Date(+start + i * batchSize * intervalMillis + j * intervalMillis)}));
+        const batch =
+            Array.from({length: batchSize},
+                       (_, j) => ({t: new Date(+start + i * batchOffset + j * intervalMillis)}));
         assert.commandWorked(coll.insert(batch));
         print(`Inserted ${i + 1} of ${numBatches} batches`);
     }
     assert.gt(buckets.aggregate([{$count: 'n'}]).next().n, 1, 'Expected more than one bucket');
+
+    TimeseriesTest.ensureDataIsDistributedIfSharded(
+        coll, new Date(+start + ((batchSize / 2) * intervalMillis)));
 }
 
-const unpackStage = getAggPlanStage(coll.explain().aggregate(), '$_internalUnpackBucket');
+const unpackStage = getAggPlanStages(coll.explain().aggregate(), '$_internalUnpackBucket')[0];
 
 function assertSorted(result, ascending) {
     let prev = ascending ? {t: -Infinity} : {t: Infinity};
@@ -65,51 +71,64 @@ function assertSorted(result, ascending) {
     }
 }
 
+function checkAgainstReference(reference, pipeline, hint, sortOrder) {
+    const opt = coll.aggregate(pipeline, {hint}).toArray();
+    assertSorted(opt, sortOrder);
+    assert.eq(reference, opt);
+
+    const plan = coll.explain({}).aggregate(pipeline, {hint});
+    const stages = getAggPlanStages(plan, "$_internalBoundedSort");
+    assert.neq(null, stages, plan);
+    assert.lte(1, stages.length, plan);
+}
+
 function runTest(ascending) {
     // Test sorting the whole collection
     {
-        const naive = buckets
-                          .aggregate([
-                              unpackStage,
-                              {$_internalInhibitOptimization: {}},
-                              {$sort: {t: ascending ? 1 : -1}},
-                          ])
-                          .toArray();
-        assertSorted(naive, ascending);
+        const reference = buckets
+                              .aggregate([
+                                  unpackStage,
+                                  {$_internalInhibitOptimization: {}},
+                                  {$sort: {t: ascending ? 1 : -1}},
+                              ])
+                              .toArray();
+        assertSorted(reference, ascending);
 
-        const optFromMin =
-            buckets
-                .aggregate([
-                    {$sort: {'control.min.t': ascending ? 1 : -1}},
-                    unpackStage,
-                    {
-                        $_internalBoundedSort: {
-                            sortKey: {t: ascending ? 1 : -1},
-                            bound: ascending ? {base: "min"}
-                                             : {base: "min", offsetSeconds: bucketMaxSpanSeconds}
-                        }
-                    },
-                ])
-                .toArray();
-        assertSorted(optFromMin, ascending);
-        assert.eq(naive, optFromMin);
+        // Check plan using control.min.t
+        checkAgainstReference(reference,
+                              [
+                                  {$sort: {t: ascending ? 1 : -1}},
+                              ],
+                              {"$natural": ascending ? 1 : -1},
+                              ascending);
 
-        const optFromMax =
-            buckets
-                .aggregate([
-                    {$sort: {'control.max.t': ascending ? 1 : -1}},
-                    unpackStage,
-                    {
-                        $_internalBoundedSort: {
-                            sortKey: {t: ascending ? 1 : -1},
-                            bound: ascending ? {base: "max", offsetSeconds: -bucketMaxSpanSeconds}
-                                             : {base: "max"}
-                        }
-                    },
-                ])
-                .toArray();
-        assertSorted(optFromMax, ascending);
-        assert.eq(naive, optFromMax);
+        // Check plan using control.max.t
+        if (ascending) {
+            // TODO (SERVER-64994): We can remove this manual re-write once we support index
+            // direction hints
+            const opt = buckets
+                            .aggregate([
+                                {$sort: {'control.max.t': ascending ? 1 : -1}},
+                                unpackStage,
+                                {
+                                    $_internalBoundedSort: {
+                                        sortKey: {t: 1},
+                                        bound: {base: "max", offsetSeconds: -bucketMaxSpanSeconds}
+                                    }
+                                },
+                            ])
+                            .toArray();
+
+            assertSorted(opt, ascending);
+            assert.eq(reference, opt);
+        } else {
+            checkAgainstReference(reference,
+                                  [
+                                      {$sort: {t: ascending ? 1 : -1}},
+                                  ],
+                                  't_-1',
+                                  ascending);
+        }
     }
 
     // Test $sort + $limit.

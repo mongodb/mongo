@@ -32,6 +32,11 @@ assert.commandWorked(
 const bucketMaxSpanSeconds =
     db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.bucketMaxSpanSeconds;
 
+assert.commandWorked(coll.createIndex({m: 1, t: 1}));
+assert.commandWorked(coll.createIndex({m: 1, t: -1}));
+assert.commandWorked(coll.createIndex({m: -1, t: 1}));
+assert.commandWorked(coll.createIndex({m: -1, t: -1}));
+
 // Insert some data.
 {
     const numSeries = 5;
@@ -59,9 +64,12 @@ const bucketMaxSpanSeconds =
                expectedBucketsPerSeries * numSeries,
                `Expected at least ${expectedBucketsPerSeries} buckets per series ` +
                    `(${expectedBucketsPerSeries}*${numSeries} total)`);
+
+    TimeseriesTest.ensureDataIsDistributedIfSharded(
+        coll, new Date(+start + ((batchSize / 2) * intervalMillis)));
 }
 
-const unpackStage = getAggPlanStage(coll.explain().aggregate(), '$_internalUnpackBucket');
+const unpackStage = getAggPlanStages(coll.explain().aggregate(), '$_internalUnpackBucket')[0];
 
 function inOrder(prev, doc, sortSpec) {
     const signum = (v) => {
@@ -110,10 +118,22 @@ function assertSorted(result, sortSpec) {
     }
 }
 
+function checkAgainstReference(reference, pipeline, hint, sortOrder) {
+    const opt = coll.aggregate(pipeline, {hint}).toArray();
+    assertSorted(opt, sortOrder);
+    assert.eq(reference, opt);
+
+    const plan = coll.explain({}).aggregate(pipeline, {hint});
+    const stages = getAggPlanStages(plan, "$_internalBoundedSort");
+    assert.neq(null, stages, plan);
+    assert.lte(1, stages.length, plan);
+}
+
 function runTest(sortSpec) {
     assert.eq(['m', 't'], Object.keys(sortSpec), 'Expected a compound sort on {m: _, t: _}');
     assert.contains(sortSpec.m, [-1, +1]);
     assert.contains(sortSpec.t, [-1, +1]);
+    const sortSpecHint = `m_${sortSpec.m}_t_${sortSpec.t}`;
 
     // Test sorting the whole collection
     {
@@ -122,38 +142,60 @@ function runTest(sortSpec) {
             {$_internalInhibitOptimization: {}},
             {$sort: sortSpec},
         ];
-        const naive = buckets.aggregate(naiveQuery).toArray();
-        assertSorted(naive, sortSpec);
+        const reference = buckets.aggregate(naiveQuery).toArray();
+        assertSorted(reference, sortSpec);
 
-        const optFromMinQuery = [
-            {$sort: {meta: sortSpec.m, 'control.min.t': sortSpec.t}},
-            unpackStage,
-            {
-                $_internalBoundedSort: {
-                    sortKey: sortSpec,
-                    bound: sortSpec.t > 0 ? {base: "min"}
-                                          : {base: "min", offsetSeconds: bucketMaxSpanSeconds}
-                }
-            },
-        ];
-        const optFromMin = buckets.aggregate(optFromMinQuery).toArray();
-        assertSorted(optFromMin, sortSpec);
-        assert.eq(naive, optFromMin);
+        // Check plan using control.min.t
+        if (sortSpec.t > 0) {
+            checkAgainstReference(reference,
+                                  [
+                                      {$sort: sortSpec},
+                                  ],
+                                  sortSpecHint,
+                                  sortSpec);
+        } else {
+            // TODO (SERVER-64994): We can remove this manual re-write once we support index
+            // direction hints
+            const optFromMinQuery = [
+                {$sort: {meta: sortSpec.m, 'control.min.t': sortSpec.t}},
+                unpackStage,
+                {
+                    $_internalBoundedSort: {
+                        sortKey: sortSpec,
+                        bound: {base: "min", offsetSeconds: bucketMaxSpanSeconds}
+                    }
+                },
+            ];
+            const optFromMin = buckets.aggregate(optFromMinQuery).toArray();
+            assertSorted(optFromMin, sortSpec);
+            assert.eq(reference, optFromMin);
+        }
 
-        const optFromMaxQuery = [
-            {$sort: {meta: sortSpec.m, 'control.max.t': sortSpec.t}},
-            unpackStage,
-            {
-                $_internalBoundedSort: {
-                    sortKey: sortSpec,
-                    bound: sortSpec.t > 0 ? {base: "max", offsetSeconds: -bucketMaxSpanSeconds}
-                                          : {base: "max"}
-                }
-            },
-        ];
-        const optFromMax = buckets.aggregate(optFromMaxQuery).toArray();
-        assertSorted(optFromMax, sortSpec);
-        assert.eq(naive, optFromMax);
+        // Check plan using control.max.t
+        if (sortSpec.t > 0) {
+            // TODO (SERVER-64994): We can remove this manual re-write once we support index
+            // direction hints
+            const optFromMaxQuery = [
+                {$sort: {meta: sortSpec.m, 'control.max.t': sortSpec.t}},
+                unpackStage,
+                {
+                    $_internalBoundedSort: {
+                        sortKey: sortSpec,
+                        bound: {base: "max", offsetSeconds: -bucketMaxSpanSeconds}
+                    }
+                },
+            ];
+            const optFromMax = buckets.aggregate(optFromMaxQuery).toArray();
+            assertSorted(optFromMax, sortSpec);
+            assert.eq(reference, optFromMax);
+        } else {
+            checkAgainstReference(reference,
+                                  [
+                                      {$sort: sortSpec},
+                                  ],
+                                  sortSpecHint,
+                                  sortSpec);
+        }
     }
 
     // Test $sort + $limit.
