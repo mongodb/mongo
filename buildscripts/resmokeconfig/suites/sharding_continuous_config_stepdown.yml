@@ -11,6 +11,12 @@ selector:
   - jstests/sharding/query/*[aA]uth*.js
   - jstests/sharding/change_streams/*[aA]uth*.js
   - jstests/sharding/internal_txns/internal_client_restrictions.js
+  - jstests/sharding/internal_txns/non_retryable_writes_during_migration.js
+  - jstests/sharding/internal_txns/retry_on_transient_error_validation.js
+  - jstests/sharding/internal_txns/retryable_findAndModify_during_migration_oplog.js
+  - jstests/sharding/internal_txns/retryable_findAndModify_during_migration_side_coll.js
+  - jstests/sharding/internal_txns/retryable_writes_aborted_during_migration.js
+  - jstests/sharding/internal_txns/retryable_writes_committed_during_migration.js
 
   - jstests/sharding/localhostAuthBypass.js
   - jstests/sharding/kill_sessions.js
