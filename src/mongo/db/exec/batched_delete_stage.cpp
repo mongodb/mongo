@@ -99,6 +99,7 @@ struct BatchedDeletesSSS : ServerStatusSection {
         bob.appendNumber("docs", docs.loadRelaxed());
         bob.appendNumber("stagedSizeBytes", stagedSizeBytes.loadRelaxed());
         bob.appendNumber("timeInBatchMillis", timeInBatchMillis.loadRelaxed());
+        bob.appendNumber("refetchesDueToYield", refetchesDueToYield.loadRelaxed());
 
         return bob.obj();
     }
@@ -107,7 +108,22 @@ struct BatchedDeletesSSS : ServerStatusSection {
     AtomicWord<long long> docs;
     AtomicWord<long long> stagedSizeBytes;
     AtomicWord<long long> timeInBatchMillis;
+    AtomicWord<long long> refetchesDueToYield;
 } batchedDeletesSSS;
+
+// Wrapper for write_stage_common::ensureStillMatches() which also updates the 'refetchesDueToYield'
+// serverStatus metric.
+bool ensureStillMatchesAndUpdateStats(const CollectionPtr& collection,
+                                      OperationContext* opCtx,
+                                      WorkingSet* ws,
+                                      WorkingSetID id,
+                                      const CanonicalQuery* cq) {
+    WorkingSetMember* member = ws->get(id);
+    if (opCtx->recoveryUnit()->getSnapshotId() != member->doc.snapshotId()) {
+        incrementSSSMetricNoOverflow(batchedDeletesSSS.refetchesDueToYield, 1);
+    }
+    return write_stage_common::ensureStillMatches(collection, opCtx, ws, id, cq);
+}
 
 BatchedDeleteStage::BatchedDeleteStage(ExpressionContext* expCtx,
                                        std::unique_ptr<DeleteStageParams> params,
@@ -248,7 +264,7 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
 
             // The PlanExecutor YieldPolicy may change snapshots between calls to 'doWork()'.
             // Different documents may have different snapshots.
-            bool docStillMatches = write_stage_common::ensureStillMatches(
+            bool docStillMatches = ensureStillMatchesAndUpdateStats(
                 collection(), opCtx(), _ws, workingSetMemberID, _params->canonicalQuery);
 
             WorkingSetMember* member = _ws->get(workingSetMemberID);
@@ -271,7 +287,7 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
                 // Committing the original WUOW and creating a new WUOW has the side effect of
                 // allocating a new snapshot, so we have to re-check whether the staged document
                 // still matches the query predicate.
-                if (!write_stage_common::ensureStillMatches(
+                if (!ensureStillMatchesAndUpdateStats(
                         collection(), opCtx(), _ws, workingSetMemberID, _params->canonicalQuery)) {
                     recordsToSkip.insert(workingSetMemberID);
                     break;

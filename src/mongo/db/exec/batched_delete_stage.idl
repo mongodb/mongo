@@ -38,7 +38,7 @@ server_parameters:
     set_at: [startup, runtime]
     cpp_vartype: 'AtomicWord<long long>'
     cpp_varname: gBatchedDeletesTargetStagedDocBytes
-    default: 31457280 # 30MB
+    default: 2097152 # 2MB
     validator:
       gte: 0
   batchedDeletesTargetBatchDocs:
@@ -46,7 +46,7 @@ server_parameters:
     set_at: [startup, runtime]
     cpp_vartype: 'AtomicWord<long long>'
     cpp_varname: "gBatchedDeletesTargetBatchDocs"
-    default: 10 # TODO (SERVER-64547): re-evaluate this default.
+    default: 10
     validator:
       gte: 0
   batchedDeletesTargetBatchTimeMS:
