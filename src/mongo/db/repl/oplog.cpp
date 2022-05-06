@@ -551,7 +551,7 @@ std::vector<OpTime> logInsertOps(
                         "namespace"_attr = nss,
                         "document"_attr = begin[i].doc);
 
-            oplogEntry.setFromMigrateIfTrue(true);
+            oplogEntry.setFromMigrate(true);
         }
         appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, begin[i].stmtIds);
 

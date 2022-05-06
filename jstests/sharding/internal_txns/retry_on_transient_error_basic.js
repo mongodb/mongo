@@ -145,6 +145,10 @@ function testPersistence(shardRst, lsid, txnNumber, txnDocFilter, oplogEntryFilt
     const txnRetryCounter1 = NumberInt(1);
     let db = shardRst.getPrimary().getDB(kDbName);
 
+    // Preload the collection metadata to avoid repeating the insert command if it fails due to
+    // StaleConfig error.
+    assert.commandWorked(db.adminCommand({_flushRoutingTableCacheUpdates: kNs}));
+
     const insertCmdObj = {
         insert: kCollName,
         documents: [{x: 0}],
