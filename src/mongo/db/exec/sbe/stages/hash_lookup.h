@@ -185,9 +185,9 @@ private:
     value::SlotAccessorMap _outAccessorMap;
     value::SlotAccessorMap _outInnerProjectAccessorMap;
 
-    value::SlotAccessor* _inOuterMatchAccessor;
+    value::SlotAccessor* _inOuterMatchAccessor{nullptr};
 
-    value::SlotAccessor* _inInnerMatchAccessor;
+    value::SlotAccessor* _inInnerMatchAccessor{nullptr};
     std::vector<value::SlotAccessor*> _inInnerProjectAccessors;
     std::vector<value::SwitchAccessor> _outInnerProjectAccessors;
     std::vector<value::MaterializedSingleRowAccessor> _outResultAggAccessors;
@@ -203,7 +203,7 @@ private:
     std::vector<BufferAccessor> _outInnerBufferProjectAccessors;
 
     // Accessor for collator. Only set if collatorSlot provided during construction.
-    value::SlotAccessor* _collatorAccessor = nullptr;
+    value::SlotAccessor* _collatorAccessor{nullptr};
 
     // Key used to probe inside the hash table.
     value::MaterializedRow _probeKey;
