@@ -542,55 +542,57 @@ TEST_F(WiredTigerKVEngineTest, WiredTigerDowngrade) {
 }
 
 TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
+    auto opCtxPtr = _makeOperationContext();
+
     // Perform each test in their own limited scope in order to establish different
     // severity levels.
     {
-        // Set the WiredTiger Checkpoint LOGV2 component severity to the Log level.
+        // Set the WiredTiger WriteLog LOGV2 component severity to the Log level.
         auto severityGuard = unittest::MinimumLoggedSeverityGuard{
-            logv2::LogComponent::kWiredTigerCheckpoint, logv2::LogSeverity::Log()};
+            logv2::LogComponent::kWiredTigerWriteLog, logv2::LogSeverity::Log()};
         ASSERT_EQ(logv2::LogSeverity::Log(),
-                  unittest::getMinimumLogSeverity(logv2::LogComponent::kWiredTigerCheckpoint));
+                  unittest::getMinimumLogSeverity(logv2::LogComponent::kWiredTigerWriteLog));
         ASSERT_OK(_engine->reconfigureLogging());
-        // Perform a checkpoint. The goal here is create some activity in WiredTiger in order
-        // to generate verbose messages (we don't really care about the checkpoint itself).
+        // Perform a flush. The goal here is create some activity in WiredTiger in order to generate
+        // verbose messages (we don't really care about the flush itself).
         startCapturingLogMessages();
-        _engine->checkpoint();
+        _engine->flushAllFiles(opCtxPtr.get(), /*callerHoldsReadLock=*/false);
         stopCapturingLogMessages();
-        // In this initial case, we don't expect to capture any debug checkpoint messages. The
-        // base severity for the checkpoint component should be at Log().
-        bool foundWTCheckpointMessage = false;
+        // In this initial case, we don't expect to capture any debug write log messages. The base
+        // severity for the write log component should be at Log().
+        bool foundWTWriteLogMessage = false;
         for (auto&& bson : getCapturedBSONFormatLogMessages()) {
-            if (bson["c"].String() == "WTCHKPT" &&
+            if (bson["c"].String() == "WTWRTLOG" &&
                 bson["attr"]["message"]["verbose_level"].String() == "DEBUG" &&
-                bson["attr"]["message"]["category"].String() == "WT_VERB_CHECKPOINT") {
-                foundWTCheckpointMessage = true;
+                bson["attr"]["message"]["category"].String() == "WT_VERB_LOG") {
+                foundWTWriteLogMessage = true;
             }
         }
-        ASSERT_FALSE(foundWTCheckpointMessage);
+        ASSERT_FALSE(foundWTWriteLogMessage);
     }
     {
-        // Set the WiredTiger Checkpoint LOGV2 component severity to the Debug(1) level.
+        // Set the WiredTiger WriteLog LOGV2 component severity to the Debug(2) level.
         auto severityGuard = unittest::MinimumLoggedSeverityGuard{
-            logv2::LogComponent::kWiredTigerCheckpoint, logv2::LogSeverity::Debug(1)};
+            logv2::LogComponent::kWiredTigerWriteLog, logv2::LogSeverity::Debug(2)};
         ASSERT_OK(_engine->reconfigureLogging());
-        ASSERT_EQ(logv2::LogSeverity::Debug(1),
-                  unittest::getMinimumLogSeverity(logv2::LogComponent::kWiredTigerCheckpoint));
+        ASSERT_EQ(logv2::LogSeverity::Debug(2),
+                  unittest::getMinimumLogSeverity(logv2::LogComponent::kWiredTigerWriteLog));
 
-        // Perform another checkpoint.
+        // Perform another flush.
         startCapturingLogMessages();
-        _engine->checkpoint();
+        _engine->flushAllFiles(opCtxPtr.get(), /*callerHoldsReadLock=*/false);
         stopCapturingLogMessages();
 
-        // This time we expect to detect WiredTiger checkpoint Debug() messages.
-        bool foundWTCheckpointMessage = false;
+        // This time we expect to detect WiredTiger write log Debug() messages.
+        bool foundWTWriteLogMessage = false;
         for (auto&& bson : getCapturedBSONFormatLogMessages()) {
-            if (bson["c"].String() == "WTCHKPT" &&
+            if (bson["c"].String() == "WTWRTLOG" &&
                 bson["attr"]["message"]["verbose_level"].String() == "DEBUG" &&
-                bson["attr"]["message"]["category"].String() == "WT_VERB_CHECKPOINT") {
-                foundWTCheckpointMessage = true;
+                bson["attr"]["message"]["category"].String() == "WT_VERB_LOG") {
+                foundWTWriteLogMessage = true;
             }
         }
-        ASSERT_TRUE(foundWTCheckpointMessage);
+        ASSERT_TRUE(foundWTWriteLogMessage);
     }
 }
 

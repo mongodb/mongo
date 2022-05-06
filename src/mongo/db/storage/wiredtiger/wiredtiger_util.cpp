@@ -1246,21 +1246,28 @@ void WiredTigerUtil::appendSnapshotWindowSettings(WiredTigerKVEngine* engine,
 
 std::string WiredTigerUtil::generateWTVerboseConfiguration() {
     // Mapping between LOGV2 WiredTiger components and their WiredTiger verbose setting counterpart.
-    static const StaticImmortal wtVerboseComponents = std::map<logv2::LogComponent, std::string>{
-        {logv2::LogComponent::kWiredTigerBackup, "backup"},
-        {logv2::LogComponent::kWiredTigerCheckpoint, "checkpoint"},
-        {logv2::LogComponent::kWiredTigerCompact, "compact"},
-        {logv2::LogComponent::kWiredTigerEviction, "evict"},
-        {logv2::LogComponent::kWiredTigerHS, "history_store"},
-        {logv2::LogComponent::kWiredTigerRecovery, "recovery"},
-        {logv2::LogComponent::kWiredTigerRTS, "rts"},
-        {logv2::LogComponent::kWiredTigerSalvage, "salvage"},
-        {logv2::LogComponent::kWiredTigerTiered, "tiered"},
-        {logv2::LogComponent::kWiredTigerTimestamp, "timestamp"},
-        {logv2::LogComponent::kWiredTigerTransaction, "transaction"},
-        {logv2::LogComponent::kWiredTigerVerify, "verify"},
-        {logv2::LogComponent::kWiredTigerWriteLog, "log"},
-    };
+    // The WiredTiger components will only be configured to be verbose if the current log component
+    // verbosity is at least the given log severity for a given component. Otherwise, only
+    // informational log messages will be provided for the given component.
+    static const StaticImmortal wtVerboseComponents =
+        std::map<logv2::LogComponent, std::pair<std::string, logv2::LogSeverity>>{
+            {logv2::LogComponent::kWiredTigerBackup, {"backup", logv2::LogSeverity::Debug(2)}},
+            {logv2::LogComponent::kWiredTigerCheckpoint,
+             {"checkpoint", logv2::LogSeverity::Info()}},
+            {logv2::LogComponent::kWiredTigerCompact, {"compact", logv2::LogSeverity::Info()}},
+            {logv2::LogComponent::kWiredTigerEviction, {"evict", logv2::LogSeverity::Debug(2)}},
+            {logv2::LogComponent::kWiredTigerHS, {"history_store", logv2::LogSeverity::Debug(2)}},
+            {logv2::LogComponent::kWiredTigerRecovery, {"recovery", logv2::LogSeverity::Info()}},
+            {logv2::LogComponent::kWiredTigerRTS, {"rts", logv2::LogSeverity::Debug(2)}},
+            {logv2::LogComponent::kWiredTigerSalvage, {"salvage", logv2::LogSeverity::Debug(2)}},
+            {logv2::LogComponent::kWiredTigerTiered, {"tiered", logv2::LogSeverity::Debug(2)}},
+            {logv2::LogComponent::kWiredTigerTimestamp,
+             {"timestamp", logv2::LogSeverity::Debug(2)}},
+            {logv2::LogComponent::kWiredTigerTransaction,
+             {"transaction", logv2::LogSeverity::Debug(2)}},
+            {logv2::LogComponent::kWiredTigerVerify, {"verify", logv2::LogSeverity::Debug(2)}},
+            {logv2::LogComponent::kWiredTigerWriteLog, {"log", logv2::LogSeverity::Debug(2)}},
+        };
 
     str::stream cfg;
 
@@ -1271,14 +1278,15 @@ std::string WiredTigerUtil::generateWTVerboseConfiguration() {
     cfg << "recovery_progress:1,checkpoint_progress:1,compact_progress:1";
 
     // Process each LOGV2 WiredTiger component and set the desired verbosity level.
-    for (const auto& [component, componentStr] : *wtVerboseComponents) {
-        auto severity =
-            logv2::LogManager::global().getGlobalSettings().getMinimumLogSeverity(component);
+    for (const auto& [component, componentStrAndSeverity] : *wtVerboseComponents) {
+        const auto& [componentStr, severity] = componentStrAndSeverity;
+        bool verbose =
+            logv2::LogManager::global().getGlobalSettings().shouldLog(component, severity);
 
         cfg << ",";
 
         int level;
-        if (severity.toInt() >= logv2::LogSeverity::Debug(1).toInt())
+        if (verbose)
             level = WT_VERBOSE_DEBUG;
         else
             level = WT_VERBOSE_INFO;
