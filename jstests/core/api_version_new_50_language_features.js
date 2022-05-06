@@ -11,6 +11,7 @@
 load("jstests/libs/api_version_helpers.js");  // For 'APIVersionHelpers'.
 
 const collName = "api_version_new_50_language_features";
+const viewName = collName + "_view";
 const coll = db[collName];
 coll.drop();
 assert.commandWorked(coll.insert({a: 1, date: new ISODate()}));
@@ -24,53 +25,12 @@ const stablePipelines = [
     [{$set: {x: {$setField: {input: "$$ROOT", field: "x", value: "foo"}}}}],
 ];
 
-function assertAggregateFailsWithAPIStrict(pipeline, errorCodes) {
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: collName,
-        pipeline: pipeline,
-        cursor: {},
-        apiStrict: true,
-        apiVersion: "1"
-    }),
-                                 errorCodes,
-                                 pipeline);
-}
-
-function assertAggregateSucceedsWithAPIStrict(pipeline) {
-    assert.commandWorked(db.runCommand(
-        {aggregate: collName, pipeline: pipeline, cursor: {}, apiStrict: true, apiVersion: "1"}));
-}
-
-function assertViewFailsWithAPIStrict(pipeline) {
-    assert.commandFailedWithCode(db.runCommand({
-        create: 'new_50_feature_view',
-        viewOn: collName,
-        pipeline: pipeline,
-        apiStrict: true,
-        apiVersion: "1"
-    }),
-                                 ErrorCodes.APIStrictError,
-                                 pipeline);
-}
-
-function assertViewSucceedsWithAPIStrict(pipeline) {
-    assert.commandWorked(db.runCommand({
-        create: 'new_50_feature_view',
-        viewOn: collName,
-        pipeline: pipeline,
-        apiStrict: true,
-        apiVersion: "1"
-    }));
-
-    assert.commandWorked(db.runCommand({drop: 'new_50_feature_view'}));
-}
-
 for (let pipeline of stablePipelines) {
     // Assert error thrown when running a pipeline with stages not in API Version 1.
     APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(pipeline, collName);
 
     // Assert error thrown when creating a view on a pipeline with stages not in API Version 1.
-    assertViewSucceedsWithAPIStrict(pipeline);
+    APIVersionHelpers.assertViewSucceedsWithAPIStrict(pipeline, viewName, collName);
 
     // Assert error is not thrown when running without apiStrict=true.
     assert.commandWorked(db.runCommand({
@@ -89,14 +49,14 @@ const setWindowFieldsPipeline = [{
         output: {runningCount: {$sum: 1, window: {documents: ["unbounded", "current"]}}}
     }
 }];
-assertAggregateSucceedsWithAPIStrict(setWindowFieldsPipeline);
+APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(setWindowFieldsPipeline, collName);
 
 APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(
     setWindowFieldsPipeline,
     collName,
     [ErrorCodes.InvalidOptions, ErrorCodes.OperationNotSupportedInTransaction]);
 
-APIVersionHelpers.assertViewSucceedsWithAPIStrict(setWindowFieldsPipeline, collName);
+APIVersionHelpers.assertViewSucceedsWithAPIStrict(setWindowFieldsPipeline, viewName, collName);
 
 // Creating a collection with dotted paths is allowed with apiStrict:true.
 

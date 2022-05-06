@@ -51,9 +51,9 @@ var APIVersionHelpers = (function() {
      * Asserts that the given pipeline cannot be used to define a view when apiStrict is set to true
      * and apiVersion is "1" on the create command.
      */
-    function assertViewFailsWithAPIStrict(pipeline, collName) {
+    function assertViewFailsWithAPIStrict(pipeline, viewName, collName) {
         assert.commandFailedWithCode(db.runCommand({
-            create: 'new_50_feature_view',
+            create: viewName,
             viewOn: collName,
             pipeline: pipeline,
             apiStrict: true,
@@ -67,16 +67,16 @@ var APIVersionHelpers = (function() {
      * Asserts that the given pipeline can be used to define a view when apiStrict is set to true
      * and apiVersion is "1" on the create command.
      */
-    function assertViewSucceedsWithAPIStrict(pipeline, collName) {
+    function assertViewSucceedsWithAPIStrict(pipeline, viewName, collName) {
         assert.commandWorked(db.runCommand({
-            create: 'new_50_feature_view',
+            create: viewName,
             viewOn: collName,
             pipeline: pipeline,
             apiStrict: true,
             apiVersion: "1"
         }));
 
-        assert.commandWorked(db.runCommand({drop: 'new_50_feature_view'}));
+        assert.commandWorked(db.runCommand({drop: viewName}));
     }
 
     return {
