@@ -49,7 +49,6 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_map_reduce_agg.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/s/query/cluster_aggregation_planner.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 
@@ -108,7 +107,7 @@ auto makeExpressionContext(OperationContext* opCtx,
         boost::none,
         false  // mayDbProfile: false because mongos has no profile collection.
     );
-    expCtx->inMongos = isMongos();
+    expCtx->inMongos = true;
     return expCtx;
 }
 
