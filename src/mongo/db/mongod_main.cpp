@@ -556,10 +556,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     auto const globalAuthzManager = AuthorizationManager::get(serviceContext);
     uassertStatusOK(globalAuthzManager->initialize(startupOpCtx.get()));
 
-    if (gFeatureFlagClusterWideConfig.isEnabledAndIgnoreFCV()) {
-        ClusterServerParameterOpObserver::initializeAllParametersFromDisk(startupOpCtx.get());
-    }
-
     if (audit::initializeManager) {
         audit::initializeManager(startupOpCtx.get());
     }

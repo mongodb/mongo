@@ -30,141 +30,25 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/change_stream_options_manager.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_interface_local.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/idl/cluster_server_parameter_gen.h"
+#include "mongo/idl/cluster_server_parameter_test_util.h"
+
 #include "mongo/idl/cluster_server_parameter_op_observer.h"
-#include "mongo/idl/cluster_server_parameter_test_gen.h"
-#include "mongo/idl/server_parameter.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 
 namespace mongo {
 namespace {
+using namespace cluster_server_parameter_test_util;
 
 const std::vector<NamespaceString> kIgnoredNamespaces = {
     NamespaceString("config"_sd, "settings"_sd),
     NamespaceString("local"_sd, "clusterParameters"_sd),
     NamespaceString("test"_sd, "foo"_sd)};
 
-constexpr auto kCSPTest = "cspTest"_sd;
-const auto kNilCPT = LogicalTime::kUninitialized;
-
-constexpr auto kConfigDB = "config"_sd;
-constexpr auto kClusterParametersColl = "clusterParameters"_sd;
-const NamespaceString kClusterParametersNS(kConfigDB, kClusterParametersColl);
-
-void upsert(BSONObj doc) {
-    const auto kMajorityWriteConcern = BSON("writeConcern" << BSON("w"
-                                                                   << "majority"));
-
-    auto uniqueOpCtx = cc().makeOperationContext();
-    auto* opCtx = uniqueOpCtx.get();
-
-    BSONObj res;
-    DBDirectClient client(opCtx);
-
-    client.runCommand(kConfigDB.toString(),
-                      [&] {
-                          write_ops::UpdateCommandRequest updateOp(kClusterParametersNS);
-                          updateOp.setUpdates({[&] {
-                              write_ops::UpdateOpEntry entry;
-                              entry.setQ(BSON(ClusterServerParameter::k_idFieldName << kCSPTest));
-                              entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                                  BSON("$set" << doc)));
-                              entry.setMulti(false);
-                              entry.setUpsert(true);
-                              return entry;
-                          }()});
-                          return updateOp.toBSON(kMajorityWriteConcern);
-                      }(),
-                      res);
-
-    BatchedCommandResponse response;
-    std::string errmsg;
-    if (!response.parseBSON(res, &errmsg)) {
-        uasserted(ErrorCodes::FailedToParse, str::stream() << "Failure: " << errmsg);
-    }
-
-    uassertStatusOK(response.toStatus());
-    uassert(ErrorCodes::OperationFailed, "No documents upserted", response.getN());
-}
-
-void remove() {
-    auto uniqueOpCtx = cc().makeOperationContext();
-    auto* opCtx = uniqueOpCtx.get();
-
-    BSONObj res;
-    DBDirectClient(opCtx).runCommand(
-        kConfigDB.toString(),
-        [] {
-            write_ops::DeleteCommandRequest deleteOp(kClusterParametersNS);
-            deleteOp.setDeletes({[] {
-                write_ops::DeleteOpEntry entry;
-                entry.setQ(BSON(ClusterServerParameter::k_idFieldName << kCSPTest));
-                entry.setMulti(true);
-                return entry;
-            }()});
-            return deleteOp.toBSON({});
-        }(),
-        res);
-
-    BatchedCommandResponse response;
-    std::string errmsg;
-    if (!response.parseBSON(res, &errmsg)) {
-        uasserted(ErrorCodes::FailedToParse,
-                  str::stream() << "Failed to parse reply to delete command: " << errmsg);
-    }
-    uassertStatusOK(response.toStatus());
-}
-
-BSONObj makeClusterParametersDoc(const LogicalTime& cpTime, int intValue, StringData strValue) {
-    ClusterServerParameter csp;
-    csp.set_id(kCSPTest);
-    csp.setClusterParameterTime(cpTime);
-
-    ClusterServerParameterTest cspt;
-    cspt.setClusterServerParameter(std::move(csp));
-    cspt.setIntValue(intValue);
-    cspt.setStrValue(strValue);
-
-    return cspt.toBSON();
-}
-
-class ClusterServerParameterOpObserverTest : public ServiceContextMongoDTest {
+class ClusterServerParameterOpObserverTest : public ClusterServerParameterTestBase {
 public:
-    void setUp() final {
-        // Set up mongod.
-        ServiceContextMongoDTest::setUp();
-
-        auto service = getServiceContext();
-        auto opCtx = cc().makeOperationContext();
-        repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
-
-        // Set up ReplicationCoordinator and create oplog.
-        repl::ReplicationCoordinator::set(
-            service,
-            std::make_unique<repl::ReplicationCoordinatorMock>(service, createReplSettings()));
-        repl::createOplog(opCtx.get());
-
-        // Set up the ChangeStreamOptionsManager so that it can be retrieved/set.
-        ChangeStreamOptionsManager::create(service);
-
-        // Ensure that we are primary.
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
-        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
-    }
-
     void doInserts(const NamespaceString& nss, std::initializer_list<BSONObj> docs) {
         std::vector<InsertStatement> stmts;
         std::transform(docs.begin(), docs.end(), std::back_inserter(stmts), [](auto doc) {
@@ -248,18 +132,13 @@ public:
         ASSERT_EQ(finalCspTest.getStrValue(), initialCspTest.getStrValue());
     }
 
-    static constexpr auto kInitialIntValue = 123;
-    static constexpr auto kDefaultIntValue = 42;
-    static constexpr auto kInitialStrValue = "initialState"_sd;
-    static constexpr auto kDefaultStrValue = ""_sd;
-
     BSONObj initializeState() {
         Timestamp now(time(nullptr));
         const auto doc =
             makeClusterParametersDoc(LogicalTime(now), kInitialIntValue, kInitialStrValue);
 
         upsert(doc);
-        doInserts(kClusterParametersNS, {doc});
+        doInserts(NamespaceString::kClusterParametersNamespace, {doc});
 
         auto* sp = ServerParameterSet::getClusterParameterSet()
                        ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
@@ -285,15 +164,7 @@ public:
     template <typename F>
     void assertIgnoredAlways(F fn) {
         assertIgnoredOtherNamespaces(fn);
-        assertIgnored(kClusterParametersNS, fn);
-    }
-
-private:
-    static repl::ReplSettings createReplSettings() {
-        repl::ReplSettings settings;
-        settings.setOplogSizeBytes(5 * 1024 * 1024);
-        settings.setReplSetString("mySet/node1:12345");
-        return settings;
+        assertIgnored(NamespaceString::kClusterParametersNamespace, fn);
     }
 
 protected:
@@ -313,7 +184,7 @@ TEST_F(ClusterServerParameterOpObserverTest, OnInsertRecord) {
     const auto singleStrValue = "OnInsertRecord.single";
 
     ASSERT_LT(initialLogicalTime, singleLogicalTime);
-    doInserts(kClusterParametersNS,
+    doInserts(NamespaceString::kClusterParametersNamespace,
               {makeClusterParametersDoc(singleLogicalTime, singleIntValue, singleStrValue)});
 
     ClusterServerParameterTest cspTest = sp->getValue();
@@ -327,7 +198,7 @@ TEST_F(ClusterServerParameterOpObserverTest, OnInsertRecord) {
     const auto multiStrValue = "OnInsertRecord.multi";
 
     ASSERT_LT(singleLogicalTime, multiLogicalTime);
-    doInserts(kClusterParametersNS,
+    doInserts(NamespaceString::kClusterParametersNamespace,
               {
                   BSON(ClusterServerParameter::k_idFieldName << "ignored"),
                   makeClusterParametersDoc(multiLogicalTime, multiIntValue, multiStrValue),
@@ -381,7 +252,7 @@ TEST_F(ClusterServerParameterOpObserverTest, OnUpdateRecord) {
     const auto singleStrValue = "OnUpdateRecord.single";
     ASSERT_LT(initialLogicalTime, singleLogicalTime);
 
-    doUpdate(kClusterParametersNS,
+    doUpdate(NamespaceString::kClusterParametersNamespace,
              makeClusterParametersDoc(singleLogicalTime, singleIntValue, singleStrValue));
 
     ClusterServerParameterTest cspTest = sp->getValue();
@@ -418,7 +289,7 @@ TEST_F(ClusterServerParameterOpObserverTest, onDeleteRecord) {
     });
 
     // Reset configuration to defaults when we claim to have deleted the doc.
-    doDelete(kClusterParametersNS, initialDoc);
+    doDelete(NamespaceString::kClusterParametersNamespace, initialDoc);
     ClusterServerParameterTest cspTest = sp->getValue();
     ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
@@ -426,7 +297,7 @@ TEST_F(ClusterServerParameterOpObserverTest, onDeleteRecord) {
 
     // Restore configured state, and delete without including deleteDoc reference.
     initializeState();
-    doDelete(kClusterParametersNS, initialDoc, false);
+    doDelete(NamespaceString::kClusterParametersNamespace, initialDoc, false);
     cspTest = sp->getValue();
     ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
@@ -473,13 +344,13 @@ TEST_F(ClusterServerParameterOpObserverTest, onRenameCollection) {
     // since the rename away doesn't require a rescan.
 
     // Rename away (and reset to default)
-    doRenameCollection(kClusterParametersNS, kTestFoo);
+    doRenameCollection(NamespaceString::kClusterParametersNamespace, kTestFoo);
     ClusterServerParameterTest cspTest = sp->getValue();
     ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
 
     // Rename in (and restore to initialized state)
-    doRenameCollection(kTestFoo, kClusterParametersNS);
+    doRenameCollection(kTestFoo, NamespaceString::kClusterParametersNamespace);
     cspTest = sp->getValue();
     ASSERT_EQ(cspTest.getIntValue(), kInitialIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kInitialStrValue);
@@ -501,7 +372,7 @@ TEST_F(ClusterServerParameterOpObserverTest, onImportCollection) {
     auto doc =
         makeClusterParametersDoc(LogicalTime(Timestamp(time(nullptr))), 333, "onImportCollection");
     upsert(doc);
-    doImportCollection(kClusterParametersNS);
+    doImportCollection(NamespaceString::kClusterParametersNamespace);
     ClusterServerParameterTest cspTest = sp->getValue();
     ASSERT_EQ(cspTest.getIntValue(), 333);
     ASSERT_EQ(cspTest.getStrValue(), "onImportCollection");
@@ -528,7 +399,7 @@ TEST_F(ClusterServerParameterOpObserverTest, onReplicationRollback) {
 
     // Trigger rollback of relevant namespace.
     remove();
-    doReplicationRollback({kClusterParametersNS});
+    doReplicationRollback({NamespaceString::kClusterParametersNamespace});
     cspTest = sp->getValue();
     ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
@@ -538,7 +409,7 @@ TEST_F(ClusterServerParameterOpObserverTest, onReplicationRollback) {
         LogicalTime(Timestamp(time(nullptr))), 444, "onReplicationRollback");
     upsert(doc);
     cspTest = sp->getValue();
-    doReplicationRollback({kClusterParametersNS});
+    doReplicationRollback({NamespaceString::kClusterParametersNamespace});
     ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
 }
