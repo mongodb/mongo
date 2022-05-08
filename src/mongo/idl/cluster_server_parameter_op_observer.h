@@ -47,15 +47,6 @@ namespace mongo {
  */
 class ClusterServerParameterOpObserver final : public OpObserver {
 public:
-    /**
-     * Used on start, import, and rename without drop.
-     * No need to clear any documents not in the current set,
-     * since the load is purely additive.
-     *
-     * Should only be invoked directly from mongod_main.
-     */
-    static void initializeAllParametersFromDisk(OperationContext*);
-
     // Interface methods.
 
     void onInserts(OperationContext* opCtx,
