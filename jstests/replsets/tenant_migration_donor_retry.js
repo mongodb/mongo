@@ -43,11 +43,8 @@ function setup() {
     donorRst.startSet();
     donorRst.initiate();
 
-    const tenantMigrationTest = new TenantMigrationTest({
-        name: jsTestName(),
-        donorRst: donorRst,
-        sharedOptions: {setParameter: garbageCollectionOpts},
-    });
+    const tenantMigrationTest = new TenantMigrationTest(
+        {name: jsTestName(), donorRst: donorRst, quickGarbageCollection: true});
     return {
         tenantMigrationTest,
         teardown: function() {

@@ -90,7 +90,6 @@ function testRejectAllReadsAfterCloningDone({testCase, dbName, collName, tenantM
     beforeFetchingTransactionsFp.off();
     TenantMigrationTest.assertCommitted(runMigrationThread.returnData());
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
-    tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString);
 }
 
 /**
@@ -170,7 +169,6 @@ function testRejectOnlyReadsWithAtClusterTimeLessThanRejectReadsBeforeTimestamp(
     });
 
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
-    tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString);
 }
 
 /**
@@ -223,7 +221,6 @@ function testDoNotRejectReadsAfterMigrationAbortedBeforeReachingRejectReadsBefor
             runCommand(db, testCase.command(collName), null);
         }
     });
-    tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString);
 }
 
 /**
@@ -415,34 +412,25 @@ const testFuncs = {
         testDoNotRejectReadsAfterMigrationAbortedAfterReachingRejectReadsBeforeTimestamp
 };
 
-const tenantMigrationTest = new TenantMigrationTest({
-    name: jsTestName(),
-    quickGarbageCollection: true,
-});
 for (const [testName, testFunc] of Object.entries(testFuncs)) {
     for (const [testCaseName, testCase] of Object.entries(testCases)) {
         jsTest.log("Testing " + testName + " with testCase " + testCaseName);
         let tenantId = `${testCaseName}-${testName}`;
-        let migrationDb = `${tenantId}_test`;
-        tenantMigrationTest.insertDonorDB(migrationDb, "test");
         let dbName = `${tenantId}_${kTenantDefinedDbName}`;
+        const tenantMigrationTest = new TenantMigrationTest({
+            name: jsTestName(),
+            quickGarbageCollection: true,
+            insertDataForTenant: tenantId,
+        });
 
-        // Force the recipient to preserve all snapshot history to ensure that snapshot reads do
-        // not fail with SnapshotTooOld due to snapshot being unavailable.
+        // Force the recipient to preserve all snapshot history to ensure that snapshot reads do not
+        // fail with SnapshotTooOld due to snapshot being unavailable.
         tenantMigrationTest.getRecipientRst().nodes.forEach(node => {
             configureFailPoint(node, "WTPreserveSnapshotHistoryIndefinitely");
         });
 
         testFunc({testCase, dbName, collName: kCollName, tenantMigrationTest});
-
-        // ShardMerge is not robust to migrating the twice in quick succession. We drop the data
-        // files to ensure a subsequent tenant migration will avoid trying to merge files from the
-        // previous migration.
-        assert.commandWorked(
-            tenantMigrationTest.getDonorRst().getPrimary().getDB(migrationDb).dropDatabase());
-        assert.commandWorked(
-            tenantMigrationTest.getRecipientRst().getPrimary().getDB(migrationDb).dropDatabase());
+        tenantMigrationTest.stop();
     }
 }
-tenantMigrationTest.stop();
 })();
