@@ -254,9 +254,10 @@ SemiFuture<void> ReshardingTxnCloner::run(
 
                    {
                        auto opCtx = factory.makeOperationContext(&cc());
-                       if (auto hitPreparedTxn = doOneRecord(opCtx.get(), *chainCtx->donorRecord)) {
-                           return future_util::withCancellation(std::move(*hitPreparedTxn),
-                                                                cancelToken);
+                       if (auto conflictingTxnCompletionFuture =
+                               doOneRecord(opCtx.get(), *chainCtx->donorRecord)) {
+                           return future_util::withCancellation(
+                               std::move(*conflictingTxnCompletionFuture), cancelToken);
                        }
                    }
 

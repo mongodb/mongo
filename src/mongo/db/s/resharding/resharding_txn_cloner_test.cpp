@@ -382,6 +382,20 @@ protected:
             .onCompletion([](auto x) { return x; });
     }
 
+    void makeInProgressTxn(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
+        opCtx->setInMultiDocumentTransaction();
+        opCtx->setLogicalSessionId(std::move(lsid));
+        opCtx->setTxnNumber(txnNumber);
+
+        MongoDOperationContextSession ocs(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        txnParticipant.beginOrContinue(
+            opCtx, {txnNumber}, false /* autocommit */, true /* startTransaction */);
+
+        txnParticipant.unstashTransactionResources(opCtx, "insert");
+        txnParticipant.stashTransactionResources(opCtx);
+    }
+
     repl::OpTime makePreparedTxn(OperationContext* opCtx,
                                  LogicalSessionId lsid,
                                  TxnNumber txnNumber) {
@@ -416,7 +430,7 @@ protected:
         return opTime;
     }
 
-    void clearPreparedTxn(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
+    void abortTxn(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
         opCtx->setInMultiDocumentTransaction();
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
@@ -429,6 +443,19 @@ protected:
         txnParticipant.unstashTransactionResources(opCtx, "abortTransaction");
         txnParticipant.abortTransaction(opCtx);
         txnParticipant.stashTransactionResources(opCtx);
+    }
+
+    Timestamp getLatestOplogTimestamp(OperationContext* opCtx) {
+        DBDirectClient client(opCtx);
+
+        FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
+        findRequest.setSort(BSON("ts" << -1));
+        findRequest.setLimit(1);
+        auto cursor = client.find(findRequest);
+        ASSERT_TRUE(cursor->more());
+        const auto oplogEntry = cursor->next();
+
+        return oplogEntry.getField("ts").timestamp();
     }
 
     std::vector<repl::DurableOplogEntry> findOplogEntriesNewerThan(OperationContext* opCtx,
@@ -923,14 +950,14 @@ TEST_F(ReshardingTxnClonerTest, WaitsOnPreparedTxnAndAutomaticallyRetries) {
         executor->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
     ASSERT_FALSE(future.isReady());
 
-    clearPreparedTxn(operationContext(), lsid, existingTxnNumber);
+    abortTxn(operationContext(), lsid, existingTxnNumber);
 
     ASSERT_OK(future.getNoThrow());
 
     {
         auto foundOps = findOplogEntriesNewerThan(operationContext(), opTime.getTimestamp());
         ASSERT_GTE(foundOps.size(), 2U);
-        // The first oplog entry is from aborting the prepared transaction via clearPreparedTxn().
+        // The first oplog entry is from aborting the prepared transaction via abortTxn().
         // The second oplog entry is from the session txn record being updated by
         // ReshardingTxnCloner.
         checkGeneratedNoop(foundOps[1], lsid, incomingTxnNumber, {kIncompleteHistoryStmtId});
@@ -946,10 +973,134 @@ TEST_F(ReshardingTxnClonerTest, CancelableWhileWaitingOnPreparedTxn) {
 
     TxnNumber existingTxnNumber = 100;
     makePreparedTxn(operationContext(), lsid, existingTxnNumber);
-    ON_BLOCK_EXIT([&] { clearPreparedTxn(operationContext(), lsid, existingTxnNumber); });
+    ON_BLOCK_EXIT([&] { abortTxn(operationContext(), lsid, existingTxnNumber); });
 
     TxnNumber incomingTxnNumber = existingTxnNumber + 1;
     auto sessionTxnRecord = SessionTxnRecord{lsid, incomingTxnNumber, repl::OpTime{}, Date_t{}};
+
+    auto executor = makeTaskExecutorForCloner();
+    ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
+    CancellationSource cancelSource;
+    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+
+    onCommandReturnTxns({sessionTxnRecord.toBSON()}, {});
+
+    ASSERT_FALSE(future.isReady());
+    // Wait a little bit to increase the likelihood that the applier has blocked on the prepared
+    // transaction before the cancellation source is canceled.
+    ASSERT_OK(
+        executor->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+    ASSERT_FALSE(future.isReady());
+
+    cancelSource.cancel();
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(ReshardingTxnClonerTest,
+       WaitsOnInProgressInternalTxnForRetryableWriteAndAutomaticallyRetries) {
+    auto retryableWriteLsid = makeLogicalSessionIdForTest();
+    TxnNumber retryableWriteTxnNumber = 100;
+    auto internalTxnLsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(retryableWriteLsid,
+                                                                           retryableWriteTxnNumber);
+    TxnNumber internalTxnTxnNumber = 1;
+
+    makeInProgressTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber);
+    auto lastOplogTs = getLatestOplogTimestamp(operationContext());
+
+    auto sessionTxnRecord =
+        SessionTxnRecord{retryableWriteLsid, retryableWriteTxnNumber, repl::OpTime{}, Date_t{}};
+
+    auto executor = makeTaskExecutorForCloner();
+    ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
+    CancellationSource cancelSource;
+    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+
+    onCommandReturnTxns({sessionTxnRecord.toBSON()}, {});
+
+    ASSERT_FALSE(future.isReady());
+    // Wait a little bit to increase the likelihood that the cloner has blocked on the in progress
+    // internal transaction before the transaction is aborted.
+    ASSERT_OK(
+        executor->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+    ASSERT_FALSE(future.isReady());
+
+    abortTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber);
+
+    ASSERT_OK(future.getNoThrow());
+
+    {
+        auto foundOps = findOplogEntriesNewerThan(operationContext(), lastOplogTs);
+        ASSERT_GTE(foundOps.size(), 1U);
+        // The first oplog entry is from the session txn record being updated by
+        // ReshardingTxnCloner.
+        checkGeneratedNoop(
+            foundOps[0], retryableWriteLsid, retryableWriteTxnNumber, {kIncompleteHistoryStmtId});
+
+        auto sessionTxnRecord = findSessionRecord(operationContext(), retryableWriteLsid);
+        ASSERT_TRUE(bool(sessionTxnRecord));
+        checkSessionTxnRecord(*sessionTxnRecord, foundOps[0]);
+    }
+}
+
+TEST_F(ReshardingTxnClonerTest,
+       WaitsOnPreparedInternalTxnForRetryableWriteAndAutomaticallyRetries) {
+    auto retryableWriteLsid = makeLogicalSessionIdForTest();
+    TxnNumber retryableWriteTxnNumber = 100;
+    auto internalTxnLsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(retryableWriteLsid,
+                                                                           retryableWriteTxnNumber);
+    TxnNumber internalTxnTxnNumber = 1;
+
+    auto opTime = makePreparedTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber);
+
+    auto sessionTxnRecord =
+        SessionTxnRecord{retryableWriteLsid, retryableWriteTxnNumber, repl::OpTime{}, Date_t{}};
+
+    auto executor = makeTaskExecutorForCloner();
+    ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
+    CancellationSource cancelSource;
+    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+
+    onCommandReturnTxns({sessionTxnRecord.toBSON()}, {});
+
+    ASSERT_FALSE(future.isReady());
+    // Wait a little bit to increase the likelihood that the cloner has blocked on the in progress
+    // internal transaction before the transaction is aborted.
+    ASSERT_OK(
+        executor->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+    ASSERT_FALSE(future.isReady());
+
+    abortTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber);
+
+    ASSERT_OK(future.getNoThrow());
+
+    {
+        auto foundOps = findOplogEntriesNewerThan(operationContext(), opTime.getTimestamp());
+        ASSERT_GTE(foundOps.size(), 2U);
+        // The first oplog entry is from aborting the prepared internal transaction via abortTxn().
+        // The second oplog entry is from the session txn record being updated by
+        // ReshardingTxnCloner.
+        checkGeneratedNoop(
+            foundOps[1], retryableWriteLsid, retryableWriteTxnNumber, {kIncompleteHistoryStmtId});
+
+        auto sessionTxnRecord = findSessionRecord(operationContext(), retryableWriteLsid);
+        ASSERT_TRUE(bool(sessionTxnRecord));
+        checkSessionTxnRecord(*sessionTxnRecord, foundOps[1]);
+    }
+}
+
+TEST_F(ReshardingTxnClonerTest, CancelableWhileWaitingOnInProgressInternalTxnForRetryableWrite) {
+    auto retryableWriteLsid = makeLogicalSessionIdForTest();
+    TxnNumber retryableWriteTxnNumber = 100;
+
+    auto internalTxnLsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(retryableWriteLsid,
+                                                                           retryableWriteTxnNumber);
+    TxnNumber internalTxnTxnNumber = 1;
+
+    makeInProgressTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber);
+    ON_BLOCK_EXIT([&] { abortTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber); });
+
+    auto sessionTxnRecord =
+        SessionTxnRecord{retryableWriteLsid, retryableWriteTxnNumber, repl::OpTime{}, Date_t{}};
 
     auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());

@@ -74,12 +74,12 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                        auto opCtx = factory.makeOperationContext(&cc());
 
                        if constexpr (IsForSessionApplication) {
-                           auto hitPreparedTxn =
+                           auto conflictingTxnCompletionFuture =
                                _sessionApplication.tryApplyOperation(opCtx.get(), oplogEntry);
 
-                           if (hitPreparedTxn) {
-                               return future_util::withCancellation(std::move(*hitPreparedTxn),
-                                                                    cancelToken);
+                           if (conflictingTxnCompletionFuture) {
+                               return future_util::withCancellation(
+                                   std::move(*conflictingTxnCompletionFuture), cancelToken);
                            }
                        } else {
                            // ReshardingOpObserver depends on the collection metadata being known
