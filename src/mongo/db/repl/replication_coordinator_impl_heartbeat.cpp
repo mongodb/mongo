@@ -81,11 +81,13 @@ MONGO_FAIL_POINT_DEFINE(waitForPostActionCompleteInHbReconfig);
 
 using executor::RemoteCommandRequest;
 
-Milliseconds ReplicationCoordinatorImpl::_getRandomizedElectionOffset_inlock() {
+long long ReplicationCoordinatorImpl::_getElectionOffsetUpperBound_inlock() {
     long long electionTimeout = durationCount<Milliseconds>(_rsConfig.getElectionTimeoutPeriod());
-    long long randomOffsetUpperBound =
-        electionTimeout * _externalState->getElectionTimeoutOffsetLimitFraction();
+    return electionTimeout * _externalState->getElectionTimeoutOffsetLimitFraction();
+}
 
+Milliseconds ReplicationCoordinatorImpl::_getRandomizedElectionOffset_inlock() {
+    long long randomOffsetUpperBound = _getElectionOffsetUpperBound_inlock();
     // Avoid divide by zero error in random number generator.
     if (randomOffsetUpperBound == 0) {
         return Milliseconds(0);
@@ -944,9 +946,7 @@ void ReplicationCoordinatorImpl::_cancelHeartbeats_inlock() {
     // Heartbeat callbacks will remove themselves from _heartbeatHandles when they execute with
     // CallbackCanceled status, so it's better to leave the handles in the list, for now.
 
-    if (_handleLivenessTimeoutCbh.isValid()) {
-        _replExecutor->cancel(_handleLivenessTimeoutCbh);
-    }
+    _handleLivenessTimeoutCallback.cancel();
 }
 
 void ReplicationCoordinatorImpl::restartScheduledHeartbeats_forTest() {
@@ -994,16 +994,12 @@ void ReplicationCoordinatorImpl::_startHeartbeats_inlock() {
         _topCoord->restartHeartbeat(now, target);
     }
 
-    _scheduleNextLivenessUpdate_inlock();
+    _scheduleNextLivenessUpdate_inlock(/* reschedule = */ false);
 }
 
 void ReplicationCoordinatorImpl::_handleLivenessTimeout(
     const executor::TaskExecutor::CallbackArgs& cbData) {
     stdx::unique_lock<Latch> lk(_mutex);
-    // Only reset the callback handle if it matches, otherwise more will be coming through
-    if (cbData.myHandle == _handleLivenessTimeoutCbh) {
-        _handleLivenessTimeoutCbh = CallbackHandle();
-    }
     if (!cbData.status.isOK()) {
         return;
     }
@@ -1015,10 +1011,10 @@ void ReplicationCoordinatorImpl::_handleLivenessTimeout(
     lk = _handleHeartbeatResponseAction_inlock(
         action, StatusWith(ReplSetHeartbeatResponse()), std::move(lk));
 
-    _scheduleNextLivenessUpdate_inlock();
+    _scheduleNextLivenessUpdate_inlock(/* reschedule = */ false);
 }
 
-void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock() {
+void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock(bool reschedule) {
     // Scan liveness table for earliest date; schedule a run at (that date plus election
     // timeout).
     Date_t earliestDate;
@@ -1031,7 +1027,7 @@ void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock() {
         return;
     }
 
-    if (_handleLivenessTimeoutCbh.isValid() && !_handleLivenessTimeoutCbh.isCanceled()) {
+    if (!reschedule && _handleLivenessTimeoutCallback.isActive()) {
         // don't bother to schedule; one is already scheduled and pending.
         return;
     }
@@ -1044,31 +1040,21 @@ void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock() {
                 "nextTimeout"_attr = nextTimeout);
 
     // It is possible we will schedule the next timeout in the past.
-    // ThreadPoolTaskExecutor::_scheduleWorkAt() schedules its work immediately if it's given a
-    // time <= now().
+    // DelayableTimeoutCallback schedules its work immediately if it's given a time <= now().
     // If we missed the timeout, it means that on our last check the earliest live member was
     // just barely fresh and it has become stale since then. We must schedule another liveness
     // check to continue conducting liveness checks and be able to step down from primary if we
     // lose contact with a majority of nodes.
-    auto cbh =
-        _scheduleWorkAt(nextTimeout, [=](const executor::TaskExecutor::CallbackArgs& cbData) {
-            _handleLivenessTimeout(cbData);
-        });
-    if (!cbh) {
-        return;
-    }
-    _handleLivenessTimeoutCbh = cbh;
+    // We ignore shutdown errors; any other error triggers an fassert.
+    _handleLivenessTimeoutCallback.delayUntil(nextTimeout).ignore();
     _earliestMemberId = earliestMemberId.getData();
 }
 
-void ReplicationCoordinatorImpl::_cancelAndRescheduleLivenessUpdate_inlock(int updatedMemberId) {
+void ReplicationCoordinatorImpl::_rescheduleLivenessUpdate_inlock(int updatedMemberId) {
     if ((_earliestMemberId != -1) && (_earliestMemberId != updatedMemberId)) {
         return;
     }
-    if (_handleLivenessTimeoutCbh.isValid()) {
-        _replExecutor->cancel(_handleLivenessTimeoutCbh);
-    }
-    _scheduleNextLivenessUpdate_inlock();
+    _scheduleNextLivenessUpdate_inlock(/* reschedule = */ true);
 }
 
 void ReplicationCoordinatorImpl::_cancelPriorityTakeover_inlock() {
@@ -1102,7 +1088,8 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
     // the logs.
     int cancelAndRescheduleLogLevel = 5;
     static auto logThrottleTime = _replExecutor->now();
-    const bool wasActive = _handleElectionTimeoutCbh.isValid();
+    auto oldWhen = _handleElectionTimeoutCallback.getNextCall();
+    const bool wasActive = oldWhen != Date_t();
     auto now = _replExecutor->now();
     const bool doNotReschedule = _inShutdown || !_memberState.secondary() || _selfIndex < 0 ||
         !_rsConfig.getMemberAt(_selfIndex).isElectable();
@@ -1111,48 +1098,40 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
         cancelAndRescheduleLogLevel = 4;
         logThrottleTime = now;
     }
-    if (wasActive) {
+    if (wasActive && doNotReschedule) {
         LOGV2_FOR_ELECTION(4615649,
                            cancelAndRescheduleLogLevel,
                            "Canceling election timeout callback at {when}",
                            "Canceling election timeout callback",
-                           "when"_attr = _handleElectionTimeoutWhen);
-        _replExecutor->cancel(_handleElectionTimeoutCbh);
-        _handleElectionTimeoutCbh = CallbackHandle();
-        _handleElectionTimeoutWhen = Date_t();
+                           "when"_attr = oldWhen);
+        _handleElectionTimeoutCallback.cancel();
     }
 
     if (doNotReschedule)
         return;
 
-    Milliseconds randomOffset = _getRandomizedElectionOffset_inlock();
-    auto when = now + _rsConfig.getElectionTimeoutPeriod() + randomOffset;
-    invariant(when > now);
+    Milliseconds upperBound = Milliseconds(_getElectionOffsetUpperBound_inlock());
+    auto requestedWhen = now + _rsConfig.getElectionTimeoutPeriod();
+    invariant(requestedWhen > now);
+    Status delayStatus =
+        _handleElectionTimeoutCallback.delayUntilWithJitter(requestedWhen, upperBound);
+    Date_t when = _handleElectionTimeoutCallback.getNextCall();
     if (wasActive) {
         // The log level here is 4 once per second, otherwise 5.
         LOGV2_FOR_ELECTION(4615650,
                            cancelAndRescheduleLogLevel,
-                           "Rescheduling election timeout callback at {when}",
-                           "Rescheduling election timeout callback",
-                           "when"_attr = when);
+                           "Rescheduled election timeout callback",
+                           "when"_attr = when,
+                           "requestedWhen"_attr = requestedWhen,
+                           "error"_attr = delayStatus);
     } else {
         LOGV2_FOR_ELECTION(4615651,
                            4,
-                           "Scheduling election timeout callback at {when}",
-                           "Scheduling election timeout callback",
-                           "when"_attr = when);
+                           "Scheduled election timeout callback",
+                           "when"_attr = when,
+                           "requestedWhen"_attr = requestedWhen,
+                           "error"_attr = delayStatus);
     }
-    _handleElectionTimeoutWhen = when;
-    _handleElectionTimeoutCbh =
-        _scheduleWorkAt(when, [=](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
-            stdx::lock_guard<Latch> lk(_mutex);
-            if (_handleElectionTimeoutCbh == cbData.myHandle) {
-                // This lets _cancelAndRescheduleElectionTimeout_inlock know the callback
-                // has happened.
-                _handleElectionTimeoutCbh = CallbackHandle();
-            }
-            _startElectSelfIfEligibleV1(lk, StartElectionReasonEnum::kElectionTimeout);
-        });
 }
 
 void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(StartElectionReasonEnum reason) {
