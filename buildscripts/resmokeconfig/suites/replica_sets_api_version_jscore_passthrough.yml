@@ -5,6 +5,8 @@ test_kind: js_test
 selector:
   roots:
   - jstests/core/**/*.js
+  - jstests/fle2/**/*.js
+  - src/mongo/db/modules/*/jstests/fle2/*.js
   exclude_files:
   # This test initiates a txn with API parameters, but runs txn-continuing commands in a separate
   # Thread object. Since those commands will not have API parameters appended, they will fail due

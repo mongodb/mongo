@@ -3,6 +3,8 @@ test_kind: js_test
 selector:
   roots:
   - jstests/core/**/*.js
+  - jstests/fle2/**/*.js
+  - src/mongo/db/modules/*/jstests/fle2/*.js
   exclude_files:
   # Only the first command in a transaction allows readConcern and this suite only tests
   # non-transaction snapshot reads.

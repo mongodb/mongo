@@ -55,6 +55,9 @@ var denylistedNamespaces = [
     /^admin\./,
     /^config\./,
     /\.system\./,
+    /enxcol_\..*\.esc/,
+    /enxcol_\..*\.ecc/,
+    /enxcol_\..*\.ecoc/,
 ];
 
 const kZoneName = 'moveToHereForMigrationPassthrough';

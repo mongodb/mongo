@@ -3,6 +3,8 @@ test_kind: js_test
 selector:
   roots:
   - jstests/core/**/*.js
+  - jstests/fle2/**/*.js
+  - src/mongo/db/modules/*/jstests/fle2/*.js
   exclude_files:
   # Don't run these tests as transactions can only run on primaries.
   - jstests/core/txns/**/*.js

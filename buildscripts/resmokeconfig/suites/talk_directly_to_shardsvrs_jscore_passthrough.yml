@@ -3,6 +3,8 @@ test_kind: js_test
 selector:
   roots:
   - jstests/core/**/*.js
+  - jstests/fle2/**/*.js
+  - src/mongo/db/modules/*/jstests/fle2/*.js
   exclude_files:
   # This test expects that the connection (i.e. 'threadName') does not change throughout each test
   # case. That is not always true when the test driver use a replica set connection string. As this
