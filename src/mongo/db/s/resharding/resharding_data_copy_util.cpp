@@ -289,6 +289,10 @@ boost::optional<SharedSemiFuture<void>> withSessionCheckedOut(OperationContext* 
     } catch (const ExceptionFor<ErrorCodes::PreparedTransactionInProgress>&) {
         // txnParticipant.transactionIsPrepared()
         return txnParticipant.onExitPrepare();
+    } catch (const ExceptionFor<ErrorCodes::RetryableTransactionInProgress>&) {
+        // This is a retryable write that was executed using an internal transaction and there is
+        // a retry in progress.
+        return txnParticipant.onConflictingInternalTransactionCompletion(opCtx);
     }
 
     callable();
