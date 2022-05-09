@@ -356,6 +356,11 @@ protected:
             _resourceYielder = resourceYielder.get();
         }
 
+        // Guarantee any tasks spawned by the API have finished and the thread pool threads are
+        // synchronized with the main test thread so any shared pointers held by them will be reset,
+        // which should guarantee sessions are pooled deterministically.
+        waitForAllEarlierTasksToComplete();
+
         // Reset _txnWithRetries so it returns and reacquires the same session from the session
         // pool. This ensures that we can predictably monitor txnNumber's value.
         _txnWithRetries = nullptr;
