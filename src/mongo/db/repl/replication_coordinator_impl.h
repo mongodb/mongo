@@ -38,6 +38,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "mongo/db/repl/delayable_timeout_callback.h"
 #include "mongo/db/repl/initial_syncer.h"
 #include "mongo/db/repl/initial_syncer_interface.h"
 #include "mongo/db/repl/member_state.h"
@@ -1146,6 +1147,13 @@ private:
      */
     Milliseconds _getRandomizedElectionOffset_inlock();
 
+    /*
+     * Return the upper bound of the offset amount returned by _getRandomizedElectionOffset
+     * This is actually off by one, that is, the election offset is in the half-open range
+     * [0, electionOffsetUpperBound)
+     */
+    long long _getElectionOffsetUpperBound_inlock();
+
     /**
      * Starts a heartbeat for each member in the current config.  Called while holding _mutex.
      */
@@ -1486,8 +1494,10 @@ private:
     /**
      * Bottom half of _scheduleNextLivenessUpdate.
      * Must be called with _mutex held.
+     * If reschedule is true, will recompute the liveness update even if a timeout is
+     * already pending.
      */
-    void _scheduleNextLivenessUpdate_inlock();
+    void _scheduleNextLivenessUpdate_inlock(bool reschedule);
 
     /**
      * Callback which marks downed nodes as down, triggers a stepdown if a majority of nodes are no
@@ -1496,11 +1506,11 @@ private:
     void _handleLivenessTimeout(const executor::TaskExecutor::CallbackArgs& cbData);
 
     /**
-     * If "updatedMemberId" is the current _earliestMemberId, cancels the current
-     * _handleLivenessTimeout callback and calls _scheduleNextLivenessUpdate to schedule a new one.
+     * If "updatedMemberId" is the current _earliestMemberId, calls _scheduleNextLivenessUpdate to
+     * schedule a new one.
      * Returns immediately otherwise.
      */
-    void _cancelAndRescheduleLivenessUpdate_inlock(int updatedMemberId);
+    void _rescheduleLivenessUpdate_inlock(int updatedMemberId);
 
     /**
      * Cancels all outstanding _priorityTakeover callbacks.
@@ -1752,15 +1762,10 @@ private:
     stdx::condition_variable _currentCommittedSnapshotCond;  // (M)
 
     // Callback Handle used to cancel a scheduled LivenessTimeout callback.
-    executor::TaskExecutor::CallbackHandle _handleLivenessTimeoutCbh;  // (M)
+    DelayableTimeoutCallback _handleLivenessTimeoutCallback;  // (S)
 
-    // Callback Handle used to cancel a scheduled ElectionTimeout callback.
-    executor::TaskExecutor::CallbackHandle _handleElectionTimeoutCbh;  // (M)
-
-    // Election timeout callback will not run before this time.
-    // If this date is Date_t(), the callback is either unscheduled or canceled.
-    // Used for testing only.
-    Date_t _handleElectionTimeoutWhen;  // (M)
+    // Used to manage scheduling and canceling election timeouts.
+    DelayableTimeoutCallbackWithJitter _handleElectionTimeoutCallback;  // (M)
 
     // Callback Handle used to cancel a scheduled PriorityTakeover callback.
     executor::TaskExecutor::CallbackHandle _priorityTakeoverCbh;  // (M)

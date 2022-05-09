@@ -6924,15 +6924,14 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     // Setting mode to secondary should schedule the election timeout.
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
-    ASSERT_EQ(1, countTextFormatLogLinesContaining("Scheduling election timeout callback"));
-    ASSERT_EQ(0, countTextFormatLogLinesContaining("Rescheduling election timeout callback"));
+    ASSERT_EQ(1, countTextFormatLogLinesContaining("Scheduled election timeout callback"));
+    ASSERT_EQ(0, countTextFormatLogLinesContaining("Rescheduled election timeout callback"));
     ASSERT_EQ(0, countTextFormatLogLinesContaining("Canceling election timeout callback"));
 
     // Scheduling again should produce the "rescheduled", not the "scheduled", message .
     replCoord->cancelAndRescheduleElectionTimeout();
-    ASSERT_EQ(1, countTextFormatLogLinesContaining("Scheduling election timeout callback"));
-    ASSERT_EQ(1, countTextFormatLogLinesContaining("Rescheduling election timeout callback"));
-    ASSERT_EQ(1, countTextFormatLogLinesContaining("Canceling election timeout callback"));
+    ASSERT_EQ(1, countTextFormatLogLinesContaining("Scheduled election timeout callback"));
+    ASSERT_EQ(1, countTextFormatLogLinesContaining("Rescheduled election timeout callback"));
 
     auto net = getNet();
     net->enterNetwork();
@@ -6960,9 +6959,8 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     net->exitNetwork();
 
     // The election should have scheduled (not rescheduled) another timeout.
-    ASSERT_EQ(2, countTextFormatLogLinesContaining("Scheduling election timeout callback"));
-    ASSERT_EQ(1, countTextFormatLogLinesContaining("Rescheduling election timeout callback"));
-    ASSERT_EQ(1, countTextFormatLogLinesContaining("Canceling election timeout callback"));
+    ASSERT_EQ(2, countTextFormatLogLinesContaining("Scheduled election timeout callback"));
+    ASSERT_EQ(1, countTextFormatLogLinesContaining("Rescheduled election timeout callback"));
 
     auto replElectionReducedSeverityGuard = unittest::MinimumLoggedSeverityGuard{
         logv2::LogComponent::kReplicationElection, logv2::LogSeverity::Debug(4)};
@@ -6973,9 +6971,8 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     replCoord->cancelAndRescheduleElectionTimeout();
 
     // We should not see this reschedule because it should be at log level 5.
-    ASSERT_EQ(2, countTextFormatLogLinesContaining("Scheduling election timeout callback"));
-    ASSERT_EQ(1, countTextFormatLogLinesContaining("Rescheduling election timeout callback"));
-    ASSERT_EQ(1, countTextFormatLogLinesContaining("Canceling election timeout callback"));
+    ASSERT_EQ(2, countTextFormatLogLinesContaining("Scheduled election timeout callback"));
+    ASSERT_EQ(1, countTextFormatLogLinesContaining("Rescheduled election timeout callback"));
 
     net->enterNetwork();
     until = electionTimeoutWhen + Milliseconds(1001);
@@ -6986,9 +6983,8 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     stopCapturingLogMessages();
     // We should see this reschedule at level 4 because it has been over 1 sec since we logged
     // at level 4.
-    ASSERT_EQ(2, countTextFormatLogLinesContaining("Scheduling election timeout callback"));
-    ASSERT_EQ(2, countTextFormatLogLinesContaining("Rescheduling election timeout callback"));
-    ASSERT_EQ(2, countTextFormatLogLinesContaining("Canceling election timeout callback"));
+    ASSERT_EQ(2, countTextFormatLogLinesContaining("Scheduled election timeout callback"));
+    ASSERT_EQ(2, countTextFormatLogLinesContaining("Rescheduled election timeout callback"));
 }
 
 TEST_F(ReplCoordTest, ZeroCommittedSnapshotAfterClearingCommittedSnapshot) {
