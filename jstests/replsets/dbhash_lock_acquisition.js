@@ -32,8 +32,13 @@ assert.commandWorked(sessionDB.mycoll.insert({}));
 const ops = db.currentOp({"lsid.id": session.getSessionId().id}).inprog;
 assert.eq(
     1, ops.length, () => "Failed to find session in currentOp() output: " + tojson(db.currentOp()));
-assert.eq(ops[0].locks,
-          {ReplicationStateTransition: "w", Global: "w", Database: "w", Collection: "w"});
+assert.eq(ops[0].locks, {
+    FeatureCompatibilityVersion: "w",
+    ReplicationStateTransition: "w",
+    Global: "w",
+    Database: "w",
+    Collection: "w",
+});
 
 const threadCaptruncCmd = new Thread(function(host) {
     try {

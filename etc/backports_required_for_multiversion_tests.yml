@@ -156,6 +156,8 @@ last-continuous:
       test_file: jstests/replsets/apply_ops_dropDatabase.js
     - ticket: SERVER-64485
       test_file: jstests/sharding/update_with_dollar_fields.js
+    - ticket: SERVER-65821
+      test_file: jstests/replsets/dbhash_lock_acquisition.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -455,6 +457,8 @@ last-lts:
       test_file: jstests/replsets/buildindexes_false_commit_quorum.js
     - ticket: SERVER-64780
       test_file: jstest/sharding/resharding_change_stream_namespace_filtering.js
+    - ticket: SERVER-65821
+      test_file: jstests/replsets/dbhash_lock_acquisition.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

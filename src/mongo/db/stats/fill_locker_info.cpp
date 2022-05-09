@@ -41,12 +41,17 @@ void fillLockerInfo(const Locker::LockerInfo& lockerInfo, BSONObjBuilder& infoBu
     BSONObjBuilder locks(infoBuilder.subobjStart("locks"));
     const size_t locksSize = lockerInfo.locks.size();
 
-    // Only add the last lock of each type, and use the largest mode encountered
-    LockMode modeForType[ResourceTypesCount] = {};  // default initialize to zero (min value)
+    // Only add the last lock of each type, and use the largest mode encountered. Each type of
+    // global resource is reported as its own type.
+    LockMode modeForType[static_cast<uint8_t>(ResourceGlobalId::kNumIds) + ResourceTypesCount - 1] =
+        {};  // default initialize to zero (min value)
     for (size_t i = 0; i < locksSize; i++) {
         const Locker::OneLock& lock = lockerInfo.locks[i];
         const ResourceType lockType = lock.resourceId.getType();
-        const LockMode lockMode = std::max(lock.mode, modeForType[lockType]);
+        auto index = lockType == RESOURCE_GLOBAL
+            ? lock.resourceId.getHashId()
+            : static_cast<uint8_t>(ResourceGlobalId::kNumIds) + lockType - 1;
+        const LockMode lockMode = std::max(lock.mode, modeForType[index]);
 
         // Check that lockerInfo is sorted on resource type
         invariant(i == 0 || lockType >= lockerInfo.locks[i - 1].resourceId.getType());
@@ -56,10 +61,16 @@ void fillLockerInfo(const Locker::LockerInfo& lockerInfo, BSONObjBuilder& infoBu
             continue;
         }
 
-        modeForType[lockType] = lockMode;
+        modeForType[index] = lockMode;
 
-        if (i + 1 < locksSize && lockerInfo.locks[i + 1].resourceId.getType() == lockType) {
+        if (i + 1 < locksSize && lockerInfo.locks[i + 1].resourceId.getType() == lockType &&
+            (lockType != RESOURCE_GLOBAL ||
+             lock.resourceId.getHashId() == lockerInfo.locks[i + 1].resourceId.getHashId())) {
             continue;  // skip this lock as it is not the last one of its type
+        } else if (lockType == RESOURCE_GLOBAL) {
+            locks.append(
+                resourceGlobalIdName(static_cast<ResourceGlobalId>(lock.resourceId.getHashId())),
+                legacyModeName(lockMode));
         } else {
             locks.append(resourceTypeName(lockType), legacyModeName(lockMode));
         }
