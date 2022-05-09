@@ -581,15 +581,11 @@ private:
     }
 
     // Returns BatchedDeleteStageBatchParams pointer only if the feature flag and the server
-    // parameter are enabled. Due to current issues with change streams, for sharded collections,
-    // returns nullptr to disable batch deletion.
-    // TODO (SERVER-66071): Remove exclusion of sharded collections.
-
+    // parameter are enabled.
     std::unique_ptr<BatchedDeleteStageBatchParams> _getBatchedDeleteParamsIfEnabled(
         const CollectionPtr& collection) {
         // Load batched delete parameters.
-        if (!collection.isSharded() &&
-            feature_flags::gBatchMultiDeletes.isEnabled(serverGlobalParams.featureCompatibility) &&
+        if (feature_flags::gBatchMultiDeletes.isEnabled(serverGlobalParams.featureCompatibility) &&
             ttlMonitorBatchDeletes.load()) {
             return std::make_unique<BatchedDeleteStageBatchParams>();
         }

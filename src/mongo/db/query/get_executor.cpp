@@ -1664,17 +1664,16 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     deleteStageParams->canonicalQuery = cq.get();
 
     // TODO (SERVER-64506): support change streams' pre- and post-images.
-    // TODO (SERVER-66071): support sharding.
     // TODO (SERVER-66079): allow batched deletions in the config.* namespace.
     const bool batchDelete = feature_flags::gBatchMultiDeletes.isEnabledAndIgnoreFCV() &&
         gBatchUserMultiDeletes.load() &&
         (opCtx->recoveryUnit()->getState() == RecoveryUnit::State::kInactive ||
          opCtx->recoveryUnit()->getState() == RecoveryUnit::State::kActiveNotInUnitOfWork) &&
         !opCtx->inMultiDocumentTransaction() && !opCtx->isRetryableWrite() &&
-        !collection->isChangeStreamPreAndPostImagesEnabled() && !collection.isSharded() &&
-        !collection->ns().isConfigDB() && deleteStageParams->isMulti &&
-        !deleteStageParams->fromMigrate && !deleteStageParams->returnDeleted &&
-        deleteStageParams->sort.isEmpty() && !deleteStageParams->numStatsForDoc;
+        !collection->isChangeStreamPreAndPostImagesEnabled() && !collection->ns().isConfigDB() &&
+        deleteStageParams->isMulti && !deleteStageParams->fromMigrate &&
+        !deleteStageParams->returnDeleted && deleteStageParams->sort.isEmpty() &&
+        !deleteStageParams->numStatsForDoc;
 
     if (batchDelete) {
         root =

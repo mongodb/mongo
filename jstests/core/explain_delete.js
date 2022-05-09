@@ -1,6 +1,13 @@
-// @tags: [requires_non_retryable_writes, requires_fastcount]
+/**
+ * Tests for explaining the delete command.
+ *
+ * @tags: [
+ *  featureFlagBatchMultiDeletes,
+ *  requires_fastcount,
+ *  requires_non_retryable_writes,
+ *  ]
+ */
 
-// Tests for explaining the delete command.
 (function() {
 "use strict";
 
@@ -10,9 +17,8 @@ t.drop();
 
 var explain;
 
-// TODO (SERVER-66071): make BATCHED_DELETE the only expected delete stage.
 /**
- * Verify that the explain command output 'explain' shows a [BATCHED_]DELETE stage with an
+ * Verify that the explain command output 'explain' shows a BATCHED_DELETE stage with an
  * nWouldDelete value equal to 'nWouldDelete'.
  */
 function checkNWouldDelete(explain, nWouldDelete) {
@@ -21,20 +27,19 @@ function checkNWouldDelete(explain, nWouldDelete) {
     var executionStats = explain.executionStats;
     assert("executionStages" in executionStats);
 
-    // If passed through mongos, then [BATCHED_]DELETE stage(s) should be below the SHARD_WRITE
-    // mongos stage.  Otherwise the [BATCHED_]DELETE stage is the root stage.
+    // If passed through mongos, then BATCHED_DELETE stage(s) should be below the SHARD_WRITE
+    // mongos stage.  Otherwise the BATCHED_DELETE stage is the root stage.
     var execStages = executionStats.executionStages;
     if ("SHARD_WRITE" === execStages.stage) {
         let totalToBeDeletedAcrossAllShards = 0;
         execStages.shards.forEach(function(shardExplain) {
             const rootStageName = shardExplain.executionStages.stage;
-            assert(rootStageName === "DELETE" || rootStageName === "BATCHED_DELETE",
-                   tojson(execStages));
+            assert(rootStageName === "BATCHED_DELETE", tojson(execStages));
             totalToBeDeletedAcrossAllShards += shardExplain.executionStages.nWouldDelete;
         });
         assert.eq(totalToBeDeletedAcrossAllShards, nWouldDelete, explain);
     } else {
-        assert(execStages.stage === "DELETE" || execStages.stage === "BATCHED_DELETE", explain);
+        assert(execStages.stage === "BATCHED_DELETE", explain);
         assert.eq(execStages.nWouldDelete, nWouldDelete, explain);
     }
 }

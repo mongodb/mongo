@@ -11,8 +11,6 @@ load("jstests/libs/analyze_plan.js");
  *  requires_non_retryable_writes,
  *  does_not_support_transactions,
  *  featureFlagBatchMultiDeletes,
- *  # TODO (SERVER-66071): Remove exclusion of sharded collections.
- *  assumes_unsharded_collection
  * ]
  */
 
@@ -20,9 +18,9 @@ var $config = (function() {
     // 'data' is passed (copied) to each of the worker threads.
     var data = {
         // Defines the number of subsets of data, which are randomly picked to create conflicts.
-        numInsertSubsets: 10,
+        numInsertSubsets: 5,
         // Docs in each subset. insertSize = subsetSize x numInsertSubsets.
-        subsetSize: 500,
+        subsetSize: 50,
     };
 
     // 'setup' is run once by the parent thread after the cluster has

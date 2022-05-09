@@ -2,8 +2,6 @@
  * Tests batch-deleting a large range of data.
  *
  * @tags: [
- *  # TODO (SERVER-66071): support sharded collections
- *  assumes_unsharded_collection,
  *  does_not_support_retryable_writes,
  *  # TODO (SERVER-55909): make WUOW 'groupOplogEntries' the only mode of operation.
  *  does_not_support_transactions,

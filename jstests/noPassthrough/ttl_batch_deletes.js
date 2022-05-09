@@ -101,7 +101,7 @@ const testTTLDeleteWithIndexScanDocByDoc = function(conn) {
     assert.eq(db.serverStatus()["batchedDeletes"]["docs"], 0);
 };
 
-const triggerCollectionScanTTL = function(testDB) {
+const triggerCollectionScanTTL = function(testDB, doShardCollection = false) {
     const timeFieldName = 'time';
     const metaFieldName = 'host';
     const expireAfterSeconds = 5;
@@ -118,6 +118,11 @@ const triggerCollectionScanTTL = function(testDB) {
         expireAfterSeconds: expireAfterSeconds,
     }));
 
+    if (doShardCollection) {
+        assert.commandWorked(
+            testDB.adminCommand({shardCollection: coll.getFullName(), key: {[metaFieldName]: 1}}));
+    }
+
     const maxTime = new Date((new Date()).getTime() - (1000 * defaultBucketMaxRange));
     const minTime = new Date(maxTime.getTime() - (1000 * 5 * 60));
     for (let i = 0; i < docCount; i++) {
@@ -125,7 +130,9 @@ const triggerCollectionScanTTL = function(testDB) {
         assert.commandWorked(coll.insert({[timeFieldName]: time, [metaFieldName]: "localhost"}));
     }
 
-    ClusteredCollectionUtil.waitForTTL(testDB);
+    assert.soon(function() {
+        return coll.find().itcount() == 0;
+    }, 'TTL index on the cluster key didn\'t delete');
 
     assert.eq(0, coll.find().itcount());
     assert.eq(0, bucketsColl.find().itcount());
@@ -151,11 +158,15 @@ const testTTLDeleteWithCollectionScanDocByDoc = function(conn) {
     assert.eq(testDB.serverStatus()["batchedDeletes"]["batches"], 0);
 };
 
-const testTTLDeleteWithIndexScanBatchedExcludesShardedCollection = function(conn) {
+const verifyTTLOnShardedCluster = function(conn, clustered = false) {
     const db = conn.getDB('test');
-    triggerIndexScanTTL(db, true);
+    if (clustered) {
+        triggerCollectionScanTTL(db, true /* doShardCollection */);
+    } else {
+        triggerIndexScanTTL(db, true /* doShardCollection */);
+    }
 
-    // Verify batchedDeletes status to verify ttl deletions have not been batched.
+    // Verify batchedDeletes status to verify ttl deletions have been batched.
     var sum = 0;
     FixtureHelpers.mapOnEachShardNode({
         db: db,
@@ -164,14 +175,27 @@ const testTTLDeleteWithIndexScanBatchedExcludesShardedCollection = function(conn
         }
     });
 
-    assert.eq(sum, 0);
+    if (clustered) {
+        // For time series the "docs" count is related to buckets instead of documents. Check that
+        // the number of batches is greater than 0 instead.
+        assert.gte(sum, 0);
+    } else {
+        assert.eq(sum, docCount);
+    }
+};
+
+const testTTLDeleteWithIndexScanBatchedOnShardedCollection = function(conn) {
+    verifyTTLOnShardedCluster(conn, false);
+};
+
+const testTTLDeleteWithCollectionScanBatchedOnShardedCollection = function(conn) {
+    verifyTTLOnShardedCluster(conn, true);
 };
 
 runTestCase(testTTLDeleteWithIndexScanBatched);
 runTestCase(testTTLDeleteWithIndexScanDocByDoc);
 runTestCase(testTTLDeleteWithCollectionScanBatched);
 runTestCase(testTTLDeleteWithCollectionScanDocByDoc);
-// Excluding sharded collections from batched deletes is a temporary measure.
-// TODO (SERVER-66071): Remove this test.
-runTestCase(testTTLDeleteWithIndexScanBatchedExcludesShardedCollection, true);
+runTestCase(testTTLDeleteWithIndexScanBatchedOnShardedCollection, true);
+runTestCase(testTTLDeleteWithCollectionScanBatchedOnShardedCollection, true);
 })();

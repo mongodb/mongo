@@ -151,6 +151,17 @@ assertEqAndDumpOpLog(1,
 
 donorOplogRes =
     donorLocal.oplog.rs.find({op: 'd', fromMigrate: {$exists: false}, 'o._id': 4}).count();
+if (!donorOplogRes) {
+    // Validate this is a batched delete, which generates one applyOps entry instead of a 'd' entry.
+    donorOplogRes =
+        donorLocal.oplog.rs
+            .find({
+                ns: 'admin.$cmd',
+                op: 'c',
+                'o.applyOps': {$elemMatch: {op: 'd', 'o._id': 4, fromMigrate: {$exists: false}}}
+            })
+            .count();
+}
 assertEqAndDumpOpLog(1,
                      donorOplogRes,
                      "Real delete of {_id: 4} on donor shard incorrectly set the " +
