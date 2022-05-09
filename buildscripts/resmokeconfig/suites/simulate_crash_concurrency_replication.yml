@@ -30,6 +30,7 @@ executor:
   config: {}
   hooks:
   - class: SimulateCrash
+  - class: CleanupConcurrencyWorkloads
   fixture:
     class: ReplicaSetFixture
     mongod_options:
