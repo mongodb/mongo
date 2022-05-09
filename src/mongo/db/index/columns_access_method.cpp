@@ -175,7 +175,7 @@ Status ColumnStoreAccessMethod::insert(OperationContext* opCtx,
                                        const std::vector<BsonRecord>& bsonRecords,
                                        const InsertDeleteOptions& options,
                                        int64_t* keysInsertedOut) {
-    int64_t numInserted;
+    int64_t numInserted = 0;
     for (auto&& bsonRecord : bsonRecords) {
         column_keygen::visitCellsForInsert(
             *bsonRecord.docPtr, [&](StringData path, const column_keygen::UnencodedCellView& cell) {
