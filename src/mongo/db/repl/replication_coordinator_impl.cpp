@@ -338,6 +338,16 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _readWriteAbility(std::make_unique<ReadWriteAbility>(!settings.usingReplSets())),
       _replicationProcess(replicationProcess),
       _storage(storage),
+      _handleLivenessTimeoutCallback(_replExecutor.get(),
+                                     [this](const executor::TaskExecutor::CallbackArgs& args) {
+                                         _handleLivenessTimeout(args);
+                                     }),
+      _handleElectionTimeoutCallback(
+          _replExecutor.get(),
+          [this](const executor::TaskExecutor::CallbackArgs&) {
+              _startElectSelfIfEligibleV1(StartElectionReasonEnum::kElectionTimeout);
+          },
+          [this](int64_t limit) { return _nextRandomInt64_inlock(limit); }),
       _random(prngSeed) {
 
     _termShadow.store(OpTime::kUninitializedTerm);
@@ -384,10 +394,7 @@ ReplSetConfig ReplicationCoordinatorImpl::getReplicaSetConfig_forTest() {
 
 Date_t ReplicationCoordinatorImpl::getElectionTimeout_forTest() const {
     stdx::lock_guard<Latch> lk(_mutex);
-    if (!_handleElectionTimeoutCbh.isValid()) {
-        return Date_t();
-    }
-    return _handleElectionTimeoutWhen;
+    return _handleElectionTimeoutCallback.getNextCall();
 }
 
 Milliseconds ReplicationCoordinatorImpl::getRandomizedElectionOffset_forTest() {
@@ -1857,7 +1864,7 @@ Status ReplicationCoordinatorImpl::_setLastOptime(WithLock lk,
         _wakeReadyWaiters(lk, std::max(args.appliedOpTime, args.durableOpTime));
     }
 
-    _cancelAndRescheduleLivenessUpdate_inlock(args.memberId);
+    _rescheduleLivenessUpdate_inlock(args.memberId);
     return Status::OK();
 }
 
