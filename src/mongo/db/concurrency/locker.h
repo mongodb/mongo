@@ -485,6 +485,18 @@ public:
     }
 
     /**
+     * If set to false, this opts out of conflicting with the barrier created by the
+     * setFeatureCompatibilityVersion command. Code that opts-out must be ok with writes being able
+     * to start under one FCV and complete under a different FCV.
+     */
+    void setShouldConflictWithSetFeatureCompatibilityVersion(bool newValue) {
+        _shouldConflictWithSetFeatureCompatibilityVersion = newValue;
+    }
+    bool shouldConflictWithSetFeatureCompatibilityVersion() const {
+        return _shouldConflictWithSetFeatureCompatibilityVersion;
+    }
+
+    /**
      * If set to true, this opts out of a fatal assertion where operations which are holding open an
      * oplog hole cannot try to acquire subsequent locks.
      */
@@ -561,6 +573,7 @@ protected:
 
 private:
     bool _shouldConflictWithSecondaryBatchApplication = true;
+    bool _shouldConflictWithSetFeatureCompatibilityVersion = true;
     bool _shouldAllowLockAcquisitionOnTimestampedUnitOfWork = false;
     bool _shouldAcquireTicket = true;
     std::string _debugInfo;  // Extra info about this locker for debugging purpose
@@ -617,6 +630,26 @@ public:
 
     ~ShouldNotConflictWithSecondaryBatchApplicationBlock() {
         _lockState->setShouldConflictWithSecondaryBatchApplication(_originalShouldConflict);
+    }
+
+private:
+    Locker* const _lockState;
+    const bool _originalShouldConflict;
+};
+
+/**
+ * RAII-style class to opt out the FeatureCompatibilityVersion lock.
+ */
+class ShouldNotConflictWithSetFeatureCompatibilityVersionBlock {
+public:
+    explicit ShouldNotConflictWithSetFeatureCompatibilityVersionBlock(Locker* lockState)
+        : _lockState(lockState),
+          _originalShouldConflict(_lockState->shouldConflictWithSetFeatureCompatibilityVersion()) {
+        _lockState->setShouldConflictWithSetFeatureCompatibilityVersion(false);
+    }
+
+    ~ShouldNotConflictWithSetFeatureCompatibilityVersionBlock() {
+        _lockState->setShouldConflictWithSetFeatureCompatibilityVersion(_originalShouldConflict);
     }
 
 private:

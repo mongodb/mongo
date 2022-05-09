@@ -252,6 +252,7 @@ public:
         OperationContext* const _opCtx;
         LockResult _result;
         ResourceLock _pbwm;
+        ResourceLock _fcvLock;
         InterruptBehavior _interruptBehavior;
         bool _skipRSTLLock;
         const bool _isOutermostLock;
