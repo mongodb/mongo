@@ -391,7 +391,7 @@ __rec_calc_upd_memsize(WT_UPDATE *onpage_upd, WT_UPDATE *tombstone, size_t upd_m
             if (upd->txnid != WT_TXN_ABORTED)
                 upd_memsize += WT_UPDATE_MEMSIZE(upd);
     }
-    return upd_memsize;
+    return (upd_memsize);
 }
 
 /*
