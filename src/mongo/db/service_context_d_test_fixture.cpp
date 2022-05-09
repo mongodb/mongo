@@ -62,7 +62,8 @@
 namespace mongo {
 
 ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
-    : _tempDir("service_context_d_test_fixture") {
+    : _journalListener(std::move(options._journalListener)),
+      _tempDir("service_context_d_test_fixture") {
 
     if (options._useReplSettings) {
         repl::ReplSettings replSettings;
@@ -137,6 +138,10 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
         getServiceContext(),
         std::make_unique<CollectionShardingStateFactoryShard>(getServiceContext()));
     getServiceContext()->getStorageEngine()->notifyStartupComplete();
+
+    if (_journalListener) {
+        serviceContext->getStorageEngine()->setJournalListener(_journalListener.get());
+    }
 }
 
 ServiceContextMongoDTest::~ServiceContextMongoDTest() {

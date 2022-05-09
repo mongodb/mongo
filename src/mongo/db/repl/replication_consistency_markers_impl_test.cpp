@@ -89,6 +89,10 @@ public:
 
 class ReplicationConsistencyMarkersTest : public ServiceContextMongoDTest {
 protected:
+    ReplicationConsistencyMarkersTest()
+        : ServiceContextMongoDTest(Options{}.useJournalListener(
+              std::make_unique<JournalListenerWithDurabilityTracking>())) {}
+
     OperationContext* getOperationContext() {
         return _opCtx.get();
     }
@@ -98,7 +102,7 @@ protected:
     }
 
     JournalListenerWithDurabilityTracking* getJournalListener() {
-        return &_jl;
+        return static_cast<JournalListenerWithDurabilityTracking*>(_journalListener.get());
     }
 
 private:
@@ -108,7 +112,6 @@ private:
         auto replCoord = std::make_unique<ReplicationCoordinatorMock>(getServiceContext());
         ReplicationCoordinator::set(getServiceContext(), std::move(replCoord));
         _storageInterface = std::make_unique<StorageInterfaceImpl>();
-        getServiceContext()->getStorageEngine()->setJournalListener(&_jl);
     }
 
     void tearDown() override {
@@ -123,7 +126,6 @@ private:
 
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<StorageInterfaceImpl> _storageInterface;
-    JournalListenerWithDurabilityTracking _jl;
 };
 
 TEST_F(ReplicationConsistencyMarkersTest, InitialSyncFlag) {

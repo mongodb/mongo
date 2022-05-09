@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/tick_source_mock.h"
@@ -76,6 +77,10 @@ protected:
             }
             return std::move(*this);
         }
+        Options useJournalListener(std::unique_ptr<JournalListener> journalListener) {
+            _journalListener = std::move(journalListener);
+            return std::move(*this);
+        }
 
     private:
         std::string _engine = "wiredTiger";
@@ -85,6 +90,7 @@ protected:
         bool _useMockClock = false;
         Milliseconds _autoAdvancingMockClockIncrement{0};
         std::unique_ptr<TickSource> _mockTickSource;
+        std::unique_ptr<JournalListener> _journalListener;
 
         friend class ServiceContextMongoDTest;
     };
@@ -94,6 +100,9 @@ protected:
     virtual ~ServiceContextMongoDTest();
 
     void tearDown() override;
+
+    // The JournalListener must stay alive as long as the storage engine is running.
+    std::unique_ptr<JournalListener> _journalListener;
 
 private:
     struct {
