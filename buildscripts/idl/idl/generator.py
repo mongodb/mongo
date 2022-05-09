@@ -666,7 +666,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 if enum_value.description is not None:
                     self.gen_description_comment(enum_value.description)
                 self._writer.write_line(
-                    common.template_args('${name} ${value},', name=enum_value.name,
+                    common.template_args('${name}${value},', name=enum_value.name,
                                          value=enum_type_info.get_cpp_value_assignment(enum_value)))
 
         self._writer.write_line("static constexpr uint32_t kNum%s = %d;" %
