@@ -56,6 +56,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/collection_uuid_mismatch.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/s/query/cluster_query_knobs_gen.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/query/establish_cursors.h"
@@ -117,7 +118,7 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
     aggReq.setNeedsMerge(true);
 
     // TODO SERVER-65369: This code block can be removed after 7.0.
-    if (expCtx->inMongos && expCtx->changeStreamTokenVersion == 1) {
+    if (isMongos() && expCtx->changeStreamTokenVersion == 1) {
         // A request for v1 resume tokens on mongos should only be allowed in test mode.
         tassert(6497000, "Invalid request for v1 resume tokens", getTestCommandsEnabled());
         aggReq.setGenerateV2ResumeTokens(false);
