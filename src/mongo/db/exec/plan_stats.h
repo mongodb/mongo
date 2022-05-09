@@ -421,6 +421,21 @@ struct DeleteStats : public SpecificStats {
     size_t docsDeleted = 0u;
 };
 
+struct BatchedDeleteStats : public DeleteStats {
+    BatchedDeleteStats() = default;
+
+    // Unlike a standard multi:true delete, BatchedDeleteStage can complete with PlanStage::IS_EOF
+    // before deleting all the documents that match the query, if a 'BatchedDeleteStagePassParams'
+    // target is met.
+    //
+    // True indicates the operation reaches completion because a pass target is met.
+    //
+    // False indicates either (1) the operation hasn't reached completion or (2) the operation
+    // removed all the documents that matched the criteria to reach completion - this is always the
+    // case with the default BatchedDeleteStagePassParams.
+    bool passTargetMet = false;
+};
+
 struct DistinctScanStats : public SpecificStats {
     std::unique_ptr<SpecificStats> clone() const final {
         auto specific = std::make_unique<DistinctScanStats>(*this);

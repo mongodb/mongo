@@ -185,6 +185,19 @@ bool BatchedDeleteStage::isEOF() {
     return _stagedDeletesBuffer.empty() && _passStagingComplete;
 }
 
+std::unique_ptr<PlanStageStats> BatchedDeleteStage::getStats() {
+    _commonStats.isEOF = isEOF();
+    std::unique_ptr<PlanStageStats> stats =
+        std::make_unique<PlanStageStats>(_commonStats, stageType());
+    stats->specific = std::make_unique<BatchedDeleteStats>(_specificStats);
+    stats->children.emplace_back(child()->getStats());
+    return stats;
+}
+
+const SpecificStats* BatchedDeleteStage::getSpecificStats() const {
+    return &_specificStats;
+}
+
 PlanStage::StageState BatchedDeleteStage::doWork(WorkingSetID* out) {
     WorkingSetID idToReturn = WorkingSet::INVALID_ID;
     PlanStage::StageState planStageState = PlanStage::NEED_TIME;
@@ -213,7 +226,16 @@ PlanStage::StageState BatchedDeleteStage::doWork(WorkingSetID* out) {
         _stagedDeletesWatermarkBytes = 0;
         planStageState = _deleteBatch(&idToReturn);
 
-        _passStagingComplete = _passStagingComplete || _passTargetMet();
+        if (!_passStagingComplete) {
+            tassert(6621000, "Expected staging to be permitted", !_specificStats.passTargetMet);
+
+            // Staging hasn't yielded PlanStage::IS_EOF.
+            //
+            // Indicate whether the operation should reach completion due to a pass target.
+            _specificStats.passTargetMet = _passTargetMet();
+        }
+
+        _passStagingComplete = _passStagingComplete || _specificStats.passTargetMet;
         _commitStagedDeletes = _passStagingComplete || !_stagedDeletesBuffer.empty();
     }
 

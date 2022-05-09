@@ -128,9 +128,9 @@ public:
         return STAGE_DELETE;
     }
 
-    std::unique_ptr<PlanStageStats> getStats() final;
+    std::unique_ptr<PlanStageStats> getStats();
 
-    const SpecificStats* getSpecificStats() const final;
+    const SpecificStats* getSpecificStats() const;
 
 protected:
     void doSaveStateRequiresCollection() final {

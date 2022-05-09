@@ -118,6 +118,10 @@ public:
     // Returns true when no more work can be done (there are no more deletes to commit).
     bool isEOF() final;
 
+    std::unique_ptr<PlanStageStats> getStats() final;
+
+    const SpecificStats* getSpecificStats() const final;
+
     StageState doWork(WorkingSetID* out);
 
     StageType stageType() const final {
@@ -147,6 +151,8 @@ private:
     // 'recordsThatNoLongerMatch' then yields.
     PlanStage::StageState _prepareToRetryDrainAfterWCE(
         WorkingSetID* out, const std::set<WorkingSetID>& recordsThatNoLongerMatch);
+
+    BatchedDeleteStats _specificStats;
 
     // Returns true if one or more of the batch targets are met and it is time to delete the batch.
     bool _batchTargetMet();

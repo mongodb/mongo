@@ -582,6 +582,23 @@ long long PlanExecutorImpl::executeDelete() {
     }
 }
 
+BatchedDeleteStats PlanExecutorImpl::getBatchedDeleteStats() {
+    // If we're deleting on a non-existent collection, then the delete plan may have an EOF as the
+    // root stage.
+    if (_root->stageType() == STAGE_EOF) {
+        return BatchedDeleteStats();
+    }
+
+    invariant(_root->stageType() == StageType::STAGE_BATCHED_DELETE);
+
+    // If the collection exists, we expect the root of the plan tree to be a batched delete stage.
+    // Note: findAndModify is incompatible with the batched delete stage so no need to handle
+    // projection stage wrapping.
+    const auto stats = _root->getSpecificStats();
+    auto batchedStats = static_cast<const BatchedDeleteStats*>(stats);
+    return *batchedStats;
+}
+
 void PlanExecutorImpl::stashResult(const BSONObj& obj) {
     _stash.push_front(Document{obj.getOwned()});
 }

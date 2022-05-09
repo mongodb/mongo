@@ -110,6 +110,9 @@ public:
     long long executeDelete() override {
         MONGO_UNREACHABLE;
     }
+    BatchedDeleteStats getBatchedDeleteStats() override {
+        MONGO_UNREACHABLE;
+    }
 
     void dispose(OperationContext* opCtx) override {
         _pipeline->dispose(opCtx);

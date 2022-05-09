@@ -286,6 +286,15 @@ public:
      */
     virtual long long executeDelete() = 0;
 
+    /**
+     * If this plan executor has already executed a batched delete operation, returns the
+     * 'BatchedDeleteStats' describing the outcome of the batched delete. Illegal to call if either
+     * 1) the PlanExecutor is not a delete PlanExecutor that executed a batched delete, or 2) the
+     * PlanExecutor has not yet been executed either with 'executeDelete()' or by calling
+     * 'getNext()' until end-of-stream.
+     */
+    virtual BatchedDeleteStats getBatchedDeleteStats() = 0;
+
     //
     // Concurrency-related methods.
     //

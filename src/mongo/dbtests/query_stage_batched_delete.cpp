@@ -247,7 +247,8 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchDocsBasic) {
 
     WorkingSet ws;
     auto deleteStage = makeBatchedDeleteStage(&ws, coll);
-    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+    const BatchedDeleteStats* stats =
+        static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 
     int nIterations = 0;
     PlanStage::StageState state = PlanStage::NEED_TIME;
@@ -264,6 +265,9 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchDocsBasic) {
     // There should be 2 more docs deleted by the time the command returns EOF.
     ASSERT_EQUALS(state, PlanStage::IS_EOF);
     ASSERT_EQUALS(stats->docsDeleted, nDocs);
+
+    // The operation deletes all of the matching documents when no pass targets exist.
+    ASSERT_FALSE(stats->passTargetMet);
 }
 
 // A staged document is removed while the BatchedDeleteStage is in a savedState. Upon restoring its
@@ -283,7 +287,8 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsDeleted) {
 
     WorkingSet ws;
     auto deleteStage = makeBatchedDeleteStage(&ws, coll);
-    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+    const BatchedDeleteStats* stats =
+        static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 
     // Index to pause at before fetching the remaining documents into the delete batch.
     int pauseBatchingIdx = 6;
@@ -312,6 +317,9 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsDeleted) {
 
     ASSERT_EQUALS(state, PlanStage::IS_EOF);
     ASSERT_EQUALS(stats->docsDeleted, nDocs - 1);
+
+    // The operation deletes all of the matching documents when no pass targets exist.
+    ASSERT_FALSE(stats->passTargetMet);
 }
 
 // A document staged for batched deletion is removed while the BatchedDeleteStage is still fetching
@@ -345,7 +353,8 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsDeletedWriteConflict
 
     WorkingSet ws;
     auto deleteStage = makeBatchedDeleteStage(&ws, coll, batchedDeleteExpCtx.get());
-    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+    const BatchedDeleteStats* stats =
+        static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 
     // Index to pause at before fetching the remaining documents into the delete batch.
     int pauseBatchingIdx = 6;
@@ -386,6 +395,9 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsDeletedWriteConflict
 
     ASSERT_EQUALS(state, PlanStage::IS_EOF);
     ASSERT_EQUALS(stats->docsDeleted, nDocs - 1);
+
+    // The operation deletes all of the matching documents when no pass targets exist.
+    ASSERT_FALSE(stats->passTargetMet);
 }
 
 // One of the staged documents is updated and then the BatchedDeleteStage increments its snapshot
@@ -404,7 +416,8 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsUpdatedToNotMatch) {
 
     WorkingSet ws;
     auto deleteStage = makeBatchedDeleteStage(&ws, coll, cq.get());
-    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+    const BatchedDeleteStats* stats =
+        static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 
     // Index to pause at before fetching the remaining documents into the delete batch.
     int pauseBatchingIdx = 6;
@@ -433,6 +446,9 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsUpdatedToNotMatch) {
 
     ASSERT_EQUALS(state, PlanStage::IS_EOF);
     ASSERT_EQUALS(stats->docsDeleted, nDocs - 1);
+
+    // The operation deletes all of the matching documents when no pass targets exist.
+    ASSERT_FALSE(stats->passTargetMet);
 }
 
 // Simulates one client performing a batched delete while another updates a document staged for
@@ -465,7 +481,8 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsUpdatedToNotMatchCli
 
     WorkingSet ws;
     auto deleteStage = makeBatchedDeleteStage(&ws, coll, batchedDeleteExpCtx.get(), cq.get());
-    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+    const BatchedDeleteStats* stats =
+        static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 
     // Index to pause at before fetching the remaining documents into the delete batch.
     int pauseBatchingIdx = 6;
@@ -503,6 +520,9 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsUpdatedToNotMatchCli
 
     ASSERT_EQUALS(state, PlanStage::IS_EOF);
     ASSERT_EQUALS(stats->docsDeleted, nDocs - 1);
+
+    // The operation deletes all of the matching documents when no pass targets exist.
+    ASSERT_FALSE(stats->passTargetMet);
 }
 
 // Tests targetBatchTimeMS is enforced.
@@ -531,7 +551,8 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchTimeMSBasic) {
 
     WorkingSet ws;
     auto deleteStage = makeBatchedDeleteStage(&ws, coll);
-    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+    const BatchedDeleteStats* stats =
+        static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 
     PlanStage::StageState state = PlanStage::NEED_TIME;
     WorkingSetID id = WorkingSet::INVALID_ID;
@@ -563,6 +584,9 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchTimeMSBasic) {
         ASSERT_EQ(stats->docsDeleted, nDocs);
         ASSERT_EQ(state, PlanStage::IS_EOF);
         ASSERT_LTE(Milliseconds(timer.millis()), targetBatchTimeMS);
+
+        // The operation deletes all of the matching documents when no pass targets exist.
+        ASSERT_FALSE(stats->passTargetMet);
     }
 }
 
@@ -607,7 +631,8 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchTimeMSWithTargetBatc
     WorkingSet ws;
     auto deleteStage = makeBatchedDeleteStage(&ws, coll);
 
-    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+    const BatchedDeleteStats* stats =
+        static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 
     PlanStage::StageState state = PlanStage::NEED_TIME;
     WorkingSetID id = WorkingSet::INVALID_ID;
@@ -657,6 +682,9 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchTimeMSWithTargetBatc
         ASSERT_EQ(stats->docsDeleted, nDocs);
         ASSERT_EQ(state, PlanStage::IS_EOF);
         ASSERT_LT(Milliseconds(timer.millis()), targetBatchTimeMS);
+
+        // The operation deletes all of the matching documents when no pass targets exist.
+        ASSERT_FALSE(stats->passTargetMet);
     }
 }
 
@@ -682,7 +710,8 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsBasic) {
 
     auto deleteStage = makeBatchedDeleteStage(
         &ws, coll, _expCtx.get(), std::move(batchParams), std::move(passParams));
-    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+    const BatchedDeleteStats* stats =
+        static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 
     PlanStage::StageState state = PlanStage::NEED_TIME;
     WorkingSetID id = WorkingSet::INVALID_ID;
@@ -693,6 +722,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsBasic) {
         for (auto i = 0; i < targetBatchDocs; i++) {
             state = deleteStage->work(&id);
             ASSERT_EQ(stats->docsDeleted, 0);
+            ASSERT_FALSE(stats->passTargetMet);
             ASSERT_EQ(state, PlanStage::NEED_TIME);
         }
     }
@@ -701,6 +731,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsBasic) {
     {
         state = deleteStage->work(&id);
         ASSERT_EQ(stats->docsDeleted, targetBatchDocs);
+        ASSERT_FALSE(stats->passTargetMet);
         ASSERT_EQ(state, PlanStage::NEED_TIME);
     }
 
@@ -709,6 +740,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsBasic) {
         for (auto i = 0; i < targetBatchDocs - 1; i++) {
             state = deleteStage->work(&id);
             ASSERT_EQ(stats->docsDeleted, targetBatchDocs);
+            ASSERT_FALSE(stats->passTargetMet);
             ASSERT_EQ(state, PlanStage::NEED_TIME);
         }
     }
@@ -719,6 +751,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsBasic) {
         // Exactly 'targetPassDocs' are deleted here because 'targetPassDocs' is an exact multiple
         // of 'targetBatchDocs'.
         ASSERT_EQ(stats->docsDeleted, targetPassDocs);
+        ASSERT_TRUE(stats->passTargetMet);
         ASSERT_EQ(state, PlanStage::IS_EOF);
     }
 }
@@ -748,7 +781,8 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsWithUnlimitedBatc
 
     auto deleteStage = makeBatchedDeleteStage(
         &ws, coll, _expCtx.get(), std::move(batchParams), std::move(passParams));
-    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+    const BatchedDeleteStats* stats =
+        static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 
     PlanStage::StageState state = PlanStage::NEED_TIME;
     WorkingSetID id = WorkingSet::INVALID_ID;
@@ -758,6 +792,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsWithUnlimitedBatc
         for (auto i = 0; i <= nDocs; i++) {
             state = deleteStage->work(&id);
             ASSERT_EQ(stats->docsDeleted, 0);
+            ASSERT_FALSE(stats->passTargetMet);
             ASSERT_EQ(state, PlanStage::NEED_TIME);
         }
     }
@@ -767,6 +802,11 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsWithUnlimitedBatc
     {
         state = deleteStage->work(&id);
         ASSERT_EQ(stats->docsDeleted, nDocs);
+
+        // The operation reaches completion because there are no more documents to fetch, not
+        // because a pass target is met.
+        ASSERT_FALSE(stats->passTargetMet);
+
         ASSERT_EQ(state, PlanStage::IS_EOF);
     }
 }
@@ -792,7 +832,8 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSBasic) {
 
     auto deleteStage = makeBatchedDeleteStage(
         &ws, coll, _expCtx.get(), std::move(batchParams), std::move(passParams));
-    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+    const BatchedDeleteStats* stats =
+        static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 
     PlanStage::StageState state = PlanStage::NEED_TIME;
     WorkingSetID id = WorkingSet::INVALID_ID;
@@ -802,6 +843,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSBasic) {
         for (auto i = 0; i < targetBatchDocs; i++) {
             state = deleteStage->work(&id);
             ASSERT_EQ(stats->docsDeleted, 0);
+            ASSERT_FALSE(stats->passTargetMet);
             ASSERT_EQ(state, PlanStage::NEED_TIME);
             tickSource()->advance(Milliseconds(1));
         }
@@ -811,6 +853,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSBasic) {
     {
         state = deleteStage->work(&id);
         ASSERT_EQ(stats->docsDeleted, targetBatchDocs);
+        ASSERT_TRUE(stats->passTargetMet);
         ASSERT_EQ(state, PlanStage::IS_EOF);
     }
 }
@@ -836,7 +879,8 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSWithUnlimitedBa
 
     auto deleteStage = makeBatchedDeleteStage(
         &ws, coll, _expCtx.get(), std::move(batchParams), std::move(passParams));
-    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+    const BatchedDeleteStats* stats =
+        static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 
     PlanStage::StageState state = PlanStage::NEED_TIME;
     WorkingSetID id = WorkingSet::INVALID_ID;
@@ -846,6 +890,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSWithUnlimitedBa
         for (auto i = 0; i <= nDocs; i++) {
             state = deleteStage->work(&id);
             ASSERT_EQ(stats->docsDeleted, 0);
+            ASSERT_FALSE(stats->passTargetMet);
             ASSERT_EQ(state, PlanStage::NEED_TIME);
             tickSource()->advance(Milliseconds(1));
         }
@@ -857,6 +902,11 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSWithUnlimitedBa
     {
         state = deleteStage->work(&id);
         ASSERT_EQ(stats->docsDeleted, nDocs);
+
+        // The operation reaches completion because there are no more documents to fetch, not
+        // because a pass target is met.
+        ASSERT_FALSE(stats->passTargetMet);
+
         ASSERT_EQ(state, PlanStage::IS_EOF);
     }
 }
@@ -920,7 +970,8 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSReachedBeforeTa
 
     auto deleteStage = makeBatchedDeleteStage(
         &ws, coll, _expCtx.get(), std::move(batchParams), std::move(passParams));
-    const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+    const BatchedDeleteStats* stats =
+        static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 
     PlanStage::StageState state = PlanStage::NEED_TIME;
     WorkingSetID id = WorkingSet::INVALID_ID;
@@ -934,6 +985,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSReachedBeforeTa
         for (auto i = 0; i < targetBatchDocs; i++) {
             state = deleteStage->work(&id);
             ASSERT_EQ(stats->docsDeleted, 0);
+            ASSERT_FALSE(stats->passTargetMet);
             ASSERT_EQ(state, PlanStage::NEED_TIME);
         }
     }
@@ -942,6 +994,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSReachedBeforeTa
     {
         state = deleteStage->work(&id);
         ASSERT_EQ(stats->docsDeleted, batch0.size());
+        ASSERT_FALSE(stats->passTargetMet);
         ASSERT_EQ(state, PlanStage::NEED_TIME);
 
         // 'targetPassTimeMS' isn't met yet, more documents can be staged.
@@ -953,6 +1006,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSReachedBeforeTa
         for (auto i = 0; i < targetBatchDocs - 1; i++) {
             state = deleteStage->work(&id);
             ASSERT_EQ(stats->docsDeleted, batch0.size());
+            ASSERT_FALSE(stats->passTargetMet);
             ASSERT_EQ(state, PlanStage::NEED_TIME);
         }
     }
@@ -962,6 +1016,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSReachedBeforeTa
         state = deleteStage->work(&id);
         ASSERT_EQ(stats->docsDeleted, batch0.size() + batch1.size());
 
+        ASSERT_TRUE(stats->passTargetMet);
         // Despite reaching the 'targetPassTimeMS', the remaining deletes staged in the buffer still
         // need to be committed.
         ASSERT_GTE(Milliseconds(passTimer.millis()), targetPassTimeMS);
@@ -972,6 +1027,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSReachedBeforeTa
     {
         state = deleteStage->work(&id);
         ASSERT_EQ(stats->docsDeleted, expectedDocsDeleted);
+        ASSERT_TRUE(stats->passTargetMet);
         ASSERT_EQ(state, PlanStage::IS_EOF);
     }
 }
