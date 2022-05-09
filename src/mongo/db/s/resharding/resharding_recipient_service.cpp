@@ -543,6 +543,10 @@ void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status)
 boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode,
     MongoProcessInterface::CurrentOpSessionsMode) noexcept {
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        return _metricsNew->reportForCurrentOp();
+    }
+
     ReshardingMetrics::ReporterOptions options(ReshardingMetrics::Role::kRecipient,
                                                _metadata.getReshardingUUID(),
                                                _metadata.getSourceNss(),

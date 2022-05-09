@@ -11,6 +11,7 @@
 'use strict';
 
 load("jstests/libs/discover_topology.js");
+load("jstests/libs/feature_flag_util.js");  // For isEnabled.
 load("jstests/sharding/libs/resharding_test_fixture.js");
 
 const kNamespace = "reshardingDb.coll";
@@ -92,6 +93,13 @@ reshardingTest.withReshardingInBackground(  //
 
 const mongos = inputCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
+
+if (FeatureFlagUtil.isEnabled(mongos.getDB('admin'), "ShardingDataTransformMetrics")) {
+    // Skip test as format is slightly different. Delete this once we rewrite it to as a cpp test.
+    jsTestLog("Skipping as featureFlagShardingDataTransformMetrics is enabled");
+    reshardingTest.teardown();
+    return;
+}
 
 // There's one terminating "no-op" oplog entry from each donor marking the
 // boundary between the cloning phase and the applying phase. So there's a

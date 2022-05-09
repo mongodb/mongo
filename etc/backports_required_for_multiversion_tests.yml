@@ -248,6 +248,10 @@ last-continuous:
       test_file: jstests/core/plan_cache_list_plans.js
     - ticket: SERVER-65947
       test_file: jstests/sharding/migration_retries_on_write_conflict_exceptions.js
+    - ticket: SERVER-64395
+      test_file: jstests/sharding/resharding_metrics_increment.js
+    - ticket: SERVER-64395
+      test_file: jstests/sharding/resharding_abort_command.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -629,6 +633,10 @@ last-lts:
       test_file: jstests/core/plan_cache_list_plans.js
     - ticket: SERVER-65947
       test_file: jstests/sharding/migration_retries_on_write_conflict_exceptions.js
+    - ticket: SERVER-64395
+      test_file: jstests/sharding/resharding_metrics_increment.js
+    - ticket: SERVER-64395
+      test_file: jstests/sharding/resharding_abort_command.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

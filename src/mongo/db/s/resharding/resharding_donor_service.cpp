@@ -531,6 +531,10 @@ void ReshardingDonorService::DonorStateMachine::interrupt(Status status) {}
 boost::optional<BSONObj> ReshardingDonorService::DonorStateMachine::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        return _metricsNew->reportForCurrentOp();
+    }
+
     ReshardingMetrics::ReporterOptions options(ReshardingMetrics::Role::kDonor,
                                                _metadata.getReshardingUUID(),
                                                _metadata.getSourceNss(),

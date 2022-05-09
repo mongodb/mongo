@@ -129,8 +129,7 @@ public:
             if (feature_flags::gFeatureFlagShardingDataTransformMetrics.isEnabledAndIgnoreFCV()) {
                 // TODO PM-2664: Switch over to using data transform metrics when they have feature
                 // parity with resharding metrics.
-                reportReshardingMetrics(opCtx, &result);
-                // reportDataTransformMetrics(opCtx, &result);
+                reportDataTransformMetrics(opCtx, &result);
             } else {
                 reportReshardingMetrics(opCtx, &result);
             }

@@ -1578,6 +1578,10 @@ void ReshardingCoordinatorService::ReshardingCoordinator::abort() {
 boost::optional<BSONObj> ReshardingCoordinatorService::ReshardingCoordinator::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode,
     MongoProcessInterface::CurrentOpSessionsMode) noexcept {
+    if (ShardingDataTransformMetrics::isEnabled()) {
+        return _metricsNew->reportForCurrentOp();
+    }
+
     ReshardingMetrics::ReporterOptions options(ReshardingMetrics::Role::kCoordinator,
                                                _coordinatorDoc.getReshardingUUID(),
                                                _coordinatorDoc.getSourceNss(),
