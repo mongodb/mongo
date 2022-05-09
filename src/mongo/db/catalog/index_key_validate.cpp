@@ -68,35 +68,6 @@ namespace {
 // specification.
 MONGO_FAIL_POINT_DEFINE(skipIndexCreateFieldNameValidation);
 
-static std::set<StringData> allowedFieldNames = {
-    IndexDescriptor::k2dIndexBitsFieldName,
-    IndexDescriptor::k2dIndexMaxFieldName,
-    IndexDescriptor::k2dIndexMinFieldName,
-    IndexDescriptor::k2dsphereCoarsestIndexedLevel,
-    IndexDescriptor::k2dsphereFinestIndexedLevel,
-    IndexDescriptor::k2dsphereVersionFieldName,
-    IndexDescriptor::kBackgroundFieldName,
-    IndexDescriptor::kCollationFieldName,
-    IndexDescriptor::kDefaultLanguageFieldName,
-    IndexDescriptor::kDropDuplicatesFieldName,
-    IndexDescriptor::kExpireAfterSecondsFieldName,
-    IndexDescriptor::kGeoHaystackBucketSize,
-    IndexDescriptor::kHiddenFieldName,
-    IndexDescriptor::kIndexNameFieldName,
-    IndexDescriptor::kIndexVersionFieldName,
-    IndexDescriptor::kKeyPatternFieldName,
-    IndexDescriptor::kLanguageOverrideFieldName,
-    IndexDescriptor::kNamespaceFieldName,
-    IndexDescriptor::kPartialFilterExprFieldName,
-    IndexDescriptor::kPathProjectionFieldName,
-    IndexDescriptor::kSparseFieldName,
-    IndexDescriptor::kStorageEngineFieldName,
-    IndexDescriptor::kTextVersionFieldName,
-    IndexDescriptor::kUniqueFieldName,
-    IndexDescriptor::kWeightsFieldName,
-    // Index creation under legacy writeMode can result in an index spec with an _id field.
-    "_id"};
-
 static const std::set<StringData> allowedIdIndexFieldNames = {
     IndexDescriptor::kCollationFieldName,
     IndexDescriptor::kIndexNameFieldName,
@@ -119,6 +90,27 @@ Status isIndexVersionAllowedForCreation(IndexVersion indexVersion, const BSONObj
     return {ErrorCodes::CannotCreateIndex,
             str::stream() << "Invalid index specification " << indexSpec
                           << "; cannot create an index with v=" << static_cast<int>(indexVersion)};
+}
+
+BSONObj buildRepairedIndexSpec(
+    const NamespaceString& ns,
+    const BSONObj& indexSpec,
+    const std::set<StringData>& allowedFieldNames,
+    std::function<void(const BSONElement&, BSONObjBuilder*)> indexSpecHandleFn) {
+    BSONObjBuilder builder;
+    for (const auto& indexSpecElem : indexSpec) {
+        StringData fieldName = indexSpecElem.fieldNameStringData();
+        if (allowedFieldNames.count(fieldName)) {
+            indexSpecHandleFn(indexSpecElem, &builder);
+        } else {
+            LOGV2_WARNING(23878,
+                          "Removing unknown field from index spec",
+                          "namespace"_attr = redact(ns.toString()),
+                          "fieldName"_attr = redact(fieldName),
+                          "indexSpec"_attr = redact(indexSpec));
+        }
+    }
+    return builder.obj();
 }
 }  // namespace
 
@@ -250,21 +242,35 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
     return Status::OK();
 }
 
-BSONObj removeUnknownFields(const BSONObj& indexSpec) {
-    BSONObjBuilder builder;
-    for (const auto& indexSpecElem : indexSpec) {
+BSONObj removeUnknownFields(const NamespaceString& ns, const BSONObj& indexSpec) {
+    auto appendIndexSpecFn = [](const BSONElement& indexSpecElem, BSONObjBuilder* builder) {
+        builder->append(indexSpecElem);
+    };
+    return buildRepairedIndexSpec(ns, indexSpec, allowedFieldNames, appendIndexSpecFn);
+}
+
+BSONObj repairIndexSpec(const NamespaceString& ns,
+                        const BSONObj& indexSpec,
+                        const std::set<StringData>& allowedFieldNames) {
+    auto fixBoolIndexSpecFn = [&indexSpec, &ns](const BSONElement& indexSpecElem,
+                                                BSONObjBuilder* builder) {
         StringData fieldName = indexSpecElem.fieldNameStringData();
-        if (allowedFieldNames.count(fieldName)) {
-            builder.append(indexSpecElem);
-        } else {
-            LOGV2_WARNING(23878,
-                          "Removing field '{fieldName}' from index spec: {indexSpec}",
-                          "Removing unknown field from index spec",
+        if ((IndexDescriptor::kBackgroundFieldName == fieldName ||
+             IndexDescriptor::kUniqueFieldName == fieldName ||
+             IndexDescriptor::kSparseFieldName == fieldName ||
+             IndexDescriptor::kDropDuplicatesFieldName == fieldName) &&
+            !indexSpecElem.isNumber() && !indexSpecElem.isBoolean() && indexSpecElem.trueValue()) {
+            LOGV2_WARNING(6444400,
+                          "Fixing boolean field from index spec",
+                          "namespace"_attr = redact(ns.toString()),
                           "fieldName"_attr = redact(fieldName),
                           "indexSpec"_attr = redact(indexSpec));
+            builder->appendBool(fieldName, true);
+        } else {
+            builder->append(indexSpecElem);
         }
-    }
-    return builder.obj();
+    };
+    return buildRepairedIndexSpec(ns, indexSpec, allowedFieldNames, fixBoolIndexSpecFn);
 }
 
 StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& indexSpec) {
