@@ -240,6 +240,7 @@ class search_near_03 : public test_harness::test {
              * Grab a random existing prefix and perform unique index insertion. We expect it to
              * fail to insert, because it should already exist.
              */
+            testutil_assert(prefixes_map.at(coll.id).size() != 0);
             random_index = random_generator::instance().generate_integer(
               static_cast<size_t>(0), prefixes_map.at(coll.id).size() - 1);
             prefix_key = get_prefix_from_key(prefixes_map.at(coll.id).at(random_index));

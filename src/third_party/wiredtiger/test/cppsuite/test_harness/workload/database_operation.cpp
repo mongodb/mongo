@@ -360,6 +360,7 @@ database_operation::update_operation(thread_context *tc)
         scoped_cursor &cursor = cursors[coll.id];
 
         /* Choose a random key to update. */
+        testutil_assert(coll.get_key_count() != 0);
         uint64_t key_id =
           random_generator::instance().generate_integer<uint64_t>(0, coll.get_key_count() - 1);
         if (!tc->update(cursor, coll.id, tc->key_to_string(key_id))) {
