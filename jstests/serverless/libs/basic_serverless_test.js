@@ -312,6 +312,30 @@ class BasicServerlessTest {
             this.donor.ports.filter(port => !this.recipientNodes.some(node => node.port === port));
     }
 
+    /**
+     * Remove the recipient nodes from the donor's config memberset and calls replSetReconfig on the
+     * updated local config.
+     */
+    reconfigDonorSetAfterSplit() {
+        // TODO(SERVER-65730) we no longer will need to call this method explicitly in the test as
+        // it will be part of the commit shard split process.
+        const primary = this.donor.getPrimary();
+        const config = this.donor.getReplSetConfigFromNode();
+        config.version++;
+
+        let donorNodeHosts = [];
+        this.donor.nodes.forEach(node => {
+            donorNodeHosts.push("" + node.host);
+        });
+
+        // remove recipient nodes and config.
+        config.members =
+            config.members.filter(member => donorNodeHosts.some(node => node === member.host));
+        delete config.recipientConfig;
+
+        assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
+    }
+
     /*
      * Look up tenant access blockers for the given tenant ids and will check, based upon the
      * expected state the access blockers are expected to be, that the different fields are
@@ -343,6 +367,19 @@ class BasicServerlessTest {
             return tenantAccessBlockersBlockRW && tenantAccessBlockersBlockTimestamp &&
                 tenantAccessBlockersAbortTimestamp;
         }));
+    }
+
+    /**
+     * After calling the forgetShardSplit command, wait for the tenant access blockers to be removed
+     * then remove and stop the recipient nodes from the donor set and test and finally apply the
+     * new config once the split has been cleaned up.
+     * @param {migrationId} migration id of the committed shard split operation.
+     * @param {tenantIds}  tenant IDs that were used for the split operation.
+     */
+    cleanupSuccesfulAbortedOrCommitted(migrationId, tenantIds) {
+        this.waitForGarbageCollection(migrationId, tenantIds);
+        this.removeAndStopRecipientNodes();
+        this.reconfigDonorSetAfterSplit();
     }
 }
 

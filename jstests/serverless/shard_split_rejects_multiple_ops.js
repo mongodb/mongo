@@ -83,9 +83,10 @@ function commitShardSplitConcurrently() {
     }),
                                  117);  // ConflictingOperationInProgress
 
-    test.waitForGarbageCollection(migrationId, tenantIds);
+    test.cleanupSuccesfulAbortedOrCommitted(migrationId, tenantIds);
 
     // another split operation can start after garbage collection of the previous one.
+    test.addRecipientNodes();
     assert.commandWorked(donorPrimary.adminCommand({
         commitShardSplit: 1,
         migrationId: UUID(),
