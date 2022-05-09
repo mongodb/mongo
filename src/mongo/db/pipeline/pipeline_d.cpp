@@ -1181,7 +1181,7 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
     auto [unpack, sort] = findUnpackThenSort(pipeline->_sources);
     if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            multiversion::FeatureCompatibilityVersion::kVersion_6_1) &&
+            multiversion::FeatureCompatibilityVersion::kVersion_6_0) &&
         feature_flags::gFeatureFlagBucketUnpackWithSort.isEnabled(
             serverGlobalParams.featureCompatibility) &&
         unpack && sort) {

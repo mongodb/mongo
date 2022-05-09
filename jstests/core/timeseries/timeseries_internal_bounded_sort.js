@@ -1,8 +1,7 @@
 /**
  * Tests the behavior of the $_internalBoundedSort stage.
  * @tags: [
- *   # TODO SERVER-52286 should be requires_fcv_60
- *   requires_fcv_53,
+ *   requires_fcv_60,
  *   # Cannot insert into a time-series collection in a multi-document transaction.
  *   does_not_support_transactions,
  *   # Refusing to run a test that issues an aggregation command with explain because it may return

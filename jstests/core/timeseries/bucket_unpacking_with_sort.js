@@ -3,7 +3,7 @@
  * results to be created.
  *
  * @tags: [
- *     requires_fcv_61,
+ *     requires_fcv_60,
  *     # We need a timeseries collection.
  *     assumes_no_implicit_collection_creation_after_drop,
  *     # Cannot insert into a time-series collection in a multi-document transaction.
