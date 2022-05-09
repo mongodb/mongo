@@ -147,8 +147,6 @@ bool LockerImpl::_shouldDelayUnlock(ResourceId resId, LockMode mode) const {
             return false;
 
         case RESOURCE_GLOBAL:
-        case RESOURCE_PBWM:
-        case RESOURCE_RSTL:
         case RESOURCE_DATABASE:
         case RESOURCE_COLLECTION:
         case RESOURCE_METADATA:
@@ -435,8 +433,7 @@ bool LockerImpl::unlockGlobal() {
         // error for any lock used with multi-granularity locking to have more references than
         // the global lock, because every scope starts by calling lockGlobal.
         const auto resType = it.key().getType();
-        if (resType == RESOURCE_GLOBAL || resType == RESOURCE_PBWM || resType == RESOURCE_RSTL ||
-            resType == RESOURCE_MUTEX) {
+        if (resType == RESOURCE_GLOBAL || resType == RESOURCE_MUTEX) {
             it.next();
         } else {
             invariant(_unlockImpl(&it));
@@ -788,8 +785,9 @@ bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
 
         // We should never have to save and restore metadata locks.
         invariant(RESOURCE_DATABASE == resType || RESOURCE_COLLECTION == resType ||
-                  (RESOURCE_PBWM == resType && isSharedLockMode(it->mode)) ||
-                  (RESOURCE_RSTL == resType && it->mode == MODE_IX));
+                  (resId == resourceIdParallelBatchWriterMode && isSharedLockMode(it->mode)) ||
+                  resId == resourceIdFeatureCompatibilityVersion ||
+                  (resId == resourceIdReplicationStateTransitionLock && it->mode == MODE_IX));
 
         // And, stuff the info into the out parameter.
         OneLock info;
@@ -892,7 +890,7 @@ LockResult LockerImpl::_lockBegin(OperationContext* opCtx, ResourceId resId, Loc
     // Give priority to the full modes for Global, PBWM, and RSTL resources so we don't stall global
     // operations such as shutdown or stepdown.
     const ResourceType resType = resId.getType();
-    if (resType == RESOURCE_GLOBAL || resType == RESOURCE_PBWM || resType == RESOURCE_RSTL) {
+    if (resType == RESOURCE_GLOBAL) {
         if (mode == MODE_S || mode == MODE_X) {
             request->enqueueAtFront = true;
             request->compatibleFirst = true;

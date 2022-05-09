@@ -548,13 +548,15 @@ private:
         _cancelTenantMigrations(opCtx);
 
         {
-            // Take the global lock in S mode to create a barrier for operations taking the global
-            // IX or X locks. This ensures that either:
+            // Take the FCV full transition lock in S mode to create a barrier for operations taking
+            // the global IX or X locks, which implicitly take the FCV full transition lock in IX
+            // mode (aside from those which explicitly opt out). This ensures that either:
             //   - The global IX/X locked operation will start after the FCV change, see the
             //     upgrading to the latest FCV and act accordingly.
             //   - The global IX/X locked operation began prior to the FCV change, is acting on that
             //     assumption and will finish before upgrade procedures begin right after this.
-            Lock::GlobalLock lk(opCtx, MODE_S);
+            Lock::ResourceLock lk(
+                opCtx, opCtx->lockState(), resourceIdFeatureCompatibilityVersion, MODE_S);
         }
 
         uassert(ErrorCodes::Error(549180),
@@ -622,13 +624,15 @@ private:
         _cancelTenantMigrations(opCtx);
 
         {
-            // Take the global lock in S mode to create a barrier for operations taking the global
-            // IX or X locks. This ensures that either
+            // Take the FCV full transition lock in S mode to create a barrier for operations taking
+            // the global IX or X locks, which implicitly take the FCV full transition lock in IX
+            // mode (aside from those which explicitly opt out). This ensures that either:
             //   - The global IX/X locked operation will start after the FCV change, see the
             //     downgrading to the last-lts or last-continuous FCV and act accordingly.
             //   - The global IX/X locked operation began prior to the FCV change, is acting on that
             //     assumption and will finish before downgrade procedures begin right after this.
-            Lock::GlobalLock lk(opCtx, MODE_S);
+            Lock::ResourceLock lk(
+                opCtx, opCtx->lockState(), resourceIdFeatureCompatibilityVersion, MODE_S);
         }
 
         if (serverGlobalParams.featureCompatibility

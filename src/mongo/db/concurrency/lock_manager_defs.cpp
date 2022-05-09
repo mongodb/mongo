@@ -35,8 +35,13 @@ namespace mongo {
 const ResourceId resourceIdLocalDB = ResourceId(RESOURCE_DATABASE, StringData("local"));
 const ResourceId resourceIdOplog = ResourceId(RESOURCE_COLLECTION, StringData("local.oplog.rs"));
 const ResourceId resourceIdAdminDB = ResourceId(RESOURCE_DATABASE, StringData("admin"));
-const ResourceId resourceIdGlobal = ResourceId(RESOURCE_GLOBAL, 1ULL);
-const ResourceId resourceIdParallelBatchWriterMode = ResourceId(RESOURCE_PBWM, 1ULL);
-const ResourceId resourceIdReplicationStateTransitionLock = ResourceId(RESOURCE_RSTL, 1ULL);
+const ResourceId resourceIdGlobal =
+    ResourceId(RESOURCE_GLOBAL, static_cast<uint8_t>(ResourceGlobalId::kGlobal));
+const ResourceId resourceIdParallelBatchWriterMode =
+    ResourceId(RESOURCE_GLOBAL, static_cast<uint8_t>(ResourceGlobalId::kParallelBatchWriterMode));
+const ResourceId resourceIdFeatureCompatibilityVersion = ResourceId(
+    RESOURCE_GLOBAL, static_cast<uint8_t>(ResourceGlobalId::kFeatureCompatibilityVersion));
+const ResourceId resourceIdReplicationStateTransitionLock = ResourceId(
+    RESOURCE_GLOBAL, static_cast<uint8_t>(ResourceGlobalId::kReplicationStateTransitionLock));
 
 }  // namespace mongo

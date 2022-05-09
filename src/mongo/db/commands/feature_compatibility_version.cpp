@@ -196,7 +196,7 @@ private:
  *
  * setFCV takes this lock in exclusive mode when changing the FCV value.
  */
-Lock::ResourceMutex fcvLock("featureCompatibilityVersionLock");
+Lock::ResourceMutex fcvDocumentLock("featureCompatibilityVersionDocumentLock");
 // lastFCVUpdateTimestamp contains the latest oplog entry timestamp which updated the FCV.
 // It is reset on rollback.
 Timestamp lastFCVUpdateTimestamp;
@@ -506,7 +506,7 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
 
 Lock::ExclusiveLock FeatureCompatibilityVersion::enterFCVChangeRegion(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
-    return Lock::ExclusiveLock(opCtx->lockState(), fcvLock);
+    return Lock::ExclusiveLock(opCtx->lockState(), fcvDocumentLock);
 }
 
 void FeatureCompatibilityVersion::advanceLastFCVUpdateTimestamp(Timestamp fcvUpdateTimestamp) {
@@ -571,7 +571,7 @@ FixedFCVRegion::FixedFCVRegion(OperationContext* opCtx)
     : _lk([&] {
           invariant(!opCtx->lockState()->isLocked());
           invariant(!opCtx->lockState()->isRSTLLocked());
-          return Lock::SharedLock(opCtx->lockState(), fcvLock);
+          return Lock::SharedLock(opCtx->lockState(), fcvDocumentLock);
       }()) {}
 
 FixedFCVRegion::~FixedFCVRegion() = default;
