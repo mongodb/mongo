@@ -125,7 +125,7 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransform) {
 
     ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry,
                                            NamespaceString::makeCollectionlessAggregateNSS(
-                                               TenantDatabaseName(boost::none, "viewDB"))),
+                                               DatabaseName(boost::none, "viewDB"))),
                        expectedDoc);
 }
 

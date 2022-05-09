@@ -41,11 +41,11 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_data.h"
-#include "mongo/db/tenant_database_name.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_set.h"
@@ -78,7 +78,7 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
     // be valid. If not valid then the NamespaceString constructor will uassert.
     if (viewNameIsValid) {
         NamespaceString viewNss(viewName);
-        valid &= viewNss.isValid() && viewNss.db() == dbName;
+        valid &= viewNss.isValid() && viewNss.dbName().db() == dbName;
     }
 
     valid &= NamespaceString::validCollectionName(viewDefinition["viewOn"].str());
@@ -115,7 +115,7 @@ void DurableViewCatalog::onExternalChange(OperationContext* opCtx, const Namespa
     // is reloaded. This will prevent any further usage of the views for this database until the
     // invalid view definitions are removed.
     auto catalog = CollectionCatalog::get(opCtx);
-    catalog->reloadViews(opCtx, TenantDatabaseName(boost::none, name.db())).ignore();
+    catalog->reloadViews(opCtx, name.dbName()).ignore();
 }
 
 Status DurableViewCatalog::onExternalInsert(OperationContext* opCtx,
@@ -153,7 +153,7 @@ void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
     dassert(name.coll() == NamespaceString::kSystemDotViewsCollectionName);
 
     auto catalog = CollectionCatalog::get(opCtx);
-    const TenantDatabaseName dbName(boost::none, name.db());
+    const DatabaseName& dbName = name.dbName();
 
     // First, iterate through the views on this database and audit them before they are dropped.
     catalog->iterateViews(opCtx,
@@ -176,7 +176,7 @@ void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
 // DurableViewCatalogImpl
 
 const std::string& DurableViewCatalogImpl::getName() const {
-    return _db->name().dbName();
+    return _db->name().toString();
 }
 
 void DurableViewCatalogImpl::iterate(OperationContext* opCtx, Callback callback) {
@@ -220,16 +220,15 @@ BSONObj DurableViewCatalogImpl::_validateViewDefinition(OperationContext* opCtx,
     // decimal data even if decimal is disabled.
     fassert(40224, validateBSON(recordData.data(), recordData.size()));
     BSONObj viewDefinition = recordData.toBson();
-    std::string dbName(_db->name().dbName());
 
-    validateViewDefinitionBSON(opCtx, viewDefinition, dbName);
+    validateViewDefinitionBSON(opCtx, viewDefinition, _db->name().db());
     return viewDefinition;
 }
 
 void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
                                     const NamespaceString& name,
                                     const BSONObj& view) {
-    dassert(opCtx->lockState()->isDbLockedForMode(_db->name().dbName(), MODE_IX));
+    dassert(opCtx->lockState()->isDbLockedForMode(_db->name().db(), MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(name, MODE_IX));
 
     NamespaceString systemViewsNs(_db->getSystemViewsName());
@@ -262,7 +261,7 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
 }
 
 void DurableViewCatalogImpl::remove(OperationContext* opCtx, const NamespaceString& name) {
-    dassert(opCtx->lockState()->isDbLockedForMode(_db->name().dbName(), MODE_IX));
+    dassert(opCtx->lockState()->isDbLockedForMode(_db->name().db(), MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(name, MODE_IX));
 
     CollectionPtr systemViews = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(

@@ -164,14 +164,14 @@ void acquireCollectionLocksInResourceIdOrder(
 
 }  // namespace
 
-// TODO SERVER-62918 Pass TenantDatabaseName instead of string for dbName.
+// TODO SERVER-62918 Pass DatabaseName instead of string for dbName.
 AutoGetDb::AutoGetDb(OperationContext* opCtx,
                      StringData dbName,
                      LockMode mode,
                      Date_t deadline,
                      const std::set<StringData>& secondaryDbNames)
     : _dbName(dbName), _dbLock(opCtx, dbName, mode, deadline), _db([&] {
-          const TenantDatabaseName tenantDbName(boost::none, dbName);
+          const DatabaseName tenantDbName(boost::none, dbName);
           auto databaseHolder = DatabaseHolder::get(opCtx);
           return databaseHolder->getDb(opCtx, tenantDbName);
       }()) {
@@ -200,8 +200,8 @@ Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
     }
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    const TenantDatabaseName tenantDbName(boost::none, _dbName);
-    _db = databaseHolder->openDb(opCtx, tenantDbName, nullptr);
+    const DatabaseName dbName(boost::none, _dbName);
+    _db = databaseHolder->openDb(opCtx, dbName, nullptr);
 
     auto dss = DatabaseShardingState::get(opCtx, _dbName);
     auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
@@ -270,13 +270,13 @@ AutoGetCollection::AutoGetCollection(
             catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID);
         auto secondaryColl = catalog->lookupCollectionByNamespace(opCtx, secondaryResolvedNss);
         // TODO SERVER-64608 Use tenantID on NamespaceString to construct DatabaseName
-        const TenantDatabaseName secondaryTenantDbName(boost::none, secondaryNssOrUUID.db());
+        const DatabaseName secondaryDbName(boost::none, secondaryNssOrUUID.db());
         verifyDbAndCollection(opCtx,
                               MODE_IS,
                               secondaryNssOrUUID,
                               secondaryResolvedNss,
                               secondaryColl,
-                              databaseHolder->getDb(opCtx, secondaryTenantDbName));
+                              databaseHolder->getDb(opCtx, secondaryDbName));
     }
 
     if (_coll) {

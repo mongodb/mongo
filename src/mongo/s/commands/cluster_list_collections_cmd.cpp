@@ -224,8 +224,7 @@ public:
                               BSONObjBuilder& output) final {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-        const auto nss(
-            NamespaceString::makeListCollectionsNSS(TenantDatabaseName(boost::none, dbName)));
+        const auto nss(NamespaceString::makeListCollectionsNSS(DatabaseName(boost::none, dbName)));
 
         BSONObj newCmd = cmdObj;
 

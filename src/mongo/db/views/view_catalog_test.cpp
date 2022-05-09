@@ -650,7 +650,7 @@ TEST_F(ViewCatalogFixture, Iterate) {
 
     Lock::DBLock dbLock(operationContext(), "db", MODE_IX);
     getCatalog()->iterateViews(operationContext(),
-                               TenantDatabaseName(boost::none, "db"),
+                               DatabaseName(boost::none, "db"),
                                [&viewNames](const ViewDefinition& view) {
                                    std::string name = view.name().toString();
                                    ASSERT(viewNames.end() != viewNames.find(name));

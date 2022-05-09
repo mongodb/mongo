@@ -711,12 +711,12 @@ namespace {
  */
 bool replHasDatabases(OperationContext* opCtx) {
     StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
-    std::vector<TenantDatabaseName> tenantDbNames = storageEngine->listDatabases();
+    std::vector<DatabaseName> dbNames = storageEngine->listDatabases();
 
-    if (tenantDbNames.size() >= 2)
+    if (dbNames.size() >= 2)
         return true;
-    if (tenantDbNames.size() == 1) {
-        if (tenantDbNames[0].dbName() != "local")
+    if (dbNames.size() == 1) {
+        if (dbNames[0].db() != "local")
             return true;
 
         // we have a local database.  return true if oplog isn't empty

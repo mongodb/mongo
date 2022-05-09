@@ -35,7 +35,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/tenant_database_name.h"
+#include "mongo/db/database_name.h"
 
 namespace mongo {
 
@@ -64,15 +64,13 @@ public:
      * Retrieves an already opened database or returns nullptr. Must be called with the database
      * locked in at least IS-mode.
      */
-    virtual Database* getDb(OperationContext* opCtx,
-                            const TenantDatabaseName& tenantDbName) const = 0;
+    virtual Database* getDb(OperationContext* opCtx, const DatabaseName& dbName) const = 0;
 
     /**
      * Checks if a database exists without holding a database-level lock. This class' internal mutex
-     * provides concurrency protection around looking up the db name of 'tenantDbName'.
+     * provides concurrency protection around looking up the db name of 'dbName'.
      */
-    virtual bool dbExists(OperationContext* opCtx,
-                          const TenantDatabaseName& tenantDbName) const = 0;
+    virtual bool dbExists(OperationContext* opCtx, const DatabaseName& dbName) const = 0;
 
     /**
      * Retrieves a database reference if it is already opened, or opens it if it hasn't been
@@ -82,7 +80,7 @@ public:
      *          existed (false). Can be NULL if this information is not necessary.
      */
     virtual Database* openDb(OperationContext* opCtx,
-                             const TenantDatabaseName& tenantDbName,
+                             const DatabaseName& dbName,
                              bool* justCreated = nullptr) = 0;
 
     /**
@@ -99,7 +97,7 @@ public:
      * Closes the specified database. Must be called with the database locked in X-mode.
      * No background jobs must be in progress on the database when this function is called.
      */
-    virtual void close(OperationContext* opCtx, const TenantDatabaseName& tenantDbName) = 0;
+    virtual void close(OperationContext* opCtx, const DatabaseName& dbName) = 0;
 
     /**
      * Closes all opened databases. Must be called with the global lock acquired in X-mode.
@@ -112,15 +110,14 @@ public:
     /**
      * Returns the set of existing database names that differ only in casing.
      */
-    virtual std::set<TenantDatabaseName> getNamesWithConflictingCasing(
-        const TenantDatabaseName& tenantDbName) = 0;
+    virtual std::set<DatabaseName> getNamesWithConflictingCasing(const DatabaseName& dbName) = 0;
 
     /**
      * Returns all the database names (including those which are empty).
      *
      * Unlike CollectionCatalog::getAllDbNames(), this returns databases that are empty.
      */
-    virtual std::vector<TenantDatabaseName> getNames() = 0;
+    virtual std::vector<DatabaseName> getNames() = 0;
 };
 
 }  // namespace mongo

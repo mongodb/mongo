@@ -639,14 +639,13 @@ void submitOrphanRanges(OperationContext* opCtx, const NamespaceString& nss, con
 
 void submitOrphanRangesForCleanup(OperationContext* opCtx) {
     auto catalog = CollectionCatalog::get(opCtx);
-    const auto& tenantDbNames = catalog->getAllDbNames();
+    const auto& dbNames = catalog->getAllDbNames();
 
-    for (const auto& tenantDbName : tenantDbNames) {
-        if (tenantDbName.dbName() == NamespaceString::kLocalDb)
+    for (const auto& dbName : dbNames) {
+        if (dbName.db() == NamespaceString::kLocalDb)
             continue;
 
-        for (auto collIt = catalog->begin(opCtx, tenantDbName); collIt != catalog->end(opCtx);
-             ++collIt) {
+        for (auto collIt = catalog->begin(opCtx, dbName); collIt != catalog->end(opCtx); ++collIt) {
             auto uuid = collIt.uuid().get();
             auto nss = catalog->lookupNSSByUUID(opCtx, uuid).get();
             LOGV2_DEBUG(22034,

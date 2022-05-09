@@ -254,7 +254,7 @@ TEST(AggregationRequestTest, ShouldSerializeBatchSizeIfSetAndExplainFalse) {
 
 TEST(AggregationRequestTest, ShouldSerialiseAggregateFieldToOneIfCollectionIsAggregateOneNSS) {
     NamespaceString nss =
-        NamespaceString::makeCollectionlessAggregateNSS(TenantDatabaseName(boost::none, "a"));
+        NamespaceString::makeCollectionlessAggregateNSS(DatabaseName(boost::none, "a"));
     AggregateCommandRequest request(nss, {});
 
     auto expectedSerialization =

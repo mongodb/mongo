@@ -84,19 +84,17 @@ public:
         stats.internalCollections = catalogStats.internal;
 
         const auto viewCatalogDbNames = catalog->getViewCatalogDbNames(opCtx);
-        for (const auto& tenantDbName : viewCatalogDbNames) {
+        for (const auto& dbName : viewCatalogDbNames) {
             try {
-                const auto viewStats = catalog->getViewStatsForDatabase(opCtx, tenantDbName);
+                const auto viewStats = catalog->getViewStatsForDatabase(opCtx, dbName);
                 invariant(viewStats);
 
                 stats.timeseries += viewStats->userTimeseries;
                 stats.views += viewStats->userViews;
                 stats.internalViews += viewStats->internal;
             } catch (ExceptionForCat<ErrorCategory::Interruption>&) {
-                LOGV2_DEBUG(5578400,
-                            2,
-                            "Failed to collect view catalog statistics",
-                            "db"_attr = tenantDbName);
+                LOGV2_DEBUG(
+                    5578400, 2, "Failed to collect view catalog statistics", "db"_attr = dbName);
             }
         }
 

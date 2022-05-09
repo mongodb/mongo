@@ -41,6 +41,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -52,7 +53,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/tenant_database_name.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -305,9 +305,8 @@ Status _checkPrecondition(OperationContext* opCtx,
         BSONObj realres = cursor->more() ? cursor->nextSafe() : BSONObj{};
 
         // Get collection default collation.
-        const TenantDatabaseName tenantDbName(boost::none, nss.db());
         auto databaseHolder = DatabaseHolder::get(opCtx);
-        auto database = databaseHolder->getDb(opCtx, tenantDbName);
+        auto database = databaseHolder->getDb(opCtx, nss.dbName());
         if (!database) {
             return {ErrorCodes::NamespaceNotFound, "database in ns does not exist: " + nss.ns()};
         }

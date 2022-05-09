@@ -260,14 +260,14 @@ bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
         _ns == kTenantMigrationRecipientsNamespace.ns();
 }
 
-NamespaceString NamespaceString::makeListCollectionsNSS(const TenantDatabaseName& dbName) {
+NamespaceString NamespaceString::makeListCollectionsNSS(const DatabaseName& dbName) {
     NamespaceString nss(dbName, listCollectionsCursorCol);
     dassert(nss.isValid());
     dassert(nss.isListCollectionsCursorNS());
     return nss;
 }
 
-NamespaceString NamespaceString::makeCollectionlessAggregateNSS(const TenantDatabaseName& dbName) {
+NamespaceString NamespaceString::makeCollectionlessAggregateNSS(const DatabaseName& dbName) {
     NamespaceString nss(dbName, collectionlessAggregateCursorCol);
     dassert(nss.isValid());
     dassert(nss.isCollectionlessAggregateNS());

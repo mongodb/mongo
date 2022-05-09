@@ -187,7 +187,7 @@ protected:
     executor::NetworkInterfaceMock* _net;
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
     std::string _tenantId = OID::gen().toString();
-    TenantDatabaseName _dbName = TenantDatabaseName(TenantId(OID(_tenantId)), "test");
+    DatabaseName _dbName = DatabaseName(TenantId(OID(_tenantId)), "test");
     UUID _migrationUuid = UUID::gen();
     ServiceContext::UniqueOperationContext _opCtx;
     TenantOplogApplierTestOpObserver* _opObserver;  // Owned by service context opObserverRegistry
@@ -296,7 +296,7 @@ TEST_F(TenantOplogApplierTest, NoOpsForLargeTransaction) {
 
     // Makes entries with ts from range [2, 5).
     std::vector<OplogEntry> srcOps = makeMultiEntryTransactionOplogEntries(
-        2, _dbName.dbName(), /* prepared */ false, {innerOps1, innerOps2, innerOps3});
+        2, _dbName.db(), /* prepared */ false, {innerOps1, innerOps2, innerOps3});
     pushOps(srcOps);
 
     auto writerPool = makeTenantMigrationWriterPool();
@@ -395,7 +395,7 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_DatabaseMissing) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyInsert_CollectionMissing) {
-    createDatabase(_opCtx.get(), _dbName.fullName());
+    createDatabase(_opCtx.get(), _dbName.toString());
     auto entry = makeInsertOplogEntry(1, NamespaceString(_dbName, "bar"), UUID::gen());
     bool onInsertsCalled = false;
     _opObserver->onInsertsFn = [&](OperationContext* opCtx,
@@ -492,7 +492,7 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_Success) {
         [&](OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
             ASSERT_FALSE(onInsertsCalled);
             onInsertsCalled = true;
-            ASSERT_EQUALS(nss.db(), _dbName.fullName());
+            ASSERT_EQUALS(nss.db(), _dbName.toString());
             ASSERT_EQUALS(nss.coll(), "bar");
             ASSERT_EQUALS(1, docs.size());
             ASSERT_BSONOBJ_EQ(docs[0], entry.getObject());
@@ -646,7 +646,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_DatabaseMissing) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyDelete_CollectionMissing) {
-    createDatabase(_opCtx.get(), _dbName.fullName());
+    createDatabase(_opCtx.get(), _dbName.toString());
     auto entry = makeOplogEntry(OpTypeEnum::kDelete, NamespaceString(_dbName, "bar"), UUID::gen());
     bool onDeleteCalled = false;
     _opObserver->onDeleteFn = [&](OperationContext* opCtx,
@@ -711,7 +711,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_Success) {
         ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
         ASSERT_TRUE(opCtx->writesAreReplicated());
         ASSERT_FALSE(args.fromMigrate);
-        ASSERT_EQUALS(nss.db(), _dbName.fullName());
+        ASSERT_EQUALS(nss.db(), _dbName.toString());
         ASSERT_EQUALS(nss.coll(), "bar");
         ASSERT_EQUALS(uuid, observer_uuid);
     };
@@ -990,7 +990,7 @@ TEST_F(TenantOplogApplierTest, ApplyCollModCommand_IndexNotFound) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyCollModCommand_CollectionMissing) {
-    createDatabase(_opCtx.get(), _dbName.fullName());
+    createDatabase(_opCtx.get(), _dbName.toString());
     NamespaceString nss(_dbName, "bar");
     UUID uuid(UUID::gen());
     auto op = BSON("op"

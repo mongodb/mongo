@@ -280,8 +280,7 @@ TEST(NamespaceStringTest, NamespaceStringParse5) {
 }
 
 TEST(NamespaceStringTest, makeListCollectionsNSIsCorrect) {
-    NamespaceString ns =
-        NamespaceString::makeListCollectionsNSS(TenantDatabaseName(boost::none, "DB"));
+    NamespaceString ns = NamespaceString::makeListCollectionsNSS(DatabaseName(boost::none, "DB"));
     ASSERT_EQUALS("DB", ns.db());
     ASSERT_EQUALS("$cmd.listCollections", ns.coll());
     ASSERT(ns.isValid());
@@ -310,7 +309,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
     ASSERT(nss.tenantId());
     ASSERT_EQ(*nss.tenantId(), tenantId);
 
-    TenantDatabaseName dbName(tenantId, "foo");
+    DatabaseName dbName(tenantId, "foo");
     NamespaceString nss2(dbName, "bar");
     ASSERT_EQ(nss2.ns(), tenantNsStr);
     ASSERT_EQ(nss2.toString(), tenantNsStr);
@@ -334,7 +333,7 @@ TEST(NamespaceStringTest, NSSNoCollectionWithTenantId) {
     ASSERT(nss.tenantId());
     ASSERT_EQ(*nss.tenantId(), tenantId);
 
-    TenantDatabaseName dbName(tenantId, "foo");
+    DatabaseName dbName(tenantId, "foo");
     NamespaceString nss2(dbName, "");
     ASSERT(nss2.tenantId());
     ASSERT_EQ(*nss2.tenantId(), tenantId);

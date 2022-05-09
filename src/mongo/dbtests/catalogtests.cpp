@@ -66,9 +66,8 @@ public:
         Lock::DBLock dbLk2(op2.get(), competingNss.db(), LockMode::MODE_IX);
         Lock::CollectionLock collLk2(op2.get(), competingNss, LockMode::MODE_IX);
 
-        const TenantDatabaseName competingTenantDbName(boost::none, competingNss.db());
         Database* db =
-            DatabaseHolder::get(op1.get())->openDb(op1.get(), competingTenantDbName, nullptr);
+            DatabaseHolder::get(op1.get())->openDb(op1.get(), competingNss.dbName(), nullptr);
 
         {
             WriteUnitOfWork wuow1(op1.get());

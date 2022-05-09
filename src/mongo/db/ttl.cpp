@@ -318,13 +318,13 @@ private:
             nullptr !=
                 (mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                             .getTenantMigrationAccessBlockerForDbName(
-                                coll.getDb()->name().fullName(), MtabType::kRecipient)) &&
+                                coll.getDb()->name().toString(), MtabType::kRecipient)) &&
             mtab->checkIfShouldBlockTTL()) {
             LOGV2_DEBUG(53768,
                         1,
                         "Postpone TTL of DB because of active tenant migration",
                         "tenantMigrationAccessBlocker"_attr = mtab->getDebugInfo().jsonString(),
-                        "database"_attr = coll.getDb()->name().dbName());
+                        "database"_attr = coll.getDb()->name().toString());
             return;
         }
 

@@ -55,7 +55,7 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 void dropDatabase(OperationContext* opCtx, const NamespaceString& nss) {
     Lock::GlobalWrite globalWriteLock(opCtx);
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto db = databaseHolder->getDb(opCtx, TenantDatabaseName(boost::none, nss.db()));
+    auto db = databaseHolder->getDb(opCtx, nss.dbName());
 
     if (db) {
         databaseHolder->dropDb(opCtx, db);

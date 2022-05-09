@@ -130,9 +130,8 @@ public:
         Lock::DBLock dbLk2(opCtx2.get(), nss.db(), LockMode::MODE_IX);
         Lock::CollectionLock collLk2(opCtx2.get(), nss, LockMode::MODE_IX);
 
-        const TenantDatabaseName tenantDbName(boost::none, nss.db());
         Database* db =
-            DatabaseHolder::get(opCtx1.get())->openDb(opCtx1.get(), tenantDbName, nullptr);
+            DatabaseHolder::get(opCtx1.get())->openDb(opCtx1.get(), nss.dbName(), nullptr);
 
         // Create the collection and insert one doc
         BSONObj doc = BSON("_id" << 1 << "x" << 2);

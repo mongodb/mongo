@@ -37,13 +37,13 @@
 #include "mongo/db/commands/list_databases_gen.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/tenant_database_name.h"
 
 namespace mongo {
 
@@ -123,13 +123,13 @@ public:
                 filter = std::move(matcher);
             }
 
-            std::vector<TenantDatabaseName> tenantDbNames;
+            std::vector<DatabaseName> dbNames;
             StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
             {
                 Lock::GlobalLock lk(opCtx, MODE_IS);
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &hangBeforeListDatabases, opCtx, "hangBeforeListDatabases", []() {});
-                tenantDbNames = storageEngine->listDatabases();
+                dbNames = storageEngine->listDatabases();
             }
 
             std::vector<ListDatabasesReplyItem> items;
@@ -138,14 +138,14 @@ public:
                 filter->getCategory() == MatchExpression::MatchCategory::kLeaf &&
                 filter->path() == kName;
             long long totalSize = 0;
-            for (const auto& tenantDbName : tenantDbNames) {
+            for (const auto& dbName : dbNames) {
                 if (authorizedDatabases &&
-                    !as->isAuthorizedForAnyActionOnAnyResourceInDB(tenantDbName.dbName())) {
+                    !as->isAuthorizedForAnyActionOnAnyResourceInDB(dbName.toString())) {
                     // We don't have listDatabases on the cluster or find on this database.
                     continue;
                 }
 
-                ListDatabasesReplyItem item(tenantDbName.dbName());
+                ListDatabasesReplyItem item(dbName.db());
 
                 long long size = 0;
                 if (!nameOnly) {
@@ -154,19 +154,18 @@ public:
                         continue;
                     }
 
-                    AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, tenantDbName.dbName());
+                    AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, dbName.db());
                     // The database could have been dropped since we called 'listDatabases()' above.
-                    if (!DatabaseHolder::get(opCtx)->dbExists(opCtx, tenantDbName)) {
+                    if (!DatabaseHolder::get(opCtx)->dbExists(opCtx, dbName)) {
                         continue;
                     }
 
-                    writeConflictRetry(opCtx, "sizeOnDisk", tenantDbName.dbName(), [&] {
-                        size = storageEngine->sizeOnDiskForDb(opCtx, tenantDbName);
+                    writeConflictRetry(opCtx, "sizeOnDisk", dbName.toString(), [&] {
+                        size = storageEngine->sizeOnDiskForDb(opCtx, dbName);
                     });
                     item.setSizeOnDisk(size);
-                    item.setEmpty(CollectionCatalog::get(opCtx)
-                                      ->getAllCollectionUUIDsFromDb(tenantDbName)
-                                      .empty());
+                    item.setEmpty(
+                        CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(dbName).empty());
                 }
                 if (!filter || filter->matchesBSON(item.toBSON())) {
                     totalSize += size;

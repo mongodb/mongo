@@ -353,14 +353,14 @@ std::string IdempotencyTest::computeDataHash(const CollectionPtr& collection) {
 std::vector<CollectionState> IdempotencyTest::validateAllCollections() {
     std::vector<CollectionState> collStates;
     auto catalog = CollectionCatalog::get(_opCtx.get());
-    auto tenantDbNames = catalog->getAllDbNames();
-    for (auto& tenantDbName : tenantDbNames) {
+    auto dbNames = catalog->getAllDbNames();
+    for (auto& dbName : dbNames) {
         // Skip local database.
-        if (tenantDbName.dbName() != "local") {
+        if (dbName.db() != "local") {
             std::vector<NamespaceString> collectionNames;
             {
-                Lock::DBLock lk(_opCtx.get(), tenantDbName.dbName(), MODE_S);
-                collectionNames = catalog->getAllCollectionNamesFromDb(_opCtx.get(), tenantDbName);
+                Lock::DBLock lk(_opCtx.get(), dbName.db(), MODE_S);
+                collectionNames = catalog->getAllCollectionNamesFromDb(_opCtx.get(), dbName);
             }
             for (const auto& nss : collectionNames) {
                 collStates.push_back(validate(nss));

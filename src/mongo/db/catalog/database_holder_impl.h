@@ -31,7 +31,7 @@
 
 #include "mongo/db/catalog/database_holder.h"
 
-#include "mongo/db/tenant_database_name.h"
+#include "mongo/db/database_name.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/string_map.h"
@@ -42,30 +42,28 @@ class DatabaseHolderImpl : public DatabaseHolder {
 public:
     DatabaseHolderImpl() = default;
 
-    Database* getDb(OperationContext* opCtx, const TenantDatabaseName& tenantDbName) const override;
+    Database* getDb(OperationContext* opCtx, const DatabaseName& dbName) const override;
 
-    bool dbExists(OperationContext* opCtx, const TenantDatabaseName& tenantDbName) const override;
+    bool dbExists(OperationContext* opCtx, const DatabaseName& dbName) const override;
 
     Database* openDb(OperationContext* opCtx,
-                     const TenantDatabaseName& tenantDbName,
+                     const DatabaseName& dbName,
                      bool* justCreated = nullptr) override;
 
     void dropDb(OperationContext* opCtx, Database* db) override;
 
-    void close(OperationContext* opCtx, const TenantDatabaseName& tenantDbName) override;
+    void close(OperationContext* opCtx, const DatabaseName& dbName) override;
 
     void closeAll(OperationContext* opCtx) override;
 
-    std::set<TenantDatabaseName> getNamesWithConflictingCasing(
-        const TenantDatabaseName& tenantDbName) override;
+    std::set<DatabaseName> getNamesWithConflictingCasing(const DatabaseName& dbName) override;
 
-    std::vector<TenantDatabaseName> getNames() override;
+    std::vector<DatabaseName> getNames() override;
 
 private:
-    std::set<TenantDatabaseName> _getNamesWithConflictingCasing_inlock(
-        const TenantDatabaseName& tenantDbName);
+    std::set<DatabaseName> _getNamesWithConflictingCasing_inlock(const DatabaseName& dbName);
 
-    typedef stdx::unordered_map<TenantDatabaseName, Database*> DBs;
+    typedef stdx::unordered_map<DatabaseName, Database*> DBs;
     mutable SimpleMutex _m;
     mutable stdx::condition_variable _c;
     DBs _dbs;

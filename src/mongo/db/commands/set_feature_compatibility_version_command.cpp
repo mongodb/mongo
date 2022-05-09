@@ -637,12 +637,12 @@ private:
 
         if (serverGlobalParams.featureCompatibility
                 .isFCVDowngradingOrAlreadyDowngradedFromLatest()) {
-            for (const auto& tenantDbName : DatabaseHolder::get(opCtx)->getNames()) {
-                const auto& dbName = tenantDbName.dbName();
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                const auto& db = dbName.db();
+                Lock::DBLock dbLock(opCtx, db, MODE_IX);
                 catalog::forEachCollectionFromDb(
                     opCtx,
-                    tenantDbName,
+                    dbName,
                     MODE_X,
                     [&](const CollectionPtr& collection) {
                         // Fail to downgrade if there exists a collection with
@@ -665,11 +665,11 @@ private:
             }
 
             // TODO SERVER-63564: Remove once FCV 6.0 becomes last-lts.
-            for (const auto& tenantDbName : DatabaseHolder::get(opCtx)->getNames()) {
-                const auto& dbName = tenantDbName.dbName();
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                const auto& db = dbName.db();
+                Lock::DBLock dbLock(opCtx, db, MODE_IX);
                 catalog::forEachCollectionFromDb(
-                    opCtx, tenantDbName, MODE_X, [&](const CollectionPtr& collection) {
+                    opCtx, dbName, MODE_X, [&](const CollectionPtr& collection) {
                         auto indexCatalog = collection->getIndexCatalog();
                         auto indexIt = indexCatalog->getIndexIterator(
                             opCtx, true /* includeUnfinishedIndexes */);
@@ -712,11 +712,11 @@ private:
 
             // Block downgrade for collections with encrypted fields
             // TODO SERVER-65077: Remove once FCV 6.0 becomes last-lts.
-            for (const auto& tenantDbName : DatabaseHolder::get(opCtx)->getNames()) {
-                const auto& dbName = tenantDbName.dbName();
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                const auto& db = dbName.db();
+                Lock::DBLock dbLock(opCtx, db, MODE_IX);
                 catalog::forEachCollectionFromDb(
-                    opCtx, tenantDbName, MODE_X, [&](const CollectionPtr& collection) {
+                    opCtx, dbName, MODE_X, [&](const CollectionPtr& collection) {
                         uassert(
                             ErrorCodes::CannotDowngrade,
                             str::stream() << "Cannot downgrade the cluster as collection "

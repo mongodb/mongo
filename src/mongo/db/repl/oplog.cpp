@@ -200,9 +200,8 @@ void createIndexForApplyOps(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(indexNss, MODE_X));
 
     // Check if collection exists.
-    const TenantDatabaseName tenantDbName(boost::none, indexNss.db());
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto db = databaseHolder->getDb(opCtx, tenantDbName);
+    auto db = databaseHolder->getDb(opCtx, indexNss.dbName());
     auto indexCollection =
         db ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, indexNss) : nullptr;
     uassert(ErrorCodes::NamespaceNotFound,

@@ -407,7 +407,6 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
  * 'collator'. Otherwise, returns ErrorCodes::OptionNotSupportedOnView.
  */
 Status collatorCompatibleWithPipeline(OperationContext* opCtx,
-                                      StringData dbName,
                                       const CollatorInterface* collator,
                                       const LiteParsedPipeline& liteParsedPipeline) {
     auto catalog = CollectionCatalog::get(opCtx);
@@ -761,7 +760,6 @@ Status runAggregate(OperationContext* opCtx,
 
             // Raise an error if 'origNss' is a view. We do not need to check this if we are opening
             // a stream on an entire db or across the cluster.
-            const TenantDatabaseName origTenantDbName(boost::none, origNss.db());
             if (!origNss.isCollectionlessAggregateNS()) {
                 auto view = catalog->lookupView(opCtx, origNss);
                 uassert(ErrorCodes::CommandNotSupportedOnView,
@@ -921,8 +919,8 @@ Status runAggregate(OperationContext* opCtx,
         // Check that the view's collation matches the collation of any views involved in the
         // pipeline.
         if (!pipelineInvolvedNamespaces.empty()) {
-            auto pipelineCollationStatus = collatorCompatibleWithPipeline(
-                opCtx, nss.db(), expCtx->getCollator(), liteParsedPipeline);
+            auto pipelineCollationStatus =
+                collatorCompatibleWithPipeline(opCtx, expCtx->getCollator(), liteParsedPipeline);
             if (!pipelineCollationStatus.isOK()) {
                 return pipelineCollationStatus;
             }

@@ -37,9 +37,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/index_builds.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/resumable_index_builds_gen.h"
 #include "mongo/db/storage/temporary_record_store.h"
-#include "mongo/db/tenant_database_name.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/str.h"
 
@@ -199,7 +199,7 @@ public:
     /**
      * List the databases stored in this storage engine.
      */
-    virtual std::vector<TenantDatabaseName> listDatabases() const = 0;
+    virtual std::vector<DatabaseName> listDatabases() const = 0;
 
     /**
      * Returns whether the storage engine supports capped collections.
@@ -232,14 +232,12 @@ public:
     /**
      * Closes all file handles associated with a database.
      */
-    virtual Status closeDatabase(OperationContext* opCtx,
-                                 const TenantDatabaseName& tenantDbName) = 0;
+    virtual Status closeDatabase(OperationContext* opCtx, const DatabaseName& dbName) = 0;
 
     /**
      * Deletes all data and metadata for a database.
      */
-    virtual Status dropDatabase(OperationContext* opCtx,
-                                const TenantDatabaseName& tenantDbName) = 0;
+    virtual Status dropDatabase(OperationContext* opCtx, const DatabaseName& dbName) = 0;
 
     /**
      * Checkpoints the data to disk.
@@ -623,10 +621,9 @@ public:
     /**
      * Returns the path to the directory which has the data files of database with `dbName`.
      */
-    virtual std::string getFilesystemPathForDb(const TenantDatabaseName& tenantDbName) const = 0;
+    virtual std::string getFilesystemPathForDb(const DatabaseName& dbName) const = 0;
 
-    virtual int64_t sizeOnDiskForDb(OperationContext* opCtx,
-                                    const TenantDatabaseName& tenantDbName) = 0;
+    virtual int64_t sizeOnDiskForDb(OperationContext* opCtx, const DatabaseName& dbName) = 0;
 
     virtual bool isUsingDirectoryPerDb() const = 0;
 

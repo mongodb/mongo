@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/db/tenant_database_name.h"
+#include "mongo/db/database_name.h"
 
 namespace mongo {
 
-TenantDatabaseName TenantDatabaseName::createSystemTenantDbName(StringData dbName) {
+DatabaseName DatabaseName::createSystemTenantDbName(StringData dbString) {
     // TODO SERVER-62491 Use kSystemTenantId
-    return TenantDatabaseName(boost::none, dbName);
+    return DatabaseName(boost::none, dbString);
 }
 
 }  // namespace mongo

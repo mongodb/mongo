@@ -101,9 +101,8 @@ public:
 
     void dropCollection() {
         Lock::DBLock dbLock(&_opCtx, nss.db(), MODE_X);
-        const TenantDatabaseName tenantDbName(boost::none, nss.db());
         auto databaseHolder = DatabaseHolder::get(&_opCtx);
-        auto database = databaseHolder->getDb(&_opCtx, tenantDbName);
+        auto database = databaseHolder->getDb(&_opCtx, nss.dbName());
         if (!database) {
             return;
         }

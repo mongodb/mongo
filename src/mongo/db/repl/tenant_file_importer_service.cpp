@@ -115,9 +115,9 @@ void importCopiedFiles(OperationContext* opCtx,
     for (auto&& m : metadatas) {
         Lock::CollectionLock systemViewsLock(
             opCtx,
-            NamespaceString(m.ns.db(), NamespaceString::kSystemDotViewsCollectionName),
+            NamespaceString(m.ns.dbName(), NamespaceString::kSystemDotViewsCollectionName),
             MODE_X);
-        uassertStatusOK(catalog->reloadViews(opCtx, TenantDatabaseName(boost::none, m.ns.db())));
+        uassertStatusOK(catalog->reloadViews(opCtx, m.ns.dbName()));
     }
 }
 }  // namespace

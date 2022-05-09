@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/database_name.h"
 #include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/tenant_database_name.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -36,118 +36,118 @@
 namespace mongo {
 namespace {
 
-TEST(TenantDatabaseNameTest, MultitenancySupportDisabled) {
-    TenantDatabaseName tdnWithoutTenant1(boost::none, "a");
+TEST(DatabaseNameTest, MultitenancySupportDisabled) {
+    DatabaseName dbnWithoutTenant1(boost::none, "a");
 
-    ASSERT(!tdnWithoutTenant1.tenantId());
-    ASSERT_EQUALS(std::string("a"), tdnWithoutTenant1.dbName());
-    ASSERT_EQUALS(std::string("a"), tdnWithoutTenant1.fullName());
+    ASSERT(!dbnWithoutTenant1.tenantId());
+    ASSERT_EQUALS(std::string("a"), dbnWithoutTenant1.db());
+    ASSERT_EQUALS(std::string("a"), dbnWithoutTenant1.toString());
 
     TenantId tenantId(OID::gen());
-    TenantDatabaseName tdnWithTenant(tenantId, "a");
-    ASSERT(tdnWithTenant.tenantId());
-    ASSERT_EQUALS(tenantId, *tdnWithTenant.tenantId());
-    ASSERT_EQUALS(std::string("a"), tdnWithTenant.dbName());
-    ASSERT_EQUALS(std::string(tenantId.toString() + "_a"), tdnWithTenant.fullName());
+    DatabaseName dbnWithTenant(tenantId, "a");
+    ASSERT(dbnWithTenant.tenantId());
+    ASSERT_EQUALS(tenantId, *dbnWithTenant.tenantId());
+    ASSERT_EQUALS(std::string("a"), dbnWithTenant.db());
+    ASSERT_EQUALS(std::string(tenantId.toString() + "_a"), dbnWithTenant.toString());
 }
 
-TEST(TenantDatabaseNameTest, MultitenancySupportEnabledTenantIDNotRequired) {
+TEST(DatabaseNameTest, MultitenancySupportEnabledTenantIDNotRequired) {
     // TODO SERVER-62114 remove this test case.
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
-    TenantDatabaseName tdnWithoutTenant(boost::none, "a");
-    ASSERT(!tdnWithoutTenant.tenantId());
-    ASSERT_EQUALS(std::string("a"), tdnWithoutTenant.dbName());
-    ASSERT_EQUALS(std::string("a"), tdnWithoutTenant.fullName());
+    DatabaseName dbnWithoutTenant(boost::none, "a");
+    ASSERT(!dbnWithoutTenant.tenantId());
+    ASSERT_EQUALS(std::string("a"), dbnWithoutTenant.db());
+    ASSERT_EQUALS(std::string("a"), dbnWithoutTenant.toString());
 
     TenantId tenantId(OID::gen());
-    TenantDatabaseName tdnWithTenant(tenantId, "a");
-    ASSERT(tdnWithTenant.tenantId());
-    ASSERT_EQUALS(tenantId, *tdnWithTenant.tenantId());
-    ASSERT_EQUALS(std::string("a"), tdnWithTenant.dbName());
-    ASSERT_EQUALS(std::string(tenantId.toString() + "_a"), tdnWithTenant.fullName());
+    DatabaseName dbnWithTenant(tenantId, "a");
+    ASSERT(dbnWithTenant.tenantId());
+    ASSERT_EQUALS(tenantId, *dbnWithTenant.tenantId());
+    ASSERT_EQUALS(std::string("a"), dbnWithTenant.db());
+    ASSERT_EQUALS(std::string(tenantId.toString() + "_a"), dbnWithTenant.toString());
 }
 
 /*
 // TODO SERVER-65457 Re-enable these tests
 
-DEATH_TEST(TenantDatabaseNameTest, TenantIDRequiredNoTenantIdAssigned, "invariant") {
+DEATH_TEST(DatabaseNameTest, TenantIDRequiredNoTenantIdAssigned, "invariant") {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
-    TenantDatabaseName tdnWithoutTenant(boost::none, "a");
+    DatabaseName dbnWithoutTenant(boost::none, "a");
 }
 
-TEST(TenantDatabaseNameTest, TenantIDRequiredBasic) {
+TEST(DatabaseNameTest, TenantIDRequiredBasic) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     // TODO SERVER-62114 Remove enabling this feature flag.
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
 
     TenantId tenantId(OID::gen());
-    TenantDatabaseName tdn(tenantId, "a");
-    ASSERT(tdn.tenantId());
-    ASSERT_EQUALS(tenantId, *tdn.tenantId());
-    ASSERT_EQUALS(std::string("a"), tdn.dbName());
-    ASSERT_EQUALS(std::string(tenantId.toString() + "_a"), tdn.fullName());
+    DatabaseName dbn(tenantId, "a");
+    ASSERT(dbn.tenantId());
+    ASSERT_EQUALS(tenantId, *dbn.tenantId());
+    ASSERT_EQUALS(std::string("a"), dbn.db());
+    ASSERT_EQUALS(std::string(tenantId.toString() + "_a"), dbn.toString());
 }
 */
 
-TEST(TenantDatabaseNameTest, VerifyEqualsOperator) {
+TEST(DatabaseNameTest, VerifyEqualsOperator) {
     TenantId tenantId(OID::gen());
-    TenantDatabaseName tdn(tenantId, "a");
-    ASSERT_TRUE(TenantDatabaseName(tenantId, "a") == tdn);
-    ASSERT_TRUE(TenantDatabaseName(tenantId, "b") != tdn);
+    DatabaseName dbn(tenantId, "a");
+    ASSERT_TRUE(DatabaseName(tenantId, "a") == dbn);
+    ASSERT_TRUE(DatabaseName(tenantId, "b") != dbn);
 
     TenantId otherTenantId = TenantId(OID::gen());
-    ASSERT_TRUE(TenantDatabaseName(otherTenantId, "a") != tdn);
-    ASSERT_TRUE(TenantDatabaseName(boost::none, "a") != tdn);
+    ASSERT_TRUE(DatabaseName(otherTenantId, "a") != dbn);
+    ASSERT_TRUE(DatabaseName(boost::none, "a") != dbn);
 }
 
-TEST(TenantDatabaseNameTest, VerifyHashFunction) {
+TEST(DatabaseNameTest, VerifyHashFunction) {
     TenantId tenantId1(OID::gen());
     TenantId tenantId2(OID::gen());
-    TenantDatabaseName tdn1 = TenantDatabaseName(tenantId1, "a");
-    TenantDatabaseName tdn2 = TenantDatabaseName(tenantId2, "a");
-    TenantDatabaseName tdn3 = TenantDatabaseName(boost::none, "a");
+    DatabaseName dbn1 = DatabaseName(tenantId1, "a");
+    DatabaseName dbn2 = DatabaseName(tenantId2, "a");
+    DatabaseName dbn3 = DatabaseName(boost::none, "a");
 
-    stdx::unordered_map<TenantDatabaseName, std::string> dbMap;
+    stdx::unordered_map<DatabaseName, std::string> dbMap;
 
-    dbMap[tdn1] = "value T1 a1";
-    ASSERT_EQUALS(dbMap[tdn1], "value T1 a1");
-    dbMap[tdn1] = "value T1 a2";
-    ASSERT_EQUALS(dbMap[tdn1], "value T1 a2");
-    dbMap[TenantDatabaseName(tenantId1, "a")] = "value T1 a3";
-    ASSERT_EQUALS(dbMap[tdn1], "value T1 a3");
+    dbMap[dbn1] = "value T1 a1";
+    ASSERT_EQUALS(dbMap[dbn1], "value T1 a1");
+    dbMap[dbn1] = "value T1 a2";
+    ASSERT_EQUALS(dbMap[dbn1], "value T1 a2");
+    dbMap[DatabaseName(tenantId1, "a")] = "value T1 a3";
+    ASSERT_EQUALS(dbMap[dbn1], "value T1 a3");
 
-    dbMap[tdn2] = "value T2 a1";
-    ASSERT_EQUALS(dbMap[tdn2], "value T2 a1");
-    dbMap[tdn2] = "value T2 a2";
+    dbMap[dbn2] = "value T2 a1";
+    ASSERT_EQUALS(dbMap[dbn2], "value T2 a1");
+    dbMap[dbn2] = "value T2 a2";
 
-    dbMap[tdn3] = "value no tenant a1";
-    ASSERT_EQUALS(dbMap[tdn3], "value no tenant a1");
-    dbMap[tdn3] = "value no tenant a2";
+    dbMap[dbn3] = "value no tenant a1";
+    ASSERT_EQUALS(dbMap[dbn3], "value no tenant a1");
+    dbMap[dbn3] = "value no tenant a2";
 
     // verify all key-value in map to ensure all data is correct.
-    ASSERT_EQUALS(dbMap[tdn1], "value T1 a3");
-    ASSERT_EQUALS(dbMap[tdn2], "value T2 a2");
-    ASSERT_EQUALS(dbMap[tdn3], "value no tenant a2");
+    ASSERT_EQUALS(dbMap[dbn1], "value T1 a3");
+    ASSERT_EQUALS(dbMap[dbn2], "value T2 a2");
+    ASSERT_EQUALS(dbMap[dbn3], "value no tenant a2");
 }
 
-TEST(TenantDatabaseNameTest, VerifyCompareFunction) {
+TEST(DatabaseNameTest, VerifyCompareFunction) {
     TenantId tenantId1 = TenantId(OID::gen());
     TenantId tenantId2 = TenantId(OID::gen());
 
     // OID's generated by the same process are monotonically increasing.
     ASSERT(tenantId1 < tenantId2);
 
-    TenantDatabaseName tdn1a = TenantDatabaseName(tenantId1, "a");
-    TenantDatabaseName tdn1b = TenantDatabaseName(tenantId1, "b");
-    TenantDatabaseName tdn2a = TenantDatabaseName(tenantId2, "a");
-    TenantDatabaseName tdn3a = TenantDatabaseName(boost::none, "a");
+    DatabaseName dbn1a = DatabaseName(tenantId1, "a");
+    DatabaseName dbn1b = DatabaseName(tenantId1, "b");
+    DatabaseName dbn2a = DatabaseName(tenantId2, "a");
+    DatabaseName dbn3a = DatabaseName(boost::none, "a");
 
-    ASSERT(tdn1a < tdn1b);
-    ASSERT(tdn1b < tdn2a);
-    ASSERT(tdn3a != tdn1a);
-    ASSERT(tdn1a != tdn2a);
+    ASSERT(dbn1a < dbn1b);
+    ASSERT(dbn1b < dbn2a);
+    ASSERT(dbn3a != dbn1a);
+    ASSERT(dbn1a != dbn2a);
 }
 }  // namespace
 }  // namespace mongo

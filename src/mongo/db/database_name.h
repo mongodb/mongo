@@ -40,115 +40,111 @@
 namespace mongo {
 
 /**
- * A TenantDatabaseName is a unique name for database.
+ * A DatabaseName is a unique name for database.
  * It holds a database name and tenant id, if one exists. In a serverless environment, a tenant id
  * is expected to exist so that a database can be uniquely identified.
  */
-class TenantDatabaseName {
+class DatabaseName {
 public:
     /**
-     * Constructs an empty TenantDatabaseName.
+     * Constructs an empty DatabaseName.
      */
-    TenantDatabaseName() : _tenantId(boost::none), _dbName(""), _tenantDbName(boost::none){};
+    DatabaseName() : _tenantId(boost::none), _dbString(""), _tenantDbString(boost::none){};
 
     /**
-     * Constructs a TenantDatabaseName from the given tenantId and database name.
+     * Constructs a DatabaseName from the given tenantId and database name.
      * "dbName" is expected only consist of a db name. It is the caller's responsibility to ensure
      * the dbName is a valid db name.
      */
-    TenantDatabaseName(boost::optional<TenantId> tenantId, StringData dbName) {
+    DatabaseName(boost::optional<TenantId> tenantId, StringData dbString) {
         _tenantId = tenantId;
-        _dbName = dbName.toString();
+        _dbString = dbString.toString();
 
-        _tenantDbName =
-            _tenantId ? boost::make_optional(_tenantId->toString() + "_" + _dbName) : boost::none;
+        _tenantDbString =
+            _tenantId ? boost::make_optional(_tenantId->toString() + "_" + _dbString) : boost::none;
     }
 
     /**
      * Prefer to use the constructor above.
      * TODO SERVER-65456 Remove this constructor.
      */
-    TenantDatabaseName(StringData dbName, boost::optional<TenantId> tenantId = boost::none)
-        : TenantDatabaseName(tenantId, dbName) {}
+    DatabaseName(StringData dbName, boost::optional<TenantId> tenantId = boost::none)
+        : DatabaseName(tenantId, dbName) {}
 
-    static TenantDatabaseName createSystemTenantDbName(StringData dbName);
+    static DatabaseName createSystemTenantDbName(StringData dbString);
 
     boost::optional<TenantId> tenantId() const {
         return _tenantId;
     }
 
-    const std::string& dbName() const {
-        return _dbName;
-    }
-
-    const std::string& fullName() const {
-        if (_tenantDbName)
-            return *_tenantDbName;
-
-        invariant(!_tenantId);
-        return _dbName;
+    const std::string& db() const {
+        return _dbString;
     }
 
     const std::string& toString() const {
-        return fullName();
+        if (_tenantDbString)
+            return *_tenantDbString;
+
+        invariant(!_tenantId);
+        return _dbString;
     }
 
-    bool equalCaseInsensitive(const TenantDatabaseName& other) const {
-        return boost::iequals(fullName(), other.fullName());
+    bool equalCaseInsensitive(const DatabaseName& other) const {
+        return boost::iequals(toString(), other.toString());
     }
 
     /**
      * Returns -1, 0, or 1 if 'this' is less, equal, or greater than 'other' in
      * lexicographical order.
      */
-    int compare(const TenantDatabaseName& other) const {
-        return fullName().compare(other.fullName());
+    int compare(const DatabaseName& other) const {
+        return toString().compare(other.toString());
     }
 
     template <typename H>
-    friend H AbslHashValue(H h, const TenantDatabaseName& obj) {
-        return H::combine(std::move(h), obj.fullName());
+    friend H AbslHashValue(H h, const DatabaseName& obj) {
+        return H::combine(std::move(h), obj.toString());
     }
 
-    friend auto logAttrs(const TenantDatabaseName& obj) {
-        return "tenantDatabaseName"_attr = obj;
+    friend auto logAttrs(const DatabaseName& obj) {
+        return "databaseName"_attr = obj;
     }
 
 private:
     boost::optional<TenantId> _tenantId;
-    std::string _dbName;
-    boost::optional<std::string> _tenantDbName;
+    std::string _dbString;
+    boost::optional<std::string> _tenantDbString;
 };
 
-inline std::ostream& operator<<(std::ostream& stream, const TenantDatabaseName& tdb) {
-    return stream << tdb.fullName();
+inline std::ostream& operator<<(std::ostream& stream, const DatabaseName& tdb) {
+    return stream << tdb.toString();
 }
 
-inline StringBuilder& operator<<(StringBuilder& builder, const TenantDatabaseName& tdb) {
-    return builder << tdb.fullName();
+inline StringBuilder& operator<<(StringBuilder& builder, const DatabaseName& tdb) {
+    return builder << tdb.toString();
 }
 
-inline bool operator==(const TenantDatabaseName& lhs, const TenantDatabaseName& rhs) {
+inline bool operator==(const DatabaseName& lhs, const DatabaseName& rhs) {
     return lhs.compare(rhs) == 0;
 }
 
-inline bool operator!=(const TenantDatabaseName& lhs, const TenantDatabaseName& rhs) {
+inline bool operator!=(const DatabaseName& lhs, const DatabaseName& rhs) {
     return !(lhs == rhs);
 }
 
-inline bool operator<(const TenantDatabaseName& lhs, const TenantDatabaseName& rhs) {
+inline bool operator<(const DatabaseName& lhs, const DatabaseName& rhs) {
     return lhs.compare(rhs) < 0;
 }
 
-inline bool operator>(const TenantDatabaseName& lhs, const TenantDatabaseName& rhs) {
+inline bool operator>(const DatabaseName& lhs, const DatabaseName& rhs) {
     return rhs < lhs;
 }
 
-inline bool operator<=(const TenantDatabaseName& lhs, const TenantDatabaseName& rhs) {
+inline bool operator<=(const DatabaseName& lhs, const DatabaseName& rhs) {
     return !(lhs > rhs);
 }
 
-inline bool operator>=(const TenantDatabaseName& lhs, const TenantDatabaseName& rhs) {
+inline bool operator>=(const DatabaseName& lhs, const DatabaseName& rhs) {
     return !(lhs < rhs);
 }
 

@@ -878,13 +878,13 @@ AutoGetCollectionForReadCommandLockFree::AutoGetCollectionForReadCommandLockFree
 
 OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& ns, bool doVersion)
     : _opCtx(opCtx) {
-    // TODO SERVER-65488 Grab the TenantDatabaseName from the NamespaceString passed in
-    const auto dbName = nsToDatabaseSubstring(ns);
-    const TenantDatabaseName tenantDbName(boost::none, dbName);
-    _db = DatabaseHolder::get(opCtx)->getDb(opCtx, tenantDbName);
+    // TODO SERVER-65488 Grab the DatabaseName from the NamespaceString passed in
+    const auto db = nsToDatabaseSubstring(ns);
+    const DatabaseName dbName(boost::none, db);
+    _db = DatabaseHolder::get(opCtx)->getDb(opCtx, dbName);
 
     if (!_db) {
-        _db = DatabaseHolder::get(opCtx)->openDb(_opCtx, tenantDbName, &_justCreated);
+        _db = DatabaseHolder::get(opCtx)->openDb(_opCtx, dbName, &_justCreated);
         invariant(_db);
     }
 
@@ -905,7 +905,7 @@ OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& n
 
     stdx::lock_guard<Client> lk(*_opCtx->getClient());
     currentOp->enter_inlock(
-        ns.c_str(), CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_db->name().dbName()));
+        ns.c_str(), CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_db->name().db()));
 }
 
 AutoGetCollectionForReadCommandMaybeLockFree::AutoGetCollectionForReadCommandMaybeLockFree(

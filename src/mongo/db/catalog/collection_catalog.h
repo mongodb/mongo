@@ -35,9 +35,9 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/views_for_database.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/tenant_database_name.h"
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/uuid.h"
@@ -64,10 +64,10 @@ public:
         using value_type = CollectionPtr;
 
         iterator(OperationContext* opCtx,
-                 const TenantDatabaseName& tenantDbName,
+                 const DatabaseName& dbName,
                  const CollectionCatalog& catalog);
         iterator(OperationContext* opCtx,
-                 std::map<std::pair<TenantDatabaseName, UUID>,
+                 std::map<std::pair<DatabaseName, UUID>,
                           std::shared_ptr<Collection>>::const_iterator mapIter,
                  const CollectionCatalog& catalog);
         value_type operator*();
@@ -88,9 +88,9 @@ public:
         bool _exhausted();
 
         OperationContext* _opCtx;
-        TenantDatabaseName _tenantDbName;
+        DatabaseName _dbName;
         boost::optional<UUID> _uuid;
-        std::map<std::pair<TenantDatabaseName, UUID>, std::shared_ptr<Collection>>::const_iterator
+        std::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>::const_iterator
             _mapIter;
         const CollectionCatalog* _catalog;
     };
@@ -192,7 +192,7 @@ public:
      *
      * Requires an IS lock on the 'system.views' collection'.
      */
-    Status reloadViews(OperationContext* opCtx, const TenantDatabaseName& dbName) const;
+    Status reloadViews(OperationContext* opCtx, const DatabaseName& dbName) const;
 
     /**
      * Handles committing a collection to the catalog within a WriteUnitOfWork.
@@ -225,15 +225,15 @@ public:
      * database has already been initialized.
      */
     void onOpenDatabase(OperationContext* opCtx,
-                        const TenantDatabaseName& dbName,
+                        const DatabaseName& dbName,
                         ViewsForDatabase&& viewsForDb);
 
     /**
-     * Removes the view records associated with 'tenantDbName', if any, from the in-memory
+     * Removes the view records associated with 'dbName', if any, from the in-memory
      * representation of the catalog. Should be called when Database instance is closed. Requires X
      * lock on database namespace.
      */
-    void onCloseDatabase(OperationContext* opCtx, TenantDatabaseName tenantDbName);
+    void onCloseDatabase(OperationContext* opCtx, DatabaseName dbName);
 
     /**
      * Register the collection with `uuid`.
@@ -268,7 +268,7 @@ public:
      *
      * Callers must re-fetch the catalog to observe changes.
      */
-    void clearViews(OperationContext* opCtx, const TenantDatabaseName& dbName) const;
+    void clearViews(OperationContext* opCtx, const DatabaseName& dbName) const;
 
     /**
      * This function gets the Collection pointer that corresponds to the UUID.
@@ -343,7 +343,7 @@ public:
      */
     void iterateViews(
         OperationContext* opCtx,
-        const TenantDatabaseName& dbName,
+        const DatabaseName& dbName,
         ViewIteratorCallback callback,
         ViewCatalogLookupBehavior lookupBehavior = ViewCatalogLookupBehavior::kValidateViews) const;
 
@@ -380,25 +380,25 @@ public:
     bool checkIfCollectionSatisfiable(UUID uuid, CollectionInfoFn predicate) const;
 
     /**
-     * This function gets the UUIDs of all collections from `tenantDbName`.
+     * This function gets the UUIDs of all collections from `dbName`.
      *
      * If the caller does not take a strong database lock, some of UUIDs might no longer exist (due
      * to collection drop) after this function returns.
      *
-     * Returns empty vector if the 'tenantDbName' is not known.
+     * Returns empty vector if the 'dbName' is not known.
      */
-    std::vector<UUID> getAllCollectionUUIDsFromDb(const TenantDatabaseName& tenantDbName) const;
+    std::vector<UUID> getAllCollectionUUIDsFromDb(const DatabaseName& dbName) const;
 
     /**
-     * This function gets the ns of all collections from `tenantDbName`. The result is not sorted.
+     * This function gets the ns of all collections from `dbName`. The result is not sorted.
      *
      * Caller must take a strong database lock; otherwise, collections returned could be dropped or
      * renamed.
      *
-     * Returns empty vector if the 'tenantDbName' is not known.
+     * Returns empty vector if the 'dbName' is not known.
      */
-    std::vector<NamespaceString> getAllCollectionNamesFromDb(
-        OperationContext* opCtx, const TenantDatabaseName& tenantDbName) const;
+    std::vector<NamespaceString> getAllCollectionNamesFromDb(OperationContext* opCtx,
+                                                             const DatabaseName& dbName) const;
 
     /**
      * This functions gets all the database names. The result is sorted in alphabetical ascending
@@ -406,7 +406,7 @@ public:
      *
      * Unlike DatabaseHolder::getNames(), this does not return databases that are empty.
      */
-    std::vector<TenantDatabaseName> getAllDbNames() const;
+    std::vector<DatabaseName> getAllDbNames() const;
 
     /**
      * Sets 'newProfileSettings' as the profiling settings for the database 'dbName'.
@@ -461,12 +461,12 @@ public:
      * Returns view statistics for the specified database.
      */
     boost::optional<ViewsForDatabase::Stats> getViewStatsForDatabase(
-        OperationContext* opCtx, const TenantDatabaseName& dbName) const;
+        OperationContext* opCtx, const DatabaseName& dbName) const;
 
     /**
      * Returns a set of databases, by name, that have view catalogs.
      */
-    using ViewCatalogSet = absl::flat_hash_set<TenantDatabaseName>;
+    using ViewCatalogSet = absl::flat_hash_set<DatabaseName>;
     ViewCatalogSet getViewCatalogDbNames(OperationContext* opCtx) const;
 
     /**
@@ -497,7 +497,7 @@ public:
      */
     uint64_t getEpoch() const;
 
-    iterator begin(OperationContext* opCtx, const TenantDatabaseName& tenantDbName) const;
+    iterator begin(OperationContext* opCtx, const DatabaseName& dbName) const;
     iterator end(OperationContext* opCtx) const;
 
     /**
@@ -533,14 +533,14 @@ private:
      * Retrieves the views for a given database, including any uncommitted changes for this
      * operation.
      */
-    boost::optional<const ViewsForDatabase&> _getViewsForDatabase(
-        OperationContext* opCtx, const TenantDatabaseName& dbName) const;
+    boost::optional<const ViewsForDatabase&> _getViewsForDatabase(OperationContext* opCtx,
+                                                                  const DatabaseName& dbName) const;
 
     /**
      * Sets all namespaces used by views for a database. Will uassert if there is a conflicting
      * collection name in the catalog.
      */
-    void _replaceViewsForDatabase(const TenantDatabaseName& dbName, ViewsForDatabase&& views);
+    void _replaceViewsForDatabase(const DatabaseName& dbName, ViewsForDatabase&& views);
 
     enum class ViewUpsertMode {
         // Insert all data for that view into the view map, view graph, and durable view catalog.
@@ -601,15 +601,15 @@ private:
 
     using CollectionCatalogMap = stdx::unordered_map<UUID, std::shared_ptr<Collection>, UUID::Hash>;
     using OrderedCollectionMap =
-        std::map<std::pair<TenantDatabaseName, UUID>, std::shared_ptr<Collection>>;
+        std::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>;
     using NamespaceCollectionMap =
         stdx::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
     using UncommittedViewsSet = stdx::unordered_set<NamespaceString>;
     using DatabaseProfileSettingsMap = StringMap<ProfileSettings>;
-    using ViewsForDatabaseMap = stdx::unordered_map<TenantDatabaseName, ViewsForDatabase>;
+    using ViewsForDatabaseMap = stdx::unordered_map<DatabaseName, ViewsForDatabase>;
 
     CollectionCatalogMap _catalog;
-    OrderedCollectionMap _orderedCollections;  // Ordered by <tenantDbName, collUUID> pair
+    OrderedCollectionMap _orderedCollections;  // Ordered by <dbName, collUUID> pair
     NamespaceCollectionMap _collections;
     UncommittedViewsSet _uncommittedViews;
 

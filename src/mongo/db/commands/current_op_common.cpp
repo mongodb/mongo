@@ -111,7 +111,7 @@ bool CurrentOpCommandBase::run(OperationContext* opCtx,
 
     // Pipeline is complete; create an AggregateCommandRequest for $currentOp.
     AggregateCommandRequest request(
-        NamespaceString::makeCollectionlessAggregateNSS(TenantDatabaseName(boost::none, "admin")),
+        NamespaceString::makeCollectionlessAggregateNSS(DatabaseName(boost::none, "admin")),
         std::move(pipeline));
 
     // Run the pipeline and obtain a CursorResponse.

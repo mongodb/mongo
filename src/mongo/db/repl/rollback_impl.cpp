@@ -43,6 +43,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -64,7 +65,6 @@
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/storage/historical_ident_tracker.h"
 #include "mongo/db/storage/remove_saver.h"
-#include "mongo/db/tenant_database_name.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -359,7 +359,7 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
 
     // Get a list of all databases.
     StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    std::vector<TenantDatabaseName> dbs;
+    std::vector<DatabaseName> dbs;
     {
         Lock::GlobalLock lk(opCtx, MODE_IS);
         dbs = storageEngine->listDatabases();
@@ -368,10 +368,10 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
     // Wait for all background operations to complete by waiting on each database. Single-phase
     // index builds are not stopped before rollback, so we must wait for these index builds to
     // complete.
-    std::vector<TenantDatabaseName> tenantDbNames(dbs.begin(), dbs.end());
+    std::vector<DatabaseName> dbNames(dbs.begin(), dbs.end());
     LOGV2(21595, "Waiting for all background operations to complete before starting rollback");
-    for (auto tenantDbName : tenantDbNames) {
-        auto numInProg = IndexBuildsCoordinator::get(opCtx)->numInProgForDb(tenantDbName.dbName());
+    for (auto dbName : dbNames) {
+        auto numInProg = IndexBuildsCoordinator::get(opCtx)->numInProgForDb(dbName.toString());
         if (numInProg > 0) {
             LOGV2_DEBUG(21596,
                         1,
@@ -379,9 +379,8 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
                         "background operations to complete on database '{db}'",
                         "Waiting for background operations to complete",
                         "numBackgroundOperationsInProgress"_attr = numInProg,
-                        "db"_attr = tenantDbName);
-            IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(opCtx,
-                                                                       tenantDbName.dbName());
+                        "db"_attr = dbName);
+            IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(opCtx, dbName.toString());
         }
     }
 
@@ -1368,11 +1367,11 @@ void RollbackImpl::_resetDropPendingState(OperationContext* opCtx) {
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     storageEngine->clearDropPendingState();
 
-    std::vector<TenantDatabaseName> tenantDbNames = storageEngine->listDatabases();
+    std::vector<DatabaseName> dbNames = storageEngine->listDatabases();
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    for (const auto& tenantDbName : tenantDbNames) {
-        Lock::DBLock dbLock(opCtx, tenantDbName.dbName(), MODE_X);
-        auto db = databaseHolder->openDb(opCtx, tenantDbName);
+    for (const auto& dbName : dbNames) {
+        Lock::DBLock dbLock(opCtx, dbName.db(), MODE_X);
+        auto db = databaseHolder->openDb(opCtx, dbName);
         db->checkForIdIndexesAndDropPendingCollections(opCtx);
     }
 }

@@ -231,7 +231,7 @@ Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
 Status validateIsNotInDbs(const NamespaceString& ns,
                           const std::vector<StringData>& disallowedDbs,
                           StringData optionName) {
-    // TODO SERVER-62491 Check for TenantDatabaseName instead
+    // TODO SERVER-62491 Check for DatabaseName instead
     if (std::find(disallowedDbs.begin(), disallowedDbs.end(), ns.db()) != disallowedDbs.end()) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << optionName << " collection option is not supported on the "

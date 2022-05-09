@@ -45,6 +45,7 @@
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
@@ -55,7 +56,6 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/tenant_database_name.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
@@ -692,7 +692,7 @@ void createChangeStreamPreImagesCollection(OperationContext* opCtx) {
             status.isOK() || status.code() == ErrorCodes::NamespaceExists);
 }
 
-// TODO SERVER-62880 pass TenantDatabaseName instead of dbName.
+// TODO SERVER-62880 pass DatabaseName instead of dbName.
 Status createCollectionForApplyOps(OperationContext* opCtx,
                                    const std::string& dbName,
                                    const boost::optional<UUID>& ui,
@@ -705,7 +705,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
     auto newCmd = cmdObj;
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    const TenantDatabaseName tenantDbName(boost::none, dbName);
+    const DatabaseName tenantDbName(boost::none, dbName);
     auto* const db = databaseHolder->getDb(opCtx, tenantDbName);
 
     // If a UUID is given, see if we need to rename a collection out of the way, and whether the

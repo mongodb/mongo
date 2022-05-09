@@ -32,7 +32,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/views_for_database.h"
-#include "mongo/db/tenant_database_name.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/views/view.h"
 #include "mongo/util/uuid.h"
 

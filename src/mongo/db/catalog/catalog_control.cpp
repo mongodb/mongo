@@ -38,11 +38,11 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/rebuild_indexes.h"
-#include "mongo/db/tenant_database_name.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -68,14 +68,13 @@ void reopenAllDatabasesAndReloadCollectionCatalog(
     boost::optional<BatchedCollectionCatalogWriter> catalogWriter(opCtx);
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    std::vector<TenantDatabaseName> databasesToOpen = storageEngine->listDatabases();
-    for (auto&& tenantDbName : databasesToOpen) {
+    std::vector<DatabaseName> databasesToOpen = storageEngine->listDatabases();
+    for (auto&& dbName : databasesToOpen) {
         LOGV2_FOR_RECOVERY(
-            23992, 1, "openCatalog: dbholder reopening database", "db"_attr = tenantDbName);
-        auto db = databaseHolder->openDb(opCtx, tenantDbName);
-        invariant(db, str::stream() << "failed to reopen database " << tenantDbName.toString());
-        for (auto&& collNss :
-             catalogWriter.get()->getAllCollectionNamesFromDb(opCtx, tenantDbName)) {
+            23992, 1, "openCatalog: dbholder reopening database", "db"_attr = dbName);
+        auto db = databaseHolder->openDb(opCtx, dbName);
+        invariant(db, str::stream() << "failed to reopen database " << dbName.toString());
+        for (auto&& collNss : catalogWriter.get()->getAllCollectionNamesFromDb(opCtx, dbName)) {
             // Note that the collection name already includes the database component.
             auto collection = catalogWriter.get()->lookupCollectionByNamespace(opCtx, collNss);
             invariant(collection,
@@ -129,14 +128,13 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgress();
 
     MinVisibleTimestampMap minVisibleTimestampMap;
-    std::vector<TenantDatabaseName> allDbs =
+    std::vector<DatabaseName> allDbs =
         opCtx->getServiceContext()->getStorageEngine()->listDatabases();
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto catalog = CollectionCatalog::get(opCtx);
-    for (auto&& tenantDbName : allDbs) {
-        for (auto collIt = catalog->begin(opCtx, tenantDbName); collIt != catalog->end(opCtx);
-             ++collIt) {
+    for (auto&& dbName : allDbs) {
+        for (auto collIt = catalog->begin(opCtx, dbName); collIt != catalog->end(opCtx); ++collIt) {
             auto coll = *collIt;
             if (!coll) {
                 break;

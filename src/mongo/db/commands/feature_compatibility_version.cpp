@@ -377,11 +377,11 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
 
 bool FeatureCompatibilityVersion::hasNoReplicatedCollections(OperationContext* opCtx) {
     StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
-    std::vector<TenantDatabaseName> tenantDbNames = storageEngine->listDatabases();
+    std::vector<DatabaseName> dbNames = storageEngine->listDatabases();
     auto catalog = CollectionCatalog::get(opCtx);
-    for (auto&& tenantDbName : tenantDbNames) {
-        Lock::DBLock dbLock(opCtx, tenantDbName.dbName(), MODE_S);
-        for (auto&& collNss : catalog->getAllCollectionNamesFromDb(opCtx, tenantDbName)) {
+    for (auto&& dbName : dbNames) {
+        Lock::DBLock dbLock(opCtx, dbName.db(), MODE_S);
+        for (auto&& collNss : catalog->getAllCollectionNamesFromDb(opCtx, dbName)) {
             if (collNss.isReplicated()) {
                 return false;
             }
@@ -480,11 +480,10 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
     auto fcvDocument = findFeatureCompatibilityVersionDocument(opCtx);
 
     auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto tenantDbNames = storageEngine->listDatabases();
-    bool nonLocalDatabases =
-        std::any_of(tenantDbNames.begin(), tenantDbNames.end(), [](auto tenantDbName) {
-            return tenantDbName.dbName() != NamespaceString::kLocalDb;
-        });
+    auto dbNames = storageEngine->listDatabases();
+    bool nonLocalDatabases = std::any_of(dbNames.begin(), dbNames.end(), [](auto dbName) {
+        return dbName.db() != NamespaceString::kLocalDb;
+    });
 
     // Fail to start up if there is no featureCompatibilityVersion document and there are non-local
     // databases present.

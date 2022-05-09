@@ -60,13 +60,13 @@ Status checkIfNamespaceExists(OperationContext* opCtx, const NamespaceString& ns
 
 
 void forEachCollectionFromDb(OperationContext* opCtx,
-                             const TenantDatabaseName& tenantDbName,
+                             const DatabaseName& dbName,
                              LockMode collLockMode,
                              CollectionCatalog::CollectionInfoFn callback,
                              CollectionCatalog::CollectionInfoFn predicate) {
 
     auto catalogForIteration = CollectionCatalog::get(opCtx);
-    for (auto collectionIt = catalogForIteration->begin(opCtx, tenantDbName);
+    for (auto collectionIt = catalogForIteration->begin(opCtx, dbName);
          collectionIt != catalogForIteration->end(opCtx);) {
         auto uuid = collectionIt.uuid().get();
         if (predicate && !catalogForIteration->checkIfCollectionSatisfiable(uuid, predicate)) {

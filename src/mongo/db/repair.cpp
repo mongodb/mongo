@@ -115,8 +115,8 @@ Status dropUnfinishedIndexes(OperationContext* opCtx, Collection* collection) {
 
 Status repairCollections(OperationContext* opCtx,
                          StorageEngine* engine,
-                         const TenantDatabaseName& tenantDbName) {
-    auto colls = CollectionCatalog::get(opCtx)->getAllCollectionNamesFromDb(opCtx, tenantDbName);
+                         const DatabaseName& dbName) {
+    auto colls = CollectionCatalog::get(opCtx)->getAllCollectionNamesFromDb(opCtx, dbName);
 
     for (const auto& nss : colls) {
         auto status = repair::repairCollection(opCtx, engine, nss);
@@ -129,33 +129,31 @@ Status repairCollections(OperationContext* opCtx,
 }  // namespace
 
 namespace repair {
-Status repairDatabase(OperationContext* opCtx,
-                      StorageEngine* engine,
-                      const TenantDatabaseName& tenantDbName) {
+Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const DatabaseName& dbName) {
     DisableDocumentValidation validationDisabler(opCtx);
 
     // We must hold some form of lock here
     invariant(opCtx->lockState()->isW());
-    invariant(tenantDbName.dbName().find('.') == std::string::npos);
+    invariant(dbName.db().find('.') == std::string::npos);
 
-    LOGV2(21029, "repairDatabase", "db"_attr = tenantDbName);
+    LOGV2(21029, "repairDatabase", "db"_attr = dbName);
 
 
     opCtx->checkForInterrupt();
 
     // Close the db and invalidate all current users and caches.
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    databaseHolder->close(opCtx, tenantDbName);
+    databaseHolder->close(opCtx, dbName);
 
     // Reopening db is necessary for repairCollections.
-    databaseHolder->openDb(opCtx, tenantDbName);
+    databaseHolder->openDb(opCtx, dbName);
 
-    auto status = repairCollections(opCtx, engine, tenantDbName);
+    auto status = repairCollections(opCtx, engine, dbName);
     if (!status.isOK()) {
         LOGV2_FATAL_CONTINUE(21030,
                              "Failed to repair database {dbName}: {status_reason}",
                              "Failed to repair database",
-                             "db"_attr = tenantDbName,
+                             "db"_attr = dbName,
                              "error"_attr = status);
     }
 

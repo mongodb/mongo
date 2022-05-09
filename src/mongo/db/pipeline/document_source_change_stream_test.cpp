@@ -2848,7 +2848,7 @@ class ChangeStreamStageDBTest : public ChangeStreamStageTest {
 public:
     ChangeStreamStageDBTest()
         : ChangeStreamStageTest(NamespaceString::makeCollectionlessAggregateNSS(
-              TenantDatabaseName(boost::none, nss.db()))) {}
+              DatabaseName(boost::none, nss.db()))) {}
 };
 
 TEST_F(ChangeStreamStageDBTest, TransformInsert) {
@@ -4538,8 +4538,8 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV1HighWaterMark) {
     ResumeTokenData resumeToken = ResumeToken::makeHighWaterMarkToken(resumeTs, 2).getData();
     resumeToken.version = 1;
     auto expCtx = getExpCtxRaw();
-    expCtx->ns = NamespaceString::makeCollectionlessAggregateNSS(
-        TenantDatabaseName(boost::none, "unittests"));
+    expCtx->ns =
+        NamespaceString::makeCollectionlessAggregateNSS(DatabaseName(boost::none, "unittests"));
 
     // Create a change stream spec that resumes after 'resumeToken'.
     const auto spec =

@@ -555,9 +555,8 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
         Lock::DBLock dbLock(opCtx.get(), nss.db(), MODE_IS, deadline);
         Lock::CollectionLock collLock(opCtx.get(), nss, MODE_IS, deadline);
 
-        const TenantDatabaseName tenantDbName(boost::none, nss.db());
         auto databaseHolder = DatabaseHolder::get(opCtx.get());
-        auto db = databaseHolder->getDb(opCtx.get(), tenantDbName);
+        auto db = databaseHolder->getDb(opCtx.get(), nss.dbName());
         if (!db) {
             // There is no config database, so there cannot be any active transactions.
             return boost::none;

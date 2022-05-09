@@ -86,12 +86,11 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
     // If the admin database, which contains the server configuration collection with the
     // featureCompatibilityVersion document, does not exist, create it.
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    const TenantDatabaseName fcvTenantDbName(boost::none, fcvNss.db());
-    auto db = databaseHolder->getDb(opCtx, fcvTenantDbName);
+    auto db = databaseHolder->getDb(opCtx, fcvNss.dbName());
     if (!db) {
         LOGV2(20998, "Re-creating admin database that was dropped.");
     }
-    db = databaseHolder->openDb(opCtx, fcvTenantDbName);
+    db = databaseHolder->openDb(opCtx, fcvNss.dbName());
     invariant(db);
 
     // If the server configuration collection, which contains the FCV document, does not exist, then
@@ -260,10 +259,10 @@ void openDatabases(OperationContext* opCtx, const StorageEngine* storageEngine, 
     invariant(opCtx->lockState()->isW());
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto tenantDbNames = storageEngine->listDatabases();
-    for (const auto& tenantDbName : tenantDbNames) {
-        LOGV2_DEBUG(21010, 1, "    Opening database: {dbName}", "dbName"_attr = tenantDbName);
-        auto db = databaseHolder->openDb(opCtx, tenantDbName);
+    auto dbNames = storageEngine->listDatabases();
+    for (const auto& dbName : dbNames) {
+        LOGV2_DEBUG(21010, 1, "    Opening database: {dbName}", "dbName"_attr = dbName);
+        auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db);
 
         onDatabase(db);
@@ -280,8 +279,8 @@ bool hasReplSetConfigDoc(OperationContext* opCtx) {
     // 'kSystemReplSetNamespace' collection have been populated if the collection exists. If the
     // "local" database doesn't exist at this point yet, then it will be created.
     const auto nss = NamespaceString::kSystemReplSetNamespace;
-    const TenantDatabaseName tenantDbName(boost::none, nss.db());
-    databaseHolder->openDb(opCtx, tenantDbName);
+
+    databaseHolder->openDb(opCtx, nss.dbName());
     BSONObj config;
     return Helpers::getSingleton(opCtx, nss.ns().c_str(), config);
 }
@@ -476,8 +475,7 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
             opCtx, NamespaceString::kServerConfigurationNamespace)) {
         auto databaseHolder = DatabaseHolder::get(opCtx);
 
-        const TenantDatabaseName fcvTenantDbName(boost::none, fcvColl->ns().db());
-        databaseHolder->openDb(opCtx, fcvTenantDbName);
+        databaseHolder->openDb(opCtx, fcvColl->ns().dbName());
         fassertNoTrace(4805000,
                        repair::repairCollection(
                            opCtx, storageEngine, NamespaceString::kServerConfigurationNamespace));
@@ -489,21 +487,20 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
     // The local database should be repaired before any other replicated collections so we know
     // whether not to rebuild unfinished two-phase index builds if this is a replica set node
     // running in standalone mode.
-    auto tenantDbNames = storageEngine->listDatabases();
-    if (auto it = std::find(tenantDbNames.begin(),
-                            tenantDbNames.end(),
-                            TenantDatabaseName(boost::none, NamespaceString::kLocalDb));
-        it != tenantDbNames.end()) {
+    auto dbNames = storageEngine->listDatabases();
+    if (auto it = std::find(
+            dbNames.begin(), dbNames.end(), DatabaseName(boost::none, NamespaceString::kLocalDb));
+        it != dbNames.end()) {
         fassertNoTrace(4805001, repair::repairDatabase(opCtx, storageEngine, *it));
 
         // This must be set before rebuilding index builds on replicated collections.
         setReplSetMemberInStandaloneMode(opCtx, StartupRecoveryMode::kAuto);
-        tenantDbNames.erase(it);
+        dbNames.erase(it);
     }
 
     // Repair the remaining databases.
-    for (const auto& tenantDbName : tenantDbNames) {
-        fassertNoTrace(18506, repair::repairDatabase(opCtx, storageEngine, tenantDbName));
+    for (const auto& dbName : dbNames) {
+        fassertNoTrace(18506, repair::repairDatabase(opCtx, storageEngine, dbName));
     }
 
     openDatabases(opCtx, storageEngine, [&](auto db) {
@@ -568,7 +565,7 @@ void startupRecovery(OperationContext* opCtx,
         !(hasReplSetConfigDoc(opCtx) || usingReplication);
 
     openDatabases(opCtx, storageEngine, [&](auto db) {
-        auto dbName = db->name().dbName();
+        auto dbString = db->name().db();
 
         // Ensures all collections meet requirements such as having _id indexes, and corrects them
         // if needed.
@@ -579,12 +576,12 @@ void startupRecovery(OperationContext* opCtx,
             db->checkForIdIndexesAndDropPendingCollections(opCtx);
             // Ensure oplog is capped (mongodb does not guarantee order of inserts on noncapped
             // collections)
-            if (dbName == NamespaceString::kLocalDb) {
+            if (dbString == NamespaceString::kLocalDb) {
                 assertCappedOplog(opCtx, db);
             }
         }
 
-        if (shouldClearNonLocalTmpCollections || dbName == NamespaceString::kLocalDb) {
+        if (shouldClearNonLocalTmpCollections || dbString == NamespaceString::kLocalDb) {
             db->clearTmpCollections(opCtx);
         }
     });

@@ -49,40 +49,39 @@
 namespace mongo {
 namespace catalog {
 namespace {
-auto removeEmptyDirectory = [](ServiceContext* svcCtx,
-                               StorageEngine* storageEngine,
-                               const NamespaceString& ns) {
-    // Nothing to do if not using directoryperdb or there are still collections in the database.
-    // If we don't support supportsPendingDrops then this is executing before the collection is
-    // removed from the catalog. In that case, just blindly attempt to delete the directory, it
-    // will only succeed if it is empty which is the behavior we want.
-    auto collectionCatalog = CollectionCatalog::get(svcCtx);
-    const TenantDatabaseName tenantDbName(boost::none, ns.db());
-    if (!storageEngine->isUsingDirectoryPerDb() ||
-        (storageEngine->supportsPendingDrops() &&
-         collectionCatalog->begin(nullptr, tenantDbName) != collectionCatalog->end(nullptr))) {
-        return;
-    }
+auto removeEmptyDirectory =
+    [](ServiceContext* svcCtx, StorageEngine* storageEngine, const NamespaceString& ns) {
+        // Nothing to do if not using directoryperdb or there are still collections in the database.
+        // If we don't support supportsPendingDrops then this is executing before the collection is
+        // removed from the catalog. In that case, just blindly attempt to delete the directory, it
+        // will only succeed if it is empty which is the behavior we want.
+        auto collectionCatalog = CollectionCatalog::get(svcCtx);
+        const DatabaseName& dbName = ns.dbName();
+        if (!storageEngine->isUsingDirectoryPerDb() ||
+            (storageEngine->supportsPendingDrops() &&
+             collectionCatalog->begin(nullptr, dbName) != collectionCatalog->end(nullptr))) {
+            return;
+        }
 
-    boost::system::error_code ec;
-    boost::filesystem::remove(storageEngine->getFilesystemPathForDb(tenantDbName), ec);
+        boost::system::error_code ec;
+        boost::filesystem::remove(storageEngine->getFilesystemPathForDb(dbName), ec);
 
-    if (!ec) {
-        LOGV2(4888200, "Removed empty database directory", "db"_attr = tenantDbName.dbName());
-    } else if (collectionCatalog->begin(nullptr, tenantDbName) == collectionCatalog->end(nullptr)) {
-        // It is possible for a new collection to be created in the database between when we
-        // check whether the database is empty and actually attempting to remove the directory.
-        // In this case, don't log that the removal failed because it is expected. However,
-        // since we attempt to remove the directory for both the collection and index ident
-        // drops, once the database is empty it will be still logged until the final of these
-        // ident drops occurs.
-        LOGV2_DEBUG(4888201,
-                    1,
-                    "Failed to remove database directory",
-                    "db"_attr = tenantDbName.dbName(),
-                    "error"_attr = ec.message());
-    }
-};
+        if (!ec) {
+            LOGV2(4888200, "Removed empty database directory", "db"_attr = dbName.toString());
+        } else if (collectionCatalog->begin(nullptr, dbName) == collectionCatalog->end(nullptr)) {
+            // It is possible for a new collection to be created in the database between when we
+            // check whether the database is empty and actually attempting to remove the directory.
+            // In this case, don't log that the removal failed because it is expected. However,
+            // since we attempt to remove the directory for both the collection and index ident
+            // drops, once the database is empty it will be still logged until the final of these
+            // ident drops occurs.
+            LOGV2_DEBUG(4888201,
+                        1,
+                        "Failed to remove database directory",
+                        "db"_attr = dbName.toString(),
+                        "error"_attr = ec.message());
+        }
+    };
 }  // namespace
 
 void removeIndex(OperationContext* opCtx,

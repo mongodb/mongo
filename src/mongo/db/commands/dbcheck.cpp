@@ -224,9 +224,9 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
         result->push_back(info);
         return true;
     };
-    // TODO SERVER-63353: Change dbcheck command to use TenantDatabaseName
+    // TODO SERVER-63353: Change dbcheck command to use DatabaseName
     mongo::catalog::forEachCollectionFromDb(
-        opCtx, TenantDatabaseName(boost::none, dbName), MODE_IS, perCollectionWork);
+        opCtx, DatabaseName(boost::none, dbName), MODE_IS, perCollectionWork);
 
     return result;
 }

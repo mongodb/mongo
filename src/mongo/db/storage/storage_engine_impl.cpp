@@ -773,9 +773,8 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
     return reconcileResult;
 }
 
-std::string StorageEngineImpl::getFilesystemPathForDb(
-    const TenantDatabaseName& tenantDbName) const {
-    return _catalog->getFilesystemPathForDb(tenantDbName.dbName());
+std::string StorageEngineImpl::getFilesystemPathForDb(const DatabaseName& dbName) const {
+    return _catalog->getFilesystemPathForDb(dbName.toString());
 }
 
 void StorageEngineImpl::cleanShutdown() {
@@ -821,27 +820,25 @@ RecoveryUnit* StorageEngineImpl::newRecoveryUnit() {
     return _engine->newRecoveryUnit();
 }
 
-std::vector<TenantDatabaseName> StorageEngineImpl::listDatabases() const {
+std::vector<DatabaseName> StorageEngineImpl::listDatabases() const {
     return CollectionCatalog::get(getGlobalServiceContext())->getAllDbNames();
 }
 
-Status StorageEngineImpl::closeDatabase(OperationContext* opCtx,
-                                        const TenantDatabaseName& tenantDbName) {
+Status StorageEngineImpl::closeDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
     // This is ok to be a no-op as there is no database layer in kv.
     return Status::OK();
 }
 
-Status StorageEngineImpl::dropDatabase(OperationContext* opCtx,
-                                       const TenantDatabaseName& tenantDbName) {
+Status StorageEngineImpl::dropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
     auto catalog = CollectionCatalog::get(opCtx);
     {
-        auto tenantDbNames = catalog->getAllDbNames();
-        if (std::count(tenantDbNames.begin(), tenantDbNames.end(), tenantDbName) == 0) {
+        auto dbNames = catalog->getAllDbNames();
+        if (std::count(dbNames.begin(), dbNames.end(), dbName) == 0) {
             return Status(ErrorCodes::NamespaceNotFound, "db not found to drop");
         }
     }
 
-    std::vector<UUID> toDrop = catalog->getAllCollectionUUIDsFromDb(tenantDbName);
+    std::vector<UUID> toDrop = catalog->getAllCollectionUUIDsFromDb(dbName);
 
     // Do not timestamp any of the following writes. This will remove entries from the catalog as
     // well as drop any underlying tables. It's not expected for dropping tables to be reversible
@@ -1303,8 +1300,7 @@ void StorageEngineImpl::TimestampMonitor::clearListeners() {
     _listeners.clear();
 }
 
-int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx,
-                                           const TenantDatabaseName& tenantDbName) {
+int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, const DatabaseName& dbName) {
     int64_t size = 0;
 
     auto perCollectionWork = [&](const CollectionPtr& collection) {
@@ -1320,13 +1316,12 @@ int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx,
 
     if (opCtx->isLockFreeReadsOp()) {
         auto collectionCatalog = CollectionCatalog::get(opCtx);
-        for (auto it = collectionCatalog->begin(opCtx, tenantDbName);
-             it != collectionCatalog->end(opCtx);
+        for (auto it = collectionCatalog->begin(opCtx, dbName); it != collectionCatalog->end(opCtx);
              ++it) {
             perCollectionWork(*it);
         }
     } else {
-        catalog::forEachCollectionFromDb(opCtx, tenantDbName, MODE_IS, perCollectionWork);
+        catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, perCollectionWork);
     };
 
     return size;
