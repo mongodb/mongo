@@ -378,7 +378,7 @@ public:
                 IDLParserErrorContext("ClusterFindAndModify"), request.body);
             if (shouldDoFLERewrite(findAndModifyRequest)) {
                 auto newRequest = processFLEFindAndModifyExplainMongos(opCtx, findAndModifyRequest);
-                return newRequest.toBSON(request.body);
+                return newRequest.first.toBSON(request.body);
             } else {
                 return request.body;
             }

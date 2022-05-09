@@ -552,14 +552,15 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     const BSONObj& cmdObj = this->request().toBSON(BSONObj() /* commandPassthroughFields */);
     validate(this->request());
 
-    auto request = [&]() {
+    auto requestAndMsg = [&]() {
         if (this->request().getEncryptionInformation().has_value() &&
             !this->request().getEncryptionInformation()->getCrudProcessed().get_value_or(false)) {
             return processFLEFindAndModifyExplainMongod(opCtx, this->request());
         } else {
-            return this->request();
+            return std::pair{this->request(), OpMsgRequest()};
         }
     }();
+    auto request = requestAndMsg.first;
 
     const NamespaceString& nsString = request.getNamespace();
     uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
