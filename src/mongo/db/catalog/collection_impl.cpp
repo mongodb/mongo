@@ -2117,7 +2117,7 @@ std::vector<std::string> CollectionImpl::removeInvalidIndexOptions(OperationCont
             }
 
             indexesWithInvalidOptions.push_back(std::string(index.nameStringData()));
-            index.spec = index_key_validate::removeUnknownFields(oldSpec);
+            index.spec = index_key_validate::removeUnknownFields(NamespaceString(md.ns), oldSpec);
         }
     });
 
