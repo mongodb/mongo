@@ -247,6 +247,14 @@ assertResultsMatchWithAndWithoutPushdown(
     [{"_id": 1, "s": 2}, {"_id": 2, "s": 2}, {"_id": 4, "s": 1}],
     2);
 
+// Verifies that an optimized expression can be pushed down.
+assertResultsMatchWithAndWithoutPushdown(
+    coll,
+    // {"$ifNull": [1, 2]} will be optimized into just the constant 1.
+    [{$group: {_id: {"$ifNull": [1, 2]}, o: {$min: "$quantity"}}}],
+    [{"_id": 1, o: 1}],
+    1);
+
 // Run a group with a supported $stdDevSamp accumultor and check that it gets pushed down.
 assertGroupPushdown(coll,
                     [{$group: {_id: "$item", s: {$stdDevSamp: "$quantity"}}}],
