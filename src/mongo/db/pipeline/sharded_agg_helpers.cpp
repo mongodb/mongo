@@ -57,7 +57,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/collection_uuid_mismatch.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/s/query/cluster_query_knobs_gen.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/query/establish_cursors.h"
@@ -116,7 +115,7 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
     aggReq.setNeedsMerge(true);
 
     // TODO SERVER-65370: from 6.1 onwards, we will default to v2 and this block should be removed.
-    if (isMongos()) {
+    if (expCtx->inMongos) {
         aggReq.setGenerateV2ResumeTokens(expCtx->changeStreamTokenVersion == 2);
     }
 
@@ -159,7 +158,7 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
     // that a 6.0 mongoS on a mixed 6.0/7.0 cluster will see only v1 tokens in the stream.
     // TODO SERVER-65370: from 6.1 onwards, we will default to v2 and this block should be removed.
     const auto& v2FieldName = AggregateCommandRequest::kGenerateV2ResumeTokensFieldName;
-    if (auto cmdObj = cmdForShards.peek(); isMongos() && cmdObj[v2FieldName].missing()) {
+    if (auto cmdObj = cmdForShards.peek(); expCtx->inMongos && cmdObj[v2FieldName].missing()) {
         cmdForShards[v2FieldName] = Value(false);
     }
 
