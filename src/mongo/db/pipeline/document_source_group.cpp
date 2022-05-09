@@ -460,9 +460,6 @@ intrusive_ptr<Expression> parseIdExpression(const intrusive_ptr<ExpressionContex
 }  // namespace
 
 void DocumentSourceGroup::setIdExpression(const boost::intrusive_ptr<Expression> idExpression) {
-    // Remember the whole _id expression so that we can translate it to a SBE stage tree as a whole.
-    _idExpression = idExpression;
-
     if (auto object = dynamic_cast<ExpressionObject*>(idExpression.get())) {
         auto& childExpressions = object->getChildExpressions();
         invariant(!childExpressions.empty());  // We expect to have converted an empty object into a
@@ -478,6 +475,28 @@ void DocumentSourceGroup::setIdExpression(const boost::intrusive_ptr<Expression>
     } else {
         _idExpressions.push_back(idExpression);
     }
+}
+
+boost::intrusive_ptr<Expression> DocumentSourceGroup::getIdExpression() const {
+    // _idFieldNames is empty and _idExpressions has one element when the _id expression is not an
+    // object expression.
+    if (_idFieldNames.empty() && _idExpressions.size() == 1) {
+        return _idExpressions[0];
+    }
+
+    tassert(6586300,
+            "Field and its expression must be always paired in ExpressionObject",
+            _idFieldNames.size() > 0 && _idFieldNames.size() == _idExpressions.size());
+
+    // Each expression in '_idExpressions' may have been optimized and so, compose the object _id
+    // expression out of the optimized expressions.
+    std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> fieldsAndExprs;
+    for (size_t i = 0; i < _idExpressions.size(); ++i) {
+        fieldsAndExprs.emplace_back(_idFieldNames[i], _idExpressions[i]);
+    }
+
+    return ExpressionObject::create(_idExpressions[0]->getExpressionContext(),
+                                    std::move(fieldsAndExprs));
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
