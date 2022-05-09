@@ -1024,7 +1024,8 @@ void QueryPlannerAccess::finishLeafNode(
                         bounds->fields[i]));
             }
         }
-        LOGV2_DEBUG(6334900, 5, "Build IETs", "iets"_attr = ietsToString(index, ixScan->iets));
+        LOGV2_DEBUG(
+            6334900, 5, "Build IETs", "iets"_attr = ietsToString(ixScan->index, ixScan->iets));
     }
 
     // We create bounds assuming a forward direction but can easily reverse bounds to align
