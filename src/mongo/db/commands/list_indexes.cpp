@@ -35,6 +35,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
@@ -63,6 +64,40 @@
 
 namespace mongo {
 namespace {
+
+// The allowed fields have to be in sync with those defined in 'src/mongo/db/list_indexes.idl'.
+static std::set<StringData> allowedFieldNames = {
+    ListIndexesReplyItem::k2dsphereIndexVersionFieldName,
+    ListIndexesReplyItem::kBackgroundFieldName,
+    ListIndexesReplyItem::kBitsFieldName,
+    ListIndexesReplyItem::kBucketSizeFieldName,
+    ListIndexesReplyItem::kBuildUUIDFieldName,
+    ListIndexesReplyItem::kClusteredFieldName,
+    ListIndexesReplyItem::kCoarsestIndexedLevelFieldName,
+    ListIndexesReplyItem::kCollationFieldName,
+    ListIndexesReplyItem::kDefault_languageFieldName,
+    ListIndexesReplyItem::kDropDupsFieldName,
+    ListIndexesReplyItem::kExpireAfterSecondsFieldName,
+    ListIndexesReplyItem::kFinestIndexedLevelFieldName,
+    ListIndexesReplyItem::kHiddenFieldName,
+    ListIndexesReplyItem::kIndexBuildInfoFieldName,
+    ListIndexesReplyItem::kKeyFieldName,
+    ListIndexesReplyItem::kLanguage_overrideFieldName,
+    ListIndexesReplyItem::kMaxFieldName,
+    ListIndexesReplyItem::kMinFieldName,
+    ListIndexesReplyItem::kNameFieldName,
+    ListIndexesReplyItem::kNsFieldName,
+    ListIndexesReplyItem::kOriginalSpecFieldName,
+    ListIndexesReplyItem::kPartialFilterExpressionFieldName,
+    ListIndexesReplyItem::kPrepareUniqueFieldName,
+    ListIndexesReplyItem::kSparseFieldName,
+    ListIndexesReplyItem::kSpecFieldName,
+    ListIndexesReplyItem::kStorageEngineFieldName,
+    ListIndexesReplyItem::kTextIndexVersionFieldName,
+    ListIndexesReplyItem::kUniqueFieldName,
+    ListIndexesReplyItem::kVFieldName,
+    ListIndexesReplyItem::kWeightsFieldName,
+    ListIndexesReplyItem::kWildcardProjectionFieldName};
 
 /**
  * Returns index specs, with resolved namespace, from the catalog for this listIndexes request.
@@ -280,6 +315,7 @@ public:
                     break;
                 }
                 invariant(state == PlanExecutor::ADVANCED);
+                nextDoc = index_key_validate::repairIndexSpec(nss, nextDoc, allowedFieldNames);
 
                 // If we can't fit this result inside the current batch, then we stash it for
                 // later.
@@ -297,7 +333,10 @@ public:
                                 "entry"_attr = nextDoc,
                                 "error"_attr = exc);
                     uasserted(5254501,
-                              "Could not parse catalog entry while replying to listIndexes");
+                              fmt::format("Could not parse catalog entry while replying to "
+                                          "listIndexes. Entry: '{}'. Error: '{}'.",
+                                          nextDoc.toString(),
+                                          exc.toString()));
                 }
                 bytesBuffered += nextDoc.objsize();
             }

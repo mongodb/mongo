@@ -43,6 +43,36 @@ class StatusWith;
 
 namespace index_key_validate {
 
+static std::set<StringData> allowedFieldNames = {
+    IndexDescriptor::k2dIndexBitsFieldName,
+    IndexDescriptor::k2dIndexMaxFieldName,
+    IndexDescriptor::k2dIndexMinFieldName,
+    IndexDescriptor::k2dsphereCoarsestIndexedLevel,
+    IndexDescriptor::k2dsphereFinestIndexedLevel,
+    IndexDescriptor::k2dsphereVersionFieldName,
+    IndexDescriptor::kBackgroundFieldName,
+    IndexDescriptor::kCollationFieldName,
+    IndexDescriptor::kDefaultLanguageFieldName,
+    IndexDescriptor::kDropDuplicatesFieldName,
+    IndexDescriptor::kExpireAfterSecondsFieldName,
+    IndexDescriptor::kHiddenFieldName,
+    IndexDescriptor::kIndexNameFieldName,
+    IndexDescriptor::kIndexVersionFieldName,
+    IndexDescriptor::kKeyPatternFieldName,
+    IndexDescriptor::kLanguageOverrideFieldName,
+    IndexDescriptor::kNamespaceFieldName,
+    IndexDescriptor::kPartialFilterExprFieldName,
+    IndexDescriptor::kPathProjectionFieldName,
+    IndexDescriptor::kSparseFieldName,
+    IndexDescriptor::kStorageEngineFieldName,
+    IndexDescriptor::kTextVersionFieldName,
+    IndexDescriptor::kUniqueFieldName,
+    IndexDescriptor::kWeightsFieldName,
+    IndexDescriptor::kOriginalSpecFieldName,
+    IndexDescriptor::kPrepareUniqueFieldName,
+    // Index creation under legacy writeMode can result in an index spec with an _id field.
+    "_id"};
+
 /**
  * Checks if the key is valid for building an index according to the validation rules for the given
  * index version.
@@ -64,7 +94,10 @@ BSONObj removeUnknownFields(const NamespaceString& ns, const BSONObj& indexSpec)
 /**
  * Returns a new index spec with boolean values in correct types and unkown field names removed.
  */
-BSONObj repairIndexSpec(const NamespaceString& ns, const BSONObj& indexSpec);
+BSONObj repairIndexSpec(
+    const NamespaceString& ns,
+    const BSONObj& indexSpec,
+    const std::set<StringData>& allowedFieldNames = index_key_validate::allowedFieldNames);
 
 /**
  * Performs additional validation for _id index specifications. This should be called after
