@@ -109,7 +109,9 @@ Status ShardingState::canAcceptShardedCommands() const {
 }
 
 ShardId ShardingState::shardId() {
-    invariant(enabled());
+    if (!enabled()) {
+        return ShardId();
+    }
     return _shardId;
 }
 
