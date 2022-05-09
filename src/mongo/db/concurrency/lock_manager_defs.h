@@ -155,12 +155,6 @@ enum LockResult {
 enum ResourceType {
     RESOURCE_INVALID = 0,
 
-    /** Parallel batch writer mode lock */
-    RESOURCE_PBWM,
-
-    /** Replication state transition lock. */
-    RESOURCE_RSTL,
-
     /**  Used for global exclusive operations */
     RESOURCE_GLOBAL,
 
@@ -177,26 +171,54 @@ enum ResourceType {
 };
 
 /**
+ * IDs for usages of RESOURCE_GLOBAL.
+ */
+enum class ResourceGlobalId : uint8_t {
+    kParallelBatchWriterMode,
+    kFeatureCompatibilityVersion,
+    kReplicationStateTransitionLock,
+    kGlobal,
+
+    // The number of global resource ids. Always insert new ids above this entry.
+    kNumIds
+};
+
+/**
  * Maps the resource id to a human-readable string.
  */
-static const char* ResourceTypeNames[] = {"Invalid",
-                                          "ParallelBatchWriterMode",
-                                          "ReplicationStateTransition",
-                                          "Global",
-                                          "Database",
-                                          "Collection",
-                                          "Metadata",
-                                          "Mutex"};
+static const char* ResourceTypeNames[] = {
+    "Invalid", "Global", "Database", "Collection", "Metadata", "Mutex"};
+
+/**
+ * Maps the global resource id to a human-readable string.
+ */
+static const char* ResourceGlobalIdNames[] = {
+    "ParallelBatchWriterMode",
+    "FeatureCompatibilityVersion",
+    "ReplicationStateTransition",
+    "Global",
+};
 
 // Ensure we do not add new types without updating the names array.
 MONGO_STATIC_ASSERT((sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) ==
                     ResourceTypesCount);
+
+// Ensure we do not add new global resource ids without updating the names array.
+MONGO_STATIC_ASSERT((sizeof(ResourceGlobalIdNames) / sizeof(ResourceGlobalIdNames[0])) ==
+                    static_cast<uint8_t>(ResourceGlobalId::kNumIds));
 
 /**
  * Returns a human-readable name for the specified resource type.
  */
 static const char* resourceTypeName(ResourceType resourceType) {
     return ResourceTypeNames[resourceType];
+}
+
+/**
+ * Returns a human-readable name for the specified global resource.
+ */
+static const char* resourceGlobalIdName(ResourceGlobalId id) {
+    return ResourceGlobalIdNames[static_cast<uint8_t>(id)];
 }
 
 /**
@@ -291,9 +313,14 @@ extern const ResourceId resourceIdGlobal;
 // this lock.
 extern const ResourceId resourceIdParallelBatchWriterMode;
 
+// Hardcoded resource id for a full FCV transition from start -> upgrading -> upgraded (or
+// equivalent for downgrading). This lock is used as a barrier to prevent writes from spanning an
+// FCV change. This lock is acquired after the PBWM but before the RSTL and resourceIdGlobal.
+extern const ResourceId resourceIdFeatureCompatibilityVersion;
+
 // Hardcoded resource id for the ReplicationStateTransitionLock (RSTL). This lock is acquired in
 // mode X for any replication state transition and is acquired by all other reads and writes in mode
-// IX. This lock is acquired after the PBWM but before the resourceIdGlobal.
+// IX. This lock is acquired after the PBWM and FCV locks but before the resourceIdGlobal.
 extern const ResourceId resourceIdReplicationStateTransitionLock;
 
 /**

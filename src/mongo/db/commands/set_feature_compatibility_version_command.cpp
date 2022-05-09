@@ -240,14 +240,17 @@ public:
             }
 
             {
-                // Take the global lock in S mode to create a barrier for operations taking the
-                // global IX or X locks. This ensures that either
+                // Take the FCV full transition lock in S mode to create a barrier for operations
+                // taking the global IX or X locks, which implicitly take the FCV full transition
+                // lock in IX mode (aside from those which explicitly opt out). This ensures that
+                // either:
                 //   - The global IX/X locked operation will start after the FCV change, see the
                 //     upgrading to 4.4 FCV and act accordingly.
                 //   - The global IX/X locked operation began prior to the FCV change, is acting on
                 //     that assumption and will finish before upgrade procedures begin right after
                 //     this.
-                Lock::GlobalLock lk(opCtx, MODE_S);
+                Lock::ResourceLock lk(
+                    opCtx, opCtx->lockState(), resourceIdFeatureCompatibilityVersion, MODE_S);
             }
 
             if (failUpgrading.shouldFail())
@@ -407,14 +410,17 @@ public:
             }
 
             {
-                // Take the global lock in S mode to create a barrier for operations taking the
-                // global IX or X locks. This ensures that either
+                // Take the FCV full transition lock in S mode to create a barrier for operations
+                // taking the global IX or X locks, which implicitly take the FCV full transition
+                // lock in IX mode (aside from those which explicitly opt out). This ensures that
+                // either:
                 //   - The global IX/X locked operation will start after the FCV change, see the
                 //     downgrading to 4.2 FCV and act accordingly.
                 //   - The global IX/X locked operation began prior to the FCV change, is acting on
                 //     that assumption and will finish before downgrade procedures begin right after
                 //     this.
-                Lock::GlobalLock lk(opCtx, MODE_S);
+                Lock::ResourceLock lk(
+                    opCtx, opCtx->lockState(), resourceIdFeatureCompatibilityVersion, MODE_S);
             }
 
             if (failDowngrading.shouldFail())

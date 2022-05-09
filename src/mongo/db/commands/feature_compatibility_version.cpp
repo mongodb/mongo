@@ -62,7 +62,7 @@ namespace mongo {
 
 using repl::UnreplicatedWritesBlock;
 
-Lock::ResourceMutex FeatureCompatibilityVersion::fcvLock("featureCompatibilityVersionLock");
+Lock::ResourceMutex FeatureCompatibilityVersion::fcvLock("featureCompatibilityVersionDocumentLock");
 // lastFCVUpdateTimestamp contains the latest oplog entry timestamp which updated the FCV.
 // It is reset on rollback.
 Timestamp lastFCVUpdateTimestamp;

@@ -81,8 +81,11 @@ public:
             : _rid(rid), _locker(locker), _result(LOCK_INVALID) {}
 
         ResourceLock(Locker* locker, ResourceId rid, LockMode mode)
+            : ResourceLock(nullptr, locker, rid, mode) {}
+
+        ResourceLock(OperationContext* opCtx, Locker* locker, ResourceId rid, LockMode mode)
             : _rid(rid), _locker(locker), _result(LOCK_INVALID) {
-            lock(nullptr, mode);
+            lock(opCtx, mode);
         }
 
         ResourceLock(ResourceLock&& otherLock)
@@ -254,6 +257,7 @@ public:
         OperationContext* const _opCtx;
         LockResult _result;
         ResourceLock _pbwm;
+        ResourceLock _fcvLock;
         InterruptBehavior _interruptBehavior;
         const bool _isOutermostLock;
     };

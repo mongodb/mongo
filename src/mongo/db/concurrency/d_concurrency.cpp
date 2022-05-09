@@ -143,6 +143,7 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
     : _opCtx(opCtx),
       _result(LOCK_INVALID),
       _pbwm(opCtx->lockState(), resourceIdParallelBatchWriterMode),
+      _fcvLock(opCtx->lockState(), resourceIdFeatureCompatibilityVersion),
       _interruptBehavior(behavior),
       _isOutermostLock(!opCtx->lockState()->isLocked()) {
     _opCtx->lockState()->getFlowControlTicket(_opCtx, lockMode);
@@ -157,6 +158,15 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
             }
         });
 
+        if (_opCtx->lockState()->shouldConflictWithSetFeatureCompatibilityVersion()) {
+            _fcvLock.lock(_opCtx, isSharedLockMode(lockMode) ? MODE_IS : MODE_IX, deadline);
+        }
+        auto unlockFCVLock = makeGuard([this] {
+            if (_opCtx->lockState()->shouldConflictWithSetFeatureCompatibilityVersion()) {
+                _fcvLock.unlock();
+            }
+        });
+
         _opCtx->lockState()->lock(
             _opCtx, resourceIdReplicationStateTransitionLock, MODE_IX, deadline);
 
@@ -168,6 +178,7 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
         _result = LOCK_OK;
 
         unlockRSTL.dismiss();
+        unlockFCVLock.dismiss();
         unlockPBWM.dismiss();
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
         // The kLeaveUnlocked behavior suppresses this exception.
@@ -182,6 +193,7 @@ Lock::GlobalLock::GlobalLock(GlobalLock&& otherLock)
     : _opCtx(otherLock._opCtx),
       _result(otherLock._result),
       _pbwm(std::move(otherLock._pbwm)),
+      _fcvLock(std::move(otherLock._fcvLock)),
       _interruptBehavior(otherLock._interruptBehavior),
       _isOutermostLock(otherLock._isOutermostLock) {
     // Mark as moved so the destructor doesn't invalidate the newly-constructed lock.

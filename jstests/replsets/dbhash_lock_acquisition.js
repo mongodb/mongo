@@ -30,8 +30,13 @@ assert.commandWorked(sessionDB.mycoll.insert({}));
 const ops = db.currentOp({"lsid.id": session.getSessionId().id}).inprog;
 assert.eq(
     1, ops.length, () => "Failed to find session in currentOp() output: " + tojson(db.currentOp()));
-assert.eq(ops[0].locks,
-          {ReplicationStateTransition: "w", Global: "w", Database: "w", Collection: "w"});
+assert.eq(ops[0].locks, {
+    FeatureCompatibilityVersion: "w",
+    ReplicationStateTransition: "w",
+    Global: "w",
+    Database: "w",
+    Collection: "w",
+});
 
 const threadCaptruncCmd = new Thread(function(host) {
     try {
@@ -78,8 +83,13 @@ assert.soon(() => {
     if (ops.length === 0) {
         return false;
     }
-    assert.eq(ops[0].locks,
-              {ReplicationStateTransition: "w", Global: "r", Database: "r", Collection: "r"});
+    assert.eq(ops[0].locks, {
+        FeatureCompatibilityVersion: "r",
+        ReplicationStateTransition: "w",
+        Global: "r",
+        Database: "r",
+        Collection: "r",
+    });
     return true;
 }, () => "Failed to find create collection in currentOp() output: " + tojson(db.currentOp()));
 
