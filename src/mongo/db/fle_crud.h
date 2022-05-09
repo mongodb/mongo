@@ -45,6 +45,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_api.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 
@@ -151,7 +152,8 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
                                        const BSONObj& cmdObj,
                                        BSONObjBuilder& result);
 
-write_ops::FindAndModifyCommandRequest processFLEFindAndModifyExplainMongos(
+std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>
+processFLEFindAndModifyExplainMongos(
     OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
 
 /**
@@ -160,7 +162,8 @@ write_ops::FindAndModifyCommandRequest processFLEFindAndModifyExplainMongos(
 write_ops::FindAndModifyCommandReply processFLEFindAndModify(
     OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
 
-write_ops::FindAndModifyCommandRequest processFLEFindAndModifyExplainMongod(
+std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>
+processFLEFindAndModifyExplainMongod(
     OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
 
 /**
@@ -462,12 +465,25 @@ using ProcessFindAndModifyCallback =
                             const write_ops::FindAndModifyCommandRequest& findAndModifyRequest)>;
 
 template <typename ReplyType>
-StatusWith<ReplyType> processFindAndModifyRequest(
+StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
     OperationContext* opCtx,
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest,
     GetTxnCallback getTxns,
     ProcessFindAndModifyCallback<ReplyType> processCallback = processFindAndModify);
 
+extern template StatusWith<std::pair<write_ops::FindAndModifyCommandReply, OpMsgRequest>>
+processFindAndModifyRequest<write_ops::FindAndModifyCommandReply>(
+    OperationContext* opCtx,
+    const write_ops::FindAndModifyCommandRequest& findAndModifyRequest,
+    GetTxnCallback getTxns,
+    ProcessFindAndModifyCallback<write_ops::FindAndModifyCommandReply> processCallback);
+
+extern template StatusWith<std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>>
+processFindAndModifyRequest<write_ops::FindAndModifyCommandRequest>(
+    OperationContext* opCtx,
+    const write_ops::FindAndModifyCommandRequest& findAndModifyRequest,
+    GetTxnCallback getTxns,
+    ProcessFindAndModifyCallback<write_ops::FindAndModifyCommandRequest> processCallback);
 
 write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
                                             const write_ops::UpdateCommandRequest& updateRequest,

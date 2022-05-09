@@ -227,7 +227,7 @@ write_ops::FindAndModifyCommandReply processFLEFindAndModify(
     auto reply = processFindAndModifyRequest<write_ops::FindAndModifyCommandReply>(
         opCtx, findAndModifyRequest, &getTransactionWithRetriesForMongoD);
 
-    return uassertStatusOK(reply);
+    return uassertStatusOK(reply).first;
 }
 
 write_ops::UpdateCommandReply processFLEUpdate(
@@ -282,8 +282,9 @@ BSONObj processFLEWriteExplainD(OperationContext* opCtx,
     return fle::rewriteQuery(opCtx, expCtx, nss, info, query, &getTransactionWithRetriesForMongoD);
 }
 
-write_ops::FindAndModifyCommandRequest processFLEFindAndModifyExplainMongod(
-    OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& request) {
+std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>
+processFLEFindAndModifyExplainMongod(OperationContext* opCtx,
+                                     const write_ops::FindAndModifyCommandRequest& request) {
     tassert(6513401,
             "Missing encryptionInformation for findAndModify",
             request.getEncryptionInformation().has_value());
