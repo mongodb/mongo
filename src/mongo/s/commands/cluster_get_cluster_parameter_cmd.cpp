@@ -34,7 +34,9 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
+#include "mongo/db/commands/get_cluster_parameter_invocation.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
+#include "mongo/idl/cluster_server_parameter_refresher.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -61,7 +63,7 @@ public:
     }
 
     std::string help() const override {
-        return "Get majority-written cluster parameter value(s) from the config servers";
+        return "Refresh and get cached cluster server parameter value from mongos.";
     }
 
     class Invocation final : public InvocationBase {
@@ -69,126 +71,18 @@ public:
         using InvocationBase::InvocationBase;
 
         Reply typedRun(OperationContext* opCtx) {
-            uassert(
-                ErrorCodes::IllegalOperation,
-                "featureFlagClusterWideConfig not enabled",
-                gFeatureFlagClusterWideConfig.isEnabled(serverGlobalParams.featureCompatibility));
+            GetClusterParameterInvocation invocation;
+            if (gFeatureFlagClusterWideConfigM2.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                // Refresh cached cluster server parameters via a majority read from the config
+                // servers.
+                uassertStatusOK(
+                    ClusterServerParameterRefresher::get(opCtx)->refreshParameters(opCtx));
 
-            // For now, the mongos implementation retrieves the names of the requested cluster
-            // server parameters and queries them from the config.clusterParameters namespace on
-            // the config servers. This may change after SERVER-62264, when cluster server
-            // parameters will be cached on mongoses as well.
-            auto configServers = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-
-            // Create the query document such that all documents in config.clusterParmeters with _id
-            // in the requested list of ServerParameters are returned.
-            const stdx::variant<std::string, std::vector<std::string>>& cmdBody =
-                request().getCommandParameter();
-            ServerParameterSet* clusterParameters = ServerParameterSet::getClusterParameterSet();
-
-            audit::logGetClusterParameter(opCtx->getClient(), cmdBody);
-
-            std::vector<std::string> requestedParameterNames;
-            BSONObjBuilder queryDocBuilder;
-            BSONObjBuilder inObjBuilder = queryDocBuilder.subobjStart("_id"_sd);
-            BSONArrayBuilder parameterNameBuilder = inObjBuilder.subarrayStart("$in"_sd);
-
-            stdx::visit(
-                visit_helper::Overloaded{
-                    [&](const std::string& strParameterName) {
-                        if (strParameterName == "*"_sd) {
-                            // Append all cluster parameter names.
-                            Map clusterParameterMap = clusterParameters->getMap();
-                            requestedParameterNames.reserve(clusterParameterMap.size());
-                            for (const auto& param : clusterParameterMap) {
-                                // Skip any disabled test parameters.
-                                if (param.second->isEnabled()) {
-                                    parameterNameBuilder.append(param.first);
-                                    requestedParameterNames.push_back(param.first);
-                                }
-                            }
-                        } else {
-                            // Return an error if a disabled cluster parameter is explicitly
-                            // requested.
-                            uassert(ErrorCodes::BadValue,
-                                    str::stream() << "Server parameter: '" << strParameterName
-                                                  << "' is currently disabled'",
-                                    clusterParameters->get(strParameterName)->isEnabled());
-                            parameterNameBuilder.append(strParameterName);
-                            requestedParameterNames.push_back(strParameterName);
-                        }
-                    },
-                    [&](const std::vector<std::string>& listParameterNames) {
-                        uassert(ErrorCodes::BadValue,
-                                "Must supply at least one cluster server parameter name to "
-                                "getClusterParameter",
-                                listParameterNames.size() > 0);
-                        requestedParameterNames.reserve(listParameterNames.size());
-                        for (const auto& requestedParameterName : listParameterNames) {
-                            // Return an error if a disabled cluster parameter is explicitly
-                            // requested.
-                            uassert(ErrorCodes::BadValue,
-                                    str::stream() << "Server parameter: '" << requestedParameterName
-                                                  << "' is currently disabled'",
-                                    clusterParameters->get(requestedParameterName)->isEnabled());
-                            parameterNameBuilder.append(requestedParameterName);
-                            requestedParameterNames.push_back(requestedParameterName);
-                        }
-                    }},
-                cmdBody);
-
-            parameterNameBuilder.doneFast();
-            inObjBuilder.doneFast();
-
-            // Perform the majority read on the config server primary.
-            BSONObj query = queryDocBuilder.obj();
-            LOGV2(6226101, "Querying config servers for cluster parameters", "query"_attr = query);
-            auto findResponse = uassertStatusOK(configServers->exhaustiveFindOnConfig(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                repl::ReadConcernLevel::kMajorityReadConcern,
-                NamespaceString::kClusterParametersNamespace,
-                query,
-                BSONObj(),
-                boost::none));
-
-            // Any parameters that are not included in the response don't have a cluster parameter
-            // document yet, which means they still are using the default value.
-            std::vector<BSONObj> retrievedParameters = std::move(findResponse.docs);
-            if (retrievedParameters.size() < requestedParameterNames.size()) {
-                std::vector<std::string> onDiskParameterNames;
-                onDiskParameterNames.reserve(retrievedParameters.size());
-                std::transform(retrievedParameters.begin(),
-                               retrievedParameters.end(),
-                               std::back_inserter(onDiskParameterNames),
-                               [&](const auto& onDiskParameter) {
-                                   return onDiskParameter["_id"_sd].String();
-                               });
-
-                // Sort and find the set difference of the requested parameters and the parameters
-                // returned.
-                std::vector<std::string> defaultParameterNames;
-
-                defaultParameterNames.reserve(requestedParameterNames.size() -
-                                              onDiskParameterNames.size());
-
-                std::sort(onDiskParameterNames.begin(), onDiskParameterNames.end());
-                std::sort(requestedParameterNames.begin(), requestedParameterNames.end());
-                std::set_difference(requestedParameterNames.begin(),
-                                    requestedParameterNames.end(),
-                                    onDiskParameterNames.begin(),
-                                    onDiskParameterNames.end(),
-                                    std::back_inserter(defaultParameterNames));
-
-                for (const auto& defaultParameterName : defaultParameterNames) {
-                    auto defaultParameter = clusterParameters->get(defaultParameterName);
-                    BSONObjBuilder bob;
-                    defaultParameter->append(opCtx, bob, defaultParameterName);
-                    retrievedParameters.push_back(bob.obj());
-                }
+                return invocation.getCachedParameters(opCtx, request());
             }
 
-            return Reply(retrievedParameters);
+            return invocation.getDurableParameters(opCtx, request());
         }
 
     private:

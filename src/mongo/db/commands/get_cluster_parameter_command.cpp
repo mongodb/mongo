@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
+#include "mongo/db/commands/get_cluster_parameter_invocation.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/logv2/log.h"
@@ -68,11 +69,6 @@ public:
         using InvocationBase::InvocationBase;
 
         Reply typedRun(OperationContext* opCtx) {
-            uassert(
-                ErrorCodes::IllegalOperation,
-                "featureFlagClusterWideConfig not enabled",
-                gFeatureFlagClusterWideConfig.isEnabled(serverGlobalParams.featureCompatibility));
-
             // TODO SERVER-65249: This will eventually be made specific to the parameter being set
             // so that some parameters will be able to use getClusterParameter even on standalones.
             uassert(ErrorCodes::IllegalOperation,
@@ -80,71 +76,8 @@ public:
                     repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
                         repl::ReplicationCoordinator::modeNone);
 
-            const stdx::variant<std::string, std::vector<std::string>>& cmdBody =
-                request().getCommandParameter();
-            ServerParameterSet* clusterParameters = ServerParameterSet::getClusterParameterSet();
-            std::vector<BSONObj> parameterValues;
-            std::vector<std::string> parameterNames;
-
-            audit::logGetClusterParameter(opCtx->getClient(), cmdBody);
-
-            // For each parameter, generate a BSON representation of it and retrieve its name.
-            auto makeBSON = [&](ServerParameter* requestedParameter) {
-                // Skip any disabled cluster parameters.
-                if (requestedParameter->isEnabled()) {
-                    BSONObjBuilder bob;
-                    requestedParameter->append(opCtx, bob, requestedParameter->name());
-                    parameterValues.push_back(bob.obj());
-                    parameterNames.push_back(requestedParameter->name());
-                }
-            };
-
-            stdx::visit(
-                visit_helper::Overloaded{
-                    [&](const std::string& strParameterName) {
-                        if (strParameterName == "*"_sd) {
-                            // Retrieve all cluster parameter values.
-                            Map clusterParameterMap = clusterParameters->getMap();
-                            parameterValues.reserve(clusterParameterMap.size());
-                            parameterNames.reserve(clusterParameterMap.size());
-                            for (const auto& param : clusterParameterMap) {
-                                makeBSON(param.second);
-                            }
-                        } else {
-                            // Any other string must correspond to a single parameter name. Return
-                            // an error if a disabled cluster parameter is explicitly requested.
-                            ServerParameter* sp = clusterParameters->get(strParameterName);
-                            uassert(ErrorCodes::BadValue,
-                                    str::stream() << "Server parameter: '" << strParameterName
-                                                  << "' is currently disabled",
-                                    sp->isEnabled());
-                            makeBSON(sp);
-                        }
-                    },
-                    [&](const std::vector<std::string>& listParameterNames) {
-                        uassert(ErrorCodes::BadValue,
-                                "Must supply at least one cluster server parameter name to "
-                                "getClusterParameter",
-                                listParameterNames.size() > 0);
-                        parameterValues.reserve(listParameterNames.size());
-                        parameterNames.reserve(listParameterNames.size());
-                        for (const auto& requestedParameterName : listParameterNames) {
-                            ServerParameter* sp = clusterParameters->get(requestedParameterName);
-                            uassert(ErrorCodes::BadValue,
-                                    str::stream() << "Server parameter: '" << requestedParameterName
-                                                  << "' is currently disabled'",
-                                    sp->isEnabled());
-                            makeBSON(sp);
-                        }
-                    }},
-                cmdBody);
-
-            LOGV2_DEBUG(6226100,
-                        2,
-                        "Retrieved parameter values for cluster server parameters",
-                        "parameterNames"_attr = parameterNames);
-
-            return Reply(parameterValues);
+            GetClusterParameterInvocation invocation;
+            return invocation.getCachedParameters(opCtx, request());
         }
 
     private:

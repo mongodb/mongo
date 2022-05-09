@@ -4,6 +4,7 @@
 //  requires_fcv_60,
 //  featureFlagClusterWideConfig,
 //  requires_replication,
+//  requires_sharding,
 // ]
 (function() {
 "use strict";

@@ -92,6 +92,22 @@ env.Library(
 )
 
 env.Library(
+    target='cluster_server_parameter_refresher',
+    source=[
+        'cluster_server_parameter_refresher.cpp',
+        'cluster_server_parameter_refresher.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/audit',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/s/grid',
+        'cluster_server_parameter',
+    ],
+)
+
+env.Library(
     target='cluster_server_parameter_test_parameter',
     source=[
         'cluster_server_parameter_test.idl',

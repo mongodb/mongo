@@ -68,6 +68,7 @@
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/idl/cluster_server_parameter_refresher.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
@@ -764,6 +765,10 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     clusterCursorCleanupJob.go();
 
     UserCacheInvalidator::start(serviceContext, opCtx);
+    if (gFeatureFlagClusterWideConfigM2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        ClusterServerParameterRefresher::start(serviceContext, opCtx);
+    }
+
     if (audit::initializeSynchronizeJob) {
         audit::initializeSynchronizeJob(serviceContext);
     }
