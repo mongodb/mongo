@@ -602,19 +602,22 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                  Timestamp newCollectionTimestamp) {
 
     // No need to bump originalNss version because its epoch will be changed.
-    executeMetadataChangesInTxn(opCtx, [&](OperationContext* opCtx, TxnNumber txnNumber) {
-        // Update the config.reshardingOperations entry
-        writeToCoordinatorStateNss(opCtx, coordinatorDoc, txnNumber);
+    executeMetadataChangesInTxn(
+        opCtx,
+        [&coordinatorDoc, &newCollectionEpoch, &newCollectionTimestamp](OperationContext* opCtx,
+                                                                        TxnNumber txnNumber) {
+            // Update the config.reshardingOperations entry
+            writeToCoordinatorStateNss(opCtx, coordinatorDoc, txnNumber);
 
-        // Remove the config.collections entry for the temporary collection
-        writeToConfigCollectionsForTempNss(
-            opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
+            // Remove the config.collections entry for the temporary collection
+            writeToConfigCollectionsForTempNss(
+                opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
 
-        // Update the config.collections entry for the original namespace to reflect the new
-        // shard key, new epoch, and new UUID
-        updateConfigCollectionsForOriginalNss(
-            opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp, txnNumber);
-    });
+            // Update the config.collections entry for the original namespace to reflect the new
+            // shard key, new epoch, and new UUID
+            updateConfigCollectionsForOriginalNss(
+                opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp, txnNumber);
+        });
 }
 
 void updateTagsDocsForTempNss(OperationContext* opCtx,
