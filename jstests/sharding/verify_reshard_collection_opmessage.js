@@ -32,6 +32,9 @@ const inputCollection = reshardingTest.createShardedCollection({
     ],
 });
 
+const mongos = inputCollection.getMongo();
+const collectionUUID = getUUIDFromConfigCollections(mongos, sourceNs);
+
 reshardingTest.withReshardingInBackground({
     newShardKeyPattern: {newKey: 1},
     newChunks: [
@@ -45,10 +48,11 @@ const oplog = reshardingTest.getReplSetForShard(primaryShardName)
                   .getCollection("local.oplog.rs");
 const logEntry = oplog.findOne({ns: sourceNs, op: 'n', "o2.reshardCollection": sourceNs});
 assert(logEntry != null);
-const mongos = inputCollection.getMongo();
-const uuidToCompare = getUUIDFromConfigCollections(mongos, sourceNs);
-assert.eq(uuidToCompare, logEntry.o2.reshardUUID, logEntry);
-assert.eq(bsonWoCompare(logEntry.o2.key, {newKey: 1}), 0, logEntry);
+const reshardedUUID = getUUIDFromConfigCollections(mongos, sourceNs);
+assert.eq(reshardedUUID, logEntry.o2.reshardUUID, logEntry);
+assert.eq(logEntry.ui, collectionUUID, logEntry);
+assert.eq(bsonWoCompare(logEntry.o2.oldShardKey, {oldKey: 1}), 0, logEntry);
+assert.eq(bsonWoCompare(logEntry.o2.shardKey, {newKey: 1}), 0, logEntry);
 
 reshardingTest.teardown();
 })();

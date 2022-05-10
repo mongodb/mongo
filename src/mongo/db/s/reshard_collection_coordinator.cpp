@@ -46,22 +46,49 @@ namespace mongo {
 
 namespace {
 
-void writeOpLogOnReshardCollectionDone(OperationContext* opCtx,
-                                       const NamespaceString& collNss,
-                                       const KeyPattern& shardKey,
-                                       BSONObj cmd,
-                                       UUID reshardingUUID) {
+void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
+                                                    const NamespaceString& collNss,
+                                                    const ReshardCollectionCoordinatorDocument& doc,
+                                                    const UUID& reshardUUID) {
 
     const std::string oMessage = str::stream()
-        << "Reshard collection " << collNss << " with shard key " << shardKey.toString();
+        << "Reshard collection " << collNss << " with shard key " << doc.getKey().toString();
+
+    BSONObjBuilder cmdBuilder;
+    tassert(6590800, "Did not set old collectionUUID", doc.getOldCollectionUUID());
+    tassert(6590801, "Did not set old ShardKey", doc.getOldShardKey());
+    UUID collUUID = *doc.getOldCollectionUUID();
+    cmdBuilder.append("reshardCollection", collNss.ns());
+    reshardUUID.appendToBuilder(&cmdBuilder, "reshardUUID");
+    cmdBuilder.append("shardKey", doc.getKey());
+    cmdBuilder.append("oldShardKey", *doc.getOldShardKey());
+
+    cmdBuilder.append("unique", doc.getUnique().get_value_or(false));
+    if (doc.getNumInitialChunks()) {
+        cmdBuilder.append("numInitialChunks", doc.getNumInitialChunks().get());
+    }
+    if (doc.getCollation()) {
+        cmdBuilder.append("collation", doc.getCollation().get());
+    }
+
+    if (doc.getZones()) {
+        BSONArrayBuilder zonesBSON(cmdBuilder.subarrayStart("zones"));
+        for (const auto& zone : *doc.getZones()) {
+            zonesBSON.append(zone.toBSON());
+        }
+        zonesBSON.doneFast();
+    }
+
     auto const serviceContext = opCtx->getClient()->getServiceContext();
+
+    const auto cmd = cmdBuilder.obj();
 
     writeConflictRetry(opCtx, "ReshardCollection", NamespaceString::kRsOplogNamespace.ns(), [&] {
         AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
         WriteUnitOfWork uow(opCtx);
         serviceContext->getOpObserver()->onInternalOpMessage(opCtx,
                                                              collNss,
-                                                             reshardingUUID,
+                                                             collUUID,
                                                              BSON("msg" << oMessage),
                                                              cmd,
                                                              boost::none,
@@ -161,6 +188,20 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                     checkCollectionUUIDMismatch(opCtx, nss(), *coll, _doc.getCollectionUUID());
                 }
 
+                const auto cmOld = uassertStatusOK(
+                    Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+                        opCtx, nss()));
+
+                if (_persistCoordinatorDocument) {
+                    StateDoc newDoc(_doc);
+                    newDoc.setOldShardKey(cmOld.getShardKeyPattern().getKeyPattern().toBSON());
+                    newDoc.setOldCollectionUUID(cmOld.getUUID());
+                    _doc = _updateStateDocument(opCtx, std::move(newDoc));
+                } else {
+                    _doc.setOldShardKey(cmOld.getShardKeyPattern().getKeyPattern().toBSON());
+                    _doc.setOldCollectionUUID(cmOld.getUUID());
+                }
+
                 ConfigsvrReshardCollection configsvrReshardCollection(nss(), _doc.getKey());
                 configsvrReshardCollection.setDbName(nss().db());
                 configsvrReshardCollection.setUnique(_doc.getUnique());
@@ -187,21 +228,10 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                     Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
                         opCtx, nss()));
 
-                BSONObjBuilder cmdBuilder;
-                cmdBuilder.append("reshardCollection", nss().ns());
-                cm.getUUID().appendToBuilder(&cmdBuilder, "reshardUUID");
-                cmdBuilder.append("key", _doc.getKey());
-
-                cmdBuilder.append("unique", _doc.getUnique().get_value_or(false));
-                if (_doc.getNumInitialChunks()) {
-                    cmdBuilder.append("numInitialChunks", _doc.getNumInitialChunks().get());
+                if (_doc.getOldCollectionUUID() && _doc.getOldCollectionUUID() != cm.getUUID()) {
+                    notifyChangeStreamsOnReshardCollectionComplete(
+                        opCtx, nss(), _doc, cm.getUUID());
                 }
-                if (_doc.getCollation()) {
-                    cmdBuilder.append("collation", _doc.getCollation().get());
-                }
-
-                writeOpLogOnReshardCollectionDone(
-                    opCtx, nss(), _doc.getKey(), cmdBuilder.obj(), cm.getUUID());
             }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
             LOGV2_ERROR(6206401,

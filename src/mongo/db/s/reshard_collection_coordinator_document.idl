@@ -59,3 +59,11 @@ structs:
                 type: ReshardCollectionCoordinatorPhase
                 description: "Coordinator phase."
                 default: kUnset
+            oldShardKey:
+                type: object
+                description: "The shard key of the collection before resharding."
+                optional: true
+            oldCollectionUUID:
+                type: uuid
+                description: "The UUID of the collection before resharding."
+                optional: true
