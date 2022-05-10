@@ -317,6 +317,12 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
             BSON("o2.migrateLastChunkFromShard" << BSON("$exists" << true)));
     }
 
+    if (feature_flags::gFeatureFlagChangeStreamsFurtherEnrichedEvents.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        internalOpTypeOrBuilder.append(
+            BSON("o2.refineCollectionShardKey" << BSON("$exists" << true)));
+    }
+
     // Finalize the array of $or filter predicates.
     internalOpTypeOrBuilder.done();
 

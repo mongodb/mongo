@@ -239,6 +239,7 @@ public:
     static constexpr StringData kDropIndexesOpType = "dropIndexes"_sd;
     static constexpr StringData kShardCollectionOpType = "shardCollection"_sd;
     static constexpr StringData kMigrateLastChunkFromShardOpType = "migrateLastChunkFromShard"_sd;
+    static constexpr StringData kRefineCollectionShardKeyOpType = "refineCollectionShardKey"_sd;
     static constexpr StringData kModifyOpType = "modify"_sd;
 
     // Default regex for collections match which prohibits system collections.
