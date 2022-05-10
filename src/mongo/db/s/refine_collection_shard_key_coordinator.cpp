@@ -96,6 +96,7 @@ RefineCollectionShardKeyCoordinator::RefineCollectionShardKeyCoordinator(
     : ShardingDDLCoordinator(service, initialState),
       _doc(RefineCollectionShardKeyCoordinatorDocument::parse(
           IDLParserErrorContext("RefineCollectionShardKeyCoordinatorDocument"), initialState)),
+      _request(_doc.getRefineCollectionShardKeyRequest()),
       _newShardKey(_doc.getNewShardKey()),
       _persistCoordinatorDocument(persistCoordinatorDocument) {}
 
@@ -108,8 +109,7 @@ void RefineCollectionShardKeyCoordinator::checkIfOptionsConflict(const BSONObj& 
             "Another refine collection with different arguments is already running for the same "
             "namespace",
             SimpleBSONObjComparator::kInstance.evaluate(
-                _doc.getRefineCollectionShardKeyRequest().toBSON() ==
-                otherDoc.getRefineCollectionShardKeyRequest().toBSON()));
+                _request.toBSON() == otherDoc.getRefineCollectionShardKeyRequest().toBSON()));
 }
 
 boost::optional<BSONObj> RefineCollectionShardKeyCoordinator::reportForCurrentOp(
@@ -119,7 +119,7 @@ boost::optional<BSONObj> RefineCollectionShardKeyCoordinator::reportForCurrentOp
     if (const auto& optComment = getForwardableOpMetadata().getComment()) {
         cmdBob.append(optComment.get().firstElement());
     }
-    cmdBob.appendElements(_doc.getRefineCollectionShardKeyRequest().toBSON());
+    cmdBob.appendElements(_request.toBSON());
 
     BSONObjBuilder bob;
     bob.append("type", "op");
@@ -148,10 +148,15 @@ void RefineCollectionShardKeyCoordinator::_enterPhase(Phase newPhase) {
         "oldPhase"_attr = RefineCollectionShardKeyCoordinatorPhase_serializer(_doc.getPhase()));
 
     if (_doc.getPhase() == Phase::kUnset) {
-        _doc = _insertStateDocument(std::move(newDoc));
-        return;
+        newDoc = _insertStateDocument(std::move(newDoc));
+    } else {
+        newDoc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
     }
-    _doc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
+
+    {
+        stdx::unique_lock ul{_docMutex};
+        _doc = std::move(newDoc);
+    }
 }
 
 ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
@@ -168,7 +173,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 {
                     AutoGetCollection coll{
                         opCtx, nss(), MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
-                    checkCollectionUUIDMismatch(opCtx, nss(), *coll, _doc.getCollectionUUID());
+                    checkCollectionUUIDMismatch(opCtx, nss(), *coll, _request.getCollectionUUID());
                 }
 
                 shardkeyutil::validateShardKeyIsNotEncrypted(
@@ -185,7 +190,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                     nss(), _newShardKey.toBSON(), cm.getVersion().epoch());
                 configsvrRefineCollShardKey.setDbName(nss().db().toString());
                 configsvrRefineCollShardKey.setEnforceUniquenessCheck(
-                    _doc.getEnforceUniquenessCheck());
+                    _request.getEnforceUniquenessCheck());
                 auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
                 if (_persistCoordinatorDocument) {

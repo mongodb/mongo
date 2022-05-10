@@ -158,13 +158,19 @@ boost::optional<BSONObj> DropDatabaseCoordinator::reportForCurrentOp(
     if (const auto& optComment = getForwardableOpMetadata().getComment()) {
         cmdBob.append(optComment.get().firstElement());
     }
+
+    const auto currPhase = [&]() {
+        stdx::lock_guard l{_docMutex};
+        return _doc.getPhase();
+    }();
+
     BSONObjBuilder bob;
     bob.append("type", "op");
     bob.append("desc", "DropDatabaseCoordinator");
     bob.append("op", "command");
     bob.append("ns", nss().toString());
     bob.append("command", cmdBob.obj());
-    bob.append("currentPhase", _doc.getPhase());
+    bob.append("currentPhase", currPhase);
     bob.append("active", true);
     return bob.obj();
 }
@@ -181,10 +187,15 @@ void DropDatabaseCoordinator::_enterPhase(Phase newPhase) {
                 "oldPhase"_attr = DropDatabaseCoordinatorPhase_serializer(_doc.getPhase()));
 
     if (_doc.getPhase() == Phase::kUnset) {
-        _doc = _insertStateDocument(std::move(newDoc));
-        return;
+        newDoc = _insertStateDocument(std::move(newDoc));
+    } else {
+        newDoc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
     }
-    _doc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
+
+    {
+        stdx::unique_lock ul{_docMutex};
+        _doc = std::move(newDoc);
+    }
 }
 
 void DropDatabaseCoordinator::_clearDatabaseInfoOnPrimary(OperationContext* opCtx) {

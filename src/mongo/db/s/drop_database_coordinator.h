@@ -50,6 +50,7 @@ public:
 
 private:
     ShardingDDLCoordinatorMetadata const& metadata() const override {
+        stdx::lock_guard l{_docMutex};
         return _doc.getShardingDDLCoordinatorMetadata();
     }
 
@@ -83,7 +84,10 @@ private:
 
     void _clearDatabaseInfoOnSecondaries(OperationContext* opCtx);
 
+    mutable Mutex _docMutex = MONGO_MAKE_LATCH("DropDatabaseCoordinator::_docMutex");
     DropDatabaseCoordinatorDocument _doc;
+
+
     StringData _dbName;
 };
 

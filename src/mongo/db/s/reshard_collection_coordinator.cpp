@@ -84,6 +84,7 @@ ReshardCollectionCoordinator::ReshardCollectionCoordinator(ShardingDDLCoordinato
       _initialState(initialState.getOwned()),
       _doc(ReshardCollectionCoordinatorDocument::parse(
           IDLParserErrorContext("ReshardCollectionCoordinatorDocument"), _initialState)),
+      _request(_doc.getReshardCollectionRequest()),
       _persistCoordinatorDocument(persistCoordinatorDocument) {}
 
 void ReshardCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
@@ -94,8 +95,7 @@ void ReshardCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) co
             "Another reshard collection with different arguments is already running for the same "
             "namespace",
             SimpleBSONObjComparator::kInstance.evaluate(
-                _doc.getReshardCollectionRequest().toBSON() ==
-                otherDoc.getReshardCollectionRequest().toBSON()));
+                _request.toBSON() == otherDoc.getReshardCollectionRequest().toBSON()));
 }
 
 boost::optional<BSONObj> ReshardCollectionCoordinator::reportForCurrentOp(
@@ -105,7 +105,7 @@ boost::optional<BSONObj> ReshardCollectionCoordinator::reportForCurrentOp(
     if (const auto& optComment = getForwardableOpMetadata().getComment()) {
         cmdBob.append(optComment.get().firstElement());
     }
-    cmdBob.appendElements(_doc.getReshardCollectionRequest().toBSON());
+    cmdBob.appendElements(_request.toBSON());
 
     BSONObjBuilder bob;
     bob.append("type", "op");
@@ -133,10 +133,15 @@ void ReshardCollectionCoordinator::_enterPhase(Phase newPhase) {
                 "oldPhase"_attr = ReshardCollectionCoordinatorPhase_serializer(_doc.getPhase()));
 
     if (_doc.getPhase() == Phase::kUnset) {
-        _doc = _insertStateDocument(std::move(newDoc));
-        return;
+        newDoc = _insertStateDocument(std::move(newDoc));
+    } else {
+        newDoc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
     }
-    _doc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
+
+    {
+        stdx::unique_lock ul{_docMutex};
+        _doc = std::move(newDoc);
+    }
 }
 
 ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(

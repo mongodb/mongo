@@ -92,13 +92,14 @@ RenameCollectionCoordinator::RenameCollectionCoordinator(ShardingDDLCoordinatorS
                                                          const BSONObj& initialState)
     : ShardingDDLCoordinator(service, initialState),
       _doc(RenameCollectionCoordinatorDocument::parse(
-          IDLParserErrorContext("RenameCollectionCoordinatorDocument"), initialState)) {}
+          IDLParserErrorContext("RenameCollectionCoordinatorDocument"), initialState)),
+      _request(_doc.getRenameCollectionRequest()) {}
 
 void RenameCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     const auto otherDoc = RenameCollectionCoordinatorDocument::parse(
         IDLParserErrorContext("RenameCollectionCoordinatorDocument"), doc);
 
-    const auto& selfReq = _doc.getRenameCollectionRequest().toBSON();
+    const auto& selfReq = _request.toBSON();
     const auto& otherReq = otherDoc.getRenameCollectionRequest().toBSON();
 
     uassert(ErrorCodes::ConflictingOperationInProgress,
@@ -109,7 +110,7 @@ void RenameCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) con
 
 std::vector<StringData> RenameCollectionCoordinator::_acquireAdditionalLocks(
     OperationContext* opCtx) {
-    return {_doc.getTo().ns()};
+    return {_request.getTo().ns()};
 }
 
 boost::optional<BSONObj> RenameCollectionCoordinator::reportForCurrentOp(
@@ -120,7 +121,12 @@ boost::optional<BSONObj> RenameCollectionCoordinator::reportForCurrentOp(
     if (const auto& optComment = getForwardableOpMetadata().getComment()) {
         cmdBob.append(optComment.get().firstElement());
     }
-    cmdBob.appendElements(_doc.getRenameCollectionRequest().toBSON());
+    cmdBob.appendElements(_request.toBSON());
+
+    const auto currPhase = [&]() {
+        stdx::lock_guard l{_docMutex};
+        return _doc.getPhase();
+    }();
 
     BSONObjBuilder bob;
     bob.append("type", "op");
@@ -128,7 +134,7 @@ boost::optional<BSONObj> RenameCollectionCoordinator::reportForCurrentOp(
     bob.append("op", "command");
     bob.append("ns", nss().toString());
     bob.append("command", cmdBob.obj());
-    bob.append("currentPhase", _doc.getPhase());
+    bob.append("currentPhase", currPhase);
     bob.append("active", true);
     return bob.obj();
 }
@@ -141,15 +147,20 @@ void RenameCollectionCoordinator::_enterPhase(Phase newPhase) {
                 2,
                 "Rename collection coordinator phase transition",
                 "fromNs"_attr = nss(),
-                "toNs"_attr = _doc.getTo(),
+                "toNs"_attr = _request.getTo(),
                 "newPhase"_attr = RenameCollectionCoordinatorPhase_serializer(newDoc.getPhase()),
                 "oldPhase"_attr = RenameCollectionCoordinatorPhase_serializer(_doc.getPhase()));
 
     if (_doc.getPhase() == Phase::kUnset) {
-        _doc = _insertStateDocument(std::move(newDoc));
-        return;
+        newDoc = _insertStateDocument(std::move(newDoc));
+    } else {
+        newDoc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
     }
-    _doc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
+
+    {
+        stdx::unique_lock ul{_docMutex};
+        _doc = std::move(newDoc);
+    }
 }
 
 ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
@@ -164,7 +175,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 const auto& fromNss = nss();
-                const auto& toNss = _doc.getTo();
+                const auto& toNss = _request.getTo();
 
                 try {
                     uassert(ErrorCodes::InvalidOptions,
@@ -238,7 +249,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 const auto& fromNss = nss();
-                const auto& toNss = _doc.getTo();
+                const auto& toNss = _request.getTo();
 
                 ShardingLogging::get(opCtx)->logChange(
                     opCtx,
@@ -283,8 +294,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     fromNss, _doc.getSourceUUID().get());
                 renameCollParticipantRequest.setDbName(fromNss.db());
                 renameCollParticipantRequest.setTargetUUID(_doc.getTargetUUID());
-                renameCollParticipantRequest.setRenameCollectionRequest(
-                    _doc.getRenameCollectionRequest());
+                renameCollParticipantRequest.setRenameCollectionRequest(_request);
 
                 auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
                 // We need to send the command to all the shards because both
@@ -321,7 +331,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         opCtx, getCurrentSession(_doc), **executor);
                 }
 
-                ConfigsvrRenameCollectionMetadata req(nss(), _doc.getTo());
+                ConfigsvrRenameCollectionMetadata req(nss(), _request.getTo());
                 req.setOptFromCollection(_doc.getOptShardedCollInfo());
                 const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(req.toBSON({}));
                 const auto& configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -368,8 +378,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 ShardsvrRenameCollectionUnblockParticipant unblockParticipantRequest(
                     fromNss, _doc.getSourceUUID().get());
                 unblockParticipantRequest.setDbName(fromNss.db());
-                unblockParticipantRequest.setRenameCollectionRequest(
-                    _doc.getRenameCollectionRequest());
+                unblockParticipantRequest.setRenameCollectionRequest(_request);
                 auto const cmdObj = CommandHelpers::appendMajorityWriteConcern(
                     unblockParticipantRequest.toBSON({}));
                 auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
@@ -391,28 +400,29 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         opCtx, fromNss.db(), cmdObj, participants, **executor);
                 }
             }))
-        .then(_executePhase(
-            Phase::kSetResponse,
-            [this, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
+        .then(_executePhase(Phase::kSetResponse,
+                            [this, anchor = shared_from_this()] {
+                                auto opCtxHolder = cc().makeOperationContext();
+                                auto* opCtx = opCtxHolder.get();
+                                getForwardableOpMetadata().setOn(opCtx);
 
-                // Retrieve the new collection version
-                const auto catalog = Grid::get(opCtx)->catalogCache();
-                const auto cm = uassertStatusOK(
-                    catalog->getCollectionRoutingInfoWithRefresh(opCtx, _doc.getTo()));
-                _response = RenameCollectionResponse(cm.isSharded() ? cm.getVersion()
-                                                                    : ChunkVersion::UNSHARDED());
+                                // Retrieve the new collection version
+                                const auto catalog = Grid::get(opCtx)->catalogCache();
+                                const auto cm =
+                                    uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(
+                                        opCtx, _request.getTo()));
+                                _response = RenameCollectionResponse(
+                                    cm.isSharded() ? cm.getVersion() : ChunkVersion::UNSHARDED());
 
-                ShardingLogging::get(opCtx)->logChange(
-                    opCtx,
-                    "renameCollection.end",
-                    nss().ns(),
-                    BSON("source" << nss().toString() << "destination" << _doc.getTo().toString()),
-                    ShardingCatalogClient::kMajorityWriteConcern);
-                LOGV2(5460504, "Collection renamed", "namespace"_attr = nss());
-            }))
+                                ShardingLogging::get(opCtx)->logChange(
+                                    opCtx,
+                                    "renameCollection.end",
+                                    nss().ns(),
+                                    BSON("source" << nss().toString() << "destination"
+                                                  << _request.getTo().toString()),
+                                    ShardingCatalogClient::kMajorityWriteConcern);
+                                LOGV2(5460504, "Collection renamed", "namespace"_attr = nss());
+                            }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (!status.isA<ErrorCategory::NotPrimaryError>() &&
                 !status.isA<ErrorCategory::ShutdownError>()) {

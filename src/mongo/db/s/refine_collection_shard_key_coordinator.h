@@ -81,7 +81,11 @@ private:
 
     void _enterPhase(Phase newPhase);
 
+    mutable Mutex _docMutex = MONGO_MAKE_LATCH("RefineCollectionShardKeyCoordinator::_docMutex");
     RefineCollectionShardKeyCoordinatorDocument _doc;
+
+    const mongo::RefineCollectionShardKeyRequest _request;
+
     const KeyPattern _newShardKey;
     KeyPattern _oldShardKey;
     const bool _persistCoordinatorDocument;  // TODO: SERVER-62850 remove this then 6.0 branches out

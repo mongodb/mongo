@@ -77,17 +77,17 @@ bool hasTimeSeriesGranularityUpdate(const CollModRequest& request) {
 
 CollModCoordinator::CollModCoordinator(ShardingDDLCoordinatorService* service,
                                        const BSONObj& initialState)
-    : ShardingDDLCoordinator(service, initialState) {
-    _initialState = initialState.getOwned();
-    _doc = CollModCoordinatorDocument::parse(IDLParserErrorContext("CollModCoordinatorDocument"),
-                                             _initialState);
-}
+    : ShardingDDLCoordinator(service, initialState),
+      _initialState{initialState.getOwned()},
+      _doc{CollModCoordinatorDocument::parse(IDLParserErrorContext("CollModCoordinatorDocument"),
+                                             _initialState)},
+      _request{_doc.getCollModRequest()} {}
 
 void CollModCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     const auto otherDoc =
         CollModCoordinatorDocument::parse(IDLParserErrorContext("CollModCoordinatorDocument"), doc);
 
-    const auto& selfReq = _doc.getCollModRequest().toBSON();
+    const auto& selfReq = _request.toBSON();
     const auto& otherReq = otherDoc.getCollModRequest().toBSON();
 
     uassert(ErrorCodes::ConflictingOperationInProgress,
@@ -104,14 +104,20 @@ boost::optional<BSONObj> CollModCoordinator::reportForCurrentOp(
     if (const auto& optComment = getForwardableOpMetadata().getComment()) {
         cmdBob.append(optComment.get().firstElement());
     }
-    cmdBob.appendElements(_doc.getCollModRequest().toBSON());
+
+    const auto currPhase = [&]() {
+        stdx::lock_guard l{_docMutex};
+        return _doc.getPhase();
+    }();
+
+    cmdBob.appendElements(_request.toBSON());
     BSONObjBuilder bob;
     bob.append("type", "op");
     bob.append("desc", "CollModCoordinator");
     bob.append("op", "command");
     bob.append("ns", nss().toString());
     bob.append("command", cmdBob.obj());
-    bob.append("currentPhase", _doc.getPhase());
+    bob.append("currentPhase", currPhase);
     bob.append("active", true);
     return bob.obj();
 }
@@ -128,10 +134,15 @@ void CollModCoordinator::_enterPhase(Phase newPhase) {
                 "oldPhase"_attr = CollModCoordinatorPhase_serializer(_doc.getPhase()));
 
     if (_doc.getPhase() == Phase::kUnset) {
-        _doc = _insertStateDocument(std::move(newDoc));
-        return;
+        newDoc = _insertStateDocument(std::move(newDoc));
+    } else {
+        newDoc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
     }
-    _doc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
+
+    {
+        stdx::unique_lock ul{_docMutex};
+        _doc = std::move(newDoc);
+    }
 }
 
 void CollModCoordinator::_performNoopRetryableWriteOnParticipants(
@@ -193,13 +204,12 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
             {
                 AutoGetCollection coll{
                     opCtx, nss(), MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
-                checkCollectionUUIDMismatch(
-                    opCtx, nss(), *coll, _doc.getCollModRequest().getCollectionUUID());
+                checkCollectionUUIDMismatch(opCtx, nss(), *coll, _request.getCollectionUUID());
             }
 
             _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
 
-            auto isGranularityUpdate = hasTimeSeriesGranularityUpdate(_doc.getCollModRequest());
+            auto isGranularityUpdate = hasTimeSeriesGranularityUpdate(_request);
             uassert(6201808,
                     "Cannot use time-series options for a non-timeseries collection",
                     _collInfo->timeSeriesOptions || !isGranularityUpdate);
@@ -209,7 +219,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         "from 'seconds' to 'minutes' or 'minutes' to 'hours'.",
                         timeseries::isValidTimeseriesGranularityTransition(
                             _collInfo->timeSeriesOptions->getGranularity(),
-                            *_doc.getCollModRequest().getTimeseries()->getGranularity()));
+                            *_request.getTimeseries()->getGranularity()));
             }
         })
         .then(_executePhase(
@@ -231,8 +241,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
-                if (_collInfo->isSharded &&
-                    hasTimeSeriesGranularityUpdate(_doc.getCollModRequest())) {
+                if (_collInfo->isSharded && hasTimeSeriesGranularityUpdate(_request)) {
                     ShardsvrParticipantBlock blockCRUDOperationsRequest(_collInfo->nsForTargeting);
                     const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
                         blockCRUDOperationsRequest.toBSON({}));
@@ -255,8 +264,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
                 if (_collInfo->isSharded && _collInfo->timeSeriesOptions &&
-                    hasTimeSeriesGranularityUpdate(_doc.getCollModRequest())) {
-                    ConfigsvrCollMod request(_collInfo->nsForTargeting, _doc.getCollModRequest());
+                    hasTimeSeriesGranularityUpdate(_request)) {
+                    ConfigsvrCollMod request(_collInfo->nsForTargeting, _request);
                     const auto cmdObj =
                         CommandHelpers::appendMajorityWriteConcern(request.toBSON({}));
 
@@ -282,9 +291,9 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
                 if (_collInfo->isSharded) {
-                    ShardsvrCollModParticipant request(nss(), _doc.getCollModRequest());
-                    bool needsUnblock = _collInfo->timeSeriesOptions &&
-                        hasTimeSeriesGranularityUpdate(_doc.getCollModRequest());
+                    ShardsvrCollModParticipant request(nss(), _request);
+                    bool needsUnblock =
+                        _collInfo->timeSeriesOptions && hasTimeSeriesGranularityUpdate(_request);
                     request.setNeedsUnblock(needsUnblock);
 
                     std::vector<AsyncRequestsSender::Response> responses;
@@ -329,7 +338,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     sharding_ddl_util::resumeMigrations(opCtx, nss(), _doc.getCollUUID());
                 } else {
                     CollMod cmd(nss());
-                    cmd.setCollModRequest(_doc.getCollModRequest());
+                    cmd.setCollModRequest(_request);
                     BSONObjBuilder collModResBuilder;
                     uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
                         opCtx, nss(), cmd, true, &collModResBuilder));

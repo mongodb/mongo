@@ -188,18 +188,41 @@ boost::optional<BSONObj> CompactStructuredEncryptionDataCoordinator::reportForCu
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
     BSONObjBuilder bob;
+
+    CompactStructuredEncryptionDataPhaseEnum currPhase;
+    std::string nss;
+    std::string escNss;
+    std::string eccNss;
+    std::string ecoNss;
+    std::string ecocNss;
+    std::string ecocRenameUuid;
+    std::string ecocUiid;
+    std::string ecocRenameNss;
+    {
+        stdx::lock_guard l{_docMutex};
+        currPhase = _doc.getPhase();
+        nss = _doc.getId().getNss().ns();
+        escNss = _doc.getEscNss().ns();
+        eccNss = _doc.getEccNss().ns();
+        ecoNss = _doc.getEcocNss().ns();
+        ecocNss = _doc.getEcocNss().ns();
+        ecocRenameUuid =
+            _doc.getEcocRenameUuid() ? _doc.getEcocRenameUuid().value().toString() : "none";
+        ecocUiid = _doc.getEcocUuid() ? _doc.getEcocUuid().value().toString() : "none";
+        ecocRenameNss = _doc.getEcocRenameNss().ns();
+    }
+
     bob.append("type", "op");
     bob.append("desc", "CompactStructuredEncryptionDataCoordinator");
     bob.append("op", "command");
-    bob.append("nss", _doc.getId().getNss().ns());
-    bob.append("escNss", _doc.getEscNss().ns());
-    bob.append("eccNss", _doc.getEccNss().ns());
-    bob.append("ecocNss", _doc.getEcocNss().ns());
-    bob.append("ecocUuid", _doc.getEcocUuid() ? _doc.getEcocUuid().value().toString() : "none");
-    bob.append("ecocRenameNss", _doc.getEcocRenameNss().ns());
-    bob.append("ecocRenameUuid",
-               _doc.getEcocRenameUuid() ? _doc.getEcocRenameUuid().value().toString() : "none");
-    bob.append("currentPhase", _doc.getPhase());
+    bob.append("nss", nss);
+    bob.append("escNss", escNss);
+    bob.append("eccNss", eccNss);
+    bob.append("ecocNss", ecocNss);
+    bob.append("ecocUuid", ecocUiid);
+    bob.append("ecocRenameNss", ecocRenameNss);
+    bob.append("ecocRenameUuid", ecocRenameUuid);
+    bob.append("currentPhase", currPhase);
     bob.append("active", true);
     return bob.obj();
 }
@@ -226,12 +249,16 @@ void CompactStructuredEncryptionDataCoordinator::_enterPhase(Phase newPhase) {
     if (_doc.getPhase() == Phase::kRenameEcocForCompact) {
         doc.setSkipCompact(_skipCompact);
         doc.setEcocRenameUuid(_ecocRenameUuid);
-        _doc = _insertStateDocument(std::move(doc));
-        return;
+        doc = _insertStateDocument(std::move(doc));
+    } else {
+        auto opCtx = cc().makeOperationContext();
+        doc = _updateStateDocument(opCtx.get(), std::move(doc));
     }
 
-    auto opCtx = cc().makeOperationContext();
-    _doc = _updateStateDocument(opCtx.get(), std::move(doc));
+    {
+        stdx::unique_lock ul{_docMutex};
+        _doc = std::move(doc);
+    }
 }
 
 ExecutorFuture<void> CompactStructuredEncryptionDataCoordinator::_runImpl(
