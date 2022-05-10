@@ -65,6 +65,9 @@ var $config = extendWorkload($config, function($config, $super) {
         [$config.data.executionContextTypes.kClientSession]: false,
         [$config.data.executionContextTypes.kClientRetryableWrite]: false,
         [$config.data.executionContextTypes.kClientTransaction]: false,
+        // Set this flag to skip the checkDocFuncs step. This is relevant if the workloads behavior
+        // causes the state of the docs to be indeterminable.
+        ["skipCheckDocs"]: false
     };
 
     // This workload sets the 'storeFindAndModifyImagesInSideCollection' parameter to a random bool
@@ -301,7 +304,10 @@ var $config = extendWorkload($config, function($config, $super) {
         delete this.dirtyDocs[executionCtxType][docToInsert._id];
         print("Finished internal transaction");
 
-        checkDocsFunc();
+        // Skip checking documents that may have been modified in a non deterministic way.
+        if (!this.expectDirtyDocs["skipCheckDocs"]) {
+            checkDocsFunc();
+        }
         assert.eq(collection.findOne({_id: docToInsert._id}), docToInsert);
         this.expectedCounters[docToInsert._id] = docToInsert.counter;
     };
