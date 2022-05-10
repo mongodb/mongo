@@ -935,6 +935,12 @@ struct UMCCacheParams {
     static constexpr auto allowedOnSecondary = BasicCommand::AllowedOnSecondary::kAlways;
 };
 
+template <typename T>
+using HasGetCmdParamOp = std::remove_cv_t<decltype(std::declval<T&>().getCommandParameter())>;
+template <typename T>
+constexpr bool hasGetCmdParamStringData =
+    stdx::is_detected_exact_v<StringData, HasGetCmdParamOp, T>;
+
 template <typename RequestT, typename Params = UMCStdParams>
 class CmdUMCTyped : public TypedCommand<CmdUMCTyped<RequestT, Params>> {
 public:
@@ -959,7 +965,11 @@ public:
         }
 
         NamespaceString ns() const final {
-            return NamespaceString(request().getDbName(), "");
+            const auto& cmd = request();
+            if constexpr (hasGetCmdParamStringData<RequestT>) {
+                return NamespaceString(cmd.getDbName(), cmd.getCommandParameter());
+            }
+            return NamespaceString(cmd.getDbName(), "");
         }
     };
 
