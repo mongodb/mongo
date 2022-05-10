@@ -1716,15 +1716,16 @@ void ShardingCatalogManager::bumpMultipleCollectionVersionsAndChangeMetadataInTx
     // migrations
     Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
 
-    withTransaction(opCtx,
-                    NamespaceString::kConfigReshardingOperationsNamespace,
-                    [&](OperationContext* opCtx, TxnNumber txnNumber) {
-                        for (const auto& nss : collNames) {
-                            bumpCollectionMinorVersion(opCtx, nss, txnNumber);
-                        }
-                        changeMetadataFunc(opCtx, txnNumber);
-                    },
-                    writeConcern);
+    withTransaction(
+        opCtx,
+        NamespaceString::kConfigReshardingOperationsNamespace,
+        [&collNames, &changeMetadataFunc](OperationContext* opCtx, TxnNumber txnNumber) {
+            for (const auto& nss : collNames) {
+                bumpCollectionMinorVersion(opCtx, nss, txnNumber);
+            }
+            changeMetadataFunc(opCtx, txnNumber);
+        },
+        writeConcern);
 }
 
 void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
@@ -1832,7 +1833,10 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
 
         cm.getAllShardIds(&shardsIds);
         withTransaction(
-            opCtx, CollectionType::ConfigNS, [&](OperationContext* opCtx, TxnNumber txnNumber) {
+            opCtx,
+            CollectionType::ConfigNS,
+            [this, allowMigrations, &nss, &collectionUUID](OperationContext* opCtx,
+                                                           TxnNumber txnNumber) {
                 // Update the 'allowMigrations' field. An unset 'allowMigrations' field implies
                 // 'true'. To ease backwards compatibility we omit 'allowMigrations' instead of
                 // setting it explicitly to 'true'.
