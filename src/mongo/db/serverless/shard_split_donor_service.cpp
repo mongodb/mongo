@@ -56,10 +56,13 @@ namespace mongo {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(abortShardSplitBeforeLeavingBlockingState);
+MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeBlockingState);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterBlocking);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterDecision);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitWaitForSplitAcceptance);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeRecipientCleanup);
+MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterMarkingStateGarbageCollectable);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitRecipientCleanup);
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
@@ -388,6 +391,9 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 // Note we do not use the abort split token here because the abortShardSplit
                 // command waits for a decision to be persisted which will not happen if
                 // inserting the initial state document fails.
+                if (MONGO_unlikely(pauseShardSplitBeforeBlockingState.shouldFail())) {
+                    pauseShardSplitBeforeBlockingState.pauseWhileSet();
+                }
                 return _enterBlockingOrAbortedState(executor, primaryToken, abortToken);
             })
             .then([this, executor, abortToken] {
@@ -395,6 +401,10 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 _cancelableOpCtxFactory.emplace(abortToken, _markKilledExecutor);
                 auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                 pauseShardSplitAfterBlocking.pauseWhileSet(opCtx.get());
+
+                if (MONGO_unlikely(abortShardSplitBeforeLeavingBlockingState.shouldFail())) {
+                    uasserted(ErrorCodes::InternalError, "simulate a shard split error");
+                }
 
                 return _waitForRecipientToReachBlockTimestamp(executor, abortToken);
             })
@@ -460,6 +470,35 @@ boost::optional<BSONObj> ShardSplitDonorService::DonorStateMachine::reportForCur
     stdx::lock_guard<Latch> lg(_mutex);
     BSONObjBuilder bob;
     bob.append("desc", "shard split operation");
+    _migrationId.appendToBuilder(&bob, "instanceID"_sd);
+    bob.append("reachedDecision", _decisionPromise.getFuture().isReady());
+    if (_stateDoc.getExpireAt()) {
+        bob.append("expireAt", *_stateDoc.getExpireAt());
+    }
+    const auto& tenantIds = _stateDoc.getTenantIds();
+    if (tenantIds) {
+        bob.append("tenantIds", *tenantIds);
+    }
+    if (_stateDoc.getBlockTimestamp()) {
+        bob.append("blockTimestamp", *_stateDoc.getBlockTimestamp());
+    }
+    if (_stateDoc.getCommitOrAbortOpTime()) {
+        _stateDoc.getCommitOrAbortOpTime()->append(&bob, "commitOrAbortOpTime");
+    }
+    if (_stateDoc.getAbortReason()) {
+        bob.append("abortReason", *_stateDoc.getAbortReason());
+    }
+    if (_stateDoc.getRecipientConnectionString()) {
+        bob.append("recipientConnectionString",
+                   _stateDoc.getRecipientConnectionString()->toString());
+    }
+    if (_stateDoc.getRecipientSetName()) {
+        bob.append("recipientSetName", *_stateDoc.getRecipientSetName());
+    }
+    if (_stateDoc.getRecipientTagName()) {
+        bob.append("recipientTagName", *_stateDoc.getRecipientTagName());
+    }
+
     return bob.obj();
 }
 
@@ -761,7 +800,10 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForMajority
     const ScopedTaskExecutorPtr& executor, repl::OpTime opTime, const CancellationToken& token) {
     return WaitForMajorityService::get(_serviceContext)
         .waitUntilMajority(std::move(opTime), token)
-        .thenRunOn(**executor);
+        .thenRunOn(**executor)
+        .then([this, self = shared_from_this()] {
+            pauseShardSplitAfterMarkingStateGarbageCollectable.pauseWhileSet();
+        });
 }
 
 void ShardSplitDonorService::DonorStateMachine::_initiateTimeout(
@@ -771,7 +813,7 @@ void ShardSplitDonorService::DonorStateMachine::_initiateTimeout(
 
     auto timeoutOrCompletionFuture =
         whenAny(std::move(timeoutFuture),
-                completionFuture().semi().ignoreValue().thenRunOn(**executor))
+                decisionFuture().semi().ignoreValue().thenRunOn(**executor))
             .thenRunOn(**executor)
             .then([this, executor, abortToken, anchor = shared_from_this()](auto result) {
                 stdx::lock_guard<Latch> lg(_mutex);
@@ -825,6 +867,11 @@ ShardSplitDonorService::DonorStateMachine::_handleErrorOrEnterAbortedState(
 
         if (!_abortReason) {
             _abortReason = statusWithState.getStatus();
+        }
+
+        if (_abortSource) {
+            // Cancel source to ensure all child threads (RSM monitor, etc) terminate.
+            _abortSource->cancel();
         }
 
         BSONObjBuilder bob;

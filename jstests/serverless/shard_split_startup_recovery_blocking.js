@@ -32,7 +32,7 @@ test.addRecipientNodes();
 
 const migrationId = UUID();
 let donorPrimary = test.donor.getPrimary();
-assert.isnull(findMigration(donorPrimary, migrationId));
+assert.isnull(findSplitOperation(donorPrimary, migrationId));
 
 let fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterBlocking");
 
@@ -54,7 +54,7 @@ awaitFirstSplitOperation();
 test.donor.startSet({restart: true});
 
 donorPrimary = test.donor.getPrimary();
-assert(findMigration(donorPrimary, migrationId), "There must be a config document");
+assert(findSplitOperation(donorPrimary, migrationId), "There must be a config document");
 
 test.validateTenantAccessBlockers(
     migrationId, tenantIds, TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);

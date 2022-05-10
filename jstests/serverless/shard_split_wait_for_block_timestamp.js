@@ -42,26 +42,26 @@ assert.commandWorked(bulk.execute());
 
 jsTestLog("Running commitShardSplit command");
 const firstOperation = test.createSplitOperation(tenantIds);
-assert.isnull(findMigration(donorPrimary, firstOperation.migrationId));
+assert.isnull(findSplitOperation(donorPrimary, firstOperation.migrationId));
 const res = firstOperation.commit({retryOnRetryableErrors: false});
 assert.commandFailed(res);
 assert.eq(res.code, ErrorCodes.TenantMigrationAborted);
 
 firstOperation.forget();
-test.waitForGarbageCollection(firstOperation.migrationId, tenantIds);
+test.cleanupSuccesfulAbortedOrCommitted(firstOperation.migrationId, tenantIds);
 
 jsTestLog("Restarting replication on recipient nodes, and running new split operation");
+test.addRecipientNodes();
 test.recipientNodes.forEach(node => restartServerReplication(node));
 test.donor.awaitReplication();
 test.donor.nodes.forEach(
     node => assert.commandWorked(setParameter(node, "shardSplitTimeoutMS", 60 * 1000)));
 
 const secondOperation = test.createSplitOperation(tenantIds);
-assert.isnull(findMigration(donorPrimary, secondOperation.migrationId));
+assert.isnull(findSplitOperation(donorPrimary, secondOperation.migrationId));
 assert.commandWorked(secondOperation.commit());
 assertMigrationState(donorPrimary, secondOperation.migrationId, "committed");
 
-test.removeRecipientNodesFromDonor();
 secondOperation.forget();
 
 test.waitForGarbageCollection(secondOperation.migrationId, tenantIds);

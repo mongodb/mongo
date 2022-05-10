@@ -30,7 +30,7 @@ const tenantIds = ["tenant1", "tenant2"];
 
 jsTestLog("Asserting no state document exist before command");
 const operation = test.createSplitOperation(tenantIds);
-assert.isnull(findMigration(donorPrimary, operation.migrationId));
+assert.isnull(findSplitOperation(donorPrimary, operation.migrationId));
 
 jsTestLog("Asserting we can write before the migration");
 tenantIds.forEach(id => {
@@ -88,8 +88,6 @@ writeThreads.forEach(thread => thread.join());
 
 jsTestLog("Asserting state document exist after command");
 assertMigrationState(donorPrimary, operation.migrationId, "committed");
-
-test.removeRecipientNodesFromDonor();
 
 operation.forget();
 

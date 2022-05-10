@@ -32,7 +32,7 @@ test.addRecipientNodes();
 let donorPrimary = test.donor.getPrimary();
 const migrationId = UUID();
 
-assert.isnull(findMigration(donorPrimary, migrationId));
+assert.isnull(findSplitOperation(donorPrimary, migrationId));
 // Pause the shard split before waiting to mark the doc for garbage collection.
 let fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterDecision");
 
@@ -51,11 +51,12 @@ jsTestLog("Restarting the set");
 test.donor.startSet({restart: true});
 
 donorPrimary = test.donor.getPrimary();
-assert(findMigration(donorPrimary, migrationId), "There must be a config document");
+assert(findSplitOperation(donorPrimary, migrationId), "There must be a config document");
 
 // we do not recover access blockers for kAborted marked for garbage collection
 tenantIds.every(tenantId => {
-    assert.isnull(test.getTenantMigrationAccessBlocker({node: donorPrimary, tenantId}));
+    assert.isnull(BasicServerlessTest.getTenantMigrationAccessBlocker(
+        {node: donorPrimary, tenantId: tenantId}));
 });
 
 test.stop();

@@ -34,7 +34,7 @@ donorAfterBlockingFailpoint.wait();
 
 jsTestLog("Asserting recipient nodes have installed access blockers");
 assert.soon(() => test.recipientNodes.every(node => {
-    const accessBlockers = test.getTenantMigrationAccessBlocker({node});
+    const accessBlockers = BasicServerlessTest.getTenantMigrationAccessBlocker({node});
     return tenantIds.every(tenantId => accessBlockers && accessBlockers.hasOwnProperty(tenantId) &&
                                !!accessBlockers[tenantId].donor);
 }));
@@ -45,7 +45,7 @@ assert.commandWorked(commitOp.returnData());
 
 jsTestLog("Asserting recipient nodes have removed access blockers");
 assert.soon(() => test.recipientNodes.every(node => {
-    return test.getTenantMigrationAccessBlocker({node}) == null;
+    return BasicServerlessTest.getTenantMigrationAccessBlocker({node}) == null;
 }));
 
 test.stop();

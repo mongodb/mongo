@@ -31,18 +31,18 @@ function shardSplitApplySplitConfig() {
     jsTestLog("Running commitShardSplit command");
     assert.commandWorked(operation.commit());
 
-    jsTestLog("Asserting state document exist after command");
-    assertMigrationState(donorPrimary, operation.migrationId, "committed");
-
-    test.removeRecipientNodesFromDonor();
-
     jsTestLog("Asserting a split config has been applied");
-    const configDoc = test.donor.getReplSetConfigFromNode();
+    // We need to pass `nodeId` below because there might be 2 primaries available at the same time
+    // from both the donor and the recipient nodes.
+    const configDoc = test.donor.getReplSetConfigFromNode(donorPrimary.nodeId);
     assert(configDoc, "There must be a config document");
     assert.eq(configDoc["members"].length, 3);
     assert(configDoc["recipientConfig"]);
     assert.eq(configDoc["recipientConfig"]["_id"], "recipient");
     assert.eq(configDoc["recipientConfig"]["members"].length, 3);
+
+    jsTestLog("Asserting state document exist after command");
+    assertMigrationState(donorPrimary, operation.migrationId, "committed");
 
     operation.forget();
 

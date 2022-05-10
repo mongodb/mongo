@@ -31,7 +31,7 @@ test.addRecipientNodes();
 
 const migrationId = UUID();
 let donorPrimary = test.donor.getPrimary();
-assert.isnull(findMigration(donorPrimary, migrationId));
+assert.isnull(findSplitOperation(donorPrimary, migrationId));
 
 // Pause the shard split before waiting to mark the doc for garbage collection.
 let fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterDecision");
@@ -50,7 +50,7 @@ test.stop({shouldRestart: true});
 test.donor.startSet({restart: true});
 
 donorPrimary = test.donor.getPrimary();
-const splitDoc = findMigration(donorPrimary, migrationId);
+const splitDoc = findSplitOperation(donorPrimary, migrationId);
 assert(splitDoc, "There must be a config document");
 
 test.validateTenantAccessBlockers(

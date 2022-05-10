@@ -20,28 +20,12 @@ function commitShardSplitConcurrently() {
         new BasicServerlessTest({recipientTagName, recipientSetName, quickGarbageCollection: true});
     test.addRecipientNodes();
 
-    const migrationId = UUID();
-
     const donorPrimary = test.donor.getPrimary();
 
     let fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterBlocking");
 
-    const awaitSecondSplitOperation = startParallelShell(
-        funWithArgs(
-            function(migrationId, recipientTagName, recipientSetName, tenantIds) {
-                assert.commandWorked(db.adminCommand({
-                    commitShardSplit: 1,
-                    migrationId,
-                    recipientTagName,
-                    recipientSetName,
-                    tenantIds
-                }));
-            },
-            migrationId,
-            test.recipientTagName,
-            test.recipientSetName,
-            tenantIds),
-        donorPrimary.port);
+    const operation = test.createSplitOperation(tenantIds);
+    const splitThread = operation.commitAsync();
 
     fp.wait();
 
@@ -57,7 +41,7 @@ function commitShardSplitConcurrently() {
 
     fp.off();
 
-    awaitSecondSplitOperation();
+    splitThread.join();
 
     // fails because there is an ongoing shard split that's about to complete.
     assert.commandFailedWithCode(donorPrimary.adminCommand({
@@ -69,9 +53,8 @@ function commitShardSplitConcurrently() {
     }),
                                  117);  // ConflictingOperationInProgress
 
-    test.removeRecipientNodesFromDonor();
-    assert.commandWorked(
-        donorPrimary.adminCommand({forgetShardSplit: 1, migrationId: migrationId}));
+    const forgetCmdObj = {forgetShardSplit: 1, migrationId: operation.migrationId};
+    assert.commandWorked(test.getDonorPrimary().adminCommand(forgetCmdObj));
 
     // fails because the commitShardSplit hasn't be garbage collected yet.
     assert.commandFailedWithCode(donorPrimary.adminCommand({
@@ -83,7 +66,7 @@ function commitShardSplitConcurrently() {
     }),
                                  117);  // ConflictingOperationInProgress
 
-    test.cleanupSuccesfulAbortedOrCommitted(migrationId, tenantIds);
+    test.cleanupSuccesfulAbortedOrCommitted(operation.migrationId, tenantIds);
 
     // another split operation can start after garbage collection of the previous one.
     test.addRecipientNodes();
