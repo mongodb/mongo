@@ -84,8 +84,8 @@ inline bool operator!=(const KillAllSessionsByPatternItem& lhs,
 using KillAllSessionsByPatternSet =
     stdx::unordered_set<KillAllSessionsByPatternItem, KillAllSessionsByPatternItemHash>;
 
-std::tuple<std::vector<UserName>, std::vector<RoleName>> getKillAllSessionsByPatternImpersonateData(
-    const KillAllSessionsByPattern& pattern);
+std::tuple<boost::optional<UserName>, std::vector<RoleName>>
+getKillAllSessionsByPatternImpersonateData(const KillAllSessionsByPattern& pattern);
 
 /**
  * Note: All three of the below makeKillAllSessionsByPattern helpers take opCtx to inline the

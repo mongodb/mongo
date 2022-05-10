@@ -39,6 +39,23 @@
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
+namespace {
+/**
+ * If auth is not enabled, will return boost::none.
+ * Otherwise, a user must be actively authenticated on the client,
+ * and a handle to this user will be returned.
+ */
+boost::optional<UserHandle> getAuthenticatedUser(Client* client) {
+    if (!AuthorizationManager::get(client->getServiceContext())->isAuthEnabled()) {
+        return boost::none;
+    }
+
+    auto optUser = AuthorizationSession::get(client)->getAuthenticatedUser();
+    uassert(ErrorCodes::Unauthorized, "Logical sessions require authentication", optUser);
+
+    return optUser.get();
+}
+}  // namespace
 
 /**
  * This is a safe hash that will not collide with a username because all full usernames include an
@@ -47,20 +64,12 @@ namespace mongo {
 const auto kNoAuthDigest = SHA256Block::computeHash(reinterpret_cast<const uint8_t*>(""), 0);
 
 SHA256Block getLogicalSessionUserDigestForLoggedInUser(const OperationContext* opCtx) {
-    auto client = opCtx->getClient();
-    ServiceContext* serviceContext = client->getServiceContext();
-
-    if (AuthorizationManager::get(serviceContext)->isAuthEnabled()) {
-        UserName userName;
-
-        const auto user = AuthorizationSession::get(client)->getSingleUser();
-        invariant(user);
-
+    if (auto user = getAuthenticatedUser(opCtx->getClient())) {
         uassert(ErrorCodes::BadValue,
                 "Username too long to use with logical sessions",
-                user->getName().getDisplayNameLength() < kMaximumUserNameLengthForLogicalSessions);
-
-        return user->getDigest();
+                user.get()->getName().getDisplayNameLength() <
+                    kMaximumUserNameLengthForLogicalSessions);
+        return user.get()->getDigest();
     } else {
         return kNoAuthDigest;
     }
@@ -172,14 +181,9 @@ LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx, Date_t la
     LogicalSessionId id{};
     LogicalSessionRecord lsr{};
 
-    auto client = opCtx->getClient();
-    ServiceContext* serviceContext = client->getServiceContext();
-    if (AuthorizationManager::get(serviceContext)->isAuthEnabled()) {
-        auto user = AuthorizationSession::get(client)->getSingleUser();
-        invariant(user);
-
-        id.setUid(user->getDigest());
-        lsr.setUser(StringData(user->getName().getDisplayName()));
+    if (auto user = getAuthenticatedUser(opCtx->getClient())) {
+        id.setUid(user.get()->getDigest());
+        lsr.setUser(StringData(user.get()->getName().getDisplayName()));
     } else {
         id.setUid(kNoAuthDigest);
     }
@@ -210,14 +214,9 @@ LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx,
                                               Date_t lastUse) {
     auto lsr = makeLogicalSessionRecord(lsid, lastUse);
 
-    auto client = opCtx->getClient();
-    ServiceContext* serviceContext = client->getServiceContext();
-    if (AuthorizationManager::get(serviceContext)->isAuthEnabled()) {
-        auto user = AuthorizationSession::get(client)->getSingleUser();
-        invariant(user);
-
-        if (user->getDigest() == lsid.getUid()) {
-            lsr.setUser(StringData(user->getName().getDisplayName()));
+    if (auto user = getAuthenticatedUser(opCtx->getClient())) {
+        if (user.get()->getDigest() == lsid.getUid()) {
+            lsr.setUser(StringData(user.get()->getName().getDisplayName()));
         }
     }
 

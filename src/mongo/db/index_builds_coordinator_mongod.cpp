@@ -370,7 +370,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         // Load the external client's attributes into this thread's client for auditing.
         auto authSession = AuthorizationSession::get(opCtx->getClient());
         if (authSession) {
-            authSession->setImpersonatedUserData(std::move(impersonatedClientAttrs.userNames),
+            authSession->setImpersonatedUserData(std::move(impersonatedClientAttrs.userName),
                                                  std::move(impersonatedClientAttrs.roleNames));
         }
 

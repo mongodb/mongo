@@ -83,9 +83,7 @@ public:
         void doCheckAuthorization(OperationContext* opCtx) const final {
             // It is always ok to run this command, as long as you are authenticated
             // as some user, if auth is enabled.
-            uassert(ErrorCodes::Unauthorized,
-                    "Not authorized to run endSessions command",
-                    AuthorizationSession::get(opCtx->getClient())->getSingleUser());
+            // requiresAuth() => true covers this for us.
         }
 
         Reply typedRun(OperationContext* opCtx) final {

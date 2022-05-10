@@ -151,10 +151,8 @@ void validateTxnNumber(OperationContext* opCtx, int64_t cursorId, const ClientCu
 void validateAuthorization(const OperationContext* opCtx, const ClientCursor& cursor) {
 
     auto authzSession = AuthorizationSession::get(opCtx->getClient());
-    // A user can only call getMore on their own cursor. If there were multiple users
-    // authenticated when the cursor was created, then at least one of them must be
-    // authenticated in order to run getMore on the cursor.
-    if (!authzSession->isCoauthorizedWith(cursor.getAuthenticatedUsers())) {
+    // A user can only call getMore on their own cursor.
+    if (!authzSession->isCoauthorizedWith(cursor.getAuthenticatedUser())) {
         uasserted(ErrorCodes::Unauthorized,
                   str::stream() << "cursor id " << cursor.cursorid()
                                 << " was not created by the authenticated user");

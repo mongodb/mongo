@@ -62,8 +62,10 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
 
     if (const auto& optAuthMetadata = getImpersonatedUserMetadata()) {
         const auto& authMetadata = optAuthMetadata.get();
-        if (!authMetadata.getUsers().empty() || !authMetadata.getRoles().empty()) {
-            AuthorizationSession::get(client)->setImpersonatedUserData(authMetadata.getUsers(),
+        const auto& users = authMetadata.getUsers();
+        if (!users.empty() || !authMetadata.getRoles().empty()) {
+            fassert(ErrorCodes::InternalError, users.size() == 1);
+            AuthorizationSession::get(client)->setImpersonatedUserData(users[0],
                                                                        authMetadata.getRoles());
         }
     }

@@ -32,7 +32,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/user_set.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
@@ -79,7 +78,7 @@ Status checkAuthForDelete(AuthorizationSession* authSession,
 // identifier.
 Status checkAuthForKillCursors(AuthorizationSession* authSession,
                                const NamespaceString& cursorNss,
-                               UserNameIterator cursorOwner);
+                               const boost::optional<UserName>& cursorOwner);
 
 // Attempts to get the privileges necessary to run the aggregation pipeline specified in
 // 'request' on the namespace 'ns' either directly on mongoD or via mongoS.

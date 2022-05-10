@@ -58,13 +58,10 @@ KillAllSessionsByPatternSet patternsForLoggedInUser(OperationContext* opCtx) {
     KillAllSessionsByPatternSet patterns;
 
     if (AuthorizationManager::get(serviceContext)->isAuthEnabled()) {
-        auto authzSession = AuthorizationSession::get(client);
-        for (auto iter = authzSession->getAuthenticatedUserNames(); iter.more(); iter.next()) {
-            User* user = authzSession->lookupUser(*iter);
-            invariant(user);
-
+        auto* as = AuthorizationSession::get(client);
+        if (auto user = as->getAuthenticatedUser()) {
             auto item = makeKillAllSessionsByPattern(opCtx);
-            item.pattern.setUid(user->getDigest());
+            item.pattern.setUid(user.get()->getDigest());
             patterns.emplace(std::move(item));
         }
     } else {

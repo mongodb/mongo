@@ -181,7 +181,6 @@ env.Library(
         'authorization_session_impl.cpp',
         'authz_manager_external_state.cpp',
         'authz_session_external_state.cpp',
-        'user_set.cpp',
         'authorization_manager_impl_parameters.idl',
     ],
     LIBDEPS=[
@@ -541,7 +540,6 @@ env.CppUnitTest(
         'sasl_scram_test.cpp',
         'security_key_test.cpp',
         'user_document_parser_test.cpp',
-        'user_set_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

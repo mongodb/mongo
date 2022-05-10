@@ -55,7 +55,8 @@ ImpersonationSessionGuard::ImpersonationSessionGuard(OperationContext* opCtx) : 
                 authSession->isAuthorizedForPrivilege(
                     Privilege(ResourcePattern::forClusterResource(), ActionType::impersonate)));
         fassert(ErrorCodes::InternalError, !authSession->isImpersonating());
-        authSession->setImpersonatedUserData(impersonatedUsersAndRoles->getUsers(),
+        fassert(ErrorCodes::InternalError, impersonatedUsersAndRoles->getUsers().size() == 1);
+        authSession->setImpersonatedUserData(impersonatedUsersAndRoles->getUsers()[0],
                                              impersonatedUsersAndRoles->getRoles());
         _active = true;
         return;

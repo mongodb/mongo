@@ -200,6 +200,13 @@ IGNORE_COMMANDS_LIST: List[str] = [
     'setChangeStreamOptions',
 ]
 
+RENAMED_COMPLEX_ACCESS_CHECKS = dict(
+    # Changed during 6.1 as part of removing multi-auth support.
+    get_single_user='get_authenticated_user',
+    get_authenticated_usernames='get_authenticated_username',
+    get_impersonated_usernames='get_impersonated_username',
+)
+
 
 class FieldCompatibility:
     """Information about a Field to check compatibility."""
@@ -1069,6 +1076,26 @@ def split_complex_checks(
     return checks, sorted(privileges, key=lambda x: len(x.action_type), reverse=True)
 
 
+def compare_complex_access_checks(new_checks: List[str], old_checks: List[str]) -> bool:
+    """Compare two sets of access check names for equivalence."""
+    # Quick path, common case where access checks match exactly.
+    if set(new_checks).issubset(old_checks):
+        return True
+
+    def map_complex_access_check_name(name: str) -> str:
+        """Returns normalized name if it exists in the map, otherwise returns self."""
+        if name in RENAMED_COMPLEX_ACCESS_CHECKS:
+            return RENAMED_COMPLEX_ACCESS_CHECKS[name]
+        else:
+            return name
+
+    # Slow path allowing for access check renames.
+    old_normalized = [map_complex_access_check_name(name) for name in old_checks]
+    new_normalized = [map_complex_access_check_name(name) for name in new_checks]
+
+    return set(new_normalized).issubset(old_normalized)
+
+
 def check_complex_checks(ctxt: IDLCompatibilityContext,
                          old_complex_checks: List[syntax.AccessCheck],
                          new_complex_checks: List[syntax.AccessCheck], cmd: syntax.Command,
@@ -1080,7 +1107,7 @@ def check_complex_checks(ctxt: IDLCompatibilityContext,
     else:
         old_checks, old_privileges = split_complex_checks(old_complex_checks)
         new_checks, new_privileges = split_complex_checks(new_complex_checks)
-        if not set(new_checks).issubset(old_checks):
+        if not compare_complex_access_checks(new_checks, old_checks):
             ctxt.add_new_complex_checks_not_subset_error(cmd_name, new_idl_file_path)
 
         if len(new_privileges) > len(old_privileges):

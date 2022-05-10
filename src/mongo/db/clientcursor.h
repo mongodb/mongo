@@ -58,7 +58,7 @@ class RecoveryUnit;
 struct ClientCursorParams {
     ClientCursorParams(std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor,
                        NamespaceString nss,
-                       UserNameIterator authenticatedUsersIter,
+                       boost::optional<UserName> authenticatedUser,
                        APIParameters apiParameters,
                        WriteConcernOptions writeConcernOptions,
                        repl::ReadConcernArgs readConcernArgs,
@@ -67,6 +67,7 @@ struct ClientCursorParams {
                        PrivilegeVector originatingPrivileges)
         : exec(std::move(planExecutor)),
           nss(std::move(nss)),
+          authenticatedUser(std::move(authenticatedUser)),
           apiParameters(std::move(apiParameters)),
           writeConcernOptions(std::move(writeConcernOptions)),
           readConcernArgs(std::move(readConcernArgs)),
@@ -81,11 +82,7 @@ struct ClientCursorParams {
                                  exec->getCanonicalQuery()->getFindCommandRequest())
                            : TailableModeEnum::kNormal),
           originatingCommandObj(originatingCommandObj.getOwned()),
-          originatingPrivileges(std::move(originatingPrivileges)) {
-        while (authenticatedUsersIter.more()) {
-            authenticatedUsers.emplace_back(authenticatedUsersIter.next());
-        }
-    }
+          originatingPrivileges(std::move(originatingPrivileges)) {}
 
     void setTailableMode(TailableModeEnum newMode) {
         tailableMode = newMode;
@@ -93,7 +90,7 @@ struct ClientCursorParams {
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
     const NamespaceString nss;
-    std::vector<UserName> authenticatedUsers;
+    boost::optional<UserName> authenticatedUser;
     const APIParameters apiParameters;
     const WriteConcernOptions writeConcernOptions;
     const repl::ReadConcernArgs readConcernArgs;
@@ -133,8 +130,8 @@ public:
         return _nss;
     }
 
-    UserNameIterator getAuthenticatedUsers() const {
-        return makeUserNameIterator(_authenticatedUsers.begin(), _authenticatedUsers.end());
+    boost::optional<UserName> getAuthenticatedUser() const {
+        return _authenticatedUser;
     }
 
     boost::optional<LogicalSessionId> getSessionId() const {
@@ -358,11 +355,11 @@ private:
     // have the correct partition of the CursorManager locked (just like _authenticatedUsers).
     const NamespaceString _nss;
 
-    // The set of authenticated users when this cursor was created. Threads may read from this
+    // The authenticated user when this cursor was created. Threads may read from this
     // field (using the getter) even if they don't have the cursor pinned as long as they hold the
     // correct partition's lock in the CursorManager. They must hold the lock to prevent the cursor
     // from being freed by another thread during the read.
-    const std::vector<UserName> _authenticatedUsers;
+    const boost::optional<UserName> _authenticatedUser;
 
     // A logical session id for this cursor, if it is running inside of a session.
     const boost::optional<LogicalSessionId> _lsid;

@@ -88,9 +88,10 @@ ListSessionsUser getUserNameForLoggedInUser(const OperationContext* opCtx) {
 
     ListSessionsUser user;
     if (AuthorizationManager::get(client->getServiceContext())->isAuthEnabled()) {
-        const auto& userName = AuthorizationSession::get(client)->getSingleUser()->getName();
-        user.setUser(userName.getUser());
-        user.setDb(userName.getDB());
+        const auto& userName = AuthorizationSession::get(client)->getAuthenticatedUserName();
+        uassert(ErrorCodes::Unauthorized, "There is no user authenticated", userName);
+        user.setUser(userName->getUser());
+        user.setDb(userName->getDB());
     } else {
         user.setUser("");
         user.setDb("");

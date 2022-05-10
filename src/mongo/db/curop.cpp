@@ -204,10 +204,7 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
     const auto serializeAuthenticatedUsers = [&](StringData name) {
         if (authSession->isAuthenticated()) {
             BSONArrayBuilder users(infoBuilder->subarrayStart(name));
-            for (auto userIt = authSession->getAuthenticatedUserNames(); userIt.more();
-                 userIt.next()) {
-                userIt->serializeToBSON(&users);
-            }
+            authSession->getAuthenticatedUserName()->serializeToBSON(&users);
         }
     };
 
@@ -1109,28 +1106,16 @@ void OpDebug::append(OperationContext* opCtx,
 void OpDebug::appendUserInfo(const CurOp& c,
                              BSONObjBuilder& builder,
                              AuthorizationSession* authSession) {
-    UserNameIterator nameIter = authSession->getAuthenticatedUserNames();
-
-    UserName bestUser;
-    if (nameIter.more())
-        bestUser = *nameIter;
-
     std::string opdb(nsToDatabase(c.getNS()));
 
     BSONArrayBuilder allUsers(builder.subarrayStart("allUsers"));
-    for (; nameIter.more(); nameIter.next()) {
-        BSONObjBuilder nextUser(allUsers.subobjStart());
-        nextUser.append(AuthorizationManager::USER_NAME_FIELD_NAME, nameIter->getUser());
-        nextUser.append(AuthorizationManager::USER_DB_FIELD_NAME, nameIter->getDB());
-        nextUser.doneFast();
-
-        if (nameIter->getDB() == opdb) {
-            bestUser = *nameIter;
-        }
+    auto name = authSession->getAuthenticatedUserName();
+    if (name) {
+        name->serializeToBSON(&allUsers);
     }
     allUsers.doneFast();
 
-    builder.append("user", bestUser.getUser().empty() ? "" : bestUser.getDisplayName());
+    builder.append("user", name ? name->getDisplayName() : "");
 }
 
 std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requestedFields,

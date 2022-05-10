@@ -38,14 +38,9 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/auth/user_set.h"
 
 namespace mongo {
 constexpr StringData AuthorizationSessionForTest::kTestDBName;
-
-AuthorizationSessionForTest::~AuthorizationSessionForTest() {
-    revokeAllPrivileges();
-}
 
 void AuthorizationSessionForTest::assumePrivilegesForDB(Privilege privilege, StringData dbName) {
     assumePrivilegesForDB(std::vector<Privilege>{privilege}, dbName);
@@ -53,11 +48,9 @@ void AuthorizationSessionForTest::assumePrivilegesForDB(Privilege privilege, Str
 
 void AuthorizationSessionForTest::assumePrivilegesForDB(PrivilegeVector privileges,
                                                         StringData dbName) {
-    UserHandle userHandle(User(UserName("authorizationSessionForTestUser", dbName)));
-    userHandle->addPrivileges(privileges);
-
-    _authenticatedUsers.add(userHandle);
-    _testUsers.emplace_back(std::move(userHandle));
+    _authenticatedUser = UserHandle(User(UserName("authorizationSessionForTestUser", dbName)));
+    _authenticatedUser.get()->addPrivileges(privileges);
+    _authenticationMode = AuthorizationSession::AuthenticationMode::kConnection;
     _updateInternalAuthorizationState();
 }
 
@@ -73,22 +66,4 @@ void AuthorizationSessionForTest::assumePrivilegesForBuiltinRole(const RoleName&
     assumePrivilegesForDB(privileges, db);
 }
 
-void AuthorizationSessionForTest::revokePrivilegesForDB(StringData dbName) {
-    _authenticatedUsers.removeByDBName(dbName);
-    _testUsers.erase(
-        std::remove_if(_testUsers.begin(),
-                       _testUsers.end(),
-                       [&](const auto& user) { return dbName == user->getName().getDB(); }),
-        _testUsers.end());
-}
-
-void AuthorizationSessionForTest::revokeAllPrivileges() {
-    _testUsers.erase(std::remove_if(_testUsers.begin(),
-                                    _testUsers.end(),
-                                    [&](const auto& user) {
-                                        _authenticatedUsers.removeByDBName(user->getName().getDB());
-                                        return true;
-                                    }),
-                     _testUsers.end());
-}
 }  // namespace mongo

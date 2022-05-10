@@ -344,14 +344,14 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     CursorId clusterCursorId = 0;
 
     if (cursorState == ClusterCursorManager::CursorState::NotExhausted) {
-        auto authUsers = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames();
+        auto authUser = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();
         clusterCursorId = uassertStatusOK(Grid::get(opCtx)->getCursorManager()->registerCursor(
             opCtx,
             ccc.releaseCursor(),
             requestedNss,
             ClusterCursorManager::CursorType::MultiTarget,
             ClusterCursorManager::CursorLifetime::Mortal,
-            authUsers));
+            authUser));
     }
 
     // Fill out the aggregation metrics in CurOp.

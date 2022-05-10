@@ -50,11 +50,6 @@ public:
     static constexpr StringData kTestDBName = "authorizationSessionForTestDB"_sd;
 
     /**
-     * Cleans up any privileges granted via assumePrivilegesForDB().
-     */
-    ~AuthorizationSessionForTest();
-
-    /**
      * Grants this session all privileges in 'privileges' for the database named 'dbName'. Any prior
      * privileges granted on 'dbName' via a call to this method are erased.
      *
@@ -64,25 +59,8 @@ public:
     void assumePrivilegesForDB(Privilege privilege, StringData dbName = kTestDBName);
 
     /**
-     * Revoke all privileges granted via assumePrivilegesForDB() on the database named 'dbName'.
-     *
-     * Do not use this method if also adding users via addAndAuthorizeUser() in the same database.
-     */
-    void revokePrivilegesForDB(StringData dbName);
-
-    /**
-     * Revokes all privileges granted via assumePrivilegesForDB() on every database.
-     *
-     * Do not use this method if also adding users via addAndAuthorizeUser() in the same database.
-     */
-    void revokeAllPrivileges();
-
-    /**
      * Grants this session all privileges for the given builtin role. Do not mix with other methods.
      */
     void assumePrivilegesForBuiltinRole(const RoleName& roleName);
-
-private:
-    std::vector<UserHandle> _testUsers;
 };
 }  // namespace mongo

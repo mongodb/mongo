@@ -175,7 +175,7 @@ Status checkAuthForDelete(AuthorizationSession* authSession,
 
 Status checkAuthForKillCursors(AuthorizationSession* authSession,
                                const NamespaceString& ns,
-                               UserNameIterator cursorOwner) {
+                               const boost::optional<UserName>& cursorOwner) {
     if (authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                       ActionType::killAnyCursor)) {
         return Status::OK();

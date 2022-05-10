@@ -60,11 +60,11 @@ protected:
         _manager.shutdown(_opCtx.get());
     }
 
-    static Status successAuthChecker(UserNameIterator userNames) {
+    static Status successAuthChecker(const boost::optional<UserName>&) {
         return Status::OK();
     };
 
-    static Status failAuthChecker(UserNameIterator userNames) {
+    static Status failAuthChecker(const boost::optional<UserName>&) {
         return {ErrorCodes::Unauthorized, "Unauthorized"};
     };
 
@@ -147,7 +147,7 @@ TEST_F(ClusterCursorManagerTest, RegisterCursor) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto pinnedCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     ASSERT_OK(pinnedCursor.getStatus());
@@ -168,7 +168,7 @@ TEST_F(ClusterCursorManagerTest, RegisterCursorReturnsNonZeroId) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     ASSERT_NE(0, cursorId);
 }
 
@@ -182,7 +182,7 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorBasic) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto checkedOutCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     ASSERT_OK(checkedOutCursor.getStatus());
@@ -210,7 +210,7 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorMultipleCursors) {
                                                    nss,
                                                    ClusterCursorManager::CursorType::SingleTarget,
                                                    ClusterCursorManager::CursorLifetime::Mortal,
-                                                   UserNameIterator()));
+                                                   boost::none));
     }
     for (int i = 0; i < numCursors; ++i) {
         auto pinnedCursor =
@@ -234,7 +234,7 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorPinned) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto pinnedCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     ASSERT_OK(pinnedCursor.getStatus());
@@ -252,7 +252,7 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorKilled) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     killCursorFromDifferentOpCtx(cursorId);
     ASSERT_EQ(ErrorCodes::CursorNotFound,
               getManager()
@@ -275,7 +275,7 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorWrongCursorId) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     ASSERT_EQ(ErrorCodes::CursorNotFound,
               getManager()
                   ->checkOutCursor(cursorId + 1, getOperationContext(), successAuthChecker)
@@ -291,7 +291,7 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorUpdateActiveTime) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     Date_t cursorRegistrationTime = getClockSource()->now();
     getClockSource()->advance(Milliseconds(1));
     auto checkedOutCursor =
@@ -309,7 +309,7 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorAuthFails) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto checkedOutCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), failAuthChecker);
     ASSERT_EQ(checkedOutCursor.getStatus(), ErrorCodes::Unauthorized);
@@ -325,7 +325,7 @@ TEST_F(ClusterCursorManagerTest, ReturnCursorUpdateActiveTime) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     Date_t cursorCheckOutTime = getClockSource()->now();
     auto checkedOutCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
@@ -344,7 +344,7 @@ TEST_F(ClusterCursorManagerTest, KillUnpinnedCursorBasic) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     killCursorFromDifferentOpCtx(cursorId);
     ASSERT(isMockCursorKilled(0));
 }
@@ -357,7 +357,7 @@ TEST_F(ClusterCursorManagerTest, KillPinnedCursorBasic) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto pinnedCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     ASSERT_OK(pinnedCursor.getStatus());
@@ -384,7 +384,7 @@ TEST_F(ClusterCursorManagerTest, KillCursorMultipleCursors) {
                                                    nss,
                                                    ClusterCursorManager::CursorType::SingleTarget,
                                                    ClusterCursorManager::CursorLifetime::Mortal,
-                                                   UserNameIterator()));
+                                                   boost::none));
     }
     // Kill each cursor and verify that it was successfully killed.
     for (size_t i = 0; i < numCursors; ++i) {
@@ -408,7 +408,7 @@ TEST_F(ClusterCursorManagerTest, KillCursorWrongCursorId) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     Status killResult = getManager()->killCursor(getOperationContext(), cursorId + 1);
     ASSERT_EQ(ErrorCodes::CursorNotFound, killResult);
 }
@@ -420,7 +420,7 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceBasic) {
                                            nss,
                                            ClusterCursorManager::CursorType::SingleTarget,
                                            ClusterCursorManager::CursorLifetime::Mortal,
-                                           UserNameIterator()));
+                                           boost::none));
     getManager()->killMortalCursorsInactiveSince(getOperationContext(), getClockSource()->now());
     ASSERT(isMockCursorKilled(0));
 }
@@ -434,7 +434,7 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceSkipUnexpired) {
                                            nss,
                                            ClusterCursorManager::CursorType::SingleTarget,
                                            ClusterCursorManager::CursorLifetime::Mortal,
-                                           UserNameIterator()));
+                                           boost::none));
     getManager()->killMortalCursorsInactiveSince(getOperationContext(), timeBeforeCursorCreation);
     ASSERT(!isMockCursorKilled(0));
 }
@@ -446,7 +446,7 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceSkipImmortal) {
                                            nss,
                                            ClusterCursorManager::CursorType::SingleTarget,
                                            ClusterCursorManager::CursorLifetime::Immortal,
-                                           UserNameIterator()));
+                                           boost::none));
     getManager()->killMortalCursorsInactiveSince(getOperationContext(), getClockSource()->now());
     ASSERT(!isMockCursorKilled(0));
 }
@@ -460,7 +460,7 @@ TEST_F(ClusterCursorManagerTest, ShouldNotKillPinnedCursors) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto pin = assertGet(
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker));
     getManager()->killMortalCursorsInactiveSince(getOperationContext(), getClockSource()->now());
@@ -485,7 +485,7 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceMultipleCursors) 
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
         getClockSource()->advance(Milliseconds(1));
     }
     getManager()->killMortalCursorsInactiveSince(getOperationContext(), cutoff);
@@ -507,7 +507,7 @@ TEST_F(ClusterCursorManagerTest, KillAllCursors) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     }
     getManager()->killAllCursors(getOperationContext());
     for (size_t i = 0; i < numCursors; ++i) {
@@ -523,7 +523,7 @@ TEST_F(ClusterCursorManagerTest, KillCursorsSatisfyingAlwaysTrueKillsAllCursors)
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     }
     auto pred = [](CursorId, const ClusterCursorManager::CursorEntry&) { return true; };
     auto nKilled = getManager()->killCursorsSatisfying(getOperationContext(), std::move(pred));
@@ -541,7 +541,7 @@ TEST_F(ClusterCursorManagerTest, KillCursorsSatisfyingAlwaysFalseKillsNoCursors)
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     }
     auto pred = [](CursorId, const ClusterCursorManager::CursorEntry&) { return false; };
     auto nKilled = getManager()->killCursorsSatisfying(getOperationContext(), std::move(pred));
@@ -562,7 +562,7 @@ TEST_F(ClusterCursorManagerTest, KillCursorsSatisfyingOnlyKillsMatchingSubset) {
                                          nss,
                                          ClusterCursorManager::CursorType::SingleTarget,
                                          ClusterCursorManager::CursorLifetime::Mortal,
-                                         UserNameIterator());
+                                         boost::none);
         ASSERT_OK(swCursorId);
         if (shouldKillCursor(i))
             idsToKill.insert(swCursorId.getValue());
@@ -589,7 +589,7 @@ TEST_F(ClusterCursorManagerTest, KillCursorsSatisfyingBasedOnOpKey) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     }
     auto pred = [&](CursorId id, const ClusterCursorManager::CursorEntry& entry) {
         return entry.getOperationKey() == getOperationContext()->getOperationKey();
@@ -608,7 +608,7 @@ TEST_F(ClusterCursorManagerTest, CorrectlyRecordsOriginatingClient) {
                                            nss,
                                            ClusterCursorManager::CursorType::MultiTarget,
                                            ClusterCursorManager::CursorLifetime::Mortal,
-                                           UserNameIterator()));
+                                           boost::none));
     // Now insert some cursors under a different client.
     const size_t numAltClientCursors = 10;
     {
@@ -621,7 +621,7 @@ TEST_F(ClusterCursorManagerTest, CorrectlyRecordsOriginatingClient) {
                                                    nss,
                                                    ClusterCursorManager::CursorType::MultiTarget,
                                                    ClusterCursorManager::CursorLifetime::Mortal,
-                                                   UserNameIterator()));
+                                                   boost::none));
         }
     }
 
@@ -652,7 +652,7 @@ TEST_F(ClusterCursorManagerTest, StatsRegisterShardedCursor) {
                                            nss,
                                            ClusterCursorManager::CursorType::MultiTarget,
                                            ClusterCursorManager::CursorLifetime::Mortal,
-                                           UserNameIterator()));
+                                           boost::none));
     ASSERT_EQ(1U, getManager()->stats().cursorsMultiTarget);
 }
 
@@ -663,7 +663,7 @@ TEST_F(ClusterCursorManagerTest, StatsRegisterNotShardedCursor) {
                                            nss,
                                            ClusterCursorManager::CursorType::SingleTarget,
                                            ClusterCursorManager::CursorLifetime::Mortal,
-                                           UserNameIterator()));
+                                           boost::none));
     ASSERT_EQ(1U, getManager()->stats().cursorsSingleTarget);
 }
 
@@ -675,7 +675,7 @@ TEST_F(ClusterCursorManagerTest, StatsPinCursor) {
                                                nss,
                                                ClusterCursorManager::CursorType::MultiTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto pinnedCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     ASSERT_EQ(1U, getManager()->stats().cursorsPinned);
@@ -691,7 +691,7 @@ TEST_F(ClusterCursorManagerTest, StatsRegisterMultipleCursors) {
                                                nss,
                                                ClusterCursorManager::CursorType::MultiTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
         ASSERT_EQ(i + 1, getManager()->stats().cursorsMultiTarget);
         ASSERT_EQ(0U, getManager()->stats().cursorsSingleTarget);
     }
@@ -702,7 +702,7 @@ TEST_F(ClusterCursorManagerTest, StatsRegisterMultipleCursors) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
         ASSERT_EQ(numShardedCursors, getManager()->stats().cursorsMultiTarget);
         ASSERT_EQ(i + 1, getManager()->stats().cursorsSingleTarget);
     }
@@ -716,7 +716,7 @@ TEST_F(ClusterCursorManagerTest, StatsKillShardedCursor) {
                                                nss,
                                                ClusterCursorManager::CursorType::MultiTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     ASSERT_EQ(1U, getManager()->stats().cursorsMultiTarget);
     ASSERT_OK(getManager()->killCursor(getOperationContext(), cursorId));
     ASSERT_EQ(0U, getManager()->stats().cursorsMultiTarget);
@@ -730,7 +730,7 @@ TEST_F(ClusterCursorManagerTest, StatsKillNotShardedCursor) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     ASSERT_EQ(1U, getManager()->stats().cursorsSingleTarget);
     ASSERT_OK(getManager()->killCursor(getOperationContext(), cursorId));
     ASSERT_EQ(0U, getManager()->stats().cursorsSingleTarget);
@@ -744,7 +744,7 @@ TEST_F(ClusterCursorManagerTest, StatsKillPinnedCursor) {
                                                nss,
                                                ClusterCursorManager::CursorType::MultiTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto pinnedCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     ASSERT_EQ(1U, getManager()->stats().cursorsPinned);
@@ -763,7 +763,7 @@ TEST_F(ClusterCursorManagerTest, StatsExhaustShardedCursor) {
                                                nss,
                                                ClusterCursorManager::CursorType::MultiTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto pinnedCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     ASSERT_OK(pinnedCursor.getStatus());
@@ -781,7 +781,7 @@ TEST_F(ClusterCursorManagerTest, StatsExhaustNotShardedCursor) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto pinnedCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     ASSERT_OK(pinnedCursor.getStatus());
@@ -800,7 +800,7 @@ TEST_F(ClusterCursorManagerTest, StatsExhaustPinnedCursor) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto pinnedCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     ASSERT_OK(pinnedCursor.getStatus());
@@ -819,7 +819,7 @@ TEST_F(ClusterCursorManagerTest, StatsCheckInWithoutExhaustingPinnedCursor) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto pinnedCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     ASSERT_OK(pinnedCursor.getStatus());
@@ -844,7 +844,7 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorReturnCursorNotExhausted) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto registeredCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     ASSERT_OK(registeredCursor.getStatus());
@@ -866,7 +866,7 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorReturnCursorExhausted) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto registeredCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     ASSERT_OK(registeredCursor.getStatus());
@@ -894,7 +894,7 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorReturnCursorExhaustedWithNonExhaust
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto registeredCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     ASSERT_OK(registeredCursor.getStatus());
@@ -920,7 +920,7 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorMoveAssignmentKill) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto pinnedCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     pinnedCursor = ClusterCursorManager::PinnedCursor();
@@ -936,7 +936,7 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorDestructorKill) {
                                                    nss,
                                                    ClusterCursorManager::CursorType::SingleTarget,
                                                    ClusterCursorManager::CursorLifetime::Mortal,
-                                                   UserNameIterator()));
+                                                   boost::none));
         auto pinnedCursor =
             getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     }
@@ -954,7 +954,7 @@ TEST_F(ClusterCursorManagerTest, RemotesExhausted) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto pinnedCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     ASSERT_OK(pinnedCursor.getStatus());
@@ -970,7 +970,7 @@ TEST_F(ClusterCursorManagerTest, DoNotDestroyKilledPinnedCursors) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto pinnedCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
     ASSERT_OK(pinnedCursor.getStatus());
@@ -1008,7 +1008,7 @@ TEST_F(ClusterCursorManagerTest, CursorStoresAPIParameters) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto pinnedCursor = assertGet(
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker));
 
@@ -1024,7 +1024,7 @@ TEST_F(ClusterCursorManagerTest, CannotRegisterCursorDuringShutdown) {
                                            nss,
                                            ClusterCursorManager::CursorType::SingleTarget,
                                            ClusterCursorManager::CursorLifetime::Mortal,
-                                           UserNameIterator()));
+                                           boost::none));
     ASSERT(!isMockCursorKilled(0));
 
     getManager()->shutdown(getOperationContext());
@@ -1037,7 +1037,7 @@ TEST_F(ClusterCursorManagerTest, CannotRegisterCursorDuringShutdown) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
 }
 
 TEST_F(ClusterCursorManagerTest, PinnedCursorNotKilledOnShutdown) {
@@ -1047,7 +1047,7 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorNotKilledOnShutdown) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
 
     auto pinnedCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
@@ -1069,7 +1069,7 @@ TEST_F(ClusterCursorManagerTest, CannotCheckoutCursorDuringShutdown) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     ASSERT(!isMockCursorKilled(0));
 
     getManager()->shutdown(getOperationContext());
@@ -1092,7 +1092,7 @@ TEST_F(ClusterCursorManagerTest, CursorsWithoutSessions) {
                                            nss,
                                            ClusterCursorManager::CursorType::SingleTarget,
                                            ClusterCursorManager::CursorLifetime::Mortal,
-                                           UserNameIterator()));
+                                           boost::none));
 
     // Manager should have no active sessions.
     LogicalSessionIdSet lsids;
@@ -1112,7 +1112,7 @@ TEST_F(ClusterCursorManagerTest, OneCursorWithASession) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
 
     // Retrieve all sessions active in manager - set should contain just lsid.
     LogicalSessionIdSet lsids;
@@ -1147,7 +1147,7 @@ TEST_F(ClusterCursorManagerTest, GetSessionIdsWhileCheckedOut) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
 
     // Check the cursor out, then try to append cursors, see that we get one.
     auto res = getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
@@ -1169,14 +1169,14 @@ TEST_F(ClusterCursorManagerTest, MultipleCursorsWithSameSession) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     auto cursorId2 =
         assertGet(getManager()->registerCursor(getOperationContext(),
                                                allocateMockCursor(lsid),
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
 
     // Retrieve all sessions - set should contain just lsid.
     stdx::unordered_set<LogicalSessionId, LogicalSessionIdHash> lsids;
@@ -1219,7 +1219,7 @@ TEST_F(ClusterCursorManagerTest, MultipleCursorsMultipleSessions) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
 
     CursorId cursor2 =
         assertGet(getManager()->registerCursor(getOperationContext(),
@@ -1227,14 +1227,14 @@ TEST_F(ClusterCursorManagerTest, MultipleCursorsMultipleSessions) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
 
     ASSERT_OK(getManager()->registerCursor(getOperationContext(),
                                            allocateMockCursor(),
                                            nss,
                                            ClusterCursorManager::CursorType::SingleTarget,
                                            ClusterCursorManager::CursorLifetime::Mortal,
-                                           UserNameIterator()));
+                                           boost::none));
 
     // Retrieve all sessions - should be both lsids.
     LogicalSessionIdSet lsids;
@@ -1265,7 +1265,7 @@ TEST_F(ClusterCursorManagerTest, ManyCursorsManySessions) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
     }
 
     // Retrieve all sessions.
@@ -1281,7 +1281,7 @@ TEST_F(ClusterCursorManagerTest, CheckAuthForKillCursors) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
+                                               boost::none));
 
     ASSERT_EQ(ErrorCodes::CursorNotFound,
               getManager()->checkAuthForKillCursors(
@@ -1301,7 +1301,7 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorReturnsUnderlyingCursorTxnNumber) {
                                      nss,
                                      ClusterCursorManager::CursorType::SingleTarget,
                                      ClusterCursorManager::CursorLifetime::Mortal,
-                                     UserNameIterator()));
+                                     boost::none));
 
     auto pinnedCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);

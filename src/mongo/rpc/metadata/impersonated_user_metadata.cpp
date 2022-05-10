@@ -58,6 +58,10 @@ void readImpersonatedUserMetadata(const BSONElement& elem, OperationContext* opC
         IDLParserErrorContext errCtx(kImpersonationMetadataSectionName);
         auto data = ImpersonatedUserMetadata::parse(errCtx, elem.embeddedObject());
 
+        uassert(ErrorCodes::BadValue,
+                "Impersonating multiple users is not supported",
+                data.getUsers().size() <= 1);
+
         // Set the impersonation data only if there are actually impersonated
         // users/roles.
         if ((!data.getUsers().empty()) || (!data.getRoles().empty())) {
@@ -75,20 +79,24 @@ void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBui
 
     // Otherwise construct a metadata section from the list of authenticated users/roles
     auto authSession = AuthorizationSession::get(opCtx->getClient());
-    auto userNames = authSession->getImpersonatedUserNames();
+    auto userName = authSession->getImpersonatedUserName();
     auto roleNames = authSession->getImpersonatedRoleNames();
-    if (!userNames.more() && !roleNames.more()) {
-        userNames = authSession->getAuthenticatedUserNames();
+    if (!userName && !roleNames.more()) {
+        userName = authSession->getAuthenticatedUserName();
         roleNames = authSession->getAuthenticatedRoleNames();
     }
 
     // If there are no users/roles being impersonated just exit
-    if (!userNames.more() && !roleNames.more()) {
+    if (!userName && !roleNames.more()) {
         return;
     }
 
     ImpersonatedUserMetadata metadata;
-    metadata.setUsers(userNameIteratorToContainer<std::vector<UserName>>(userNames));
+    if (userName) {
+        metadata.setUsers({userName.get()});
+    } else {
+        metadata.setUsers({});
+    }
     metadata.setRoles(roleNameIteratorToContainer<std::vector<RoleName>>(roleNames));
 
     BSONObjBuilder section(out->subobjStart(kImpersonationMetadataSectionName));

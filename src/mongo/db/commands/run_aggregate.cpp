@@ -989,7 +989,7 @@ Status runAggregate(OperationContext* opCtx,
         ClientCursorParams cursorParams(
             std::move(exec),
             origNss,
-            AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+            AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName(),
             APIParameters::get(opCtx),
             opCtx->getWriteConcern(),
             repl::ReadConcernArgs::get(opCtx),

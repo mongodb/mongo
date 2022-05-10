@@ -162,7 +162,7 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
     const NamespaceString& nss,
     CursorType cursorType,
     CursorLifetime cursorLifetime,
-    UserNameIterator authenticatedUsers) {
+    const boost::optional<UserName>& authenticatedUser) {
     // Read the clock out of the lock.
     const auto now = _clockSource->now();
 
@@ -188,7 +188,7 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
                                                              cursorType,
                                                              cursorLifetime,
                                                              now,
-                                                             authenticatedUsers,
+                                                             authenticatedUser,
                                                              opCtx->getClient()->getUUID(),
                                                              opCtx->getOperationKey(),
                                                              nss));
@@ -216,7 +216,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     }
 
     // Check if the user is coauthorized to access this cursor.
-    auto authCheckStatus = authChecker(entry->getAuthenticatedUsers());
+    auto authCheckStatus = authChecker(entry->getAuthenticatedUser());
     if (!authCheckStatus.isOK()) {
         return authCheckStatus.withContext(str::stream()
                                            << "cursor id " << cursorId
@@ -296,9 +296,9 @@ Status ClusterCursorManager::checkAuthForKillCursors(OperationContext* opCtx,
         return cursorNotFoundStatus(cursorId);
     }
 
-    // Note that getAuthenticatedUsers() is thread-safe, so it's okay to call even if there's
+    // Note that getAuthenticatedUser() is thread-safe, so it's okay to call even if there's
     // an operation using the cursor.
-    return authChecker(entry->getAuthenticatedUsers());
+    return authChecker(entry->getAuthenticatedUser());
 }
 
 void ClusterCursorManager::killOperationUsingCursor(WithLock, CursorEntry* entry) {
@@ -497,7 +497,7 @@ std::vector<GenericCursor> ClusterCursorManager::getIdleCursors(
         // permission to see this cursor.
         if (ctxAuth->getAuthorizationManager().isAuthEnabled() &&
             userMode == MongoProcessInterface::CurrentOpUserMode::kExcludeOthers &&
-            !ctxAuth->isCoauthorizedWith(entry.getAuthenticatedUsers())) {
+            !ctxAuth->isCoauthorizedWith(entry.getAuthenticatedUser())) {
             continue;
         }
         if (entry.isKillPending() || entry.getOperationUsingCursor()) {

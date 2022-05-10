@@ -1054,45 +1054,33 @@ TEST_F(AuthorizationSessionTest,
     ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
 }
 
-TEST_F(AuthorizationSessionTest, UnauthorizedSessionIsCoauthorizedWithEmptyUserSet) {
-    std::vector<UserName> userSet;
-    ASSERT_TRUE(
-        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+TEST_F(AuthorizationSessionTest, UnauthorizedSessionIsCoauthorizedWithNobody) {
+    ASSERT_TRUE(authzSession->isCoauthorizedWith(boost::none));
 }
 
-TEST_F(AuthorizationSessionTest, UnauthorizedSessionIsNotCoauthorizedWithNonemptyUserSet) {
-    std::vector<UserName> userSet;
-    userSet.emplace_back("spencer", "test");
-    ASSERT_FALSE(
-        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+TEST_F(AuthorizationSessionTest, UnauthorizedSessionIsNotCoauthorizedWithAnybody) {
+    ASSERT_FALSE(authzSession->isCoauthorizedWith(UserName("spencer", "test")));
 }
 
-TEST_F(AuthorizationSessionTest,
-       UnauthorizedSessionIsCoauthorizedWithNonemptyUserSetWhenAuthIsDisabled) {
+TEST_F(AuthorizationSessionTest, UnauthorizedSessionIsCoauthorizedWithAnybodyWhenAuthIsDisabled) {
     authzManager->setAuthEnabled(false);
-    std::vector<UserName> userSet;
-    userSet.emplace_back("spencer", "test");
-    ASSERT_TRUE(
-        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+    ASSERT_TRUE(authzSession->isCoauthorizedWith(UserName("spencer", "test")));
 }
 
-TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedWithEmptyUserSet) {
-    ASSERT_OK(createUser({"spencer", "test"}, {}));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
-    std::vector<UserName> userSet;
-    ASSERT_FALSE(
-        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedNobody) {
+    UserName user("spencer", "test");
+    ASSERT_OK(createUser(user, {}));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), user));
+    ASSERT_FALSE(authzSession->isCoauthorizedWith(boost::none));
     authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
 }
 
-TEST_F(AuthorizationSessionTest,
-       AuthorizedSessionIsCoauthorizedWithEmptyUserSetWhenAuthIsDisabled) {
+TEST_F(AuthorizationSessionTest, AuthorizedSessionIsCoauthorizedNobodyWhenAuthIsDisabled) {
+    UserName user("spencer", "test");
     authzManager->setAuthEnabled(false);
-    ASSERT_OK(createUser({"spencer", "test"}, {}));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
-    std::vector<UserName> userSet;
-    ASSERT_TRUE(
-        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+    ASSERT_OK(createUser(user, {}));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), user));
+    ASSERT_TRUE(authzSession->isCoauthorizedWith(user));
     authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
 }
 

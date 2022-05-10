@@ -86,7 +86,7 @@ commands:
                 - check: is_coauthorized_with_client
                 - check: is_coauthorized_with
                 - check: should_ignore_auth_checks
-                - check: get_single_user
+                - check: get_authenticated_user
                 - check: lookup_user
                 - privilege: # many commands
                     resource_pattern: exact_namespace

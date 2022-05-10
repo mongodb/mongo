@@ -42,14 +42,14 @@ namespace mongo {
 namespace {
 
 std::vector<KillAllSessionsUser> getKillAllSessionsImpersonateUsers(OperationContext* opCtx) {
-    AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+    auto* as = AuthorizationSession::get(opCtx->getClient());
 
     std::vector<KillAllSessionsUser> out;
 
-    for (auto iter = authSession->getAuthenticatedUserNames(); iter.more(); iter.next()) {
+    if (auto name = as->getAuthenticatedUserName()) {
         out.emplace_back();
-        out.back().setUser(iter->getUser());
-        out.back().setDb(iter->getDB());
+        out.back().setUser(name->getUser());
+        out.back().setDb(name->getDB());
     }
 
     return out;
@@ -71,19 +71,19 @@ std::vector<KillAllSessionsRole> getKillAllSessionsImpersonateRoles(OperationCon
 
 }  // namespace
 
-std::tuple<std::vector<UserName>, std::vector<RoleName>> getKillAllSessionsByPatternImpersonateData(
-    const KillAllSessionsByPattern& pattern) {
-    std::tuple<std::vector<UserName>, std::vector<RoleName>> out;
+std::tuple<boost::optional<UserName>, std::vector<RoleName>>
+getKillAllSessionsByPatternImpersonateData(const KillAllSessionsByPattern& pattern) {
+    std::tuple<boost::optional<UserName>, std::vector<RoleName>> out;
 
-    auto& users = std::get<0>(out);
+    auto& user = std::get<0>(out);
     auto& roles = std::get<1>(out);
 
-    if (pattern.getUsers()) {
-        users.reserve(pattern.getUsers()->size());
-
-        for (auto&& user : pattern.getUsers().get()) {
-            users.emplace_back(user.getUser(), user.getDb());
-        }
+    if (pattern.getUsers() && (pattern.getUsers()->size() > 0)) {
+        uassert(ErrorCodes::BadValue,
+                "Too many users in impersonation data",
+                pattern.getUsers()->size() <= 1);
+        const auto& impUser = pattern.getUsers().get()[0];
+        user = UserName(impUser.getUser(), impUser.getDb());
     }
 
     if (pattern.getRoles()) {
@@ -119,16 +119,14 @@ KillAllSessionsByPatternItem makeKillAllSessionsByPattern(OperationContext* opCt
 }
 
 KillAllSessionsByPatternSet makeSessionFilterForAuthenticatedUsers(OperationContext* opCtx) {
-    AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     KillAllSessionsByPatternSet patterns;
 
-    for (auto it = authSession->getAuthenticatedUserNames(); it.more(); it.next()) {
-        if (auto user = authSession->lookupUser(*it)) {
-            KillAllSessionsByPattern pattern;
-            pattern.setUid(user->getDigest());
-            KillAllSessionsByPatternItem item{std::move(pattern), APIParameters::get(opCtx)};
-            patterns.emplace(std::move(item));
-        }
+    if (auto user = as->getAuthenticatedUser()) {
+        KillAllSessionsByPattern pattern;
+        pattern.setUid(user.get()->getDigest());
+        KillAllSessionsByPatternItem item{std::move(pattern), APIParameters::get(opCtx)};
+        patterns.emplace(std::move(item));
     }
     return patterns;
 }

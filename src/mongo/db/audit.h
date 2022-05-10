@@ -75,7 +75,7 @@ extern std::function<void(ServiceContext*)> initializeSynchronizeJob;
  * roleNames stored in ImpersonatedClientAttrs.
  */
 struct ImpersonatedClientAttrs {
-    std::vector<UserName> userNames;
+    UserName userName;
     std::vector<RoleName> roleNames;
 
     ImpersonatedClientAttrs() = default;

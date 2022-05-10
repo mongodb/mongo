@@ -127,10 +127,8 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
 
     // Compute the set of collection names which would be permissible to return.
     std::set<std::string> collectionNames;
-    for (UserNameIterator nameIter = authzSession->getAuthenticatedUserNames(); nameIter.more();
-         nameIter.next()) {
-        User* authUser = authzSession->lookupUser(*nameIter);
-        for (const auto& [resource, privilege] : authUser->getPrivileges()) {
+    if (auto authUser = authzSession->getAuthenticatedUser()) {
+        for (const auto& [resource, privilege] : authUser.get()->getPrivileges()) {
             if (resource.isCollectionPattern() ||
                 (resource.isExactNamespacePattern() && resource.databaseToMatch() == dbName)) {
                 collectionNames.emplace(resource.collectionToMatch().toString());

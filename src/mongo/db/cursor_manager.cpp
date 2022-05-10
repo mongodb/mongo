@@ -324,7 +324,7 @@ std::vector<GenericCursor> CursorManager::getIdleCursors(
             // Exclude cursors that this user does not own if auth is enabled.
             if (ctxAuth->getAuthorizationManager().isAuthEnabled() &&
                 userMode == MongoProcessInterface::CurrentOpUserMode::kExcludeOthers &&
-                !ctxAuth->isCoauthorizedWith(cursor->getAuthenticatedUsers())) {
+                !ctxAuth->isCoauthorizedWith(cursor->getAuthenticatedUser())) {
                 continue;
             }
             // Exclude pinned cursors.
@@ -479,7 +479,7 @@ Status CursorManager::checkAuthForKillCursors(OperationContext* opCtx, CursorId 
     // after the cursor's creation. We're guaranteed that the cursor won't get destroyed while we're
     // reading from it because we hold the partition's lock.
     AuthorizationSession* as = AuthorizationSession::get(opCtx->getClient());
-    return auth::checkAuthForKillCursors(as, cursor->nss(), cursor->getAuthenticatedUsers());
+    return auth::checkAuthForKillCursors(as, cursor->nss(), cursor->getAuthenticatedUser());
 }
 
 }  // namespace mongo

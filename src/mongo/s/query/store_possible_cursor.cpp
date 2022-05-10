@@ -132,14 +132,14 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     // We don't expect to use this cursor until a subsequent getMore, so detach from the current
     // OperationContext until then.
     ccc->detachFromOperationContext();
-    auto authUsers = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames();
+    auto authUser = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();
     auto clusterCursorId =
         cursorManager->registerCursor(opCtx,
                                       ccc.releaseCursor(),
                                       requestedNss,
                                       ClusterCursorManager::CursorType::SingleTarget,
                                       ClusterCursorManager::CursorLifetime::Mortal,
-                                      authUsers);
+                                      authUser);
     if (!clusterCursorId.isOK()) {
         return clusterCursorId.getStatus();
     }

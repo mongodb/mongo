@@ -57,7 +57,11 @@ public:
             {Privilege(ResourcePattern::forClusterResource(), ActionType::useTenant)});
         auto* as =
             dynamic_cast<AuthorizationSessionImpl*>(AuthorizationSession::get(opCtx->getClient()));
-        as->_authenticatedUsers.add(std::move(user));
+        if (as->_authenticatedUser != boost::none) {
+            as->logoutAllDatabases(opCtx->getClient(), "AuthorizationSessionImplTestHelper"_sd);
+        }
+        as->_authenticatedUser = std::move(user);
+        as->_authenticationMode = AuthorizationSession::AuthenticationMode::kConnection;
         as->_updateInternalAuthorizationState();
     }
 };

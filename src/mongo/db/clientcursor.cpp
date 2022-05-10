@@ -87,7 +87,7 @@ ClientCursor::ClientCursor(ClientCursorParams params,
                            Date_t now)
     : _cursorid(cursorId),
       _nss(std::move(params.nss)),
-      _authenticatedUsers(std::move(params.authenticatedUsers)),
+      _authenticatedUser(std::move(params.authenticatedUser)),
       _lsid(operationUsingCursor->getLogicalSessionId()),
       _txnNumber(operationUsingCursor->getTxnNumber()),
       _apiParameters(std::move(params.apiParameters)),

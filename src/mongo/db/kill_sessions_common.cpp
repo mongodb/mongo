@@ -102,8 +102,11 @@ void killSessionsReport(OperationContext* opCtx, const BSONObj& cmdObj) {
     auto client = opCtx->getClient();
     if (client) {
         if (AuthorizationManager::get(client->getServiceContext())->isAuthEnabled()) {
-            auto user = AuthorizationSession::get(client)->getAuthenticatedUserNames();
-            attr.add("user", user->toBSON());
+            if (auto user = AuthorizationSession::get(client)->getAuthenticatedUserName()) {
+                attr.add("user", BSON_ARRAY(user->toBSON()));
+            } else {
+                attr.add("user", BSONArray());
+            }
         }
 
         if (client->session()) {

@@ -61,7 +61,7 @@ commands:
         access_check:
             complex:
                 - check: should_ignore_auth_checks
-                - check: get_single_user # Can be triggered by aggregation
+                - check: get_authenticated_user # Can be triggered by aggregation
                 - check: lookup_user # Can be triggered by aggregation
                 - privilege:
                     resource_pattern: exact_namespace

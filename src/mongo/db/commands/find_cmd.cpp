@@ -686,7 +686,7 @@ public:
                     opCtx,
                     {std::move(exec),
                      nss,
-                     AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+                     AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName(),
                      APIParameters::get(opCtx),
                      opCtx->getWriteConcern(),
                      repl::ReadConcernArgs::get(opCtx),

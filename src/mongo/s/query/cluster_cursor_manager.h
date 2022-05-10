@@ -117,7 +117,7 @@ public:
     // Represents a function that may be passed into a ClusterCursorManager method which checks
     // whether the current client is authorized to perform the operation in question. The function
     // will be passed the list of users authorized to use the cursor.
-    using AuthzCheckFn = std::function<Status(UserNameIterator)>;
+    using AuthzCheckFn = std::function<Status(const boost::optional<UserName>&)>;
 
     /**
      * PinnedCursor is a moveable, non-copyable class representing ownership of a cursor that has
@@ -226,7 +226,7 @@ public:
                     CursorType cursorType,
                     CursorLifetime cursorLifetime,
                     Date_t lastActive,
-                    UserNameIterator authenticatedUsersIter,
+                    boost::optional<UserName> authenticatedUser,
                     UUID clientUUID,
                     boost::optional<OperationKey> opKey,
                     NamespaceString nss)
@@ -238,8 +238,7 @@ public:
               _opKey(std::move(opKey)),
               _nss(std::move(nss)),
               _originatingClient(std::move(clientUUID)),
-              _authenticatedUsers(
-                  userNameIteratorToContainer<std::vector<UserName>>(authenticatedUsersIter)) {
+              _authenticatedUser(std::move(authenticatedUser)) {
             invariant(_cursor);
         }
 
@@ -330,8 +329,8 @@ public:
             _lastActive = lastActive;
         }
 
-        UserNameIterator getAuthenticatedUsers() const {
-            return makeUserNameIterator(_authenticatedUsers.begin(), _authenticatedUsers.end());
+        const boost::optional<UserName>& getAuthenticatedUser() const {
+            return _authenticatedUser;
         }
 
         const UUID& originatingClientUuid() const {
@@ -365,7 +364,7 @@ public:
         /**
          * The set of users authorized to use this cursor.
          */
-        std::vector<UserName> _authenticatedUsers;
+        boost::optional<UserName> _authenticatedUser;
     };
 
     /**
@@ -408,7 +407,7 @@ public:
                                         const NamespaceString& nss,
                                         CursorType cursorType,
                                         CursorLifetime cursorLifetime,
-                                        UserNameIterator authenticatedUsers);
+                                        const boost::optional<UserName>& authenticatedUser);
 
     /**
      * Moves the given cursor to the 'pinned' state, and transfers ownership of the cursor to the
