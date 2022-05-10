@@ -1829,9 +1829,12 @@ DB.prototype.createEncryptedCollection = function(name, opts) {
 
     assert.commandWorked(this.getCollection(name).createIndex({__safeContent__: 1}));
 
-    assert.commandWorked(this.createCollection(ef.escCollection));
-    assert.commandWorked(this.createCollection(ef.eccCollection));
-    assert.commandWorked(this.createCollection(ef.ecocCollection));
+    assert.commandWorked(
+        this.createCollection(ef.escCollection, {clusteredIndex: {key: {_id: 1}, unique: true}}));
+    assert.commandWorked(
+        this.createCollection(ef.eccCollection, {clusteredIndex: {key: {_id: 1}, unique: true}}));
+    assert.commandWorked(
+        this.createCollection(ef.ecocCollection, {clusteredIndex: {key: {_id: 1}, unique: true}}));
 
     return res;
 };
