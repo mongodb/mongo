@@ -38,6 +38,7 @@ function TenantMigrationTest({
     initiateRstWithHighElectionTimeout = true,
     quickGarbageCollection = false,
     insertDataForTenant,
+    optimizeMigrations = true,
 }) {
     const donorPassedIn = (donorRst !== undefined);
     const recipientPassedIn = (recipientRst !== undefined);
@@ -47,9 +48,15 @@ function TenantMigrationTest({
 
     const nodes = sharedOptions.nodes || 2;
     const setParameterOpts = sharedOptions.setParameter || {};
+    if (optimizeMigrations) {
+        // A tenant migration recipient's `OplogFetcher` uses aggregation which does not support
+        // tailable awaitdata cursors. For aggregation commands `OplogFetcher` will default to half
+        // the election timeout (e.g: 5 seconds) between getMores. That wait is largely unnecessary.
+        setParameterOpts["failpoint.setSmallOplogGetMoreMaxTimeMS"] = tojson({"mode": "alwaysOn"});
+    }
     if (quickGarbageCollection) {
-        setParameterOpts.tenantMigrationGarbageCollectionDelayMS = 3 * 1000;
-        setParameterOpts.ttlMonitorSleepSecs = 3;
+        setParameterOpts.tenantMigrationGarbageCollectionDelayMS = 0;
+        setParameterOpts.ttlMonitorSleepSecs = 1;
     }
 
     donorRst = donorPassedIn ? donorRst : performSetUp(true /* isDonor */);

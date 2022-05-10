@@ -19,15 +19,6 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/replsets/rslib.js");
 load("jstests/libs/uuid_util.js");
 
-const kGarbageCollectionParams = {
-    // Set the delay before a donor state doc is garbage collected to be short to speed up
-    // the test.
-    tenantMigrationGarbageCollectionDelayMS: 3 * 1000,
-
-    // Set the TTL monitor to run at a smaller interval to speed up the test.
-    ttlMonitorSleepSecs: 1,
-};
-
 const tenantMigrationTest = new TenantMigrationTest(
     {name: jsTestName(), sharedOptions: {nodes: 1}, quickGarbageCollection: true});
 
@@ -96,7 +87,11 @@ waitAfterStartingOplogApplier.off();
 waitInOplogApplier.off();
 
 TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+// With `quickGarbageCollection` it's likely that forgetting the migration will race with its
+// natural destruction.
+assert.commandWorkedOrFailedWithCode(
+    tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString),
+    [ErrorCodes.NoSuchTenantMigration]);
 tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId);
 
 // Test the client can retry commitTransaction against the recipient for transactions that committed
@@ -115,7 +110,8 @@ jsTestLog("Running a back-to-back migration");
 const tenantMigrationTest2 = new TenantMigrationTest({
     name: jsTestName() + "2",
     donorRst: tenantMigrationTest.getRecipientRst(),
-    sharedOptions: {nodes: 1, setParameter: kGarbageCollectionParams}
+    sharedOptions: {nodes: 1},
+    quickGarbageCollection: true,
 });
 const migrationId2 = UUID();
 const migrationOpts2 = {
@@ -132,7 +128,11 @@ donorTxnEntries.forEach((txnEntry) => {
     assert.commandWorked(recipientPrimary2.adminCommand(
         {commitTransaction: 1, lsid: txnEntry._id, txnNumber: txnEntry.txnNum, autocommit: false}));
 });
-assert.commandWorked(tenantMigrationTest2.forgetMigration(migrationOpts2.migrationIdString));
+// With `quickGarbageCollection` it's likely that forgetting the migration will race with its
+// natural destruction.
+assert.commandWorkedOrFailedWithCode(
+    tenantMigrationTest2.forgetMigration(migrationOpts2.migrationIdString),
+    [ErrorCodes.NoSuchTenantMigration]);
 tenantMigrationTest2.waitForMigrationGarbageCollection(migrationId2, kTenantId);
 
 tenantMigrationTest2.stop();

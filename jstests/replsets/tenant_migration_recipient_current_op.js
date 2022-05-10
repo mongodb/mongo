@@ -24,7 +24,12 @@ load("jstests/libs/parallelTester.js");   // For the Thread().
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+const tenantMigrationTest = new TenantMigrationTest({
+    name: jsTestName(),
+    // This test relies on a large awaitData timeout keeping a window open such that failpoints
+    // configured for hanging are hit.
+    optimizeMigrations: false,
+});
 
 const kMigrationId = UUID();
 const kTenantId = 'testTenantId';
