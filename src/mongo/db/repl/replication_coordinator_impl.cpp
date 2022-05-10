@@ -5261,6 +5261,13 @@ ChangeSyncSourceAction ReplicationCoordinatorImpl::shouldChangeSyncSource(
 
     if (_topCoord->shouldChangeSyncSource(
             currentSource, replMetadata, oqMetadata, lastOpTimeFetched, now)) {
+        if (getSettings().isServerless() &&
+            replMetadata.getReplicaSetId() != _rsConfig.getReplicaSetId()) {
+            // Drop the last batch of message following a change of replica set due to a shard
+            // split
+            return ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent;
+        }
+
         return ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch;
     }
 

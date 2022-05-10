@@ -70,7 +70,8 @@ void reconfigToAddRecipientNodes(ServiceContext* serviceContext,
     auto newConfig = repl::ReplSetConfig::parse(BSON("_id"
                                                      << "donor"
                                                      << "version" << 1 << "protocolVersion" << 1
-                                                     << "members" << members.arr()));
+                                                     << "members" << members.arr() << "settings"
+                                                     << BSON("replicaSetId" << OID::gen())));
 
     auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
     dynamic_cast<repl::ReplicationCoordinatorMock*>(replCoord)->setGetConfigReturnValue(newConfig);

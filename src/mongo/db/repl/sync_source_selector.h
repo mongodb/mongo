@@ -54,6 +54,22 @@ enum class ChangeSyncSourceAction {
     kStopSyncingAndEnqueueLastBatch
 };
 
+inline std::ostream& operator<<(std::ostream& os, const ChangeSyncSourceAction action) {
+    switch (action) {
+        case ChangeSyncSourceAction::kContinueSyncing:
+            os << "kContinueSyncing";
+            break;
+        case ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent:
+            os << "kStopSyncingAndDropLastBatchIfPresent";
+            break;
+        case ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch:
+            os << "kStopSyncingAndEnqueueLastBatch";
+            break;
+    }
+
+    return os;
+}
+
 /**
  * Manage list of viable and blocked sync sources that we can replicate from.
  */

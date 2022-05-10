@@ -119,7 +119,9 @@ repl::ReplSetConfig makeSplitConfig(const repl::ReplSetConfig& config,
         configNoMembersBson.getField("settings").isABSONObj()) {
         BSONObj settings = configNoMembersBson.getField("settings").Obj();
         if (settings.hasField("replicaSetId")) {
-            recipientConfigBob.append("settings", settings.removeField("replicaSetId"));
+            recipientConfigBob.append(
+                "settings",
+                settings.removeField("replicaSetId").addFields(BSON("replicaSetId" << OID::gen())));
         }
     }
 
@@ -128,7 +130,13 @@ repl::ReplSetConfig makeSplitConfig(const repl::ReplSetConfig& config,
     splitConfigBob.append("members", donorMembers);
     splitConfigBob.append("recipientConfig", recipientConfigBob.obj());
 
-    return repl::ReplSetConfig::parse(splitConfigBob.obj());
+    auto finalConfig = repl::ReplSetConfig::parse(splitConfigBob.obj());
+
+    uassert(ErrorCodes::InvalidReplicaSetConfig,
+            "Recipient config and top level config cannot share the same replicaSetId",
+            finalConfig.getReplicaSetId() != finalConfig.getRecipientConfig()->getReplicaSetId());
+
+    return finalConfig;
 }
 
 Status insertStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& stateDoc) {

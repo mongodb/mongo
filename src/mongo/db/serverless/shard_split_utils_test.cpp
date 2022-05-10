@@ -34,6 +34,36 @@
 namespace mongo {
 namespace repl {
 namespace {
+TEST(MakeSplitConfig, recipientConfigHasNewReplicaSetId) {
+    const std::string recipientTagName{"recipient"};
+    const auto donorReplSetId = OID::gen();
+    const auto recipientMemberBSON =
+        BSON("_id" << 1 << "host"
+                   << "localhost:20002"
+                   << "priority" << 0 << "votes" << 0 << "tags" << BSON(recipientTagName << "one"));
+
+    ReplSetConfig configA =
+        ReplSetConfig::parse(BSON("_id"
+                                  << "rs0"
+                                  << "version" << 1 << "protocolVersion" << 1 << "members"
+                                  << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                           << "localhost:12345")
+                                                << recipientMemberBSON)
+                                  << "settings"
+                                  << BSON("heartbeatIntervalMillis"
+                                          << 5000 << "heartbeatTimeoutSecs" << 20 << "replicaSetId"
+                                          << donorReplSetId)));
+
+    const std::string recipientConfigSetName{"newSet"};
+    const ReplSetConfig splitConfigResult =
+        serverless::makeSplitConfig(configA, recipientConfigSetName, recipientTagName);
+
+    ASSERT_EQ(splitConfigResult.getReplicaSetId(), donorReplSetId);
+    ASSERT_NE(splitConfigResult.getReplicaSetId(),
+              splitConfigResult.getRecipientConfig()->getReplicaSetId());
+    ASSERT_NE(splitConfigResult.getRecipientConfig()->getReplicaSetId(), OID());
+}
+
 TEST(MakeSplitConfig, toBSONRoundTripAbility) {
     ReplSetConfig configA;
     ReplSetConfig configB;
@@ -57,10 +87,13 @@ TEST(MakeSplitConfig, toBSONRoundTripAbility) {
     configB = ReplSetConfig::parse(configA.toBSON());
     ASSERT_TRUE(configA == configB);
 
+    const std::string recipientConfigSetName{"newSet"};
+    const ReplSetConfig splitConfigResult =
+        serverless::makeSplitConfig(configA, recipientConfigSetName, recipientTagName);
+
     // here we will test that the result from the method `makeSplitConfig` matches the hardcoded
     // resultSplitConfigBSON. We will also check that the recipient from the splitConfig matches
     // the hardcoded recipientConfig.
-    const std::string recipientConfigSetName{"newSet"};
     BSONObj resultRecipientConfigBSON = BSON(
         "_id" << recipientConfigSetName << "version" << 2 << "protocolVersion" << 1 << "members"
               << BSON_ARRAY(BSON("_id" << 0 << "host"
@@ -68,7 +101,11 @@ TEST(MakeSplitConfig, toBSONRoundTripAbility) {
                                        << "priority" << 1 << "votes" << 1 << "tags"
                                        << BSON(recipientTagName << "one")))
               << "settings"
-              << BSON("heartbeatIntervalMillis" << 5000 << "heartbeatTimeoutSecs" << 20));
+              // we use getReplicaSetId to match the newly replicaSetId created from makeSplitConfig
+              // on the recipientConfig since configA had a replicaSetId in its config.
+              << BSON("heartbeatIntervalMillis"
+                      << 5000 << "heartbeatTimeoutSecs" << 20 << "replicaSetId"
+                      << splitConfigResult.getRecipientConfig()->getReplicaSetId()));
 
     BSONObj resultSplitConfigBSON = BSON("_id"
                                          << "rs0"
@@ -81,9 +118,6 @@ TEST(MakeSplitConfig, toBSONRoundTripAbility) {
                                                  << "replicaSetId" << donorReplSetId)
                                          << "recipientConfig" << resultRecipientConfigBSON);
 
-    const ReplSetConfig splitConfigResult =
-        serverless::makeSplitConfig(configA, recipientConfigSetName, recipientTagName);
-
     ASSERT_OK(splitConfigResult.validate());
     ASSERT_TRUE(splitConfigResult == ReplSetConfig::parse(splitConfigResult.toBSON()));
 
@@ -92,8 +126,6 @@ TEST(MakeSplitConfig, toBSONRoundTripAbility) {
     ASSERT_TRUE(splitConfigResult == resultSplitConfig);
 
     auto recipientConfigResultPtr = splitConfigResult.getRecipientConfig();
-    // we use getReplicaSetId to match the newly replicaSetId created from makeSplitConfig on the
-    // recipientConfig since configA had a replicaSetId in its config.
 
     ASSERT_TRUE(*recipientConfigResultPtr == ReplSetConfig::parse(resultRecipientConfigBSON));
 }
@@ -116,7 +148,8 @@ TEST(MakeSplitConfig, ValidateSplitConfigIntegrityTest) {
                                  << BSON("_id" << 2 << "host"
                                                << "localhost:20003"
                                                << "priority" << 6))
-                   << "settings" << BSON("electionTimeoutMillis" << 1000)));
+                   << "settings"
+                   << BSON("electionTimeoutMillis" << 1000 << "replicaSetId" << OID::gen())));
 
 
     const ReplSetConfig splitConfig =

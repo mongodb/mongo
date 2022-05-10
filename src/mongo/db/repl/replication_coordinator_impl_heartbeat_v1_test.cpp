@@ -626,7 +626,8 @@ public:
         bob.appendElements(BSON("_id"
                                 << "mySet"
                                 << "version" << version << "members" << _members
-                                << "protocolVersion" << 1));
+                                << "protocolVersion" << 1 << "settings"
+                                << BSON("replicaSetId" << OID::gen())));
         if (term) {
             bob.append("term", *term);
         }
