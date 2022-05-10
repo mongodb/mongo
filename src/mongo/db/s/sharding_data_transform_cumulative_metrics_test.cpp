@@ -562,13 +562,13 @@ public:
         addExpectedField(CoordinatorStateEnum::kAborting);
         addExpectedField(CoordinatorStateEnum::kCommitting);
 
-        for (const auto& expectedState : expectedStateFieldCount) {
-            const auto actualValue = serverStatusSubObj.getIntField(expectedState.first);
-            if (actualValue != expectedState.second) {
+        for (const auto& fieldNameAndState : expectedStateFieldCount) {
+            const auto actualValue = serverStatusSubObj.getIntField(fieldNameAndState.first);
+            if (actualValue != fieldNameAndState.second) {
                 LOGV2_DEBUG(6438600,
                             0,
                             "coordinator state field value does not match expected value",
-                            "field"_attr = expectedState.first,
+                            "field"_attr = fieldNameAndState.first,
                             "serverStatus"_attr = serverStatusSubObj);
                 return false;
             }
@@ -596,13 +596,13 @@ public:
         addExpectedField(DonorStateEnum::kBlockingWrites);
         addExpectedField(DonorStateEnum::kDone);
 
-        for (const auto& expectedState : expectedStateFieldCount) {
-            const auto actualValue = serverStatusSubObj.getIntField(expectedState.first);
-            if (actualValue != expectedState.second) {
+        for (const auto& fieldNameAndState : expectedStateFieldCount) {
+            const auto actualValue = serverStatusSubObj.getIntField(fieldNameAndState.first);
+            if (actualValue != fieldNameAndState.second) {
                 LOGV2_DEBUG(6438701,
                             0,
                             "Donor state field value does not match expected value",
-                            "field"_attr = expectedState.first,
+                            "field"_attr = fieldNameAndState.first,
                             "serverStatus"_attr = serverStatusSubObj);
                 return false;
             }
@@ -630,13 +630,13 @@ public:
         addExpectedField(RecipientStateEnum::kStrictConsistency);
         addExpectedField(RecipientStateEnum::kDone);
 
-        for (const auto& expectedState : expectedStateFieldCount) {
-            const auto actualValue = serverStatusSubObj.getIntField(expectedState.first);
-            if (actualValue != expectedState.second) {
+        for (const auto& fieldNameAndState : expectedStateFieldCount) {
+            const auto actualValue = serverStatusSubObj.getIntField(fieldNameAndState.first);
+            if (actualValue != fieldNameAndState.second) {
                 LOGV2_DEBUG(6438901,
                             0,
                             "Recipient state field value does not match expected value",
-                            "field"_attr = expectedState.first,
+                            "field"_attr = fieldNameAndState.first,
                             "serverStatus"_attr = serverStatusSubObj);
                 return false;
             }
