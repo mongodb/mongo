@@ -157,7 +157,13 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.data.getRandomDocument = function getRandomDocument(collection) {
-        const doc = collection.findOne({tid: this.tid});
+        // Use linearizable read concern to guarantee any subsequent transaction snapshot will
+        // include the found document. Skip if the test has a default read concern or requires
+        // casual consistency because in both cases the default read concern should provide this
+        // guarantee already.
+        const doc = (TestData.defaultReadConcernLevel || this.shouldUseCausalConsistency)
+            ? collection.findOne({tid: this.tid})
+            : collection.findOne({tid: this.tid}, {}, {}, "linearizable");
         assert.neq(doc, null);
         return doc;
     };
