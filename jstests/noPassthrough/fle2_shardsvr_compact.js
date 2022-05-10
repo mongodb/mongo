@@ -2,7 +2,8 @@
  * Cannot run compact against a shard server
  *
  * @tags: [
- * requires_fcv_60
+ * requires_fcv_60,
+ * requires_sharding
  * ]
  */
 load("jstests/fle2/libs/encrypted_client_util.js");
