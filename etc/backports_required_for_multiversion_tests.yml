@@ -220,6 +220,8 @@ last-continuous:
       test_file: jstests/core/wildcard_index_cached_plans.js
     - ticket: SERVER-65821
       test_file: jstests/replsets/dbhash_lock_acquisition.js
+    - ticket: SERVER-66089
+      test_file: jstests/replsets/initial_sync_with_partial_transaction.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -573,6 +575,8 @@ last-lts:
       test_file: jstests/core/wildcard_index_cached_plans.js
     - ticket: SERVER-65821
       test_file: jstests/replsets/dbhash_lock_acquisition.js
+    - ticket: SERVER-66089
+      test_file: jstests/replsets/initial_sync_with_partial_transaction.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

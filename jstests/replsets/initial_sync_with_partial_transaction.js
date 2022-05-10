@@ -87,6 +87,7 @@ checkLog.containsJson(initialSyncNode, 6608900);
 stopReplProducerOnDocumentFailPoint.off();
 pauseBatchApplicationAfterWritingOplogEntriesFailPoint.off();
 replTest.awaitSecondaryNodes();
+replTest.awaitReplication();
 
 // Make sure we got the transaction.
 assert.eq(4, initialSyncNode.getDB(dbName)[collName].find().itcount());
