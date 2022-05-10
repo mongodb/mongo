@@ -879,7 +879,7 @@ class NinjaState:
         )
 
         ninja.build(
-            "compiledb", rule="phony", implicit=["compile_commands.json"], order_only=[generated_sources_alias],
+            "compiledb", rule="phony", implicit=["compile_commands.json"],
         )
 
         # Look in SCons's list of DEFAULT_TARGETS, find the ones that
