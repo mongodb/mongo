@@ -13,6 +13,20 @@ overrides:
   enterprise-macos:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
+  - task: run_unittests
+    exec_timeout: 60
+
+  enterprise-macos-arm64:
+  - task: run_unittests
+    exec_timeout: 60
+
+  enterprise-macos-cxx20:
+  - task: run_unittests
+    exec_timeout: 60
+
+  enterprise-macos-rosetta-2:
+  - task: run_unittests
+    exec_timeout: 60
 
   enterprise-rhel-80-64-bit-coverage:
   - task: replica_sets_jscore_passthrough
@@ -53,6 +67,16 @@ overrides:
   macos:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
+  - task: run_unittests
+    exec_timeout: 60
+
+  macos-debug-suggested:
+  - task: run_unittests
+    exec_timeout: 60
+
+  macos-arm64:
+  - task: run_unittests
+    exec_timeout: 60
 
   rhel80-asan:
   - task: run_unittests
