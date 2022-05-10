@@ -514,32 +514,43 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
     def gen_getter(self, struct, field):
         # type: (ast.Struct, ast.Field) -> None
         """Generate the C++ getter definition for a field."""
-        method_name = _get_field_member_getter_name(field)
-        if field.chained_struct_field:
-            ch = _get_field_member_name(field.chained_struct_field)
-            ch_get = _get_field_member_getter_name(field)
-            self._writer.write_line(
-                f'decltype(auto) {method_name}() const {{ return {ch}.{ch_get}(); }}')
-            return
-
         cpp_type_info = cpp_types.get_cpp_type(field)
-        body = cpp_type_info.get_getter_body(_get_field_member_name(field))
+        param_type = cpp_type_info.get_getter_setter_type()
+        member_name = _get_field_member_name(field)
 
-        add_const = lambda t: f'std::add_const_t<{t}>'
-        add_ref = lambda t: f'std::add_lvalue_reference_t<{t}>'
-        ret = cpp_type_info.get_getter_setter_type()
-        cret = ret
-        nonconst = False
         if cpp_type_info.return_by_reference():
-            ret, cret = add_ref(ret), add_ref(add_const(ret))
-            if field.type.is_struct:
-                nonconst = not struct.immutable
-            else:
-                nonconst = field.non_const_getter
+            param_type += "&"
 
-        self._writer.write_line(f'{cret} {method_name}() const {{ {body} }}')
-        if nonconst:
-            self._writer.write_line(f'{ret} {method_name}() {{ {body} }}')
+        template_params = {
+            'method_name': _get_field_member_getter_name(field),
+            'param_type': param_type,
+            'body': cpp_type_info.get_getter_body(member_name),
+            'const_type': 'const ' if cpp_type_info.return_by_reference() else '',
+        }
+
+        # Generate a getter that disables xvalue for view types (i.e. StringData), constructed
+        # optional types, and non-primitive types.
+        with self._with_template(template_params):
+
+            if field.chained_struct_field:
+                self._writer.write_template(
+                    '${const_type} ${param_type} ${method_name}() const { return %s.%s(); }' % (
+                        (_get_field_member_name(field.chained_struct_field),
+                         _get_field_member_getter_name(field))))
+
+            elif field.type.is_struct:
+                # Support mutable accessors
+                self._writer.write_template(
+                    'const ${param_type} ${method_name}() const { ${body} }')
+
+                if not struct.immutable:
+                    self._writer.write_template('${param_type} ${method_name}() { ${body} }')
+            else:
+                self._writer.write_template(
+                    '${const_type}${param_type} ${method_name}() const { ${body} }')
+
+                if field.non_const_getter:
+                    self._writer.write_template('${param_type} ${method_name}() { ${body} }')
 
     def gen_validators(self, field):
         # type: (ast.Field) -> None
