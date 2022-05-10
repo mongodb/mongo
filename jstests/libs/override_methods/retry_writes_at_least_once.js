@@ -37,6 +37,9 @@ function runWithRetries(mongo, cmdObj, clientFunction, clientFunctionArguments) 
     if (isRetryableWriteCmd && canRetryWrites) {
         print("*** Initial response: " + tojsononeline(res));
         let retryAttempt = 1;
+        // Don't retry retryable writes that failed to execute because of
+        // InternalTransactionNotSupported (i.e. the writes require internal transactions but the
+        // mongod is not in the latest FCV).
         do {
             print("*** Retry attempt: " + retryAttempt + ", for command: " + cmdName +
                   " with txnNumber: " + tojson(cmdObj.txnNumber) +
@@ -44,7 +47,8 @@ function runWithRetries(mongo, cmdObj, clientFunction, clientFunctionArguments) 
             ++retryAttempt;
             res = clientFunction.apply(mongo, clientFunctionArguments);
             print("*** Retry response: " + tojsononeline(res));
-        } while (Random.rand() <= kExtraRetryProbability);
+        } while (Random.rand() <= kExtraRetryProbability &&
+                 res.code != ErrorCodes.InternalTransactionNotSupported);
     }
 
     return res;
