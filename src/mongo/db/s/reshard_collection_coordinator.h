@@ -55,6 +55,7 @@ protected:
 
 private:
     ShardingDDLCoordinatorMetadata const& metadata() const override {
+        stdx::lock_guard l{_docMutex};
         return _doc.getShardingDDLCoordinatorMetadata();
     }
 
@@ -81,7 +82,11 @@ private:
     void _enterPhase(Phase newPhase);
 
     const BSONObj _initialState;
+    mutable Mutex _docMutex = MONGO_MAKE_LATCH("ReshardCollectionCoordinator::_docMutex");
     ReshardCollectionCoordinatorDocument _doc;
+
+    const mongo::ReshardCollectionRequest _request;
+
     const bool _persistCoordinatorDocument;  // TODO: SERVER-62338 remove this then 6.0 branches out
 };
 

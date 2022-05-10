@@ -66,7 +66,10 @@ public:
     }
 
 protected:
+    mutable Mutex _docMutex = MONGO_MAKE_LATCH("CreateCollectionCoordinator::_docMutex");
     CoordDoc _doc;
+
+    const mongo::CreateCollectionRequest _request;
 
 private:
     ShardingDDLCoordinatorMetadata const& metadata() const override {

@@ -91,9 +91,11 @@ private:
 
     void _enterPhase(Phase newPhase);
 
+    mutable Mutex _docMutex = MONGO_MAKE_LATCH("RenameCollectionCoordinator::_docMutex");
     RenameCollectionCoordinatorDocument _doc;
 
     boost::optional<RenameCollectionResponse> _response;
+    const RenameCollectionRequest _request;
 };
 
 }  // namespace mongo

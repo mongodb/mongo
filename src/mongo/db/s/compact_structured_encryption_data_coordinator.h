@@ -60,10 +60,6 @@ public:
         return *_response;
     }
 
-    const NamespaceString& nss() const {
-        return _doc.getId().getNss();
-    }
-
     void checkIfOptionsConflict(const BSONObj& doc) const final {}
 
 private:
@@ -93,7 +89,10 @@ private:
                                   const CancellationToken& token) noexcept final;
 
 private:
+    mutable Mutex _docMutex =
+        MONGO_MAKE_LATCH("CompactStructuredEncryptionDataCoordinator::_docMutex");
     StateDoc _doc;
+
     boost::optional<CompactStructuredEncryptionDataCommandReply> _response;
     bool _skipCompact{false};
     boost::optional<UUID> _ecocRenameUuid;

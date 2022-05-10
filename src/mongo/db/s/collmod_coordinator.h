@@ -108,7 +108,11 @@ private:
     void _saveShardingInfoOnCoordinatorIfNecessary(OperationContext* opCtx);
 
     BSONObj _initialState;
+    mutable Mutex _docMutex = MONGO_MAKE_LATCH("CollModCoordinator::_docMutex");
     CollModCoordinatorDocument _doc;
+
+    const mongo::CollModRequest _request;
+
     boost::optional<BSONObj> _result;
     boost::optional<CollectionInfo> _collInfo;
     boost::optional<ShardingInfo> _shardingInfo;

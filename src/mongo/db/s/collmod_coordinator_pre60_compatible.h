@@ -32,6 +32,7 @@
 #include "mongo/db/s/collmod_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -61,6 +62,7 @@ public:
 
 private:
     ShardingDDLCoordinatorMetadata const& metadata() const override {
+        stdx::lock_guard l{_docMutex};
         return _doc.getShardingDDLCoordinatorMetadata();
     }
 
@@ -90,7 +92,9 @@ private:
         OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor);
 
     BSONObj _initialState;
+    mutable Mutex _docMutex = MONGO_MAKE_LATCH("CollModCoordinatorPre60Compatible::_docMutex");
     CollModCoordinatorDocument _doc;
+
     boost::optional<BSONObj> _result;
 };
 
