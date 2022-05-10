@@ -2343,7 +2343,6 @@ env.Program(
         '$BUILD_DIR/mongo/util/signal_handlers',
         'traffic_reader',
     ],
-    AIB_COMPONENT="mongotrafficreader"
 )
 
 env.Library(

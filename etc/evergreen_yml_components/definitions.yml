@@ -2224,7 +2224,7 @@ tasks:
   tags: []
   commands:
   - func: "scons compile"
-    vars: &compile-ninja-vars
+    vars:
       generating_for_ninja: true
       separate_debug: off
       task_install_action:
@@ -2270,49 +2270,6 @@ tasks:
         --build-tools=next
       targets:
         install-core
-
-- name: ninja_determinism
-  tags: []
-  commands:
-  - command: expansions.update
-    params:
-      updates:
-      - key: generating_for_ninja
-        value: "true"
-      - key: separate_debug
-        value: off
-      - key: task_install_action
-        value: default
-      - key: task_compile_flags
-        value: --ninja
-      - key: targets
-        value: generate-ninja
-  - *f_expansions_write
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "src/evergreen/ninja_determinism_test.sh"
-      env:
-        repeat: "5"
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/ninja.tgz
-      remote_file: ${project}/${build_variant}/${revision}/artifacts/ninja-determinism-${build_id}-${task_name}-${execution}.tgz
-      bucket: mciuploads
-      permissions: private
-      content_type: application/gzip
-      display_name: Ninja Determinism Test Artifacts
-      visibility: signed
-      optional: true
-  - command: subprocess.exec
-    type: test
-    params:
-      binary: bash
-      args:
-      - "src/evergreen/ninja_determinism_status.sh"
 
 - name: libdeps_graph_linting
   tags: []
@@ -7379,11 +7336,6 @@ task_groups:
       permissions: public-read
       content_type: text/plain
       display_name: build.ninja
-
-- <<: *compile_task_group_template
-  name: ninja_determinism_TG
-  tasks:
-  - ninja_determinism
 
 - <<: *compile_task_group_template
   name: server_discovery_and_monitoring_json_test_TG
