@@ -41,7 +41,6 @@ from wiredtiger import stat
 #   checkpoint snapshot.
 class test_checkpoint_snapshot03(wttest.WiredTigerTestCase):
 
-    # FIXME-WT-9063 revisit the use of self.retry() throughout this file.
     # Create a table.
     uri = "table:test_checkpoint_snapshot03"
     nrows = 500000
@@ -63,9 +62,7 @@ class test_checkpoint_snapshot03(wttest.WiredTigerTestCase):
         session = self.session
         cursor = session.open_cursor(uri)
         for i in range(1, nrows + 1):
-            for retry in self.retry():
-                with retry.transaction():
-                    cursor[ds.key(i)] = value
+            cursor[ds.key(i)] = value
         cursor.close()
 
     def check(self, check_value, uri, nrows):
