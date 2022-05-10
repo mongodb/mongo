@@ -32,8 +32,14 @@ const garbageCollectionOpts = {
     'failpoint.tenantMigrationDonorAllowsNonTimestampedReads': tojson({mode: 'alwaysOn'}),
 };
 
-const tenantMigrationTest = new TenantMigrationTest(
-    {name: jsTestName(), sharedOptions: {setParameter: garbageCollectionOpts}});
+const tenantMigrationTest = new TenantMigrationTest({
+    name: jsTestName(),
+    sharedOptions: {setParameter: garbageCollectionOpts},
+    // This test relies on ttl monitor deletion to be delayed long enough to observe documents prior
+    // to being deleted. That result is unintuitively achieved better with a large awaitData timeout
+    // than a slow ttl monitor.
+    optimizeMigrations: false
+});
 
 const collName = "testColl";
 

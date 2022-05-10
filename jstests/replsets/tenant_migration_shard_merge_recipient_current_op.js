@@ -106,6 +106,9 @@ jsTestLog("Starting tenant migration with migrationId: " + kMigrationId +
 assert.commandWorked(
     tenantMigrationTest.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
 
+const fpBeforePersistingRejectReadsBeforeTimestamp = configureFailPoint(
+    recipientPrimary, "fpBeforePersistingRejectReadsBeforeTimestamp", {action: "hang"});
+
 {
     // Wait until a current operation corresponding to "tenant recipient migration" with state
     // kStarted is visible on the recipientPrimary.
@@ -164,8 +167,6 @@ assert.commandWorked(
     // Wait for the "kConsistent" state to be reached.
     jsTestLog("Waiting for the kConsistent state to be reached.");
     fpAfterDataConsistent.wait();
-    const fpBeforePersistingRejectReadsBeforeTimestamp = configureFailPoint(
-        recipientPrimary, "fpBeforePersistingRejectReadsBeforeTimestamp", {action: "hang"});
 
     let res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient migration"});
     checkStandardFieldsOK(res);

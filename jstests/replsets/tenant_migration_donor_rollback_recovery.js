@@ -236,10 +236,20 @@ function testRollBackMarkingStateGarbageCollectable() {
                                            true /* retryOnRetryableErrors */);
         forgetMigrationThread.start();
         assert.soon(() => {
+            let docs =
+                donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).find().toArray();
+            // There is a ttl index on `expireAt`. Thus we know the state doc is marked as garbage
+            // collectible either when:
+            //
+            // 1) It has an `expireAt`.
+            // 2) The document is deleted/the collection is empty.
             return 1 === donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).count({
                 _id: migrationId,
                 expireAt: {$exists: 1}
-            });
+            }) ||
+                donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).count({
+                    _id: migrationId
+                }) === 0;
         });
     };
 

@@ -17,8 +17,18 @@ load("jstests/libs/uuid_util.js");  // For extractUUIDFromObject().
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const tenantMigrationTest =
-    new TenantMigrationTest({name: jsTestName(), quickGarbageCollection: true});
+const kGarbageCollectionParams = {
+    // Set the delay to 20s so that we can see the `expireAt` set prior to the document vanishing.
+    tenantMigrationGarbageCollectionDelayMS: 20 * 1000,
+
+    // Set the TTL monitor to run at a smaller interval to speed up the test.
+    ttlMonitorSleepSecs: 1
+};
+
+const tenantMigrationTest = new TenantMigrationTest({
+    name: jsTestName(),
+    sharedOptions: {setParameter: kGarbageCollectionParams},
+});
 
 const kRecipientTTLIndexName = "TenantMigrationRecipientTTLIndex";
 
@@ -70,8 +80,7 @@ assert(stateDocQuery[0].hasOwnProperty("expireAt"), tojson(stateDocQuery));
 
 // Sleep past the garbage collection delay time, and then make sure the state document for our
 // migration does not exist.
-jsTestLog("Sleeping and then expecting the state document to have been deleted.");
-sleep(30000);  // The garbage collection delay is 30s.
+jsTestLog("Waiting for the state document to have been deleted.");
 tenantMigrationTest.waitForMigrationGarbageCollection(kMigrationId, kTenantId);
 
 tenantMigrationTest.stop();
