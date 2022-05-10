@@ -106,6 +106,13 @@ TEST_F(ShardingDataTransformCumulativeMetricsTest, MetricsReportsOldestWhenInser
               kOldestTimeLeft);
 }
 
+TEST_F(ShardingDataTransformCumulativeMetricsTest, NoServerStatusWhenNeverUsed) {
+    BSONObjBuilder bob;
+    _cumulativeMetrics.reportForServerStatus(&bob);
+    auto report = bob.done();
+    ASSERT_BSONOBJ_EQ(report, BSONObj());
+}
+
 TEST_F(ShardingDataTransformCumulativeMetricsTest, RemainingTimeReports0WhenEmpty) {
     ASSERT_EQ(_cumulativeMetrics.getObservedMetricsCount(), 0);
     ASSERT_EQ(_cumulativeMetrics.getOldestOperationHighEstimateRemainingTimeMillis(
