@@ -3,6 +3,7 @@
  *
  * @tags: [
  *  featureFlagBatchMultiDeletes,
+ *  no_selinux,
  *  requires_fastcount,
  *  requires_non_retryable_writes,
  *  ]
