@@ -2093,6 +2093,12 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
     // reserve enough entries for all statements in the transaction.
     auto oplogSlots = repl::getNextOpTimes(opCtx, batchedOps.size());
 
+    // Throw TenantMigrationConflict error if the database for the transaction statements is being
+    // migrated. We only need check the namespace of the first statement since a transaction's
+    // statements must all be for the same tenant.
+    tenant_migration_access_blocker::checkIfCanWriteOrThrow(
+        opCtx, batchedOps.begin()->getNss().db(), oplogSlots.back().getTimestamp());
+
     auto noPrePostImage = boost::optional<ImageBundle>(boost::none);
 
     // Serialize batched statements to BSON and determine their assignment to "applyOps"
