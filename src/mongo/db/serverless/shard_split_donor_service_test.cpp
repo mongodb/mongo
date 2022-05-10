@@ -677,7 +677,7 @@ TEST_F(ShardSplitDonorServiceTest, ResumeAfterStepdownTest) {
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
-    auto initialFuture = [&]() {
+    auto firstSplitInstance = [&]() {
         FailPointEnableBlock fp("pauseShardSplitAfterBlocking");
         auto initialTimesEntered = fp.initialTimesEntered();
 
@@ -687,38 +687,31 @@ TEST_F(ShardSplitDonorServiceTest, ResumeAfterStepdownTest) {
         ASSERT(serviceInstance.get());
 
         fp->waitForTimesEntered(initialTimesEntered + 1);
-        stepDown();
-
-        return serviceInstance->decisionFuture();
+        return serviceInstance;
     }();
 
-    auto result = initialFuture.getNoThrow();
+    stepDown();
+    auto result = firstSplitInstance->completionFuture().getNoThrow();
     ASSERT_FALSE(result.isOK());
-    ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange, result.getStatus().code());
+    ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange, result.code());
 
-    // verify that the state document exists
-    ASSERT_OK(getStateDocument(opCtx.get(), _uuid).getStatus());
+    auto secondSplitInstance = [&]() {
+        FailPointEnableBlock fp("pauseShardSplitAfterBlocking");
+        stepUp(opCtx.get());
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
 
-    auto fp = std::make_unique<FailPointEnableBlock>("pauseShardSplitAfterBlocking");
-    auto initialTimesEntered = fp->initialTimesEntered();
+        ASSERT_OK(getStateDocument(opCtx.get(), _uuid).getStatus());
+        auto serviceInstance = ShardSplitDonorService::DonorStateMachine::lookup(
+            opCtx.get(), _service, BSON("_id" << _uuid));
+        ASSERT(serviceInstance);
+        return *serviceInstance;
+    }();
 
-    stepUp(opCtx.get());
+    ASSERT_OK(secondSplitInstance->decisionFuture().getNoThrow().getStatus());
 
-    fp->failPoint()->waitForTimesEntered(initialTimesEntered + 1);
-
-    // verify that the state document exists
-    ASSERT_OK(getStateDocument(opCtx.get(), _uuid).getStatus());
-    auto donor = ShardSplitDonorService::DonorStateMachine::lookup(
-        opCtx.get(), _service, BSON("_id" << _uuid));
-    ASSERT(donor);
-
-    fp.reset();
-
-    ASSERT_OK((*donor)->decisionFuture().getNoThrow().getStatus());
-
-    (*donor)->tryForget();
-    ASSERT_OK((*donor)->completionFuture().getNoThrow());
-    ASSERT_TRUE((*donor)->isGarbageCollectable());
+    secondSplitInstance->tryForget();
+    ASSERT_OK(secondSplitInstance->completionFuture().getNoThrow());
+    ASSERT_TRUE(secondSplitInstance->isGarbageCollectable());
 }
 
 class ShardSplitPersistenceTest : public ShardSplitDonorServiceTest {
