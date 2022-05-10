@@ -33,7 +33,7 @@
 #include "mongo/db/exec/delete_stage.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -173,7 +173,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         // Either the document has already been deleted, or it has been updated such that it no
         // longer matches the predicate.
         if (shouldRestartDeleteIfNoLongerMatches(_params.get())) {
-            throw WriteConflictException();
+            throwWriteConflictException();
         }
         return PlanStage::NEED_TIME;
     }

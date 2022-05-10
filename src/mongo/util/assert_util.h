@@ -124,7 +124,14 @@ public:
         return _status.extraInfo<ErrorDetail>();
     }
 
-    static AtomicWord<bool> traceExceptions;
+    static inline AtomicWord<bool> traceExceptions{false};
+
+    /**
+     * Allows handling `ErrorCodes::WriteConflict` as a special case and if true, will call
+     * `printStackTrace` on every `WriteConflict` error. Can be set via the
+     * `traceWriteConflictExceptions` server parameter.
+     */
+    static inline AtomicWord<bool> traceWriteConflictExceptions{false};
 
 protected:
     DBException(const Status& status) : _status(status) {
@@ -150,6 +157,29 @@ public:
 };
 
 /**
+ * Use `throwWriteConflictException()` instead of throwing `WriteConflictException` directly.
+ */
+class WriteConflictException final : public DBException {
+public:
+    WriteConflictException(const Status& status) : DBException(status) {}
+
+private:
+    void defineOnlyInFinalSubclassToPreventSlicing() final {}
+};
+
+/**
+ * Use `throwTemporarilyUnavailableException()` instead of throwing
+ * `TemporarilyUnavailableException` directly.
+ */
+class TemporarilyUnavailableException final : public DBException {
+public:
+    TemporarilyUnavailableException(const Status& status) : DBException(status) {}
+
+private:
+    void defineOnlyInFinalSubclassToPreventSlicing() final {}
+};
+
+/**
  * The base class of all DBExceptions for codes of the given ErrorCategory to allow catching by
  * category.
  */
@@ -164,9 +194,6 @@ protected:
         invariant(isA<kCategory>());
     }
 };
-
-class WriteConflictException;
-class TemporarilyUnavailableException;
 
 /**
  * This namespace contains implementation details for our error handling code and should not be used

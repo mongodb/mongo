@@ -45,6 +45,11 @@ server_parameters:
     set_at: runtime
     cpp_varname: "DBException::traceExceptions"
 
+  traceWriteConflictExceptions:
+    description: "Call printStackTrace on every WriteConflictException created"
+    set_at: ["startup", "runtime"]
+    cpp_varname: "DBException::traceWriteConflictExceptions"
+
   logLevel:
     description: "Specifies the verbosity of logging"
     set_at: ["startup", "runtime"]

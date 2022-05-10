@@ -398,7 +398,7 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
             createCollection(opCtx, ns.db().toString(), builder.obj().getOwned(), idIndexSpec);
 
         if (createStatus == ErrorCodes::NamespaceExists) {
-            throw WriteConflictException(
+            throwWriteConflictException(
                 str::stream() << "Failed to create indexes on new collection: namespace "_sd
                               << ns.ns() << " exists. Status: "_sd << createStatus.toString());
         }
@@ -433,7 +433,7 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
     const int numIndexesAfter = IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection.get());
 
     if (MONGO_unlikely(createIndexesWriteConflict.shouldFail())) {
-        throw WriteConflictException();
+        throwWriteConflictException();
     }
     wunit.commit();
 

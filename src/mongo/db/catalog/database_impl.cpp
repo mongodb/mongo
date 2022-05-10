@@ -52,7 +52,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds_coordinator.h"
@@ -747,7 +747,7 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
                       str::stream()
                           << "Cannot create collection " << nss << " - collection already exists.");
         } else {
-            throw WriteConflictException();
+            throwWriteConflictException();
         }
     }
 
@@ -755,7 +755,7 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
         opCtx->inMultiDocumentTransaction()) {
         LOGV2(4696600,
               "Throwing WriteConflictException due to failpoint 'throwWCEDuringTxnCollCreate'");
-        throw WriteConflictException();
+        throwWriteConflictException();
     }
 
     uassert(28838, "cannot create a non-capped oplog collection", options.capped || !nss.isOplog());

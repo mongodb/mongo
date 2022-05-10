@@ -37,7 +37,6 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/collection_scan.h"
@@ -425,7 +424,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
             invariant(id == WorkingSet::INVALID_ID);
             if (!_yieldPolicy->canAutoYield() ||
                 MONGO_unlikely(skipWriteConflictRetries.shouldFail())) {
-                throw WriteConflictException();
+                throwWriteConflictException();
             }
 
             CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);

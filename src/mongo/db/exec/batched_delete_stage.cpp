@@ -34,7 +34,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -279,7 +279,7 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
         bool groupedWuowActive = true;
         for (; bufferOffset < _stagedDeletesBuffer.size(); ++bufferOffset) {
             if (MONGO_unlikely(throwWriteConflictExceptionInBatchedDeleteStage.shouldFail())) {
-                throw WriteConflictException();
+                throwWriteConflictException();
             }
 
             auto workingSetMemberID = _stagedDeletesBuffer.at(bufferOffset);

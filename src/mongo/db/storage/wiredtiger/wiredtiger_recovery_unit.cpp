@@ -33,6 +33,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -423,7 +424,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
             LOGV2_ERROR(5703401,
                         "Found a violation of multi-timestamp constraint. Retrying operation to "
                         "collect extra debugging context for the involved writes.");
-            throw WriteConflictException();
+            throwWriteConflictException();
         }
         if (commit) {
             LOGV2_FATAL(

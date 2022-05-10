@@ -30,8 +30,6 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/concurrency/temporarily_unavailable_exception.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
@@ -62,6 +60,30 @@ void handleTemporarilyUnavailableExceptionInTransaction(OperationContext* opCtx,
                                                         StringData opStr,
                                                         StringData ns,
                                                         const TemporarilyUnavailableException& e);
+
+/**
+ * A `WriteConflictException` is thrown if during a write, two or more operations conflict with each
+ * other. For example if two operations get the same version of a document, and then both try to
+ * modify that document, this exception will get thrown by one of them.
+ */
+[[noreturn]] inline void throwWriteConflictException(StringData context = {}) {
+    Status status{ErrorCodes::WriteConflict,
+                  "WriteConflict error: this operation conflicted with another operation. "
+                  "Please retry your operation or multi-document transaction."_sd};
+    if (!context.empty())
+        status.addContext(context);
+    iasserted(status);
+}
+
+/**
+ * A `TemporarilyUnavailableException` is thrown if an operation aborts due to the server being
+ * temporarily unavailable, e.g. due to excessive load. For user-originating operations, this will
+ * be retried internally by the `writeConflictRetry` helper a finite number of times before
+ * eventually being returned.
+ */
+[[noreturn]] inline void throwTemporarilyUnavailableException(StringData context) {
+    iasserted({ErrorCodes::TemporarilyUnavailable, context});
+}
 
 /**
  * Runs the argument function f as many times as needed for f to complete or throw an exception

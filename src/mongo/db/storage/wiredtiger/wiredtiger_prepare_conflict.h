@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -83,7 +83,7 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
         // be blocking on a prepared update that requires replication to make progress, creating a
         // stall in the MDB cluster.
         wiredTigerPrepareConflictOplogResourceLog();
-        throw WriteConflictException();
+        throwWriteConflictException();
     }
 
     auto recoveryUnit = WiredTigerRecoveryUnit::get(opCtx);

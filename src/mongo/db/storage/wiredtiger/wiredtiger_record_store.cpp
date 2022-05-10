@@ -1950,7 +1950,7 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
         // Force the caller to rollback its transaction if we can't make progess with eviction.
         // TODO (SERVER-63620): Convert this to a different error code that is distinguishable from
         // a true write conflict.
-        throw WriteConflictException(
+        throwWriteConflictException(
             fmt::format("Cache full while performing initial write to '{}'", _ns));
     } else if (ret != WT_NOTFOUND) {
         invariantWTOK(ret, wtSession);
@@ -2228,7 +2228,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
 
         // Force a retry of the operation from our last known position by acting as-if
         // we received a WT_ROLLBACK error.
-        throw WriteConflictException();
+        throwWriteConflictException();
     }
 
     WT_ITEM value;

@@ -216,7 +216,7 @@ Status ReshardingOplogApplicationRules::applyOperation(OperationContext* opCtx,
             return Status::OK();
         } catch (const DBException& ex) {
             if (ex.code() == ErrorCodes::WriteConflict || ex.code() == ErrorCodes::LockTimeout) {
-                throw WriteConflictException();
+                throwWriteConflictException();
             }
 
             return ex.toStatus();

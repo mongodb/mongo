@@ -716,7 +716,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
 
                 // Used to make sure that a WCE can be handled by this logic without data loss.
                 if (MONGO_unlikely(writeConflictInRenameCollCopyToTmp.shouldFail())) {
-                    throw WriteConflictException();
+                    throwWriteConflictException();
                 }
 
                 wunit.commit();

@@ -32,6 +32,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/concurrency/exception_util_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
@@ -78,7 +79,7 @@ void handleTemporarilyUnavailableException(OperationContext* opCtx,
     opCtx->recoveryUnit()->abandonSnapshot();
     temporarilyUnavailableErrors.increment(1);
     if (opCtx->getClient()->isFromUserConnection() &&
-        attempts > TemporarilyUnavailableException::maxRetryAttempts.load()) {
+        attempts > gTemporarilyUnavailableExceptionMaxRetryAttempts.load()) {
         LOGV2_DEBUG(6083901,
                     1,
                     "Too many TemporarilyUnavailableException's, giving up",
@@ -92,7 +93,7 @@ void handleTemporarilyUnavailableException(OperationContext* opCtx,
 
     // Back off linearly with the retry attempt number.
     auto sleepFor =
-        Milliseconds(TemporarilyUnavailableException::retryBackoffBaseMs.load()) * attempts;
+        Milliseconds(gTemporarilyUnavailableExceptionRetryBackoffBaseMs.load()) * attempts;
     LOGV2_DEBUG(6083900,
                 1,
                 "Caught TemporarilyUnavailableException",
@@ -113,7 +114,7 @@ void handleTemporarilyUnavailableExceptionInTransaction(OperationContext* opCtx,
     // transactions to retry without changing any behavior. Otherwise, we let the error escape as
     // usual.
     temporarilyUnavailableErrorsConvertedToWriteConflict.increment(1);
-    throw WriteConflictException(e.reason());
+    throwWriteConflictException(e.reason());
 }
 
 }  // namespace mongo

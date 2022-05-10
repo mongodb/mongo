@@ -33,7 +33,6 @@
 #include <memory>
 #include <vector>
 
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/scoped_timer.h"
@@ -41,6 +40,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

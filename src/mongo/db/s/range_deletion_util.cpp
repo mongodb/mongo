@@ -194,7 +194,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
         BSONObj deletedObj;
 
         if (throwWriteConflictExceptionInDeleteRange.shouldFail()) {
-            throw WriteConflictException();
+            throwWriteConflictException();
         }
 
         if (throwInternalErrorInDeleteRange.shouldFail()) {

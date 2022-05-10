@@ -28,16 +28,8 @@
 
 global:
     cpp_namespace: "mongo"
-    cpp_includes:
-      - "mongo/db/concurrency/temporarily_unavailable_exception.h"
-      - "mongo/db/concurrency/write_conflict_exception.h"
 
 server_parameters:
-    traceWriteConflictExceptions:
-        description: 'Call printStackTrace on every WriteConflictException created'
-        set_at: [ startup, runtime ]
-        cpp_varname: 'WriteConflictException::trace'
-
     enableTemporarilyUnavailableExceptions:
         description: 'Enables the use of TemporarilyUnavailableExceptions. When disabled, reverts to
                       throwing WriteConflictException.'
@@ -49,7 +41,8 @@ server_parameters:
     temporarilyUnavailableMaxRetries:
         description: 'The number of times to retry a TemporarilyUnavailable error internally'
         set_at: [ startup, runtime ]
-        cpp_varname: 'TemporarilyUnavailableException::maxRetryAttempts'
+        cpp_varname: 'gTemporarilyUnavailableExceptionMaxRetryAttempts'
+        cpp_vartype: AtomicWord<long long>
         default: 10
         validator:
           gte: 0
@@ -59,7 +52,8 @@ server_parameters:
                       attempt. The backoff time is linear such that the Nth retry waits for N times
                       the base backoff period.'
         set_at: [ startup, runtime ]
-        cpp_varname: 'TemporarilyUnavailableException::retryBackoffBaseMs'
+        cpp_varname: 'gTemporarilyUnavailableExceptionRetryBackoffBaseMs'
+        cpp_vartype: AtomicWord<long long>
         default: 1000
         validator:
           gte: 0

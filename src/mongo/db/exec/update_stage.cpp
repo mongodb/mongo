@@ -39,7 +39,7 @@
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -454,7 +454,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             // Either the document has been deleted, or it has been updated such that it no longer
             // matches the predicate.
             if (shouldRestartUpdateIfNoLongerMatches(_params)) {
-                throw WriteConflictException();
+                throwWriteConflictException();
             }
             return PlanStage::NEED_TIME;
         }

@@ -78,10 +78,10 @@ void AssertionCount::condrollover(int newvalue) {
         rollover();
 }
 
-AtomicWord<bool> DBException::traceExceptions(false);
-
 void DBException::traceIfNeeded(const DBException& e) {
-    if (traceExceptions.load()) {
+    const bool traceNeeded = traceExceptions.load() ||
+        (e.code() == ErrorCodes::WriteConflict && traceWriteConflictExceptions.load());
+    if (traceNeeded) {
         LOGV2_WARNING(23075, "DBException thrown {error}", "DBException thrown", "error"_attr = e);
         printStackTrace();
     }

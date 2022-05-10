@@ -405,7 +405,7 @@ void updateSessionEntry(OperationContext* opCtx,
         auto status = collection->insertDocument(opCtx, InsertStatement(updateMod), nullptr, false);
 
         if (status == ErrorCodes::DuplicateKey) {
-            throw WriteConflictException(
+            throwWriteConflictException(
                 str::stream() << "Updating session entry failed with duplicate key, session "_sd
                               << sessionId << ", transaction "_sd << txnNum);
         }
@@ -433,7 +433,7 @@ void updateSessionEntry(OperationContext* opCtx,
         fassert(40673, MatchExpressionParser::parse(updateRequest.getQuery(), std::move(expCtx)));
     if (!matcher->matchesBSON(originalDoc)) {
         // Document no longer match what we expect so throw WCE to make the caller re-examine.
-        throw WriteConflictException(
+        throwWriteConflictException(
             str::stream() << "Updating session entry failed as document no longer matches, "_sd
                           << "session "_sd << sessionId << ", transaction "_sd << txnNum);
     }

@@ -49,7 +49,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -931,7 +931,7 @@ Status CollectionImpl::insertDocumentForBulkLoader(
               "Failpoint failAfterBulkLoadDocInsert enabled. Throwing "
               "WriteConflictException",
               logAttrs(_ns));
-        throw WriteConflictException();
+        throwWriteConflictException();
     }
 
     std::vector<InsertStatement> inserts;

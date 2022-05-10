@@ -150,7 +150,7 @@ TEST_F(DConcurrencyTestFixture, WriteConflictRetryRetriesFunctionOnWriteConflict
     ASSERT_EQUALS(0, opDebug.additiveMetrics.writeConflicts.load());
     ASSERT_EQUALS(100, writeConflictRetry(opCtx.get(), "", "", [&opDebug] {
                       if (0 == opDebug.additiveMetrics.writeConflicts.load()) {
-                          throw WriteConflictException();
+                          throwWriteConflictException();
                       }
                       return 100;
                   }));
@@ -177,7 +177,7 @@ TEST_F(DConcurrencyTestFixture,
     getClient()->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
     Lock::GlobalWrite globalWrite(opCtx.get());
     WriteUnitOfWork wuow(opCtx.get());
-    ASSERT_THROWS(writeConflictRetry(opCtx.get(), "", "", [] { throw WriteConflictException(); }),
+    ASSERT_THROWS(writeConflictRetry(opCtx.get(), "", "", [] { throwWriteConflictException(); }),
                   WriteConflictException);
 }
 

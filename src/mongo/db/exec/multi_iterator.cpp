@@ -33,8 +33,8 @@
 
 #include <memory>
 
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

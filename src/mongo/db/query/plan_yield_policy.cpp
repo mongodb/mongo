@@ -33,8 +33,8 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
