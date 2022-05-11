@@ -138,18 +138,20 @@ TEST(ColumnCellAppendElement, WriteEncodedCellWithDuplicateFieldsTest) {
 
     // What the invalid cell would look like with "a" as the path.
     column_keygen::UnencodedCellView unencodedCell = {
+        // These should _not_ get included in the output.
         getBsonElements(referenceBson),
-        "{"_sd,  // This should _not_ get included in the output.
-        true,    // hasDuplicateFields
-        false,   // hasSubPaths
-        false,   // isSparse
-        false,   // hasDoubleNestedArrays
+        "{"_sd,
+        // This flag is the only thing that gets included.
+        true,   // hasDuplicateFields
+        false,  // hasSubPaths
+        false,  // isSparse
+        false,  // hasDoubleNestedArrays
     };
 
     BufBuilder cellBuffer;
     writeEncodedCell(unencodedCell, &cellBuffer);
 
-    ASSERT_EQ("FC2020", hexblob::encode(cellBuffer.buf(), cellBuffer.len()));
+    ASSERT_EQ("FC", hexblob::encode(cellBuffer.buf(), cellBuffer.len()));
 }
 
 TEST(ColumnCellAppendElement, WriteEncodedCellWithArrInfoSize1) {

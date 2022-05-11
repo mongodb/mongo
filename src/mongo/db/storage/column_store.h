@@ -329,6 +329,13 @@ public:
         return res;
     }
 
+    static size_t readArrInfoNumber(StringData str, size_t* indexInOut) {
+        auto it = str.begin() + *indexInOut;
+        auto out = readArrInfoNumber(&it, str.end());
+        *indexInOut = it - str.begin();
+        return out;
+    }
+
     /**
      * Returns the parent path for the given path, if there is one.
      */
@@ -363,17 +370,20 @@ protected:
 };
 
 struct SplitCellView {
-    StringData arrInfo;  // rawData() is 1-past-end of range starting with firstElementPtr.
-    const char* firstElementPtr;
-    bool hasSubObjects;
+    StringData arrInfo;  // rawData() is 1-past-end of range starting with firstValuePtr.
+    const char* firstValuePtr = nullptr;
+
+    // See column_keygen::UnencodedCellView for a description of each of these flags.
+    bool hasDuplicateFields = false;
+    bool hasSubPaths = false;
+    bool isSparse = false;
+    bool hasDoubleNestedArrays = false;
 
     template <class ValueEncoder>
     auto subcellValuesGenerator(ValueEncoder&& valEncoder) const {
         struct Cursor {
             using Out = typename std::remove_reference_t<ValueEncoder>::Out;
             Out nextValue() {
-                if (!elemPtr)
-                    return Out();
                 if (elemPtr == end)
                     return Out();
 
@@ -385,70 +395,69 @@ struct SplitCellView {
             const char* end;
             ValueEncoder encoder;
         };
-        return Cursor{firstElementPtr, arrInfo.rawData(), std::forward<ValueEncoder>(valEncoder)};
-    }
-
-    // If there isn't a number at this position, returns 0 and doesn't advance itInOut.
-    static size_t readNumber(StringData::const_iterator* itInOut, StringData::const_iterator end) {
-        auto it = *itInOut;  // Use local to allow compiler to assume it doesn't point to itself.
-        size_t res = 0;
-        while (it != end && *it >= '0' && *it <= '9') {
-            res *= 10;  // noop first pass.
-            res += (*it++) - '0';
-        }
-        *itInOut = it;
-        return res;
-    }
-    static size_t readNumber(StringData str, size_t* indexInOut) {
-        auto it = str.begin() + *indexInOut;
-        auto out = readNumber(&it, str.end());
-        *indexInOut = it - str.begin();
-        return out;
+        return Cursor{firstValuePtr, arrInfo.rawData(), std::forward<ValueEncoder>(valEncoder)};
     }
 
     static SplitCellView parse(CellView cell) {
         using Bytes = ColumnStore::Bytes;
         using TinySize = ColumnStore::Bytes::TinySize;
 
-        if (cell.empty())
-            return SplitCellView{""_sd, nullptr, /*hasSubObjects=*/true};
-
-        bool hasSubObjects = false;
-
-        const char* firstByteAddr = cell.rawData();
-        uint8_t firstByte = *firstByteAddr;
+        auto out = SplitCellView();
+        auto it = cell.begin();
+        const auto end = cell.end();
         size_t arrInfoSize = 0;
 
-        // This block handles all prefix bytes, and leaves firstByteAddr pointing at the first elem.
-        if (firstByte >= Bytes::kFirstPrefixByte) {
-            if (firstByte == ColumnStore::Bytes::kSubPathsMarker) {
-                hasSubObjects = true;
-                firstByte = *++firstByteAddr;
+        // This block handles all prefix bytes, and leaves `it` pointing at the first elem.
+        // The first two comparisons are technically not needed, but optimize for common cases of no
+        // prefix bytes, and an array info size with no other flag bytes.
+        if (it != end && uint8_t(*it) >= Bytes::kFirstPrefixByte) {
+            if (uint8_t(*it) > Bytes::kLastArrInfoSize) {
+                if (it != end && uint8_t(*it) == ColumnStore::Bytes::kDuplicateFieldsMarker) {
+                    out.hasDuplicateFields = true;
+                    ++it;
+                    // This flag is special and should only appear by itself.
+                    invariant(it == end);
+                    return out;
+                }
+                if (it != end && uint8_t(*it) == ColumnStore::Bytes::kSubPathsMarker) {
+                    out.hasSubPaths = true;
+                    ++it;
+                }
+                if (it != end && uint8_t(*it) == ColumnStore::Bytes::kSparseMarker) {
+                    out.isSparse = true;
+                    ++it;
+                }
+                if (it != end && uint8_t(*it) == ColumnStore::Bytes::kDoubleNestedArraysMarker) {
+                    out.hasDoubleNestedArrays = true;
+                    ++it;
+                }
+
+                // Next byte must be either an array info size or a value.
+                invariant(it == end || uint8_t(*it) <= Bytes::kLastArrInfoSize);
             }
 
-            if (Bytes::kFirstArrInfoSize >= firstByte && firstByte <= Bytes::kLastArrInfoSize) {
-                firstByteAddr++;  // Skip size-kind byte.
+            if (it != end && Bytes::kFirstArrInfoSize <= uint8_t(*it) &&
+                uint8_t(*it) <= Bytes::kLastArrInfoSize) {
+                const auto format = uint8_t(*it++);  // Consume size-kind byte.
 
                 // TODO SERVER-63284: This check for the tiny array info case would be more
                 // concisely expressed using the case range syntax and being added to the switch
                 // statement below.
-                if (Bytes::kArrInfoSizeTinyMin <= firstByte &&
-                    firstByte <= Bytes::kArrInfoSizeTinyMax) {
-                    arrInfoSize = firstByte - TinySize::kArrInfoZero;
-                    firstByte = *firstByteAddr;
+                if (Bytes::kArrInfoSizeTinyMin <= format && format <= Bytes::kArrInfoSizeTinyMax) {
+                    arrInfoSize = format - TinySize::kArrInfoZero;
                 } else {
-                    switch (firstByte) {
+                    switch (format) {
                         case Bytes::kArrInfoSize1:
-                            arrInfoSize = ConstDataView(firstByteAddr).read<uint8_t>();
-                            firstByte = *(firstByteAddr += 1);
+                            arrInfoSize = ConstDataView(it).read<uint8_t>();
+                            it += 1;
                             break;
                         case Bytes::kArrInfoSize2:
-                            arrInfoSize = ConstDataView(firstByteAddr).read<uint16_t>();
-                            firstByte = *(firstByteAddr += 2);
+                            arrInfoSize = ConstDataView(it).read<LittleEndian<uint16_t>>();
+                            it += 2;
                             break;
                         case Bytes::kArrInfoSize4:
-                            arrInfoSize = ConstDataView(firstByteAddr).read<uint32_t>();
-                            firstByte = *(firstByteAddr += 4);
+                            arrInfoSize = ConstDataView(it).read<LittleEndian<uint32_t>>();
+                            it += 4;
                             break;
                         default:
                             MONGO_UNREACHABLE;
@@ -457,9 +466,17 @@ struct SplitCellView {
             }
         }
 
-        invariant(firstByte < Bytes::kFirstPrefixByte);
-        auto arrayInfo = StringData(cell.rawData() + (cell.size() - arrInfoSize), arrInfoSize);
-        return SplitCellView{arrayInfo, firstByteAddr, hasSubObjects};
+        out.firstValuePtr = it;
+        out.arrInfo = StringData(cell.end() - arrInfoSize, cell.end());
+
+        if (it == out.arrInfo.begin()) {  // Reminder: beginning of arrInfo is end of values.
+            // The lack of any values implies that there must be sub paths.
+            out.hasSubPaths = true;
+        } else {
+            invariant(uint8_t(*it) < Bytes::kFirstPrefixByte);
+        }
+
+        return out;
     }
 
     template <typename Encoder>

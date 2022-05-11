@@ -68,7 +68,7 @@ public:
     }
 
     size_t takeNumber() {
-        return SplitCellView::readNumber(_arrInfo, &_offsetInArrInfo);
+        return ColumnStore::readArrInfoNumber(_arrInfo, &_offsetInArrInfo);
     }
 
     bool empty() const {

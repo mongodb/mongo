@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/index/column_cell.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bson_depth.h"
@@ -36,6 +37,46 @@
 
 namespace mongo::column_keygen {
 namespace {
+class CellConverter {
+private:
+    // It shouldn't matter, but g++8.3 seems to want this at the top of this type.
+    struct ValueEncoder {
+        using Out = bool;
+
+        template <typename T>
+        bool operator()(T&& value) {
+            *builder << value;
+            return true;
+        }
+
+        BSONArrayBuilder* builder;
+    };
+
+public:
+    UnencodedCellView toUnencodedCellView(const SplitCellView& view) {
+        // Fill builder with bson-encoded elements from view.
+        auto cursor = view.subcellValuesGenerator(ValueEncoder{&builder});
+        while (cursor.nextValue()) {
+            // Work done in ValueEncoder::operator() rather than here.
+        }
+
+        builder.done().elems(elems);
+
+        return UnencodedCellView{
+            elems,
+            view.arrInfo,
+            view.hasDuplicateFields,
+            view.hasSubPaths,
+            view.isSparse,
+            view.hasDoubleNestedArrays,
+        };
+    }
+
+private:
+    std::vector<BSONElement> elems;
+    BSONArrayBuilder builder;
+};
+
 enum Flags_ForTest {
     kNoFlags = 0,
     kHasDuplicateFields = 1 << 0,
@@ -79,6 +120,14 @@ void insertTest(int line,
         }
         auto expectedCell = it->second.toView(owner, elems);
         ASSERT_EQ(cell, expectedCell) << "test:" << line << " path:" << path;
+
+        // Round-trip the cell through encoder/parser and make sure we still agree.
+        BufBuilder encoder;
+        writeEncodedCell(cell, &encoder);
+        auto decoded = SplitCellView::parse({encoder.buf(), size_t(encoder.len())});
+        CellConverter converter;
+        ASSERT_EQ(converter.toUnencodedCellView(decoded), expectedCell)
+            << "test:" << line << " path:" << path;
     });
 
     for (auto [path, _] : expected) {

@@ -172,11 +172,13 @@ template <typename Buffer>
 void doWriteEncodedCell(const UnencodedCellView& cell, Buffer* cellBuffer) {
     using Bytes = ColumnStore::Bytes;
 
-    // The 'hasDuplicateFields' flag indicates an ill-formed document. We encode the values from all
-    // instances of the multiply defined path, but we do not store an 'arrayInfo' or otherwise
-    // attempt to encode the structure of the encoded values.
+    // WARNING: The decoder assumes that flags are written in this order. Do not change the order!
+
+    // The 'hasDuplicateFields' flag indicates an ill-formed document. In this case, we make no
+    // attempt to record any other information about this field in the index.
     if (cell.hasDuplicateFields) {
         cellBuffer->appendUChar(Bytes::kDuplicateFieldsMarker);
+        return;
     }
 
     // Encode meaningful flags.
