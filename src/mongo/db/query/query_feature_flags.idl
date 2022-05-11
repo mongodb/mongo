@@ -107,6 +107,12 @@ feature_flags:
         default: true
         version: 5.3
 
+    featureFlagChangeStreamsFurtherEnrichedEvents:
+      description: "Feature flag for enabling the reshardCollection and refineCollectionShardKey events, as well as enhancements to the updateDescription field for update events"
+      cpp_varname: gFeatureFlagChangeStreamsFurtherEnrichedEvents
+      default: true
+      version: 6.0
+
     featureFlagCommonQueryFramework:
       description: "Feature flag for allowing use of Cascades-based query optimizer"
       cpp_varname: gfeatureFlagCommonQueryFramework
