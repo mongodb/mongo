@@ -40,7 +40,14 @@ assert.commandFailedWithCode(db.runCommand({
 }),
                              ErrorCodes.FailedToParse);
 
-assert.throwsWithCode(
-    () => db.non_existent_namespace.aggregate([{$searchMeta: {query: {nonsense: true}}}]),
-    [6448001, 31082, 40324]);  // Error code may change on mongos or on community server.
+const response = db.runCommand({
+    aggregate: "non_existent_namespace",
+    pipeline: [{$searchMeta: {query: {nonsense: true}}}],
+    cursor: {}
+});
+if (!response.ok) {
+    assert.commandFailedWithCode(response, [31082, 40324] /* community or mongos */);
+} else {
+    assert.eq(response.cursor.firstBatch, []);
+}
 })();

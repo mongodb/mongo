@@ -267,14 +267,29 @@ public:
      * collection. Describes how a pipeline should be split for sharded execution.
      */
     struct DistributedPlanLogic {
+        DistributedPlanLogic() = default;
+
+        /**
+         * Convenience constructor for the common case where there is at most one merging stage. Can
+         * pass nullptr for the merging stage which means "no merging required."
+         */
+        DistributedPlanLogic(boost::intrusive_ptr<DocumentSource> shardsStageIn,
+                             boost::intrusive_ptr<DocumentSource> mergeStage,
+                             boost::optional<BSONObj> mergeSortPatternIn = boost::none)
+            : shardsStage(std::move(shardsStageIn)),
+              mergeSortPattern(std::move(mergeSortPatternIn)) {
+            if (mergeStage)
+                mergingStages.emplace_back(std::move(mergeStage));
+        }
+
         typedef std::function<bool(const DocumentSource&)> movePastFunctionType;
         // A stage which executes on each shard in parallel, or nullptr if nothing can be done in
         // parallel. For example, a partial $group before a subsequent global $group.
         boost::intrusive_ptr<DocumentSource> shardsStage = nullptr;
 
-        // A stage which executes after merging all the results together, or nullptr if nothing is
-        // necessary after merging. For example, a $limit stage.
-        boost::intrusive_ptr<DocumentSource> mergingStage = nullptr;
+        // A stage or stages which funciton to merge all the results together, or an empty list if
+        // nothing is necessary after merging. For example, a $limit stage.
+        std::list<boost::intrusive_ptr<DocumentSource>> mergingStages = {};
 
         // If set, each document is expected to have sort key metadata which will be serialized in
         // the '$sortKey' field. 'mergeSortPattern' will then be used to describe which fields are
