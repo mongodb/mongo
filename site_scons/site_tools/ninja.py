@@ -876,6 +876,7 @@ class NinjaState:
                     ninja_file, '-x ' if self.env.get('NINJA_COMPDB_EXPAND') else ''
                 )
             },
+            order_only=[generated_sources_alias],
         )
 
         ninja.build(
