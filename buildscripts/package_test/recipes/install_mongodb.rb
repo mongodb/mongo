@@ -51,11 +51,21 @@ if platform_family? 'debian'
   ENV['DEBIAN_FRONTEND'] = 'noninteractive'
   package 'openssl'
 
-  # the ubuntu 16.04 image does not have some dependencies installed by default
+  # the ubuntu image does not have some dependencies installed by default
   # and it is required for the install_compass script
-  execute 'install dependencies' do
-    command 'apt-get install -y python libsasl2-modules-gssapi-mit'
-    live_stream true
+  if node['platform'] == 'ubuntu' and node['platform_version'] == '20.04'
+    execute 'install dependencies ubuntu 20.04' do
+      command 'apt-get install -y python3 libsasl2-modules-gssapi-mit'
+      live_stream true
+    end
+    link '/usr/bin/python' do
+      to '/usr/bin/python3'
+    end
+  else
+    execute 'install dependencies' do
+      command 'apt-get install -y python libsasl2-modules-gssapi-mit'
+      live_stream true
+    end
   end
 
   # dpkg returns 1 if dependencies are not satisfied, which they will not be
