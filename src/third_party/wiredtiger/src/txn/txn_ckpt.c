@@ -1124,6 +1124,15 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ERR(__wt_txn_commit(session, NULL));
 
     /*
+     * Flush all the logs that are generated during the checkpoint. It is possible that checkpoint
+     * may include the changes that are written in parallel by an eviction. To have a consistent
+     * view of the data, make sure that all the logs are flushed to disk before the checkpoint is
+     * complete.
+     */
+    if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+        WT_ERR(__wt_log_flush(session, WT_LOG_FSYNC));
+
+    /*
      * Ensure that the metadata changes are durable before the checkpoint is resolved. Do this by
      * either checkpointing the metadata or syncing the log file. Recovery relies on the checkpoint
      * LSN in the metadata only being updated by full checkpoints so only checkpoint the metadata
@@ -1149,6 +1158,11 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     } else
         WT_WITH_DHANDLE(session, WT_SESSION_META_DHANDLE(session),
           ret = __wt_txn_checkpoint_log(session, false, WT_TXN_LOG_CKPT_SYNC, NULL));
+
+    WT_STAT_CONN_SET(session, txn_checkpoint_stop_stress_active, 1);
+    /* Wait prior to flush the checkpoint stop log record. */
+    __checkpoint_timing_stress(session, WT_TIMING_STRESS_CHECKPOINT_STOP, &tsp);
+    WT_STAT_CONN_SET(session, txn_checkpoint_stop_stress_active, 0);
 
     /*
      * Now that the metadata is stable, re-open the metadata file for regular eviction by clearing
