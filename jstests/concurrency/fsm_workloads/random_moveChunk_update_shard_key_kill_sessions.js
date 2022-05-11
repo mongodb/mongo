@@ -16,6 +16,11 @@ load('jstests/concurrency/fsm_workload_helpers/kill_session.js');  // for killSe
 load('jstests/concurrency/fsm_workloads/random_moveChunk_update_shard_key.js');
 load('jstests/libs/override_methods/retry_on_killed_session.js');
 
+// By default retry_on_killed_session.js will only retry known retryable operations like reads and
+// retryable writes, but the moveChunks in this test may be interrupted and are safe to retry so opt
+// into always retrying killed operations.
+TestData.alwaysRetryOnKillSessionErrors = true;
+
 var $config = extendWorkload($config, function($config, $super) {
     $config.data.retryOnKilledSession = true;
 
