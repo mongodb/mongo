@@ -268,7 +268,7 @@ public:
 
         // Ensure that this operation will be killed by the RstlKillOpThread during step-up or
         // stepdown.
-        opCtx->setAlwaysInterruptAtStepDownOrUp();
+        opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
         // Only allow one instance of setFeatureCompatibilityVersion to run at a time.
         Lock::ExclusiveLock setFCVCommandLock(opCtx->lockState(), commandMutex);

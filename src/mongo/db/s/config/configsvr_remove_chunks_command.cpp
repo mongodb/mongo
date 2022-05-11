@@ -59,7 +59,7 @@ public:
         void typedRun(OperationContext* opCtx) {
             const UUID& collectionUUID = request().getCollectionUUID();
 
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrRemoveChunks can only be run on config servers",

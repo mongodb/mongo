@@ -372,7 +372,7 @@ ExecutorFuture<void> cleanUpRange(ServiceContext* serviceContext,
                }
                auto uniqueOpCtx = tc->makeOperationContext();
                auto opCtx = uniqueOpCtx.get();
-               opCtx->setAlwaysInterruptAtStepDownOrUp();
+               opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
                const NamespaceString& nss = deletionTask.getNss();
 
@@ -450,7 +450,7 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                                    tc->setSystemOperationKillableByStepdown(lk);
                                }
                                auto uniqueOpCtx = tc->makeOperationContext();
-                               uniqueOpCtx->setAlwaysInterruptAtStepDownOrUp();
+                               uniqueOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
                                LOGV2(55557,
                                      "cleanUpRange failed due to keyPattern shorter than range "
@@ -517,7 +517,7 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
             }
 
             auto opCtx = tc->makeOperationContext();
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             DBDirectClient client(opCtx.get());
             FindCommandRequest findCommand(NamespaceString::kRangeDeletionNamespace);
@@ -540,7 +540,7 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
             }
 
             auto opCtx = tc->makeOperationContext();
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             submitPendingDeletions(opCtx.get());
         })

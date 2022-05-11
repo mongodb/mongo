@@ -96,7 +96,7 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-        opCtx->setAlwaysInterruptAtStepDownOrUp();
+        opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
         auto nss = NamespaceString(parseNs(dbname, cmdObj));
@@ -344,7 +344,7 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        opCtx->setAlwaysInterruptAtStepDownOrUp();
+        opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
         CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
         const auto sessionId = uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj));

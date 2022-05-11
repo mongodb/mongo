@@ -158,7 +158,7 @@ public:
                     // Join the existing resharding operation to prevent generating a new resharding
                     // instance if the same command is issued consecutively due to client disconnect
                     // etc.
-                    opCtx->setAlwaysInterruptAtStepDownOrUp();
+                    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
                     reshardCollectionJoinedExistingOperation.pauseWhileSet(opCtx);
                     existingInstance.get()->getCoordinatorDocWrittenFuture().get(opCtx);
                     return existingInstance;
@@ -212,7 +212,7 @@ public:
                 coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
                 coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
 
-                opCtx->setAlwaysInterruptAtStepDownOrUp();
+                opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
                 auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
                 auto service =
                     registry->lookupServiceByName(ReshardingCoordinatorService::kServiceName);

@@ -1252,7 +1252,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         // through to all the places where they are needed would make this code more complex, and 2)
         // some of the operations, like creating the collection or building indexes, are not
         // currently supported in retryable writes.
-        outerOpCtx->setAlwaysInterruptAtStepDownOrUp();
+        outerOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         {
             auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
             {
@@ -1673,7 +1673,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         // We can only ever be in this path if the recipient critical section feature is enabled.
         invariant(_acquireCSOnRecipient);
 
-        outerOpCtx->setAlwaysInterruptAtStepDownOrUp();
+        outerOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
         {
             stdx::lock_guard<Client> lk(*newClient.get());
@@ -1707,7 +1707,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
     }
 
     if (_acquireCSOnRecipient) {
-        outerOpCtx->setAlwaysInterruptAtStepDownOrUp();
+        outerOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
         {
             stdx::lock_guard<Client> lk(*newClient.get());

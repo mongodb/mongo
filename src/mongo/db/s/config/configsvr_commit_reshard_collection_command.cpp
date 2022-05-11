@@ -76,7 +76,7 @@ public:
                     format(FMT_STRING("{} command not enabled"), definition()->getName()),
                     resharding::gFeatureFlagResharding.isEnabled(
                         serverGlobalParams.featureCompatibility));
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
             uassert(
                 ErrorCodes::IllegalOperation,
                 format(FMT_STRING("{} can only be run on config servers"), definition()->getName()),

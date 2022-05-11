@@ -79,7 +79,7 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             // If the needsUnblock flag is set, we must have blocked the CRUD operations in the
             // previous phase of collMod operation for granularity updates. Unblock it now after we

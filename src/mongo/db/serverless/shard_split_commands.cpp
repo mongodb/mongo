@@ -64,7 +64,7 @@ public:
             stateDoc.setRecipientTagName(cmd.getRecipientTagName());
             stateDoc.setRecipientSetName(cmd.getRecipientSetName());
 
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             auto donorService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                                     ->lookupServiceByName(ShardSplitDonorService::kServiceName);
@@ -141,7 +141,7 @@ public:
 
             const RequestType& cmd = request();
 
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             auto splitService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                                     ->lookupServiceByName(ShardSplitDonorService::kServiceName);
@@ -215,7 +215,7 @@ public:
 
             const RequestType& cmd = request();
 
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             auto splitService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                                     ->lookupServiceByName(ShardSplitDonorService::kServiceName);

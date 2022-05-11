@@ -253,7 +253,7 @@ public:
             uassertStatusOK(tenant_migration_util::protocolTenantIdCompatibilityCheck(
                 migrationProtocol, cmd.getTenantId().toString()));
 
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
             auto recipientService =
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                     ->lookupServiceByName(repl::TenantMigrationRecipientService::

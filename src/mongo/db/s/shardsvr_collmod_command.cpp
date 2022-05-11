@@ -104,7 +104,7 @@ public:
         CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                       opCtx->getWriteConcern());
 
-        opCtx->setAlwaysInterruptAtStepDownOrUp();
+        opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
         // Since this operation is not directly writing locally we need to force its db
         // profile level increase in order to be logged in "<db>.system.profile"

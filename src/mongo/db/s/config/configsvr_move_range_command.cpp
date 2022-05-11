@@ -69,7 +69,7 @@ public:
                                   << " can only be run on the config server",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             const auto nss = ns();
             const auto& req = request();

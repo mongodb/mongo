@@ -561,7 +561,7 @@ TEST_F(PrimaryOnlyServiceTest, LookupInstanceHoldingISLock) {
 
         // The RstlKillOpThread would only interrupt a read operation if the OperationContext opted
         // into always being interrupted.
-        opCtx->setAlwaysInterruptAtStepDownOrUp();
+        opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 
         auto instance2 =

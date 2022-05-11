@@ -104,7 +104,7 @@ public:
                     resharding::gFeatureFlagResharding.isEnabled(
                         serverGlobalParams.featureCompatibility));
 
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrAbortReshardCollection can only be run on config servers",

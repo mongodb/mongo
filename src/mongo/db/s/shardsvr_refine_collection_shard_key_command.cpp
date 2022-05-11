@@ -68,7 +68,7 @@ public:
         void typedRun(OperationContext* opCtx) {
 
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             const auto coordinatorCompletionFuture = [&]() -> SharedSemiFuture<void> {
                 FixedFCVRegion fixedFcvRegion(opCtx);

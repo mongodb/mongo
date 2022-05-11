@@ -111,7 +111,7 @@ void ReshardingCleaner<Service, StateMachine, ReshardingDocument>::clean(Operati
         return;
     }
 
-    opCtx->setAlwaysInterruptAtStepDownOrUp();
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
     _waitOnMachineCompletionIfExists(opCtx);
 

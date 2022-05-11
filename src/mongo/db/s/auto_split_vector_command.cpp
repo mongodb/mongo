@@ -72,7 +72,7 @@ public:
                     serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             const auto& req = request();
 

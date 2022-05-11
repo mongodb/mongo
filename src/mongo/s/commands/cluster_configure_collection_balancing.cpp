@@ -61,7 +61,7 @@ public:
         StringData kStatusField = "status"_sd;
 
         void typedRun(OperationContext* opCtx) {
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
             const NamespaceString& nss = ns();
 
             ConfigsvrConfigureCollectionBalancing configsvrRequest(nss);

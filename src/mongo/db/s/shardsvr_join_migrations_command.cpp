@@ -66,7 +66,7 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
             {
                 Lock::GlobalLock lk(opCtx, MODE_IX);
                 uassert(ErrorCodes::InterruptedDueToReplStateChange,

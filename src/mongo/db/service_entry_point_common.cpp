@@ -1467,7 +1467,7 @@ void ExecCommandDatabase::_initiateCommand() {
         // could conflict with transactions from a new primary.
         if (inMultiDocumentTransaction) {
             hangBeforeSettingTxnInterruptFlag.pauseWhileSet();
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         }
 
         auto allowed = command->secondaryAllowed(opCtx->getServiceContext());
@@ -1509,7 +1509,7 @@ void ExecCommandDatabase::_initiateCommand() {
         // We acquire the RSTL which helps us here in two ways:
         // 1) It forces us to wait out any outstanding stepdown attempts.
         // 2) It guarantees that future RSTL holders will see the
-        // 'setAlwaysInterruptAtStepDownOrUp' flag we set above.
+        // 'setAlwaysInterruptAtStepDownOrUp_UNSAFE' flag we set above.
         if (inMultiDocumentTransaction) {
             hangAfterCheckingWritabilityForMultiDocumentTransactions.pauseWhileSet();
             repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);

@@ -493,8 +493,14 @@ public:
     /**
      * Sets that this operation should always get killed during stepDown and stepUp, regardless of
      * whether or not it's taken a write lock.
+     *
+     * Note: This function is NOT synchronized with the ReplicationStateTransitionLock!  This means
+     * that the node's view of it's replication state can change concurrently with this function
+     * running - in which case your operation may _not_ be interrupted by that concurrent
+     * replication state change. If you need to ensure that your node does not change
+     * replication-state while calling this function, take the RSTL. See SERVER-66353 for more info.
      */
-    void setAlwaysInterruptAtStepDownOrUp() {
+    void setAlwaysInterruptAtStepDownOrUp_UNSAFE() {
         _alwaysInterruptAtStepDownOrUp.store(true);
     }
 

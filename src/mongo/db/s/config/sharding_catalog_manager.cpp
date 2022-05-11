@@ -147,7 +147,7 @@ BSONObj commitOrAbortTransaction(OperationContext* opCtx,
     }
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();
-    newOpCtx->setAlwaysInterruptAtStepDownOrUp();
+    newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
     AuthorizationSession::get(newOpCtx.get()->getClient())
         ->grantInternalAuthorization(newOpCtx.get()->getClient());
     newOpCtx.get()->setLogicalSessionId(opCtx->getLogicalSessionId().get());
@@ -720,7 +720,7 @@ void ShardingCatalogManager::withTransaction(
         stdx::lock_guard<Client> lk(*client);
         client->setSystemOperationKillableByStepdown(lk);
     }
-    asr.opCtx()->setAlwaysInterruptAtStepDownOrUp();
+    asr.opCtx()->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
     AuthorizationSession::get(client)->grantInternalAuthorization(client);
     TxnNumber txnNumber = 0;
 

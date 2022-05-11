@@ -65,7 +65,7 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             uassertStatusOK(dropCollectionIfUUIDNotMatching(
                 opCtx, ns(), request().getExpectedCollectionUUID()));

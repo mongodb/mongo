@@ -244,7 +244,7 @@ auto withTemporaryOperationContext(Callable&& callable, const NamespaceString& n
     auto opCtx = uniqueOpCtx.get();
 
     // Ensure that this operation will be killed by the RstlKillOpThread during step-up or stepdown.
-    opCtx->setAlwaysInterruptAtStepDownOrUp();
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
     invariant(opCtx->shouldAlwaysInterruptAtStepDownOrUp());
 
     {

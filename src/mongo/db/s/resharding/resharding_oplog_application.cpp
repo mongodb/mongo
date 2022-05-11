@@ -72,7 +72,7 @@ void runWithTransaction(OperationContext* opCtx,
         stdx::lock_guard<Client> lk(*client);
         client->setSystemOperationKillableByStepdown(lk);
     }
-    asr.opCtx()->setAlwaysInterruptAtStepDownOrUp();
+    asr.opCtx()->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
     AuthorizationSession::get(client)->grantInternalAuthorization(client);
     TxnNumber txnNumber = 0;

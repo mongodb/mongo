@@ -104,7 +104,7 @@ public:
         // correctness since registering the OpCtx below will ensure that the OpCtx gets interrupted
         // at stepDown anyway, but setting this lets it get interrupted a little earlier in the
         // stepDown process.
-        opCtx->setAlwaysInterruptAtStepDownOrUp();
+        opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
         // Register the opCtx with the PrimaryOnlyService so it will get interrupted on stepDown. We
         // need this, and cannot simply rely on the ReplicationCoordinator to interrupt this OpCtx
