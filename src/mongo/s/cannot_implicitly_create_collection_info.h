@@ -51,7 +51,4 @@ private:
     NamespaceString _nss;
 };
 
-using ImplicitCreateCollectionException =
-    ExceptionFor<ErrorCodes::CannotImplicitlyCreateCollection>;
-
 }  // namespace mongo
