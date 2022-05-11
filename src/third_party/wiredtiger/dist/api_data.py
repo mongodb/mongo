@@ -1310,6 +1310,26 @@ wiredtiger_open = wiredtiger_open_common + [
         type='boolean'),
 ]
 
+
+cursor_bound_config = [
+    Config('action', 'set', r'''
+        configures whether this call into the api will set or clear range bounds on the given
+        cursor, it takes two values "set" or "clear". If "set" is specified then "bound" must also
+        be specified. If "clear" is specified without any bounds then both will be cleared. The
+        keys relevant to the given bound must have been set prior to the call using
+        WT_CURSOR::set_key. This configuration is currently a work in progress and should not be
+        used.''',
+        choices=['clear','set']),
+    Config('inclusive', 'true', r'''
+        configures whether the given bound is inclusive or not. This configuration is currently a
+        work in progress and should not be used.''',
+        type='boolean'),
+    Config('bound', '', r'''
+        configures which bound is being operated on, it takes two values "lower" and "upper".
+        This configuration is currently a work in progress and should not be used.''',
+        choices=['lower','upper']),
+]
+
 cursor_runtime_config = [
     Config('append', 'false', r'''
         append the value as a new record, creating a new record
@@ -1354,6 +1374,8 @@ methods = {
 'WT_CURSOR.close' : Method([]),
 
 'WT_CURSOR.reconfigure' : Method(cursor_runtime_config),
+
+'WT_CURSOR.bound' : Method(cursor_bound_config),
 
 'WT_SESSION.alter' : Method(file_runtime_config + [
     Config('checkpoint', '', r'''

@@ -348,6 +348,30 @@ err:
 }
 
 /*
+ * __curindex_bound --
+ *     WT_CURSOR->bound method for the index cursor type.
+ *
+ */
+static int
+__curindex_bound(WT_CURSOR *cursor, const char *config)
+{
+    WT_CURSOR *child;
+    WT_CURSOR_INDEX *cindex;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    cindex = (WT_CURSOR_INDEX *)cursor;
+    JOINABLE_CURSOR_API_CALL(cursor, session, bound, NULL);
+
+    /* Grab the primary cursor and call bound function. */
+    cindex = (WT_CURSOR_INDEX *)cursor;
+    child = cindex->child;
+    WT_ERR(child->bound(child, config));
+err:
+    API_END_RET(session, ret);
+}
+
+/*
  * __curindex_close --
  *     WT_CURSOR->close method for index cursors.
  */
@@ -452,8 +476,9 @@ __wt_curindex_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
       __wt_cursor_notsup,                             /* update */
       __wt_cursor_notsup,                             /* remove */
       __wt_cursor_notsup,                             /* reserve */
-      __wt_cursor_reconfigure_notsup,                 /* reconfigure */
+      __wt_cursor_config_notsup,                      /* reconfigure */
       __wt_cursor_notsup,                             /* largest_key */
+      __curindex_bound,                               /* bound */
       __wt_cursor_notsup,                             /* cache */
       __wt_cursor_reopen_notsup,                      /* reopen */
       __wt_cursor_checkpoint_id,                      /* checkpoint ID */

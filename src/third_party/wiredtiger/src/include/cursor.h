@@ -14,7 +14,7 @@
  */
 #define WT_CURSOR_STATIC_INIT(n, get_key, get_value, set_key, set_value, compare, equals, next, \
   prev, reset, search, search_near, insert, modify, update, remove, reserve, reconfigure,       \
-  largest_key, cache, reopen, checkpoint_id, close)                                             \
+  largest_key, bound, cache, reopen, checkpoint_id, close)                                      \
     static const WT_CURSOR n = {                                                                \
       NULL, /* session */                                                                       \
       NULL, /* uri */                                                                           \
@@ -22,17 +22,17 @@
       NULL, /* value_format */                                                                  \
       get_key, get_value, set_key, set_value, compare, equals, next, prev, reset, search,       \
       search_near, insert, modify, update, remove, reserve, checkpoint_id, close, largest_key,  \
-      reconfigure, cache, reopen, 0, /* uri_hash */                                             \
-      {NULL, NULL},                  /* TAILQ_ENTRY q */                                        \
-      0,                             /* recno key */                                            \
-      {0},                           /* recno raw buffer */                                     \
-      NULL,                          /* json_private */                                         \
-      NULL,                          /* lang_private */                                         \
-      {NULL, 0, NULL, 0, 0},         /* WT_ITEM key */                                          \
-      {NULL, 0, NULL, 0, 0},         /* WT_ITEM value */                                        \
-      0,                             /* int saved_err */                                        \
-      NULL,                          /* internal_uri */                                         \
-      0                              /* uint32_t flags */                                       \
+      reconfigure, bound, cache, reopen, 0, /* uri_hash */                                      \
+      {NULL, NULL},                         /* TAILQ_ENTRY q */                                 \
+      0,                                    /* recno key */                                     \
+      {0},                                  /* recno raw buffer */                              \
+      NULL,                                 /* json_private */                                  \
+      NULL,                                 /* lang_private */                                  \
+      {NULL, 0, NULL, 0, 0},                /* WT_ITEM key */                                   \
+      {NULL, 0, NULL, 0, 0},                /* WT_ITEM value */                                 \
+      0,                                    /* int saved_err */                                 \
+      NULL,                                 /* internal_uri */                                  \
+      0                                     /* uint32_t flags */                                \
     }
 
 /* Call a function without the evict reposition cursor flag, restore afterwards. */

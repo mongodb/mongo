@@ -676,6 +676,29 @@ struct __wt_cursor {
 	 */
 	int __F(reconfigure)(WT_CURSOR *cursor, const char *config);
 
+	/*!
+	 * Set range bounds on the cursor.
+	 *
+	 * @param cursor the cursor handle
+	 * @configstart{WT_CURSOR.bound, see dist/api_data.py}
+	 * @config{action, configures whether this call into the api will set or clear range bounds
+	 * on the given cursor\, it takes two values "set" or "clear". If "set" is specified then
+	 * "bound" must also be specified.  If "clear" is specified without any bounds then both
+	 * will be cleared.  The keys relevant to the given bound must have been set prior to the
+	 * call using WT_CURSOR::set_key.  This configuration is currently a work in progress and
+	 * should not be used., a string\, chosen from the following options: \c "clear"\, \c "set";
+	 * default \c set.}
+	 * @config{bound, configures which bound is being operated on\, it takes two values "lower"
+	 * and "upper". This configuration is currently a work in progress and should not be used.,
+	 * a string\, chosen from the following options: \c "lower"\, \c "upper"; default empty.}
+	 * @config{inclusive, configures whether the given bound is inclusive or not.  This
+	 * configuration is currently a work in progress and should not be used., a boolean flag;
+	 * default \c true.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(bound)(WT_CURSOR *cursor, const char *config);
+
 	/*
 	 * Protected fields, only to be used by cursor implementations.
 	 */
