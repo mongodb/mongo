@@ -321,6 +321,8 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
             serverGlobalParams.featureCompatibility)) {
         internalOpTypeOrBuilder.append(
             BSON("o2.refineCollectionShardKey" << BSON("$exists" << true)));
+
+        internalOpTypeOrBuilder.append(BSON("o2.reshardCollection" << BSON("$exists" << true)));
     }
 
     // Finalize the array of $or filter predicates.
