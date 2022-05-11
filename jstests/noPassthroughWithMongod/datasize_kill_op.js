@@ -19,6 +19,9 @@ const dataSizeCommand = {
     "max": {"_id": 1}
 };
 
+// Set the yield iterations to 1 such that on every getNext() call we check for yield or interrupt.
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
+
 // Configure the failpoint.
 const failpoint = configureFailPoint(db, "hangBeforeDatasizeCount");
 
