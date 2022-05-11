@@ -34,6 +34,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/resource_yielder.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -46,8 +47,12 @@ class TxnMetadataHooks;
 class TransactionWithRetries;
 }  // namespace details
 
-// Max number of retries allowed for a transaction operation.
-static constexpr int kTxnRetryLimit = 10;
+// Max number of retries allowed for a transaction operation. The API uses exponential backoffs
+// capped at 1 second for transient error and commit network error retries, so this corresponds to
+// roughly 2 minutes of sleeps in total between retries meant to loosely mirror the 2 minute timeout
+// used by the driver's convenient transactions API:
+// https://github.com/mongodb/specifications/blob/92d77a6d/source/transactions-convenient-api/transactions-convenient-api.rst
+static constexpr int kTxnRetryLimit = 120;
 static constexpr auto kMaxTimeMSField = "maxTimeMS";
 
 /**
@@ -156,7 +161,7 @@ public:
      *
      */
     SyncTransactionWithRetries(OperationContext* opCtx,
-                               ExecutorPtr executor,
+                               std::shared_ptr<executor::TaskExecutor> executor,
                                std::unique_ptr<ResourceYielder> resourceYielder,
                                std::unique_ptr<TransactionClient> txnClient = nullptr);
 
@@ -238,7 +243,7 @@ public:
 class SEPTransactionClient : public TransactionClient {
 public:
     SEPTransactionClient(OperationContext* opCtx,
-                         ExecutorPtr executor,
+                         std::shared_ptr<executor::TaskExecutor> executor,
                          std::unique_ptr<SEPTransactionClientBehaviors> behaviors)
         : _serviceContext(opCtx->getServiceContext()),
           _executor(executor),
@@ -269,7 +274,7 @@ public:
 
 private:
     ServiceContext* const _serviceContext;
-    ExecutorPtr _executor;
+    std::shared_ptr<executor::TaskExecutor> _executor;
     std::unique_ptr<SEPTransactionClientBehaviors> _behaviors;
     std::unique_ptr<details::TxnMetadataHooks> _hooks;
     std::unique_ptr<CancelableOperationContextFactory> _cancelableOpCtxFactory;
@@ -304,7 +309,7 @@ public:
      * and infers its execution context from the given OperationContext.
      */
     Transaction(OperationContext* opCtx,
-                ExecutorPtr executor,
+                std::shared_ptr<executor::TaskExecutor> executor,
                 std::unique_ptr<TransactionClient> txnClient)
         : _executor(executor),
           _txnClient(std::move(txnClient)),
@@ -414,7 +419,7 @@ private:
      */
     void _primeTransaction(OperationContext* opCtx);
 
-    const ExecutorPtr _executor;
+    const std::shared_ptr<executor::TaskExecutor> _executor;
     std::unique_ptr<TransactionClient> _txnClient;
     Callback _callback;
 
@@ -464,7 +469,7 @@ public:
     TransactionWithRetries operator=(const TransactionWithRetries&) = delete;
 
     TransactionWithRetries(OperationContext* opCtx,
-                           ExecutorPtr executor,
+                           std::shared_ptr<executor::TaskExecutor> executor,
                            std::unique_ptr<TransactionClient> txnClient)
         : _internalTxn(std::make_shared<Transaction>(opCtx, executor, std::move(txnClient))),
           _executor(executor) {}
@@ -499,7 +504,7 @@ private:
     ExecutorFuture<void> _bestEffortAbort();
 
     std::shared_ptr<Transaction> _internalTxn;
-    ExecutorPtr _executor;
+    std::shared_ptr<executor::TaskExecutor> _executor;
 };
 
 }  // namespace details

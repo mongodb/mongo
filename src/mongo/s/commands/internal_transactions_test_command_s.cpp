@@ -36,10 +36,11 @@ namespace {
 class InternalTransactionsTestCommandS
     : public InternalTransactionsTestCommandBase<InternalTransactionsTestCommandS> {
 public:
-    static txn_api::SyncTransactionWithRetries getTxn(OperationContext* opCtx,
-                                                      ExecutorPtr executor,
-                                                      StringData commandName,
-                                                      bool useClusterClient) {
+    static txn_api::SyncTransactionWithRetries getTxn(
+        OperationContext* opCtx,
+        std::shared_ptr<executor::TaskExecutor> executor,
+        StringData commandName,
+        bool useClusterClient) {
         return txn_api::SyncTransactionWithRetries(
             opCtx, executor, TransactionRouterResourceYielder::makeForLocalHandoff());
     }

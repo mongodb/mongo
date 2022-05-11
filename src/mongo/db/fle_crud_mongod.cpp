@@ -52,6 +52,8 @@
 #include "mongo/db/transaction_api.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/transaction_participant_resource_yielder.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
@@ -62,7 +64,7 @@
 namespace mongo {
 namespace {
 
-std::shared_ptr<ThreadPool> _fleCrudthreadPool;
+std::shared_ptr<executor::ThreadPoolTaskExecutor> _fleCrudExecutor;
 
 ThreadPool::Options getThreadPoolOptions() {
     ThreadPool::Options tpOptions;
@@ -145,7 +147,7 @@ private:
 std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesForMongoD(
     OperationContext* opCtx) {
     return std::make_shared<txn_api::SyncTransactionWithRetries>(
-        opCtx, _fleCrudthreadPool, std::make_unique<FLEMongoDResourceYielder>());
+        opCtx, _fleCrudExecutor, std::make_unique<FLEMongoDResourceYielder>());
 }
 
 void startFLECrud(ServiceContext* serviceContext) {
@@ -155,14 +157,16 @@ void startFLECrud(ServiceContext* serviceContext) {
         return;
     }
 
-    _fleCrudthreadPool = std::make_shared<ThreadPool>(getThreadPoolOptions());
-    _fleCrudthreadPool->startup();
+    _fleCrudExecutor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPool>(getThreadPoolOptions()),
+        executor::makeNetworkInterface("FLECrudNetwork"));
+    _fleCrudExecutor->startup();
 }
 
 void stopFLECrud() {
     // Check if it was started
-    if (_fleCrudthreadPool.get() != nullptr) {
-        _fleCrudthreadPool->shutdown();
+    if (_fleCrudExecutor.get() != nullptr) {
+        _fleCrudExecutor->shutdown();
     }
 }
 
