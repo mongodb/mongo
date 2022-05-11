@@ -37,10 +37,11 @@ namespace {
 class InternalTransactionsTestCommandD
     : public InternalTransactionsTestCommandBase<InternalTransactionsTestCommandD> {
 public:
-    static txn_api::SyncTransactionWithRetries getTxn(OperationContext* opCtx,
-                                                      ExecutorPtr executor,
-                                                      StringData commandName,
-                                                      bool useClusterClient) {
+    static txn_api::SyncTransactionWithRetries getTxn(
+        OperationContext* opCtx,
+        std::shared_ptr<executor::TaskExecutor> executor,
+        StringData commandName,
+        bool useClusterClient) {
         // If a sharded mongod is acting as a mongos, it will need special routing behaviors.
         if (useClusterClient) {
             return txn_api::SyncTransactionWithRetries(

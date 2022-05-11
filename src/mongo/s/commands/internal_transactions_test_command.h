@@ -32,6 +32,8 @@
 #include "mongo/db/commands/internal_transactions_test_command_gen.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/transaction_api.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/future.h"
 
@@ -59,8 +61,8 @@ public:
             auto sharedBlock = std::make_shared<SharedBlock>(Base::request().getCommandInfos());
 
             const auto executor = Grid::get(opCtx)->isShardingInitialized()
-                ? static_cast<ExecutorPtr>(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
-                : static_cast<ExecutorPtr>(getTransactionExecutor());
+                ? Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()
+                : getTransactionExecutor();
 
             // If internalTransactionsTestCommand is received by a mongod, it should be instantiated
             // with the TransactionParticipant's resource yielder. If on a mongos, txn should be
@@ -137,10 +139,10 @@ public:
                                                            ActionType::internal));
         }
 
-        const std::shared_ptr<ThreadPool>& getTransactionExecutor() {
+        std::shared_ptr<executor::TaskExecutor> getTransactionExecutor() {
             static Mutex mutex =
                 MONGO_MAKE_LATCH("InternalTransactionsTestCommandExecutor::_mutex");
-            static std::shared_ptr<ThreadPool> executor;
+            static std::shared_ptr<executor::ThreadPoolTaskExecutor> executor;
 
             stdx::lock_guard<Latch> lg(mutex);
             if (!executor) {
@@ -148,7 +150,9 @@ public:
                 options.poolName = "InternalTransaction";
                 options.minThreads = 0;
                 options.maxThreads = 4;
-                executor = std::make_shared<ThreadPool>(std::move(options));
+                executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+                    std::make_unique<ThreadPool>(std::move(options)),
+                    executor::makeNetworkInterface("InternalTransactionNetwork"));
                 executor->startup();
             }
             return executor;

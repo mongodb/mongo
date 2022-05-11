@@ -39,6 +39,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/transaction_api.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/stdx/future.h"
@@ -312,24 +314,28 @@ protected:
         options.minThreads = 1;
         options.maxThreads = 1;
 
-        _threadPool = std::make_shared<ThreadPool>(std::move(options));
-        _threadPool->startup();
+        _executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+            std::make_unique<ThreadPool>(std::move(options)),
+            executor::makeNetworkInterface("TxnAPITestNetwork"));
+        _executor->startup();
 
-        auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>(
-            opCtx(), _threadPool, nullptr);
+        auto mockClient =
+            std::make_unique<txn_api::details::MockTransactionClient>(opCtx(), _executor, nullptr);
         _mockClient = mockClient.get();
         _txnWithRetries = std::make_unique<txn_api::SyncTransactionWithRetries>(
-            opCtx(), _threadPool, nullptr /* resourceYielder */, std::move(mockClient));
+            opCtx(), _executor, nullptr /* resourceYielder */, std::move(mockClient));
     }
 
     void tearDown() override {
-        _threadPool->shutdown();
-        _threadPool->join();
-        _threadPool.reset();
+        _executor->shutdown();
+        _executor->join();
+        _executor.reset();
     }
 
     void waitForAllEarlierTasksToComplete() {
-        _threadPool->waitForIdle();
+        while (_executor->hasTasks()) {
+            continue;
+        }
     }
 
     OperationContext* opCtx() {
@@ -349,8 +355,8 @@ protected:
     }
 
     void resetTxnWithRetries(std::unique_ptr<MockResourceYielder> resourceYielder = nullptr) {
-        auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>(
-            opCtx(), _threadPool, nullptr);
+        auto mockClient =
+            std::make_unique<txn_api::details::MockTransactionClient>(opCtx(), _executor, nullptr);
         _mockClient = mockClient.get();
         if (resourceYielder) {
             _resourceYielder = resourceYielder.get();
@@ -365,7 +371,7 @@ protected:
         // pool. This ensures that we can predictably monitor txnNumber's value.
         _txnWithRetries = nullptr;
         _txnWithRetries = std::make_unique<txn_api::SyncTransactionWithRetries>(
-            opCtx(), _threadPool, std::move(resourceYielder), std::move(mockClient));
+            opCtx(), _executor, std::move(resourceYielder), std::move(mockClient));
     }
 
     void expectSentAbort(TxnNumber txnNumber, BSONObj writeConcern) {
@@ -380,7 +386,7 @@ protected:
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;
-    std::shared_ptr<ThreadPool> _threadPool;
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
     txn_api::details::MockTransactionClient* _mockClient{nullptr};
     MockResourceYielder* _resourceYielder{nullptr};
     std::unique_ptr<txn_api::SyncTransactionWithRetries> _txnWithRetries;
@@ -1751,6 +1757,8 @@ TEST_F(TxnAPITest, TestExhaustiveFindErrorOnGetMore) {
 }
 
 TEST_F(TxnAPITest, OwnSession_StartTransactionRetryLimitOnTransientErrors) {
+    FailPointEnableBlock fp("overrideTransactionApiMaxRetriesToThree");
+
     int retryCount = 0;
     auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
@@ -1770,12 +1778,13 @@ TEST_F(TxnAPITest, OwnSession_StartTransactionRetryLimitOnTransientErrors) {
     // The transient error should have been propagated.
     ASSERT_EQ(swResult.getStatus(), ErrorCodes::HostUnreachable);
 
-    // We get 11 due to the initial try and then 10 follow up retries.
-    ASSERT_EQ(retryCount, 11);
+    // We get 4 due to the initial try and then 3 follow up retries because
+    // overrideTransactionApiMaxRetriesToThree sets the max retry attempts to 3.
+    ASSERT_EQ(retryCount, 4);
 
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
-                      10 /* txnNumber */,
+                      3 /* txnNumber */,
                       boost::none /* startTransaction */,
                       boost::none /* readConcern */,
                       WriteConcernOptions().toBSON() /* writeConcern */);
@@ -1784,6 +1793,8 @@ TEST_F(TxnAPITest, OwnSession_StartTransactionRetryLimitOnTransientErrors) {
 }
 
 TEST_F(TxnAPITest, OwnSession_CommitTransactionRetryLimitOnTransientErrors) {
+    FailPointEnableBlock fp("overrideTransactionApiMaxRetriesToThree");
+
     // If we are able to successfully finish this test, then we know that we have limited our
     // retries.
     auto swResult = txnWithRetries().runNoThrow(
@@ -1820,7 +1831,9 @@ TEST_F(TxnAPITest, OwnSession_CommitTransactionRetryLimitOnTransientErrors) {
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
-TEST_F(TxnAPITest, MaxTimeMSIsSetIfOperationContextHasDeadline) {
+TEST_F(TxnAPITest, MaxTimeMSIsSetIfOperationContextHasDeadlineAndIgnoresDefaultRetryLimit) {
+    FailPointEnableBlock fp("overrideTransactionApiMaxRetriesToThree");
+
     const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
     mockClock->reset(getServiceContext()->getFastClockSource()->now());
     getServiceContext()->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
@@ -1831,8 +1844,11 @@ TEST_F(TxnAPITest, MaxTimeMSIsSetIfOperationContextHasDeadline) {
     // txnNumber will be incremented upon the release of a session.
     resetTxnWithRetries();
 
+    int attempt = -1;
     auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            attempt += 1;
+
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
                                  .runCommand("user"_sd,
@@ -1842,12 +1858,16 @@ TEST_F(TxnAPITest, MaxTimeMSIsSetIfOperationContextHasDeadline) {
                                  .get();
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(mockClient()->getLastSentRequest(),
-                              1 /* txnNumber */,
+                              attempt + 1 /* txnNumber */,
                               true /* startTransaction */,
                               boost::none /* readConcern */,
                               boost::none /* writeConcern */,
                               maxTimeMS /* maxTimeMS */);
             assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
+
+            // Throw a transient error more times than the overriden retry limit to verify the limit
+            // is disabled when a deadline is set.
+            uassert(ErrorCodes::HostUnreachable, "Host unreachable error", attempt > 3);
 
             mockClock->advance(Milliseconds(1000));
 
@@ -1860,7 +1880,7 @@ TEST_F(TxnAPITest, MaxTimeMSIsSetIfOperationContextHasDeadline) {
 
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
-                      1 /* txnNumber */,
+                      attempt + 1 /* txnNumber */,
                       boost::none /* startTransaction */,
                       boost::none /* readConcern */,
                       WriteConcernOptions().toBSON() /* writeConcern */,

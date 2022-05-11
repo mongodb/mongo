@@ -89,10 +89,6 @@ var $config = extendWorkload($config, function($config, $super) {
             }));
             this.originalStoreFindAndModifyImagesInSideCollection[db.getMongo().host] = res.was;
         });
-
-        cluster.executeOnMongosNodes((db) => {
-            configureFailPoint(db, "skipTransactionApiRetryCheckInHandleError");
-        });
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
@@ -102,10 +98,6 @@ var $config = extendWorkload($config, function($config, $super) {
                 storeFindAndModifyImagesInSideCollection:
                     this.originalStoreFindAndModifyImagesInSideCollection[db.getMongo().host]
             }));
-        });
-
-        cluster.executeOnMongosNodes((db) => {
-            configureFailPoint(db, "skipTransactionApiRetryCheckInHandleError", {}, "off");
         });
     };
 
