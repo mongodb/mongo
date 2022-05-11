@@ -23,7 +23,7 @@ provisioner:
   name: chef_zero
   log_level: info
   product_name: cinc
-  product_version: 16.7.61
+  product_version: 17.9.52
   download_url: https://omnitruck.cinc.sh/install.sh
 
 platforms:
@@ -34,7 +34,7 @@ platforms:
       username: ec2-user
   - name: amazon2-x86-64
     driver:
-      image_id: ami-428aa838
+      image_id: ami-02013ed1a71752ea7
     transport:
       username: ec2-user
   - name: amazon2-arm64
@@ -65,7 +65,7 @@ platforms:
       username: admin
   - name: rhel70-x86-64
     driver:
-      image_id: ami-2051294a
+      image_id: ami-0051b1b2c5a166c8c
     transport:
       username: root
   - name: rhel80-x86-64
