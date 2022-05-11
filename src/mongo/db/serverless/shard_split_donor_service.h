@@ -188,6 +188,8 @@ private:
     void _initiateTimeout(const ScopedTaskExecutorPtr& executor,
                           const CancellationToken& abortToken);
 
+    bool _hasInstalledSplitConfig(WithLock lock);
+
     /*
      * We need to call this method when we find out the replica set name is the same as the state
      * doc recipient set name and the current state doc state is blocking.

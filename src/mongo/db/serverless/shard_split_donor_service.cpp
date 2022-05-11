@@ -502,13 +502,23 @@ boost::optional<BSONObj> ShardSplitDonorService::DonorStateMachine::reportForCur
     return bob.obj();
 }
 
+bool ShardSplitDonorService::DonorStateMachine::_hasInstalledSplitConfig(WithLock lock) {
+    auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
+    auto config = replCoord->getConfig();
+
+    invariant(_stateDoc.getRecipientSetName());
+    return config.isSplitConfig() &&
+        config.getRecipientConfig()->getReplSetName() == *_stateDoc.getRecipientSetName();
+}
+
 ExecutorFuture<void>
 ShardSplitDonorService::DonorStateMachine::_waitForRecipientToReachBlockTimestamp(
     const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken) {
     checkForTokenInterrupt(abortToken);
 
     stdx::lock_guard<Latch> lg(_mutex);
-    if (_stateDoc.getState() > ShardSplitDonorStateEnum::kBlocking) {
+    if (_stateDoc.getState() > ShardSplitDonorStateEnum::kBlocking ||
+        _hasInstalledSplitConfig(lg)) {
         return ExecutorFuture(**executor);
     }
 
@@ -541,43 +551,38 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_applySplitConfi
 
     {
         stdx::lock_guard<Latch> lg(_mutex);
-        if (_stateDoc.getState() >= ShardSplitDonorStateEnum::kCommitted) {
+        if (_stateDoc.getState() >= ShardSplitDonorStateEnum::kCommitted ||
+            _hasInstalledSplitConfig(lg)) {
             return ExecutorFuture(**executor);
         }
     }
 
+    auto splitConfig = [&]() {
+        stdx::lock_guard<Latch> lg(_mutex);
+        auto setName = _stateDoc.getRecipientSetName();
+        invariant(setName);
+        auto tagName = _stateDoc.getRecipientTagName();
+        invariant(tagName);
 
-    auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
-    invariant(replCoord);
+        auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
+        invariant(replCoord);
+
+        return serverless::makeSplitConfig(
+            replCoord->getConfig(), setName->toString(), tagName->toString());
+    }();
 
     LOGV2(6309100,
           "Applying the split config.",
           "id"_attr = _migrationId,
-          "config"_attr = replCoord->getConfig());
+          "config"_attr = splitConfig);
 
-    return AsyncTry([this] {
+    return AsyncTry([this, splitConfig] {
                auto opCtxHolder = _cancelableOpCtxFactory->makeOperationContext(&cc());
-
-               auto newConfig = [&]() {
-                   stdx::lock_guard<Latch> lg(_mutex);
-                   auto setName = _stateDoc.getRecipientSetName();
-                   invariant(setName);
-                   auto tagName = _stateDoc.getRecipientTagName();
-                   invariant(tagName);
-
-                   auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
-                   invariant(replCoord);
-
-                   return serverless::makeSplitConfig(
-                       replCoord->getConfig(), setName->toString(), tagName->toString());
-               }();
-
                DBDirectClient client(opCtxHolder.get());
-
                BSONObj result;
                const bool returnValue =
                    client.runCommand(NamespaceString::kAdminDb.toString(),
-                                     BSON("replSetReconfig" << newConfig.toBSON()),
+                                     BSON("replSetReconfig" << splitConfig.toBSON()),
                                      result);
                uassert(ErrorCodes::BadValue,
                        "Invalid return value for 'replSetReconfig' command.",
@@ -639,13 +644,20 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_enterBlockingOr
 
             LOGV2(8423355, "Entering 'aborted' state.", "id"_attr = _stateDoc.getId());
         } else {
-            auto recipientTagName = _stateDoc.getRecipientTagName();
-            invariant(recipientTagName);
-            auto recipientSetName = _stateDoc.getRecipientSetName();
-            invariant(recipientSetName);
-            auto config = repl::ReplicationCoordinator::get(cc().getServiceContext())->getConfig();
-            auto recipientConnectionString = serverless::makeRecipientConnectionString(
-                config, *recipientTagName, *recipientSetName);
+            auto recipientConnectionString = [stateDoc = _stateDoc]() {
+                if (stateDoc.getRecipientConnectionString()) {
+                    return *stateDoc.getRecipientConnectionString();
+                }
+
+                auto recipientTagName = stateDoc.getRecipientTagName();
+                invariant(recipientTagName);
+                auto recipientSetName = stateDoc.getRecipientSetName();
+                invariant(recipientSetName);
+                auto config =
+                    repl::ReplicationCoordinator::get(cc().getServiceContext())->getConfig();
+                return serverless::makeRecipientConnectionString(
+                    config, *recipientTagName, *recipientSetName);
+            }();
 
             // Always start the replica set monitor if we haven't reached a decision yet
             _splitAcceptancePromise.setWith([&]() -> Future<void> {
