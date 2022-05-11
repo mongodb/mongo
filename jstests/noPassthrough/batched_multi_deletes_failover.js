@@ -25,8 +25,11 @@ function stepUpNewPrimary(replSet) {
     let originalPrimary = replSet.getPrimary();
     let secondaries = replSet.getSecondaries();
 
-    while (secondaries.length > 0) {
-        // Try stepping up secondaries until one succeeds.
+    // The test relies on the batched delete failing to commit on the primary. The original primary
+    // must step down to ensure the batched delete cannot succeed. Additionally, if the original
+    // primary doesn't step down, the 'batchedDeleteStageSleepAfterNDocuments' failpoint will never
+    // get cancelled and the test will hang.
+    assert.soon(() => {
         const newPrimaryIdx = Random.randInt(secondaries.length);
         const newPrimary = secondaries[newPrimaryIdx];
 
@@ -49,19 +52,13 @@ function stepUpNewPrimary(replSet) {
         if (res.ok === 1) {
             replSet.awaitNodesAgreeOnPrimary();
             assert.eq(newPrimary, replSet.getPrimary());
-            return;
+            return true;
         }
 
         jsTest.log(`Failed to step up secondary ${newPrimary.host} and` +
-                   ` got error ${tojson(res)}. Will retry on another secondary until all` +
-                   ` secondaries have been exhausted`);
-        secondaries.splice(newPrimaryIdx, 1);
-    }
-
-    jsTest.log(`Failed to step up secondaries, trying to step` +
-               ` original primary back up`);
-    replSet.stepUp(originalPrimary, {awaitReplicationBeforeStepUp: false});
-    replSet.awaitNodesAgreeOnPrimary();
+                   ` got error ${tojson(res)}. Will retry until one of the secondaries step up`);
+        return false;
+    });
 }
 
 function killAndRestartPrimaryOnShard(replSet) {
@@ -112,7 +109,7 @@ function runTest(failoverFn, clustered, expectNetworkErrorOnDelete) {
             testDB.createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
     }
 
-    const collCount = 50032;  // Intentionally not a multiple of the default batch size.
+    const collCount = 5032;  // Intentionally not a multiple of the default batch size.
 
     const docs = [...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(1024), b: 2 * x}));
 
