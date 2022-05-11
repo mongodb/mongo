@@ -195,7 +195,7 @@ Dump in reverse order, from largest key to smallest.
 
 @par <code>-t</code>
 By default, the \c dump command opens the most recent version of the data
-source; the \c -c option changes the \c dump command to dump as of the specified
+source; the \c -t option changes the \c dump command to dump as of the specified
 timestamp.
 
 @par <code>-x</code>
