@@ -136,6 +136,11 @@ public:
      * implementations.
      */
     virtual bool supportsClientTransactionContext() const = 0;
+
+    /**
+     * Returns if the client is safe to use within an operation with a shard or database version.
+     */
+    virtual bool canRunInShardedOperations() const = 0;
 };
 
 using Callback =
@@ -158,7 +163,6 @@ public:
      *
      * Optionally accepts a custom TransactionClient and will default to a client that runs commands
      * against the local service entry point.
-     *
      */
     SyncTransactionWithRetries(OperationContext* opCtx,
                                std::shared_ptr<executor::TaskExecutor> executor,
@@ -220,6 +224,12 @@ public:
      */
     virtual Future<DbResponse> handleRequest(OperationContext* opCtx,
                                              const Message& request) const = 0;
+
+    /**
+     * Returns if a client with these behaviors is safe to use within an operation with a shard or
+     * database version.
+     */
+    virtual bool canRunInShardedOperations() const = 0;
 };
 
 /**
@@ -234,6 +244,13 @@ public:
 
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) const override;
+
+    bool canRunInShardedOperations() const {
+        // Commands are run directly on the local service entry point, so if the caller is in an
+        // operation that requires shard versions, spawned commands won't include shard versions and
+        // won't obey sharding protocols.
+        return false;
+    }
 };
 
 /**
@@ -270,6 +287,10 @@ public:
 
     virtual bool supportsClientTransactionContext() const override {
         return true;
+    }
+
+    virtual bool canRunInShardedOperations() const override {
+        return _behaviors->canRunInShardedOperations();
     }
 
 private:

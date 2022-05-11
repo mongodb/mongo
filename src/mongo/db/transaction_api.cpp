@@ -48,6 +48,7 @@
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/write_concern_options.h"
@@ -673,6 +674,17 @@ void Transaction::_setSessionInfo(WithLock,
 }
 
 void Transaction::_primeTransaction(OperationContext* opCtx) {
+    // The API does not forward shard or database versions from the caller's opCtx, so spawned
+    // commands would not obey sharding protocols, like the migration critical section, so it
+    // cannot currently be used in an operation with shard versions. This does not apply in the
+    // cluster commands configuration because those commands will attach appropriate shard
+    // versions.
+    uassert(6638800,
+            "Transaction API does not currently support use within operations with shard or "
+            "database versions without using router commands",
+            !OperationShardingState::isComingFromRouter(opCtx) ||
+                _txnClient->canRunInShardedOperations());
+
     stdx::lock_guard<Latch> lg(_mutex);
 
     // Extract session options and infer execution context from client's opCtx.

@@ -36,6 +36,7 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/transaction_api.h"
@@ -178,6 +179,10 @@ public:
 
     virtual bool supportsClientTransactionContext() const override {
         return true;
+    }
+
+    virtual bool canRunInShardedOperations() const override {
+        return false;
     }
 
     BSONObj getLastSentRequest() {
@@ -372,6 +377,13 @@ protected:
         _txnWithRetries = nullptr;
         _txnWithRetries = std::make_unique<txn_api::SyncTransactionWithRetries>(
             opCtx(), _executor, std::move(resourceYielder), std::move(mockClient));
+    }
+
+    void resetTxnWithRetriesWithClient(std::unique_ptr<txn_api::TransactionClient> txnClient) {
+        waitForAllEarlierTasksToComplete();
+        _txnWithRetries = nullptr;
+        _txnWithRetries = std::make_unique<txn_api::SyncTransactionWithRetries>(
+            opCtx(), _executor, nullptr, std::move(txnClient));
     }
 
     void expectSentAbort(TxnNumber txnNumber, BSONObj writeConcern) {
@@ -1888,5 +1900,48 @@ TEST_F(TxnAPITest, MaxTimeMSIsSetIfOperationContextHasDeadlineAndIgnoresDefaultR
     assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
+
+TEST_F(TxnAPITest, CannotBeUsedWithinShardedOperationsIfClientDoesNotSupportIt) {
+    OperationShardingState::setShardRole(
+        opCtx(), NamespaceString("foo.bar"), ChunkVersion(), boost::none);
+
+    ASSERT_THROWS_CODE(
+        resetTxnWithRetries(), DBException, ErrorCodes::duplicateCodeForTest(6638800));
+}
+
+class MockShardedOperationTransactionClient : public txn_api::TransactionClient {
+public:
+    virtual void injectHooks(std::unique_ptr<txn_api::details::TxnMetadataHooks> hooks) {}
+
+    virtual SemiFuture<BSONObj> runCommand(StringData dbName, BSONObj cmd) const {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual SemiFuture<BatchedCommandResponse> runCRUDOp(const BatchedCommandRequest& cmd,
+                                                         std::vector<StmtId> stmtIds) const {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual SemiFuture<std::vector<BSONObj>> exhaustiveFind(const FindCommandRequest& cmd) const {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual bool supportsClientTransactionContext() const {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual bool canRunInShardedOperations() const override {
+        return true;
+    }
+};
+
+TEST_F(TxnAPITest, CanBeUsedWithinShardedOperationsIfClientSupportsIt) {
+    OperationShardingState::setShardRole(
+        opCtx(), NamespaceString("foo.bar"), ChunkVersion(), boost::none);
+
+    // Should not throw.
+    resetTxnWithRetriesWithClient(std::make_unique<MockShardedOperationTransactionClient>());
+}
+
 }  // namespace
 }  // namespace mongo
