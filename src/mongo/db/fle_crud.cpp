@@ -965,6 +965,7 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
                                            newDeleteOp.getQ(),
                                            &getTransactionWithRetriesForMongoS));
         deleteRequest.setDeletes({newDeleteOp});
+        deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(boost::none);
         return std::make_unique<BatchedCommandRequest>(deleteRequest);
     } else if (request.getBatchType() == BatchedCommandRequest::BatchType_Update) {
         auto updateRequest = request.getUpdateRequest();
@@ -976,6 +977,7 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
                                            newUpdateOp.getQ(),
                                            &getTransactionWithRetriesForMongoS));
         updateRequest.setUpdates({newUpdateOp});
+        updateRequest.getWriteCommandRequestBase().setEncryptionInformation(boost::none);
         return std::make_unique<BatchedCommandRequest>(updateRequest);
     }
     MONGO_UNREACHABLE;
