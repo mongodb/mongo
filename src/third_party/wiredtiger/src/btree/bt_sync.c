@@ -341,6 +341,17 @@ __sync_page_skip(
 
     *skipp = false; /* Default to reading */
 
+    /*
+     * Skip deleted pages as they are no longer required for the checkpoint. The checkpoint never
+     * needs to review the content of those pages - if they should be included in the checkpoint the
+     * existing page on disk contains the right information and will be linked into the checkpoint
+     * as the internal tree structure is built.
+     */
+    if (ref->state == WT_REF_DELETED) {
+        *skipp = true;
+        return (0);
+    }
+
     /* If the page is in-memory, we want to look at it. */
     if (ref->state != WT_REF_DISK)
         return (0);
