@@ -39,6 +39,7 @@
 #include <memory>
 #include <vm/PosixNSPR.h>
 
+#include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
@@ -191,7 +192,7 @@ private:
             try {
                 MozJSImplScope scope(static_cast<MozJSScriptEngine*>(getGlobalScriptEngine()),
                                      boost::none /* Don't override global jsHeapLimitMB */);
-
+                Client::initThread("js");
                 scope.setParentStack(thisv->_sharedData->_stack);
                 thisv->_sharedData->_returnData = scope.callThreadArgs(thisv->_sharedData->_args);
             } catch (...) {

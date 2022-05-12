@@ -3,6 +3,7 @@ test_kind: parallel_fsm_workload_test
 selector:
   roots:
   - jstests/concurrency/fsm_workloads/**/*.js
+  - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
   exclude_files:
   # These workloads implicitly assume that their tid ranges are [0, $config.threadCount). This
   # isn't guaranteed to be true when they are run in parallel with other workloads.
