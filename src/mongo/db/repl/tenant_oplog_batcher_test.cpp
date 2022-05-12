@@ -73,6 +73,7 @@ protected:
     OplogBufferMock _oplogBuffer;
     executor::NetworkInterfaceMock* _net;
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
+    UUID _migrationUuid = UUID::gen();
 
 private:
     unittest::MinimumLoggedSeverityGuard _replicationSeverityGuard{
@@ -104,7 +105,7 @@ constexpr auto dbName = "tenant_test"_sd;
 
 TEST_F(TenantOplogBatcherTest, CannotRequestTwoBatchesAtOnce) {
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(), OpTime());
     ASSERT_OK(batcher->startup());
     auto batchFuture = batcher->getNextBatch(bigBatchLimits);
     // We just started, no batch should be available.
@@ -118,7 +119,7 @@ TEST_F(TenantOplogBatcherTest, CannotRequestTwoBatchesAtOnce) {
 
 TEST_F(TenantOplogBatcherTest, OplogBatcherGroupsCrudOps) {
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(), OpTime());
     ASSERT_OK(batcher->startup());
     auto batchFuture = batcher->getNextBatch(bigBatchLimits);
     // We just started, no batch should be available.
@@ -143,7 +144,7 @@ TEST_F(TenantOplogBatcherTest, OplogBatcherGroupsCrudOps) {
 
 TEST_F(TenantOplogBatcherTest, OplogBatcherFailsOnPreparedApplyOps) {
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(), OpTime());
     ASSERT_OK(batcher->startup());
     auto batchFuture = batcher->getNextBatch(bigBatchLimits);
 
@@ -158,7 +159,7 @@ TEST_F(TenantOplogBatcherTest, OplogBatcherFailsOnPreparedApplyOps) {
 
 TEST_F(TenantOplogBatcherTest, OplogBatcherFailsOnPreparedCommit) {
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(), OpTime());
     ASSERT_OK(batcher->startup());
     auto batchFuture = batcher->getNextBatch(bigBatchLimits);
 
@@ -190,7 +191,7 @@ TEST_F(TenantOplogBatcherTest, GetNextApplierBatchGroupsUnpreparedApplyOpsOpWith
     srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "bar")).getEntry().toBSON());
 
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(), OpTime());
     ASSERT_OK(batcher->startup());
     auto batchFuture = batcher->getNextBatch(bigBatchLimits);
     _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
@@ -224,7 +225,7 @@ TEST_F(TenantOplogBatcherTest, GetNextApplierBatchGroupsMultipleTransactions) {
     srcOps.push_back(makeApplyOpsOplogEntry(2, false, innerOps2).getEntry().toBSON());
 
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(), OpTime());
     ASSERT_OK(batcher->startup());
     auto batchFuture = batcher->getNextBatch(bigBatchLimits);
     _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
@@ -268,7 +269,7 @@ TEST_F(TenantOplogBatcherTest, GetNextApplierBatchChecksBatchLimitsForNumberOfOp
     auto limits = bigBatchLimits;
     limits.ops = 3U;
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(), OpTime());
     ASSERT_OK(batcher->startup());
     auto batchFuture = batcher->getNextBatch(limits);
 
@@ -300,7 +301,7 @@ TEST_F(TenantOplogBatcherTest, GetNextApplierBatchChecksBatchLimitsForSizeOfOper
     auto limits = bigBatchLimits;
     limits.bytes = std::size_t(srcOps[0].objsize() + srcOps[1].objsize());
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(), OpTime());
     ASSERT_OK(batcher->startup());
     auto batchFuture = batcher->getNextBatch(limits);
 
@@ -346,7 +347,7 @@ TEST_F(TenantOplogBatcherTest, LargeTransactionProcessedIndividuallyAndExpanded)
     _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
 
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(), OpTime());
     ASSERT_OK(batcher->startup());
     auto batchFuture = batcher->getNextBatch(bigBatchLimits);
 
@@ -399,7 +400,7 @@ TEST_F(TenantOplogBatcherTest, LargeTransactionProcessedIndividuallyAndExpanded)
 
 TEST_F(TenantOplogBatcherTest, OplogBatcherRetreivesPreImageOutOfOrder) {
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(), OpTime());
     ASSERT_OK(batcher->startup());
     auto batchFuture = batcher->getNextBatch(bigBatchLimits);
     // We just started, no batch should be available.
@@ -434,7 +435,7 @@ TEST_F(TenantOplogBatcherTest, OplogBatcherRetreivesPreImageOutOfOrder) {
 
 TEST_F(TenantOplogBatcherTest, OplogBatcherRetreivesPostImageOutOfOrder) {
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(), OpTime());
     ASSERT_OK(batcher->startup());
     auto batchFuture = batcher->getNextBatch(bigBatchLimits);
     // We just started, no batch should be available.
@@ -472,7 +473,7 @@ TEST_F(TenantOplogBatcherTest, OplogBatcherRetreivesPostImageOutOfOrder) {
 
 TEST_F(TenantOplogBatcherTest, GetNextApplierBatchRejectsZeroBatchOpsLimits) {
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(), OpTime());
     ASSERT_OK(batcher->startup());
     // bigBatchLimits is a legal batch limit.
     auto limits = bigBatchLimits;
@@ -485,7 +486,7 @@ TEST_F(TenantOplogBatcherTest, GetNextApplierBatchRejectsZeroBatchOpsLimits) {
 
 TEST_F(TenantOplogBatcherTest, OplogBatcherRetreivesPreImageBeforeBatchStart) {
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(), OpTime());
     ASSERT_OK(batcher->startup());
     std::vector<BSONObj> srcOps;
     srcOps.push_back(makeNoopOplogEntry(1, "preImage").getEntry().toBSON());
@@ -516,7 +517,7 @@ TEST_F(TenantOplogBatcherTest, OplogBatcherRetreivesPreImageBeforeBatchStart) {
 
 TEST_F(TenantOplogBatcherTest, OplogBatcherRetreivesPostImageBeforeBatchStart) {
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(), OpTime());
     ASSERT_OK(batcher->startup());
     std::vector<BSONObj> srcOps;
     srcOps.push_back(makeNoopOplogEntry(1, "postImage").getEntry().toBSON());
@@ -550,7 +551,7 @@ TEST_F(TenantOplogBatcherTest, OplogBatcherRetreivesPostImageBeforeBatchStart) {
 
 TEST_F(TenantOplogBatcherTest, GetNextApplierBatchRejectsZeroBatchSizeLimits) {
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(), OpTime());
     ASSERT_OK(batcher->startup());
     // bigBatchLimits is a legal batch limit.
     auto limits = bigBatchLimits;
@@ -571,7 +572,7 @@ TEST_F(TenantOplogBatcherTest, ResumeOplogBatcherFromTimestamp) {
     _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
 
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(4, 1), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(4, 1), OpTime());
     ASSERT_OK(batcher->startup());
 
     auto batchFuture = batcher->getNextBatch(bigBatchLimits);
@@ -591,7 +592,7 @@ TEST_F(TenantOplogBatcherTest, ResumeOplogBatcherFromNonExistentTimestamp) {
     _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
 
     auto batcher = std::make_shared<TenantOplogBatcher>(
-        "tenant", &_oplogBuffer, _executor, Timestamp(3, 1), OpTime());
+        _migrationUuid, &_oplogBuffer, _executor, Timestamp(3, 1), OpTime());
     ASSERT_OK(batcher->startup());
 
     auto batchFuture = batcher->getNextBatch(bigBatchLimits);

@@ -48,7 +48,8 @@ assert.eq(runNonMongoProgram("mkdir", "-p", kDataDir), 0);
 (function() {
 jsTestLog("Generate test data");
 
-const db = donorPrimary.getDB("myDatabase");
+const dbName = "myDatabase";
+const db = donorPrimary.getDB(dbName);
 const collection = db["myCollection"];
 const capped = db["myCappedCollection"];
 assert.commandWorked(db.createCollection("myCappedCollection", {capped: true, size: 100}));
@@ -83,13 +84,13 @@ TenantMigrationTest.assertCommitted(
 
 tenantMigrationTest.getRecipientRst().nodes.forEach(node => {
     for (let collectionName of ["myCollection", "myCappedCollection"]) {
-        jsTestLog(`Checking ${collectionName}`);
+        jsTestLog(`Checking ${dbName}.${collectionName} on ${node}`);
         // Use "countDocuments" to check actual docs, "count" to check sizeStorer data.
-        assert.eq(donorPrimary.getDB("myDatabase")[collectionName].countDocuments({}),
-                  recipientPrimary.getDB("myDatabase")[collectionName].countDocuments({}),
+        assert.eq(donorPrimary.getDB(dbName)[collectionName].countDocuments({}),
+                  node.getDB(dbName)[collectionName].countDocuments({}),
                   "countDocuments");
-        assert.eq(donorPrimary.getDB("myDatabase")[collectionName].count(),
-                  recipientPrimary.getDB("myDatabase")[collectionName].count(),
+        assert.eq(donorPrimary.getDB(dbName)[collectionName].count(),
+                  node.getDB(dbName)[collectionName].count(),
                   "count");
     }
 });

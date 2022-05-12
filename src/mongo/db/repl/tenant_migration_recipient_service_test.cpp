@@ -1358,50 +1358,6 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
     checkStateDocPersisted(opCtx.get(), instance.get());
 }
 
-TEST_F(TenantMigrationRecipientServiceTest,
-       TenantMigrationRecipientGetStartOpTime_Advances_NoTransaction) {
-    stopFailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance");
-
-    auto pauseFailPoint =
-        globalFailPointRegistry().find("pauseAfterRetrievingLastTxnMigrationRecipientInstance");
-    auto timesEntered = pauseFailPoint->setMode(FailPoint::alwaysOn, 0);
-
-    const UUID migrationUUID = UUID::gen();
-    const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
-    const OpTime newTopOfOplogOpTime(Timestamp(6, 1), 1);
-
-    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
-    getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
-    insertTopOfOplog(&replSet, topOfOplogOpTime);
-
-    TenantMigrationRecipientDocument initialStateDocument(
-        migrationUUID,
-        replSet.getConnectionString(),
-        "tenantA",
-        kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
-    initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
-
-    // Create and start the instance.
-    auto opCtx = makeOperationContext();
-    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        opCtx.get(), _service, initialStateDocument.toBSON());
-    ASSERT(instance.get());
-
-    pauseFailPoint->waitForTimesEntered(timesEntered + 1);
-    insertTopOfOplog(&replSet, newTopOfOplogOpTime);
-    pauseFailPoint->setMode(FailPoint::off, 0);
-
-    // Wait for task completion.
-    ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
-
-    ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartFetchingDonorOpTime());
-    ASSERT_EQ(newTopOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingDonorOpTime());
-    checkStateDocPersisted(opCtx.get(), instance.get());
-}
-
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTime_Transaction) {
     stopFailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance");
 
@@ -1441,58 +1397,6 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
 
     ASSERT_EQ(txnStartOpTime, getStateDoc(instance.get()).getStartFetchingDonorOpTime());
     ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingDonorOpTime());
-    checkStateDocPersisted(opCtx.get(), instance.get());
-}
-
-TEST_F(TenantMigrationRecipientServiceTest,
-       TenantMigrationRecipientGetStartOpTime_Advances_Transaction) {
-    stopFailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance");
-
-    auto pauseFailPoint =
-        globalFailPointRegistry().find("pauseAfterRetrievingLastTxnMigrationRecipientInstance");
-    auto timesEntered = pauseFailPoint->setMode(FailPoint::alwaysOn, 0);
-
-    const UUID migrationUUID = UUID::gen();
-    const OpTime txnStartOpTime(Timestamp(3, 1), 1);
-    const OpTime txnLastWriteOpTime(Timestamp(4, 1), 1);
-    const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
-    const OpTime newTopOfOplogOpTime(Timestamp(6, 1), 1);
-
-    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
-    getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
-    insertTopOfOplog(&replSet, topOfOplogOpTime);
-
-    SessionTxnRecord lastTxn(makeLogicalSessionIdForTest(), 100, txnLastWriteOpTime, Date_t());
-    lastTxn.setStartOpTime(txnStartOpTime);
-    lastTxn.setState(DurableTxnStateEnum::kInProgress);
-    insertToAllNodes(
-        &replSet, NamespaceString::kSessionTransactionsTableNamespace.ns(), lastTxn.toBSON());
-
-    TenantMigrationRecipientDocument initialStateDocument(
-        migrationUUID,
-        replSet.getConnectionString(),
-        "tenantA",
-        kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
-    initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
-
-    // Create and start the instance.
-    auto opCtx = makeOperationContext();
-    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        opCtx.get(), _service, initialStateDocument.toBSON());
-    ASSERT(instance.get());
-
-    pauseFailPoint->waitForTimesEntered(timesEntered + 1);
-    insertTopOfOplog(&replSet, newTopOfOplogOpTime);
-    pauseFailPoint->setMode(FailPoint::off, 0);
-
-    // Wait for task completion.
-    ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
-
-    ASSERT_EQ(txnStartOpTime, getStateDoc(instance.get()).getStartFetchingDonorOpTime());
-    ASSERT_EQ(newTopOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingDonorOpTime());
     checkStateDocPersisted(opCtx.get(), instance.get());
 }
 

@@ -37,6 +37,7 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/tenant_oplog_batcher.h"
+#include "mongo/db/serverless/serverless_types_gen.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -72,7 +73,8 @@ public:
     };
 
     TenantOplogApplier(const UUID& migrationUuid,
-                       const std::string& tenantId,
+                       const MigrationProtocolEnum protocol,
+                       boost::optional<std::string> tenantId,
                        OpTime StartApplyingAfterOpTime,
                        RandomAccessOplogBuffer* oplogBuffer,
                        std::shared_ptr<executor::TaskExecutor> executor,
@@ -159,7 +161,10 @@ private:
     // Handles consuming oplog entries from the OplogBuffer for oplog application.
     std::shared_ptr<TenantOplogBatcher> _oplogBatcher;  // (R)
     const UUID _migrationUuid;                          // (R)
-    const std::string _tenantId;                        // (R)
+    const MigrationProtocolEnum _protocol;              // (R)
+    // For multi-tenant migration protocol, _tenantId is set.
+    // But, for shard merge protcol, _tenantId is empty.
+    const boost::optional<std::string> _tenantId;       // (R)
     const OpTime _startApplyingAfterOpTime;             // (R)
     RandomAccessOplogBuffer* _oplogBuffer;              // (R)
     std::shared_ptr<executor::TaskExecutor> _executor;  // (R)

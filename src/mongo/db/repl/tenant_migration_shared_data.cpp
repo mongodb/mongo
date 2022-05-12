@@ -39,6 +39,14 @@ OpTime TenantMigrationSharedData::getLastVisibleOpTime(WithLock) {
     return _lastVisibleOpTime;
 }
 
+void TenantMigrationSharedData::setDonorBackupCursorInfo(WithLock,
+                                                         BackupCursorInfo donorBackupCursorInfo) {
+    _donorBackupCursorInfo = std::move(donorBackupCursorInfo);
+}
+
+const BackupCursorInfo& TenantMigrationSharedData::getDonorBackupCursorInfo(WithLock) const {
+    return _donorBackupCursorInfo;
+}
 
 }  // namespace repl
 }  // namespace mongo

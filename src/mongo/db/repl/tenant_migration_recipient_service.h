@@ -366,17 +366,37 @@ public:
         void _fetchAndStoreDonorClusterTimeKeyDocs(const CancellationToken& token);
 
         /**
-         * Creates a backup cursor wrapped in a Fetcher.
+         * Opens a backup cursor on the donor primary and fetches the
+         * list of donor files to be cloned.
          */
-        ExecutorFuture<void> _getDonorFilenames(const CancellationToken& token);
+        SemiFuture<void> _openBackupCursor(const CancellationToken& token);
+        SemiFuture<void> _openBackupCursorWithRetry(const CancellationToken& token);
+
+        /**
+         * Keeps the donor backup cursor alive.
+         */
+        void _keepBackupCursorAlive(const CancellationToken& token);
 
         /**
          * Kills the Donor backup cursor
          */
-        ExecutorFuture<void> _killBackupCursor();
+        SemiFuture<void> _killBackupCursor();
 
         /**
-         * Retrieves the start optimes from the donor and updates the on-disk state accordingly.
+         * Gets the backup cursor metadata info.
+         */
+        const BackupCursorInfo& _getDonorBackupCursorInfo(WithLock) const;
+
+        /**
+         * Get the oldest active multi-statement transaction optime by reading
+         * config.transactions collection at given ReadTimestamp (i.e, equal to
+         * startApplyingDonorOpTime) snapshot.
+         */
+        boost::optional<OpTime> _getOldestActiveTransactionAt(Timestamp ReadTimestamp);
+
+        /**
+         * Retrieves the start/fetch optimes from the donor and updates the in-memory/on-disk states
+         * accordingly.
          */
         SemiFuture<void> _getStartOpTimesFromDonor();
 
@@ -462,13 +482,23 @@ public:
         SemiFuture<TenantOplogApplier::OpTimePair> _waitForOplogApplierToStop();
 
         /*
-         * Advances the stableTimestamp to be >= startApplyingDonorOpTime by:
-         * 1. Advancing the clusterTime to startApplyingDonorOpTime
-         * 2. Writing a no-op oplog entry with ts > startApplyingDonorOpTime
-         * 3. Waiting for the majority commit timestamp to be the time of the no-op write
+         * Advances the majority commit timestamp to be >= donor's backup cursor checkpoint
+         * timestamp(CkptTs) by:
+         * 1. Advancing the clusterTime to CkptTs.
+         * 2. Writing a no-op oplog entry with ts > CkptTs
+         * 3. Waiting for the majority commit timestamp to be the time of the no-op write.
+         *
+         * Notes: This method should be called before transitioning the instance state to
+         * 'kLearnedFilenames' which causes donor collections to get imported. Current import rule
+         * is that the import table's checkpoint timestamp can't be later than the recipient's
+         * stable timestamp. Due to the fact, we don't have a mechanism to wait until a specific
+         * stable timestamp on a given node or set of nodes in the replica set and the majority
+         * commit point and stable timestamp aren't atomically updated, advancing the majority
+         * commit point on the recipient before import collection stage is a best-effort attempt to
+         * prevent import retry attempts on import timestamp rule violation.
          */
-        void _advanceStableTimestampToStartApplyingDonorOpTime(OperationContext* opCtx,
-                                                               const CancellationToken& token);
+        SemiFuture<void> _advanceMajorityCommitTsToBkpCursorCheckpointTs(
+            const CancellationToken& token);
 
         /*
          * Gets called when the logical/file cloner completes cloning data successfully.
@@ -487,6 +517,11 @@ public:
          * Wait for the data cloned via logical cloner to be consistent.
          */
         SemiFuture<TenantOplogApplier::OpTimePair> _waitForDataToBecomeConsistent();
+
+        /*
+         * Transitions the instance state to 'kLearnedFilenames'.
+         */
+        SemiFuture<void> _enterLearnedFilenamesState();
 
         /*
          * Transitions the instance state to 'kConsistent'.
@@ -607,8 +642,6 @@ public:
         std::unique_ptr<DBClientConnection> _client;              // (S)
         std::unique_ptr<DBClientConnection> _oplogFetcherClient;  // (S)
 
-        CursorId _donorFilenameBackupCursorId;                           // (M)
-        NamespaceString _donorFilenameBackupCursorNamespaceString;       // (M)
         std::unique_ptr<Fetcher> _donorFilenameBackupCursorFileFetcher;  // (M)
         CancellationSource _backupCursorKeepAliveCancellation = {};      // (X)
         boost::optional<SemiFuture<void>> _backupCursorKeepAliveFuture;  // (M)
@@ -650,7 +683,6 @@ public:
         // Promise that is resolved when the chain of work kicked off by run() has completed to
         // indicate whether the state doc is successfully marked as garbage collectable.
         SharedPromise<void> _taskCompletionPromise;  // (W)
-
         // Waiters are notified when 'tenantOplogApplier' is valid on restart.
         stdx::condition_variable _restartOplogApplierCondVar;  // (M)
         // Waiters are notified when 'tenantOplogApplier' is ready to use.

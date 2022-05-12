@@ -41,12 +41,13 @@
 
 namespace mongo {
 namespace repl {
-TenantOplogBatcher::TenantOplogBatcher(const std::string& tenantId,
+TenantOplogBatcher::TenantOplogBatcher(const UUID& migrationUuid,
                                        RandomAccessOplogBuffer* oplogBuffer,
                                        std::shared_ptr<executor::TaskExecutor> executor,
                                        Timestamp resumeBatchingTs,
                                        OpTime beginApplyingAfterOpTime)
-    : AbstractAsyncComponent(executor.get(), std::string("TenantOplogBatcher_") + tenantId),
+    : AbstractAsyncComponent(executor.get(),
+                             std::string("TenantOplogBatcher_") + migrationUuid.toString()),
       _oplogBuffer(oplogBuffer),
       _executor(executor),
       _resumeBatchingTs(resumeBatchingTs),
