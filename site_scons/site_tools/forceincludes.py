@@ -33,6 +33,15 @@ def _add_scanner(builder):
         # the forced includes into nodes given the search path.
         fis = [env.FindFile(f, path) for f in env.get('FORCEINCLUDES', [])]
 
+        # If all nodes could not be resolved, there are missing headers.
+        if not all(fis):
+            missing_headers = [header for node, header in zip(fis, env.get('FORCEINCLUDES')) if not node]
+            errstring = f"Could not find force include header(s): {missing_headers} in any path in CPPPATH:\n"
+            for cpppath in env.get('CPPPATH', []):
+                errstring += f"\t{env.Dir(cpppath).path}\n"
+
+            raise SCons.Errors.SConsEnvironmentError(errstring)
+
         # Use the nodes *source* scanner, which was provided to us as
         # `argument` when we created this scanner, to scan the forced
         # includes for transitive includes.
