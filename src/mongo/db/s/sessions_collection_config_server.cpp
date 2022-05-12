@@ -69,8 +69,7 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
 
 void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* opCtx) {
     const auto nss = NamespaceString::kLogicalSessionsNamespace;
-
-    shardVersionRetry(
+    auto shardResults = shardVersionRetry(
         opCtx,
         Grid::get(opCtx)->catalogCache(),
         nss,
@@ -90,7 +89,7 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
                 }
             }();
 
-            scatterGatherVersionedTargetByRoutingTable(
+            return scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
                 nss.db(),
                 nss,
@@ -101,6 +100,12 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
                 BSONObj() /* query */,
                 BSONObj() /* collation */);
         });
+
+    for (auto& shardResult : shardResults) {
+        const auto shardResponse = uassertStatusOK(std::move(shardResult.swResponse));
+        const auto& res = shardResponse.data;
+        uassertStatusOK(getStatusFromCommandResult(res));
+    }
 }
 
 void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* opCtx) {

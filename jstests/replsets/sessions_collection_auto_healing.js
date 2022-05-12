@@ -66,7 +66,8 @@ let timeoutMinutes = res.localLogicalSessionTimeoutMinutes;
     replTest.awaitReplication();
     validateSessionsCollection(secondary, false, false, timeoutMinutes);
 
-    assert.commandWorked(secondaryAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
+    assert.commandFailedWithCode(secondaryAdmin.runCommand({refreshLogicalSessionCacheNow: 1}),
+                                 [ErrorCodes.NamespaceNotFound]);
 
     validateSessionsCollection(primary, false, false, timeoutMinutes);
 
@@ -103,11 +104,13 @@ let timeoutMinutes = res.localLogicalSessionTimeoutMinutes;
 
 // Test that a refresh on a secondary will not create the TTL index on the sessions collection.
 {
-    assert.commandWorked(primary.getDB("config").system.sessions.dropIndex({lastUse: 1}));
+    assert.commandWorked(primary.getDB("config").system.sessions.runCommand(
+        "dropIndexes", {index: {lastUse: 1}, writeConcern: {w: "majority"}}));
 
     validateSessionsCollection(primary, true, false, timeoutMinutes);
 
-    assert.commandWorked(secondaryAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
+    assert.commandFailedWithCode(secondaryAdmin.runCommand({refreshLogicalSessionCacheNow: 1}),
+                                 [ErrorCodes.IndexNotFound]);
 
     validateSessionsCollection(primary, true, false, timeoutMinutes);
 }

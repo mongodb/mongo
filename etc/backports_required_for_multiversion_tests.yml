@@ -220,6 +220,10 @@ last-continuous:
       test_file: jstests/core/wildcard_index_cached_plans.js
     - ticket: SERVER-65821
       test_file: jstests/replsets/dbhash_lock_acquisition.js
+    - ticket: SERVER-65188
+      test_file: jstests/sharding/sessions_collection_auto_healing.js
+    - ticket: SERVER-65188
+      test_file: jstests/replsets/sessions_collection_auto_healing.js
     - ticket: SERVER-66089
       test_file: jstests/replsets/initial_sync_with_partial_transaction.js
 
@@ -575,6 +579,10 @@ last-lts:
       test_file: jstests/core/wildcard_index_cached_plans.js
     - ticket: SERVER-65821
       test_file: jstests/replsets/dbhash_lock_acquisition.js
+    - ticket: SERVER-65188
+      test_file: jstests/sharding/sessions_collection_auto_healing.js
+    - ticket: SERVER-65188
+      test_file: jstests/replsets/sessions_collection_auto_healing.js
     - ticket: SERVER-66089
       test_file: jstests/replsets/initial_sync_with_partial_transaction.js
 

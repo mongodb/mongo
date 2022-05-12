@@ -168,7 +168,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
  *
  * Does not retry on StaleConfigException.
  */
-std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
+[[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     OperationContext* opCtx,
     StringData dbName,
     const NamespaceString& nss,

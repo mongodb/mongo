@@ -113,6 +113,13 @@ Status LogicalSessionCacheImpl::vivify(OperationContext* opCtx, const LogicalSes
 Status LogicalSessionCacheImpl::refreshNow(OperationContext* opCtx) {
     try {
         _refresh(opCtx->getClient());
+    } catch (const DBException& ex) {
+        LOGV2(
+            20714,
+            "Failed to refresh session cache, will try again at the next refresh interval {error}",
+            "Failed to refresh session cache, will try again at the next refresh interval",
+            "error"_attr = redact(ex));
+        return exceptionToStatus();
     } catch (...) {
         return exceptionToStatus();
     }
@@ -262,16 +269,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
 
     ON_BLOCK_EXIT([&opCtx] { clearShardingOperationFailedStatus(opCtx); });
 
-    try {
-        _sessionsColl->setupSessionsCollection(opCtx);
-    } catch (const DBException& ex) {
-        LOGV2(
-            20714,
-            "Failed to refresh session cache, will try again at the next refresh interval {error}",
-            "Failed to refresh session cache, will try again at the next refresh interval",
-            "error"_attr = redact(ex));
-        return;
-    }
+    _sessionsColl->setupSessionsCollection(opCtx);
 
     LogicalSessionIdSet staleSessions;
     LogicalSessionIdSet explicitlyEndingSessions;

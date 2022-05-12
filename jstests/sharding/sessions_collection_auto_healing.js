@@ -46,7 +46,8 @@ var mongosConfig = mongos.getDB("config");
 {
     assert.eq(mongosConfig.shards.countDocuments({}), 0);
 
-    assert.commandWorked(configSvr.adminCommand({refreshLogicalSessionCacheNow: 1}));
+    assert.commandFailedWithCode(configSvr.adminCommand({refreshLogicalSessionCacheNow: 1}),
+                                 [ErrorCodes.ShardNotFound]);
 
     validateSessionsCollection(configSvr, false, false);
 }
@@ -102,7 +103,8 @@ var shardConfig = shard.getDB("config");
     validateSessionsCollection(configSvr, false, false);
     validateSessionsCollection(shard, false, false);
 
-    assert.commandWorked(shard.adminCommand({refreshLogicalSessionCacheNow: 1}));
+    assert.commandFailedWithCode(shard.adminCommand({refreshLogicalSessionCacheNow: 1}),
+                                 [ErrorCodes.NamespaceNotSharded]);
 
     validateSessionsCollection(configSvr, false, false);
     validateSessionsCollection(shard, false, false);
