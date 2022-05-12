@@ -488,6 +488,7 @@ struct __wt_connection_impl {
     uint32_t log_cursors;                  /* Log cursor count */
     wt_off_t log_dirty_max;                /* Log dirty system cache max size */
     wt_off_t log_file_max;                 /* Log file max size */
+    uint32_t log_force_write_wait;         /* Log force write wait configuration */
     const char *log_path;                  /* Logging path format */
     uint32_t log_prealloc;                 /* Log file pre-allocation */
     uint16_t log_req_max;                  /* Max required log version */
@@ -588,20 +589,21 @@ struct __wt_connection_impl {
 #define WT_TIMING_STRESS_BACKUP_RENAME 0x00002u
 #define WT_TIMING_STRESS_CHECKPOINT_RESERVED_TXNID_DELAY 0x00004u
 #define WT_TIMING_STRESS_CHECKPOINT_SLOW 0x00008u
-#define WT_TIMING_STRESS_COMPACT_SLOW 0x00010u
-#define WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_DELETE_KEY_FROM_TS 0x00020u
-#define WT_TIMING_STRESS_HS_CHECKPOINT_DELAY 0x00040u
-#define WT_TIMING_STRESS_HS_SEARCH 0x00080u
-#define WT_TIMING_STRESS_HS_SWEEP 0x00100u
-#define WT_TIMING_STRESS_PREPARE_CHECKPOINT_DELAY 0x00200u
-#define WT_TIMING_STRESS_SPLIT_1 0x00400u
-#define WT_TIMING_STRESS_SPLIT_2 0x00800u
-#define WT_TIMING_STRESS_SPLIT_3 0x01000u
-#define WT_TIMING_STRESS_SPLIT_4 0x02000u
-#define WT_TIMING_STRESS_SPLIT_5 0x04000u
-#define WT_TIMING_STRESS_SPLIT_6 0x08000u
-#define WT_TIMING_STRESS_SPLIT_7 0x10000u
-#define WT_TIMING_STRESS_TIERED_FLUSH_FINISH 0x20000u
+#define WT_TIMING_STRESS_CHECKPOINT_STOP 0x00010u
+#define WT_TIMING_STRESS_COMPACT_SLOW 0x00020u
+#define WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_DELETE_KEY_FROM_TS 0x00040u
+#define WT_TIMING_STRESS_HS_CHECKPOINT_DELAY 0x00080u
+#define WT_TIMING_STRESS_HS_SEARCH 0x00100u
+#define WT_TIMING_STRESS_HS_SWEEP 0x00200u
+#define WT_TIMING_STRESS_PREPARE_CHECKPOINT_DELAY 0x00400u
+#define WT_TIMING_STRESS_SPLIT_1 0x00800u
+#define WT_TIMING_STRESS_SPLIT_2 0x01000u
+#define WT_TIMING_STRESS_SPLIT_3 0x02000u
+#define WT_TIMING_STRESS_SPLIT_4 0x04000u
+#define WT_TIMING_STRESS_SPLIT_5 0x08000u
+#define WT_TIMING_STRESS_SPLIT_6 0x10000u
+#define WT_TIMING_STRESS_SPLIT_7 0x20000u
+#define WT_TIMING_STRESS_TIERED_FLUSH_FINISH 0x40000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
     uint64_t timing_stress_flags;
 

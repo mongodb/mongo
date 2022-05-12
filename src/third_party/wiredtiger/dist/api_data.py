@@ -855,7 +855,7 @@ connection_runtime_config = [
         type='list', undoc=True,
         choices=[
         'aggressive_sweep', 'backup_rename', 'checkpoint_reserved_txnid_delay', 'checkpoint_slow',
-        'compact_slow', 'failpoint_history_store_delete_key_from_ts',
+        'checkpoint_stop', 'compact_slow', 'failpoint_history_store_delete_key_from_ts',
         'history_store_checkpoint_delay', 'history_store_search', 'history_store_sweep_race',
         'prepare_checkpoint_delay', 'split_1', 'split_2', 'split_3', 'split_4', 'split_5',
         'split_6', 'split_7', 'tiered_flush_finish']),
@@ -989,6 +989,11 @@ wiredtiger_open_log_configuration = [
             the maximum size of log files''',
             min='100KB',    # !!! Must match WT_LOG_FILE_MIN
             max='2GB'),    # !!! Must match WT_LOG_FILE_MAX
+        Config('force_write_wait', '0', r'''
+            enable code that interrupts the usual timing of flushing the log from
+            the internal log server thread with a goal of uncovering race conditions.
+            This option is intended for use with internal stress testing of WiredTiger.''',
+            min='1', max='60', undoc=True),
         Config('path', '"."', r'''
             the name of a directory into which log files are written. The
             directory must already exist. If the value is not an absolute path,
