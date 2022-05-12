@@ -114,7 +114,7 @@ bool EncryptedDBClientBase::call(Message& toSend,
 }
 
 void EncryptedDBClientBase::say(Message& toSend, bool isRetry, std::string* actualServer) {
-    MONGO_UNREACHABLE;
+    return _conn->say(toSend, isRetry, actualServer);
 }
 
 BSONObj EncryptedDBClientBase::encryptDecryptCommand(const BSONObj& object,
