@@ -992,7 +992,7 @@ tasks:
   # All cppsuite pull request tasks must supply the relative path to the config file as we are in
   # the cmake build working directory and the LD_LIBRARY_PATH is .libs.
 
-  - name: cppsuite-base-test-default
+  - name: cppsuite-operations-test-default
     tags: ["pull_request"]
     depends_on:
       - name: compile
@@ -1064,7 +1064,7 @@ tasks:
         vars:
           test_path: test/cppsuite/search_near_03
 
-  - name: cppsuite-base-test-stress
+  - name: cppsuite-operations-test-stress
     depends_on:
       - name: compile
     commands:
@@ -3835,7 +3835,7 @@ buildvariants:
     - name: examples-c-production-disable-static-test
     - name: format-stress-pull-request-test
     - name: make-check-test
-    - name: cppsuite-base-test-default
+    - name: cppsuite-operations-test-default
     - name: cppsuite-hs-cleanup-default
     - name: cppsuite-search-near-01-default
     - name: cppsuite-search-near-02-default
@@ -4051,7 +4051,7 @@ buildvariants:
       -DCMAKE_PREFIX_PATH="$(pwd)/../TCMALLOC_LIB"
   tasks:
     - name: compile
-    - name: cppsuite-base-test-stress
+    - name: cppsuite-operations-test-stress
     - name: cppsuite-hs-cleanup-stress
     - name: cppsuite-search-near-01-stress
     - name: cppsuite-search-near-02-stress
