@@ -1080,6 +1080,13 @@ env_vars.Add('WINDOWS_OPENSSL_BIN',
     help='Sets the path to the openssl binaries for packaging',
     default='c:/openssl/bin')
 
+# TODO SERVER-42170 switch to PathIsDirCreate validator
+env_vars.Add(PathVariable(
+        "LOCAL_TMPDIR",
+        help='Set the TMPDIR when running tests.',
+        default='$BUILD_ROOT/tmp_test_data',
+        validator=PathVariable.PathAccept
+))
 # -- Validate user provided options --
 
 # A dummy environment that should *only* have the variables we have set. In practice it has
@@ -1216,6 +1223,11 @@ if get_option('build-tools') == 'next':
 
 env = Environment(variables=env_vars, **envDict)
 del envDict
+
+# TODO SERVER-42170 We can remove this Execute call
+# when support for PathIsDirCreate can be used as a validator
+# to the Variable above.
+env.Execute(SCons.Defaults.Mkdir(env.Dir('$LOCAL_TMPDIR')))
 
 if get_option('cache-signature-mode') == 'validate':
     validate_cache_dir = Tool('validate_cache_dir')

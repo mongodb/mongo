@@ -58,7 +58,9 @@ def generate_test_execution_aliases(env, test):
 
     target_name = os.path.basename(installed[0].path)
 
-    target_command = env.Command(
+    test_env = env.Clone()
+    test_env['ENV']['TMPDIR'] = test_env.Dir('$LOCAL_TMPDIR').abspath
+    target_command = test_env.Command(
         target=f"#+{target_name}",
         source=installed[0],
         action="$( $ICERUN $) ${SOURCES[0]} $UNITTEST_FLAGS",
@@ -85,7 +87,7 @@ def generate_test_execution_aliases(env, test):
         # We always create the verbose command, but we only create the legacy
         # command if there isn't a conflict between the target_name and
         # source_name. Legacy commands must be unique
-        verbose_source_command = env.Command(
+        verbose_source_command = test_env.Command(
             target=f"#+{target_name}-{source_name}",
             source=installed[0],
             action="$( $ICERUN $) ${SOURCES[0]} -fileNameFilter $TEST_SOURCE_FILE_NAME $UNITTEST_FLAGS",
@@ -102,7 +104,7 @@ def generate_test_execution_aliases(env, test):
         if len(alias[0].children()) > 1:
             raise SCons.Errors.BuildError(alias[0].children()[0], f"Multiple unit test programs contain a source file named '{source_name}' which would result in an ambiguous test execution alias. Unit test source filenames are required to be globally unique.")
 
-    proof_generator_command = env.Command(
+    proof_generator_command = test_env.Command(
         target=[
             '${SOURCE}.log',
             '${SOURCE}.status',
@@ -123,7 +125,7 @@ def generate_test_execution_aliases(env, test):
         env.NoCache(proof_generator_command)
         env.AlwaysBuild(proof_generator_command)
 
-    proof_analyzer_command = env.Command(
+    proof_analyzer_command = test_env.Command(
         target='${SOURCES[1].base}.proof',
         source=proof_generator_command,
         action=SCons.Action.Action(

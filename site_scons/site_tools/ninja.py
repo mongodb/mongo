@@ -79,8 +79,8 @@ def _mkdir_action_function(env, node):
         # to an invalid ninja file.
         "variables": {
             # On Windows mkdir "-p" is always on
-            "cmd": "{mkdir} $out".format(
-                mkdir="mkdir" if env["PLATFORM"] == "win32" else "mkdir -p",
+            "cmd": "mkdir {args}".format(
+                args = ' '.join(get_outputs(node)) + " & exit /b 0" if env["PLATFORM"] == "win32" else "-p " + ' '.join(get_outputs(node)),
             ),
         },
     }
