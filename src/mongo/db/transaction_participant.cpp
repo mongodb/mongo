@@ -1405,26 +1405,35 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(opCtx->getTxnNumber());
 
-    uassert(ErrorCodes::NoSuchTransaction,
-            str::stream() << "The requested transaction number is different than the "
-                             "active transaction. Requested: "
-                          << *opCtx->getTxnNumber()
-                          << ". Active: " << o().activeTxnNumberAndRetryCounter.getTxnNumber(),
-            *opCtx->getTxnNumber() == o().activeTxnNumberAndRetryCounter.getTxnNumber());
-
+    // Verify that transaction number and mode are as expected.
     if (opCtx->inMultiDocumentTransaction()) {
+        uassert(ErrorCodes::NoSuchTransaction,
+                str::stream() << "Attempted to run '" << cmdName << "' inside a transaction with "
+                              << "session id" << _sessionId() << " and transaction number "
+                              << *opCtx->getTxnNumber()
+                              << " but the active transaction number on the session is "
+                              << o().activeTxnNumberAndRetryCounter.getTxnNumber(),
+                *opCtx->getTxnNumber() == o().activeTxnNumberAndRetryCounter.getTxnNumber());
+
         uassert(6611000,
                 str::stream() << "Attempted to use the active transaction number "
                               << o().activeTxnNumberAndRetryCounter.getTxnNumber() << " in session "
                               << _sessionId()
-                              << " for a transaction but it corresponds to a retryable write",
+                              << " to run a transaction but it corresponds to a retryable write",
                 !o().txnState.isInRetryableWriteMode());
     } else {
+        uassert(6564100,
+                str::stream() << "Attempted to run '" << cmdName << "' as a retryable write with "
+                              << "session id" << _sessionId() << " and transaction number "
+                              << *opCtx->getTxnNumber()
+                              << " but the active transaction number on the session is "
+                              << o().activeTxnNumberAndRetryCounter.getTxnNumber(),
+                *opCtx->getTxnNumber() == o().activeTxnNumberAndRetryCounter.getTxnNumber());
         uassert(6611001,
                 str::stream() << "Attempted to use the active transaction number "
                               << o().activeTxnNumberAndRetryCounter.getTxnNumber() << " in session "
                               << _sessionId()
-                              << " for a retryable write but it corresponds to a transaction",
+                              << " to run a retryable write but it corresponds to a transaction",
                 o().txnState.isInRetryableWriteMode());
     }
 
