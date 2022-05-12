@@ -132,6 +132,9 @@ const NamespaceString NamespaceString::kForceOplogBatchBoundaryNamespace(
 const NamespaceString NamespaceString::kConfigImagesNamespace(NamespaceString::kConfigDb,
                                                               "image_collection");
 
+// TODO (SERVER-66431): replace all usages of ShardType::ConfigNS by kConfigsvrShardsNamespace
+const NamespaceString NamespaceString::kConfigsvrShardsNamespace(NamespaceString::kConfigDb,
+                                                                 "shards");
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
 }
@@ -194,11 +197,15 @@ bool NamespaceString::isLegalClientSystemNS(
  *
  * Process updates to 'admin.system.version' individually as well so the secondary's FCV when
  * processing each operation matches the primary's when committing that operation.
+ *
+ * Oplog entries on 'config.shards' should be processed one at a time, otherwise the in-memory state
+ * that its kept on the TopologyTimeTicker might be wrong.
+ *
  */
 bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
     return isSystemDotViews() || isServerConfigurationCollection() || isPrivilegeCollection() ||
         _ns == kDonorReshardingOperationsNamespace.ns() ||
-        _ns == kForceOplogBatchBoundaryNamespace.ns();
+        _ns == kForceOplogBatchBoundaryNamespace.ns() || _ns == kConfigsvrShardsNamespace.ns();
 }
 
 NamespaceString NamespaceString::makeListCollectionsNSS(StringData dbName) {

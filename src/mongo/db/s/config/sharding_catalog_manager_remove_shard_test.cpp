@@ -71,9 +71,12 @@ BSONObj getReplSecondaryOkMetadata() {
     o.append(rpc::kReplSetMetadataFieldName, 1);
     return o.obj();
 }
-
+// The unit tests defined below only work with the wiredTiger storage engine since they rely on
+// having valid timestamps when committing the WUOW on the CSRS.
 class RemoveShardTest : public ConfigServerTestFixture {
 protected:
+    RemoveShardTest() : ConfigServerTestFixture("wiredTiger") {}
+
     /**
      * Performs the test setup steps from the parent class and then configures the config shard and
      * the client name.

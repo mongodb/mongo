@@ -1770,7 +1770,8 @@ env.Library(
 env.Library(
     target='vector_clock_mongod',
     source=[
-        'vector_clock_mongod.cpp',
+        's/topology_time_ticker.cpp',
+        'vector_clock_mongod.cpp'
     ],
     LIBDEPS=[
         'vector_clock_mutable',
@@ -1866,6 +1867,7 @@ env.Library(
         'storage/ephemeral_for_test/storage_ephemeral_for_test',
         'storage/storage_control',
         'storage/storage_options',
+        'storage/wiredtiger/storage_wiredtiger',
     ],
 )
 

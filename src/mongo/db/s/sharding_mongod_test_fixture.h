@@ -49,6 +49,9 @@ class ShardingMongodTestFixture : public ServiceContextMongoDTest,
                                   public ShardingTestFixtureCommon {
 protected:
     ShardingMongodTestFixture();
+
+    explicit ShardingMongodTestFixture(std::string engine);
+
     ~ShardingMongodTestFixture();
 
     void setUp() override;

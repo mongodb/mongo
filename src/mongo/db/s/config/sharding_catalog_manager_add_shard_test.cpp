@@ -67,8 +67,12 @@ using unittest::assertGet;
 
 const Hours kLongFutureTimeout(8);
 
+// The unit tests defined below only work with the wiredTiger storage engine since they rely on
+// having valid timestamps when committing the WUOW on the CSRS.
 class AddShardTest : public ConfigServerTestFixture {
 protected:
+    AddShardTest() : ConfigServerTestFixture("wiredTiger") {}
+
     /**
      * Performs the test setup steps from the parent class and then configures the config shard and
      * the client name.

@@ -94,6 +94,9 @@ ReadPreferenceSetting kReadPref(ReadPreference::PrimaryOnly);
 
 ConfigServerTestFixture::ConfigServerTestFixture() = default;
 
+ConfigServerTestFixture::ConfigServerTestFixture(std::string engine)
+    : ShardingMongodTestFixture(std::move(engine)) {}
+
 ConfigServerTestFixture::~ConfigServerTestFixture() = default;
 
 void ConfigServerTestFixture::setUp() {

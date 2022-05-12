@@ -49,6 +49,9 @@ class Shard;
 class ConfigServerTestFixture : public ShardingMongodTestFixture {
 protected:
     ConfigServerTestFixture();
+
+    explicit ConfigServerTestFixture(std::string engine);
+
     ~ConfigServerTestFixture();
 
     void setUp() override;

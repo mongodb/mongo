@@ -39,6 +39,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
+#include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
 
@@ -243,6 +244,12 @@ void ReplicationCoordinatorMock::setMyLastAppliedOpTimeAndWallTime(
 
     _myLastAppliedOpTime = opTimeAndWallTime.opTime;
     _myLastAppliedWallTime = opTimeAndWallTime.wallTime;
+
+    if (auto storageEngine = _service->getStorageEngine()) {
+        if (auto snapshotManager = storageEngine->getSnapshotManager()) {
+            snapshotManager->setCommittedSnapshot(opTimeAndWallTime.opTime.getTimestamp());
+        }
+    }
 }
 
 void ReplicationCoordinatorMock::setMyLastDurableOpTimeAndWallTime(
@@ -260,6 +267,12 @@ void ReplicationCoordinatorMock::setMyLastAppliedOpTimeAndWallTimeForward(
     if (opTimeAndWallTime.opTime > _myLastAppliedOpTime) {
         _myLastAppliedOpTime = opTimeAndWallTime.opTime;
         _myLastAppliedWallTime = opTimeAndWallTime.wallTime;
+
+        if (auto storageEngine = _service->getStorageEngine()) {
+            if (auto snapshotManager = storageEngine->getSnapshotManager()) {
+                snapshotManager->setCommittedSnapshot(opTimeAndWallTime.opTime.getTimestamp());
+            }
+        }
     }
 }
 

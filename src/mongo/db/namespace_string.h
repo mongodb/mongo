@@ -192,6 +192,9 @@ public:
     // Namespace used for storing retryable findAndModify images.
     static const NamespaceString kConfigImagesNamespace;
 
+    // Namespace used for storing the list of shards on the CSRS
+    static const NamespaceString kConfigsvrShardsNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

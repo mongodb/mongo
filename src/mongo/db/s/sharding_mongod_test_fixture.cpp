@@ -56,6 +56,7 @@
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/shard_server_op_observer.h"
+#include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -86,6 +87,9 @@ using repl::ReplSettings;
 using unittest::assertGet;
 
 ShardingMongodTestFixture::ShardingMongodTestFixture() {}
+
+ShardingMongodTestFixture::ShardingMongodTestFixture(std::string engine)
+    : ServiceContextMongoDTest(std::move(engine)), ShardingTestFixtureCommon() {}
 
 ShardingMongodTestFixture::~ShardingMongodTestFixture() = default;
 
@@ -282,6 +286,13 @@ void ShardingMongodTestFixture::setUp() {
     // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
     serverGlobalParams.mutableFeatureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::kLatest);
+
+    if (service->getStorageEngine()->getSnapshotManager()) {
+        WriteUnitOfWork wuow{operationContext()};
+        service->getStorageEngine()->getSnapshotManager()->setCommittedSnapshot(
+            repl::getNextOpTime(operationContext()).getTimestamp());
+        wuow.commit();
+    }
 }
 
 void ShardingMongodTestFixture::tearDown() {
