@@ -69,10 +69,12 @@ TEST(MakeSplitConfig, toBSONRoundTripAbility) {
     ReplSetConfig configB;
     const std::string recipientTagName{"recipient"};
     const auto donorReplSetId = OID::gen();
-    const auto recipientMemberBSON =
-        BSON("_id" << 1 << "host"
-                   << "localhost:20002"
-                   << "priority" << 0 << "votes" << 0 << "tags" << BSON(recipientTagName << "one"));
+    const auto recipientMemberBSON = BSON("_id" << 1 << "host"
+                                                << "localhost:20002"
+                                                << "priority" << 0 << "votes" << 0 << "tags"
+                                                << BSON(recipientTagName << "one"
+                                                                         << "k1"
+                                                                         << "v1"));
 
     configA = ReplSetConfig::parse(BSON("_id"
                                         << "rs0"
@@ -99,7 +101,8 @@ TEST(MakeSplitConfig, toBSONRoundTripAbility) {
               << BSON_ARRAY(BSON("_id" << 0 << "host"
                                        << "localhost:20002"
                                        << "priority" << 1 << "votes" << 1 << "tags"
-                                       << BSON(recipientTagName << "one")))
+                                       << BSON("k1"
+                                               << "v1")))
               << "settings"
               // we use getReplicaSetId to match the newly replicaSetId created from makeSplitConfig
               // on the recipientConfig since configA had a replicaSetId in its config.

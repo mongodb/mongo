@@ -90,10 +90,15 @@ repl::ReplSetConfig makeSplitConfig(const repl::ReplSetConfig& config,
             std::any_of(member.tagsBegin(), member.tagsEnd(), [&](const repl::ReplSetTag& tag) {
                 return tagConfig.getTagKey(tag) == recipientTagName;
             });
+
         if (isRecipient) {
+            auto memberBSON = member.toBSON();
+            auto recipientTags = memberBSON.getField("tags").Obj().removeField(recipientTagName);
             BSONObjBuilder bob(
-                member.toBSON().removeField("votes").removeField("priority").removeField("_id"));
+                memberBSON.removeFields(StringDataSet{"votes", "priority", "_id", "tags"}));
+
             bob.appendNumber("_id", recipientIndex);
+            bob.append("tags", recipientTags);
             recipientMembers.push_back(bob.obj());
             recipientIndex++;
         } else {
