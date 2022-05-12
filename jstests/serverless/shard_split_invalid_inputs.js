@@ -8,7 +8,7 @@
  *   incompatible_with_windows_tls,
  *   requires_persistence,
  *   requires_fcv_52,
- *   featureFlagShardSplit
+ *   featureFlagShardSplit,
  *   serverless,
  * ]
  */
