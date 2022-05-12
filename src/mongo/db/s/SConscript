@@ -673,9 +673,10 @@ env.CppUnitTest(
         'resharding/resharding_util_test.cpp',
         'sharding_ddl_util_test.cpp',
         'sharding_util_refresh_test.cpp',
+        'topology_time_ticker_test.cpp',
         'type_lockpings_test.cpp',
         'type_locks_test.cpp',
-        'vector_clock_config_server_test.cpp',
+        'vector_clock_config_server_test.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',

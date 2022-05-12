@@ -218,13 +218,7 @@ public:
 
 private:
     void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo);
-    void _registerTopologyTimeTickPoint(Timestamp newTopologyTime);
     void _tickTopologyTimeIfNecessary(ServiceContext* service, Timestamp newCommitPointTime);
-
-    // Guards access to the instance variables below.
-    Mutex _mutex = MONGO_MAKE_LATCH("ConfigServerOpObserver");
-
-    std::vector<Timestamp> _topologyTimeTickPoints;
 };
 
 }  // namespace mongo

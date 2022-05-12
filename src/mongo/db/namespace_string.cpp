@@ -166,6 +166,10 @@ const NamespaceString NamespaceString::kCompactStructuredEncryptionCoordinatorNa
 const NamespaceString NamespaceString::kClusterParametersNamespace(NamespaceString::kConfigDb,
                                                                    "clusterParameters");
 
+// TODO (SERVER-66431): replace all usages of ShardType::ConfigNS by kConfigsvrShardsNamespace
+const NamespaceString NamespaceString::kConfigsvrShardsNamespace(NamespaceString::kConfigDb,
+                                                                 "shards");
+
 NamespaceString NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(StringData ns) {
     if (!gMultitenancySupport) {
         return NamespaceString(ns, boost::none);
@@ -252,12 +256,16 @@ bool NamespaceString::isLegalClientSystemNS(
  *
  * Process updates to config.tenantMigrationRecipients individually so they serialize after inserts
  * into config.donatedFiles.<migrationId>.
+ *
+ * Oplog entries on 'config.shards' should be processed one at a time, otherwise the in-memory state
+ * that its kept on the TopologyTimeTicker might be wrong.
+ *
  */
 bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
     return isSystemDotViews() || isServerConfigurationCollection() || isPrivilegeCollection() ||
         _ns == kDonorReshardingOperationsNamespace.ns() ||
         _ns == kForceOplogBatchBoundaryNamespace.ns() ||
-        _ns == kTenantMigrationRecipientsNamespace.ns();
+        _ns == kTenantMigrationRecipientsNamespace.ns() || _ns == kConfigsvrShardsNamespace.ns();
 }
 
 NamespaceString NamespaceString::makeListCollectionsNSS(const DatabaseName& dbName) {

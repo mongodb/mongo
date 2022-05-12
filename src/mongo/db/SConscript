@@ -2090,7 +2090,8 @@ env.Library(
 env.Library(
     target='vector_clock_mongod',
     source=[
-        'vector_clock_mongod.cpp',
+        's/topology_time_ticker.cpp',
+        'vector_clock_mongod.cpp'
     ],
     LIBDEPS=[
         'vector_clock_mutable',

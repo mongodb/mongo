@@ -221,6 +221,9 @@ public:
     // Namespace used for storing cluster wide parameters.
     static const NamespaceString kClusterParametersNamespace;
 
+    // Namespace used for storing the list of shards on the CSRS
+    static const NamespaceString kConfigsvrShardsNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

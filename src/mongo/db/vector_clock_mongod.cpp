@@ -34,7 +34,9 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/topology_time_ticker.h"
 #include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -94,7 +96,7 @@ private:
     // ReplicaSetAwareService methods implementation
 
     void onStartup(OperationContext* opCtx) override {}
-    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) override {}
+    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) override;
     void onShutdown() override {}
     void onStepUpBegin(OperationContext* opCtx, long long term) override;
     void onStepUpComplete(OperationContext* opCtx, long long term) override {}
@@ -187,9 +189,15 @@ VectorClockMongoD::~VectorClockMongoD() = default;
 void VectorClockMongoD::onStepUpBegin(OperationContext* opCtx, long long term) {
     stdx::lock_guard lg(_mutex);
     _durableTime.reset();
+}
 
-    // Initialize the config server's topology time to the maximum topology time from
-    // `config.shards` collection instead of using `Timestamp(0 ,0)`.
+void VectorClockMongoD::onStepDown() {
+    stdx::lock_guard lg(_mutex);
+    _durableTime.reset();
+}
+
+void VectorClockMongoD::onInitialDataAvailable(OperationContext* opCtx,
+                                               bool isMajorityDataAvailable) {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         const auto maxTopologyTime{[&opCtx]() -> boost::optional<Timestamp> {
             DBDirectClient client{opCtx};
@@ -208,14 +216,22 @@ void VectorClockMongoD::onStepUpBegin(OperationContext* opCtx, long long term) {
         }()};
 
         if (maxTopologyTime) {
-            _advanceComponentTimeTo(Component::TopologyTime, LogicalTime(*maxTopologyTime));
+            if (isMajorityDataAvailable) {
+                // The maxTopologyTime is majority committed. Thus, we can start gossiping it.
+                _advanceComponentTimeTo(Component::TopologyTime, LogicalTime(*maxTopologyTime));
+            } else {
+                // There is no guarantee that the maxTopologyTime is majority committed and we don't
+                // have a way to obtain the commit time associated with it (init sync scenario).
+                // The only guarantee that we have at this point is that any majority read
+                // that comes afterwards will read, at least, from the initialDataTimestamp. Thus,
+                // we introduce an artificial tick point <initialDataTimestamp, maxTopologyTime>.
+                const auto initialDataTimestamp =
+                    repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime();
+                TopologyTimeTicker::get(opCtx).onNewLocallyCommittedTopologyTimeAvailable(
+                    initialDataTimestamp.getTimestamp(), *maxTopologyTime);
+            }
         }
     }
-}
-
-void VectorClockMongoD::onStepDown() {
-    stdx::lock_guard lg(_mutex);
-    _durableTime.reset();
 }
 
 void VectorClockMongoD::onBecomeArbiter() {
