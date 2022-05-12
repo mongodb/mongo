@@ -5339,7 +5339,7 @@ TEST_F(TxnParticipantTest, UnstashRetryableWriteAfterActiveTxnNumberHasChanged) 
         auto txnParticipant = TransactionParticipant::get(opCtx);
         ASSERT_THROWS_CODE(txnParticipant.unstashTransactionResources(opCtx, "insert"),
                            AssertionException,
-                           ErrorCodes::NoSuchTransaction);
+                           6564100);
     }
 }
 

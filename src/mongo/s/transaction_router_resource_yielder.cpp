@@ -36,6 +36,10 @@
 
 namespace mongo {
 
+namespace {
+MONGO_FAIL_POINT_DEFINE(hangBeforeUnyieldingTransactionRouter);
+}
+
 std::unique_ptr<TransactionRouterResourceYielder>
 TransactionRouterResourceYielder::makeForLocalHandoff() {
     return std::make_unique<TransactionRouterResourceYielder>();
@@ -61,6 +65,8 @@ void TransactionRouterResourceYielder::yield(OperationContext* opCtx) {
 
 void TransactionRouterResourceYielder::unyield(OperationContext* opCtx) {
     if (_yielded) {
+        hangBeforeUnyieldingTransactionRouter.pauseWhileSet();
+
         // Code that uses the TransactionRouter assumes it will only run with it, so check back out
         // the session ignoring interruptions, except at global shutdown to prevent stalling
         // shutdown. Unyield should always run with no resources held, so there shouldn't be a risk
