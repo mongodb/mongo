@@ -241,6 +241,8 @@ public:
 
     virtual bool getMaintenanceMode();
 
+    virtual bool shouldDropSyncSourceAfterShardSplit(OID replicaSetId) const;
+
     virtual Status processReplSetSyncFrom(OperationContext* opCtx,
                                           const HostAndPort& target,
                                           BSONObjBuilder* resultObj);

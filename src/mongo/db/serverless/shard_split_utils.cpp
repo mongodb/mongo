@@ -71,6 +71,10 @@ ConnectionString makeRecipientConnectionString(const repl::ReplSetConfig& config
                    std::back_inserter(recipientNodes),
                    [](const repl::MemberConfig& member) { return member.getHostAndPort(); });
 
+    uassert(ErrorCodes::BadValue,
+            "The recipient connection string must have at least three members.",
+            recipientNodes.size() >= kMinimumRequiredRecipientNodes);
+
     return ConnectionString::forReplicaSet(recipientSetName.toString(), recipientNodes);
 }
 
@@ -292,16 +296,12 @@ void RecipientAcceptSplitListener::onServerHeartbeatSucceededEvent(const HostAnd
 
     _reportedSetNames[hostAndPort] = reply["setName"].str();
 
-    if (!_hasPrimary && reply["ismaster"].booleanSafe()) {
-        _hasPrimary = true;
-    }
-
     auto allReportCorrectly =
         std::all_of(_reportedSetNames.begin(),
                     _reportedSetNames.end(),
                     [&](const auto& entry) { return entry.second == _recipientSetName; }) &&
         _reportedSetNames.size() == _numberOfRecipient;
-    if (allReportCorrectly && _hasPrimary) {
+    if (allReportCorrectly) {
         _fulfilled = true;
         _promise.emplaceValue();
     }

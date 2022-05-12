@@ -3435,6 +3435,16 @@ Status ReplicationCoordinatorImpl::setMaintenanceMode(OperationContext* opCtx, b
     return Status::OK();
 }
 
+bool ReplicationCoordinatorImpl::shouldDropSyncSourceAfterShardSplit(const OID replicaSetId) const {
+    if (!_settings.isServerless()) {
+        return false;
+    }
+
+    stdx::lock_guard<Latch> lg(_mutex);
+
+    return replicaSetId != _rsConfig.getReplicaSetId();
+}
+
 Status ReplicationCoordinatorImpl::processReplSetSyncFrom(OperationContext* opCtx,
                                                           const HostAndPort& target,
                                                           BSONObjBuilder* resultObj) {
@@ -5256,18 +5266,20 @@ ChangeSyncSourceAction ReplicationCoordinatorImpl::shouldChangeSyncSource(
     const rpc::OplogQueryMetadata& oqMetadata,
     const OpTime& previousOpTimeFetched,
     const OpTime& lastOpTimeFetched) const {
+    if (shouldDropSyncSourceAfterShardSplit(replMetadata.getReplicaSetId())) {
+        // Drop the last batch of message following a change of replica set due to a shard split.
+        LOGV2(6394902,
+              "Choosing new sync source because we left the replica set due to a shard split.",
+              "currentReplicaSetId"_attr = _rsConfig.getReplicaSetId(),
+              "otherReplicaSetId"_attr = replMetadata.getReplicaSetId());
+        return ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent;
+    }
+
     stdx::lock_guard<Latch> lock(_mutex);
     const auto now = _replExecutor->now();
 
     if (_topCoord->shouldChangeSyncSource(
             currentSource, replMetadata, oqMetadata, lastOpTimeFetched, now)) {
-        if (getSettings().isServerless() &&
-            replMetadata.getReplicaSetId() != _rsConfig.getReplicaSetId()) {
-            // Drop the last batch of message following a change of replica set due to a shard
-            // split
-            return ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent;
-        }
-
         return ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch;
     }
 

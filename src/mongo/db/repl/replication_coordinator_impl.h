@@ -274,6 +274,8 @@ public:
 
     virtual bool getMaintenanceMode() override;
 
+    virtual bool shouldDropSyncSourceAfterShardSplit(OID replicaSetId) const override;
+
     virtual Status processReplSetSyncFrom(OperationContext* opCtx,
                                           const HostAndPort& target,
                                           BSONObjBuilder* resultObj) override;

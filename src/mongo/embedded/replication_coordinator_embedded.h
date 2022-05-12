@@ -221,6 +221,8 @@ public:
 
     Status setMaintenanceMode(OperationContext*, bool) override;
 
+    bool shouldDropSyncSourceAfterShardSplit(OID replicaSetId) const override;
+
     Status processReplSetSyncFrom(OperationContext*, const HostAndPort&, BSONObjBuilder*) override;
 
     Status processReplSetFreeze(int, BSONObjBuilder*) override;

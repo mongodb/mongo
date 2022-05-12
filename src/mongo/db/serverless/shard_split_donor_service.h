@@ -164,8 +164,8 @@ private:
     ExecutorFuture<void> _applySplitConfigToDonor(const ScopedTaskExecutorPtr& executor,
                                                   const CancellationToken& abortToken);
 
-    ExecutorFuture<void> _waitForRecipientToAcceptSplit(const ScopedTaskExecutorPtr& executor,
-                                                        const CancellationToken& abortToken);
+    ExecutorFuture<void> _waitForRecipientToAcceptSplitAndTriggerElection(
+        const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken);
 
     ExecutorFuture<void> _waitForForgetCmdThenMarkGarbageCollectable(
         const ScopedTaskExecutorPtr& executor, const CancellationToken& primaryToken);

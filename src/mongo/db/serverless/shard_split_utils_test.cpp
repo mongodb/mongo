@@ -284,6 +284,65 @@ TEST(MakeSplitConfig, RecipientConfigValidationTest) {
     ASSERT_OK(serverless::validateRecipientNodesForShardSplit(statedoc, config));
 }
 
+TEST(MakeRecipientConnectionString, StringCreationSuccess) {
+    std::string recipientSetName{"recipientSetName"};
+    const std::string recipientTagName{"recipient"};
+
+    auto config =
+        ReplSetConfig::parse(BSON("_id"
+                                  << "donorSetName"
+                                  << "version" << 1 << "protocolVersion" << 1 << "members"
+                                  << BSON_ARRAY(
+                                         BSON("_id" << 0 << "host"
+                                                    << "localhost:20001"
+                                                    << "priority" << 1 << "votes" << 1)
+                                         << BSON("_id" << 2 << "host"
+                                                       << "localhost:20004"
+                                                       << "priority" << 0 << "votes" << 0 << "tags"
+                                                       << BSON(recipientTagName << "one"))
+                                         << BSON("_id" << 3 << "host"
+                                                       << "localhost:20005"
+                                                       << "priority" << 0 << "votes" << 0 << "tags"
+                                                       << BSON(recipientTagName << "one"))
+                                         << BSON("_id" << 4 << "host"
+                                                       << "localhost:20006"
+                                                       << "priority" << 0 << "votes" << 0 << "tags"
+                                                       << BSON(recipientTagName << "one")))));
+
+    auto connectionString =
+        serverless::makeRecipientConnectionString(config, recipientTagName, recipientSetName);
+    ASSERT_EQ(connectionString.getServers().size(), 3);
+}
+
+TEST(MakeRecipientConnectionString, StringCreationFailure) {
+    std::string recipientSetName{"recipientSetName"};
+    const std::string recipientTagName{"recipient"};
+
+    auto config =
+        ReplSetConfig::parse(BSON("_id"
+                                  << "donorSetName"
+                                  << "version" << 1 << "protocolVersion" << 1 << "members"
+                                  << BSON_ARRAY(
+                                         BSON("_id" << 0 << "host"
+                                                    << "localhost:20001"
+                                                    << "priority" << 1 << "votes" << 1)
+                                         << BSON("_id" << 2 << "host"
+                                                       << "localhost:20004"
+                                                       << "priority" << 0 << "votes" << 0 << "tags"
+                                                       << BSON(recipientTagName << "one"))
+                                         << BSON("_id" << 3 << "host"
+                                                       << "localhost:20005"
+                                                       << "priority" << 0 << "votes" << 0 << "tags"
+                                                       << BSON(recipientTagName << "one")))));
+
+    ASSERT_THROWS_CODE(
+        serverless::makeRecipientConnectionString(config, recipientTagName, recipientSetName),
+        AssertionException,
+        ErrorCodes::BadValue);
+}
+
 }  // namespace
+
+
 }  // namespace repl
 }  // namespace mongo

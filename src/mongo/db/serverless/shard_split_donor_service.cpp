@@ -422,9 +422,9 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 return _applySplitConfigToDonor(executor, abortToken);
             })
             .then([this, executor, abortToken] {
-                return _waitForRecipientToAcceptSplit(executor, abortToken);
+                return _waitForRecipientToAcceptSplitAndTriggerElection(executor, abortToken);
             })
-            .then([this, executor, abortToken] {
+            .then([this] {
                 stdx::lock_guard<Latch> lg(_mutex);
                 return DurableState{_stateDoc.getState(), _abortReason};
             })
@@ -604,22 +604,88 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_applySplitConfi
         .on(**executor, abortToken);
 }
 
-ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipientToAcceptSplit(
+ExecutorFuture<void> sendStepUpToRecipient(const HostAndPort recipient,
+                                           TaskExecutorPtr executor,
+                                           const CancellationToken& token) {
+    return AsyncTry([executor, recipient, token] {
+               executor::RemoteCommandRequest request(
+                   recipient, "admin", BSON("replSetStepUp" << 1 << "skipDryRun" << true), nullptr);
+
+               return executor->scheduleRemoteCommand(request, token)
+                   .then([](const auto& response) {
+                       return getStatusFromCommandResult(response.data);
+                   });
+           })
+        .until([](Status status) {
+            return status.isOK() ||
+                (!ErrorCodes::isRetriableError(status) &&
+                 !ErrorCodes::isNetworkTimeoutError(status));
+        })
+        .withBackoffBetweenIterations(kExponentialBackoff)
+        .on(executor, token);
+}
+
+ExecutorFuture<void>
+ShardSplitDonorService::DonorStateMachine::_waitForRecipientToAcceptSplitAndTriggerElection(
     const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken) {
     checkForTokenInterrupt(abortToken);
 
+    std::vector<HostAndPort> recipients;
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_stateDoc.getState() > ShardSplitDonorStateEnum::kBlocking) {
             return ExecutorFuture(**executor);
         }
+
+        recipients = _stateDoc.getRecipientConnectionString()->getServers();
     }
+
+    invariant(!recipients.empty());
+
+    auto rng = std::default_random_engine{};
+    std::shuffle(std::begin(recipients), std::end(recipients), rng);
+
+    auto remoteCommandExecutor =
+        _splitAcceptanceTaskExecutorForTest ? *_splitAcceptanceTaskExecutorForTest : **executor;
 
     LOGV2(6142501, "Waiting for recipient to accept the split.", "id"_attr = _migrationId);
 
-    return ExecutorFuture(**executor)
-        .then([&]() { return _splitAcceptancePromise.getFuture(); })
-        .then([this, executor, abortToken] {
+    return _splitAcceptancePromise.getFuture()
+        .thenRunOn(**executor)
+        .then([this, recipients, abortToken, remoteCommandExecutor] {
+            LOGV2(6493901,
+                  "Triggering an election after applying the split config.",
+                  "id"_attr = _migrationId);
+
+            // replSetStepUp on a random node will succeed as long as it's note the most out-of-date
+            // node (in that case at least another node will vote for it and the election will
+            // succeed). Selecting a random node has a 2/3 chance to succeed for replSetStepUp. If
+            // the first command fail, we know this node is the most out-of-date. Therefore we
+            // select the next node and we know the first node selected will vote for the second.
+            return sendStepUpToRecipient(recipients[0], remoteCommandExecutor, abortToken)
+                .onCompletion([this, recipients, remoteCommandExecutor, abortToken](Status status) {
+                    if (status.isOK()) {
+                        return ExecutorFuture<void>(remoteCommandExecutor, status);
+                    }
+
+                    return sendStepUpToRecipient(recipients[1], remoteCommandExecutor, abortToken);
+                })
+                .onCompletion([this](Status replSetStepUpStatus) {
+                    if (!replSetStepUpStatus.isOK()) {
+                        LOGV2(6493904,
+                              "Failed to trigger an election on the recipient replica set.",
+                              "replSetStatus"_attr = replSetStepUpStatus);
+                    }
+
+                    // Even if replSetStepUp failed, the recipient nodes have joined the
+                    // recipient set. Therefore they will eventually elect a primary and the
+                    // split will complete successfully, although slower than if the election
+                    // succeeded.
+                    return Status::OK();
+                });
+        })
+        .thenRunOn(**executor)
+        .onCompletion([this, executor, abortToken](Status status) {
             LOGV2(6142503, "Entering 'committed' state.", "id"_attr = _stateDoc.getId());
 
             return _updateStateDocument(executor, abortToken, ShardSplitDonorStateEnum::kCommitted)
@@ -638,8 +704,8 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_enterBlockingOr
         stdx::lock_guard<Latch> lg(_mutex);
         if (_stateDoc.getState() == ShardSplitDonorStateEnum::kAborted) {
             if (isAbortedDocumentPersistent(lg, _stateDoc)) {
-                // Node has step up and created an instance using a document in abort state. No need
-                // to write the document as it already exists.
+                // Node has step up and created an instance using a document in abort state. No
+                // need to write the document as it already exists.
                 return ExecutorFuture(**executor);
             }
 
@@ -692,8 +758,8 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_enterBlockingOr
             });
 
             if (_stateDoc.getState() > ShardSplitDonorStateEnum::kUninitialized) {
-                // Node has step up and resumed a shard split. No need to write the document as it
-                // already exists.
+                // Node has step up and resumed a shard split. No need to write the document as
+                // it already exists.
                 return ExecutorFuture(**executor);
             }
 

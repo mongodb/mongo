@@ -131,7 +131,6 @@ private:
     const size_t _numberOfRecipient;
     std::string _recipientSetName;
     std::map<HostAndPort, std::string> _reportedSetNames;
-    bool _hasPrimary{false};
     SharedPromise<void> _promise;
 };
 

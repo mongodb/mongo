@@ -754,6 +754,13 @@ public:
     virtual bool getMaintenanceMode() = 0;
 
     /**
+     * Returns true if serverless mode is enabled and the replicaSetId differs from the current
+     * replicaSetId. It signals the sync source should be dropped and the new batch of oplogs should
+     * be discarded.
+     */
+    virtual bool shouldDropSyncSourceAfterShardSplit(OID replicaSetId) const = 0;
+
+    /**
      * Handles an incoming replSetSyncFrom command. Adds BSON to 'result'
      * returns Status::OK if the sync target could be set and an ErrorCode indicating why it
      * couldn't otherwise.

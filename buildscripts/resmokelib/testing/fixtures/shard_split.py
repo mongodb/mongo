@@ -59,17 +59,6 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, donor_rs_name)
         mongod_options["serverless"] = True
 
-        # The default `electionTimeoutMillis` on evergreen is 24hr to prevent spurious
-        # elections.  We _want_ elections to occur after split, so reduce the value here.
-        # TODO(SERVER-64939): No longer required once we send replSetStepUp to recipient nodes
-        # when splitting them.
-        if "settings" in self.replset_config_options:
-            self.replset_config_options["settings"] = self.fixturelib.default_if_none(
-                self.replset_config_options["settings"], {})
-            self.replset_config_options["settings"]["electionTimeoutMillis"] = 5000
-        else:
-            self.replset_config_options["settings"] = {"electionTimeoutMillis": 5000}
-
         self.fixtures.append(
             self.fixturelib.make_fixture(
                 "ReplicaSetFixture", self.logger, self.job_num, mongod_options=mongod_options,

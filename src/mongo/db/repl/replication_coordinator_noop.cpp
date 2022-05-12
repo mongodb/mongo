@@ -369,6 +369,11 @@ Status ReplicationCoordinatorNoOp::setMaintenanceMode(OperationContext*, bool) {
     MONGO_UNREACHABLE;
 }
 
+ChangeSyncSourceAction ReplicationCoordinatorNoOp::shouldChangeSyncSourceOnError(
+    const HostAndPort&, const OpTime&) const {
+    MONGO_UNREACHABLE;
+}
+
 Status ReplicationCoordinatorNoOp::processReplSetSyncFrom(OperationContext*,
                                                           const HostAndPort&,
                                                           BSONObjBuilder*) {
@@ -463,8 +468,7 @@ ChangeSyncSourceAction ReplicationCoordinatorNoOp::shouldChangeSyncSource(
     MONGO_UNREACHABLE;
 }
 
-ChangeSyncSourceAction ReplicationCoordinatorNoOp::shouldChangeSyncSourceOnError(
-    const HostAndPort&, const OpTime&) const {
+bool ReplicationCoordinatorNoOp::shouldDropSyncSourceAfterShardSplit(OID replicaSetId) const {
     MONGO_UNREACHABLE;
 }
 

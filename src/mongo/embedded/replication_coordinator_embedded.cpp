@@ -397,6 +397,10 @@ Status ReplicationCoordinatorEmbedded::setMaintenanceMode(OperationContext*, boo
     UASSERT_NOT_IMPLEMENTED;
 }
 
+bool ReplicationCoordinatorEmbedded::shouldDropSyncSourceAfterShardSplit(OID replicaSetId) const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 Status ReplicationCoordinatorEmbedded::processReplSetSyncFrom(OperationContext*,
                                                               const HostAndPort&,
                                                               BSONObjBuilder*) {
