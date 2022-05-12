@@ -691,6 +691,7 @@ icuEnv.CppUnitTest(
         'future_test_future_int.cpp',
         'future_test_future_move_only.cpp',
         'future_test_future_void.cpp',
+        'future_test_valid.cpp',
         'future_test_promise_int.cpp',
         'future_test_promise_void.cpp',
         'future_test_shared_future.cpp',
