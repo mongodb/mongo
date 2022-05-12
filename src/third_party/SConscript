@@ -2,11 +2,16 @@
 
 import json
 
-Import("env use_system_version_of_library usemozjs get_option")
-Import("use_libunwind")
-Import("use_system_libunwind")
-Import("use_vendored_libunwind")
-Import("wiredtiger")
+Import([
+    'env',
+    'get_option',
+    'jsEngine',
+    'use_libunwind',
+    'use_system_libunwind',
+    'use_system_version_of_library',
+    'use_vendored_libunwind',
+    'wiredtiger',
+])
 
 snappySuffix = '-1.1.7'
 zlibSuffix = '-1.2.11'
@@ -480,7 +485,7 @@ else:
 
 benchmarkEnv.ShimLibrary(name="benchmark")
 
-if usemozjs:
+if jsEngine:
     mozjsEnv = env.Clone()
     mozjsEnv.SConscript('mozjs/SConscript', exports={'env' : mozjsEnv })
     mozjsEnv = mozjsEnv.Clone(

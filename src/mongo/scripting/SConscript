@@ -3,8 +3,8 @@
 Import([
     'env',
     'get_option',
+    'jsEngine',
     'serverJs',
-    'usemozjs',
 ])
 
 env.Library(
@@ -51,7 +51,7 @@ env.Library(
     ]
 )
 
-if usemozjs:
+if jsEngine:
     scriptingEnv = env.Clone()
 
     scriptingEnv.Append(

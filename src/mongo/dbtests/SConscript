@@ -3,7 +3,6 @@
 Import("env")
 Import("get_option")
 Import("has_option")
-Import("usemozjs")
 Import("wiredtiger")
 
 env = env.Clone()

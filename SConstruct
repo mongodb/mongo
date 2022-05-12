@@ -1171,9 +1171,7 @@ jsEngine = get_option( "js-engine")
 
 serverJs = get_option( "server-js" ) == "on"
 
-usemozjs = (jsEngine.startswith('mozjs'))
-
-if not serverJs and not usemozjs:
+if not serverJs and not jsEngine:
     print("Warning: --server-js=off is not needed with --js-engine=none")
 
 # We defer building the env until we have determined whether we want certain values. Some values
@@ -5326,6 +5324,7 @@ Export([
     'get_option',
     'has_option',
     'http_client',
+    'jsEngine',
     'module_sconscripts',
     'optBuild',
     'selected_experimental_optimizations',
@@ -5335,7 +5334,6 @@ Export([
     'use_system_libunwind',
     'use_system_version_of_library',
     'use_vendored_libunwind',
-    'usemozjs',
     'version_extra',
     'version_parts',
     'wiredtiger',
