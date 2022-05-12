@@ -654,6 +654,10 @@ public:
         return _shared->state.load(std::memory_order_acquire) == SSBState::kFinished;
     }
 
+    bool valid() const {
+        return _shared != nullptr;
+    }
+
     void wait(Interruptible* interruptible) const {
         _shared->wait(interruptible);
     }
@@ -757,6 +761,10 @@ public:
         return _inner.isReady();
     }
 
+    bool valid() const {
+        return _inner.valid();
+    }
+
     void wait(Interruptible* interruptible) const {
         _inner.wait(interruptible);
     }
@@ -822,6 +830,16 @@ public:
 
     bool isReady() const {
         return _immediate || _shared.isReady();
+    }
+
+    /**
+     * Returns whether the Future has or can eventually have access to a deferred value or status.
+     *
+     * NOTE: this does not return whether that deferred value is itself valid. It could have been
+     * moved from.
+     */
+    bool valid() const {
+        return _immediate || _shared.valid();
     }
 
     void wait(Interruptible* interruptible) const {

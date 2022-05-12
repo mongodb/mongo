@@ -181,6 +181,16 @@ public:
     }
 
     /**
+     * Returns whether this SemiFuture can or will be able to access a deferred status or value.
+     *
+     * NOTE: valid() will still return true if the value inside of the future is moved from. This
+     * should not be used as a way to determine usage validity until SERVER-66036.
+     */
+    bool valid() const {
+        return _impl.valid();
+    }
+
+    /**
      * Returns when the Semifuture isReady().
      *
      * Throws if the interruptible passed is interrupted (explicitly or via deadline).
@@ -316,6 +326,7 @@ public:
     using SemiFuture<T>::SemiFuture;  // Constructors.
     using SemiFuture<T>::share;
     using SemiFuture<T>::isReady;
+    using SemiFuture<T>::valid;
     using SemiFuture<T>::wait;
     using SemiFuture<T>::waitNoThrow;
     using SemiFuture<T>::get;
@@ -594,6 +605,7 @@ public:
     using value_type = T;
     using SemiFuture<T>::share;
     using SemiFuture<T>::isReady;
+    using SemiFuture<T>::valid;
     using SemiFuture<T>::wait;
     using SemiFuture<T>::waitNoThrow;
     using SemiFuture<T>::get;
@@ -968,6 +980,10 @@ public:
 
     bool isReady() const {
         return _shared.isReady();
+    }
+
+    bool valid() const {
+        return _shared.valid();
     }
 
     void wait(Interruptible* interruptible = Interruptible::notInterruptible()) const {
