@@ -66,7 +66,7 @@ MONGO_FAIL_POINT_DEFINE(hangInTenantOplogApplication);
 MONGO_FAIL_POINT_DEFINE(fpBeforeTenantOplogApplyingBatch);
 
 TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
-                                       const MigrationProtocolEnum protocol,
+                                       const MigrationProtocolEnum& protocol,
                                        boost::optional<std::string> tenantId,
                                        OpTime startApplyingAfterOpTime,
                                        RandomAccessOplogBuffer* oplogBuffer,

@@ -73,7 +73,7 @@ public:
     };
 
     TenantOplogApplier(const UUID& migrationUuid,
-                       const MigrationProtocolEnum protocol,
+                       const MigrationProtocolEnum& protocol,
                        boost::optional<std::string> tenantId,
                        OpTime StartApplyingAfterOpTime,
                        RandomAccessOplogBuffer* oplogBuffer,
