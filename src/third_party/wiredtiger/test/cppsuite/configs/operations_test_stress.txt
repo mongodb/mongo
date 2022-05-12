@@ -54,7 +54,7 @@ workload_generator=
     ),
     update_config=
     (
-        op_rate=10s,
+        op_rate=10ms,
         ops_per_transaction=(max=10,min=5),
         thread_count=25,
         value_size=10000
