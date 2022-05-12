@@ -55,10 +55,13 @@ using TransactionCoordinatorDocument = txn::TransactionCoordinatorDocument;
 MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForParticipantListWriteConcern);
 MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForDecisionWriteConcern);
 
-ExecutorFuture<void> waitForMajorityWithHangFailpoint(ServiceContext* service,
-                                                      FailPoint& failpoint,
-                                                      const std::string& failPointName,
-                                                      repl::OpTime opTime) {
+ExecutorFuture<void> waitForMajorityWithHangFailpoint(
+    ServiceContext* service,
+    FailPoint& failpoint,
+    const std::string& failPointName,
+    repl::OpTime opTime,
+    const LogicalSessionId& lsid,
+    const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
     auto executor = Grid::get(service)->getExecutorPool()->getFixedExecutor();
     auto waitForWC = [service, executor](repl::OpTime opTime) {
         return WaitForMajorityService::get(service)
@@ -68,7 +71,11 @@ ExecutorFuture<void> waitForMajorityWithHangFailpoint(ServiceContext* service,
 
     if (auto sfp = failpoint.scoped(); MONGO_unlikely(sfp.isActive())) {
         const BSONObj& data = sfp.getData();
-        LOGV2(22445, "Hit {failPointName} failpoint", "failPointName"_attr = failPointName);
+        LOGV2(22445,
+              "Hit {failPointName} failpoint",
+              "failPointName"_attr = failPointName,
+              "lsid"_attr = lsid,
+              "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
         // Run the hang failpoint asynchronously on a different thread to avoid self deadlocks.
         return ExecutorFuture<void>(executor).then(
@@ -179,7 +186,9 @@ TransactionCoordinator::TransactionCoordinator(
                 _serviceContext,
                 hangBeforeWaitingForParticipantListWriteConcern,
                 "hangBeforeWaitingForParticipantListWriteConcern",
-                std::move(opTime));
+                std::move(opTime),
+                _lsid,
+                _txnNumberAndRetryCounter);
         })
         .thenRunOn(Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor())
         .then([this, apiParams] {
@@ -292,7 +301,9 @@ TransactionCoordinator::TransactionCoordinator(
             return waitForMajorityWithHangFailpoint(_serviceContext,
                                                     hangBeforeWaitingForDecisionWriteConcern,
                                                     "hangBeforeWaitingForDecisionWriteConcern",
-                                                    std::move(opTime));
+                                                    std::move(opTime),
+                                                    _lsid,
+                                                    _txnNumberAndRetryCounter);
         })
         .then([this, apiParams] {
             {
