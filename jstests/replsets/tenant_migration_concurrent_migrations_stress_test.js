@@ -37,8 +37,11 @@ const setParameterOpts = {
     maxTenantMigrationRecipientThreadPoolSize: 1000,
     maxTenantMigrationDonorServiceThreadPoolSize: 1000
 };
-const tenantMigrationTest =
-    new TenantMigrationTest({name: jsTestName(), sharedOptions: {setParameter: setParameterOpts}});
+const tenantMigrationTest = new TenantMigrationTest({
+    name: jsTestName(),
+    sharedOptions: {setParameter: setParameterOpts},
+    optimizeMigrations: false
+});
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
