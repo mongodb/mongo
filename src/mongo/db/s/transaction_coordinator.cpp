@@ -156,7 +156,7 @@ TransactionCoordinator::TransactionCoordinator(
         .then([this] {
             return VectorClockMutable::get(_serviceContext)->waitForDurableTopologyTime();
         })
-        .thenRunOn(Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor())
+        .thenRunOn(_scheduler->getExecutor())
         .then([this] {
             // Persist the participants, unless they have been made durable already (which would
             // only be the case if this coordinator was created as part of step-up recovery).
@@ -190,7 +190,7 @@ TransactionCoordinator::TransactionCoordinator(
                 _lsid,
                 _txnNumberAndRetryCounter);
         })
-        .thenRunOn(Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor())
+        .thenRunOn(_scheduler->getExecutor())
         .then([this, apiParams] {
             {
                 stdx::lock_guard<Latch> lg(_mutex);

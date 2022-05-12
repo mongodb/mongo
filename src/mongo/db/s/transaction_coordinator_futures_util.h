@@ -56,6 +56,13 @@ public:
     ~AsyncWorkScheduler();
 
     /**
+     * @brief Returns a shared pointer to the executor
+     */
+    ExecutorPtr getExecutor() {
+        return _executor;
+    }
+
+    /**
      * Schedules the specified callable to execute asynchronously and returns a future which will be
      * set with its result.
      */
