@@ -30,7 +30,6 @@ build-stamp: configure-stamp
 		fi ; \
 	done
 
-	echo debian/mongo.1 > debian/mongodb-enterprise-shell.manpages
 	echo debian/mongod.1 > debian/mongodb-enterprise-server.manpages
 	echo debian/mongos.1 > debian/mongodb-enterprise-mongos.manpages
 
@@ -54,7 +53,6 @@ clean:
 	rm -rf $(CURDIR)/debian/mongodb-enterprise-database-tools-extra
 	rm -rf $(CURDIR)/debian/mongodb-enterprise-cryptd
 	rm -f config.log
-	rm -f mongo
 	rm -f mongod
 	rm -f mongocryptd
 	rm -f install_compass
@@ -82,7 +80,6 @@ install: build
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-mongos/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-database-tools-extra/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-cryptd/usr/bin
-	cp -v $(CURDIR)/bin/mongo $(CURDIR)/debian/mongodb-enterprise-shell/usr/bin
 	cp -v $(CURDIR)/bin/mongod $(CURDIR)/debian/mongodb-enterprise-server/usr/bin
 	cp -v $(CURDIR)/bin/mongos $(CURDIR)/debian/mongodb-enterprise-mongos/usr/bin
 	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/mongodb-enterprise-database-tools-extra/usr/bin

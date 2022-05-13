@@ -100,9 +100,9 @@ only certain components:
 
 * `install-mongod`
 * `install-mongos`
-* `install-mongo` or `install-shell`
 * `install-servers` (includes `mongod` and `mongos`)
-* `install-core` (includes `mongod`, `mongos`, `mongo`)
+* `install-core` (includes `mongod` and `mongos`)
+* `install-devcore` (includes `mongod`, `mongos`, and `jstestshell` (formerly mongo shell))
 * `install-all`
 
 

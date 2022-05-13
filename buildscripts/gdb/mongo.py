@@ -763,7 +763,7 @@ class MongoDBJavaScriptStack(gdb.Command):
     """Print the JavaScript stack from a MongoDB process."""
 
     # Looking to test your changes to this? Really easy!
-    # 1. install-core to build the mongo shell binary (mongo)
+    # 1. install-jstestshell to build the mongo shell binary (mongo)
     # 2. launch it: ./path/to/bin/mongo --nodb
     # 3. in the shell, run: sleep(99999999999). (do not use --eval)
     # 4. ps ax | grep nodb to find the PID

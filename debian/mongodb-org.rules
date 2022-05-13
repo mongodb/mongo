@@ -27,7 +27,6 @@ build-stamp: configure-stamp
 	  echo debian/$$binary.1 >> debian/mongodb-org-database-tools-extra.manpages ; \
 	done
 
-	echo debian/mongo.1 > debian/mongodb-org-shell.manpages
 	echo debian/mongod.1 > debian/mongodb-org-server.manpages
 	echo debian/mongos.1 > debian/mongodb-org-mongos.manpages
 
@@ -50,7 +49,6 @@ clean:
 	rm -rf $(CURDIR)/debian/mongodb-org-mongos
 	rm -rf $(CURDIR)/debian/mongodb-org-database-tools-extra
 	rm -f config.log
-	rm -f mongo
 	rm -f mongod
 	rm -f install_compass
 	rm -f .sconsign.dblite
@@ -76,7 +74,6 @@ install: build
 	mkdir -p $(CURDIR)/debian/mongodb-org-server/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-org-mongos/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-org-database-tools-extra/usr/bin
-	cp -v $(CURDIR)/bin/mongo $(CURDIR)/debian/mongodb-org-shell/usr/bin
 	cp -v $(CURDIR)/bin/mongod $(CURDIR)/debian/mongodb-org-server/usr/bin
 	cp -v $(CURDIR)/bin/mongos $(CURDIR)/debian/mongodb-org-mongos/usr/bin
 	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/mongodb-org-database-tools-extra/usr/bin

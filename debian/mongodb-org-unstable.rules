@@ -28,7 +28,6 @@ build-stamp: configure-stamp
 	  echo debian/$$binary.1 >> debian/mongodb-org-unstable-database-tools-extra.manpages ; \
 	done
 
-	echo debian/mongo.1 > debian/mongodb-org-unstable-shell.manpages
 	echo debian/mongod.1 > debian/mongodb-org-unstable-server.manpages
 	echo debian/mongos.1 > debian/mongodb-org-unstable-mongos.manpages
 
@@ -51,7 +50,6 @@ clean:
 	rm -rf $(CURDIR)/debian/mongodb-org-unstable-mongos
 	rm -rf $(CURDIR)/debian/mongodb-org-unstable-database-tools-extra
 	rm -f config.log
-	rm -f mongo
 	rm -f mongod
 	rm -f install_compass
 	rm -f .sconsign.dblite
@@ -77,7 +75,6 @@ install: build
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-server/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-mongos/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-database-tools-extra/usr/bin
-	cp -v $(CURDIR)/bin/mongo $(CURDIR)/debian/mongodb-org-unstable-shell/usr/bin
 	cp -v $(CURDIR)/bin/mongod $(CURDIR)/debian/mongodb-org-unstable-server/usr/bin
 	cp -v $(CURDIR)/bin/mongos $(CURDIR)/debian/mongodb-org-unstable-mongos/usr/bin
 	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/mongodb-org-unstable-database-tools-extra/usr/bin

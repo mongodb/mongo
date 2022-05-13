@@ -78,11 +78,6 @@ else
   end
 end
 
-# wait to make sure mongod is ready
-describe command("/inspec_wait.sh") do
-  its('exit_status') { should eq 0 }
-end
-
 ############################################################
 # This section verifies files, directories, and users
 # - files and directories exist and have correct attributes
@@ -197,23 +192,6 @@ ulimits.each do |limit, value|
   describe command("#{ulimits_cmd} | grep \"#{limit}\"") do
     its('stdout') { should match(/#{limit}\s+#{value}/) }
   end
-end
-
-############################################################
-# This section verifies reads and writes.
-# - insert a document into the database
-# - verify that findOne() returns a matching document
-############################################################
-
-describe command('sh -c "ulimit -v unlimited && mongo --eval \"db.smoke.insert({answer: 42})\""') do
-  its('exit_status') { should eq 0 }
-  its('stdout') { should match(/.+WriteResult\({ "nInserted" : 1 }\).+/m) }
-end
-
-# read a document from the db
-describe command('sh -c "ulimit -v unlimited && mongo --eval \"db.smoke.findOne()\""') do
-  its('exit_status') { should eq 0 }
-  its('stdout') { should match(/.+"answer" : 42.+/m) }
 end
 
 ############################################################
