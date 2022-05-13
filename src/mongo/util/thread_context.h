@@ -39,7 +39,11 @@
 namespace mongo {
 
 /**
- * A ThreadContext is a simple decorable that has an explicit one-to-one relationship with threads.
+ * A simple decorable that has roughly `thread_local` duration.
+ * There is a `ThreadContext` associated with every running thread that has made
+ * at least one call to `ThreadContext::get` after `MONGO_INTIALIZER`s have run.
+ * Every `stdx::thread` and service executor worker thread will perform such a
+ * call in their callback wrapper, so they always have a `ThreadContext`.
  *
  * There are three lifetime tricks that this class does:
  * 1. It only exists on the main thread after we run MONGO_INITIALIZERS (a.k.a. post-init).

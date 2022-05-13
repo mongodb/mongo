@@ -48,7 +48,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/util/thread_context.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -204,16 +203,22 @@ public:
 
     /**
      * Get a pointer to this thread's ThreadNameInfo.
-     * Returns null if there's no ThreadContext to get it from.
+     * Can return null during thread_local destructors.
      */
     static ThreadNameInfo* forThisThread() {
-        auto& context = ThreadContext::get();
-        return context ? &_decoration(*context) : nullptr;
+        struct Tls {
+            ~Tls() {
+                delete std::exchange(info, nullptr);
+            }
+            // A pointer has no destructor, so loading it after
+            // destruction should be ok.
+            ThreadNameInfo* info = new ThreadNameInfo;
+        };
+        thread_local const Tls tls;
+        return tls.info;
     }
 
 private:
-    inline static auto _decoration = ThreadContext::declareDecoration<ThreadNameInfo>();
-
     /**
      * Main thread always gets "main". Other threads are sequentially
      * named as "thread1", "thread2", etc.
