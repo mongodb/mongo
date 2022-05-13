@@ -55,13 +55,17 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
  * This function prepares the SBE tree for execution, such as attaching the OperationContext,
  * ensuring that the SBE tree is registered with the PlanYieldPolicySBE and populating the
  * "RuntimeEnvironment".
+ *
+ * The caller should pass true for 'preparingFromCache' if the SBE plan being prepared is being
+ * recovered from the SBE plan cache.
  */
 void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                                     sbe::PlanStage* root,
                                     PlanStageData* data,
                                     const CanonicalQuery& cq,
                                     const MultipleCollectionAccessor& collections,
-                                    PlanYieldPolicySBE* yieldPolicy);
+                                    PlanYieldPolicySBE* yieldPolicy,
+                                    bool preparingFromCache = false);
 
 class PlanStageReqs;
 

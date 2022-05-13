@@ -163,7 +163,7 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::collectExecutionStatsForCached
     auto tracker = std::make_unique<TrialRunTracker>(
         std::move(onMetricReached), maxNumResults, maxTrialPeriodNumReads);
     candidate.root->attachToTrialRunTracker(tracker.get());
-    executeCandidateTrial(&candidate, maxNumResults);
+    executeCandidateTrial(&candidate, maxNumResults, /*isCachedPlanTrial*/ true);
 
     return candidate;
 }

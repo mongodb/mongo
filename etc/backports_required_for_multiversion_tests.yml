@@ -226,6 +226,8 @@ last-continuous:
       test_file: jstests/replsets/sessions_collection_auto_healing.js
     - ticket: SERVER-66089
       test_file: jstests/replsets/initial_sync_with_partial_transaction.js
+    - ticket: SERVER-66389
+      test_file: jstests/core/where_multiple_plans.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -585,6 +587,8 @@ last-lts:
       test_file: jstests/replsets/sessions_collection_auto_healing.js
     - ticket: SERVER-66089
       test_file: jstests/replsets/initial_sync_with_partial_transaction.js
+    - ticket: SERVER-66389
+      test_file: jstests/core/where_multiple_plans.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

@@ -44,8 +44,11 @@ class MatchExpressionParameterBindingVisitor final : public MatchExpressionConst
 public:
     MatchExpressionParameterBindingVisitor(
         const stage_builder::InputParamToSlotMap& inputParamToSlotMap,
-        sbe::RuntimeEnvironment* runtimeEnvironment)
-        : _inputParamToSlotMap(inputParamToSlotMap), _runtimeEnvironment(runtimeEnvironment) {
+        sbe::RuntimeEnvironment* runtimeEnvironment,
+        bool bindingCachedPlan)
+        : _inputParamToSlotMap(inputParamToSlotMap),
+          _runtimeEnvironment(runtimeEnvironment),
+          _bindingCachedPlan(bindingCachedPlan) {
         invariant(_runtimeEnvironment);
     }
 
@@ -173,18 +176,24 @@ public:
             return;
         }
 
-        // Generally speaking, this visitor is non-destructive and does not mutate the
-        // MatchExpression tree. However, in order to apply an optimization to avoid making a copy
-        // of the 'JsFunction' object stored within 'WhereMatchExpression', we can transfer its
-        // ownership from the match expression node into the SBE runtime environment. Hence, we need
-        // to drop the const qualifier. This should be a safe operation, given that the match
-        // expression tree is allocated on the heap, and this visitor has exclusive access to this
-        // tree (after we have bound in all input parameters, it's no longer used).
-        bindParam(*inputParam,
-                  true /*owned*/,
-                  sbe::value::TypeTags::jsFunction,
-                  sbe::value::bitcastFrom<JsFunction*>(
-                      const_cast<WhereMatchExpression*>(expr)->extractPredicate().release()));
+        if (_bindingCachedPlan) {
+            // Generally speaking, this visitor is non-destructive and does not mutate the
+            // MatchExpression tree. However, in order to apply an optimization to avoid making a
+            // copy of the 'JsFunction' object stored within 'WhereMatchExpression', we can transfer
+            // its ownership from the match expression node into the SBE runtime environment. Hence,
+            // we need to drop the const qualifier. This is a safe operation only when the plan is
+            // being recovered from the SBE plan cache -- in this case, the visitor has exclusive
+            // access to this match expression tree. Furthermore, after all input parameters are
+            // bound the match expression tree is no longer used.
+            bindParam(*inputParam,
+                      true /*owned*/,
+                      sbe::value::TypeTags::jsFunction,
+                      sbe::value::bitcastFrom<JsFunction*>(
+                          const_cast<WhereMatchExpression*>(expr)->extractPredicate().release()));
+        } else {
+            auto [typeTag, value] = sbe::value::makeCopyJsFunction(expr->getPredicate());
+            bindParam(*inputParam, true /*owned*/, typeTag, value);
+        }
     }
 
     /**
@@ -298,6 +307,10 @@ private:
     const stage_builder::InputParamToSlotMap& _inputParamToSlotMap;
 
     sbe::RuntimeEnvironment* const _runtimeEnvironment;
+
+    // True if the plan for which we are binding parameter values is being recovered from the SBE
+    // plan cache.
+    const bool _bindingCachedPlan;
 };
 
 class MatchExpressionParameterBindingWalker {
@@ -426,8 +439,10 @@ void bindGenericPlanSlots(const stage_builder::IndexBoundsEvaluationInfo& indexB
 
 void bind(const CanonicalQuery& canonicalQuery,
           const stage_builder::InputParamToSlotMap& inputParamToSlotMap,
-          sbe::RuntimeEnvironment* runtimeEnvironment) {
-    MatchExpressionParameterBindingVisitor visitor{inputParamToSlotMap, runtimeEnvironment};
+          sbe::RuntimeEnvironment* runtimeEnvironment,
+          const bool bindingCachedPlan) {
+    MatchExpressionParameterBindingVisitor visitor{
+        inputParamToSlotMap, runtimeEnvironment, bindingCachedPlan};
     MatchExpressionParameterBindingWalker walker{&visitor};
     tree_walker::walk<true, MatchExpression>(canonicalQuery.root(), &walker);
 }

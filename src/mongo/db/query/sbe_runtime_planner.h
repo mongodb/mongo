@@ -97,9 +97,14 @@ protected:
      * returns two slot accessors for the result and recordId slots, and a boolean value indicating
      * if the plan has exited early from the trial period. If the plan has failed in a recoverable
      * fashion, it will return a non-OK status.
+     *
+     * The caller should pass true for 'preparingFromCache' if the SBE plan being prepared is being
+     * recovered from the SBE plan cache.
      */
     StatusWith<std::tuple<sbe::value::SlotAccessor*, sbe::value::SlotAccessor*, bool>>
-    prepareExecutionPlan(PlanStage* root, stage_builder::PlanStageData* data) const;
+    prepareExecutionPlan(PlanStage* root,
+                         stage_builder::PlanStageData* data,
+                         bool preparingFromCache = false) const;
 
     /**
      * Executes a candidate plan until it
@@ -111,8 +116,13 @@ protected:
      * The execution process populates the 'results' array of the 'candidate' plan with any results
      * from execution the plan. This function also sets the 'status' and 'exitedEarly' fields of the
      * input 'candidate' object when applicable.
+     *
+     * If we are running the trial period for a plan recovered from the plan cache, then the caller
+     * must pass true for 'isCachedPlanTrial'.
      */
-    void executeCandidateTrial(plan_ranker::CandidatePlan* candidate, size_t maxNumResults);
+    void executeCandidateTrial(plan_ranker::CandidatePlan* candidate,
+                               size_t maxNumResults,
+                               bool isCachedPlanTrial);
 
     /**
      * Executes each plan in a round-robin fashion to collect execution stats. Stops when:

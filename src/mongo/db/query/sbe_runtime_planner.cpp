@@ -131,12 +131,13 @@ FetchDocStatus fetchNextDocument(
 
 StatusWith<std::tuple<value::SlotAccessor*, value::SlotAccessor*, bool>>
 BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
-                                         stage_builder::PlanStageData* data) const {
+                                         stage_builder::PlanStageData* data,
+                                         const bool preparingFromCache) const {
     invariant(root);
     invariant(data);
 
     stage_builder::prepareSlotBasedExecutableTree(
-        _opCtx, root, data, _cq, _collections, _yieldPolicy);
+        _opCtx, root, data, _cq, _collections, _yieldPolicy, preparingFromCache);
 
     value::SlotAccessor* resultSlot{nullptr};
     if (auto slot = data->outputs.getIfExists(stage_builder::PlanStageSlots::kResult); slot) {
@@ -164,10 +165,11 @@ BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
 }
 
 void BaseRuntimePlanner::executeCandidateTrial(plan_ranker::CandidatePlan* candidate,
-                                               size_t maxNumResults) {
+                                               size_t maxNumResults,
+                                               const bool isCachedPlanTrial) {
     _indexExistenceChecker.check();
 
-    auto status = prepareExecutionPlan(candidate->root.get(), &candidate->data);
+    auto status = prepareExecutionPlan(candidate->root.get(), &candidate->data, isCachedPlanTrial);
     if (!status.isOK()) {
         candidate->status = status.getStatus();
         return;
@@ -259,7 +261,7 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
             auto& currentCandidate = candidates.back();
             // Store the original plan in the CandidatePlan.
             currentCandidate.clonedPlan.emplace(std::move(origPlan));
-            executeCandidateTrial(&currentCandidate, maxNumResults);
+            executeCandidateTrial(&currentCandidate, maxNumResults, /*isCachedPlanTrial*/ false);
 
             auto reads = tracker->getMetric<TrialRunTracker::TrialRunMetric::kNumReads>();
             // We intentionally increment the metrics outside of the isOk/existedEarly check.

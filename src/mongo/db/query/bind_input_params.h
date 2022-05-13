@@ -40,10 +40,14 @@ namespace mongo::input_params {
  * parameter id, along with a constant associated with that parameter id. For each such match
  * expression node, looks up the corresponding slot in the 'RuntimeEnvironment' using the
  * 'InputParamToSlotMap' and sets the value of that slot.
+ *
+ * The caller should pass true for 'bindingCachedPlan' if we are binding-in new parameter values for
+ * a plan that was recovered from the SBE plan cache.
  */
 void bind(const CanonicalQuery&,
           const stage_builder::InputParamToSlotMap&,
-          sbe::RuntimeEnvironment*);
+          sbe::RuntimeEnvironment*,
+          bool bindingCachedPlan);
 
 /**
  * Binds index bounds evaluated from IETs to index bounds slots for the given query.
