@@ -10,6 +10,7 @@ stemming_packages = [
     #"ISO_8859_1_french",
     #"ISO_8859_1_norwegian",
     #"ISO_8859_1_swedish",
+    "UTF_8_czech",
     "UTF_8_dutch",
     "UTF_8_german",
     "UTF_8_porter",
@@ -37,6 +38,7 @@ stemming_packages = [
     "UTF_8_french",
     "UTF_8_norwegian",
     "UTF_8_russian",
+    "UTF_8_slovak",
     ]
 
 stemmer_files = [
