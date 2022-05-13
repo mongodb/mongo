@@ -27,15 +27,33 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/util/errno_util.h"
 
 #include <cerrno>
 #include <fmt/format.h>
 #include <system_error>
 
+#ifdef _WIN32
+#include <errhandlingapi.h>
+#include <winsock2.h>
+#endif
+
 namespace mongo {
 
 using namespace fmt::literals;
+
+#ifdef _WIN32
+namespace errno_util_win32_detail {
+int gle() {
+    return GetLastError();
+}
+int wsaGle() {
+    return WSAGetLastError();
+}
+}  // namespace errno_util_win32_detail
+#endif
 
 std::string errorMessage(std::error_code ec) {
     std::string r = ec.message();

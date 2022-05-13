@@ -29,103 +29,141 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "mongo/base/string_data.h"
-#include "mongo/util/intrusive_counter.h"
-#include "mongo/util/thread_context.h"
+#include "mongo/util/static_immortal.h"
 
 namespace mongo {
 
 /**
- * ThreadName is a uniquely identifyable, immutable, ref-counted string.
+ * A nullable handle pinning a ref-counted immutable string.
+ * Copies of a ThreadNameString refer to the same string object.
+ * Equality comparisons consider only that string's identity, not its value.
  *
- * This class is used for three purposes:
- * - Setting the official thread name with the OS.
- * - Populating the "ctx" field for log lines.
- * - Providing a thread name to gdb.
+ * This class is just a kind of refcounted string handle and does not itself
+ * interact with the OS or with thread storage.
+ *
+ * Presents a pointer-like API with `get()`, and dereference operators, and
+ * explicit bool conversion. Dereferencing yields a reference to a
+ * string value if nonempty. Dereferencing an empty reference is allowed and
+ * yields the singleton string value "-".
+ *
+ * Copyable and movable, with the usual refcounting semantics. Copies refer
+ * to the same string and will compare equal to each other.
+ *
  */
-class ThreadName : public RefCountable {
+class ThreadNameRef {
 public:
-    using Id = size_t;
+    /** An empty ref (empty refs still stringify as "-"). */
+    ThreadNameRef() = default;
+
+    /** A ref to the string value `name`. */
+    explicit ThreadNameRef(std::string name)
+        : _ptr{std::make_shared<std::string>(std::move(name))} {}
 
     /**
-     * Create a new instance.
-     *
-     * Note that this does not set it to be the official one for the thread.
+     * Dereferences this. If nonempty, returns its string value.
+     * Otherwise, returns a singleton "-" string.
      */
-    explicit ThreadName(StringData name);
-    ThreadName(const ThreadName&) = delete;
-    ThreadName(ThreadName&&) = delete;
-
-    /**
-     * Get the official ThreadName for the current thread via the ThreadContext.
-     */
-    static boost::intrusive_ptr<ThreadName> get(boost::intrusive_ptr<ThreadContext> context);
-
-    /**
-     * Set the official ThreadName for the current thread via the ThreadContext.
-     *
-     * Note that this also will set the OS thread name if the name is different from the current
-     * one.
-     *
-     * If a different non-anonymous thread name was previously set, this returns that name. If the
-     * given name was already set, a previous name was released, or the initial name was set, this
-     * returns an empty pointer.
-     */
-    static boost::intrusive_ptr<ThreadName> set(boost::intrusive_ptr<ThreadContext> context,
-                                                boost::intrusive_ptr<ThreadName> name);
-
-    /**
-     * Release the current thread name.
-     *
-     * This does not unset the OS thread name or change the current storage. Instead, this marks the
-     * current name as available for reuse or replacement.
-     */
-    static void release(boost::intrusive_ptr<ThreadContext> context);
-
-    /**
-     * Get a string for the current thread without new allocations.
-     *
-     * In pre-init, this returns "-". That value will mostly be associated with the main thread.
-     * If a thread is somehow started in pre-init and dodges our ThreadSafetyContext checks, it will
-     * also return "-" for this function.
-     */
-    static StringData getStaticString();
-
-    StringData toString() const {
-        return _storage;
+    const std::string* get() const {
+        if (_ptr)
+            return &*_ptr;
+        static const StaticImmortal whenEmpty = std::string("-");
+        return &*whenEmpty;
     }
 
-    friend bool operator==(const ThreadName& lhs, const ThreadName& rhs) noexcept {
-        return lhs._id == rhs._id;
+    const std::string* operator->() const {
+        return get();
     }
 
-    friend bool operator!=(const ThreadName& lhs, const ThreadName& rhs) noexcept {
-        return lhs._id != rhs._id;
+    const std::string& operator*() const {
+        return *get();
+    }
+
+    /** Returns true if nonempty. */
+    explicit operator bool() const {
+        return !!_ptr;
+    }
+
+    operator StringData() const {
+        return **this;
+    }
+
+    /**
+     * Two ThreadNameRef are equal if and only if they are copies of the same
+     * original ThreadNameRef object. Equality of string value is insufficient.
+     */
+    friend bool operator==(const ThreadNameRef& a, const ThreadNameRef& b) noexcept {
+        return a._ptr == b._ptr;
+    }
+
+    friend bool operator!=(const ThreadNameRef& a, const ThreadNameRef& b) noexcept {
+        return !(a == b);
     }
 
 private:
-    static Id _nextId();
-
-    const Id _id;
-    const std::string _storage;
+    std::shared_ptr<const std::string> _ptr;
 };
+
+/**
+ * Returns the name reference attached to current thread. Returns an empty
+ * ThreadNameRef if current thread has no ThreadContext. The empty ThreadNameRef
+ * still has a valid string value of "-".
+ *
+ * This string is not limited in length, so it will be a better name
+ * than the name the OS uses to refer to the same thread.
+ */
+ThreadNameRef getThreadNameRef();
+
+/**
+ * Swaps in a new active name, returns the old one if it was active.
+ *
+ * The active thread name is used for:
+ * - Setting the thread name in the OS. As an optimization, clearing
+ *   the thread name in the OS is performed lazily.
+ * - Populating the "ctx" field for log lines.
+ * - Providing a thread name to GDB.
+ *
+ * Has no effect if there is no `ThreadContext` for this thread.
+ */
+ThreadNameRef setThreadNameRef(ThreadNameRef name);
+
+/**
+ * Marks the ThreadNameRef attached to the current thread as inactive.
+ *  - The inactive thread name remains attached to the thread.
+ *  - The thread name according to the OS is not changed.
+ *  - A subsequent `setThreadNameRef` call will not return it.
+ *  - An immediately subsequent `setThreadNameRef` call with the same name will
+ *    cheaply reactivate it, saving two OS thread rename operations.
+ * This is an optimization on the assumption that a thread name will be
+ * temporarily set to the same `ThreadNameRef` repeatedly, so setting it and
+ * resetting it with the OS on each change would be wasteful.
+ *
+ * Has no effect if there is no `ThreadContext` for this thread.
+ */
+void releaseThreadNameRef();
 
 /**
  * Sets the name of the current thread.
  */
-inline void setThreadName(StringData name) {
-    ThreadName::set(ThreadContext::get(), make_intrusive<ThreadName>(name));
+inline void setThreadName(std::string name) {
+    setThreadNameRef(ThreadNameRef{std::move(name)});
 }
 
 /**
- * Retrieves the name of the current thread, as previously set, or "thread#" if no name was
- * previously set. The returned StringData is always null terminated so it is safe to pass to APIs
- * that expect c-strings.
+ * Returns current thread's name, as previously set, or "main", or
+ * "thread#" if no name was previously set.
+ *
+ * Before the ThreadContext API is initialized, this returns "-". That value
+ * will mostly be associated with the main thread, or threads that were started
+ * before ThreadContext API initialization.
+ *
+ * Used by the MongoDB GDB pretty printer extentions in `gdb/mongo.py`.
  */
 inline StringData getThreadName() {
-    return ThreadName::get(ThreadContext::get())->toString();
+    return *getThreadNameRef();
 }
 
 }  // namespace mongo

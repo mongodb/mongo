@@ -133,7 +133,7 @@ public:
     ClientStrand(ServiceContext::UniqueClient client)
         : _clientPtr(client.get()),
           _client(std::move(client)),
-          _threadName(make_intrusive<ThreadName>(_client->desc())) {}
+          _threadName(ThreadNameRef{_client->desc()}) {}
 
     /**
      * Get a pointer to the underlying Client.
@@ -204,8 +204,8 @@ private:
 
     ServiceContext::UniqueClient _client;
 
-    boost::intrusive_ptr<ThreadName> _threadName;
-    boost::intrusive_ptr<ThreadName> _oldThreadName;
+    ThreadNameRef _threadName;
+    ThreadNameRef _oldThreadName;
 };
 
 inline void ClientStrand::Executor::schedule(Task task) {

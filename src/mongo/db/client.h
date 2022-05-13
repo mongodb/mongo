@@ -337,7 +337,7 @@ public:
     }
 
 private:
-    boost::intrusive_ptr<ThreadName> _originalThreadName;
+    ThreadNameRef _originalThreadName;
 };
 
 /**

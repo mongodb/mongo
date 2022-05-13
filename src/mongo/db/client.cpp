@@ -188,14 +188,14 @@ ThreadClient::ThreadClient(StringData desc,
                            ServiceContext* serviceContext,
                            transport::SessionHandle session) {
     invariantNoCurrentClient();
-    _originalThreadName = ThreadName::get(ThreadContext::get());
+    _originalThreadName = getThreadNameRef();
     Client::initThread(desc, serviceContext, std::move(session));
 }
 
 ThreadClient::~ThreadClient() {
     invariant(currentClient);
     currentClient.reset(nullptr);
-    ThreadName::set(ThreadContext::get(), _originalThreadName);
+    setThreadNameRef(std::move(_originalThreadName));
 }
 
 Client* ThreadClient::get() const {

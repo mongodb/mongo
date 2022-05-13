@@ -44,10 +44,6 @@
 #include <mach/thread_info.h>
 #endif
 #endif
-#if defined(__linux__)
-#include <sys/syscall.h>
-#include <sys/types.h>
-#endif
 
 #include <fmt/format.h>
 
@@ -55,12 +51,17 @@
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/util/str.h"
+#include "mongo/platform/process_id.h"
+#include "mongo/util/thread_context.h"
 
 namespace mongo {
 using namespace fmt::literals;
 
 namespace {
+
+bool isMainThread() {
+    return ProcessId::getCurrent() == ProcessId::getCurrentThreadId();
+}
 
 #ifdef _WIN32
 // From https://msdn.microsoft.com/en-us/library/xcb2z8hs.aspx
@@ -92,49 +93,15 @@ void setWindowsThreadName(DWORD dwThreadID, const char* threadName) {
 }
 #endif
 
-constexpr auto kMainId = size_t{0};
-
-auto makeAnonymousThreadName() {
-    static auto gNextAnonymousId = AtomicWord<size_t>{kMainId};
-    auto id = gNextAnonymousId.fetchAndAdd(1);
-    if (id == kMainId) {
-        // The first thread name should always be "main".
-        return make_intrusive<ThreadName>("main");
-    } else {
-        return make_intrusive<ThreadName>("thread{}"_format(id));
-    }
-}
-
-struct ThreadNameSconce {
-    ThreadNameSconce() : cachedPtr(makeAnonymousThreadName()) {
-        // Note that we're not setting the thread name here. It will log differently, but appear the
-        // same in top and like.
-    }
-
-    // At any given time, either cachedPtr or activePtr can be valid, but not both.
-    boost::intrusive_ptr<ThreadName> activePtr;
-    boost::intrusive_ptr<ThreadName> cachedPtr;
-};
-
-auto getSconce = ThreadContext::declareDecoration<ThreadNameSconce>();
-auto& getThreadName(const boost::intrusive_ptr<ThreadContext>& context) {
-    auto& sconce = getSconce(context.get());
-    if (sconce.activePtr) {
-        return sconce.activePtr;
-    }
-
-    return sconce.cachedPtr;
-}
-
-void setOSThreadName(StringData threadName) {
+void setOSThreadName(const std::string& threadName) {
 #if defined(_WIN32)
     // Naming should not be expensive compared to thread creation and connection set up, but if
     // testing shows otherwise we should make this depend on DEBUG again.
-    setWindowsThreadName(GetCurrentThreadId(), threadName.rawData());
+    setWindowsThreadName(GetCurrentThreadId(), threadName.c_str());
 #elif defined(__APPLE__)
     // Maximum thread name length on OS X is MAXTHREADNAMESIZE (64 characters). This assumes
     // OS X 10.6 or later.
-    std::string threadNameCopy = threadName.toString();
+    std::string threadNameCopy = threadName;
     if (threadNameCopy.size() > MAXTHREADNAMESIZE) {
         threadNameCopy.resize(MAXTHREADNAMESIZE - 4);
         threadNameCopy += "...";
@@ -150,95 +117,137 @@ void setOSThreadName(StringData threadName) {
     // Do not set thread name on the main() thread. Setting the name on main thread breaks
     // pgrep/pkill since these programs base this name on /proc/*/status which displays the thread
     // name, not the executable name.
-    if (getpid() != syscall(SYS_gettid)) {
-        //  Maximum thread name length supported on Linux is 16 including the null terminator.
-        //  Ideally we use short and descriptive thread names that fit: this helps for log
-        //  readability as well. Still, as the limit is so low and a few current names exceed the
-        //  limit, it's best to shorten long names.
-        int error = 0;
-        if (threadName.size() > 15) {
-            std::string shortName = str::stream()
-                << threadName.substr(0, 7) << '.' << threadName.substr(threadName.size() - 7);
-            error = pthread_setname_np(pthread_self(), shortName.c_str());
-        } else {
-            error = pthread_setname_np(pthread_self(), threadName.rawData());
-        }
+    if (isMainThread())
+        return;
+    //  Maximum thread name length supported on Linux is 16 including the null terminator.
+    //  Ideally we use short and descriptive thread names that fit: this helps for log
+    //  readability as well. Still, as the limit is so low and a few current names exceed the
+    //  limit, it's best to shorten long names.
+    static constexpr size_t kMaxThreadNameLength = 16 - 1;
+    boost::optional<std::string> shortNameBuf;
+    const char* truncName = threadName.c_str();
+    if (threadName.size() > kMaxThreadNameLength) {
+        StringData sd = threadName;
+        shortNameBuf = "{}.{}"_format(sd.substr(0, 7), sd.substr(sd.size() - 7));
+        truncName = shortNameBuf->c_str();
+    }
 
-        if (error) {
-            LOGV2(23103,
-                  "Ignoring error from setting thread name: {error}",
-                  "Ignoring error from setting thread name",
-                  "error"_attr = errnoWithDescription(error));
-        }
+    int error = pthread_setname_np(pthread_self(), truncName);
+    if (error) {
+        LOGV2(23103,
+              "Ignoring error from setting thread name: {error}",
+              "Ignoring error from setting thread name",
+              "error"_attr = errnoWithDescription(error));
     }
 #endif
 }
 
+/**
+ * Manages the relationship of our high-level ThreadNameRef strings to
+ * the thread local context, and efficiently notifying the OS of name
+ * changes. We try to apply temporary names to threads to make them
+ * meaningful representations of the kind of work the thread is doing.
+ * But sharing these names with the OS is slow and name length is limited.  So
+ * ThreadNameInfo is an auxiliary resource to the OS thread name, available to
+ * the LOGV2 system and to GDB.
+ *
+ * ThreadNameInfo is a decoration of ThreadContext.
+ * ThreadContext are held by thread_local storage and so threads started
+ * after server initialization will have an associated ThreadNameInfo.
+ *
+ * A name is "active" when it has been pushed to the OS by `setHandle`. The
+ * association can be abandoned by calling `release`. This doesn't affect the
+ * OS, but indicates that the name binding is abandoned and shouldn't be
+ * preserved by returning it from subsequent `setHandle` calls. We do however
+ * retain the inactive reference in hopes of perhaps identifying redundant
+ * `setHandle` calls that would set the OS thread name to the same value it
+ * already has.
+ *
+ * Upon construction, a ThreadNameInfo has an inactive unique name that
+ * the OS doesn't know about yet. A push/pop style call sequence of
+ * `h=getHandle()` then (eventually) `setHandle(h)` can make this name
+ * the active (known to the OS) thread name.
+ */
+class ThreadNameInfo {
+public:
+    /** Returns the thread name ref, whether it's active or not. */
+    const ThreadNameRef& getHandle() const {
+        return _h;
+    }
+
+    /**
+     * Changes the thread name ref to `name`, marking it active,
+     * and updating the OS thread name if necessary.
+     *
+     * If there was a previous active thread name, it is returned so that
+     * callers can perhaps restore it and implement a temporary rename.
+     * Inactive thread names are considered abandoned and are not returned.
+     */
+    ThreadNameRef setHandle(ThreadNameRef name) {
+        bool alreadyActive = std::exchange(_active, true);
+        if (name == _h)
+            return {};
+        auto old = std::exchange(_h, std::move(name));
+        setOSThreadName(*_h);
+        if (alreadyActive)
+            return old;
+        return {};
+    }
+
+    /**
+     * Mark the current ThreadNameRef as inactive. This is only a marking and
+     * does not affect the OS thread name. The ThreadNameRef is retained
+     * so that redundant setHandle calls can be recognized and elided.
+     */
+    void release() {
+        _active = false;
+    }
+
+    /**
+     * Get a pointer to this thread's ThreadNameInfo.
+     * Returns null if there's no ThreadContext to get it from.
+     */
+    static ThreadNameInfo* forThisThread() {
+        auto& context = ThreadContext::get();
+        return context ? &_decoration(*context) : nullptr;
+    }
+
+private:
+    inline static auto _decoration = ThreadContext::declareDecoration<ThreadNameInfo>();
+
+    /**
+     * Main thread always gets "main". Other threads are sequentially
+     * named as "thread1", "thread2", etc.
+     */
+    static std::string _makeAnonymousThreadName() {
+        if (isMainThread())
+            return "main";
+        static AtomicWord<uint64_t> next{1};
+        return "thread{}"_format(next.fetchAndAdd(1));
+    }
+
+    ThreadNameRef _h{_makeAnonymousThreadName()};
+    bool _active = false;
+};
+
 }  // namespace
 
-ThreadName::Id ThreadName::_nextId() {
-    static auto gNextId = AtomicWord<Id>{0};
-    return gNextId.fetchAndAdd(1);
+ThreadNameRef getThreadNameRef() {
+    if (auto info = ThreadNameInfo::forThisThread())
+        return info->getHandle();
+    return {};
 }
 
-StringData ThreadName::getStaticString() {
-    auto& context = ThreadContext::get();
-    if (!context) {
-        // Use a static fallback to avoid allocations. This is the string that will be used before
-        // initializers run in main a.k.a. pre-init.
-        static constexpr auto kFallback = "-"_sd;
-        return kFallback;
-    }
-
-    return getThreadName(context)->toString();
-}
-
-boost::intrusive_ptr<ThreadName> ThreadName::get(boost::intrusive_ptr<ThreadContext> context) {
-    return getThreadName(context);
-}
-
-boost::intrusive_ptr<ThreadName> ThreadName::set(boost::intrusive_ptr<ThreadContext> context,
-                                                 boost::intrusive_ptr<ThreadName> name) {
+ThreadNameRef setThreadNameRef(ThreadNameRef name) {
     invariant(name);
-
-    auto& sconce = getSconce(context.get());
-
-    if (sconce.activePtr) {
-        invariant(!sconce.cachedPtr);
-        if (*sconce.activePtr == *name) {
-            // The name was already set, skip setting it to the OS thread name.
-            return {};
-        } else {
-            // Replace the current active name with the new one, and set the OS thread name.
-            setOSThreadName(name->toString());
-            return std::exchange(sconce.activePtr, name);
-        }
-    } else if (sconce.cachedPtr) {
-        if (*sconce.cachedPtr == *name) {
-            // The name was cached, set it as active and skip setting it to the OS thread name.
-            sconce.activePtr = std::exchange(sconce.cachedPtr, {});
-            return {};
-        } else {
-            // The new name is different than the cached name, set the active, reset the cached, and
-            // set the OS thread name.
-            setOSThreadName(name->toString());
-
-            sconce.activePtr = name;
-            sconce.cachedPtr.reset();
-            return {};
-        }
-    }
-
-    MONGO_UNREACHABLE;
+    if (auto info = ThreadNameInfo::forThisThread())
+        return info->setHandle(std::move(name));
+    return {};
 }
 
-void ThreadName::release(boost::intrusive_ptr<ThreadContext> context) {
-    auto& sconce = getSconce(context.get());
-    if (sconce.activePtr) {
-        sconce.cachedPtr = std::exchange(sconce.activePtr, {});
-    }
+void releaseThreadNameRef() {
+    if (auto info = ThreadNameInfo::forThisThread())
+        info->release();
 }
-
-ThreadName::ThreadName(StringData name) : _id(_nextId()), _storage(name.toString()){};
 
 }  // namespace mongo
