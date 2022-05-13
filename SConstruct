@@ -5037,15 +5037,15 @@ env.AddPackageNameAlias(
 )
 
 env.AddPackageNameAlias(
-    component="shell",
+    component="jstestshell",
     role="runtime",
-    name="mongodb-shell",
+    name="mongodb-jstestshell",
 )
 
 env.AddPackageNameAlias(
-    component="shell",
+    component="jstestshell",
     role="debug",
-    name="mongodb-shell-debugsymbols",
+    name="mongodb-jstestshell-debugsymbols",
 )
 
 env.AddPackageNameAlias(

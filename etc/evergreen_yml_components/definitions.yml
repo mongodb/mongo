@@ -84,7 +84,7 @@ modules:
 ## Some variables for convenience:
 variables:
 
-# Used when the tests it runs depend only on mongod, mongos, the mongo shell and the tools.
+# Used when the tests it runs depend only on mongod, mongos, the jstestshell and the tools.
 - &task_template
   name: template
   depends_on:
@@ -753,10 +753,10 @@ functions:
         value: ${project}/${build_variant}/${revision}/debugsymbols/mh-debugsymbols-${build_id}.${ext|tgz}
       - key: mongo_debugsymbols
         value: ${project}/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
-      - key: mongo_shell
-        value: ${project}/${build_variant}/${revision}/binaries/mongo-shell-${build_id}.${ext|tgz}
-      - key: mongo_shell_debugsymbols
-        value: ${project}/${build_variant}/${revision}/binaries/mongo-shell-debugsymbols-${build_id}.${ext|tgz}
+      - key: mongo_jstestshell
+        value: ${project}/${build_variant}/${revision}/binaries/mongo-jstestshell-${build_id}.${ext|tgz}
+      - key: mongo_jstestshell_debugsymbols
+        value: ${project}/${build_variant}/${revision}/binaries/mongo-jstestshell-debugsymbols-${build_id}.${ext|tgz}
       - key: mongo_fuzzer_corpus_mciuploads
         value: ${project}/${build_variant}/${revision}/libfuzzer-corpora/corpora-${build_id}.${ext|tgz}
       - key: mongo_fuzzer_corpus
@@ -6245,8 +6245,8 @@ tasks:
         distsrc-${ext|tgz}
         archive-dist
         archive-dist-debug
-        archive-shell
-        archive-shell-debug
+        archive-jstestshell
+        archive-jstestshell-debug
         ${additional_package_targets|}
       task_compile_flags: >-
         --legacy-tarball
@@ -6293,26 +6293,24 @@ tasks:
       display_name: Dist Debugsymbols
   - command: s3.put
     params:
-      optional: true
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: src/mongodb-shell.${ext|tgz}
-      remote_file: ${mongo_shell}
+      local_file: src/mongodb-jstestshell.${ext|tgz}
+      remote_file: ${mongo_jstestshell}
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/gzip}
-      display_name: Shell
+      display_name: Jstestshell
   - command: s3.put
     params:
-      optional: true
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: src/mongodb-shell-debugsymbols.${ext|tgz}
-      remote_file: ${mongo_shell_debugsymbols}
+      local_file: src/mongodb-jstestshell-debugsymbols.${ext|tgz}
+      remote_file: ${mongo_jstestshell_debugsymbols}
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/gzip}
-      display_name: Shell Debugsymbols
+      display_name: Jstestshell Debugsymbols
   - command: s3.put
     params:
       optional: true
@@ -6430,14 +6428,6 @@ tasks:
   - func: "set up venv"
   - func: "fetch packages"
   - func: "fetch dist tarball"
-  # Fetch the shell
-  - command: s3.get
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      remote_file: ${mongo_shell}
-      bucket: mciuploads
-      local_file: src/mongo-shell.tgz
   # Fetch mongocryptd
   - command: s3.get
     params:
@@ -6491,16 +6481,6 @@ tasks:
       permissions: public-read
       content_type: ${content_type|application/gzip}
       remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}
-  # Put the shell tarball/zipfile
-  - command: s3.put
-    params:
-      aws_secret: ${aws_secret}
-      local_file: src/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-      aws_key: ${aws_key}
-      bucket: build-push-testing
-      permissions: public-read
-      content_type: ${content_type|application/gzip}
-      remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}
   # Put the cryptd tarball/zipfile
   - command: s3.put
     params:
@@ -6558,17 +6538,6 @@ tasks:
       permissions: public-read
       content_type: ${content_type|application/gzip}
       remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig
-
-  # Put the shell tarball signature
-  - command: s3.put
-    params:
-      aws_secret: ${aws_secret}
-      local_file: src/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
-      aws_key: ${aws_key}
-      bucket: build-push-testing
-      permissions: public-read
-      content_type: ${content_type|application/gzip}
-      remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig
 
   # Put the cryptd tarball signature
   - command: s3.put
@@ -6629,17 +6598,6 @@ tasks:
       content_type: text/plain
       remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1
 
-  # Put the shell tarball sha1
-  - command: s3.put
-    params:
-      aws_secret: ${aws_secret}
-      local_file: src/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
-      aws_key: ${aws_key}
-      permissions: public-read
-      bucket: build-push-testing
-      content_type: text/plain
-      remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1
-
   # Put the cryptd tarball sha1
   - command: s3.put
     params:
@@ -6698,17 +6656,6 @@ tasks:
       bucket: build-push-testing
       content_type: text/plain
       remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256
-
-  # Put the shell tarball sha256
-  - command: s3.put
-    params:
-      aws_secret: ${aws_secret}
-      local_file: src/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
-      permissions: public-read
-      aws_key: ${aws_key}
-      bucket: build-push-testing
-      content_type: text/plain
-      remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256
 
   # Put the cryptd tarball sha256
   - command: s3.put
@@ -6769,17 +6716,6 @@ tasks:
       content_type: text/plain
       remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5
 
-  # Put the shell tarball md5
-  - command: s3.put
-    params:
-      aws_secret: ${aws_secret}
-      local_file: src/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
-      aws_key: ${aws_key}
-      bucket: build-push-testing
-      permissions: public-read
-      content_type: text/plain
-      remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5
-
   # Put the cryptd tarball md5
   - command: s3.put
     params:
@@ -6837,10 +6773,6 @@ tasks:
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
          'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'}}
 
-      #Shell
-      - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
-         'destination': {'path': '${push_path}/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'}}
-
       #Cryptd
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
          'destination': {'path': '${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'},
@@ -6865,10 +6797,6 @@ tasks:
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
          'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig', 'bucket': '${push_bucket}'}}
 
-      #Shell Signature
-      - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
-         'destination': {'path': '${push_path}/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig', 'bucket': '${push_bucket}'}}
-
       #Cryptd Signature
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
          'destination': {'path': '${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig', 'bucket': '${push_bucket}'},
@@ -6882,10 +6810,6 @@ tasks:
       #SHA1 for binaries
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
          'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1', 'bucket': '${push_bucket}'}}
-
-      #SHA1 for shell
-      - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
-         'destination': {'path': '${push_path}/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1', 'bucket': '${push_bucket}'}}
 
       #SHA1 for cryptd
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
@@ -6906,10 +6830,6 @@ tasks:
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
          'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256', 'bucket': '${push_bucket}'}}
 
-      #SHA256 for shell
-      - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
-         'destination': {'path': '${push_path}/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256', 'bucket': '${push_bucket}'}}
-
       #SHA256 for cryptd
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
          'destination': {'path': '${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256', 'bucket': '${push_bucket}'},
@@ -6928,10 +6848,6 @@ tasks:
       #MD5 for binaries
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
          'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
-
-      #MD5 for shell
-      - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
-         'destination': {'path': '${push_path}/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
 
       #MD5 for cryptd
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},

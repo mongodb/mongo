@@ -92,12 +92,6 @@ if platform_family? 'debian'
     command 'apt update && apt -y -f install'
     live_stream true
   end
-
-  execute 'install mongo shell' do
-    command 'dpkg -i `find . -name "*shell*.deb"`'
-    live_stream true
-    cwd homedir
-  end
 end
 
 if platform_family? 'rhel' or platform_family? 'amazon'
@@ -115,12 +109,6 @@ if platform_family? 'rhel' or platform_family? 'amazon'
   # install the tools so we can test install_compass
   execute 'install mongo tools' do
     command 'yum install -y `find . -name "*tools-extra*.rpm"`'
-    live_stream true
-    cwd homedir
-  end
-
-  execute 'install mongo shell' do
-    command 'yum install -y `find . -name "*shell*.rpm"`'
     live_stream true
     cwd homedir
   end
@@ -155,32 +143,4 @@ if platform_family? 'suse'
     live_stream true
     cwd homedir
   end
-
-  execute 'install mongo' do
-    command 'zypper --no-gpg-checks -n install `find . -name "*shell*.rpm"`'
-    live_stream true
-    cwd homedir
-  end
-end
-
-inspec_wait = <<HEREDOC
-#!/bin/bash -x
-ulimit -v unlimited
-for i in {1..60}
-do
-  mongo --eval "db.smoke.insert({answer: 42})"
-  if [ $? -eq 0 ]
-  then
-    exit 0
-  else
-    echo "sleeping"
-    sleep 1
-  fi
-done
-exit 1
-HEREDOC
-
-file '/inspec_wait.sh' do
-  content inspec_wait
-  mode '0755'
 end

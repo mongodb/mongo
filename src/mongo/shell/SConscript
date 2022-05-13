@@ -348,15 +348,13 @@ if not has_option('noshell') and jsEngine:
             '$BUILD_DIR/mongo/base',
             'mongo_main',
         ],
-        AIB_COMPONENT="mongo",
+        AIB_COMPONENT="jstestshell",
         AIB_COMPONENTS_EXTRA=[
-            "core",
-            "default",
-            "dist",
+            "devcore",
             "dist-test",
-            "serverless-test",
-            "shell",
             "integration-tests",
+            "mongo",
+            "serverless-test",
         ],
     )
 

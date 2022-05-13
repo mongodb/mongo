@@ -2615,12 +2615,13 @@ env.Program(
     AIB_COMPONENTS_EXTRA=[
         "core",
         "default",
+        "devcore",
         "dist",
         "dist-test",
+        "integration-tests",
         "serverless",
         "serverless-test",
         "servers",
-        "integration-tests",
     ],
 )
 
