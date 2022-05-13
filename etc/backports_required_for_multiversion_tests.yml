@@ -216,6 +216,8 @@ last-continuous:
       test_file: jstests/core/wildcard_index_cached_plans.js
     - ticket: SERVER-65821
       test_file: jstests/replsets/dbhash_lock_acquisition.js
+    - ticket: SERVER-66389
+      test_file: jstests/core/where_multiple_plans.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -567,6 +569,8 @@ last-lts:
       test_file: jstests/core/wildcard_index_cached_plans.js
     - ticket: SERVER-65821
       test_file: jstests/replsets/dbhash_lock_acquisition.js
+    - ticket: SERVER-66389
+      test_file: jstests/core/where_multiple_plans.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

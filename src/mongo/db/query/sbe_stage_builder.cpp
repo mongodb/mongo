@@ -530,7 +530,8 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                                     PlanStageData* data,
                                     const CanonicalQuery& cq,
                                     const MultipleCollectionAccessor& collections,
-                                    PlanYieldPolicySBE* yieldPolicy) {
+                                    PlanYieldPolicySBE* yieldPolicy,
+                                    const bool preparingFromCache) {
     tassert(6183502, "PlanStage cannot be null", root);
     tassert(6142205, "PlanStageData cannot be null", data);
     tassert(6142206, "yieldPolicy cannot be null", yieldPolicy);
@@ -591,7 +592,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
 
     // If the cached plan is parameterized, bind new values for the parameters into the runtime
     // environment.
-    input_params::bind(cq, data->inputParamToSlotMap, env);
+    input_params::bind(cq, data->inputParamToSlotMap, env, preparingFromCache);
 
     for (auto&& indexBoundsInfo : data->indexBoundsEvaluationInfos) {
         bindIndexBoundsParams(cq, indexBoundsInfo, env);
