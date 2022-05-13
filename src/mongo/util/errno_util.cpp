@@ -27,11 +27,18 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/util/errno_util.h"
 
 #include <cerrno>
 #include <fmt/format.h>
 #include <system_error>
+
+#ifdef _WIN32
+#include <errhandlingapi.h>
+#include <winsock2.h>
+#endif
 
 #ifndef _WIN32
 #include <netdb.h>
@@ -40,6 +47,17 @@
 namespace mongo {
 
 using namespace fmt::literals;
+
+#ifdef _WIN32
+namespace errno_util_win32_detail {
+int gle() {
+    return GetLastError();
+}
+int wsaGle() {
+    return WSAGetLastError();
+}
+}  // namespace errno_util_win32_detail
+#endif
 
 class AddrInfoErrorCategory : public std::error_category {
 public:

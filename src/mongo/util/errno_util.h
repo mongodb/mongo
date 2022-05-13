@@ -29,12 +29,20 @@
 
 #pragma once
 
+#include <cstdlib>
 #include <system_error>
 #include <utility>
 
 #include "mongo/base/string_data.h"
 
 namespace mongo {
+
+#ifdef _WIN32
+namespace errno_util_win32_detail {
+int gle();
+int wsaGle();
+}  // namespace errno_util_win32_detail
+#endif
 
 /**
  * Returns category to use for POSIX errno error codes.
@@ -86,7 +94,7 @@ inline std::error_code lastPosixError() {
  */
 inline std::error_code lastSystemError() {
 #ifdef _WIN32
-    return systemError(GetLastError());
+    return systemError(errno_util_win32_detail::gle());
 #else
     return systemError(errno);
 #endif
@@ -123,7 +131,7 @@ inline std::error_code addrInfoError(int e) {
  */
 inline std::error_code lastSocketError() {
 #ifdef _WIN32
-    return systemError(WSAGetLastError());
+    return systemError(errno_util_win32_detail::wsaGle());
 #else
     return lastSystemError();
 #endif
