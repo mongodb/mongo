@@ -66,7 +66,8 @@ public:
         }
     };
 
-    DocumentSourceGraphLookUp(const DocumentSourceGraphLookUp&);
+    DocumentSourceGraphLookUp(const DocumentSourceGraphLookUp&,
+                              const boost::intrusive_ptr<ExpressionContext>&);
 
     const char* getSourceName() const final;
 
@@ -155,7 +156,8 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    boost::intrusive_ptr<DocumentSource> clone() const final;
+    boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final;
 
 protected:
     GetNextResult doGetNext() final;

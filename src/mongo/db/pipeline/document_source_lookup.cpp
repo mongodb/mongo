@@ -243,9 +243,12 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     initializeResolvedIntrospectionPipeline();
 }
 
-DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original)
-    : DocumentSource(kStageName,
-                     original.pExpCtx->copyWith(original.pExpCtx->ns, original.pExpCtx->uuid)),
+DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
+                                           const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
+    : DocumentSource(
+          kStageName,
+          newExpCtx ? newExpCtx
+                    : original.pExpCtx->copyWith(original.pExpCtx->ns, original.pExpCtx->uuid)),
       _fromNs(original._fromNs),
       _resolvedNs(original._resolvedNs),
       _as(original._as),
@@ -272,8 +275,9 @@ DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original)
     }
 }
 
-boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::clone() const {
-    return make_intrusive<DocumentSourceLookUp>(*this);
+boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::clone(
+    const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
+    return make_intrusive<DocumentSourceLookUp>(*this, newExpCtx);
 }
 
 void validateLookupCollectionlessPipeline(const std::vector<BSONObj>& pipeline) {

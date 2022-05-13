@@ -109,10 +109,11 @@ void validateUnionWithCollectionlessPipeline(
     );
 }
 
-boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::clone() const {
+boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::clone(
+    const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
     // At this point the ExpressionContext already has info about any resolved namespaces, so there
     // is no need to resolve them again when creating the clone.
-    return make_intrusive<DocumentSourceUnionWith>(*this);
+    return make_intrusive<DocumentSourceUnionWith>(*this, newExpCtx);
 }
 
 std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::LiteParsed::parse(

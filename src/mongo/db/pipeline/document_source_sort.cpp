@@ -271,8 +271,9 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
     return GetNextResult{_sortExecutor->getNext().second};
 }
 
-boost::intrusive_ptr<DocumentSource> DocumentSourceSort::clone() const {
-    return create(pExpCtx,
+boost::intrusive_ptr<DocumentSource> DocumentSourceSort::clone(
+    const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
+    return create(newExpCtx ? newExpCtx : pExpCtx,
                   getSortKeyPattern(),
                   _sortExecutor->getLimit(),
                   _sortExecutor->getMaxMemoryBytes());

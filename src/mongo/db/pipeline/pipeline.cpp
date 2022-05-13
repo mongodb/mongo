@@ -155,12 +155,13 @@ Pipeline::~Pipeline() {
     invariant(_disposed);
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::clone() const {
+std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::clone(
+    const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
     SourceContainer clonedStages;
     for (auto&& stage : _sources) {
-        clonedStages.push_back(stage->clone());
+        clonedStages.push_back(stage->clone(newExpCtx));
     }
-    return create(clonedStages, getContext());
+    return create(clonedStages, newExpCtx ? newExpCtx : getContext());
 }
 
 template <class T>

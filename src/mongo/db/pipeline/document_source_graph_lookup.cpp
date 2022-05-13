@@ -633,9 +633,13 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     _fromPipeline.push_back(BSON("$match" << BSONObj()));
 }
 
-DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(const DocumentSourceGraphLookUp& original)
-    : DocumentSource(kStageName,
-                     original.pExpCtx->copyWith(original.pExpCtx->ns, original.pExpCtx->uuid)),
+DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
+    const DocumentSourceGraphLookUp& original,
+    const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
+    : DocumentSource(
+          kStageName,
+          newExpCtx ? newExpCtx
+                    : original.pExpCtx->copyWith(original.pExpCtx->ns, original.pExpCtx->uuid)),
       _from(original._from),
       _as(original._as),
       _connectFromField(original._connectFromField),
@@ -785,8 +789,9 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
     return newSource;
 }
 
-boost::intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::clone() const {
-    return make_intrusive<DocumentSourceGraphLookUp>(*this);
+boost::intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::clone(
+    const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
+    return make_intrusive<DocumentSourceGraphLookUp>(*this, newExpCtx);
 }
 
 void DocumentSourceGraphLookUp::addInvolvedCollections(
