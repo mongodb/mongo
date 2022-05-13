@@ -67,7 +67,7 @@ void ClientStrand::_setCurrent() noexcept {
     Client::setCurrent(std::move(_client));
 
     // Set up the thread name.
-    _oldThreadName = ThreadName::set(ThreadContext::get(), _threadName);
+    _oldThreadName = setThreadNameRef(_threadName);
     if (_oldThreadName) {
         LOGV2_DEBUG(5127802, kDiagnosticLogLevel, "Set thread name", "name"_attr = *_threadName);
     }
@@ -83,10 +83,10 @@ void ClientStrand::_releaseCurrent() noexcept {
 
     if (_oldThreadName) {
         // Reset the last thread name because it was previously set in the OS.
-        ThreadName::set(ThreadContext::get(), std::move(_oldThreadName));
+        setThreadNameRef(std::move(_oldThreadName));
     } else {
         // Release the thread name for reuse.
-        ThreadName::release(ThreadContext::get());
+        releaseThreadNameRef();
     }
 
     LOGV2_DEBUG(
