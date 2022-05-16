@@ -79,6 +79,7 @@ MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeInsertingDonorStateDoc);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeCreatingStateDocumentTTLIndex);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeCreatingExternalKeysTTLIndex);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingCommittedState);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterUpdatingToCommittedState);
 
 const std::string kTTLIndexName = "TenantMigrationDonorTTLIndex";
 const std::string kExternalKeysTTLIndexName = "ExternalKeysTTLIndex";
@@ -619,6 +620,10 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
 
                        wuow.commit();
 
+                       if (nextState == TenantMigrationDonorStateEnum::kCommitted) {
+                           pauseTenantMigrationAfterUpdatingToCommittedState.pauseWhileSet();
+                       }
+
                        updateOpTime = oplogSlot;
                    });
 
@@ -934,13 +939,13 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             return _waitForRecipientToBecomeConsistentAndEnterBlockingState(
                 executor, recipientTargeterRS, abortToken);
         })
-        .then([this, self = shared_from_this(), executor, recipientTargeterRS, abortToken] {
+        .then([this, self = shared_from_this(), executor, recipientTargeterRS, abortToken, token] {
             LOGV2(6104905,
                   "Waiting for recipient to reach the block timestamp.",
                   "migrationId"_attr = _migrationUuid,
                   "tenantId"_attr = _tenantId);
             return _waitForRecipientToReachBlockTimestampAndEnterCommittedState(
-                executor, recipientTargeterRS, abortToken);
+                executor, recipientTargeterRS, abortToken, token);
         })
         // Note from here on the migration cannot be aborted, so only the token from the primary
         // only service should be used.
@@ -1274,7 +1279,8 @@ ExecutorFuture<void>
 TenantMigrationDonorService::Instance::_waitForRecipientToReachBlockTimestampAndEnterCommittedState(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-    const CancellationToken& abortToken) {
+    const CancellationToken& abortToken,
+    const CancellationToken& token) {
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kBlocking) {
@@ -1339,18 +1345,18 @@ TenantMigrationDonorService::Instance::_waitForRecipientToReachBlockTimestampAnd
                 uasserted(ErrorCodes::InternalError, "simulate a tenant migration error");
             }
         })
-        .then([this, self = shared_from_this(), executor, abortToken] {
+        .then([this, self = shared_from_this(), executor, token] {
             // Enter "commit" state.
             LOGV2(6104908,
                   "Entering 'committed' state.",
                   "migrationId"_attr = _migrationUuid,
                   "tenantId"_attr = _tenantId);
-            return _updateStateDoc(executor, TenantMigrationDonorStateEnum::kCommitted, abortToken)
-                .then([this, self = shared_from_this(), executor, abortToken](repl::OpTime opTime) {
-                    return _waitForMajorityWriteConcern(executor, std::move(opTime), abortToken)
+            // Ignore the abort token once we've entered the committed state
+            return _updateStateDoc(executor, TenantMigrationDonorStateEnum::kCommitted, token)
+                .then([this, self = shared_from_this(), executor, token](repl::OpTime opTime) {
+                    return _waitForMajorityWriteConcern(executor, std::move(opTime), token)
                         .then([this, self = shared_from_this()] {
                             pauseTenantMigrationBeforeLeavingCommittedState.pauseWhileSet();
-
                             stdx::lock_guard<Latch> lg(_mutex);
                             // If interrupt is called at some point during execution, it is
                             // possible that interrupt() will fulfill the promise before we

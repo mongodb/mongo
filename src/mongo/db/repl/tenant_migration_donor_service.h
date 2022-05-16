@@ -192,7 +192,8 @@ public:
         ExecutorFuture<void> _waitForRecipientToReachBlockTimestampAndEnterCommittedState(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
             std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-            const CancellationToken& abortToken);
+            const CancellationToken& abortToken,
+            const CancellationToken& token);
 
         ExecutorFuture<void> _handleErrorOrEnterAbortedState(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
