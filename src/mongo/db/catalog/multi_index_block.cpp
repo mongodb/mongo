@@ -1002,6 +1002,8 @@ void MultiIndexBlock::setIndexBuildMethod(IndexBuildMethod indexBuildMethod) {
     _method = indexBuildMethod;
 }
 
+void MultiIndexBlock::appendBuildInfo(BSONObjBuilder* builder) const {}
+
 void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
                                           const CollectionPtr& collection,
                                           bool isResumable) {

@@ -305,6 +305,11 @@ public:
 
     void setIndexBuildMethod(IndexBuildMethod indexBuildMethod);
 
+    /**
+     * Appends the current state information of the index build to the builder.
+     */
+    void appendBuildInfo(BSONObjBuilder* builder) const;
+
 private:
     struct IndexToBuild {
         std::unique_ptr<IndexBuildBlock> block;

@@ -117,6 +117,8 @@ void IndexBuildState::setState(StateFlag state,
     }
 }
 
+void IndexBuildState::appendBuildInfo(BSONObjBuilder* builder) const {}
+
 ReplIndexBuildState::ReplIndexBuildState(const UUID& indexBuildUUID,
                                          const UUID& collUUID,
                                          const std::string& dbName,
@@ -460,6 +462,12 @@ void ReplIndexBuildState::setLastOpTimeBeforeInterceptors(repl::OpTime opTime) {
 void ReplIndexBuildState::clearLastOpTimeBeforeInterceptors() {
     stdx::unique_lock<Latch> lk(_mutex);
     _lastOpTimeBeforeInterceptors = {};
+}
+
+void ReplIndexBuildState::appendBuildInfo(BSONObjBuilder* builder) const {
+    stdx::unique_lock<Latch> lk(_mutex);
+
+    _indexBuildState.appendBuildInfo(builder);
 }
 
 bool ReplIndexBuildState::_shouldSkipIndexBuildStateTransitionCheck(OperationContext* opCtx) const {

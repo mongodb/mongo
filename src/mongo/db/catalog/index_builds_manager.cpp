@@ -374,6 +374,17 @@ bool IndexBuildsManager::isBackgroundBuilding(const UUID& buildUUID) {
     return builder->isBackgroundBuilding();
 }
 
+void IndexBuildsManager::appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const {
+    stdx::unique_lock<Latch> lk(_mutex);
+
+    auto builderIt = _builders.find(buildUUID);
+    if (builderIt == _builders.end()) {
+        return;
+    }
+
+    builderIt->second->appendBuildInfo(builder);
+}
+
 void IndexBuildsManager::verifyNoIndexBuilds_forTestOnly() {
     invariant(_builders.empty());
 }

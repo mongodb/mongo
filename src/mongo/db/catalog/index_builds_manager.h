@@ -187,6 +187,12 @@ public:
     bool isBackgroundBuilding(const UUID& buildUUID);
 
     /**
+     * Provides passthrough access to MultiIndexBlock for index build info.
+     * Does nothing if build UUID does not refer to an active index build.
+     */
+    void appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const;
+
+    /**
      * Checks via invariant that the manager has no index builds presently.
      */
     void verifyNoIndexBuilds_forTestOnly();

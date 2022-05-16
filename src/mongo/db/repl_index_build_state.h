@@ -209,6 +209,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    /**
+     * Appends the current state information of the index build to the builder.
+     */
+    void appendBuildInfo(BSONObjBuilder* builder) const;
+
 private:
     // Represents the index build state.
     StateFlag _state = kSetup;
@@ -370,6 +375,11 @@ public:
     repl::OpTime getLastOpTimeBeforeInterceptors() const;
     void setLastOpTimeBeforeInterceptors(repl::OpTime opTime);
     void clearLastOpTimeBeforeInterceptors();
+
+    /**
+     * Appends index build info to builder.
+     */
+    void appendBuildInfo(BSONObjBuilder* builder) const;
 
     // Uniquely identifies this index build across replica set members.
     const UUID buildUUID;

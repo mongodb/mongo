@@ -411,6 +411,13 @@ public:
      */
     void waitUntilAnIndexBuildFinishes(OperationContext* opCtx);
 
+
+    /**
+     * Appends the current state information of the index build to the builder.
+     * Does nothing if build UUID does not refer to an active index build.
+     */
+    void appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const;
+
     //
     // Helper functions for creating indexes that do not have to be managed by the
     // IndexBuildsCoordinator.

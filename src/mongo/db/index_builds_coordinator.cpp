@@ -1695,6 +1695,11 @@ void IndexBuildsCoordinator::waitUntilAnIndexBuildFinishes(OperationContext* opC
     activeIndexBuilds.waitUntilAnIndexBuildFinishes(opCtx);
 }
 
+void IndexBuildsCoordinator::appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const {
+    _indexBuildsManager.appendBuildInfo(buildUUID, builder);
+    activeIndexBuilds.appendBuildInfo(buildUUID, builder);
+}
+
 void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
                                          UUID collectionUUID,
                                          const BSONObj& spec,

@@ -40,6 +40,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -114,9 +115,32 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
                     break;
                 case ListIndexesInclude::IndexBuildInfo:
                     if (inProgressInformationExists) {
-                        indexSpecs.push_back(BSON("spec"_sd
-                                                  << spec << "indexBuildInfo"_sd
-                                                  << BSON("buildUUID"_sd << *durableBuildUUID)));
+                        // Constructs a sub-document "indexBuildInfo" in the following
+                        // format with sample values:
+                        //
+                        // indexBuildInfo: {
+                        //     buildUUID: UUID("00836550-d10e-4ec8-84df-cb5166bc085b"),
+                        //     method: "Hybrid",
+                        //     phase: 1,
+                        //     phaseStr: "collection scan",
+                        //     opid: 654,
+                        //     resumable: true,
+                        //     replicationState: {
+                        //         state: "In progress"
+                        //     }
+                        // }
+                        //
+                        // The information here is gathered by querying the various index build
+                        // classes accessible through the IndexBuildCoordinator interface. The
+                        // example above is intended to provide a general idea of the information
+                        // gathered for an in-progress index build and is subject to change.
+
+                        BSONObjBuilder builder;
+                        durableBuildUUID->appendToBuilder(&builder, "buildUUID"_sd);
+                        IndexBuildsCoordinator::get(opCtx)->appendBuildInfo(*durableBuildUUID,
+                                                                            &builder);
+                        indexSpecs.push_back(
+                            BSON("spec"_sd << spec << "indexBuildInfo"_sd << builder.obj()));
                     } else {
                         indexSpecs.push_back(BSON("spec"_sd << spec));
                     }

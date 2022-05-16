@@ -208,6 +208,15 @@ size_t ActiveIndexBuilds::getActiveIndexBuilds() const {
     return _allIndexBuilds.size();
 }
 
+void ActiveIndexBuilds::appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const {
+    stdx::unique_lock<Latch> lk(_mutex);
+    auto it = _allIndexBuilds.find(buildUUID);
+    if (it == _allIndexBuilds.end()) {
+        return;
+    }
+    it->second->appendBuildInfo(builder);
+}
+
 void ActiveIndexBuilds::sleepIfNecessary_forTestOnly() const {
     stdx::unique_lock<Latch> lk(_mutex);
     while (_sleepForTest) {

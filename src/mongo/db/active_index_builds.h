@@ -101,6 +101,12 @@ public:
     size_t getActiveIndexBuilds() const;
 
     /**
+     * Provides passthrough access to ReplIndexBuildState for index build info.
+     * Does nothing if build UUID does not refer to an active index build.
+     */
+    void appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const;
+
+    /**
      * When _sleepForTest is true, this function will sleep for 100ms and then check the value
      * of _sleepForTest again.
      */
