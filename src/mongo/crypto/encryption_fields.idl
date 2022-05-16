@@ -40,7 +40,7 @@ enums:
 
 feature_flags:
     featureFlagFLE2:
-        description: "Enable FLE2 support"
+        description: "Enable Queryable Encryption support"
         cpp_varname: gFeatureFlagFLE2
         default: true
         version: 6.0

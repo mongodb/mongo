@@ -902,7 +902,8 @@ public:
     }
     void visit(const InternalSchemaBinDataFLE2EncryptedTypeExpression* expr) final {
         static constexpr auto kNotEncryptedReason = "value was not encrypted";
-        static constexpr auto kBadValueTypeReason = "FLE2 encrypted value has wrong type";
+        static constexpr auto kBadValueTypeReason =
+            "Queryable Encryption encrypted value has wrong type";
         static constexpr auto kInvertedReason = "value was encrypted";
 
         _context->pushNewFrame(*expr);

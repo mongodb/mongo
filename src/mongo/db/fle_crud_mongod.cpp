@@ -180,7 +180,7 @@ FLEBatchResult processFLEInsert(OperationContext* opCtx,
                 repl::ReplicationCoordinator::modeReplSet);
 
     uassert(5926101,
-            "FLE 2 is only supported when FCV supports 6.0",
+            "Queryable Encryption is only supported when FCV supports 6.0",
             gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility));
 
     auto [batchResult, insertReplyReturn] =
@@ -206,7 +206,7 @@ write_ops::DeleteCommandReply processFLEDelete(
                 repl::ReplicationCoordinator::modeReplSet);
 
     uassert(5926102,
-            "FLE 2 is only supported when FCV supports 6.0",
+            "Queryable Encryption is only supported when FCV supports 6.0",
             gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility));
 
     auto deleteReply = processDelete(opCtx, deleteRequest, &getTransactionWithRetriesForMongoD);
@@ -225,7 +225,7 @@ write_ops::FindAndModifyCommandReply processFLEFindAndModify(
                 repl::ReplicationCoordinator::modeReplSet);
 
     uassert(5926103,
-            "FLE 2 is only supported when FCV supports 6.0",
+            "Queryable Encryption is only supported when FCV supports 6.0",
             gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility));
 
     auto reply = processFindAndModifyRequest<write_ops::FindAndModifyCommandReply>(
@@ -243,7 +243,7 @@ write_ops::UpdateCommandReply processFLEUpdate(
                 repl::ReplicationCoordinator::modeReplSet);
 
     uassert(5926104,
-            "FLE 2 is only supported when FCV supports 6.0",
+            "Queryable Encryption is only supported when FCV supports 6.0",
             gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility));
 
     auto updateReply = processUpdate(opCtx, updateRequest, &getTransactionWithRetriesForMongoD);

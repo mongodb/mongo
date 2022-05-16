@@ -30,7 +30,7 @@ const valueNotEncryptedError = {
 };
 const wrongEncryptedTypeError = {
     operator: "fle2Encrypt",
-    reason: "FLE2 encrypted value has wrong type"
+    reason: "Queryable Encryption encrypted value has wrong type"
 };
 
 const userMalformedSchema = {
@@ -242,7 +242,7 @@ function negativeTests(coll, hasUserValidator, invert = false) {
     }),
                          {"a.b.c": valueNotEncryptedError});
 
-    jsTestLog("test inserting encrypted field with incorrect FLE2 subtype");
+    jsTestLog("test inserting encrypted field with incorrect Queryable Encryption subtype");
     assertExpectedResult(coll.insert({firstName: fle1RandomBinData}),
                          {firstName: wrongEncryptedTypeError});
     assertExpectedResult(coll.insert({
@@ -451,7 +451,7 @@ dbTest.test.drop();
 assert.commandFailed(dbTest.createCollection(
     "test", {encryptedFields: sampleEncryptedFields, validator: userMalformedSchema}));
 
-jsTestLog("test FLE1 schema validator on FLE2 collection");
+jsTestLog("test FLE1 schema validator on Queryable Encryption collection");
 dbTest.test.drop();
 assert.commandFailedWithCode(
     dbTest.createCollection("test",
