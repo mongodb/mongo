@@ -40,7 +40,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/executor_test_util.h"
-#include "mongo/util/thread_context.h"
 
 namespace mongo {
 namespace {

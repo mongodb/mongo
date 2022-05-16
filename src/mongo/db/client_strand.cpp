@@ -34,7 +34,6 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/thread_context.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

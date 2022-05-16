@@ -149,9 +149,7 @@ void setOSThreadName(const std::string& threadName) {
  * ThreadNameInfo is an auxiliary resource to the OS thread name, available to
  * the LOGV2 system and to GDB.
  *
- * ThreadNameInfo is a decoration of ThreadContext.
- * ThreadContext are held by thread_local storage and so threads started
- * after server initialization will have an associated ThreadNameInfo.
+ * ThreadNameInfo are per-thread and managed by thread_local storage.
  *
  * A name is "active" when it has been pushed to the OS by `setHandle`. The
  * association can be abandoned by calling `release`. This doesn't affect the

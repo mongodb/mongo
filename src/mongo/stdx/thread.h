@@ -40,7 +40,6 @@
 #include <type_traits>
 
 #include "mongo/stdx/exception.h"
-#include "mongo/util/thread_context.h"
 #include "mongo/util/thread_safety_context.h"
 
 #if defined(__linux__) || defined(__FreeBSD__)
@@ -191,7 +190,6 @@ public:
 #endif
                   ThreadSafetyContext::getThreadSafetyContext()->onThreadCreate();
                   auto sigAltStackGuard = sigAltStackController.makeInstallGuard();
-                  ThreadContext::get();  // Eagerly create ThreadContext
                   return std::apply(std::move(f), std::move(pack));
               }) {
     }
