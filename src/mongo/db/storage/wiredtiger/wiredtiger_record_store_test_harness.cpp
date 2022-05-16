@@ -40,7 +40,7 @@ std::string _testLoggingSettings(std::string extraStrings) {
 }
 }  // namespace
 
-WiredTigerHarnessHelper::WiredTigerHarnessHelper(StringData extraStrings)
+WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData extraStrings)
     : _dbpath("wt_test"),
       _lockerNoopClientObserverRegisterer(getServiceContext()),
       _engine(kWiredTigerEngineName,
@@ -54,7 +54,10 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(StringData extraStrings)
               false) {
     repl::ReplicationCoordinator::set(
         serviceContext(),
-        std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext(), repl::ReplSettings()));
+        options == Options::ReplicationEnabled
+            ? std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext())
+            : std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext(),
+                                                                 repl::ReplSettings()));
     _engine.notifyStartupComplete();
 }
 
@@ -160,8 +163,9 @@ std::unique_ptr<RecoveryUnit> WiredTigerHarnessHelper::newRecoveryUnit() {
     return std::unique_ptr<RecoveryUnit>(_engine.newRecoveryUnit());
 }
 
-std::unique_ptr<RecordStoreHarnessHelper> makeWTRSHarnessHelper() {
-    return std::make_unique<WiredTigerHarnessHelper>();
+std::unique_ptr<RecordStoreHarnessHelper> makeWTRSHarnessHelper(
+    RecordStoreHarnessHelper::Options options) {
+    return std::make_unique<WiredTigerHarnessHelper>(options);
 }
 
 MONGO_INITIALIZER(RegisterRecordStoreHarnessFactory)(InitializerContext* const) {

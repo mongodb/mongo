@@ -509,5 +509,54 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         ASSERT(!nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
     }
 }
+
+TEST(RecordStoreTestHarness, OplogVisibilityStandalone) {
+    std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(
+        newRecordStoreHarnessHelper(RecordStoreHarnessHelper::Options::Standalone));
+    std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
+
+    RecordId id1;
+
+    // insert a document
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            // We must have a "ts" field with a timestamp.
+            Timestamp ts(5, 1);
+            BSONObj obj = BSON("ts" << ts);
+            // However, the insert is not timestamped in standalone mode.
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp());
+            ASSERT_OK(res.getStatus());
+            id1 = res.getValue();
+            StatusWith<RecordId> expectedId = record_id_helpers::keyForOptime(ts);
+            ASSERT_OK(expectedId.getStatus());
+            // RecordId should be extracted from 'ts' field when inserting into oplog namespace
+            ASSERT(expectedId.getValue().compare(id1) == 0);
+
+            uow.commit();
+        }
+    }
+
+    // verify that we can read it
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto cursor = rs->getCursor(opCtx.get());
+        auto record = cursor->seekExact(id1);
+        ASSERT(record);
+        ASSERT_EQ(id1, record->id);
+        ASSERT(!cursor->next());
+    }
+
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto cursor = rs->getCursor(opCtx.get());
+        auto record = cursor->seekNear(RecordId(id1.getLong() + 1));
+        ASSERT(record);
+        ASSERT_EQ(id1, record->id);
+        ASSERT(!cursor->next());
+    }
+}
 }  // namespace
 }  // namespace mongo
