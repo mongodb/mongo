@@ -1002,7 +1002,11 @@ void MultiIndexBlock::setIndexBuildMethod(IndexBuildMethod indexBuildMethod) {
     _method = indexBuildMethod;
 }
 
-void MultiIndexBlock::appendBuildInfo(BSONObjBuilder* builder) const {}
+void MultiIndexBlock::appendBuildInfo(BSONObjBuilder* builder) const {
+    builder->append("method", toString(_method));
+    builder->append("phase", static_cast<int>(_phase));
+    builder->append("phaseStr", IndexBuildPhase_serializer(_phase));
+}
 
 void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
                                           const CollectionPtr& collection,

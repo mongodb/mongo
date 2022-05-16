@@ -51,6 +51,34 @@ function assertListIndexesOutputsMatch(
                 withBuildInfo[i].indexBuildInfo.hasOwnProperty('buildUUID'),
                 "Index expected to be in-progress building did not have indexBuildInfo.buildUUID: " +
                     tojson(withBuildInfo[i]));
+
+            // Index building, should have indexBuildInfo.method.
+            assert(
+                withBuildInfo[i].indexBuildInfo.hasOwnProperty('method'),
+                "Index expected to be in-progress building did not have indexBuildInfo.method: " +
+                    tojson(withBuildInfo[i]));
+            assert.eq(withBuildInfo[i].indexBuildInfo.method,
+                      'Hybrid',
+                      "Index expected to be in-progress is building with an unexpected method: " +
+                          tojson(withBuildInfo[i]));
+
+            // Index building, should have indexBuildInfo.phase.
+            assert(withBuildInfo[i].indexBuildInfo.hasOwnProperty('phase'),
+                   "Index expected to be in-progress building did not have indexBuildInfo.phase: " +
+                       tojson(withBuildInfo[i]));
+            assert.eq(withBuildInfo[i].indexBuildInfo.phase,
+                      1,
+                      "Index expected to be in-progress is building an unexpected phase: " +
+                          tojson(withBuildInfo[i]));
+
+            // Index building, should have indexBuildInfo.phaseStr.
+            assert(withBuildInfo[i].indexBuildInfo.hasOwnProperty('phaseStr'),
+                   "Index expected to be in-progress building did not have indexBuildInfo.Str: " +
+                       tojson(withBuildInfo[i]));
+            assert.eq(withBuildInfo[i].indexBuildInfo.phaseStr,
+                      'collection scan',
+                      "Index expected to be in-progress building unexpected phaseStr: " +
+                          tojson(withBuildInfo[i]));
         }
     }
 }
