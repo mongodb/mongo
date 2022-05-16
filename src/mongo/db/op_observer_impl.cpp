@@ -548,7 +548,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                             "namespace"_attr = nss,
                             "document"_attr = iter->doc);
 
-                operation.setFromMigrate(true);
+                operation.setFromMigrate_BackwardsCompatible(true);
             }
 
             txnParticipant.addTransactionOperation(opCtx, operation);
@@ -716,7 +716,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         }
         operation.setDestinedRecipient(
             shardingWriteRouter.getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
-        operation.setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
+        operation.setFromMigrateIfTrue_BackwardsCompatible(args.updateArgs->source ==
+                                                           OperationSource::kFromMigrate);
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         MutableOplogEntry oplogEntry;
@@ -858,7 +859,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     if (inBatchedWrite) {
         auto operation =
             MutableOplogEntry::makeDeleteOperation(nss, uuid, documentKey.getShardKeyAndId());
-        operation.setFromMigrateIfTrue(args.fromMigrate);
+        operation.setFromMigrateIfTrue_BackwardsCompatible(args.fromMigrate);
         batchedWriteContext.addBatchedOperation(opCtx, operation);
     } else if (inMultiDocumentTransaction) {
         const bool inRetryableInternalTransaction =
@@ -917,7 +918,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         }
 
         operation.setDestinedRecipient(destinedRecipientDecoration(opCtx));
-        operation.setFromMigrateIfTrue(args.fromMigrate);
+        operation.setFromMigrateIfTrue_BackwardsCompatible(args.fromMigrate);
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         MutableOplogEntry oplogEntry;

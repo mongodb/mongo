@@ -189,9 +189,29 @@ public:
         return variant_util::toVector<StmtId>(DurableReplOperation::getStatementIds());
     }
 
-    void setFromMigrateIfTrue(bool value) & {
-        if (value)
+    /**
+     * Sets the `fromMigrate` flag for the individual statement of the `applyOps` entry.
+     *
+     * During a replica set downgrade from 6.0 to 5.3, there is a window in which the primary node
+     * uses the 6.0 binary and secondaries still use the 5.3 binary. The latter are unable to parse
+     * the `fromMigrate` field, so they would assert. This function skips setting the `fromMigrate`
+     * flag to avoid compatibility problems.
+     */
+    void setFromMigrate_BackwardsCompatible(bool value) {
+        if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                multiversion::FeatureCompatibilityVersion::kVersion_6_0)) {
             setFromMigrate(value);
+        }
+    }
+
+    /**
+     * Same as `setFromMigrate_BackwardsCompatible` but set the `fromMigrate` flag only when the
+     * passed value is true.
+     */
+    void setFromMigrateIfTrue_BackwardsCompatible(bool value) {
+        if (value) {
+            setFromMigrate_BackwardsCompatible(true);
+        }
     }
 
 private:
