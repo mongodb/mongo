@@ -94,6 +94,7 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
+        opCtx->setAlwaysInterruptAtStepDownOrUp();
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
         auto nss = NamespaceString(parseNs(dbname, cmdObj));
@@ -109,7 +110,7 @@ public:
         // Ensure this shard is not currently receiving or donating any chunks.
         auto scopedReceiveChunk(
             uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerReceiveChunk(
-                opCtx, nss, chunkRange, cloneRequest.getFromShardId())));
+                opCtx, nss, chunkRange, cloneRequest.getFromShardId(), false)));
 
         // We force a refresh immediately after registering this migration to guarantee that this
         // shard will not receive a chunk after refreshing.

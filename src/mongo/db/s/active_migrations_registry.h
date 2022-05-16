@@ -96,12 +96,15 @@ public:
      * ScopedReceiveChunk will unregister the migration when the ScopedReceiveChunk goes out of
      * scope.
      *
-     * Otherwise returns a ConflictingOperationInProgress error.
+     * Otherwise returns a ConflictingOperationInProgress error if waitForOngoingMigrations is false
+     * or waits for the ongoing migration/split/merge to finish and then registers the migration if
+     * waitForOngoingMigrations is true.
      */
     StatusWith<ScopedReceiveChunk> registerReceiveChunk(OperationContext* opCtx,
                                                         const NamespaceString& nss,
                                                         const ChunkRange& chunkRange,
-                                                        const ShardId& fromShardId);
+                                                        const ShardId& fromShardId,
+                                                        bool waitForOngoingMigrations);
 
     /**
      * If there are no migrations running on this shard, registers an active split or merge

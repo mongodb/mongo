@@ -1311,10 +1311,15 @@ void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx) {
             const auto& nss = doc.getNss();
 
             // Register this receiveChunk on the ActiveMigrationsRegistry before completing step-up
-            // to prevent a new migration from starting while a receiveChunk was ongoing.
+            // to prevent a new migration from starting while a receiveChunk was ongoing. Wait for
+            // any migrations that began in a previous term to complete if there are any.
             auto scopedReceiveChunk(
                 uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerReceiveChunk(
-                    opCtx, nss, doc.getRange(), doc.getDonorShardIdForLoggingPurposesOnly())));
+                    opCtx,
+                    nss,
+                    doc.getRange(),
+                    doc.getDonorShardIdForLoggingPurposesOnly(),
+                    true /* waitForOngoingMigrations */)));
 
             const auto mdm = MigrationDestinationManager::get(opCtx);
             uassertStatusOK(

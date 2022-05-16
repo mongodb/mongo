@@ -236,7 +236,8 @@ TEST_F(MoveChunkRegistration, TestBlockingReceiveChunk) {
             _registry.registerReceiveChunk(opCtx.get(),
                                            NamespaceString("TestDB", "TestColl"),
                                            ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
-                                           ShardId("shard0001"));
+                                           ShardId("shard0001"),
+                                           false);
 
         ASSERT_OK(scopedReceiveChunk.getStatus());
 
@@ -330,7 +331,8 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileReceiveInProgress) {
             _registry.registerReceiveChunk(operationContext(),
                                            NamespaceString("TestDB", "TestColl"),
                                            ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
-                                           ShardId("shard0001"));
+                                           ShardId("shard0001"),
+                                           false);
         ASSERT_OK(scopedReceiveChunk.getStatus());
 
         // 3. Signal the registry locking thread that the registry is ready to be locked.

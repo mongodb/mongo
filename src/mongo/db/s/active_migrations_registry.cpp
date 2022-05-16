@@ -136,22 +136,29 @@ StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkRange& chunkRange,
-    const ShardId& fromShardId) {
+    const ShardId& fromShardId,
+    bool waitForOngoingMigrations) {
     stdx::unique_lock<Latch> ul(_mutex);
 
-    opCtx->waitForConditionOrInterrupt(
-        _chunkOperationsStateChangedCV, ul, [this] { return !_migrationsBlocked; });
+    if (waitForOngoingMigrations) {
+        opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [this] {
+            return !_migrationsBlocked && !_activeMoveChunkState && !_activeReceiveChunkState;
+        });
+    } else {
+        opCtx->waitForConditionOrInterrupt(
+            _chunkOperationsStateChangedCV, ul, [this] { return !_migrationsBlocked; });
 
-    if (_activeReceiveChunkState) {
-        return _activeReceiveChunkState->constructErrorStatus();
-    }
+        if (_activeReceiveChunkState) {
+            return _activeReceiveChunkState->constructErrorStatus();
+        }
 
-    if (_activeMoveChunkState) {
-        LOGV2(6386802,
-              "Rejecting receive chunk due to conflicting donate chunk in progress",
-              logAttrs(_activeMoveChunkState->args.getCommandParameter()),
-              "runningMigration"_attr = _activeMoveChunkState->args.toBSON({}));
-        return _activeMoveChunkState->constructErrorStatus();
+        if (_activeMoveChunkState) {
+            LOGV2(6386802,
+                  "Rejecting receive chunk due to conflicting donate chunk in progress",
+                  logAttrs(_activeMoveChunkState->args.getCommandParameter()),
+                  "runningMigration"_attr = _activeMoveChunkState->args.toBSON({}));
+            return _activeMoveChunkState->constructErrorStatus();
+        }
     }
 
     _activeReceiveChunkState.emplace(nss, chunkRange, fromShardId);
