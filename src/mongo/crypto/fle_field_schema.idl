@@ -134,7 +134,7 @@ structs:
             type: IDLAnyType
             cpp_name: value
           cm:
-            description: "FLE2 max contention counter"
+            description: "Queryable Encryption max contention counter"
             type: long
             cpp_name: maxContentionCounter
 
@@ -205,13 +205,13 @@ structs:
             type: bindata_generic
             cpp_name: eccDerivedToken
           cm:
-            description: "FLE2 max counter"
+            description: "Queryable Encryption max counter"
             type: long
             cpp_name: maxCounter
             optional: true
 
     EncryptionInformation:
-        description: "Implements Encryption Information which includes the schema for FLE 2 that is consumed by query_analysis, queries and write_ops"
+        description: "Implements Encryption Information which includes the schema for Queryable Encryption that is consumed by query_analysis, queries and write_ops"
         strict: true
         fields:
           type:
@@ -229,7 +229,7 @@ structs:
             type: object_owned
             unstable: true
           crudProcessed:
-            description: "A boolean to indicate whether the CRUD layer has already processed this FLE2 request. Used to prevent infinite recursion."
+            description: "A boolean to indicate whether the CRUD layer has already processed this Queryable Encryption request. Used to prevent infinite recursion."
             type: bool
             optional: true
             unstable: true

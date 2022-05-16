@@ -903,7 +903,7 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
         if (ep.getAlgorithm() == Fle2AlgorithmInt::kEquality) {
             uassert(6338602,
                     str::stream() << "Type '" << typeName(el.type())
-                                  << "' is not a valid type for FLE 2 encryption",
+                                  << "' is not a valid type for Queryable Encryption",
                     isFLE2EqualityIndexedSupportedType(el.type()));
 
             if (ep.getType() == Fle2PlaceholderType::kInsert) {
@@ -923,19 +923,21 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
                                    findpayload,
                                    builder);
             } else {
-                uasserted(6410100, "No other FLE2 placeholders supported at this time.");
+                uasserted(6410100,
+                          "No other Queryable Encryption placeholders supported at this time.");
             }
         } else if (ep.getAlgorithm() == Fle2AlgorithmInt::kUnindexed) {
             uassert(6379102,
                     str::stream() << "Type '" << typeName(el.type())
-                                  << "' is not a valid type for FLE 2 encryption",
+                                  << "' is not a valid type for Queryable Encryption",
                     isFLE2UnindexedSupportedType(el.type()));
 
             auto payload = FLE2UnindexedEncryptedValue::serialize(userKey, el);
             builder->appendBinData(
                 fieldNameToSerialize, payload.size(), BinDataType::Encrypt, payload.data());
         } else {
-            uasserted(6338603, "Only FLE 2 style encryption placeholders are supported");
+            uasserted(6338603,
+                      "Only Queryable Encryption style encryption placeholders are supported");
         }
 
 
@@ -954,7 +956,7 @@ void parseAndVerifyInsertUpdatePayload(std::vector<EDCServerPayloadInfo>* pField
 
     uassert(6373504,
             str::stream() << "Type '" << typeName(static_cast<BSONType>(iupayload.getType()))
-                          << "' is not a valid type for FLE 2 encryption",
+                          << "' is not a valid type for Queryable Encryption",
             isValidBSONType(iupayload.getType()) &&
                 isFLE2EqualityIndexedSupportedType(static_cast<BSONType>(iupayload.getType())));
 
@@ -1023,7 +1025,7 @@ void convertServerPayload(ConstDataRange cdr,
 
         uassert(6373506,
                 str::stream() << "Type '" << typeName(sp.bsonType)
-                              << "' is not a valid type for FLE 2 encryption",
+                              << "' is not a valid type for Queryable Encryption",
                 isFLE2EqualityIndexedSupportedType(sp.bsonType));
 
         auto swEncrypted =
@@ -1450,8 +1452,8 @@ void FLEClientCrypto::validateDocument(const BSONObj& doc,
 
     BSONElement safeContent = doc[kSafeContent];
 
-    // If there are no tags and no safeContent, then this document is not FLE 2 and is therefore
-    // fine
+    // If there are no tags and no safeContent, then this document is not Queryable Encryption and
+    // is therefore fine
     if (tags.size() == 0 && safeContent.eoo()) {
         return;
     }
@@ -1807,7 +1809,7 @@ FLE2IndexedEqualityEncryptedValue::FLE2IndexedEqualityEncryptedValue(
       indexKeyId(payload.getIndexKeyId()),
       clientEncryptedValue(vectorFromCDR(payload.getValue())) {
     uassert(6373508,
-            "Invalid BSON Type in FLE2InsertUpdatePayload",
+            "Invalid BSON Type in Queryable Encryption InsertUpdatePayload",
             isValidBSONType(payload.getType()));
 }
 
@@ -1856,7 +1858,7 @@ StatusWith<FLE2IndexedEqualityEncryptedValue> FLE2IndexedEqualityEncryptedValue:
     }
 
     uassert(6373509,
-            "Invalid BSON Type in FLE2InsertUpdatePayload",
+            "Invalid BSON Type in Queryable Encryption InsertUpdatePayload",
             isValidBSONType(swBsonType.getValue()));
 
     auto type = static_cast<BSONType>(swBsonType.getValue());
@@ -1964,7 +1966,9 @@ StatusWith<std::vector<uint8_t>> FLE2IndexedEqualityEncryptedValue::serialize(
 std::vector<uint8_t> FLE2UnindexedEncryptedValue::serialize(const FLEUserKeyAndId& userKey,
                                                             const BSONElement& element) {
     BSONType bsonType = element.type();
-    uassert(6379107, "Invalid BSON data type", isFLE2UnindexedSupportedType(bsonType));
+    uassert(6379107,
+            "Invalid BSON data type for Queryable Encryption",
+            isFLE2UnindexedSupportedType(bsonType));
 
     auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
     auto cdrKeyId = userKey.keyId.toCDR();
@@ -2000,7 +2004,9 @@ std::pair<BSONType, std::vector<uint8_t>> FLE2UnindexedEncryptedValue::deseriali
     auto userKey = keyVault->getUserKeyById(keyId);
 
     BSONType bsonType = static_cast<BSONType>(adc.read<uint8_t>());
-    uassert(6379111, "Invalid BSON data type", isFLE2UnindexedSupportedType(bsonType));
+    uassert(6379111,
+            "Invalid BSON data type for Queryable Encryption",
+            isFLE2UnindexedSupportedType(bsonType));
 
     auto data = uassertStatusOK(
         decryptDataWithAssociatedData(userKey.key.toCDR(), assocDataCdr, cipherTextCdr));

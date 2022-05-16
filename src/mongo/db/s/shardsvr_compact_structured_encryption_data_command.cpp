@@ -79,7 +79,7 @@ public:
         Reply typedRun(OperationContext* opCtx) {
             // TODO (SERVER-65077): Remove FCV check once 6.0 is released
             uassert(6350499,
-                    "FLE 2 is only supported when FCV supports 6.0",
+                    "Queryable Encryption is only supported when FCV supports 6.0",
                     gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility));
             FixedFCVRegion fixedFcvRegion(opCtx);
 

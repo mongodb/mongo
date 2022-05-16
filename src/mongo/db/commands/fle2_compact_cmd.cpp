@@ -91,7 +91,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
 
     // TODO (SERVER-65077): Remove FCV check once 6.0 is released
     uassert(6319903,
-            "FLE 2 is only supported when FCV supports 6.0",
+            "Queryable Encryption is only supported when FCV supports 6.0",
             gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility));
 
     validateCompactRequest(request, *edc.get());

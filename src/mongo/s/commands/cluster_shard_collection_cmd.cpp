@@ -93,7 +93,7 @@ public:
                 !nss.isTimeseriesBucketsCollection());
 
         uassert(6464401,
-                "Sharding a FLE 2 state collection is not allowed",
+                "Sharding a Queryable Encryption state collection is not allowed",
                 !nss.isFLE2StateCollection());
 
         auto shardCollRequest =

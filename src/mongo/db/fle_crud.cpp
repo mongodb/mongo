@@ -192,7 +192,9 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
 
     auto documents = insertRequest.getDocuments();
     // TODO - how to check if a document will be too large???
-    uassert(6371202, "Only single insert batches are supported in FLE2", documents.size() == 1);
+    uassert(6371202,
+            "Only single insert batches are supported in Queryable Encryption",
+            documents.size() == 1);
 
     auto document = documents[0];
     EDCServerCollection::validateEncryptedFieldInfo(document, efc);
@@ -243,7 +245,8 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
             // does not try to commit the transaction.
             if (reply->getWriteErrors().has_value() && !reply->getWriteErrors().value().empty()) {
                 return SemiFuture<void>::makeReady(
-                    Status(ErrorCodes::FLETransactionAbort, "FLE2 write errors on insert"));
+                    Status(ErrorCodes::FLETransactionAbort,
+                           "Queryable Encryption write errors on insert"));
             }
 
             return SemiFuture<void>::makeReady();
@@ -322,7 +325,8 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
             // does not try to commit the transaction.
             if (reply->getWriteErrors().has_value() && !reply->getWriteErrors().value().empty()) {
                 return SemiFuture<void>::makeReady(
-                    Status(ErrorCodes::FLETransactionAbort, "FLE2 write errors on delete"));
+                    Status(ErrorCodes::FLETransactionAbort,
+                           "Queryable Encryption write errors on delete"));
             }
 
             return SemiFuture<void>::makeReady();
@@ -406,7 +410,8 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
             // does not try to commit the transaction.
             if (reply->getWriteErrors().has_value() && !reply->getWriteErrors().value().empty()) {
                 return SemiFuture<void>::makeReady(
-                    Status(ErrorCodes::FLETransactionAbort, "FLE2 write errors on delete"));
+                    Status(ErrorCodes::FLETransactionAbort,
+                           "Queryable Encryption write errors on delete"));
             }
 
             return SemiFuture<void>::makeReady();
@@ -887,7 +892,7 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
 
     // TODO (SERVER-65077): Remove FCV check once 6.0 is released
     uassert(6371209,
-            "FLE 2 is only supported when FCV supports 6.0",
+            "Queryable Encryption is only supported when FCV supports 6.0",
             gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility));
 
     if (request.getBatchType() == BatchedCommandRequest::BatchType_Insert) {
@@ -1145,7 +1150,7 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
 
     // TODO (SERVER-65077): Remove FCV check once 6.0 is released
     if (!gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility)) {
-        uasserted(6371405, "FLE 2 is only supported when FCV supports 6.0");
+        uasserted(6371405, "Queryable Encryption is only supported when FCV supports 6.0");
     }
 
     // FLE2 Mongos CRUD operations loopback through MongoS with EncryptionInformation as
