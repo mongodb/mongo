@@ -330,7 +330,6 @@ const allCommands = {
     rotateCertificates: {skip: isNotAUserDataRead},
     saslContinue: {skip: isPrimaryOnly},
     saslStart: {skip: isPrimaryOnly},
-    sbe: {skip: isAnInternalCommand},
     serverStatus: {skip: isNotAUserDataRead},
     setAuditConfig: {skip: isNotAUserDataRead},
     setChangeStreamOptions: {skip: isPrimaryOnly},  // TODO SERVER-65353 remove in 6.1.
