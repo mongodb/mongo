@@ -61,6 +61,7 @@ const std::string POPULATE_CONFIG = "populate_config";
 const std::string POSTRUN_STATISTICS = "postrun";
 const std::string READ_OP_CONFIG = "read_config";
 const std::string REMOVE_OP_CONFIG = "remove_config";
+const std::string REVERSE_COLLATOR = "reverse_collator";
 const std::string RUNTIME_STATISTICS = "runtime";
 const std::string SAVE = "save";
 const std::string STABLE_LAG = "stable_lag";

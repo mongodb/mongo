@@ -173,15 +173,7 @@ class search_near_02 : public test_harness::test {
 
             auto &cursor_prefix = cursors[coll.id];
 
-            /*
-             * Pick a random timestamp between the oldest and now. Get rid of the last 32 bits as
-             * they represent an increment for uniqueness.
-             */
-            wt_timestamp_t ts = random_generator::instance().generate_integer(
-              (tc->tsm->get_oldest_ts() >> 32), (tc->tsm->get_next_ts() >> 32));
-            /* Put back the timestamp in the correct format. */
-            ts <<= 32;
-
+            wt_timestamp_t ts = tc->tsm->get_random_ts();
             /*
              * The oldest timestamp might move ahead and the reading timestamp might become invalid.
              * To tackle this issue, we round the timestamp to the oldest timestamp value.
@@ -251,7 +243,7 @@ class search_near_02 : public test_harness::test {
             /* Both calls are successful. */
             if (ret_prefix == 0)
                 validate_successful_calls(
-                  ret_prefix, exact_prefix, key_prefix, cursor_default, exact_default, prefix);
+                  exact_prefix, key_prefix, cursor_default, exact_default, prefix);
             /* The prefix search near call failed. */
             else
                 validate_unsuccessful_prefix_call(cursor_default, prefix, exact_default);
@@ -271,7 +263,7 @@ class search_near_02 : public test_harness::test {
      * key that is lexicographically greater than the prefix but still contains the prefix.
      */
     void
-    validate_successful_calls(int ret_prefix, int exact_prefix, const std::string &key_prefix,
+    validate_successful_calls(int exact_prefix, const std::string &key_prefix,
       scoped_cursor &cursor_default, int exact_default, const std::string &prefix)
     {
         const char *k;

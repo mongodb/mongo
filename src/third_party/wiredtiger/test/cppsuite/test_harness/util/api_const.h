@@ -64,6 +64,7 @@ extern const std::string POPULATE_CONFIG;
 extern const std::string POSTRUN_STATISTICS;
 extern const std::string READ_OP_CONFIG;
 extern const std::string REMOVE_OP_CONFIG;
+extern const std::string REVERSE_COLLATOR;
 extern const std::string RUNTIME_STATISTICS;
 extern const std::string SAVE;
 extern const std::string STABLE_LAG;
@@ -95,8 +96,13 @@ extern const std::string STATISTICS_LOG;
 #ifndef EXTSUBPATH
 #define EXTSUBPATH ".libs/"
 #endif
+
+/* Use reverse collator to test changes that deal different table sorting orders. */
+#define REVERSE_COL_CFG "collator=reverse"
+
 #define SNAPPY_PATH EXTPATH "compressors/snappy/" EXTSUBPATH "libwiredtiger_snappy.so"
-#define SNAPPY_EXT ",extensions=(" SNAPPY_PATH ")"
+#define REVERSE_COLLATOR_PATH \
+    EXTPATH "collators/reverse/" EXTSUBPATH "libwiredtiger_reverse_collator.so"
 
 /* Test harness consts. */
 extern const std::string DEFAULT_FRAMEWORK_SCHEMA;

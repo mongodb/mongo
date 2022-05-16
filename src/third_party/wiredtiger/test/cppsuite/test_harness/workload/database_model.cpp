@@ -147,10 +147,10 @@ database::set_workload_tracking(workload_tracking *tracking)
 }
 
 void
-database::set_create_config(bool use_compression)
+database::set_create_config(bool use_compression, bool use_reverse_collator)
 {
-    _collection_create_config = use_compression ?
-      DEFAULT_FRAMEWORK_SCHEMA + std::string(SNAPPY_BLK) :
-      DEFAULT_FRAMEWORK_SCHEMA;
+    _collection_create_config = DEFAULT_FRAMEWORK_SCHEMA;
+    _collection_create_config += use_compression ? std::string(SNAPPY_BLK) + "," : "";
+    _collection_create_config += use_reverse_collator ? std::string(REVERSE_COL_CFG) + "," : "";
 }
 } // namespace test_harness
