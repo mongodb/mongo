@@ -40,8 +40,11 @@ class test_tiered07(wttest.WiredTigerTestCase, TieredConfigMixin):
     # is interpreting a directory to end in a '/', whereas the code in the tiered storage doesn't 
     # expect that. Enable when fixed.
     # Make scenarios for different cloud service providers
+    flush_obj = [('ckpt', dict(first_ckpt=True)),
+                 ('no_ckpt', dict(first_ckpt=False)),
+                ]
     tiered_storage_dirstore_source = storage_sources[:1]
-    scenarios = make_scenarios(tiered_storage_dirstore_source)
+    scenarios = make_scenarios(flush_obj, tiered_storage_dirstore_source)
 
     uri = "table:abc"
     uri2 = "table:ab"
@@ -94,9 +97,12 @@ class test_tiered07(wttest.WiredTigerTestCase, TieredConfigMixin):
         c = self.session.open_cursor(self.localuri)
         c["0"] = "0"
         c.close()
-        self.session.checkpoint()
+        if (self.first_ckpt):
+            self.session.checkpoint()
         self.pr('After data, call flush_tier')
         self.session.flush_tier(None)
+        if (not self.first_ckpt):
+            self.session.checkpoint()
 
         # Drop table.
         self.pr('call drop')
@@ -110,6 +116,7 @@ class test_tiered07(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.assertFalse(os.path.isfile("abc-0000000002.wtobj"))
 
         # Dropping a table using the force setting should succeed even if the table does not exist.
+        self.pr('drop with force')
         self.session.drop(self.localuri, 'force=true')
         self.session.drop(self.uri, 'force=true')
 
@@ -122,10 +129,17 @@ class test_tiered07(wttest.WiredTigerTestCase, TieredConfigMixin):
             lambda: self.session.drop("table:random_non_existent", None))
 
         # Create new table with same name. This should error.
-        msg = "/already exists/"
-        self.pr('check cannot create with same name')
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.create(self.uri, 'key_format=S'), 0), msg)
+        self.session.create(self.newuri, 'key_format=S')
+
+        # If we didn't do a checkpoint before the flush_tier then creating with the same name
+        # will succeed because no bucket objects were created. 
+        if (self.first_ckpt):
+            msg = "/already exists/"
+            self.pr('check cannot create with same name')
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda:self.assertEquals(self.session.create(self.uri, 'key_format=S'), 0), msg)
+        else:
+            self.session.create(self.uri, 'key_format=S')
 
         # Make sure there was no problem with overlapping table names.
         self.pr('check original similarly named tables')
