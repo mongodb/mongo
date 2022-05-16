@@ -40,7 +40,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
-
 namespace mongo {
 namespace {
 
@@ -147,103 +146,120 @@ void testComputeSBEKey(const char* queryStr,
 TEST(CanonicalQueryEncoderTest, ComputeKey) {
     // Generated cache keys should be treated as opaque to the user.
 
+    // The computed key depends on which execution engine is enabled. As such, we disable SBE for
+    // this test so that the test doesn't break should the default value of
+    // 'internalQueryEnableSlotBasedExecutionEngine' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE(
+        "internalQueryEnableSlotBasedExecutionEngine", false);
+
     // No sorts
-    testComputeKey("{}", "{}", "{}", "an@t");
-    testComputeKey("{$or: [{a: 1}, {b: 2}]}", "{}", "{}", "or[eqa,eqb]@t");
+    testComputeKey("{}", "{}", "{}", "an@f");
+    testComputeKey("{$or: [{a: 1}, {b: 2}]}", "{}", "{}", "or[eqa,eqb]@f");
     testComputeKey(
-        "{$or: [{a: 1}, {b: 1}, {c: 1}], d: 1}", "{}", "{}", "an[or[eqa,eqb,eqc],eqd]@t");
-    testComputeKey("{$or: [{a: 1}, {b: 1}], c: 1, d: 1}", "{}", "{}", "an[or[eqa,eqb],eqc,eqd]@t");
-    testComputeKey("{a: 1, b: 1, c: 1}", "{}", "{}", "an[eqa,eqb,eqc]@t");
-    testComputeKey("{a: 1, beqc: 1}", "{}", "{}", "an[eqa,eqbeqc]@t");
-    testComputeKey("{ap1a: 1}", "{}", "{}", "eqap1a@t");
-    testComputeKey("{aab: 1}", "{}", "{}", "eqaab@t");
+        "{$or: [{a: 1}, {b: 1}, {c: 1}], d: 1}", "{}", "{}", "an[or[eqa,eqb,eqc],eqd]@f");
+    testComputeKey("{$or: [{a: 1}, {b: 1}], c: 1, d: 1}", "{}", "{}", "an[or[eqa,eqb],eqc,eqd]@f");
+    testComputeKey("{a: 1, b: 1, c: 1}", "{}", "{}", "an[eqa,eqb,eqc]@f");
+    testComputeKey("{a: 1, beqc: 1}", "{}", "{}", "an[eqa,eqbeqc]@f");
+    testComputeKey("{ap1a: 1}", "{}", "{}", "eqap1a@f");
+    testComputeKey("{aab: 1}", "{}", "{}", "eqaab@f");
 
     // With sort
-    testComputeKey("{}", "{a: 1}", "{}", "an~aa@t");
-    testComputeKey("{}", "{a: -1}", "{}", "an~da@t");
+    testComputeKey("{}", "{a: 1}", "{}", "an~aa@f");
+    testComputeKey("{}", "{a: -1}", "{}", "an~da@f");
     testComputeKey("{$text: {$search: 'search keywords'}}",
                    "{a: {$meta: 'textScore'}}",
                    "{a: {$meta: 'textScore'}}",
-                   "te_fts~ta@t");
-    testComputeKey("{a: 1}", "{b: 1}", "{}", "eqa~ab@t");
+                   "te_fts~ta@f");
+    testComputeKey("{a: 1}", "{b: 1}", "{}", "eqa~ab@f");
 
     // With projection
-    testComputeKey("{}", "{}", "{a: 1}", "an|_id-a@t");
-    testComputeKey("{}", "{}", "{a: -1}", "an|_id-a@t");
-    testComputeKey("{}", "{}", "{a: -1.0}", "an|_id-a@t");
-    testComputeKey("{}", "{}", "{a: true}", "an|_id-a@t");
-    testComputeKey("{}", "{}", "{a: 0}", "an@t");
-    testComputeKey("{}", "{}", "{a: false}", "an@t");
-    testComputeKey("{}", "{}", "{a: 99}", "an|_id-a@t");
-    testComputeKey("{}", "{}", "{a: 'foo'}", "an|_id@t");
+    testComputeKey("{}", "{}", "{a: 1}", "an|_id-a@f");
+    testComputeKey("{}", "{}", "{a: -1}", "an|_id-a@f");
+    testComputeKey("{}", "{}", "{a: -1.0}", "an|_id-a@f");
+    testComputeKey("{}", "{}", "{a: true}", "an|_id-a@f");
+    testComputeKey("{}", "{}", "{a: 0}", "an@f");
+    testComputeKey("{}", "{}", "{a: false}", "an@f");
+    testComputeKey("{}", "{}", "{a: 99}", "an|_id-a@f");
+    testComputeKey("{}", "{}", "{a: 'foo'}", "an|_id@f");
 
     // $slice defaults to exclusion.
-    testComputeKey("{}", "{}", "{a: {$slice: [3, 5]}}", "an@t");
-    testComputeKey("{}", "{}", "{a: {$slice: [3, 5]}, b: 0}", "an@t");
+    testComputeKey("{}", "{}", "{a: {$slice: [3, 5]}}", "an@f");
+    testComputeKey("{}", "{}", "{a: {$slice: [3, 5]}, b: 0}", "an@f");
 
     // But even when using $slice in an inclusion, the entire document is needed.
-    testComputeKey("{}", "{}", "{a: {$slice: [3, 5]}, b: 1}", "an@t");
+    testComputeKey("{}", "{}", "{a: {$slice: [3, 5]}, b: 1}", "an@f");
 
-    testComputeKey("{}", "{}", "{a: {$elemMatch: {x: 2}}}", "an@t");
-    testComputeKey("{}", "{}", "{a: {$elemMatch: {x: 2}}, b: 0}", "an@t");
-    testComputeKey("{}", "{}", "{a: {$elemMatch: {x: 2}}, b: 1}", "an@t");
+    testComputeKey("{}", "{}", "{a: {$elemMatch: {x: 2}}}", "an@f");
+    testComputeKey("{}", "{}", "{a: {$elemMatch: {x: 2}}, b: 0}", "an@f");
+    testComputeKey("{}", "{}", "{a: {$elemMatch: {x: 2}}, b: 1}", "an@f");
 
-    testComputeKey("{}", "{}", "{a: {$slice: [3, 5]}, b: {$elemMatch: {x: 2}}}", "an@t");
+    testComputeKey("{}", "{}", "{a: {$slice: [3, 5]}, b: {$elemMatch: {x: 2}}}", "an@f");
 
-    testComputeKey("{}", "{}", "{a: ObjectId('507f191e810c19729de860ea')}", "an|_id@t");
+    testComputeKey("{}", "{}", "{a: ObjectId('507f191e810c19729de860ea')}", "an|_id@f");
     // Since this projection overwrites the entire document, no fields are required.
     testComputeKey(
-        "{}", "{}", "{_id: 0, a: ObjectId('507f191e810c19729de860ea'), b: 'foo'}", "an|@t");
-    testComputeKey("{a: 1}", "{}", "{'a.$': 1}", "eqa@t");
-    testComputeKey("{a: 1}", "{}", "{a: 1}", "eqa|_id-a@t");
+        "{}", "{}", "{_id: 0, a: ObjectId('507f191e810c19729de860ea'), b: 'foo'}", "an|@f");
+    testComputeKey("{a: 1}", "{}", "{'a.$': 1}", "eqa@f");
+    testComputeKey("{a: 1}", "{}", "{a: 1}", "eqa|_id-a@f");
 
     // Projection should be order-insensitive
-    testComputeKey("{}", "{}", "{a: 1, b: 1}", "an|_id-a-b@t");
-    testComputeKey("{}", "{}", "{b: 1, a: 1}", "an|_id-a-b@t");
+    testComputeKey("{}", "{}", "{a: 1, b: 1}", "an|_id-a-b@f");
+    testComputeKey("{}", "{}", "{b: 1, a: 1}", "an|_id-a-b@f");
 
     // And should escape the separation character.
-    testComputeKey("{}", "{}", "{'b-1': 1, 'a-2': 1}", "an|_id-a\\-2-b\\-1@t");
+    testComputeKey("{}", "{}", "{'b-1': 1, 'a-2': 1}", "an|_id-a\\-2-b\\-1@f");
 
     // And should exclude $-prefixed fields which can be added internally.
-    testComputeKey("{}", "{x: 1}", "{$sortKey: {$meta: 'sortKey'}}", "an~ax@t");
-    testComputeKey("{}", "{}", "{}", "an@t");
+    testComputeKey("{}", "{x: 1}", "{$sortKey: {$meta: 'sortKey'}}", "an~ax@f");
+    testComputeKey("{}", "{}", "{}", "an@f");
 
-    testComputeKey("{}", "{x: 1}", "{a: 1, $sortKey: {$meta: 'sortKey'}}", "an~ax|_id-a@t");
-    testComputeKey("{}", "{}", "{a: 1}", "an|_id-a@t");
+    testComputeKey("{}", "{x: 1}", "{a: 1, $sortKey: {$meta: 'sortKey'}}", "an~ax|_id-a@f");
+    testComputeKey("{}", "{}", "{a: 1}", "an|_id-a@f");
 
     // With or-elimination and projection
-    testComputeKey("{$or: [{a: 1}]}", "{}", "{_id: 0, a: 1}", "eqa|a@t");
-    testComputeKey("{$or: [{a: 1}]}", "{}", "{'a.$': 1}", "eqa@t");
+    testComputeKey("{$or: [{a: 1}]}", "{}", "{_id: 0, a: 1}", "eqa|a@f");
+    testComputeKey("{$or: [{a: 1}]}", "{}", "{'a.$': 1}", "eqa@f");
 }
 
 TEST(CanonicalQueryEncoderTest, EncodeNotEqualNullPredicates) {
+    // The computed key depends on which execution engine is enabled. As such, we disable SBE for
+    // this test so that the test doesn't break should the default value of
+    // 'internalQueryEnableSlotBasedExecutionEngine' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE(
+        "internalQueryEnableSlotBasedExecutionEngine", false);
+
     // With '$eq', '$gte', and '$lte' negation comparison to 'null'.
-    testComputeKey("{a: {$not: {$eq: null}}}", "{}", "{_id: 0, a: 1}", "ntnot_eq_null[eqa]|a@t");
+    testComputeKey("{a: {$not: {$eq: null}}}", "{}", "{_id: 0, a: 1}", "ntnot_eq_null[eqa]|a@f");
     testComputeKey(
-        "{a: {$not: {$eq: null}}}", "{a: 1}", "{_id: 0, a: 1}", "ntnot_eq_null[eqa]~aa|a@t");
+        "{a: {$not: {$eq: null}}}", "{a: 1}", "{_id: 0, a: 1}", "ntnot_eq_null[eqa]~aa|a@f");
     testComputeKey(
-        "{a: {$not: {$gte: null}}}", "{a: 1}", "{_id: 0, a: 1}", "ntnot_eq_null[gea]~aa|a@t");
+        "{a: {$not: {$gte: null}}}", "{a: 1}", "{_id: 0, a: 1}", "ntnot_eq_null[gea]~aa|a@f");
     testComputeKey(
-        "{a: {$not: {$lte: null}}}", "{a: 1}", "{_id: 0, a: 1}", "ntnot_eq_null[lea]~aa|a@t");
+        "{a: {$not: {$lte: null}}}", "{a: 1}", "{_id: 0, a: 1}", "ntnot_eq_null[lea]~aa|a@f");
 
     // Same '$eq' negation query with non-'null' argument should have different key.
-    testComputeKey("{a: {$not: {$eq: true}}}", "{a: 1}", "{_id: 0, a: 1}", "nt[eqa]~aa|a@t");
+    testComputeKey("{a: {$not: {$eq: true}}}", "{a: 1}", "{_id: 0, a: 1}", "nt[eqa]~aa|a@f");
 }
 
 // Delimiters found in user field names or non-standard projection field values
 // must be escaped.
 TEST(CanonicalQueryEncoderTest, ComputeKeyEscaped) {
+    // The computed key depends on which execution engine is enabled. As such, we disable SBE for
+    // this test so that the test doesn't break should the default value of
+    // 'internalQueryEnableSlotBasedExecutionEngine' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE(
+        "internalQueryEnableSlotBasedExecutionEngine", false);
     // Field name in query.
-    testComputeKey("{'a,[]~|-<>': 1}", "{}", "{}", "eqa\\,\\[\\]\\~\\|\\-<>@t");
+    testComputeKey("{'a,[]~|-<>': 1}", "{}", "{}", "eqa\\,\\[\\]\\~\\|\\-<>@f");
 
     // Field name in sort.
-    testComputeKey("{}", "{'a,[]~|-<>': 1}", "{}", "an~aa\\,\\[\\]\\~\\|\\-<>@t");
+    testComputeKey("{}", "{'a,[]~|-<>': 1}", "{}", "an~aa\\,\\[\\]\\~\\|\\-<>@f");
 
     // Field name in projection.
-    testComputeKey("{}", "{}", "{'a,[]~|-<>': 1}", "an|_id-a\\,\\[\\]\\~\\|\\-<>@t");
+    testComputeKey("{}", "{}", "{'a,[]~|-<>': 1}", "an|_id-a\\,\\[\\]\\~\\|\\-<>@f");
 
     // String literal provided as value.
-    testComputeKey("{}", "{}", "{a: 'foo,[]~|-<>'}", "an|_id@t");
+    testComputeKey("{}", "{}", "{a: 'foo,[]~|-<>'}", "an|_id@f");
 }
 
 // Cache keys for $geoWithin queries with legacy and GeoJSON coordinates should
@@ -266,17 +282,27 @@ TEST(CanonicalQueryEncoderTest, ComputeKeyGeoWithin) {
 // GEO_NEAR cache keys should include information on geometry and CRS in addition
 // to the match type and field name.
 TEST(CanonicalQueryEncoderTest, ComputeKeyGeoNear) {
-    testComputeKey("{a: {$near: [0,0], $maxDistance:0.3 }}", "{}", "{}", "gnanrfl@t");
-    testComputeKey("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}", "{}", "{}", "gnanssp@t");
+    // The computed key depends on which execution engine is enabled. As such, we disable SBE for
+    // this test so that the test doesn't break should the default value of
+    // 'internalQueryEnableSlotBasedExecutionEngine' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE(
+        "internalQueryEnableSlotBasedExecutionEngine", false);
+
+    testComputeKey("{a: {$near: [0,0], $maxDistance:0.3 }}", "{}", "{}", "gnanrfl@f");
+    testComputeKey("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}", "{}", "{}", "gnanssp@f");
     testComputeKey(
         "{a: {$geoNear: {$geometry: {type: 'Point', coordinates: [0,0]},"
         "$maxDistance:100}}}",
         "{}",
         "{}",
-        "gnanrsp@t");
+        "gnanrsp@f");
 }
 
 TEST(CanonicalQueryEncoderTest, ComputeKeyRegexDependsOnFlags) {
+    // The computed key depends on which execution engine is enabled. As such, we enable SBE for
+    // this test in order to ensure that we have coverage for both SBE and the classic engine.
+    RAIIServerParameterControllerForTest controllerSBE(
+        "internalQueryEnableSlotBasedExecutionEngine", true);
     testComputeKey("{a: {$regex: \"sometext\"}}", "{}", "{}", "rea@t");
     testComputeKey("{a: {$regex: \"sometext\", $options: \"\"}}", "{}", "{}", "rea@t");
 
@@ -307,60 +333,75 @@ TEST(CanonicalQueryEncoderTest, ComputeKeyRegexDependsOnFlags) {
 }
 
 TEST(CanonicalQueryEncoderTest, ComputeKeyMatchInDependsOnPresenceOfRegexAndFlags) {
+    // The computed key depends on which execution engine is enabled. As such, we disable SBE for
+    // this test so that the test doesn't break should the default value of
+    // 'internalQueryEnableSlotBasedExecutionEngine' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE(
+        "internalQueryEnableSlotBasedExecutionEngine", false);
+
     // Test that an $in containing a single regex is unwrapped to $regex.
-    testComputeKey("{a: {$in: [/foo/]}}", "{}", "{}", "rea@t");
-    testComputeKey("{a: {$in: [/foo/i]}}", "{}", "{}", "rea/i/@t");
+    testComputeKey("{a: {$in: [/foo/]}}", "{}", "{}", "rea@f");
+    testComputeKey("{a: {$in: [/foo/i]}}", "{}", "{}", "rea/i/@f");
 
     // Test that an $in with no regexes does not include any regex information.
-    testComputeKey("{a: {$in: [1, 'foo']}}", "{}", "{}", "ina@t");
+    testComputeKey("{a: {$in: [1, 'foo']}}", "{}", "{}", "ina@f");
 
     // Test that an $in with a regex encodes the presence of the regex.
-    testComputeKey("{a: {$in: [1, /foo/]}}", "{}", "{}", "ina_re@t");
+    testComputeKey("{a: {$in: [1, /foo/]}}", "{}", "{}", "ina_re@f");
 
     // Test that an $in with a regex encodes the presence of the regex and its flags.
-    testComputeKey("{a: {$in: [1, /foo/is]}}", "{}", "{}", "ina_re/is/@t");
+    testComputeKey("{a: {$in: [1, /foo/is]}}", "{}", "{}", "ina_re/is/@f");
 
     // Test that the computed key is invariant to the order of the flags within each regex.
-    testComputeKey("{a: {$in: [1, /foo/si]}}", "{}", "{}", "ina_re/is/@t");
+    testComputeKey("{a: {$in: [1, /foo/si]}}", "{}", "{}", "ina_re/is/@f");
 
     // Test that an $in with multiple regexes encodes all unique flags.
-    testComputeKey("{a: {$in: [1, /foo/i, /bar/m, /baz/s]}}", "{}", "{}", "ina_re/ims/@t");
+    testComputeKey("{a: {$in: [1, /foo/i, /bar/m, /baz/s]}}", "{}", "{}", "ina_re/ims/@f");
 
     // Test that an $in with multiple regexes deduplicates identical flags.
     testComputeKey(
-        "{a: {$in: [1, /foo/i, /bar/m, /baz/s, /qux/i, /quux/s]}}", "{}", "{}", "ina_re/ims/@t");
+        "{a: {$in: [1, /foo/i, /bar/m, /baz/s, /qux/i, /quux/s]}}", "{}", "{}", "ina_re/ims/@f");
 
     // Test that the computed key is invariant to the ordering of the flags across regexes.
     testComputeKey("{a: {$in: [1, /foo/ism, /bar/msi, /baz/im, /qux/si, /quux/im]}}",
                    "{}",
                    "{}",
-                   "ina_re/ims/@t");
+                   "ina_re/ims/@f");
     testComputeKey("{a: {$in: [1, /foo/msi, /bar/ism, /baz/is, /qux/mi, /quux/im]}}",
                    "{}",
                    "{}",
-                   "ina_re/ims/@t");
+                   "ina_re/ims/@f");
 
     // Test that $not-$in-$regex similarly records the presence and flags of any regexes.
-    testComputeKey("{a: {$not: {$in: [1, 'foo']}}}", "{}", "{}", "nt[ina]@t");
-    testComputeKey("{a: {$not: {$in: [1, /foo/]}}}", "{}", "{}", "nt[ina_re]@t");
+    testComputeKey("{a: {$not: {$in: [1, 'foo']}}}", "{}", "{}", "nt[ina]@f");
+    testComputeKey("{a: {$not: {$in: [1, /foo/]}}}", "{}", "{}", "nt[ina_re]@f");
     testComputeKey(
-        "{a: {$not: {$in: [1, /foo/i, /bar/i, /baz/msi]}}}", "{}", "{}", "nt[ina_re/ims/]@t");
+        "{a: {$not: {$in: [1, /foo/i, /bar/i, /baz/msi]}}}", "{}", "{}", "nt[ina_re/ims/]@f");
 
     // Test that a $not-$in containing a single regex is unwrapped to $not-$regex.
-    testComputeKey("{a: {$not: {$in: [/foo/]}}}", "{}", "{}", "nt[rea]@t");
-    testComputeKey("{a: {$not: {$in: [/foo/i]}}}", "{}", "{}", "nt[rea/i/]@t");
+    testComputeKey("{a: {$not: {$in: [/foo/]}}}", "{}", "{}", "nt[rea]@f");
+    testComputeKey("{a: {$not: {$in: [/foo/i]}}}", "{}", "{}", "nt[rea/i/]@f");
 }
 
 TEST(CanonicalQueryEncoderTest, CheckCollationIsEncoded) {
+    // The computed key depends on which execution engine is enabled. As such, we disable SBE for
+    // this test so that the test doesn't break should the default value of
+    // 'internalQueryEnableSlotBasedExecutionEngine' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE(
+        "internalQueryEnableSlotBasedExecutionEngine", false);
 
     unique_ptr<CanonicalQuery> cq(canonicalize(
         fromjson("{a: 1, b: 1}"), {}, {}, fromjson("{locale: 'mock_reverse_string'}")));
 
-    testComputeKey(*cq, "an[eqa,eqb]#mock_reverse_string02300000@t");
+    testComputeKey(*cq, "an[eqa,eqb]#mock_reverse_string02300000@f");
 }
 
 TEST(CanonicalQueryEncoderTest, ComputeKeySBE) {
     // Generated cache keys should be treated as opaque to the user.
+
+    // SBE must be enabled in order to generate SBE plan cache keys.
+    RAIIServerParameterControllerForTest controllerSBE(
+        "internalQueryEnableSlotBasedExecutionEngine", true);
 
     // TODO SERVER-61314: Remove when featureFlagSbePlanCache is removed.
     RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbePlanCache", true);

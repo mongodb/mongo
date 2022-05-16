@@ -92,6 +92,6 @@ executor:
       set_parameters:
         enableTestCommands: 1
         # SBE is not compatible with clustered collections
-        internalQueryForceClassicEngine: 1
+        internalQueryEnableSlotBasedExecutionEngine: 0
         failpoint.clusterAllCollectionsByDefault: "{mode: 'alwaysOn'}"
     num_nodes: 2

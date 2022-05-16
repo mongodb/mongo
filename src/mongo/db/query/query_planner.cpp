@@ -212,7 +212,7 @@ void tryToAddColumnScan(const QueryPlannerParams& params,
         // We only want to use the columnar index if we can avoid fetching the whole document.
         return;
     }
-    if (!query.isSbeCompatible() || query.getForceClassicEngine()) {
+    if (!query.isSbeCompatible() || !query.getEnableSlotBasedExecutionEngine()) {
         // We only support column scans in SBE.
         return;
     }

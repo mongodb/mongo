@@ -26,7 +26,7 @@
 
         // Turns on the classical engine.
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
+            db.adminCommand({setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: false}));
 
         const pipeline = [{$group: {_id: "$k", o: accSpec}}, {$group: {_id: "$o"}}];
 
@@ -75,13 +75,13 @@
 
         // Turns on the classical engine.
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
+            db.adminCommand({setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: false}));
         const classicRes = assert.commandWorked(db.runCommand(aggCmd)).cursor.firstBatch;
         assert.eq(classicRes, expectedRes, testDesc);
 
         // Turns off the classical engine.
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
+            db.adminCommand({setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: true}));
         const sbeRes = assert.commandWorked(db.runCommand(aggCmd)).cursor.firstBatch;
         assert.eq(sbeRes, expectedRes, testDesc);
     };
@@ -211,20 +211,20 @@
 
     let verifyShardedAccumulatorResultsOnBothEngine = (testDesc, coll, pipeline, expectedRes) => {
         // Turns to the classic engine at the shards.
-        assert.commandWorked(
-            dbAtShard0.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
-        assert.commandWorked(
-            dbAtShard1.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
+        assert.commandWorked(dbAtShard0.adminCommand(
+            {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: false}));
+        assert.commandWorked(dbAtShard1.adminCommand(
+            {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: false}));
 
         // Verifies that the classic engine's results are same as the expected results.
         const classicRes = coll.aggregate(pipeline).toArray();
         assert.eq(classicRes, expectedRes, testDesc);
 
         // Turns to the SBE engine at the shards.
-        assert.commandWorked(
-            dbAtShard0.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
-        assert.commandWorked(
-            dbAtShard1.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
+        assert.commandWorked(dbAtShard0.adminCommand(
+            {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: true}));
+        assert.commandWorked(dbAtShard1.adminCommand(
+            {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: true}));
 
         // Verifies that the SBE engine's results are same as the expected results.
         const sbeRes = coll.aggregate(pipeline).toArray();

@@ -16,11 +16,9 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-const getParamResponse =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagColumnstoreIndexes: 1}));
-const columnstoreEnabled = getParamResponse.hasOwnProperty("featureFlagColumnstoreIndexes") &&
-    getParamResponse.featureFlagColumnstoreIndexes.value;
+const columnstoreEnabled = checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"]);
 if (!columnstoreEnabled) {
     jsTestLog("Skipping columnstore index validation test since the feature flag is not enabled.");
     return;

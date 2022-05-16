@@ -1386,7 +1386,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     const auto& mainColl = collections.getMainCollection();
     canonicalQuery->setSbeCompatible(
         sbe::isQuerySbeCompatible(&mainColl, canonicalQuery.get(), plannerOptions));
-    return !canonicalQuery->getForceClassicEngine() && canonicalQuery->isSbeCompatible()
+    return canonicalQuery->getEnableSlotBasedExecutionEngine() && canonicalQuery->isSbeCompatible()
         ? getSlotBasedExecutor(opCtx,
                                collections,
                                std::move(canonicalQuery),

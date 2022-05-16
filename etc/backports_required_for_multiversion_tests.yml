@@ -230,6 +230,22 @@ last-continuous:
       test_file: jstests/replsets/initial_sync_with_partial_transaction.js
     - ticket: SERVER-66389
       test_file: jstests/core/where_multiple_plans.js
+    - ticket: SERVER-66445
+      test_file: jstests/concurrency/fsm_workloads/find_flip_sbe_enabled.js
+    - ticket: SERVER-66445
+      test_file: jstests/core/index_stats.js
+    - ticket: SERVER-66445
+      test_file: jstests/core/wildcard_index_cached_plans.js
+    - ticket: SERVER-66445
+      test_file: jstests/core/index_filter_commands_invalidate_plan_cache_entries.js
+    - ticket: SERVER-66445
+      test_file: jstests/core/idhack.js
+    - ticket: SERVER-66445
+      test_file: jstests/core/sbe/sbe_explain_rejected_plans.js
+    - ticket: SERVER-66445
+      test_file: jstests/core/plan_cache_list_shapes.js
+    - ticket: SERVER-66445
+      test_file: jstests/core/plan_cache_list_plans.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -593,6 +609,22 @@ last-lts:
       test_file: jstests/replsets/initial_sync_with_partial_transaction.js
     - ticket: SERVER-66389
       test_file: jstests/core/where_multiple_plans.js
+    - ticket: SERVER-66445
+      test_file: jstests/concurrency/fsm_workloads/find_flip_sbe_enabled.js
+    - ticket: SERVER-66445
+      test_file: jstests/core/index_stats.js
+    - ticket: SERVER-66445
+      test_file: jstests/core/wildcard_index_cached_plans.js
+    - ticket: SERVER-66445
+      test_file: jstests/core/index_filter_commands_invalidate_plan_cache_entries.js
+    - ticket: SERVER-66445
+      test_file: jstests/core/idhack.js
+    - ticket: SERVER-66445
+      test_file: jstests/core/sbe/sbe_explain_rejected_plans.js
+    - ticket: SERVER-66445
+      test_file: jstests/core/plan_cache_list_shapes.js
+    - ticket: SERVER-66445
+      test_file: jstests/core/plan_cache_list_plans.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
