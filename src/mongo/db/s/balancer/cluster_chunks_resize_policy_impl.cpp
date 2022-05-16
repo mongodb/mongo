@@ -92,7 +92,7 @@ void applyResultToCollState(OperationContext* opCtx,
                       "Marking collection chunks resize state as pending to be restarded",
                       "namespace"_attr = collectionState.getNss().ns(),
                       "err"_attr = result);
-        collectionState.errorDetectedOnActionCompleted();
+        collectionState.errorDetectedOnActionCompleted(opCtx);
     }
 }
 
@@ -144,7 +144,7 @@ boost::optional<DefragmentationAction> CollectionState::popNextAction(OperationC
                   "pending to be restarted",
                   "namespace"_attr = _nss.ns(),
                   "error"_attr = redact(e));
-            _restartRequested = true;
+            _requestRestart(opCtx);
         }
     }
     return boost::none;
@@ -170,8 +170,8 @@ void CollectionState::actionCompleted(std::vector<ActionRequestInfo>&& followUpR
     }
 }
 
-void CollectionState::errorDetectedOnActionCompleted() {
-    _restartRequested = true;
+void CollectionState::errorDetectedOnActionCompleted(OperationContext* opCtx) {
+    _requestRestart(opCtx);
     --_numOutstandingActions;
     _pendingRequests.clear();
 }
@@ -190,6 +190,12 @@ const NamespaceString& CollectionState::getNss() const {
 
 const UUID& CollectionState::getUuid() const {
     return _uuid;
+}
+
+void CollectionState::_requestRestart(OperationContext* opCtx) {
+    // Invalidate the CollectionState object and the related entry in the cache.
+    _restartRequested = true;
+    Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(_nss);
 }
 
 ClusterChunksResizePolicyImpl::ClusterChunksResizePolicyImpl(
@@ -268,11 +274,24 @@ boost::optional<DefragmentationAction> ClusterChunksResizePolicyImpl::getNextStr
             if (collState.restartNeeded()) {
                 auto refreshedCollState = _buildInitialStateFor(opCtx, collState.getNss());
                 if (!refreshedCollState) {
+                    // The collection does not longer exist - discard it
                     auto entryToErase = it;
                     it = std::next(it);
                     _collectionsBeingProcessed.erase(entryToErase);
                     continue;
                 }
+                if (refreshedCollState->getUuid() != collUuid) {
+                    // the collection has been dropped and re-created since the creation of the
+                    // element; re-insert the entry with an updated UUID (this operation will
+                    // invalidate the iterator).
+                    _collectionsBeingProcessed.erase(it);
+                    _collectionsBeingProcessed.emplace(refreshedCollState->getUuid(),
+                                                       std::move(*refreshedCollState));
+                    it = _collectionsBeingProcessed.begin();
+                    continue;
+                }
+
+                // update the current element
                 collState = std::move(*refreshedCollState);
             }
 
