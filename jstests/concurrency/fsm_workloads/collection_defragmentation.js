@@ -239,7 +239,7 @@ var $config = (function() {
                 // Wait for defragmentation to complete and check final state
                 defragmentationUtil.waitForEndOfDefragmentation(mongos, fullNs);
                 defragmentationUtil.checkPostDefragmentationState(
-                    mongos, fullNs, maxChunkSizeMB, "key");
+                    cluster.getConfigPrimaryNode(), mongos, fullNs, maxChunkSizeMB, "key");
                 // Resume original throttling value
                 cluster.executeOnConfigNodes((db) => {
                     assert.commandWorked(db.adminCommand({

@@ -122,9 +122,11 @@ var defragmentationUtil = (function() {
                        tojson(rightChunk)} are mergeable with combined size ${combinedDataSize}`);
     };
 
-    let checkPostDefragmentationState = function(mongos, ns, maxChunkSizeMB, shardKey) {
+    let checkPostDefragmentationState = function(configSvr, mongos, ns, maxChunkSizeMB, shardKey) {
         const withAutoSplitActive =
-            !FeatureFlagUtil.isEnabled(mongos.getDB('admin'), 'NoMoreAutoSplitter');
+            !FeatureFlagUtil.isEnabled(configSvr.getDB('admin'), 'NoMoreAutoSplitter');
+        jsTest.log(`Chunk (auto)splitting functionalities assumed to be ${
+            withAutoSplitActive ? "ON" : "OFF"}`);
         const oversizedChunkThreshold = maxChunkSizeMB * 1024 * 1024 * 4 / 3;
         const chunks = findChunksUtil.findChunksByNs(mongos.getDB('config'), ns)
                            .sort({[shardKey]: 1})
@@ -160,7 +162,8 @@ var defragmentationUtil = (function() {
                                                        oversizedChunkThreshold);
                     } else {
                         assert(false,
-                               `Chunks ${leftChunk} and ${rightChunk} should have been merged`);
+                               `Chunks ${tojson(leftChunk)} and ${
+                                   tojson(rightChunk)} should have been merged`);
                     }
                 }
             }

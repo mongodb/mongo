@@ -319,6 +319,11 @@ var Cluster = function(options) {
         });
     };
 
+    this.getConfigPrimaryNode = function getConfigPrimaryNode() {
+        assert(initialized, 'cluster must be initialized first');
+        return st._configsvr.getPrimary();
+    };
+
     this.synchronizeMongosClusterTimes = function synchronizeMongosClusterTimes() {
         const contactConfigServerFn = ((mongosConn) => {
             // The admin database is hosted on the config server.
