@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/ttl_collection_cache.h"
+#include "mongo/util/background.h"
+
 namespace mongo {
 
 class ServiceContext;
@@ -43,5 +46,70 @@ void startTTLMonitor(ServiceContext* serviceContext);
  * Shuts down the TTLMonitor if it is running. Safe to call multiple times.
  */
 void shutdownTTLMonitor(ServiceContext* serviceContext);
+
+class TTLMonitor : public BackgroundJob {
+public:
+    explicit TTLMonitor() : BackgroundJob(false /* selfDelete */) {}
+
+    static TTLMonitor* get(ServiceContext* serviceCtx);
+
+    static void set(ServiceContext* serviceCtx, std::unique_ptr<TTLMonitor> monitor);
+
+    std::string name() const {
+        return "TTLMonitor";
+    }
+
+    void run();
+
+    /**
+     * Signals the thread to quit and then waits until it does.
+     */
+    void shutdown();
+
+private:
+    /**
+     * Gets all TTL specifications for every collection and deletes expired documents.
+     */
+    void _doTTLPass();
+
+    /**
+     * Uses the TTL 'info' to determine which documents are expired and removes them from the
+     * collection when applicble. In some cases (i.e: on temporary resharding collections,
+     * collections pending to be dropped, etc), the TTLMonitor is prohibitied from removing
+     * documents and the method silently returns.
+     */
+    void _deleteExpired(OperationContext* opCtx,
+                        TTLCollectionCache* ttlCollectionCache,
+                        const UUID& uuid,
+                        const NamespaceString& nss,
+                        const TTLCollectionCache::Info& info);
+
+    /**
+     * Removes documents from the collection using the specified TTL index after a sufficient
+     * amount of time has passed according to its expiry specification.
+     */
+    void _deleteExpiredWithIndex(OperationContext* opCtx,
+                                 TTLCollectionCache* ttlCollectionCache,
+                                 const CollectionPtr& collection,
+                                 std::string indexName);
+
+    /*
+     * Removes expired documents from a clustered collection using a bounded collection scan.
+     * On time-series buckets collections, TTL operates on type 'ObjectId'. On general purpose
+     * collections, TTL operates on type 'Date'.
+     */
+    void _deleteExpiredWithCollscan(OperationContext* opCtx,
+                                    TTLCollectionCache* ttlCollectionCache,
+                                    const CollectionPtr& collection);
+
+    // Protects the state below.
+    mutable Mutex _stateMutex = MONGO_MAKE_LATCH("TTLMonitorStateMutex");
+
+    // Signaled to wake up the thread, if the thread is waiting. The thread will check whether
+    // _shuttingDown is set and stop accordingly.
+    mutable stdx::condition_variable _shuttingDownCV;
+
+    bool _shuttingDown = false;
+};
 
 }  // namespace mongo
