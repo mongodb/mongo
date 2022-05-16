@@ -221,12 +221,12 @@ const mongos = st.s0;
     assert.commandFailed(fromColl.renameCollection(toNs.split('.')[1], false /* dropTarget*/));
 }
 
+const fcvDoc = testDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
 // Rename to target collection with very a long name
 {
     const dbName = 'testRenameToCollectionWithVeryLongName';
 
     const testDB = st.rs0.getPrimary().getDB(dbName);
-    const fcvDoc = testDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
     if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '5.3') >= 0) {
         const longEnoughNs = dbName + '.' +
             'x'.repeat(235 - dbName.length - 1);
@@ -235,6 +235,34 @@ const mongos = st.s0;
         const tooLongNs = longEnoughNs + 'x';
         testRename(st, dbName, tooLongNs, false /* dropTarget */, true /* mustFail */);
     }
+}
+
+// For C2C: rename of existing collection with correct uuid as argument must succeed
+// (Also creating target collection to test target UUID internal check)
+if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '6.0') >= 0) {
+    const dbName = 'testRenameToUnshardedCollectionWithSourceUUID';
+    const fromCollName = 'from';
+    const fromNs = dbName + '.' + fromCollName;
+    const toNs = dbName + '.to';
+    assert.commandWorked(
+        mongos.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
+    const fromColl = mongos.getCollection(fromNs);
+    fromColl.insert({a: 0});
+
+    const toColl = mongos.getCollection(toNs);
+    toColl.insert({b: 0});
+
+    const sourceUUID = assert.commandWorked(st.getDB(dbName).runCommand({listCollections: 1}))
+                           .cursor.firstBatch.find(c => c.name === fromCollName)
+                           .info.uuid;
+
+    // The command succeeds when the correct UUID is provided.
+    assert.commandWorked(mongos.adminCommand({
+        renameCollection: fromNs,
+        to: toNs,
+        dropTarget: true,
+        collectionUUID: sourceUUID,
+    }));
 }
 
 st.stop();
