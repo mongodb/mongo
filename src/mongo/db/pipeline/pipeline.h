@@ -177,7 +177,12 @@ public:
         std::vector<BSONObj> currentPipeline,
         MakePipelineOptions opts);
 
-    std::unique_ptr<Pipeline, PipelineDeleter> clone() const;
+    /**
+     * Callers can optionally specify 'newExpCtx' to construct the deep clone with it. This will be
+     * used to construct all the cloned DocumentSources as well.
+     */
+    std::unique_ptr<Pipeline, PipelineDeleter> clone(
+        const boost::intrusive_ptr<ExpressionContext>& = nullptr) const;
 
     const boost::intrusive_ptr<ExpressionContext>& getContext() const {
         return pCtx;

@@ -43,14 +43,16 @@ public:
     DocumentSourceChangeStreamOplogMatch(Timestamp clusterTime,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    DocumentSourceChangeStreamOplogMatch(const DocumentSourceChangeStreamOplogMatch& other)
-        : DocumentSourceMatch(other) {
+    DocumentSourceChangeStreamOplogMatch(const DocumentSourceChangeStreamOplogMatch& other,
+                                         const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
+        : DocumentSourceMatch(other, newExpCtx) {
         _clusterTime = other._clusterTime;
         _optimizedEndOfPipeline = other._optimizedEndOfPipeline;
     }
 
-    boost::intrusive_ptr<DocumentSource> clone() const final {
-        return new auto(*this);
+    boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& newExpCtx = nullptr) const final {
+        return new DocumentSourceChangeStreamOplogMatch(*this, newExpCtx);
     }
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(

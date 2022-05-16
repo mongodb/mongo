@@ -314,9 +314,13 @@ public:
 
     /**
      * Makes a deep clone of the DocumentSource by serializing and re-parsing it. DocumentSources
-     * that cannot be safely cloned this way should override this method.
+     * that cannot be safely cloned this way should override this method. Callers can optionally
+     * specify 'newExpCtx' to construct the deep clone with it instead of defaulting to the
+     * original's 'ExpressionContext'.
      */
-    virtual boost::intrusive_ptr<DocumentSource> clone() const {
+    virtual boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& newExpCtx = nullptr) const {
+        auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
         std::vector<Value> serializedDoc;
         serializeToArray(serializedDoc);
         tassert(5757900,
@@ -324,7 +328,7 @@ public:
                               << " should have serialized to exactly one document. This stage may "
                                  "need a custom clone() implementation",
                 serializedDoc.size() == 1 && serializedDoc[0].getType() == BSONType::Object);
-        auto dsList = parse(pExpCtx, Document(serializedDoc[0].getDocument()).toBson());
+        auto dsList = parse(expCtx, Document(serializedDoc[0].getDocument()).toBson());
         // Cloning should only happen once the pipeline has been fully built, after desugaring from
         // one stage to multiple stages has occurred. When cloning desugared stages we expect each
         // stage to re-parse to one stage.

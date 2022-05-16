@@ -50,11 +50,13 @@ namespace mongo {
  */
 class DocumentSourceListSessions final : public DocumentSourceMatch {
 public:
-    DocumentSourceListSessions(const DocumentSourceListSessions& other)
-        : DocumentSourceMatch(other), _allUsers(other._allUsers), _users(other._users) {}
+    DocumentSourceListSessions(const DocumentSourceListSessions& other,
+                               const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
+        : DocumentSourceMatch(other, newExpCtx), _allUsers(other._allUsers), _users(other._users) {}
 
-    virtual boost::intrusive_ptr<DocumentSource> clone() const {
-        return make_intrusive<std::decay_t<decltype(*this)>>(*this);
+    virtual boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
+        return make_intrusive<std::decay_t<decltype(*this)>>(*this, newExpCtx);
     }
 
     static constexpr StringData kStageName = "$listSessions"_sd;

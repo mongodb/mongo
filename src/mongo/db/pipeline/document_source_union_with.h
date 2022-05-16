@@ -70,8 +70,10 @@ public:
         }
     }
 
-    DocumentSourceUnionWith(const DocumentSourceUnionWith& original)
-        : DocumentSource(kStageName, original.pExpCtx->copyWith(original.pExpCtx->ns)),
+    DocumentSourceUnionWith(const DocumentSourceUnionWith& original,
+                            const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
+        : DocumentSource(kStageName,
+                         newExpCtx ? newExpCtx : original.pExpCtx->copyWith(original.pExpCtx->ns)),
           _pipeline(original._pipeline->clone()) {}
 
     ~DocumentSourceUnionWith();
@@ -138,7 +140,8 @@ public:
         return *_pipeline;
     }
 
-    boost::intrusive_ptr<DocumentSource> clone() const final;
+    boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final;
 
     const Pipeline::SourceContainer* getSubPipeline() const final {
         if (_pipeline) {

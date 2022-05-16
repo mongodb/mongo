@@ -43,9 +43,10 @@ namespace mongo {
 
 class DocumentSourceMatch : public DocumentSource {
 public:
-    virtual boost::intrusive_ptr<DocumentSource> clone() const {
+    virtual boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& newExpCtx = nullptr) const {
         // Raw new is needed to access non-public constructors.
-        return new auto(*this);
+        return new DocumentSourceMatch(*this, newExpCtx);
     }
 
     static constexpr StringData kStageName = "$match"_sd;
@@ -205,10 +206,11 @@ public:
     }
 
 protected:
-    DocumentSourceMatch(const DocumentSourceMatch& other)
+    DocumentSourceMatch(const DocumentSourceMatch& other,
+                        const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
         : DocumentSourceMatch(
               other.serialize().getDocument().toBson().firstElement().embeddedObject(),
-              other.pExpCtx) {}
+              newExpCtx ? newExpCtx : other.pExpCtx) {}
 
     GetNextResult doGetNext() override;
     DocumentSourceMatch(const BSONObj& query,

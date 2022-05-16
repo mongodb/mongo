@@ -121,7 +121,8 @@ public:
     /**
      * Copy constructor used for clone().
      */
-    DocumentSourceLookUp(const DocumentSourceLookUp&);
+    DocumentSourceLookUp(const DocumentSourceLookUp&,
+                         const boost::intrusive_ptr<ExpressionContext>&);
 
     const char* getSourceName() const final;
     void serializeToArray(
@@ -244,7 +245,8 @@ public:
         return buildPipeline(inputDoc);
     }
 
-    boost::intrusive_ptr<DocumentSource> clone() const final;
+    boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final;
 
     bool sbeCompatible() const {
         return _sbeCompatible;
