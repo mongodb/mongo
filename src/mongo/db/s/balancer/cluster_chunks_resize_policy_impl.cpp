@@ -353,6 +353,30 @@ boost::optional<DefragmentationAction> ClusterChunksResizePolicyImpl::getNextStr
 void ClusterChunksResizePolicyImpl::applyActionResult(OperationContext* opCtx,
                                                       const DefragmentationAction& action,
                                                       const DefragmentationActionResponse& result) {
+    std::string completedNss;
+    ScopeGuard onExitGuard([&] {
+        if (!completedNss.empty()) {
+            PersistentTaskStore<CollectionType> store(CollectionType::ConfigNS);
+            try {
+                store.update(
+                    opCtx,
+                    BSON(CollectionType::kNssFieldName << completedNss),
+                    BSON("$set" << BSON(CollectionType::kChunksAlreadySplitForDowngradeFieldName
+                                        << true)),
+                    WriteConcerns::kMajorityWriteConcernNoTimeout);
+            } catch (const DBException& e) {
+                LOGV2(6417111,
+                      "Could not mark collection as already processed by ClusterChunksResizePolicy",
+                      "namespace"_attr = completedNss,
+                      "error"_attr = redact(e));
+            }
+        }
+
+        // Notify the reception of an operation outcome, even if it did not lead to a change of the
+        // internal state.
+        _onStateUpdated();
+    });
+
     stdx::lock_guard<Latch> lk(_stateMutex);
     if (!_activeRequestPromise.is_initialized()) {
         return;
@@ -433,7 +457,6 @@ void ClusterChunksResizePolicyImpl::applyActionResult(OperationContext* opCtx,
         action);
 
     if (updatedEntryIt == _collectionsBeingProcessed.end()) {
-        _onStateUpdated();
         return;
     }
 
@@ -442,17 +465,7 @@ void ClusterChunksResizePolicyImpl::applyActionResult(OperationContext* opCtx,
         LOGV2(6417107,
               "Collection chunks resize process completed",
               "namespace"_attr = collectionState.getNss().ns());
-        PersistentTaskStore<CollectionType> store(CollectionType::ConfigNS);
-        try {
-            store.update(
-                opCtx,
-                BSON(CollectionType::kNssFieldName << collectionState.getNss().ns()),
-                BSON("$set" << BSON(CollectionType::kChunksAlreadySplitForDowngradeFieldName
-                                    << true)),
-                WriteConcerns::kMajorityWriteConcernNoTimeout);
-        } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
-            // ignore
-        }
+        completedNss = collectionState.getNss().ns();
         _collectionsBeingProcessed.erase(updatedEntryIt);
 
     } else if (collectionState.restartNeeded()) {
@@ -464,7 +477,6 @@ void ClusterChunksResizePolicyImpl::applyActionResult(OperationContext* opCtx,
                                                std::move(*refreshedState));
         }
     }
-    _onStateUpdated();
 }
 
 boost::optional<CollectionState> ClusterChunksResizePolicyImpl::_buildInitialStateFor(
