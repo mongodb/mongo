@@ -60,7 +60,6 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/synchronized_value.h"
-#include "mongo/util/thread_context.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/waitable.h"
 
@@ -600,45 +599,50 @@ TEST(TransportLayerASIO, ConfirmSocketSetOptionOnResetConnections) {
 
 class TransportLayerASIOWithServiceContextTest : public ServiceContextTest {
 public:
-    /**
-     * `ThreadCounter` and `ThreadToken` allow tracking the number of active (running) threads.
-     * For each thread, a `ThreadToken` is created. The token notifies `ThreadCounter` about
-     * creation and destruction of its associated thread. This allows maintaining the number of
-     * active threads at any point during the execution of this unit-test.
-     */
     class ThreadCounter {
     public:
-        static ThreadCounter& get() {
-            static StaticImmortal<ThreadCounter> instance;
-            return *instance;
+        std::function<stdx::thread(std::function<void()>)> makeSpawnFunc() {
+            return [core = _core](std::function<void()> cb) {
+                {
+                    stdx::lock_guard lk(core->mutex);
+                    ++core->created;
+                    core->cv.notify_all();
+                }
+                return stdx::thread{[core, cb = std::move(cb)]() mutable {
+                    {
+                        stdx::lock_guard lk(core->mutex);
+                        ++core->started;
+                        core->cv.notify_all();
+                    }
+                    cb();
+                }};
+            };
         }
 
-        int64_t count() const {
-            const auto count = _count.load();
-            invariant(count > 0);
-            return count;
+        int64_t created() const {
+            stdx::lock_guard lk(_core->mutex);
+            return _core->created;
         }
 
-        void onCreateThread() {
-            _count.fetchAndAdd(1);
+        int64_t started() const {
+            stdx::lock_guard lk(_core->mutex);
+            return _core->started;
         }
 
-        void onDestroyThread() {
-            _count.fetchAndAdd(-1);
+        template <typename Pred>
+        void waitForStarted(const Pred& pred) const {
+            stdx::unique_lock lk(_core->mutex);
+            _core->cv.wait(lk, [&] { return pred(_core->started); });
         }
 
     private:
-        AtomicWord<int64_t> _count;
-    };
-
-    struct ThreadToken {
-        ThreadToken() {
-            ThreadCounter::get().onCreateThread();
-        }
-
-        ~ThreadToken() {
-            ThreadCounter::get().onDestroyThread();
-        }
+        struct Core {
+            mutable stdx::mutex mutex;  // NOLINT
+            mutable stdx::condition_variable cv;
+            int64_t created = 0;
+            int64_t started = 0;
+        };
+        std::shared_ptr<Core> _core = std::make_shared<Core>();
     };
 
     void setUp() override {
@@ -658,46 +662,32 @@ public:
     }
 };
 
-const auto getThreadToken =
-    ThreadContext::declareDecoration<TransportLayerASIOWithServiceContextTest::ThreadToken>();
-
 TEST_F(TransportLayerASIOWithServiceContextTest, TimerServiceDoesNotSpawnThreadsBeforeStart) {
-    const auto beforeThreadCount = ThreadCounter::get().count();
-    transport::TransportLayerASIO::TimerService service;
-    // Note that the following is a best-effort and not deterministic as we don't have control over
-    // when threads may start running and advance the thread count.
-    const auto afterThreadCount = ThreadCounter::get().count();
-    ASSERT_EQ(beforeThreadCount, afterThreadCount);
+    ThreadCounter counter;
+    { transport::TransportLayerASIO::TimerService service{{counter.makeSpawnFunc()}}; }
+    ASSERT_EQ(counter.created(), 0);
 }
 
 TEST_F(TransportLayerASIOWithServiceContextTest, TimerServiceOneShotStart) {
-    const auto beforeThreadCount = ThreadCounter::get().count();
-    transport::TransportLayerASIO::TimerService service;
+    ThreadCounter counter;
+    transport::TransportLayerASIO::TimerService service{{counter.makeSpawnFunc()}};
     service.start();
-    LOGV2(5490004, "Waiting for the timer thread to start", "threads"_attr = beforeThreadCount);
-    while (ThreadCounter::get().count() == beforeThreadCount) {
-        sleepFor(Milliseconds(1));
-    }
-    const auto afterThreadCount = ThreadCounter::get().count();
-    LOGV2(5490005, "Returned from waiting for the timer thread", "threads"_attr = afterThreadCount);
+    LOGV2(5490004, "Awaiting timer thread start", "threads"_attr = counter.started());
+    counter.waitForStarted([](auto n) { return n > 0; });
+    LOGV2(5490005, "Awaited timer thread start", "threads"_attr = counter.started());
 
-    // Start the service a few times and verify that the thread count has not changed. Note that the
-    // following is a best-effort and not deterministic as we don't have control over when threads
-    // may start running and advance the thread count.
     service.start();
     service.start();
     service.start();
-    ASSERT_EQ(afterThreadCount, ThreadCounter::get().count());
+    ASSERT_EQ(counter.created(), 1) << "Redundant start should spawn only once";
 }
 
 TEST_F(TransportLayerASIOWithServiceContextTest, TimerServiceDoesNotStartAfterStop) {
-    const auto beforeThreadCount = ThreadCounter::get().count();
-    transport::TransportLayerASIO::TimerService service;
+    ThreadCounter counter;
+    transport::TransportLayerASIO::TimerService service{{counter.makeSpawnFunc()}};
     service.stop();
     service.start();
-    const auto afterThreadCount = ThreadCounter::get().count();
-    // The test would fail if `start` proceeds to spawn a thread for `service`.
-    ASSERT_EQ(beforeThreadCount, afterThreadCount);
+    ASSERT_EQ(counter.created(), 0) << "Stop then start should not spawn";
 }
 
 TEST_F(TransportLayerASIOWithServiceContextTest, TimerServiceCanStopMoreThanOnce) {
