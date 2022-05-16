@@ -45,6 +45,8 @@ class RecoveryUnit;
 
 class RecordStoreHarnessHelper : public HarnessHelper {
 public:
+    enum class Options { Standalone, ReplicationEnabled };
+
     virtual std::unique_ptr<RecordStore> newRecordStore() = 0;
 
     std::unique_ptr<RecordStore> newRecordStore(const std::string& ns) {
@@ -61,8 +63,11 @@ public:
 };
 
 void registerRecordStoreHarnessHelperFactory(
-    std::function<std::unique_ptr<RecordStoreHarnessHelper>()> factory);
+    std::function<std::unique_ptr<RecordStoreHarnessHelper>(RecordStoreHarnessHelper::Options)>
+        factory);
 
-std::unique_ptr<RecordStoreHarnessHelper> newRecordStoreHarnessHelper();
+std::unique_ptr<RecordStoreHarnessHelper> newRecordStoreHarnessHelper(
+    RecordStoreHarnessHelper::Options options =
+        RecordStoreHarnessHelper::Options::ReplicationEnabled);
 
 }  // namespace mongo

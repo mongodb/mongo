@@ -95,7 +95,8 @@ public:
     }
 };
 
-std::unique_ptr<mongo::RecordStoreHarnessHelper> makeRecordStoreHarnessHelper() {
+std::unique_ptr<mongo::RecordStoreHarnessHelper> makeRecordStoreHarnessHelper(
+    RecordStoreHarnessHelper::Options options) {
     return std::make_unique<RecordStoreHarnessHelper>();
 }
 

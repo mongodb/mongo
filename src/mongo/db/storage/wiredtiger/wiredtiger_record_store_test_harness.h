@@ -39,9 +39,12 @@ namespace mongo {
 
 class WiredTigerHarnessHelper final : public RecordStoreHarnessHelper {
 public:
-    WiredTigerHarnessHelper() : WiredTigerHarnessHelper(""_sd) {}
+    WiredTigerHarnessHelper() : WiredTigerHarnessHelper(Options::ReplicationEnabled, ""_sd) {}
+    WiredTigerHarnessHelper(Options options) : WiredTigerHarnessHelper(options, ""_sd) {}
+    WiredTigerHarnessHelper(StringData extraStrings)
+        : WiredTigerHarnessHelper(Options::ReplicationEnabled, extraStrings) {}
 
-    WiredTigerHarnessHelper(StringData extraStrings);
+    WiredTigerHarnessHelper(Options options, StringData extraStrings);
     ~WiredTigerHarnessHelper() {}
 
     virtual std::unique_ptr<RecordStore> newRecordStore() override {

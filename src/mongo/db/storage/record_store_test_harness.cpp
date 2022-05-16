@@ -39,16 +39,19 @@
 
 namespace mongo {
 namespace {
-std::function<std::unique_ptr<RecordStoreHarnessHelper>()> recordStoreHarnessFactory;
+std::function<std::unique_ptr<RecordStoreHarnessHelper>(RecordStoreHarnessHelper::Options)>
+    recordStoreHarnessFactory;
 }
 
 void registerRecordStoreHarnessHelperFactory(
-    std::function<std::unique_ptr<RecordStoreHarnessHelper>()> factory) {
+    std::function<std::unique_ptr<RecordStoreHarnessHelper>(RecordStoreHarnessHelper::Options)>
+        factory) {
     recordStoreHarnessFactory = std::move(factory);
 }
 
-auto newRecordStoreHarnessHelper() -> std::unique_ptr<RecordStoreHarnessHelper> {
-    return recordStoreHarnessFactory();
+auto newRecordStoreHarnessHelper(RecordStoreHarnessHelper::Options options)
+    -> std::unique_ptr<RecordStoreHarnessHelper> {
+    return recordStoreHarnessFactory(options);
 }
 
 namespace {
