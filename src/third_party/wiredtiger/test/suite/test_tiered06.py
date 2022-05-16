@@ -134,11 +134,15 @@ class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
                 lambda: fs.fs_rename(session, 'foobar', 'barfoo', 0))
         self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
 
-        # Files that have been flushed cannot be manipulated through the custom file system.
-        with self.expectedStderrPattern('foobar: remove of file not supported'):
-            self.assertRaisesException(wiredtiger.WiredTigerError,
-                lambda: fs.fs_remove(session, 'foobar', 0))
-        self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
+        if self.ss_name == 's3_store':
+            # Files that have been flushed cannot be manipulated through the custom file system.
+            with self.expectedStderrPattern('foobar: remove of file not supported'):
+                self.assertRaisesException(wiredtiger.WiredTigerError,
+                    lambda: fs.fs_remove(session, 'foobar', 0))
+            self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
+        else:
+            fs.fs_remove(session, 'foobar', 0)
+            self.assertEquals(fs.fs_directory_list(session, '', ''), [])
 
         fs.terminate(session)
         ss.terminate(session)

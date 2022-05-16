@@ -163,6 +163,7 @@ static int dir_store_fs_terminate(WT_FILE_SYSTEM *, WT_SESSION *);
 static int dir_store_open(WT_FILE_SYSTEM *, WT_SESSION *, const char *,
   WT_FS_OPEN_FILE_TYPE file_type, uint32_t, WT_FILE_HANDLE **);
 static int dir_store_remove(WT_FILE_SYSTEM *, WT_SESSION *, const char *, uint32_t);
+static int dir_store_remove_if_exists(WT_FILE_SYSTEM *, WT_SESSION *, char *, uint32_t);
 static int dir_store_rename(WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, uint32_t);
 static int dir_store_size(WT_FILE_SYSTEM *, WT_SESSION *, const char *, wt_off_t *);
 
@@ -1090,15 +1091,68 @@ dir_store_rename(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *f
 
 /*
  * dir_store_remove --
- *     POSIX remove, not supported for cloud objects.
+ *     Calls the corresponding remove method of the file system behind our dir_store storage source.
  */
 static int
 dir_store_remove(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, uint32_t flags)
 {
-    (void)flags; /* unused */
+    int ret;
+    char *bucket_path, *cache_path;
 
-    return (dir_store_err(
-      FS2DS(file_system), session, ENOTSUP, "%s: remove of file not supported", name));
+    bucket_path = cache_path = NULL;
+    ret = 0;
+
+    /* Check to see if the file exists in the cache directory before attempting to remove it. */
+    if ((ret = dir_store_cache_path(file_system, name, &cache_path)) != 0)
+        goto err;
+    if ((ret = dir_store_remove_if_exists(file_system, session, cache_path, flags)) != 0)
+        goto err;
+
+    /* Check to see if the file exists in the bucket directory before attempting to remove it. */
+    if ((ret = dir_store_bucket_path(file_system, name, &bucket_path)) != 0)
+        goto err;
+    if ((ret = dir_store_remove_if_exists(file_system, session, bucket_path, flags)) != 0)
+        goto err;
+
+err:
+    free(bucket_path);
+    free(cache_path);
+    return (ret);
+}
+
+/*
+ * dir_store_remove_if_exists --
+ *     Checks to see if the specified file exists in the directory before attempting to remove it.
+ */
+static int
+dir_store_remove_if_exists(
+  WT_FILE_SYSTEM *file_system, WT_SESSION *session, char *file_path, uint32_t flags)
+{
+    struct stat sb;
+    DIR_STORE_FILE_SYSTEM *dir_store_fs;
+    WT_FILE_SYSTEM *wt_fs;
+    int ret;
+
+    dir_store_fs = (DIR_STORE_FILE_SYSTEM *)file_system;
+    wt_fs = dir_store_fs->wt_fs;
+
+    ret = stat(file_path, &sb);
+    if (ret != 0) {
+        if (errno != ENOENT) {
+            ret = dir_store_err(
+              FS2DS(file_system), session, errno, "%s: dir_store_remove stat", file_path);
+            goto err;
+        }
+    } else {
+        if ((ret = wt_fs->fs_remove(wt_fs, session, file_path, flags)) != 0) {
+            ret =
+              dir_store_err(FS2DS(file_system), session, errno, "%s: dir_store_remove", file_path);
+            goto err;
+        }
+    }
+
+err:
+    return (ret);
 }
 
 /*

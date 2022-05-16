@@ -1452,6 +1452,12 @@ methods = {
     Config('remove_files', 'true', r'''
         if the underlying files should be removed''',
         type='boolean'),
+    Config('remove_shared', 'false', r'''
+        to force the removal of any shared objects. This is intended for tiered
+        tables, and can only be set if the drop operation is configured to remove
+        the underlying files. Ignore this configuration if it is set for non-tiered
+        tables''',
+        type='boolean', undoc=True),
 ]),
 
 'WT_SESSION.join' : Method([

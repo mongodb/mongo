@@ -21,6 +21,31 @@ __wt_block_manager_drop(WT_SESSION_IMPL *session, const char *filename, bool dur
 }
 
 /*
+ * __wt_block_manager_drop_object --
+ *     Drop a shared object file from the bucket directory and the cache directory.
+ */
+int
+__wt_block_manager_drop_object(
+  WT_SESSION_IMPL *session, WT_BUCKET_STORAGE *bstorage, const char *filename, bool durable)
+{
+    WT_DECL_ITEM(tmp);
+    WT_DECL_RET;
+
+    WT_UNUSED(durable);
+
+    WT_RET(__wt_scr_alloc(session, 0, &tmp));
+
+    /* Generate the name of the shared object file with the bucket prefix. */
+    WT_ERR(__wt_buf_fmt(session, tmp, "%s%s", bstorage->bucket_prefix, filename));
+    WT_WITH_BUCKET_STORAGE(bstorage, session, ret = __wt_fs_remove(session, tmp->data, false));
+    WT_ERR(ret);
+
+err:
+    __wt_scr_free(session, &tmp);
+    return (ret);
+}
+
+/*
  * __wt_block_manager_create --
  *     Create a file.
  */
