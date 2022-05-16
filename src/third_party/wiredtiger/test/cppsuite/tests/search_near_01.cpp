@@ -55,7 +55,6 @@ class search_near_01 : public test_harness::test {
     {
         logger::log_msg(LOG_INFO, "Populate with thread id: " + std::to_string(tc->id));
 
-        std::string prefix_key;
         uint64_t collections_per_thread = tc->collection_count;
         const uint64_t MAX_ROLLBACKS = 100;
         uint32_t rollback_retries = 0;
@@ -76,10 +75,14 @@ class search_near_01 : public test_harness::test {
                          * Generate the prefix key, and append a random generated key string based
                          * on the key size configuration.
                          */
-                        prefix_key = {ALPHABET.at(tc->id), ALPHABET.at(j), ALPHABET.at(k)};
+                        std::string prefix_key = {
+                          ALPHABET.at(tc->id), ALPHABET.at(j), ALPHABET.at(k)};
                         prefix_key += random_generator::instance().generate_random_string(
                           tc->key_size - PREFIX_KEY_LEN);
-                        if (!tc->insert(cursor, coll.id, prefix_key)) {
+                        std::string value =
+                          random_generator::instance().generate_pseudo_random_string(
+                            tc->value_size);
+                        if (!tc->insert(cursor, coll.id, prefix_key, value)) {
                             testutil_assert(rollback_retries < MAX_ROLLBACKS);
                             /* We failed to insert, rollback our transaction and retry. */
                             tc->transaction.rollback();

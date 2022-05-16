@@ -121,21 +121,22 @@ class thread_context {
     std::string key_to_string(uint64_t key_id);
 
     /*
-     * Generic update function, takes a collection_id and key, will generate the value.
+     * Generic update function, takes a collection_id, key and value.
      *
      * Return true if the operation was successful, a return value of false implies the transaction
      * needs to be rolled back.
      */
-    bool update(scoped_cursor &cursor, uint64_t collection_id, const std::string &key);
+    bool update(scoped_cursor &cursor, uint64_t collection_id, const std::string &key,
+      const std::string &value);
 
     /*
-     * Generic insert function, takes a collection_id and key_id, will generate the value.
+     * Generic insert function, takes a collection_id, key and value.
      *
      * Return true if the operation was successful, a return value of false implies the transaction
      * needs to be rolled back.
      */
-    bool insert(scoped_cursor &cursor, uint64_t collection_id, uint64_t key_id);
-    bool insert(scoped_cursor &cursor, uint64_t collection_id, const std::string &key);
+    bool insert(scoped_cursor &cursor, uint64_t collection_id, const std::string &key,
+      const std::string &value);
 
     /*
      * Generic remove function, takes a collection_id and key and will delete the key if it exists.
@@ -143,8 +144,7 @@ class thread_context {
      * Return true if the operation was successful, a return value of false implies the transaction
      * needs to be rolled back.
      */
-    bool remove(
-      scoped_cursor &cursor, uint64_t collection_id, const std::string &key, wt_timestamp_t ts = 0);
+    bool remove(scoped_cursor &cursor, uint64_t collection_id, const std::string &key);
     void sleep();
     bool running() const;
 

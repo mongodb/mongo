@@ -214,7 +214,8 @@ thread_context::key_to_string(uint64_t key_id)
 }
 
 bool
-thread_context::update(scoped_cursor &cursor, uint64_t collection_id, const std::string &key)
+thread_context::update(
+  scoped_cursor &cursor, uint64_t collection_id, const std::string &key, const std::string &value)
 {
     WT_DECL_RET;
 
@@ -223,10 +224,11 @@ thread_context::update(scoped_cursor &cursor, uint64_t collection_id, const std:
 
     wt_timestamp_t ts = tsm->get_next_ts();
     transaction.set_commit_timestamp(ts);
-    std::string value = random_generator::instance().generate_pseudo_random_string(value_size);
+
     cursor->set_key(cursor.get(), key.c_str());
     cursor->set_value(cursor.get(), value.c_str());
     ret = cursor->update(cursor.get());
+
     if (ret != 0) {
         if (ret == WT_ROLLBACK) {
             transaction.set_needs_rollback(true);
@@ -249,13 +251,8 @@ thread_context::update(scoped_cursor &cursor, uint64_t collection_id, const std:
 }
 
 bool
-thread_context::insert(scoped_cursor &cursor, uint64_t collection_id, uint64_t key_id)
-{
-    return insert(cursor, collection_id, key_to_string(key_id));
-}
-
-bool
-thread_context::insert(scoped_cursor &cursor, uint64_t collection_id, const std::string &key)
+thread_context::insert(
+  scoped_cursor &cursor, uint64_t collection_id, const std::string &key, const std::string &value)
 {
     WT_DECL_RET;
 
@@ -265,11 +262,10 @@ thread_context::insert(scoped_cursor &cursor, uint64_t collection_id, const std:
     wt_timestamp_t ts = tsm->get_next_ts();
     transaction.set_commit_timestamp(ts);
 
-    std::string value = random_generator::instance().generate_pseudo_random_string(value_size);
-
     cursor->set_key(cursor.get(), key.c_str());
     cursor->set_value(cursor.get(), value.c_str());
     ret = cursor->insert(cursor.get());
+
     if (ret != 0) {
         if (ret == WT_ROLLBACK) {
             transaction.set_needs_rollback(true);
@@ -292,19 +288,13 @@ thread_context::insert(scoped_cursor &cursor, uint64_t collection_id, const std:
 }
 
 bool
-thread_context::remove(
-  scoped_cursor &cursor, uint64_t collection_id, const std::string &key, wt_timestamp_t ts)
+thread_context::remove(scoped_cursor &cursor, uint64_t collection_id, const std::string &key)
 {
     WT_DECL_RET;
     testutil_assert(tracking != nullptr);
     testutil_assert(cursor.get() != nullptr);
 
-    /*
-     * When no timestamp is specified, get one to apply for the deletion. We still do this even if
-     * the timestamp manager is not enabled as it will return a value for the tracking table.
-     */
-    if (ts == 0)
-        ts = tsm->get_next_ts();
+    wt_timestamp_t ts = tsm->get_next_ts();
     transaction.set_commit_timestamp(ts);
 
     cursor->set_key(cursor.get(), key.c_str());
