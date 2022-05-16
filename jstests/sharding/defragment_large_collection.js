@@ -82,7 +82,8 @@ let runTest = function(numCollections, dbName) {
         const finalNumberChunks = findChunksUtil.countChunksForNs(st.s.getDB('config'), ns);
         jsTest.log("Finished defragmentation of collection " + coll + " with " + finalNumberChunks +
                    " chunks.");
-        defragmentationUtil.checkPostDefragmentationState(st.s, ns, maxChunkSizeMB, "key");
+        defragmentationUtil.checkPostDefragmentationState(
+            st.configRS.getPrimary(), st.s, ns, maxChunkSizeMB, "key");
     });
 
     st.printShardingStatus();

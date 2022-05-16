@@ -1611,6 +1611,11 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transi
     DefragmentationPhaseEnum nextPhase,
     bool shouldPersistPhase) {
     std::unique_ptr<DefragmentationPhase> nextPhaseObject(nullptr);
+    if (nextPhase == DefragmentationPhaseEnum::kSplitChunks &&
+        feature_flags::gNoMoreAutoSplitter.isEnabled(serverGlobalParams.featureCompatibility)) {
+        nextPhase = DefragmentationPhaseEnum::kFinished;
+    }
+
     try {
         if (shouldPersistPhase) {
             _persistPhaseUpdate(opCtx, nextPhase, coll.getUuid());
@@ -1629,13 +1634,7 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transi
                 nextPhaseObject = MergeChunksPhase::build(opCtx, coll);
                 break;
             case DefragmentationPhaseEnum::kSplitChunks:
-                if (feature_flags::gNoMoreAutoSplitter.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
-                    _clearDefragmentationState(opCtx, coll.getUuid());
-                } else {
-                    nextPhaseObject = SplitChunksPhase::build(opCtx, coll);
-                }
-
+                nextPhaseObject = SplitChunksPhase::build(opCtx, coll);
                 break;
             case DefragmentationPhaseEnum::kFinished:
                 _clearDefragmentationState(opCtx, coll.getUuid());
