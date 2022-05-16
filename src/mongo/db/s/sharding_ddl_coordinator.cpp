@@ -125,10 +125,9 @@ bool ShardingDDLCoordinator::_removeDocument(OperationContext* opCtx) {
     batchedResponse.parseBSON(commandReply, &unusedErrmsg);
 
     WriteConcernResult ignoreResult;
-    const WriteConcernOptions majorityWriteConcern{
-        WriteConcernOptions::kMajority,
-        WriteConcernOptions::SyncMode::UNSET,
-        WriteConcernOptions::kWriteConcernTimeoutSharding};
+    const WriteConcernOptions majorityWriteConcern{WriteConcernOptions::kMajority,
+                                                   WriteConcernOptions::SyncMode::UNSET,
+                                                   WriteConcernOptions::kNoTimeout};
     auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     uassertStatusOK(waitForWriteConcern(opCtx, latestOpTime, majorityWriteConcern, &ignoreResult));
 

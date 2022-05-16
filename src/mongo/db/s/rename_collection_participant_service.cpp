@@ -203,12 +203,23 @@ void RenameParticipantInstance::_enterPhase(Phase newPhase) {
     PersistentTaskStore<StateDoc> store(NamespaceString::kShardingRenameParticipantsNamespace);
 
     if (_doc.getPhase() == Phase::kUnset) {
-        store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcernShardingTimeout);
+        try {
+            store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcernNoTimeout);
+        } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+            // A series of step-up and step-down events can cause a node to try and insert the
+            // document when it has already been persisted locally, but we must still wait for
+            // majority commit.
+            const auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
+            const auto lastLocalOpTime = replCoord->getMyLastAppliedOpTime();
+            WaitForMajorityService::get(opCtx->getServiceContext())
+                .waitUntilMajority(lastLocalOpTime, opCtx.get()->getCancellationToken())
+                .get(opCtx.get());
+        }
     } else {
         store.update(opCtx.get(),
                      BSON(StateDoc::kFromNssFieldName << fromNss().ns()),
                      newDoc.toBSON(),
-                     WriteConcerns::kMajorityWriteConcernShardingTimeout);
+                     WriteConcerns::kMajorityWriteConcernNoTimeout);
     }
 
     _doc = std::move(newDoc);
@@ -224,7 +235,7 @@ void RenameParticipantInstance::_removeStateDocument(OperationContext* opCtx) {
     PersistentTaskStore<StateDoc> store(NamespaceString::kShardingRenameParticipantsNamespace);
     store.remove(opCtx,
                  BSON(StateDoc::kFromNssFieldName << fromNss().ns()),
-                 WriteConcerns::kMajorityWriteConcernShardingTimeout);
+                 WriteConcerns::kMajorityWriteConcernNoTimeout);
 
     _doc = {};
 }
@@ -377,7 +388,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 service->releaseRecoverableCriticalSection(
                     opCtx, fromNss(), reason, ShardingCatalogClient::kLocalWriteConcern);
                 service->releaseRecoverableCriticalSection(
-                    opCtx, toNss(), reason, ShardingCatalogClient::kMajorityWriteConcern);
+                    opCtx, toNss(), reason, WriteConcerns::kMajorityWriteConcernNoTimeout);
 
                 LOGV2(5515107, "CRUD unblocked", "fromNs"_attr = fromNss(), "toNs"_attr = toNss());
             }))
