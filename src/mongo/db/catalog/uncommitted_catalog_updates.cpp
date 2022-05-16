@@ -73,10 +73,10 @@ UncommittedCatalogUpdates::CollectionLookupResult UncommittedCatalogUpdates::loo
 }
 
 boost::optional<const ViewsForDatabase&> UncommittedCatalogUpdates::getViewsForDatabase(
-    StringData dbName) const {
+    const DatabaseName& dbName) const {
     // Perform a reverse search so we find most recent entry affecting this namespace.
     auto it = std::find_if(_entries.rbegin(), _entries.rend(), [&](auto&& entry) {
-        return entry.nss.db() == dbName && entry.viewsForDb;
+        return entry.nss.dbName() == dbName && entry.viewsForDb;
     });
     if (it == _entries.rend()) {
         return boost::none;
@@ -182,11 +182,11 @@ void UncommittedCatalogUpdates::dropCollection(const Collection* collection) {
     it->collection = nullptr;
 }
 
-void UncommittedCatalogUpdates::replaceViewsForDatabase(StringData dbName,
+void UncommittedCatalogUpdates::replaceViewsForDatabase(const DatabaseName& dbName,
                                                         ViewsForDatabase&& vfdb) {
     _entries.push_back({Entry::Action::kReplacedViewsForDatabase,
                         nullptr,
-                        NamespaceString{dbName},
+                        NamespaceString{dbName, ""},
                         boost::none,
                         {},
                         std::move(vfdb)});
@@ -215,7 +215,8 @@ std::vector<UncommittedCatalogUpdates::Entry> UncommittedCatalogUpdates::release
     return ret;
 }
 
-void UncommittedCatalogUpdates::setIgnoreExternalViewChanges(StringData dbName, bool value) {
+void UncommittedCatalogUpdates::setIgnoreExternalViewChanges(const DatabaseName& dbName,
+                                                             bool value) {
     if (value) {
         _ignoreExternalViewChanges.emplace(dbName);
     } else {
@@ -223,7 +224,7 @@ void UncommittedCatalogUpdates::setIgnoreExternalViewChanges(StringData dbName, 
     }
 }
 
-bool UncommittedCatalogUpdates::shouldIgnoreExternalViewChanges(StringData dbName) const {
+bool UncommittedCatalogUpdates::shouldIgnoreExternalViewChanges(const DatabaseName& dbName) const {
     return _ignoreExternalViewChanges.contains(dbName);
 }
 

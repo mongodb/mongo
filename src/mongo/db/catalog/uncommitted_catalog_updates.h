@@ -139,7 +139,7 @@ public:
     static CollectionLookupResult lookupCollection(OperationContext* opCtx,
                                                    const NamespaceString& nss);
 
-    boost::optional<const ViewsForDatabase&> getViewsForDatabase(StringData dbName) const;
+    boost::optional<const ViewsForDatabase&> getViewsForDatabase(const DatabaseName& dbName) const;
 
     /**
      * Add collection to entries and register RecoveryUnit preCommitHook to throw a
@@ -174,7 +174,7 @@ public:
      * the primary low-level write method to alter any information about the views associated with a
      * given database.
      */
-    void replaceViewsForDatabase(StringData dbName, ViewsForDatabase&& vfdb);
+    void replaceViewsForDatabase(const DatabaseName& dbName, ViewsForDatabase&& vfdb);
 
     /**
      * Adds a ResourceID associated with a view namespace, and registers a preCommitHook to do
@@ -197,7 +197,7 @@ public:
      * should be used by DDL operations to prevent op observers from triggering additional catalog
      * operations.
      */
-    void setIgnoreExternalViewChanges(StringData dbName, bool value);
+    void setIgnoreExternalViewChanges(const DatabaseName& dbName, bool value);
 
     /**
      * The catalog needs to ignore external view changes for its own modifications. This method can
@@ -205,7 +205,7 @@ public:
      * between an external write to 'system.views' and one initiated through the proper view DDL
      * operations.
      */
-    bool shouldIgnoreExternalViewChanges(StringData dbName) const;
+    bool shouldIgnoreExternalViewChanges(const DatabaseName& dbName) const;
 
     /**
      * Checks if there is an entry with the nss `nss` and the
@@ -234,7 +234,7 @@ private:
      */
     std::vector<Entry> _entries;
 
-    StringSet _ignoreExternalViewChanges;
+    stdx::unordered_set<DatabaseName> _ignoreExternalViewChanges;
 };
 
 }  // namespace mongo

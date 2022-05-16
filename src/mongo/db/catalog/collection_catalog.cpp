@@ -62,7 +62,7 @@ const OperationContext::Decoration<std::shared_ptr<const CollectionCatalog>> sta
 
 class IgnoreExternalViewChangesForDatabase {
 public:
-    IgnoreExternalViewChangesForDatabase(OperationContext* opCtx, StringData dbName)
+    IgnoreExternalViewChangesForDatabase(OperationContext* opCtx, const DatabaseName& dbName)
         : _opCtx(opCtx), _dbName(dbName) {
         auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(_opCtx);
         uncommittedCatalogUpdates.setIgnoreExternalViewChanges(_dbName, true);
@@ -75,7 +75,7 @@ public:
 
 private:
     OperationContext* _opCtx;
-    std::string _dbName;
+    DatabaseName _dbName;
 };
 
 /**
@@ -95,9 +95,7 @@ public:
                                        std::shared_ptr<Collection> collection) {
         catalog._collections[collection->ns()] = collection;
         catalog._catalog[collection->uuid()] = collection;
-        // TODO SERVER-64608 Use tenantID from ns
-        auto dbIdPair =
-            std::make_pair(DatabaseName(boost::none, collection->ns().db()), collection->uuid());
+        auto dbIdPair = std::make_pair(collection->ns().dbName(), collection->uuid());
         catalog._orderedCollections[dbIdPair] = collection;
     }
 
@@ -181,7 +179,7 @@ public:
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kReplacedViewsForDatabase: {
                     writeJobs.push_back(
-                        [dbName = DatabaseName(boost::none, entry.nss.db()),
+                        [dbName = entry.nss.dbName(),
                          &viewsForDb = entry.viewsForDb.get()](CollectionCatalog& catalog) {
                             catalog._replaceViewsForDatabase(dbName, std::move(viewsForDb));
                         });
@@ -482,12 +480,11 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
-    DatabaseName dbName(boost::none, viewName.db());
-    invariant(_viewsForDatabase.contains(dbName));
-    const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, dbName);
+    invariant(_viewsForDatabase.contains(viewName.dbName()));
+    const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    if (uncommittedCatalogUpdates.shouldIgnoreExternalViewChanges(viewName.db())) {
+    if (uncommittedCatalogUpdates.shouldIgnoreExternalViewChanges(viewName.dbName())) {
         return Status::OK();
     }
 
@@ -508,7 +505,7 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
 
     Status result = Status::OK();
     {
-        IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.db());
+        IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.dbName());
 
         result = _createOrUpdateView(opCtx,
                                      viewName,
@@ -532,10 +529,8 @@ Status CollectionCatalog::modifyView(
     invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_X));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
-
-    DatabaseName dbName(boost::none, viewName.db());
-    invariant(_viewsForDatabase.contains(dbName));
-    const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, dbName);
+    invariant(_viewsForDatabase.contains(viewName.dbName()));
+    const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
 
     if (viewName.db() != viewOn.db())
         return Status(ErrorCodes::BadValue,
@@ -552,7 +547,7 @@ Status CollectionCatalog::modifyView(
 
     Status result = Status::OK();
     {
-        IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.db());
+        IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.dbName());
 
         result = _createOrUpdateView(opCtx,
                                      viewName,
@@ -571,10 +566,8 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
     invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
-
-    DatabaseName dbName(boost::none, viewName.db());
-    invariant(_viewsForDatabase.contains(dbName));
-    const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, dbName);
+    invariant(_viewsForDatabase.contains(viewName.dbName()));
+    const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
     viewsForDb.requireValidCatalog();
 
     // Make sure the view exists before proceeding.
@@ -585,7 +578,7 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
 
     Status result = Status::OK();
     {
-        IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.db());
+        IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.dbName());
 
         ViewsForDatabase writable{viewsForDb};
 
@@ -614,7 +607,7 @@ Status CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseNam
         NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_IS));
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    if (uncommittedCatalogUpdates.shouldIgnoreExternalViewChanges(dbName.db())) {
+    if (uncommittedCatalogUpdates.shouldIgnoreExternalViewChanges(dbName)) {
         return Status::OK();
     }
 
@@ -980,7 +973,7 @@ void CollectionCatalog::iterateViews(OperationContext* opCtx,
 
 std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupView(
     OperationContext* opCtx, const NamespaceString& ns) const {
-    auto viewsForDb = _getViewsForDatabase(opCtx, DatabaseName(boost::none, ns.db()));
+    auto viewsForDb = _getViewsForDatabase(opCtx, ns.dbName());
     if (!viewsForDb) {
         return nullptr;
     }
@@ -1002,7 +995,7 @@ std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupView(
 
 std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupViewWithoutValidatingDurable(
     OperationContext* opCtx, const NamespaceString& ns) const {
-    auto viewsForDb = _getViewsForDatabase(opCtx, DatabaseName(boost::none, ns.db()));
+    auto viewsForDb = _getViewsForDatabase(opCtx, ns.dbName());
     if (!viewsForDb) {
         return nullptr;
     }
@@ -1143,8 +1136,6 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
                                            const UUID& uuid,
                                            std::shared_ptr<Collection> coll) {
     auto nss = coll->ns();
-    // TODO SERVER-64608 Use tenantId from nss
-    auto dbName = DatabaseName(boost::none, nss.db());
     _ensureNamespaceDoesNotExist(opCtx, nss, NamespaceType::kAll);
 
     LOGV2_DEBUG(20280,
@@ -1154,7 +1145,7 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
                 logAttrs(nss),
                 "uuid"_attr = uuid);
 
-    auto dbIdPair = std::make_pair(dbName, uuid);
+    auto dbIdPair = std::make_pair(nss.dbName(), uuid);
 
     // Make sure no entry related to this uuid.
     invariant(_catalog.find(uuid) == _catalog.end());
@@ -1179,8 +1170,8 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
     invariant(static_cast<size_t>(_stats.internal + _stats.userCollections) == _collections.size());
 
     // TODO SERVER-62918 create ResourceId for db with DatabaseName.
-    auto dbRid = ResourceId(RESOURCE_DATABASE, dbName.toString());
-    addResource(dbRid, dbName.toString());
+    auto dbRid = ResourceId(RESOURCE_DATABASE, nss.dbName().toString());
+    addResource(dbRid, nss.dbName().toString());
 
     auto collRid = ResourceId(RESOURCE_COLLECTION, nss.ns());
     addResource(collRid, nss.ns());
@@ -1192,9 +1183,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
 
     auto coll = std::move(_catalog[uuid]);
     auto ns = coll->ns();
-    // TODO SERVER-64608 Use tenantID from ns
-    auto dbName = DatabaseName(boost::none, coll->ns().db());
-    auto dbIdPair = std::make_pair(dbName, uuid);
+    auto dbIdPair = std::make_pair(ns.dbName(), uuid);
 
     LOGV2_DEBUG(20281, 1, "Deregistering collection", logAttrs(ns), "uuid"_attr = uuid);
 
@@ -1263,7 +1252,7 @@ void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
             throwWriteConflictException();
         }
 
-        if (auto viewsForDb = _getViewsForDatabase(opCtx, DatabaseName(boost::none, nss.db()))) {
+        if (auto viewsForDb = _getViewsForDatabase(opCtx, nss.dbName())) {
             if (viewsForDb->lookup(nss) != nullptr) {
                 LOGV2(
                     5725003,
@@ -1390,7 +1379,7 @@ void CollectionCatalog::invariantHasExclusiveAccessToCollection(OperationContext
 boost::optional<const ViewsForDatabase&> CollectionCatalog::_getViewsForDatabase(
     OperationContext* opCtx, const DatabaseName& dbName) const {
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto uncommittedViews = uncommittedCatalogUpdates.getViewsForDatabase(dbName.db());
+    auto uncommittedViews = uncommittedCatalogUpdates.getViewsForDatabase(dbName);
     if (uncommittedViews) {
         return uncommittedViews;
     }
@@ -1471,7 +1460,7 @@ Status CollectionCatalog::_createOrUpdateView(
     if (res.isOK()) {
         auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
         uncommittedCatalogUpdates.addView(opCtx, viewName);
-        uncommittedCatalogUpdates.replaceViewsForDatabase(viewName.db(), std::move(viewsForDb));
+        uncommittedCatalogUpdates.replaceViewsForDatabase(viewName.dbName(), std::move(viewsForDb));
 
         PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
     }
