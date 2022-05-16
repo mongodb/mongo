@@ -126,24 +126,17 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
 }
 
 OpMsgFuzzerFixture::~OpMsgFuzzerFixture() {
-    // The following ensures a thread-local instance of `ThreadContext` is available when running
-    // the destructor code. This is necessary as the main thread uses static storage for the
-    // instance of `OpMsgFuzzerFixture`, which is not destroyed until after all thread-locals are
-    // destructed. See SERVER-58194 for more details.
-    stdx::thread thread([this] {
-        CollectionShardingStateFactory::clear(_serviceContext);
+    CollectionShardingStateFactory::clear(_serviceContext);
 
-        {
-            auto clientGuard = _clientStrand->bind();
-            auto opCtx = _serviceContext->makeOperationContext(clientGuard.get());
-            Lock::GlobalLock glk(opCtx.get(), MODE_X);
-            auto databaseHolder = DatabaseHolder::get(opCtx.get());
-            databaseHolder->closeAll(opCtx.get());
-        }
+    {
+        auto clientGuard = _clientStrand->bind();
+        auto opCtx = _serviceContext->makeOperationContext(clientGuard.get());
+        Lock::GlobalLock glk(opCtx.get(), MODE_X);
+        auto databaseHolder = DatabaseHolder::get(opCtx.get());
+        databaseHolder->closeAll(opCtx.get());
+    }
 
-        shutdownGlobalStorageEngineCleanly(_serviceContext);
-    });
-    thread.join();
+    shutdownGlobalStorageEngineCleanly(_serviceContext);
 }
 
 int OpMsgFuzzerFixture::testOneInput(const char* Data, size_t Size) {
