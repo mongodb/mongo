@@ -57,7 +57,7 @@ public:
 
     void actionCompleted(std::vector<ActionRequestInfo>&& followUpRequests);
 
-    void errorDetectedOnActionCompleted();
+    void errorDetectedOnActionCompleted(OperationContext* opCtx);
 
     bool restartNeeded() const;
 
@@ -86,6 +86,8 @@ private:
     std::vector<ActionRequestInfo> _pendingRequests;
     int _numOutstandingActions;
     bool _restartRequested;
+
+    void _requestRestart(OperationContext* opCtx);
 };
 
 class ClusterChunksResizePolicyImpl : public ClusterChunksResizePolicy {
