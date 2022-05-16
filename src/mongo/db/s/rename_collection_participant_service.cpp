@@ -330,8 +330,6 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 RenameCollectionOptions options;
                 options.dropTarget = _doc.getDropTarget();
                 options.stayTemp = _doc.getStayTemp();
-                options.expectedSourceUUID = _doc.getExpectedSourceUUID();
-                options.expectedTargetUUID = _doc.getExpectedTargetUUID();
 
                 renameOrDropTarget(
                     opCtx, fromNss(), toNss(), options, _doc.getSourceUUID(), _doc.getTargetUUID());
