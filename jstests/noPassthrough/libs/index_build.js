@@ -180,6 +180,8 @@ var IndexBuildTest = class {
         const indexMap = res.cursor.firstBatch.reduce((m, spec) => {
             if (spec.hasOwnProperty('buildUUID')) {
                 m[spec.spec.name] = spec;
+            } else if (options.includeIndexBuildInfo) {
+                m[spec.spec.name] = spec;
             } else {
                 m[spec.name] = spec;
             }
@@ -193,6 +195,8 @@ var IndexBuildTest = class {
             const spec = indexMap[name];
             assert(!spec.hasOwnProperty('buildUUID'),
                    'unexpected buildUUID field in ' + name + ' index spec: ' + tojson(spec));
+            assert(!spec.hasOwnProperty('indexBuildInfo'),
+                   'unexpected indexBuildInfo field in ' + name + ' index spec: ' + tojson(spec));
         }
 
         // Check indexes that are not ready.
@@ -206,6 +210,13 @@ var IndexBuildTest = class {
                        'expected spec field in ' + name + ': ' + tojson(spec));
                 assert(spec.hasOwnProperty('buildUUID'),
                        'expected buildUUID field in ' + name + ': ' + tojson(spec));
+            } else if (options.includeIndexBuildInfo) {
+                assert(spec.hasOwnProperty('spec'),
+                       'expected spec field in ' + name + ': ' + tojson(spec));
+                assert(spec.hasOwnProperty('indexBuildInfo'),
+                       'expected indexBuildInfo field in ' + name + ': ' + tojson(spec));
+                assert(spec.indexBuildInfo.hasOwnProperty('buildUUID'),
+                       'expected indexBuildInfo.buildUUID field in ' + name + ': ' + tojson(spec));
             } else {
                 assert(!spec.hasOwnProperty('buildUUID'),
                        'unexpected buildUUID field in ' + name + ' index spec: ' + tojson(spec));
