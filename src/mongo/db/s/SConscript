@@ -686,6 +686,8 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/read_write_concern_defaults_mock',
         '$BUILD_DIR/mongo/db/repl/replication_info',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
+        '$BUILD_DIR/mongo/db/transaction',
+        '$BUILD_DIR/mongo/db/transaction_api',
         '$BUILD_DIR/mongo/util/version_impl',
         'config_server_test_fixture',
     ],

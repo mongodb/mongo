@@ -30,9 +30,12 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/read_preference.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 
@@ -50,6 +53,18 @@ protected:
         shard.setName(_shardName);
         shard.setHost(_shardName + ":12");
         setupShards({shard});
+
+        DBDirectClient client(operationContext());
+        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
+
+        LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
+        TransactionCoordinatorService::get(operationContext())
+            ->onShardingInitialization(operationContext(), true);
+    }
+
+    void tearDown() override {
+        TransactionCoordinatorService::get(operationContext())->onStepDown();
+        ConfigServerTestFixture::tearDown();
     }
 
     const ShardId _shardId{_shardName};

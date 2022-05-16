@@ -664,6 +664,37 @@ private:
      */
     void _standardizeClusterParameters(OperationContext* opCtx, RemoteCommandTargeter* targeter);
 
+    /**
+     * Execute the merge chunk updates using the internal transaction API.
+     */
+    void _mergeChunksInTransaction(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const UUID& collectionUUID,
+                                   const ChunkVersion& initialVersion,
+                                   const ChunkVersion& mergeVersion,
+                                   const boost::optional<Timestamp>& validAfter,
+                                   std::shared_ptr<std::vector<ChunkType>> chunksToMerge);
+
+    struct SplitChunkInTransactionResult {
+        SplitChunkInTransactionResult(const ChunkVersion& currentMaxVersion_,
+                                      std::shared_ptr<std::vector<ChunkType>> newChunks_)
+            : currentMaxVersion(currentMaxVersion_), newChunks(newChunks_) {}
+
+        ChunkVersion currentMaxVersion;
+        std::shared_ptr<std::vector<ChunkType>> newChunks;
+    };
+
+    /**
+     * Execute the split chunk operations using the internal transaction API.
+     */
+    SplitChunkInTransactionResult _splitChunkInTransaction(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           const ChunkRange& range,
+                                                           const std::string& shardName,
+                                                           const ChunkType& origChunk,
+                                                           const ChunkVersion& collVersion,
+                                                           const std::vector<BSONObj>& splitPoints);
+
     // The owning service context
     ServiceContext* const _serviceContext;
 
