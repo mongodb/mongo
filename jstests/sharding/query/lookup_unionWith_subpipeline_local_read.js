@@ -134,14 +134,17 @@ function assertProfilerEntriesMatch(expected, comment, pipeline) {
                    ' instead in profiler ' +
                    tojson({[node.name]: node.getDB(dbName).system.profile.find().toArray()}));
 
-        const localReadCount = getLocalReadCount(node, foreignNs, comment);
-        let expectedLocalCountList = expected.subPipelineLocal[i];
-        if (!Array.isArray(expectedLocalCountList)) {
-            expectedLocalCountList = [expectedLocalCountList];
+        if (expected.subPipelineLocal) {
+            const localReadCount = getLocalReadCount(node, foreignNs, comment);
+            let expectedLocalCountList = expected.subPipelineLocal[i];
+            if (!Array.isArray(expectedLocalCountList)) {
+                expectedLocalCountList = [expectedLocalCountList];
+            }
+            assert(expectedLocalCountList.includes(localReadCount),
+                   () => 'Expected count of local reads to be in ' +
+                       tojson(expectedLocalCountList) + ' but found ' + localReadCount +
+                       ' instead for node ' + node.name);
         }
-        assert(expectedLocalCountList.includes(localReadCount),
-               () => 'Expected count of local reads to be in ' + tojson(expectedLocalCountList) +
-                   ' but found ' + localReadCount + ' instead for node ' + node.name);
     }
 }
 
@@ -588,10 +591,12 @@ awaitShell();
 let expectedRouting = {
     // At the beginning, the foreign collection is unsharded, so the $lookup cannot be parallelized.
     toplevelExec: [1, 0],
-    // For the first local document, the $lookup can do local reads, since it is executing on the
-    // primary with an unsharded foreign collection. For the remaining two local documents, $lookup
-    // has to open a cursor on every shard to get correct documents for 'foreign'.
-    subPipelineLocal: [1, 0],
+    // We know from prior tests that the $lookup will do a local read for the first local document,
+    // since it is executing on the primary with an unsharded foreign collection. Checking the local
+    // read log here can be flakey because of the failpoint; the local read log may be rotated off
+    // the internal log buffer before we can check for it. Instead, we can just check that for the
+    // remaining two local documents, $lookup has to open a cursor on every shard to get correct
+    // documents for 'foreign'.
     subPipelineRemote: [2, 2]
 };
 assertProfilerEntriesMatch(expectedRouting, parallelTestComment, pipeline);
@@ -624,10 +629,12 @@ failPoint.off();
 awaitShell();
 
 expectedRouting = {
-    // For the first local document, the $lookup can do local reads, since it is executing on the
-    // primary with an unsharded foreign collection. For the remaining two local documents, $lookup
-    // tries and fails to read locally and must target shards to get correct foreign documents.
-    subPipelineLocal: [1, 0],
+    // We know from prior tests that the $lookup will do a local read for the first document, since
+    // it is executing on the primary with an unsharded foreign collection. Checking the local
+    // read log here can be flakey because of the failpoint; the local read log may be rotated off
+    // the internal log buffer before we can check for it. Instead, we can just check that for the
+    // remaining two local documents, $lookup tries and fails to read locally and must target
+    // shards to get correct foreign documents.
     subPipelineRemote: [0, 2]
 };
 assertProfilerEntriesMatch(expectedRouting, parallelTestComment, pipeline);
