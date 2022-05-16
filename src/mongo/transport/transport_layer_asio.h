@@ -130,7 +130,12 @@ public:
      */
     class TimerService {
     public:
-        TimerService();
+        using Spawn = std::function<stdx::thread(std::function<void()>)>;
+        struct Options {
+            Spawn spawn;
+        };
+        explicit TimerService(Options opt);
+        TimerService() : TimerService(Options{}) {}
         ~TimerService();
 
         /**
@@ -165,6 +170,7 @@ public:
         enum class State { kInitialized, kStarted, kStopped };
         AtomicWord<State> _state;
 
+        Spawn _spawn = [](std::function<void()> f) { return stdx::thread{std::move(f)}; };
         stdx::thread _thread;
     };
 
