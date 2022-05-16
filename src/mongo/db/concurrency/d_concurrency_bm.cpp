@@ -95,6 +95,10 @@ protected:
 };
 
 BENCHMARK_DEFINE_F(DConcurrencyTest, BM_StdMutex)(benchmark::State& state) {
+    if (state.thread_index == 0) {
+        makeKClientsWithLockers(state.threads);
+    }
+
     static auto mtx = MONGO_MAKE_LATCH();
 
     for (auto keepRunning : state) {
@@ -103,6 +107,10 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_StdMutex)(benchmark::State& state) {
 }
 
 BENCHMARK_DEFINE_F(DConcurrencyTest, BM_ResourceMutexShared)(benchmark::State& state) {
+    if (state.thread_index == 0) {
+        makeKClientsWithLockers(state.threads);
+    }
+
     static Lock::ResourceMutex mtx("testMutex");
 
     for (auto keepRunning : state) {
@@ -111,6 +119,10 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_ResourceMutexShared)(benchmark::State& s
 }
 
 BENCHMARK_DEFINE_F(DConcurrencyTest, BM_ResourceMutexExclusive)(benchmark::State& state) {
+    if (state.thread_index == 0) {
+        makeKClientsWithLockers(state.threads);
+    }
+
     static Lock::ResourceMutex mtx("testMutex");
 
     for (auto keepRunning : state) {
