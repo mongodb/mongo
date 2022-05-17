@@ -3,6 +3,13 @@
 set -o errexit
 set -o xtrace
 
+mongo="$(pwd)/dist-test/bin/mongo"
+export PATH="$(dirname "$mongo"):$PATH"
+if [ ! -f "$mongo" ]; then
+  echo "Mongo shell at $mongo is missing"
+  exit 1
+fi
+
 function print() {
   echo "$@" >&2
 }
@@ -19,7 +26,7 @@ if [ ! -f "$TEST_PATH" ]; then
 fi
 
 # test file is even good before going on
-if ! mongo --nodb --norc --quiet "$TEST_PATH"; then
+if ! "$mongo" --nodb --norc --quiet "$TEST_PATH"; then
   print "File $TEST_PATH has syntax errors"
   exit 1
 fi
@@ -42,14 +49,14 @@ sudo --non-interactive bash -c '
 '
 
 # create mongo config
-mongo --nodb --norc --quiet --eval='
+"$mongo" --nodb --norc --quiet --eval='
     assert(load("'"$TEST_PATH"'"));
     const test = new TestDefinition();
     print(typeof(test.config) === "string" ? test.config : JSON.stringify(test.config, null, 2));
 ' | sudo --non-interactive tee /etc/mongod.conf
 
 # setup
-mongo --nodb --norc --quiet --eval='
+"$mongo" --nodb --norc --quiet --eval='
     assert(load("'"$TEST_PATH"'"));
     const test = new TestDefinition();
     jsTest.log("Running setup()");
@@ -78,7 +85,7 @@ sudo --non-interactive systemctl start mongod \
 )
 
 # run test and teardown
-mongo --norc --gssapiServiceName=mockservice --eval='
+"$mongo" --norc --gssapiServiceName=mockservice --eval='
     assert(load("'"$TEST_PATH"'"));
     // name is such to prevent collisions
     const test_812de7ce = new TestDefinition();
