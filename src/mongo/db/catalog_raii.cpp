@@ -302,7 +302,8 @@ AutoGetCollection::AutoGetCollection(
 
     if ((_view = catalog->lookupView(opCtx, _resolvedNss))) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
-                str::stream() << "Namespace " << _resolvedNss.ns() << " is a timeseries collection",
+                str::stream() << "Taking " << _resolvedNss.ns()
+                              << " lock for timeseries is not allowed",
                 viewMode == AutoGetCollectionViewMode::kViewsPermitted || !_view->timeseries());
 
         uassert(ErrorCodes::CommandNotSupportedOnView,
@@ -432,10 +433,10 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
     }
 
     _view = catalog->lookupView(opCtx, _resolvedNss);
-    uassert(ErrorCodes::CommandNotSupportedOnView,
-            str::stream() << "Namespace " << _resolvedNss.ns() << " is a timeseries collection",
-            !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted ||
-                !_view->timeseries());
+    uassert(
+        ErrorCodes::CommandNotSupportedOnView,
+        str::stream() << "Taking " << _resolvedNss.ns() << " lock for timeseries is not allowed",
+        !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted || !_view->timeseries());
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "Namespace " << _resolvedNss.ns() << " is a view, not a collection",
             !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted);

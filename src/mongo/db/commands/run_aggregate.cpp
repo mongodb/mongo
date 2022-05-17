@@ -763,8 +763,8 @@ Status runAggregate(OperationContext* opCtx,
             if (!origNss.isCollectionlessAggregateNS()) {
                 auto view = catalog->lookupView(opCtx, origNss);
                 uassert(ErrorCodes::CommandNotSupportedOnView,
-                        str::stream()
-                            << "Namespace " << origNss.ns() << " is a timeseries collection",
+                        str::stream() << "Cannot run aggregation on timeseries with namespace "
+                                      << origNss.ns(),
                         !view || !view->timeseries());
                 uassert(ErrorCodes::CommandNotSupportedOnView,
                         str::stream()
