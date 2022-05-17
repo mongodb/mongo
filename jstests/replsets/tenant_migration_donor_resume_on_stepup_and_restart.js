@@ -3,17 +3,12 @@
  *
  * Incompatible with shard merge, which can't handle restart.
  *
- * TODO SERVER-66034: Remove requires_fcv_61 tag.
- *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
- *   # failpoint pauseTenantMigrationAfterUpdatingToCommittedState only exists on the latest branch.
- *   requires_fcv_61,
- *   # Tenant migrations are only used in serverless.
  *   serverless,
  * ]
  */
@@ -199,8 +194,7 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
  * interrupts the donor using the 'interruptFunc', and asserts that the migration state is
  * eventually garbage collected.
  */
-function testDonorAbortMigrationInterrupt(
-    interruptFunc, fpName, {fpWaitBeforeAbort = false, isShutdown = false} = {}) {
+function testDonorAbortMigrationInterrupt(interruptFunc, fpName, isShutdown = false) {
     const donorRst = new ReplSetTest({
         nodes: 3,
         name: "donorRst",
@@ -247,10 +241,6 @@ function testDonorAbortMigrationInterrupt(
     }
 
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
-
-    if (fp && !isShutdown && fpWaitBeforeAbort) {
-        fp.wait();
-    }
 
     const tryAbortThread = new Thread(TenantMigrationUtil.tryAbortMigrationAsync,
                                       {migrationIdString: migrationOpts.migrationIdString},
@@ -414,17 +404,8 @@ function testStateDocPersistenceOnFailover(interruptFunc, fpName, isShutdown = f
             // migration and cause it to fail.
             donorRst.stopSet(null /* signal */, true /*forRestart */, {skipValidation: true});
             donorRst.startSet({restart: true});
-        }, fpName, {isShutdown: true});
+        }, fpName, true);
     });
-})();
-
-(() => {
-    jsTest.log(
-        "Test that the donorAbortMigration command fails if issued after state == kCommitted");
-
-    testDonorAbortMigrationInterrupt((donorRst) => {},
-                                     "pauseTenantMigrationAfterUpdatingToCommittedState",
-                                     {fpWaitBeforeAbort: true});
 })();
 
 (() => {
