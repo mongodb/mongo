@@ -2157,7 +2157,10 @@ public:
     }
 
     bool isCommutative() const final {
-        return true;
+        // Only commutative when performing binary string comparison. The first value entered when
+        // multiple collation-equal but binary-unequal values are added will dictate what is stored
+        // in the set.
+        return getExpressionContext()->getCollator() == nullptr;
     }
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
