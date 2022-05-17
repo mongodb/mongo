@@ -52,6 +52,7 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sample.h"
+#include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -982,6 +983,15 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
         tryInsertBucketLevelSortAndGroup(AccumulatorDocumentsNeeded::kLastDocument);
 }
 
+// Find $sequentialDocumentCache in the rest of the pipeline.
+Pipeline::SourceContainer::iterator findSequentialDocumentCache(
+    Pipeline::SourceContainer::iterator start, Pipeline::SourceContainer::iterator end) {
+    while (start != end && !dynamic_cast<DocumentSourceSequentialDocumentCache*>(start->get())) {
+        start = std::next(start);
+    }
+    return start;
+}
+
 Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
@@ -1077,6 +1087,18 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         }
 
         Pipeline::optimizeEndOfPipeline(itr, container);
+
+        // $sequentialDocumentCache is full pipeline context aware. The call to
+        // optimizeEndOfPipeline above isolates part of the pipeline and $sequentialDocumentCache
+        // optimization applies incorrectly. The second call to
+        // $sequentialDocumentCache->optimizeAt() is no-op, so it has to be forced.
+        auto cache = findSequentialDocumentCache(std::next(itr), container->end());
+        if (cache != container->end()) {
+            auto cacheDocSource =
+                dynamic_cast<DocumentSourceSequentialDocumentCache*>(cache->get());
+            cacheDocSource->forceOptimizeAt(cache, container);
+        }
+
         if (std::next(itr) == container->end()) {
             return container->end();
         } else {

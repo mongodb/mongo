@@ -97,6 +97,12 @@ public:
         return newStage;
     }
 
+    Pipeline::SourceContainer::iterator forceOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                        Pipeline::SourceContainer* container) {
+        _hasOptimizedPos = false;
+        return doOptimizeAt(itr, container);
+    }
+
 protected:
     GetNextResult doGetNext() final;
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
