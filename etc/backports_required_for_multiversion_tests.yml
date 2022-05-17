@@ -220,6 +220,8 @@ last-continuous:
       test_file: jstests/replsets/initial_sync_with_partial_transaction.js
     - ticket: SERVER-65947
       test_file: jstests/sharding/migration_retries_on_write_conflict_exceptions.js
+    - ticket: SERVER-66264
+      test_file: jstests/sharding/timeseries_multiple_mongos.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -575,6 +577,8 @@ last-lts:
       test_file: jstests/replsets/initial_sync_with_partial_transaction.js
     - ticket: SERVER-65947
       test_file: jstests/sharding/migration_retries_on_write_conflict_exceptions.js
+    - ticket: SERVER-66264
+      test_file: jstests/sharding/timeseries_multiple_mongos.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

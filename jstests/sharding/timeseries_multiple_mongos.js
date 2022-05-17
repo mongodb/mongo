@@ -60,6 +60,7 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
     const isDelete = cmdObj["delete"] !== undefined;
     const isUpdate = cmdObj["update"] !== undefined;
     const isCollMod = cmdObj["collMod"] !== undefined;
+    const isDropIndex = cmdObj["dropIndexes"] !== undefined;
     const cmdCollName = cmdObj[Object.keys(cmdObj)[0]];
     const shardKeyHasMetaField = shardKey[metaField] !== undefined;
 
@@ -174,8 +175,10 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
     assert.commandWorked(mongos0.createCollection(
         collName, {timeseries: {timeField: timeField, metaField: metaField}}));
 
-    // When unsharded, the command should be run against the user requested namespace.
-    validateCommand(cmdCollName, numProfilerEntries.unsharded, true);
+    // When unsharded, the command should be run against the user requested namespace, except for
+    // dropIndex.
+    validateCommand(
+        isDropIndex ? bucketsCollName : cmdCollName, numProfilerEntries.unsharded, true);
 }
 
 /**
