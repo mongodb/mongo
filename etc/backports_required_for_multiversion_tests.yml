@@ -246,6 +246,8 @@ last-continuous:
       test_file: jstests/core/plan_cache_list_shapes.js
     - ticket: SERVER-66445
       test_file: jstests/core/plan_cache_list_plans.js
+    - ticket: SERVER-65947
+      test_file: jstests/sharding/migration_retries_on_write_conflict_exceptions.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -625,6 +627,8 @@ last-lts:
       test_file: jstests/core/plan_cache_list_shapes.js
     - ticket: SERVER-66445
       test_file: jstests/core/plan_cache_list_plans.js
+    - ticket: SERVER-65947
+      test_file: jstests/sharding/migration_retries_on_write_conflict_exceptions.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

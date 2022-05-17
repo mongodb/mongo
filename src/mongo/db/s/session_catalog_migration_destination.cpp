@@ -36,6 +36,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/logical_session_id.h"
@@ -201,7 +202,9 @@ BSONObj getNextSessionOplogBatch(OperationContext* opCtx,
  * information. The new oplogEntry will also link to prePostImageTs if not null.
  */
 ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
-                                       const ProcessOplogResult& lastResult) {
+                                       const ProcessOplogResult& lastResult,
+                                       ServiceContext* serviceContext,
+                                       CancellationToken cancellationToken) {
     auto oplogEntry = parseOplog(oplogBSON);
 
     ProcessOplogResult result;
@@ -247,7 +250,9 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
 
     const auto stmtIds = oplogEntry.getStatementIds();
 
-    auto uniqueOpCtx = cc().makeOperationContext();
+    auto executor = Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor();
+    auto uniqueOpCtx =
+        CancelableOperationContext(cc().makeOperationContext(), cancellationToken, executor);
     auto opCtx = uniqueOpCtx.get();
     opCtx->setLogicalSessionId(result.sessionId);
     opCtx->setTxnNumber(result.txnNum);
@@ -344,10 +349,14 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
 }  // namespace
 
 SessionCatalogMigrationDestination::SessionCatalogMigrationDestination(
-    NamespaceString nss, ShardId fromShard, MigrationSessionId migrationSessionId)
+    NamespaceString nss,
+    ShardId fromShard,
+    MigrationSessionId migrationSessionId,
+    CancellationToken cancellationToken)
     : _nss(std::move(nss)),
       _fromShard(std::move(fromShard)),
-      _migrationSessionId(std::move(migrationSessionId)) {}
+      _migrationSessionId(std::move(migrationSessionId)),
+      _cancellationToken(std::move(cancellationToken)) {}
 
 SessionCatalogMigrationDestination::~SessionCatalogMigrationDestination() {
     if (_thread.joinable()) {
@@ -429,7 +438,9 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
         BSONObj nextBatch;
         BSONArray oplogArray;
         {
-            auto uniqueCtx = cc().makeOperationContext();
+            auto executor = Grid::get(service)->getExecutorPool()->getFixedExecutor();
+            auto uniqueCtx = CancelableOperationContext(
+                cc().makeOperationContext(), _cancellationToken, executor);
             auto opCtx = uniqueCtx.get();
 
             nextBatch = getNextSessionOplogBatch(opCtx, _fromShard, _migrationSessionId);
@@ -484,7 +495,8 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
         }
         for (BSONArrayIteratorSorted oplogIter(oplogArray); oplogIter.more();) {
             try {
-                lastResult = processSessionOplog(oplogIter.next().Obj(), lastResult);
+                lastResult = processSessionOplog(
+                    oplogIter.next().Obj(), lastResult, service, _cancellationToken);
             } catch (const ExceptionFor<ErrorCodes::TransactionTooOld>&) {
                 // This means that the server has a newer txnNumber than the oplog being
                 // migrated, so just skip it
@@ -494,7 +506,11 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
     }
 
     WriteConcernResult unusedWCResult;
-    auto uniqueOpCtx = cc().makeOperationContext();
+
+    auto executor = Grid::get(service)->getExecutorPool()->getFixedExecutor();
+    auto uniqueOpCtx =
+        CancelableOperationContext(cc().makeOperationContext(), _cancellationToken, executor);
+
     uassertStatusOK(
         waitForWriteConcern(uniqueOpCtx.get(), lastResult.oplogTime, kMajorityWC, &unusedWCResult));
 

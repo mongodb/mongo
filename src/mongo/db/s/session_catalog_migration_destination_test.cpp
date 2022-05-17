@@ -280,6 +280,8 @@ public:
             ->setFilteringMetadata(operationContext(), CollectionMetadata());
     }
 
+    CancellationSource _cancellationSource;
+
 private:
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
         class StaticCatalogClient final : public ShardingCatalogClientMock {
@@ -327,7 +329,8 @@ private:
 };
 
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyWhenNothingToTransfer) {
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
 
     sessionMigration.start(getServiceContext());
     finishSessionExpectSuccess(&sessionMigration);
@@ -336,7 +339,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyWhenNothingToTr
 TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxn) {
     const auto sessionId = makeLogicalSessionIdForTest();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
 
     OperationSessionInfo sessionInfo;
@@ -396,7 +400,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxn) {
 TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithMultiStmtIds) {
     const auto sessionId = makeLogicalSessionIdForTest();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
 
     OperationSessionInfo sessionInfo;
@@ -459,7 +464,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithMultiStmtIds) {
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldOnlyStoreHistoryOfLatestTxn) {
     const auto sessionId = makeLogicalSessionIdForTest();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
 
     OperationSessionInfo sessionInfo;
@@ -514,7 +520,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldOnlyStoreHistoryOfLatestTxn
 TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxnInSeparateBatches) {
     const auto sessionId = makeLogicalSessionIdForTest();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
 
     OperationSessionInfo sessionInfo;
@@ -578,7 +585,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithDifferentSession)
     const auto sessionId1 = makeLogicalSessionIdForTest();
     const auto sessionId2 = makeLogicalSessionIdForTest();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
 
     OperationSessionInfo sessionInfo1;
@@ -661,7 +669,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithDifferentSession)
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldNotNestAlreadyNestedOplog) {
     const auto sessionId = makeLogicalSessionIdForTest();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
 
     OperationSessionInfo sessionInfo;
@@ -726,7 +735,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldNotNestAlreadyNestedOplog) 
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePreImageFindAndModify) {
     const auto sessionId = makeLogicalSessionIdForTest();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
 
     sessionMigration.start(getServiceContext());
 
@@ -818,7 +828,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePreImageFindA
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleForgedPreImageFindAndModify) {
     const auto sessionId = makeLogicalSessionIdForTest();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
 
     sessionMigration.start(getServiceContext());
 
@@ -912,7 +923,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleForgedPreImag
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFindAndModify) {
     const auto sessionId = makeLogicalSessionIdForTest();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
 
     OperationSessionInfo sessionInfo;
@@ -1003,7 +1015,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFind
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleForgedPostImageFindAndModify) {
     const auto sessionId = makeLogicalSessionIdForTest();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
 
     OperationSessionInfo sessionInfo;
@@ -1095,7 +1108,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleForgedPostIma
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleFindAndModifySplitIn2Batches) {
     const auto sessionId = makeLogicalSessionIdForTest();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
 
     OperationSessionInfo sessionInfo;
@@ -1201,7 +1215,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, OlderTxnShouldBeIgnored) {
                                   << "newerSess"),
                              0);
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
 
     OperationSessionInfo oldSessionInfo;
@@ -1252,7 +1267,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, NewerTxnWriteShouldNotBeOverwritt
 
     auto opCtx = operationContext();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
 
     OperationSessionInfo oldSessionInfo;
@@ -1309,7 +1325,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, NewerTxnWriteShouldNotBeOverwritt
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyAfterNetworkError) {
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
     sessionMigration.finish();
 
@@ -1324,7 +1341,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyAfterNetworkErr
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyForResponseWithNoOplog) {
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
     sessionMigration.finish();
 
@@ -1339,7 +1357,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyForResponseWith
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyForResponseWithBadOplogFormat) {
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
     sessionMigration.finish();
 
@@ -1358,7 +1377,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyForResponseWith
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyForResponseWithNoSessionId) {
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
 
     sessionMigration.start(getServiceContext());
     sessionMigration.finish();
@@ -1383,7 +1403,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyForResponseWith
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyForResponseWithNoTxnNumber) {
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
     sessionMigration.finish();
 
@@ -1407,7 +1428,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyForResponseWith
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyForResponseWithNoStmtId) {
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
 
     sessionMigration.start(getServiceContext());
     sessionMigration.finish();
@@ -1437,7 +1459,8 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     const auto sessionId = makeLogicalSessionIdForTest();
     auto opCtx = operationContext();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
 
     OperationSessionInfo sessionInfo;
@@ -1502,7 +1525,8 @@ TEST_F(SessionCatalogMigrationDestinationTest,
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldErrorForConsecutivePreImageOplog) {
     const auto sessionId = makeLogicalSessionIdForTest();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
 
     sessionMigration.start(getServiceContext());
 
@@ -1540,7 +1564,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldErrorForConsecutivePreImage
 TEST_F(SessionCatalogMigrationDestinationTest,
        ShouldErrorForPreImageOplogWithNonMatchingSessionId) {
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
 
     sessionMigration.start(getServiceContext());
 
@@ -1581,7 +1606,8 @@ TEST_F(SessionCatalogMigrationDestinationTest,
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldErrorForPreImageOplogWithNonMatchingTxnNum) {
     const auto sessionId = makeLogicalSessionIdForTest();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
 
     sessionMigration.start(getServiceContext());
 
@@ -1623,7 +1649,8 @@ TEST_F(SessionCatalogMigrationDestinationTest,
        ShouldErrorIfPreImageOplogFollowWithOplogWithNoPreImageLink) {
     const auto sessionId = makeLogicalSessionIdForTest();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
 
     sessionMigration.start(getServiceContext());
 
@@ -1662,7 +1689,8 @@ TEST_F(SessionCatalogMigrationDestinationTest,
        ShouldErrorIfOplogWithPreImageLinkIsPrecededByNormalOplog) {
     const auto sessionId = makeLogicalSessionIdForTest();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
 
     sessionMigration.start(getServiceContext());
 
@@ -1703,7 +1731,8 @@ TEST_F(SessionCatalogMigrationDestinationTest,
        ShouldErrorIfOplogWithPostImageLinkIsPrecededByNormalOplog) {
     const auto sessionId = makeLogicalSessionIdForTest();
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
 
     sessionMigration.start(getServiceContext());
 
@@ -1750,7 +1779,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldIgnoreAlreadyExecutedStatem
 
     insertDocWithSessionInfo(sessionInfo, kNs, BSON("_id" << 46), 30);
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
 
     auto oplog1 = makeOplogEntry(OpTime(Timestamp(60, 2), 1),  // optime
@@ -1833,7 +1863,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithIncompleteHistory
                        Date_t::now(),                // wall clock time
                        {5})};                        // statement ids
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
     sessionMigration.finish();
 
@@ -1913,7 +1944,8 @@ TEST_F(SessionCatalogMigrationDestinationTest,
                        Date_t::now(),                // wall clock time
                        {55})};                       // statement ids
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
     sessionMigration.finish();
 
@@ -2007,7 +2039,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, MigratingKnownStmtWhileOplogTrunc
                                         Date_t::now(),                 // wall clock time
                                         {kStmtId});                    // statement ids
 
-    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationId(), _cancellationSource.token());
     sessionMigration.start(getServiceContext());
     sessionMigration.finish();
 

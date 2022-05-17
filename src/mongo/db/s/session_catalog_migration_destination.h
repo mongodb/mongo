@@ -40,6 +40,7 @@
 #include "mongo/s/shard_id.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
@@ -69,7 +70,8 @@ public:
 
     SessionCatalogMigrationDestination(NamespaceString nss,
                                        ShardId fromShard,
-                                       MigrationSessionId migrationSessionId);
+                                       MigrationSessionId migrationSessionId,
+                                       CancellationToken cancellationToken);
     ~SessionCatalogMigrationDestination();
 
     /**
@@ -113,6 +115,7 @@ private:
     const NamespaceString _nss;
     const ShardId _fromShard;
     const MigrationSessionId _migrationSessionId;
+    const CancellationToken _cancellationToken;
 
     stdx::thread _thread;
 

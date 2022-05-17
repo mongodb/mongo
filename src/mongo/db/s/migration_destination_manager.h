@@ -37,6 +37,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/migration_recipient_recovery_document_gen.h"
 #include "mongo/db/s/migration_session_id.h"
@@ -46,6 +47,7 @@
 #include "mongo/s/shard_id.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/timer.h"
 
@@ -70,7 +72,8 @@ struct CollectionOptionsAndIndexes {
 /**
  * Drives the receiving side of the MongoD migration process. One instance exists per shard.
  */
-class MigrationDestinationManager {
+class MigrationDestinationManager
+    : public ReplicaSetAwareServiceShardSvr<MigrationDestinationManager> {
     MigrationDestinationManager(const MigrationDestinationManager&) = delete;
     MigrationDestinationManager& operator=(const MigrationDestinationManager&) = delete;
 
@@ -94,6 +97,7 @@ public:
     /**
      * Returns the singleton instance of the migration destination manager.
      */
+    static MigrationDestinationManager* get(ServiceContext* serviceContext);
     static MigrationDestinationManager* get(OperationContext* opCtx);
 
     State getState() const;
@@ -211,7 +215,7 @@ private:
     /**
      * Thread which drives the migration apply process on the recipient side.
      */
-    void _migrateThread(bool skipToCritSecTaken = false);
+    void _migrateThread(CancellationToken cancellationToken, bool skipToCritSecTaken = false);
 
     void _migrateDriver(OperationContext* opCtx, bool skipToCritSecTaken = false);
 
@@ -254,6 +258,17 @@ private:
      */
     void awaitCriticalSectionReleaseSignalAndCompleteMigration(OperationContext* opCtx,
                                                                const Timer& timeInCriticalSection);
+
+    /**
+     * ReplicaSetAwareService entry points.
+     */
+    void onStartup(OperationContext* opCtx) final {}
+    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
+    void onShutdown() final {}
+    void onStepUpBegin(OperationContext* opCtx, long long term) final;
+    void onStepUpComplete(OperationContext* opCtx, long long term) final {}
+    void onStepDown() final;
+    void onBecomeArbiter() final {}
 
     // Mutex to guard all fields
     mutable Mutex _mutex = MONGO_MAKE_LATCH("MigrationDestinationManager::_mutex");
@@ -303,6 +318,17 @@ private:
     stdx::condition_variable _stateChangedCV;
 
     bool _acquireCSOnRecipient{false};
+
+    // Promise that will be fulfilled when the donor has signaled us that we can release the
+    // critical section.
+    std::unique_ptr<SharedPromise<void>> _canReleaseCriticalSectionPromise;
+
+    // Promise that will be fulfilled when the migrateThread has finished its work.
+    std::unique_ptr<SharedPromise<State>> _migrateThreadFinishedPromise;
+
+    // Cancellation source that is cancelled on stepdowns. On stepup, a new cancellation source will
+    // be installed.
+    CancellationSource _cancellationSource;
 };
 
 }  // namespace mongo

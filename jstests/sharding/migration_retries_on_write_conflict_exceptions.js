@@ -59,5 +59,10 @@ preTransferModsFailpoint.off();
 
 awaitResult();
 
+// After the migration has finished, check that writes are possible on both shards (meaning the
+// critical sections have been properly released).
+assert.commandWorked(testColl.update({x: 49}, {$set: {c: 1}}));
+assert.commandWorked(testColl.update({x: 50}, {$set: {c: 1}}));
+
 st.stop();
 })();

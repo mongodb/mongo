@@ -200,7 +200,8 @@ void sendWriteCommandToRecipient(OperationContext* opCtx,
 void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
     OperationContext* opCtx,
     StringData taskDescription,
-    std::function<void(OperationContext*)> doWork) {
+    std::function<void(OperationContext*)> doWork,
+    boost::optional<Backoff> backoff = boost::none) {
     const std::string newClientName = "{}-{}"_format(getThreadName(), taskDescription);
     const auto initialTerm = repl::ReplicationCoordinator::get(opCtx)->getTerm();
 
@@ -238,6 +239,10 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
             doWork(newOpCtx.get());
             break;
         } catch (DBException& ex) {
+            if (backoff) {
+                sleepFor(backoff->nextSleep());
+            }
+
             if (attempt % kLogRetryAttemptThreshold == 1) {
                 LOGV2_WARNING(23937,
                               "Retrying task after failed attempt",
@@ -1243,8 +1248,9 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
                           "shardId"_attr = recipientShardId,
                           "sessionId"_attr = sessionId,
                           "error"_attr = exShardNotFound);
-                };
-            });
+                }
+            },
+            Backoff(Seconds(1), Milliseconds::max()));
     });
 }
 
