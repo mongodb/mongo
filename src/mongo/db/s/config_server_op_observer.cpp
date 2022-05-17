@@ -136,74 +136,34 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
     }
 }
 
-void ConfigServerOpObserver::onApplyOps(OperationContext* opCtx,
-                                        const std::string& dbName,
-                                        const BSONObj& applyOpCmd) {
-    if (dbName != ShardType::ConfigNS.db()) {
+void ConfigServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
+    if (args.nss != ShardType::ConfigNS) {
         return;
     }
 
-    if (topology_time_ticker_utils::inRecoveryMode(opCtx)) {
-        return;
-    }
+    const auto& updateDoc = args.updateArgs->update;
 
-    if (applyOpCmd.firstElementFieldNameStringData() != "applyOps") {
-        return;
-    }
-
-    const auto& updatesElem = applyOpCmd["applyOps"];
-    if (updatesElem.type() != Array) {
-        return;
-    }
-
-    auto updates = updatesElem.Array();
-    if (updates.size() != 2) {
-        return;
-    }
-
-    if (updates[0].type() != Object) {
-        return;
-    }
-    auto removeShard = updates[0].Obj();
-    if (removeShard["op"].str() != "d") {
-        return;
-    }
-    if (removeShard["ns"].str() != ShardType::ConfigNS.ns()) {
-        return;
-    }
-
-    if (updates[1].type() != Object) {
-        return;
-    }
-    auto updateShard = updates[1].Obj();
-    if (updateShard["op"].str() != "u") {
-        return;
-    }
-    if (updateShard["ns"].str() != ShardType::ConfigNS.ns()) {
-        return;
-    }
-
-    auto updateElem = updateShard["o"];
-    if (updateElem.type() != BSONType::Object) {
-        return;
-    }
-
-    auto updateObj = updateElem.embeddedObject();
-    if (update_oplog_entry::extractUpdateType(updateObj) ==
+    if (update_oplog_entry::extractUpdateType(updateDoc) ==
         update_oplog_entry::UpdateType::kReplacement) {
         return;
     }
 
-    auto newTopologyTime =
-        update_oplog_entry::extractNewValueForField(updateObj, ShardType::topologyTime())
-            .timestamp();
+    auto topologyTimeValue =
+        update_oplog_entry::extractNewValueForField(updateDoc, ShardType::topologyTime());
+    if (!topologyTimeValue.ok()) {
+        return;
+    }
 
-    opCtx->recoveryUnit()->onCommit(
-        [opCtx, newTopologyTime](boost::optional<Timestamp> commitTime) mutable {
-            invariant(commitTime);
-            TopologyTimeTicker::get(opCtx).onNewLocallyCommittedTopologyTimeAvailable(
-                *commitTime, newTopologyTime);
-        });
+    auto topologyTime = topologyTimeValue.timestamp();
+    if (topologyTime == Timestamp()) {
+        return;
+    }
+
+    opCtx->recoveryUnit()->onCommit([opCtx, topologyTime](boost::optional<Timestamp> commitTime) {
+        invariant(commitTime);
+        TopologyTimeTicker::get(opCtx).onNewLocallyCommittedTopologyTimeAvailable(*commitTime,
+                                                                                  topologyTime);
+    });
 }
 
 void ConfigServerOpObserver::onMajorityCommitPointUpdate(ServiceContext* service,

@@ -665,6 +665,14 @@ private:
     void _standardizeClusterParameters(OperationContext* opCtx, RemoteCommandTargeter* targeter);
 
     /**
+     * Use the internal transaction API to remove a shard.
+     */
+    void _removeShardInTransaction(OperationContext* opCtx,
+                                   const std::string& removedShardName,
+                                   const std::string& controlShardName,
+                                   const Timestamp& newTopologyTime);
+
+    /**
      * Execute the merge chunk updates using the internal transaction API.
      */
     void _mergeChunksInTransaction(OperationContext* opCtx,
