@@ -6127,6 +6127,7 @@ tasks:
 - name: selinux_rhel8_org
   tags: []
   depends_on:
+  - name: archive_dist_test
   - name: package
   commands:
   - command: manifest.load
@@ -6134,6 +6135,8 @@ tasks:
   - *f_expansions_write
   - func: "set up venv"
   - func: "fetch packages"
+  - func: "fetch binaries"
+  - func: "extract binaries"
   - func: "run selinux tests"
     vars:
       distro: rhel80-selinux
@@ -6142,6 +6145,7 @@ tasks:
 - name: selinux_rhel8_enterprise
   tags: []
   depends_on:
+  - name: archive_dist_test
   - name: package
   commands:
   - command: manifest.load
@@ -6149,6 +6153,8 @@ tasks:
   - *f_expansions_write
   - func: "set up venv"
   - func: "fetch packages"
+  - func: "fetch binaries"
+  - func: "extract binaries"
   - func: "run selinux tests"
     vars:
       distro: rhel80-selinux
@@ -6157,6 +6163,7 @@ tasks:
 - name: selinux_rhel7_org
   tags: []
   depends_on:
+  - name: archive_dist_test
   - name: package
   commands:
   - command: manifest.load
@@ -6164,6 +6171,8 @@ tasks:
   - *f_expansions_write
   - func: "set up venv"
   - func: "fetch packages"
+  - func: "fetch binaries"
+  - func: "extract binaries"
   - func: "run selinux tests"
     vars:
       user: root
@@ -6173,6 +6182,7 @@ tasks:
 - name: selinux_rhel7_enterprise
   tags: []
   depends_on:
+  - name: archive_dist_test
   - name: package
   commands:
   - command: manifest.load
@@ -6180,6 +6190,8 @@ tasks:
   - *f_expansions_write
   - func: "set up venv"
   - func: "fetch packages"
+  - func: "fetch binaries"
+  - func: "extract binaries"
   - func: "run selinux tests"
     vars:
       user: root

@@ -30,14 +30,9 @@ if [ "$SEORDER" == "0" ]; then
   apply_selinux_policy
 fi
 
-# install shell using yum, so that dependencies are pulled
-pkg="$(find "$HOME"/repo -name 'mongodb-*-shell-*.x86_64.rpm' | tee /dev/stderr)"
-sudo --non-interactive yum install --assumeyes "$pkg" \
-  || if [ "$?" -gt "1" ]; then exit 1; fi # exit code 1 is OK
-
 pkg="$(find "$HOME"/repo -name 'mongodb-*-server-*.x86_64.rpm' | tee /dev/stderr)"
-sudo --non-interactive rpm --install --verbose --verbose --hash --nodeps "$pkg" \
-  || if [ "$?" -gt "1" ]; then exit 1; fi # exit code 1 is OK
+sudo --non-interactive rpm --install --verbose --verbose --hash --nodeps "$pkg"
+if [ "$?" -gt "1" ]; then exit 1; fi # exit code 1 is OK
 
 if [ "$SEORDER" == "1" ]; then
   apply_selinux_policy
