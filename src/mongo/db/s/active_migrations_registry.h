@@ -295,8 +295,12 @@ private:
      */
     bool _shouldExecute;
 
-    // This is the future, which will be signaled at the end of a migration
+    // This is the future, which will be set at the end of a migration.
     std::shared_ptr<Notification<Status>> _completionNotification;
+
+    // This is the outcome of the migration execution, stored when signalComplete() is called and
+    // set on the future of the executing ScopedDonateChunk object when this gets destroyed.
+    boost::optional<Status> _completionOutcome;
 };
 
 /**

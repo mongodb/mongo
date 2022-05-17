@@ -281,9 +281,10 @@ ScopedDonateChunk::ScopedDonateChunk(ActiveMigrationsRegistry* registry,
 
 ScopedDonateChunk::~ScopedDonateChunk() {
     if (_registry && _shouldExecute) {
-        // If this is a newly started migration the caller must always signal on completion
-        invariant(*_completionNotification);
+        // If this is a newly started migration the outcome must have been set by the holder
+        invariant(_completionOutcome);
         _registry->_clearDonateChunk();
+        _completionNotification->set(*_completionOutcome);
     }
 }
 
@@ -304,7 +305,8 @@ ScopedDonateChunk& ScopedDonateChunk::operator=(ScopedDonateChunk&& other) {
 
 void ScopedDonateChunk::signalComplete(Status status) {
     invariant(_shouldExecute);
-    _completionNotification->set(status);
+    invariant(!_completionOutcome.has_value());
+    _completionOutcome = status;
 }
 
 Status ScopedDonateChunk::waitForCompletion(OperationContext* opCtx) {
