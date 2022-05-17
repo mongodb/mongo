@@ -15,13 +15,11 @@ var RoutingTableConsistencyChecker = (function() {
         return true;
     };
 
-    const fetchRoutingTableData = (mongos) => {
-        // Group docs in config.chunks by coll UUID (sorting by minKey),
-        // then join with docs in config.collections.
-        // NOTE: the query may throw an exception if the collected data size is bigger than 16MB.
-        // To skip the execution of the hook, set the `TestData.skipCheckRoutingTableConsistency`
-        // flag in the failing test.
-        return mongos.getDB('config')
+    const fetchRoutingTableData =
+        (mongos) => {
+            // Group docs in config.chunks by coll UUID (sorting by minKey), then join with docs in
+            // config.collections.
+            return mongos.getDB('config')
                                 .chunks
                                 .aggregate([
                                     {$sort: {min: 1}},
@@ -38,9 +36,8 @@ var RoutingTableConsistencyChecker = (function() {
                                         as: 'details'
                                     },
                                     }
-                                ])
-                                .toArray();
-    };
+                                ]);
+        };
 
     const checkCollRoutingTable = (nss, shardKeyPattern, routingTable) => {
         if (!routingTable) {
@@ -87,28 +84,23 @@ var RoutingTableConsistencyChecker = (function() {
     const run = (mongos) => {
         try {
             jsTest.log('Checking routing table consistency');
-            // Group docs in config.chunks by coll UUID (sorting by minKey),
-            // then join with docs in config.collections.
+
+            // Group docs in config.chunks by coll UUID (sorting by minKey), then join with docs in
+            // config.collections.
             const testCollectionsWithRoutingTable = fetchRoutingTableData(mongos);
 
-            for (const collData of testCollectionsWithRoutingTable) {
-                // Test invariant
-                assert.lte(
-                    1,
-                    collData.details.length,
-                    'Possible bug in aggregation generating testCollectionsWithRoutingTable');
-
-                // Test checks
+            testCollectionsWithRoutingTable.forEach(function(collData) {
                 assert.eq(
                     1,
                     collData.details.length,
-                    `Found entries in config.chunks with no match in config.collections! Details: ${
+                    `There are entries in config.chunks which are either not linked to a collection or are linked to more than one collection! Details: ${
                         tojson(collData)}`);
+
                 assert(checkCollRoutingTable(
                            collData.details[0]._id, collData.details[0].key, collData.routingTable),
                        `Corrupted routing table detected for ${collData._id}! Details: ${
                            tojson(collData)}`);
-            }
+            });
         } catch (e) {
             if (e.code !== ErrorCodes.Unauthorized) {
                 throw e;
