@@ -66,7 +66,7 @@ class KeyVault {
             doc.keyAltNames = keyAltNames;
         }
 
-        this.keyColl.insert(doc);
+        this.keyColl.insert(doc, {writeConcern: {w: "majority"}});
         return uuid;
     }
 
