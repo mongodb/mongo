@@ -221,11 +221,11 @@ const mongos = st.s0;
     assert.commandFailed(fromColl.renameCollection(toNs.split('.')[1], false /* dropTarget*/));
 }
 
-const fcvDoc = testDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+const fcvDoc = st.rs0.getPrimary().getDB('admin').adminCommand(
+    {getParameter: 1, featureCompatibilityVersion: 1});
 // Rename to target collection with very a long name
 {
     const dbName = 'testRenameToCollectionWithVeryLongName';
-
     const testDB = st.rs0.getPrimary().getDB(dbName);
     if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '5.3') >= 0) {
         const longEnoughNs = dbName + '.' +
