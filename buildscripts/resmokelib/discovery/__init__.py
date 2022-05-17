@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from buildscripts.resmokelib import configure_resmoke
 from buildscripts.resmokelib import suitesconfig
+from buildscripts.resmokelib.multiversion.multiversion_service import MultiversionService, MongoReleases, MongoVersion
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.testing.suite import Suite
 
@@ -85,6 +86,8 @@ class MultiversionConfig(BaseModel):
 
     last_versions: List[str]
     requires_fcv_tag: str
+    requires_fcv_tag_lts: str
+    requires_fcv_tag_continuous: str
 
 
 class MultiversionConfigSubcommand(Subcommand):
@@ -99,9 +102,16 @@ class MultiversionConfigSubcommand(Subcommand):
     def determine_multiversion_config() -> MultiversionConfig:
         """Discover the current multiversion configuration."""
         from buildscripts.resmokelib import multiversionconstants
+        multiversion_service = MultiversionService(
+            mongo_version=MongoVersion.from_yaml_file(multiversionconstants.MONGO_VERSION_YAML),
+            mongo_releases=MongoReleases.from_yaml_file(multiversionconstants.RELEASES_YAML),
+        )
+        fcv_constants = multiversion_service.calculate_fcv_constants()
         return MultiversionConfig(
             last_versions=multiversionconstants.OLD_VERSIONS,
-            requires_fcv_tag=multiversionconstants.REQUIRES_FCV_TAG,
+            requires_fcv_tag=fcv_constants.get_fcv_tag_list(),
+            requires_fcv_tag_lts=fcv_constants.get_lts_fcv_tag_list(),
+            requires_fcv_tag_continuous=fcv_constants.get_continuous_fcv_tag_list(),
         )
 
 
