@@ -96,7 +96,7 @@ void generatePlannerInfo(PlanExecutor* exec,
             QuerySettingsDecoration::get(collection->getSharedDecorations());
         if (exec->getCanonicalQuery()->isSbeCompatible() &&
             feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() &&
-            !exec->getCanonicalQuery()->getForceClassicEngine() &&
+            exec->getCanonicalQuery()->getEnableSlotBasedExecutionEngine() &&
             // TODO(SERVER-61507): Remove pipeline check once lowered pipelines are integrated with
             // SBE plan cache.
             exec->getCanonicalQuery()->pipeline().empty()) {

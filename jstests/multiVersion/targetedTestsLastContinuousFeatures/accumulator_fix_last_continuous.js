@@ -33,19 +33,37 @@ load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster()
             st.rs1.getSecondary().getDB(jsTestName())
         ];
 
+        function setEngine(db, turnOnSBE) {
+            // Based on which version we are running, set the appropriate parameter which
+            // controls the execution engine.
+            const res = db.adminCommand({
+                getParameter: 1,
+                internalQueryEnableSlotBasedExecutionEngine: 1,
+                internalQueryForceClassicEngine: 1
+            });
+
+            if (res.hasOwnProperty("internalQueryEnableSlotBasedExecutionEngine")) {
+                assert.commandWorked(
+                    db.adminCommand(
+                        {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: turnOnSBE}),
+                    `at node ${db.getMongo().host}`);
+            } else {
+                assert(res.hasOwnProperty("internalQueryForceClassicEngine"));
+                assert.commandWorked(
+                    db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: !turnOnSBE}),
+                    `at node ${db.getMongo().host}`);
+            }
+        }
+
         // Turns to the classic engine at the shards.
-        dbs.forEach((db) => assert.commandWorked(
-                        db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}),
-                        `at node ${db.getMongo().host}`));
+        dbs.forEach((db) => setEngine(db, false /* turnOnSBE */));
 
         // Verifies that the classic engine's results are same as the expected results.
         const classicRes = coll.aggregate(pipeline).toArray();
         verifyThis(classicRes);
 
         // Turns to the SBE engine at the shards.
-        dbs.forEach((db) => assert.commandWorked(
-                        db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}),
-                        `at node ${db.getMongo().host}`));
+        dbs.forEach((db) => setEngine(db, true /* turnOnSBE */));
 
         // Verifies that the SBE engine's results are same as the expected results.
         const sbeRes = coll.aggregate(pipeline).toArray();

@@ -32,6 +32,8 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
+#include "mongo/db/query/query_planner_test_lib.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 
 namespace mongo {
@@ -64,6 +66,11 @@ protected:
     void addColumnarIndex() {
         params.columnarIndexes.emplace_back(kIndexName);
     }
+
+private:
+    // SBE must be enabled in order to test columnar indexes.
+    RAIIServerParameterControllerForTest _controllerSBE{
+        "internalQueryEnableSlotBasedExecutionEngine", true};
 };
 
 TEST_F(QueryPlannerColumnarTest, InclusionProjectionUsesColumnarIndex) {

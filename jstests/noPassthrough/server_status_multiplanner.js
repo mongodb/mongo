@@ -44,7 +44,8 @@ assert.eq(multiPlannerMetrics.histograms.classicMicros[0].lowerBound, 0);
 
 // Run with classic engine and verify metrics.
 {
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: false}));
     assert.commandWorked(coll.find({a: 1, b: 1, c: 1}).explain());
 
     multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;
@@ -66,7 +67,7 @@ assert.eq(multiPlannerMetrics.histograms.classicMicros[0].lowerBound, 0);
 // Run with SBE and verify metrics.
 {
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
+        db.adminCommand({setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: true}));
     assert.commandWorked(coll.find({a: 1, b: 1, c: 1}).explain());
 
     multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;

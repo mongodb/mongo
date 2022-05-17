@@ -34,12 +34,14 @@ load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster()
                 st.rs1.getSecondary().getDB(jsTestName())
             ];
 
-            // In the last-lts, we don't have the 'internalQueryForceClassicEngine' query knob.
+            // In the last-lts, we don't have the 'internalQueryEnableSlotBasedExecutionEngine'
+            // query knob.
             if (isGreaterLastContinous) {
                 // Turns to the classic engine at the shards.
                 dbs.forEach(
                     (db) => assert.commandWorked(
-                        db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}),
+                        db.adminCommand(
+                            {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: false}),
                         `at node ${db.getMongo().host}`));
             }
 
@@ -47,13 +49,14 @@ load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster()
             const classicRes = coll.aggregate(pipeline).toArray();
             verifyThis(classicRes);
 
-            // In the last-lts, we have neither the 'internalQueryForceClassicEngine' query knob
-            // nor the SBE $group pushdown feature.
+            // In the last-lts, we have neither the 'internalQueryEnableSlotBasedExecutionEngine'
+            // query knob nor the SBE $group pushdown feature.
             if (isGreaterLastContinous) {
                 // Turns to the SBE engine at the shards.
                 dbs.forEach(
                     (db) => assert.commandWorked(
-                        db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}),
+                        db.adminCommand(
+                            {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: true}),
                         `at node ${db.getMongo().host}`));
 
                 // Verifies that the SBE engine's results are same as the expected results.

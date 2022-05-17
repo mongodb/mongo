@@ -20,13 +20,15 @@ const isDebugBuild = (db) => {
     return db.adminCommand('buildInfo').debug;
 };
 const isGroupPushdownEnabled = (db) => {
-    const internalQueryForceClassicEngine =
-        assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryForceClassicEngine: 1}))
-            .internalQueryForceClassicEngine;
+    const internalQueryEnableSlotBasedExecutionEngine =
+        assert
+            .commandWorked(
+                db.adminCommand({getParameter: 1, internalQueryEnableSlotBasedExecutionEngine: 1}))
+            .internalQueryEnableSlotBasedExecutionEngine;
     const featureFlagSBEGroupPushdown =
         assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagSBEGroupPushdown: 1}))
             .featureFlagSBEGroupPushdown.value;
-    return !internalQueryForceClassicEngine && featureFlagSBEGroupPushdown;
+    return internalQueryEnableSlotBasedExecutionEngine && featureFlagSBEGroupPushdown;
 };
 
 const assertMetricsExist = (profilerEntry) => {

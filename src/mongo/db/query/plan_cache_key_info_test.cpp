@@ -420,10 +420,10 @@ TEST(PlanCacheKeyInfoTest, DifferentQueryEngines) {
                       false,                         // sparse
                       IndexEntry::Identifier{""})};  // name
 
-    // Helper to construct a plan cache key given the 'forceClassicEngine' flag.
-    auto constructPlanCacheKey = [&](bool forceClassicEngine) {
-        RAIIServerParameterControllerForTest controller{"internalQueryForceClassicEngine",
-                                                        forceClassicEngine};
+    // Helper to construct a plan cache key given the 'enableSlotBasedExecutionEngine' flag.
+    auto constructPlanCacheKey = [&](bool enableSlotBasedExecutionEngine) {
+        RAIIServerParameterControllerForTest controller{
+            "internalQueryEnableSlotBasedExecutionEngine", enableSlotBasedExecutionEngine};
         const auto queryStr = "{a: 0}";
         unique_ptr<CanonicalQuery> cq(canonicalize(queryStr));
         return makeKey(*cq, indexCores);
