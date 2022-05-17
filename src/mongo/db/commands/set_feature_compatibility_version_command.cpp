@@ -664,35 +664,6 @@ private:
                     });
             }
 
-            // TODO SERVER-63564: Remove once FCV 6.0 becomes last-lts.
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                const auto& db = dbName.db();
-                Lock::DBLock dbLock(opCtx, db, MODE_IX);
-                catalog::forEachCollectionFromDb(
-                    opCtx, dbName, MODE_X, [&](const CollectionPtr& collection) {
-                        auto indexCatalog = collection->getIndexCatalog();
-                        auto indexIt = indexCatalog->getIndexIterator(
-                            opCtx, true /* includeUnfinishedIndexes */);
-                        while (indexIt->more()) {
-                            auto indexEntry = indexIt->next();
-                            uassert(
-                                ErrorCodes::CannotDowngrade,
-                                fmt::format(
-                                    "Cannot downgrade the cluster when there are indexes that have "
-                                    "the 'prepareUnique' field. Use listIndexes to find "
-                                    "them and drop "
-                                    "the indexes or use collMod to manually set it to false to "
-                                    "remove the field "
-                                    "before downgrading. First detected incompatible index name: "
-                                    "'{}' on collection: '{}'",
-                                    indexEntry->descriptor()->indexName(),
-                                    collection->ns().toString()),
-                                !indexEntry->descriptor()->prepareUnique());
-                        }
-                        return true;
-                    });
-            }
-
             // Drop the pre-images collection if 'changeStreamPreAndPostImages' feature flag is not
             // enabled on the downgrade version.
             // TODO SERVER-61770: Remove once FCV 6.0 becomes last-lts.
