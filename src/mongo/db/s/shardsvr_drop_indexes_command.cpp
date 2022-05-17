@@ -35,9 +35,9 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -161,61 +161,68 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
     // Check under the dbLock if this is still the primary shard for the database
     DatabaseShardingState::checkIsPrimaryShardForDb(opCtx, ns().db());
 
-    auto nsLocalLock = distLockManager->lockDirectLocally(opCtx, ns().ns(), lockTimeout);
+    auto resolvedNs = ns();
+    auto dropIdxBSON = dropIdxCmd.toBSON({});
+
+    if (auto timeseriesOptions = timeseries::getTimeseriesOptions(opCtx, ns(), true)) {
+        dropIdxBSON =
+            timeseries::makeTimeseriesCommand(dropIdxBSON,
+                                              ns(),
+                                              DropIndexes::kCommandName,
+                                              DropIndexes::kIsTimeseriesNamespaceFieldName);
+
+        resolvedNs = ns().makeTimeseriesBucketsNamespace();
+    }
+
+    auto nsLocalLock = distLockManager->lockDirectLocally(opCtx, resolvedNs.ns(), lockTimeout);
 
     StaleConfigRetryState retryState;
-    return shardVersionRetry(opCtx, Grid::get(opCtx)->catalogCache(), ns(), "dropIndexes", [&] {
-        // If the collection is sharded, we target only the primary shard and the shards that own
-        // chunks for the collection.
-        auto targeter = ChunkManagerTargeter(opCtx, ns());
-        auto routingInfo = targeter.getRoutingInfo();
+    return shardVersionRetry(
+        opCtx, Grid::get(opCtx)->catalogCache(), resolvedNs, "dropIndexes", [&] {
+            // If the collection is sharded, we target only the primary shard and the shards that
+            // own chunks for the collection.
+            const auto routingInfo = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, resolvedNs));
 
-        auto cmdToBeSent = dropIdxCmd.toBSON({});
-        if (targeter.timeseriesNamespaceNeedsRewrite(ns())) {
-            cmdToBeSent =
-                timeseries::makeTimeseriesCommand(cmdToBeSent,
-                                                  ns(),
-                                                  DropIndexes::kCommandName,
-                                                  DropIndexes::kIsTimeseriesNamespaceFieldName);
-        }
+            auto cmdToBeSent = CommandHelpers::filterCommandRequestForPassthrough(
+                CommandHelpers::appendMajorityWriteConcern(dropIdxBSON));
 
-        cmdToBeSent = CommandHelpers::filterCommandRequestForPassthrough(
-            CommandHelpers::appendMajorityWriteConcern(cmdToBeSent));
+            auto shardResponses =
+                scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
+                    opCtx,
+                    resolvedNs.db(),
+                    resolvedNs,
+                    routingInfo,
+                    retryState.shardsWithSuccessResponses,
+                    applyReadWriteConcern(
+                        opCtx,
+                        this,
+                        CommandHelpers::filterCommandRequestForPassthrough(cmdToBeSent)),
+                    ReadPreferenceSetting::get(opCtx),
+                    Shard::RetryPolicy::kNotIdempotent,
+                    BSONObj() /* query */,
+                    BSONObj() /* collation */);
 
-        auto shardResponses =
-            scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
-                opCtx,
-                ns().db(),
-                targeter.getNS(),
-                routingInfo,
-                retryState.shardsWithSuccessResponses,
-                applyReadWriteConcern(
-                    opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdToBeSent)),
-                ReadPreferenceSetting::get(opCtx),
-                Shard::RetryPolicy::kNotIdempotent,
-                BSONObj() /* query */,
-                BSONObj() /* collation */);
+            // Append responses we've received from previous retries of this operation due to a
+            // stale config error.
+            shardResponses.insert(shardResponses.end(),
+                                  retryState.shardSuccessResponses.begin(),
+                                  retryState.shardSuccessResponses.end());
 
-        // Append responses we've received from previous retries of this operation due to a stale
-        // config error.
-        shardResponses.insert(shardResponses.end(),
-                              retryState.shardSuccessResponses.begin(),
-                              retryState.shardSuccessResponses.end());
+            std::string errmsg;
+            BSONObjBuilder output;
+            const auto aggregateResponse =
+                appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses));
 
-        std::string errmsg;
-        BSONObjBuilder output;
-        const auto aggregateResponse =
-            appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses));
+            // If we have a stale config error, update the success shards for the upcoming retry.
+            if (!aggregateResponse.responseOK && aggregateResponse.firstStaleConfigError) {
+                updateStateForStaleConfigRetry(opCtx, aggregateResponse, &retryState);
+                uassertStatusOK(*aggregateResponse.firstStaleConfigError);
+            }
 
-        // If we have a stale config error, update the success shards for the upcoming retry.
-        if (!aggregateResponse.responseOK && aggregateResponse.firstStaleConfigError) {
-            updateStateForStaleConfigRetry(opCtx, aggregateResponse, &retryState);
-            uassertStatusOK(*aggregateResponse.firstStaleConfigError);
-        }
-
-        CommandHelpers::appendSimpleCommandStatus(output, aggregateResponse.responseOK, errmsg);
-        return Response(output.obj());
-    });
+            CommandHelpers::appendSimpleCommandStatus(output, aggregateResponse.responseOK, errmsg);
+            return Response(output.obj());
+        });
 }
 
 }  // namespace
