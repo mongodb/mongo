@@ -1,13 +1,7 @@
 /**
- * Tests that writes on the donor set succeeds when there is no migration.
- *
- * Tenant migrations are not expected to be run on servers with ephemeralForTest, and in particular
- * this test fails on ephemeralForTest because the donor has to wait for the write to set the
- * migration state to "committed" and "aborted" to be majority committed but it cannot do that on
- * ephemeralForTest.
+ * Tests that the donor blocks writes that are executed after the migration committed are rejected.
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
@@ -34,22 +28,38 @@ const donorRst = tenantMigrationTest.getDonorRst();
 const donorPrimary = donorRst.getPrimary();
 
 const kCollName = "testColl";
-
 const kTenantDefinedDbName = "0";
 
 /**
- * Tests that the write succeeds when there is no migration.
+ * Tests that the donor rejects writes after the migration commits.
  */
-function testWritesNoMigration(testCase, testOpts) {
-    runCommandForConcurrentWritesTest(testOpts);
-    testCase.assertCommandSucceeded(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+function testRejectWritesAfterMigrationCommitted(testCase, testOpts) {
+    const tenantId = testOpts.dbName.split('_')[0];
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        tenantId,
+    };
+
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts, {
+        retryOnRetryableErrors: false,
+        automaticForgetMigration: false,
+        enableDonorStartMigrationFsync: true
+    }));
+
+    runCommandForConcurrentWritesTest(testOpts, ErrorCodes.TenantMigrationCommitted);
+    testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+    checkTenantMigrationAccessBlockerForConcurrentWritesTest(
+        testOpts.primaryDB, tenantId, {numTenantMigrationCommittedErrors: 1});
+
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+    tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString);
 }
 
 const testCases = TenantMigrationConcurrentWriteUtil.testCases;
 
-// Run test cases with no migration.
+// Run test cases after the migration has committed.
 for (const [commandName, testCase] of Object.entries(testCases)) {
-    let baseDbName = commandName + "-noMigration0";
+    let baseDbName = commandName + "-inCommitted0";
 
     if (testCase.skip) {
         print("Skipping " + commandName + ": " + testCase.skip);
@@ -58,14 +68,14 @@ for (const [commandName, testCase] of Object.entries(testCases)) {
 
     runTestForConcurrentWritesTest(donorPrimary,
                                    testCase,
-                                   testWritesNoMigration,
+                                   testRejectWritesAfterMigrationCommitted,
                                    baseDbName + "Basic_" + kTenantDefinedDbName,
                                    kCollName);
 
     if (testCase.testInTransaction) {
         runTestForConcurrentWritesTest(donorPrimary,
                                        testCase,
-                                       testWritesNoMigration,
+                                       testRejectWritesAfterMigrationCommitted,
                                        baseDbName + "Txn_" + kTenantDefinedDbName,
                                        kCollName,
                                        {testInTransaction: true});
@@ -74,7 +84,7 @@ for (const [commandName, testCase] of Object.entries(testCases)) {
     if (testCase.testAsRetryableWrite) {
         runTestForConcurrentWritesTest(donorPrimary,
                                        testCase,
-                                       testWritesNoMigration,
+                                       testRejectWritesAfterMigrationCommitted,
                                        baseDbName + "Retryable_" + kTenantDefinedDbName,
                                        kCollName,
                                        {testAsRetryableWrite: true});

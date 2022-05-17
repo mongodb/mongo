@@ -1,13 +1,7 @@
 /**
- * Tests that writes on the donor set succeeds when there is no migration.
- *
- * Tenant migrations are not expected to be run on servers with ephemeralForTest, and in particular
- * this test fails on ephemeralForTest because the donor has to wait for the write to set the
- * migration state to "committed" and "aborted" to be majority committed but it cannot do that on
- * ephemeralForTest.
+ * Tests that the donor accepts writes after the migration aborts.
  *
  * @tags: [
- *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
@@ -38,18 +32,47 @@ const kCollName = "testColl";
 const kTenantDefinedDbName = "0";
 
 /**
- * Tests that the write succeeds when there is no migration.
+ * Tests that the donor does not reject writes after the migration aborts.
  */
-function testWritesNoMigration(testCase, testOpts) {
+function testDoNotRejectWritesAfterMigrationAborted(testCase, testOpts) {
+    const tenantId = testOpts.dbName.split('_')[0];
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        tenantId,
+    };
+
+    let abortFp =
+        configureFailPoint(testOpts.primaryDB, "abortTenantMigrationBeforeLeavingBlockingState");
+    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(migrationOpts, {
+        retryOnRetryableErrors: false,
+        automaticForgetMigration: false,
+        enableDonorStartMigrationFsync: true
+    }));
+    abortFp.off();
+
+    // Wait until the in-memory migration state is updated after the migration has majority
+    // committed the abort decision. Otherwise, the command below is expected to block and then get
+    // rejected.
+    assert.soon(() => {
+        const mtab = TenantMigrationUtil.getTenantMigrationAccessBlocker(
+            {donorNode: testOpts.primaryDB, tenantId});
+        return mtab.donor.state === TenantMigrationTest.DonorAccessState.kAborted;
+    });
+
     runCommandForConcurrentWritesTest(testOpts);
     testCase.assertCommandSucceeded(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+    checkTenantMigrationAccessBlockerForConcurrentWritesTest(
+        testOpts.primaryDB, tenantId, {numTenantMigrationAbortedErrors: 0});
+
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+    tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString);
 }
 
 const testCases = TenantMigrationConcurrentWriteUtil.testCases;
 
-// Run test cases with no migration.
+// Run test cases after an aborted migration.
 for (const [commandName, testCase] of Object.entries(testCases)) {
-    let baseDbName = commandName + "-noMigration0";
+    let baseDbName = commandName + "-inAborted0";
 
     if (testCase.skip) {
         print("Skipping " + commandName + ": " + testCase.skip);
@@ -58,14 +81,14 @@ for (const [commandName, testCase] of Object.entries(testCases)) {
 
     runTestForConcurrentWritesTest(donorPrimary,
                                    testCase,
-                                   testWritesNoMigration,
+                                   testDoNotRejectWritesAfterMigrationAborted,
                                    baseDbName + "Basic_" + kTenantDefinedDbName,
                                    kCollName);
 
     if (testCase.testInTransaction) {
         runTestForConcurrentWritesTest(donorPrimary,
                                        testCase,
-                                       testWritesNoMigration,
+                                       testDoNotRejectWritesAfterMigrationAborted,
                                        baseDbName + "Txn_" + kTenantDefinedDbName,
                                        kCollName,
                                        {testInTransaction: true});
@@ -74,7 +97,7 @@ for (const [commandName, testCase] of Object.entries(testCases)) {
     if (testCase.testAsRetryableWrite) {
         runTestForConcurrentWritesTest(donorPrimary,
                                        testCase,
-                                       testWritesNoMigration,
+                                       testDoNotRejectWritesAfterMigrationAborted,
                                        baseDbName + "Retryable_" + kTenantDefinedDbName,
                                        kCollName,
                                        {testAsRetryableWrite: true});
