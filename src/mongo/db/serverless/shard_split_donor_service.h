@@ -197,6 +197,8 @@ private:
     ExecutorFuture<void> _cleanRecipientStateDoc(const ScopedTaskExecutorPtr& executor,
                                                  const CancellationToken& token);
 
+    void _abortIndexBuilds(const CancellationToken& abortToken);
+
 private:
     const NamespaceString _stateDocumentsNS = NamespaceString::kTenantSplitDonorsNamespace;
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardSplitDonorService::_mutex");

@@ -828,6 +828,5 @@ function validateTestCase(testCase) {
 
 // Validate test cases for all commands.
 for (let command of Object.keys(TenantMigrationConcurrentWriteUtil.testCases)) {
-    jsTestLog("calling the angels");
     validateTestCase(TenantMigrationConcurrentWriteUtil.testCases[command]);
 }

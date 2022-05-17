@@ -34,6 +34,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -409,6 +410,10 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
             .then([this, executor, abortToken] {
                 checkForTokenInterrupt(abortToken);
                 _cancelableOpCtxFactory.emplace(abortToken, _markKilledExecutor);
+
+                _abortIndexBuilds(abortToken);
+            })
+            .then([this, executor, abortToken] {
                 auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                 pauseShardSplitAfterBlocking.pauseWhileSet(opCtx.get());
 
@@ -1044,5 +1049,31 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_cleanRecipientS
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, primaryToken)
         .ignoreValue();
+}
+
+void ShardSplitDonorService::DonorStateMachine::_abortIndexBuilds(
+    const CancellationToken& abortToken) {
+    checkForTokenInterrupt(abortToken);
+
+    boost::optional<std::vector<StringData>> tenantIds;
+    {
+        stdx::lock_guard<Latch> lg(_mutex);
+        if (_stateDoc.getState() > ShardSplitDonorStateEnum::kBlocking) {
+            return;
+        }
+        tenantIds = _stateDoc.getTenantIds();
+        invariant(tenantIds);
+    }
+
+    LOGV2(6436100, "Aborting index build for shard split.", "id"_attr = _migrationId);
+
+    // Before applying the split config, abort any in-progress index builds. No new index builds
+    // can start while we are doing this because the mtab prevents it.
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx.get());
+    for (const auto& tenantId : *tenantIds) {
+        indexBuildsCoordinator->abortTenantIndexBuilds(
+            opCtx.get(), MigrationProtocolEnum::kMultitenantMigrations, tenantId, "shard split");
+    }
 }
 }  // namespace mongo
