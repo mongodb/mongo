@@ -112,7 +112,7 @@ structs:
                              do not match.
 
             targetCollectionVersion:
-                type: ChunkVersionArrayWronglyEncodedAsBSONObjFormat
+                type: ChunkVersion
                 optional: true
                 description: If set, the collection's ChunkVersion found when parsed on mongos. Can
                              be used to check if a collection has since been dropped and re-created,

@@ -56,7 +56,7 @@ commands:
             version:
                 description: The version of the chunk, including major version, minor version, and
                              epoch.
-                type: ChunkVersionArrayWronglyEncodedAsBSONObjFormat
+                type: ChunkVersion
                 optional: false
             collectionUUID:
                 description: The collection's UUID. This field was introduced in 5.0 as mandatory.

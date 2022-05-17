@@ -213,6 +213,9 @@ public:
         return isOlderThan(otherVersion) || (*this == otherVersion);
     }
 
+    static ChunkVersion parse(const BSONElement& element);
+    void serialize(StringData field, BSONObjBuilder* builder);
+
     /**
      * Serializes the version held by this object to 'out' in the form:
      * {..., <field>: {0:<combined major/minor, 1: <epoch>, 2: <Timestamp>}}
@@ -259,12 +262,6 @@ public:
                                                               BSONObjBuilder* builder) const;
 
 private:
-    /**
-     * Parses future ChunkVersion BSON format (from 6.1+):
-     * {t: timestamp, e: epoch, v: (major, minor)}
-     */
-    static ChunkVersion _parse60Format(const BSONObj&);
-
     // The following static functions will be deprecated. Only one function should be used to parse
     // ChunkVersion and is fromBSON.
     /**

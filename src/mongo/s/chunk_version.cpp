@@ -57,16 +57,6 @@ std::string CollectionGeneration::toString() const {
     return str::stream() << _epoch << "|" << _timestamp;
 }
 
-ChunkVersion ChunkVersion::_parse60Format(const BSONObj& obj) {
-    IDLParserErrorContext ctx("_parse60Format");
-    auto parsedVersion = ChunkVersion60Format::parse(ctx, obj);
-    auto version = parsedVersion.getVersion();
-    return ChunkVersion(version.getSecs(),
-                        version.getInc(),
-                        parsedVersion.getEpoch(),
-                        parsedVersion.getTimestamp());
-}
-
 ChunkVersion ChunkVersion::_parseArrayOrObjectPositionalFormat(const BSONObj& obj) {
     BSONObjIterator it(obj);
     uassert(ErrorCodes::BadValue, "Unexpected empty version array", it.more());
@@ -199,7 +189,7 @@ StatusWith<ChunkVersion> ChunkVersion::_parseLegacyWithField(const BSONObj& obj,
 ChunkVersion ChunkVersion::fromBSONLegacyOrNewerFormat(const BSONObj& obj, StringData field) {
     // New format.
     if (obj[field].isABSONObj()) {
-        return _parse60Format(obj[field].Obj());
+        return parse(obj[field]);
     }
 
     // Legacy format.
@@ -208,13 +198,31 @@ ChunkVersion ChunkVersion::fromBSONLegacyOrNewerFormat(const BSONObj& obj, Strin
 
 ChunkVersion ChunkVersion::fromBSONPositionalOrNewerFormat(const BSONElement& element) {
     auto obj = element.Obj();
+
     // Positional or wrongly encoded format.
     if (obj.couldBeArray()) {
         return ChunkVersion::_parseArrayOrObjectPositionalFormat(obj);
     }
 
     // New format.
-    return _parse60Format(obj);
+    return parse(element);
+}
+
+ChunkVersion ChunkVersion::parse(const BSONElement& element) {
+    auto parsedVersion =
+        ChunkVersion60Format::parse(IDLParserErrorContext("ChunkVersion"), element.Obj());
+    auto version = parsedVersion.getVersion();
+    return ChunkVersion(version.getSecs(),
+                        version.getInc(),
+                        parsedVersion.getEpoch(),
+                        parsedVersion.getTimestamp());
+}
+
+void ChunkVersion::serialize(StringData field, BSONObjBuilder* builder) {
+    ChunkVersion60Format version;
+    version.setGeneration({_epoch, _timestamp});
+    version.setPlacement(Timestamp(majorVersion(), minorVersion()));
+    builder->append(field, version.toBSON());
 }
 
 void ChunkVersion::serializeToPositionalWronlyEcondedOr60AsBSON(StringData field,
