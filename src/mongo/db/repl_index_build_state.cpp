@@ -117,7 +117,17 @@ void IndexBuildState::setState(StateFlag state,
     }
 }
 
-void IndexBuildState::appendBuildInfo(BSONObjBuilder* builder) const {}
+void IndexBuildState::appendBuildInfo(BSONObjBuilder* builder) const {
+    BSONObjBuilder stateBuilder;
+    stateBuilder.append("state", toString());
+    if (auto ts = getTimestamp()) {
+        stateBuilder.append("timestamp", *ts);
+    }
+    if (auto abortStatus = getAbortStatus(); !abortStatus.isOK()) {
+        abortStatus.serializeErrorToBSON(&stateBuilder);
+    }
+    builder->append("replicationState", stateBuilder.obj());
+}
 
 ReplIndexBuildState::ReplIndexBuildState(const UUID& indexBuildUUID,
                                          const UUID& collUUID,
