@@ -2,9 +2,9 @@
  * Tests for explaining the delete command.
  *
  * @tags: [
- *  featureFlagBatchMultiDeletes,
  *  no_selinux,
  *  requires_fastcount,
+ *  requires_fcv_61,
  *  requires_non_retryable_writes,
  *  ]
  */

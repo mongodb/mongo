@@ -2,7 +2,7 @@
  * Verifies change streams operation for batched writes.
  *
  * @tags: [
- *   featureFlagBatchMultiDeletes,
+ *   requires_fcv_61,
  *   # Running as a replica set requires journaling.
  *   requires_journaling,
  *   requires_majority_read_concern,

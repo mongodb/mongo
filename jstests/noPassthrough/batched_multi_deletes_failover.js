@@ -2,11 +2,11 @@
  * Tests that data is consistent after a failover, clean, or unclean shutdown occurs in the middle
  * of a batched delete.
  * @tags: [
- *  featureFlagBatchMultiDeletes,
  *  # TODO (SERVER-55909): make WUOW 'groupOplogEntries' the only mode of operation.
  *  does_not_support_transactions,
  *  exclude_from_large_txns,
  *  requires_replication,
+ *  requires_fcv_61
  * ]
  */
 (function() {

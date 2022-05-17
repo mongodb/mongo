@@ -2,8 +2,7 @@
  * Validate basic batched multi-deletion handling with write conflicts.
  *
  * @tags: [
- *   featureFlagBatchMultiDeletes,
- *   requires_fcv_53,
+ *   requires_fcv_61,
  * ]
  */
 

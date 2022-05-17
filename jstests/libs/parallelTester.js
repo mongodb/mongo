@@ -245,11 +245,6 @@ if (typeof _threadInject != "undefined") {
             "collmod_convert_to_unique_violations.js",
             "collmod_convert_to_unique_violations_size_limit.js",
 
-            // TODO (SERVER-55750): Remove the exclusions once the feature flag is enabled by
-            // default.
-            "batched_multi_deletes.js",
-            "explain_delete.js",
-
             // This test sets fail points which can cause other tests to fail.
             "profile_write_conflict.js",
         ]);

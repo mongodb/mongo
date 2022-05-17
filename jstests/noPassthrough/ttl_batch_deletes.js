@@ -18,11 +18,9 @@ const docCount = 50;
 
 const runTestCase = function(fn, isSharded = false) {
     if (!isSharded) {
-        // TODO: Remove featureFlagBatchMultiDeletes after SERVER-55750.
         const replTest = new ReplSetTest({
             nodes: 1,
-            nodeOptions:
-                {setParameter: {ttlMonitorSleepSecs: 1, featureFlagBatchMultiDeletes: true}},
+            nodeOptions: {setParameter: {ttlMonitorSleepSecs: 1}},
         });
         replTest.startSet();
         replTest.initiate();
@@ -31,14 +29,12 @@ const runTestCase = function(fn, isSharded = false) {
 
         replTest.stopSet();
     } else {
-        // TODO: Remove featureFlagBatchMultiDeletes after SERVER-55750.
         const st = new ShardingTest({
             shards: 1,
             mongos: 1,
             config: 1,
             other: {
-                shardOptions:
-                    {setParameter: {ttlMonitorSleepSecs: 1, featureFlagBatchMultiDeletes: true}},
+                shardOptions: {setParameter: {ttlMonitorSleepSecs: 1}},
             }
         });
         const conn = st.s0;

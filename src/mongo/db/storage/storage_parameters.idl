@@ -148,7 +148,8 @@ feature_flags:
     featureFlagBatchMultiDeletes:
         description: "When enabled, support batching multi-document deletions"
         cpp_varname: feature_flags::gBatchMultiDeletes
-        default: false
+        default: true
+        version: 6.1
     featureFlagDocumentSourceListCatalog:
         description: "When enabled, allow the use of the $listCatalog aggregation stage"
         cpp_varname: feature_flags::gDocumentSourceListCatalog

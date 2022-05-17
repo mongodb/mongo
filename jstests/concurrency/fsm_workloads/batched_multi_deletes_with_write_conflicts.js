@@ -10,7 +10,7 @@ load("jstests/libs/analyze_plan.js");
  *  does_not_support_retryable_writes,
  *  requires_non_retryable_writes,
  *  does_not_support_transactions,
- *  featureFlagBatchMultiDeletes,
+ *  requires_fcv_61,
  * ]
  */
 

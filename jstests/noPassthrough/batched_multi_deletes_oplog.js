@@ -2,7 +2,7 @@
  * Validate oplog behaviour of batched multi-deletes.
  *
  * @tags: [
- *  featureFlagBatchMultiDeletes,
+ *  requires_fcv_61,
  *  # Running as a replica set requires journaling.
  *  requires_journaling,
  * ]

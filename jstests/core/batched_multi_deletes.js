@@ -7,10 +7,9 @@
  *  does_not_support_retryable_writes,
  *  # TODO (SERVER-55909): make WUOW 'groupOplogEntries' the only mode of operation.
  *  does_not_support_transactions,
- *  featureFlagBatchMultiDeletes,
  *  multiversion_incompatible,
  *  no_selinux,
- *  requires_fcv_60,
+ *  requires_fcv_61,
  *  requires_non_retryable_writes,
  * ]
  */

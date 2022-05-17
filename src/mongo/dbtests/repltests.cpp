@@ -228,34 +228,39 @@ protected:
                 ops.push_back(cursor->nextSafe());
             }
         }
-        {
-            WriteUnitOfWork wunit(&_opCtx);
-            if (!serverGlobalParams.enableMajorityReadConcern) {
-                if (ops.size() > 0) {
-                    if (auto tsElem = ops.front()["ts"]) {
-                        _opCtx.getServiceContext()->getStorageEngine()->setOldestTimestamp(
-                            tsElem.timestamp());
-                    }
+
+        if (!serverGlobalParams.enableMajorityReadConcern) {
+            if (ops.size() > 0) {
+                if (auto tsElem = ops.front()["ts"]) {
+                    _opCtx.getServiceContext()->getStorageEngine()->setOldestTimestamp(
+                        tsElem.timestamp());
                 }
             }
-            auto lastApplied = repl::ReplicationCoordinator::get(_opCtx.getServiceContext())
-                                   ->getMyLastAppliedOpTime()
-                                   .getTimestamp();
-            auto nextTimestamp = std::max(lastApplied + 1, Timestamp(1, 1));
-            ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(nextTimestamp));
+        }
 
-            OldClientContext ctx(&_opCtx, ns());
-            for (vector<BSONObj>::iterator i = ops.begin(); i != ops.end(); ++i) {
-                if (0) {
-                    LOGV2(22501, "op: {i}", "i"_attr = *i);
-                }
-                repl::UnreplicatedWritesBlock uwb(&_opCtx);
-                auto entry = uassertStatusOK(OplogEntry::parse(*i));
+        OldClientContext ctx(&_opCtx, ns());
+        for (vector<BSONObj>::iterator i = ops.begin(); i != ops.end(); ++i) {
+            if (0) {
+                LOGV2(22501, "op: {i}", "i"_attr = *i);
+            }
+            repl::UnreplicatedWritesBlock uwb(&_opCtx);
+            auto entry = uassertStatusOK(OplogEntry::parse(*i));
+            // Handle the case of batched writes which generate command-type (applyOps) oplog
+            // entries.
+            if (entry.getOpType() == repl::OpTypeEnum::kCommand) {
+                uassertStatusOK(applyCommand_inlock(&_opCtx, entry, getOplogApplicationMode()));
+            } else {
+                WriteUnitOfWork wunit(&_opCtx);
+                auto lastApplied = repl::ReplicationCoordinator::get(_opCtx.getServiceContext())
+                                       ->getMyLastAppliedOpTime()
+                                       .getTimestamp();
+                auto nextTimestamp = std::max(lastApplied + 1, Timestamp(1, 1));
+                ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(nextTimestamp));
                 const bool dataIsConsistent = true;
                 uassertStatusOK(applyOperation_inlock(
                     &_opCtx, ctx.db(), &entry, false, getOplogApplicationMode(), dataIsConsistent));
+                wunit.commit();
             }
-            wunit.commit();
         }
     }
     // These deletes don't get logged.

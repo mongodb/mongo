@@ -2,7 +2,7 @@
  * Validate basic batched multi-deletion functionality.
  *
  * @tags: [
- *  featureFlagBatchMultiDeletes,
+ *  requires_fcv_61,
  *  # Running as a replica set requires journaling.
  *  requires_journaling,
  * ]
