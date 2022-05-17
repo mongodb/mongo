@@ -64,9 +64,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 
-// TODO SERVER-65395: Remove failpoint when fle2 tests can reliably support internal transaction
-// retry limit.
-MONGO_FAIL_POINT_DEFINE(skipTransactionApiRetryCheckInHandleError);
 MONGO_FAIL_POINT_DEFINE(overrideTransactionApiMaxRetriesToThree);
 
 namespace mongo {
@@ -513,8 +510,7 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
     }
 
     // If the op has a deadline, retry until it is reached regardless of the number of attempts.
-    if (attemptCounter > getMaxRetries() && !_opDeadline &&
-        !MONGO_unlikely(skipTransactionApiRetryCheckInHandleError.shouldFail())) {
+    if (attemptCounter > getMaxRetries() && !_opDeadline) {
         return _isInCommit() ? ErrorHandlingStep::kDoNotRetry
                              : ErrorHandlingStep::kAbortAndDoNotRetry;
     }
