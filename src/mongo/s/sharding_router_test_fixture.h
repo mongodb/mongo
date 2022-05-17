@@ -36,7 +36,6 @@ namespace mongo {
 
 class BSONObj;
 class ShardingCatalogClient;
-struct ChunkVersion;
 class CollectionType;
 class ShardRegistry;
 

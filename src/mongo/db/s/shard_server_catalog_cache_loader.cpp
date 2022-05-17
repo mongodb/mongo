@@ -245,7 +245,8 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
 
     // If the persisted epoch doesn't match what the CatalogCache requested, read everything.
     // If the epochs are the same we can safely take the timestamp from the shard coll entry.
-    ChunkVersion startingVersion = version.isSameCollection(shardCollectionEntry.getTimestamp())
+    ChunkVersion startingVersion = version.isSameCollection({shardCollectionEntry.getEpoch(),
+                                                             shardCollectionEntry.getTimestamp()})
         ? ChunkVersion(version.majorVersion(),
                        version.minorVersion(),
                        version.epoch(),
@@ -712,7 +713,7 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     auto& collAndChunks = swCollectionAndChangedChunks.getValue();
 
     if (!collAndChunks.changedChunks.back().getVersion().isSameCollection(
-            collAndChunks.timestamp)) {
+            {collAndChunks.epoch, collAndChunks.timestamp})) {
         return Status{ErrorCodes::ConflictingOperationInProgress,
                       str::stream()
                           << "Invalid chunks found when reloading '" << nss.toString()
@@ -1262,9 +1263,6 @@ ShardServerCatalogCacheLoader::_getCompletePersistedMetadataForSecondarySinceVer
         LOGV2_FOR_CATALOG_REFRESH(
             24114,
             1,
-            "Cache loader read metadata while updates were being applied: this metadata may be "
-            "incomplete. Retrying. Refresh state before read: {beginRefreshState}. Current refresh "
-            "state: {endRefreshState}",
             "Cache loader read metadata while updates were being applied: this metadata may be "
             "incomplete. Retrying",
             "beginRefreshState"_attr = beginRefreshState,

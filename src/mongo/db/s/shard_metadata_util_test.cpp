@@ -213,7 +213,7 @@ TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
 
     RefreshState state = assertGet(getPersistedRefreshFlags(operationContext(), kNss));
 
-    ASSERT_EQUALS(state.epoch, maxCollVersion.epoch());
+    ASSERT(state.generation.isSameCollection(maxCollVersion));
     ASSERT_EQUALS(state.refreshing, true);
     ASSERT_EQUALS(state.lastRefreshedCollectionVersion,
                   ChunkVersion(0, 0, maxCollVersion.epoch(), maxCollVersion.getTimestamp()));
@@ -223,7 +223,7 @@ TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
 
     state = assertGet(getPersistedRefreshFlags(operationContext(), kNss));
 
-    ASSERT_EQUALS(state.epoch, maxCollVersion.epoch());
+    ASSERT(state.generation.isSameCollection(maxCollVersion));
     ASSERT_EQUALS(state.refreshing, false);
     ASSERT_EQUALS(state.lastRefreshedCollectionVersion, maxCollVersion);
 }

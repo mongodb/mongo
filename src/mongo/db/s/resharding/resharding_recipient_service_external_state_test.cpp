@@ -58,17 +58,20 @@ class RecipientServiceExternalStateTest : public CatalogCacheTestFixture,
                                           public ServiceContextMongoDTest {
 public:
     const ShardKeyPattern kShardKey = ShardKeyPattern(BSON("_id" << 1));
-    const OID kOrigEpoch = OID::gen();
-    const UUID kOrigUUID = UUID::gen();
-    const Timestamp kOrigTimestamp = Timestamp(1);
+
     const NamespaceString kOrigNss = NamespaceString("db.foo");
-    const ShardKeyPattern kReshardingKey = ShardKeyPattern(BSON("newKey" << 1));
-    const OID kReshardingEpoch = OID::gen();
-    const UUID kReshardingUUID = UUID::gen();
-    const Timestamp kReshardingTimestamp = Timestamp(2);
+    const OID kOrigEpoch = OID::gen();
+    const Timestamp kOrigTimestamp = Timestamp(1);
+    const UUID kOrigUUID = UUID::gen();
+
     const NamespaceString kReshardingNss = NamespaceString(
         str::stream() << "db." << NamespaceString::kTemporaryReshardingCollectionPrefix
                       << kOrigUUID);
+    const ShardKeyPattern kReshardingKey = ShardKeyPattern(BSON("newKey" << 1));
+    const OID kReshardingEpoch = OID::gen();
+    const Timestamp kReshardingTimestamp = Timestamp(2);
+    const UUID kReshardingUUID = UUID::gen();
+
     const CommonReshardingMetadata kMetadata{
         kReshardingUUID, kOrigNss, kOrigUUID, kReshardingNss, kReshardingKey.getKeyPattern()};
     const Timestamp kDefaultFetchTimestamp = Timestamp(200, 1);
@@ -283,8 +286,12 @@ TEST_F(RecipientServiceExternalStateTest, CreateLocalReshardingCollectionBasic) 
 
     // Shard kOrigNss by _id with chunks [minKey, 0), [0, maxKey] on shards "0" and "1"
     // respectively. ShardId("1") is the primary shard for the database.
-    loadRoutingTableWithTwoChunksAndTwoShardsImpl(
-        kOrigNss, kShardKey.toBSON(), boost::optional<std::string>("1"), kOrigUUID);
+    loadRoutingTableWithTwoChunksAndTwoShardsImpl(kOrigNss,
+                                                  kShardKey.toBSON(),
+                                                  boost::optional<std::string>("1"),
+                                                  kOrigUUID,
+                                                  kOrigEpoch,
+                                                  kOrigTimestamp);
 
     {
         // The resharding collection shouldn't exist yet.
@@ -334,8 +341,12 @@ TEST_F(RecipientServiceExternalStateTest,
 
     // Shard kOrigNss by _id with chunks [minKey, 0), [0, maxKey] on shards "0" and "1"
     // respectively. ShardId("1") is the primary shard for the database.
-    loadRoutingTableWithTwoChunksAndTwoShardsImpl(
-        kOrigNss, kShardKey.toBSON(), boost::optional<std::string>("1"), kOrigUUID);
+    loadRoutingTableWithTwoChunksAndTwoShardsImpl(kOrigNss,
+                                                  kShardKey.toBSON(),
+                                                  boost::optional<std::string>("1"),
+                                                  kOrigUUID,
+                                                  kOrigEpoch,
+                                                  kOrigTimestamp);
 
     {
         // The resharding collection shouldn't exist yet.
@@ -391,8 +402,12 @@ TEST_F(RecipientServiceExternalStateTest,
 
     // Shard kOrigNss by _id with chunks [minKey, 0), [0, maxKey] on shards "0" and "1"
     // respectively. ShardId("1") is the primary shard for the database.
-    loadRoutingTableWithTwoChunksAndTwoShardsImpl(
-        kOrigNss, kShardKey.toBSON(), boost::optional<std::string>("1"), kOrigUUID);
+    loadRoutingTableWithTwoChunksAndTwoShardsImpl(kOrigNss,
+                                                  kShardKey.toBSON(),
+                                                  boost::optional<std::string>("1"),
+                                                  kOrigUUID,
+                                                  kOrigEpoch,
+                                                  kOrigTimestamp);
 
     {
         // The resharding collection shouldn't exist yet.
@@ -457,8 +472,12 @@ TEST_F(RecipientServiceExternalStateTest,
 
     // Shard kOrigNss by _id with chunks [minKey, 0), [0, maxKey] on shards "0" and "1"
     // respectively. ShardId("1") is the primary shard for the database.
-    loadRoutingTableWithTwoChunksAndTwoShardsImpl(
-        kOrigNss, kShardKey.toBSON(), boost::optional<std::string>("1"), kOrigUUID);
+    loadRoutingTableWithTwoChunksAndTwoShardsImpl(kOrigNss,
+                                                  kShardKey.toBSON(),
+                                                  boost::optional<std::string>("1"),
+                                                  kOrigUUID,
+                                                  kOrigEpoch,
+                                                  kOrigTimestamp);
 
     {
         // The resharding collection shouldn't exist yet.
@@ -525,8 +544,12 @@ TEST_F(RecipientServiceExternalStateTest,
 
     // Shard kOrigNss by _id with chunks [minKey, 0), [0, maxKey] on shards "0" and "1"
     // respectively. ShardId("1") is the primary shard for the database.
-    loadRoutingTableWithTwoChunksAndTwoShardsImpl(
-        kOrigNss, kShardKey.toBSON(), boost::optional<std::string>("1"), kOrigUUID);
+    loadRoutingTableWithTwoChunksAndTwoShardsImpl(kOrigNss,
+                                                  kShardKey.toBSON(),
+                                                  boost::optional<std::string>("1"),
+                                                  kOrigUUID,
+                                                  kOrigEpoch,
+                                                  kOrigTimestamp);
 
     {
         // The resharding collection shouldn't exist yet.

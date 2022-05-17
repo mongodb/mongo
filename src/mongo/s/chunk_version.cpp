@@ -37,6 +37,26 @@ namespace mongo {
 
 constexpr StringData ChunkVersion::kShardVersionField;
 
+bool CollectionGeneration::isSameCollection(const CollectionGeneration& other) const {
+    if (_timestamp == other._timestamp) {
+        tassert(664720,
+                str::stream() << "Collections have matching timestamps " << _timestamp
+                              << ", but different epochs " << _epoch << " vs " << other._epoch,
+                _epoch == other._epoch);
+        return true;
+    }
+
+    tassert(664721,
+            str::stream() << "Collections have different timestamps " << _timestamp << " vs "
+                          << other._timestamp << ", but matching epochs " << _epoch,
+            _epoch != other._epoch);
+    return false;
+}
+
+std::string CollectionGeneration::toString() const {
+    return str::stream() << _epoch << "|" << _timestamp;
+}
+
 ChunkVersion ChunkVersion::_parse60Format(const BSONObj& obj) {
     IDLParserErrorContext ctx("_parse60Format");
     auto parsedVersion = ChunkVersion60Format::parse(ctx, obj);
@@ -201,9 +221,10 @@ void ChunkVersion::serializeToPositionalWronlyEcondedOr60AsBSON(StringData field
                                                                 BSONObjBuilder* builder) const {
     if (feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        ChunkVersion60Format chunkVersion(
-            _timestamp, _epoch, Timestamp(majorVersion(), minorVersion()));
-        builder->append(field, chunkVersion.toBSON());
+        ChunkVersion60Format version;
+        version.setGeneration({_epoch, _timestamp});
+        version.setPlacement(Timestamp(majorVersion(), minorVersion()));
+        builder->append(field, version.toBSON());
     } else {
         serializeToPositionalFormatWronglyEncodedAsBSON(field, builder);
     }
@@ -212,9 +233,10 @@ void ChunkVersion::serializeToPositionalWronlyEcondedOr60AsBSON(StringData field
 void ChunkVersion::serializeToBSON(StringData field, BSONObjBuilder* builder) const {
     if (feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        ChunkVersion60Format chunkVersion(
-            _timestamp, _epoch, Timestamp(majorVersion(), minorVersion()));
-        builder->append(field, chunkVersion.toBSON());
+        ChunkVersion60Format version;
+        version.setGeneration({_epoch, _timestamp});
+        version.setPlacement(Timestamp(majorVersion(), minorVersion()));
+        builder->append(field, version.toBSON());
     } else {
         BSONArrayBuilder arr(builder->subarrayStart(field));
         arr.appendTimestamp(_combined);
@@ -227,9 +249,10 @@ void ChunkVersion::serializeToPositionalFormatWronglyEncodedAsBSON(StringData fi
                                                                    BSONObjBuilder* builder) const {
     if (feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        ChunkVersion60Format chunkVersion(
-            _timestamp, _epoch, Timestamp(majorVersion(), minorVersion()));
-        builder->append(field, chunkVersion.toBSON());
+        ChunkVersion60Format version;
+        version.setGeneration({_epoch, _timestamp});
+        version.setPlacement(Timestamp(majorVersion(), minorVersion()));
+        builder->append(field, version.toBSON());
     } else {
         BSONObjBuilder subObjBuilder(builder->subobjStart(field));
         subObjBuilder.appendElements([&] {
@@ -245,9 +268,10 @@ void ChunkVersion::serializeToPositionalFormatWronglyEncodedAsBSON(StringData fi
 void ChunkVersion::appendLegacyWithField(BSONObjBuilder* out, StringData field) const {
     if (feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        ChunkVersion60Format chunkVersion(
-            _timestamp, _epoch, Timestamp(majorVersion(), minorVersion()));
-        out->append(field, chunkVersion.toBSON());
+        ChunkVersion60Format version;
+        version.setGeneration({_epoch, _timestamp});
+        version.setPlacement(Timestamp(majorVersion(), minorVersion()));
+        out->append(field, version.toBSON());
     } else {
         out->appendTimestamp(field, _combined);
         out->append(field + "Epoch", _epoch);

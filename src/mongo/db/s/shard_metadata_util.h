@@ -69,8 +69,8 @@ struct RefreshState {
 
     std::string toString() const;
 
-    // The current epoch of the collection metadata.
-    OID epoch;
+    // The current generation of the collection.
+    CollectionGeneration generation;
 
     // Whether a refresh is currently in progress.
     bool refreshing;

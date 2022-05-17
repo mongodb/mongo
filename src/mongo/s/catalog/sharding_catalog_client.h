@@ -30,7 +30,6 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -40,6 +39,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
@@ -48,7 +48,6 @@ class BSONArrayBuilder;
 class BSONObj;
 class BSONObjBuilder;
 class ChunkType;
-struct ChunkVersion;
 class CollectionType;
 class ConnectionString;
 class DatabaseType;
