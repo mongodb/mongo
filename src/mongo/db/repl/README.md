@@ -307,11 +307,11 @@ endless loop doing the following:
 6. Use multiple threads to apply the batch in parallel. This means that oplog entries within the
    same batch are not necessarily applied in order. The operations in each batch will be divided
    among the writer threads. The only restriction for creating the vector of operations that each
-   writer thread will apply serially has to do with the namespace that the operation applies to.
-   Operations on a document must be atomic and ordered, so operations on the same namespace will be
-   put on the same thread to be serialized. When applying operations, each writer thread will try to
-   **group** together insert operations for improved performance and will apply all other operations
-   individually.
+   writer thread will apply serially has to do with the documents that the operation applies to.
+   Operations on a document must be atomic and ordered, and are hence put on the same thread to be
+   serialized. Operations on the same collection can still be parallelized if they are working with
+   distinct documents. When applying operations, each writer thread will try to **group** together
+   insert operations for improved performance and will apply all other operations individually.
 7. Tell the storage engine to flush the journal.
 8. Update [**oplog visibility**](../catalog/README.md#oplog-visibility) by notifying the storage
    engine of the new oplog entries. Since entries in an oplog applier batch are applied in
