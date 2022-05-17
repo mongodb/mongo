@@ -381,18 +381,19 @@ PlanState ColumnScanStage::getNext() {
             splitCellView = SplitCellView::parse(lastCell->value);
         }
 
-        if (splitCellView && (splitCellView->hasSubPaths || splitCellView->hasDuplicateFields)) {
-            useRowStore = true;
-        } else if (!useRowStore && _columnCursors[i].includeInOutput()) {
-            if (!splitCellView || splitCellView->isSparse) {
-                // Must read in the parent information first.
-                readParentsIntoObj(path, &outObj, &parentPathsRead);
-            }
-
-            if (splitCellView) {
-                auto translatedCell = translateCell(path, *splitCellView);
-
-                addCellToObject(translatedCell, outObj);
+        if (_columnCursors[i].includeInOutput() && !useRowStore) {
+            if (splitCellView &&
+                (splitCellView->hasSubPaths || splitCellView->hasDuplicateFields)) {
+                useRowStore = true;
+            } else {
+                if (!splitCellView || splitCellView->isSparse) {
+                    // Must read in the parent information first.
+                    readParentsIntoObj(path, &outObj, &parentPathsRead);
+                }
+                if (splitCellView) {
+                    auto translatedCell = translateCell(path, *splitCellView);
+                    addCellToObject(translatedCell, outObj);
+                }
             }
         }
 
