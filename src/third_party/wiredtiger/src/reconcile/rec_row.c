@@ -661,6 +661,7 @@ __wt_rec_row_leaf(
     WT_CELL *cell;
     WT_CELL_UNPACK_KV *kpack, _kpack, *vpack, _vpack;
     WT_CURSOR_BTREE *cbt;
+    WT_DECL_ITEM(lastkey);
     WT_DECL_ITEM(tmpkey);
     WT_DECL_RET;
     WT_IKEY *ikey;
@@ -701,8 +702,17 @@ __wt_rec_row_leaf(
         WT_RET(__rec_row_leaf_insert(session, r, ins));
 
     /*
-     * Temporary buffers in which to instantiate any uninstantiated keys or value items we need.
+     * When we walk the page, we store each key we're building for the disk image in the last-key
+     * buffer. There's trickiness because it's significantly faster to use a previously built key
+     * plus the next key's prefix count to build the next key (rather than to call some underlying
+     * function to do it from scratch). In other words, we put each key into the last-key buffer,
+     * then use it to create the next key, again storing the result into the last-key buffer. If we
+     * don't build a key for any reason (imagine we skip a key because the value was deleted), clear
+     * the last-key buffer size so it's not used to fast-path building the next key.
      */
+    WT_ERR(__wt_scr_alloc(session, 0, &lastkey));
+
+    /* Temporary buffer in which to instantiate any uninstantiated keys or value items we need. */
     WT_ERR(__wt_scr_alloc(session, 0, &tmpkey));
 
     /* For each entry in the page... */
@@ -849,9 +859,9 @@ __wt_rec_row_leaf(
                 if (kpack != NULL && F_ISSET(kpack, WT_CELL_UNPACK_OVERFLOW) &&
                   kpack->raw != WT_CELL_KEY_OVFL_RM) {
                     /*
-                     * Keys are part of the name-space, we can't remove them from the in-memory
-                     * tree; if an overflow key was deleted without being instantiated (for example,
-                     * cursor-based truncation), instantiate it now.
+                     * Keys are part of the name-space, we can't remove them. If an overflow key was
+                     * deleted without ever having been instantiated, instantiate it now so future
+                     * searches aren't surprised when it's marked as cleared in the on-disk image.
                      */
                     if (ikey == NULL)
                         WT_ERR(__wt_row_leaf_key(session, page, rip, tmpkey, true));
@@ -868,11 +878,8 @@ __wt_rec_row_leaf(
                     WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, WT_RECNO_OOB, tmpkey, false));
                 }
 
-                /*
-                 * We aren't creating a key so we can't use bytes from this key to provide prefix
-                 * information for a subsequent key.
-                 */
-                tmpkey->size = 0;
+                /* Not creating a key so we can't use last-key as a prefix for a subsequent key. */
+                lastkey->size = 0;
 
                 /* Proceed with appended key/value pairs. */
                 goto leaf_insert;
@@ -895,10 +902,8 @@ __wt_rec_row_leaf(
             key->len = key->buf.size;
             ovfl_key = true;
 
-            /*
-             * We aren't creating a key so we can't use this key as a prefix for a subsequent key.
-             */
-            tmpkey->size = 0;
+            /* Not creating a key so we can't use last-key as a prefix for a subsequent key. */
+            lastkey->size = 0;
 
             /* Track if page has overflow items. */
             r->ovfl_items = true;
@@ -918,33 +923,32 @@ __wt_rec_row_leaf(
                 key_size = kpack->size;
                 key_prefix = kpack->prefix;
             }
-            if (key_prefix == 0) {
-                tmpkey->data = key_data;
-                tmpkey->size = key_size;
-                goto build;
-            }
-
-            if (tmpkey->size == 0 || tmpkey->size < key_prefix)
-                goto slow;
 
             /*
-             * Grow the buffer as necessary as well as ensure data has been copied into local buffer
-             * space, then append the suffix to the prefix already in the buffer. Don't grow the
-             * buffer unnecessarily or copy data we don't need, truncate the item's CURRENT data
-             * length to the prefix bytes before growing the buffer.
+             * If the key has no prefix count, no prefix compression work is needed; else check for
+             * a previously built key big enough cover this key's prefix count, else build from
+             * scratch.
              */
-            tmpkey->size = key_prefix;
-            WT_ERR(__wt_buf_grow(session, tmpkey, key_prefix + key_size));
-            memcpy((uint8_t *)tmpkey->mem + key_prefix, key_data, key_size);
-            tmpkey->size = key_prefix + key_size;
-
-            if (0) {
+            if (key_prefix == 0) {
+                lastkey->data = key_data;
+                lastkey->size = key_size;
+            } else if (lastkey->size >= key_prefix) {
+                /*
+                 * Grow the buffer as necessary as well as ensure data has been copied into local
+                 * buffer space, then append the suffix to the prefix already in the buffer. Don't
+                 * grow the buffer unnecessarily or copy data we don't need, truncate the item's
+                 * CURRENT data length to the prefix bytes before growing the buffer.
+                 */
+                lastkey->size = key_prefix;
+                WT_ERR(__wt_buf_grow(session, lastkey, key_prefix + key_size));
+                memcpy((uint8_t *)lastkey->mem + key_prefix, key_data, key_size);
+                lastkey->size = key_prefix + key_size;
+            } else {
 slow:
-                WT_ERR(__wt_row_leaf_key_copy(session, page, rip, tmpkey));
+                WT_ERR(__wt_row_leaf_key_copy(session, page, rip, lastkey));
             }
 
-build:
-            WT_ERR(__rec_cell_build_leaf_key(session, r, tmpkey->data, tmpkey->size, &ovfl_key));
+            WT_ERR(__rec_cell_build_leaf_key(session, r, lastkey->data, lastkey->size, &ovfl_key));
         }
 
         /* Boundary: split or write the page. */
@@ -997,6 +1001,7 @@ leaf_insert:
     ret = __wt_rec_split_finish(session, r);
 
 err:
+    __wt_scr_free(session, &lastkey);
     __wt_scr_free(session, &tmpkey);
     return (ret);
 }
