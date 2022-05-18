@@ -180,11 +180,27 @@ TEST_F(TicketHolderTest, FifoBasicMetrics) {
         // Wait for thread to start waiting.
     }
 
-    ASSERT_EQ(stats["out"], 1);
-    ASSERT_EQ(stats["available"], 0);
-    ASSERT_EQ(stats["addedToQueue"], 1);
-    ASSERT_EQ(stats["queueLength"], 1);
-
+    {
+        // Test that the metrics eventually converge to the following set of values. There can be
+        // cases where the values are incorrect for brief periods of time due to optimistic
+        // concurrency.
+        auto deadline = Date_t::now() + Milliseconds{100};
+        while (true) {
+            try {
+                ASSERT_EQ(stats["out"], 1);
+                ASSERT_EQ(stats["available"], 0);
+                ASSERT_EQ(stats["addedToQueue"], 1);
+                ASSERT_EQ(stats["queueLength"], 1);
+                break;
+            } catch (...) {
+                if (Date_t::now() > deadline) {
+                    throw;
+                }
+                // Sleep to allow other threads to process and converge the metrics.
+                stdx::this_thread::sleep_for(Milliseconds{1}.toSystemDuration());
+            }
+        }
+    }
     tickSource->advance(Microseconds(100));
     ticket.reset();
 
