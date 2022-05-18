@@ -293,7 +293,7 @@ void writeToImageCollection(OperationContext* opCtx,
     UpdateRequest request;
     request.setNamespaceString(NamespaceString::kConfigImagesNamespace);
     request.setQuery(
-        BSON("_id" << imageEntry.get_id().toBSON() << "ts" << BSON("$lt" << imageEntry.getTs())));
+        BSON("_id" << imageEntry.get_id().toBSON() << "ts" << BSON("$lte" << imageEntry.getTs())));
     request.setUpsert(*upsertConfigImage);
     request.setUpdateModification(
         write_ops::UpdateModification::parseFromClassicUpdate(imageEntry.toBSON()));
