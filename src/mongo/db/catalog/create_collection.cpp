@@ -540,6 +540,46 @@ Status _createCollection(OperationContext* opCtx,
     });
 }
 
+/**
+ * Creates the collection or the view as described by 'options'.
+ */
+Status createCollection(OperationContext* opCtx,
+                        const NamespaceString& ns,
+                        const CollectionOptions& options,
+                        const boost::optional<BSONObj>& idIndex) {
+    auto status = userAllowedCreateNS(opCtx, ns);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    if (options.isView()) {
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Cannot create a view in a multi-document "
+                                 "transaction.",
+                !opCtx->inMultiDocumentTransaction());
+        uassert(ErrorCodes::Error(6026500),
+                "The 'clusteredIndex' option is not supported with views",
+                !options.clusteredIndex);
+
+        return _createView(opCtx, ns, options);
+    } else if (options.timeseries && !ns.isTimeseriesBucketsCollection()) {
+        // This helper is designed for user-created time-series collections on primaries. If a
+        // time-series buckets collection is created explicitly or during replication, treat this as
+        // a normal collection creation.
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream()
+                    << "Cannot create a time-series collection in a multi-document transaction.",
+                !opCtx->inMultiDocumentTransaction());
+        return _createTimeseries(opCtx, ns, options);
+    } else {
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Cannot create system collection " << ns
+                              << " within a transaction.",
+                !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
+        return _createCollection(opCtx, ns, options, idIndex);
+    }
+}
+
 CollectionOptions clusterByDefaultIfNecessary(const NamespaceString& nss,
                                               CollectionOptions collectionOptions,
                                               const boost::optional<BSONObj>& idIndex) {
@@ -811,43 +851,6 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
 
     return createCollection(
         opCtx, newCollName, newCmd, idIndex, CollectionOptions::parseForStorage);
-}
-
-Status createCollection(OperationContext* opCtx,
-                        const NamespaceString& ns,
-                        const CollectionOptions& options,
-                        const boost::optional<BSONObj>& idIndex) {
-    auto status = userAllowedCreateNS(opCtx, ns);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    if (options.isView()) {
-        uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Cannot create a view in a multi-document "
-                                 "transaction.",
-                !opCtx->inMultiDocumentTransaction());
-        uassert(ErrorCodes::Error(6026500),
-                "The 'clusteredIndex' option is not supported with views",
-                !options.clusteredIndex);
-
-        return _createView(opCtx, ns, options);
-    } else if (options.timeseries && !ns.isTimeseriesBucketsCollection()) {
-        // This helper is designed for user-created time-series collections on primaries. If a
-        // time-series buckets collection is created explicitly or during replication, treat this as
-        // a normal collection creation.
-        uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream()
-                    << "Cannot create a time-series collection in a multi-document transaction.",
-                !opCtx->inMultiDocumentTransaction());
-        return _createTimeseries(opCtx, ns, options);
-    } else {
-        uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Cannot create system collection " << ns
-                              << " within a transaction.",
-                !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
-        return _createCollection(opCtx, ns, options, idIndex);
-    }
 }
 
 }  // namespace mongo
