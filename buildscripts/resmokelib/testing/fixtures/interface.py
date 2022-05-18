@@ -185,14 +185,15 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
         raise NotImplementedError(
             "get_driver_connection_url must be implemented by Fixture subclasses")
 
-    def mongo_client(self, read_preference=pymongo.ReadPreference.PRIMARY, timeout_millis=30000):
+    def mongo_client(self, read_preference=pymongo.ReadPreference.PRIMARY, timeout_millis=30000,
+                     **kwargs):
         """Return a pymongo.MongoClient connecting to this fixture with specified 'read_preference'.
 
         The PyMongo driver will wait up to 'timeout_millis' milliseconds
         before concluding that the server is unavailable.
         """
 
-        kwargs = {"connectTimeoutMS": timeout_millis}
+        kwargs["connectTimeoutMS"] = timeout_millis
         if pymongo.version_tuple[0] >= 3:
             kwargs["serverSelectionTimeoutMS"] = timeout_millis
             kwargs["connect"] = True
@@ -289,7 +290,7 @@ class NoOpFixture(Fixture):
         """:return: any pids owned by this fixture (none for NopFixture)."""
         return []
 
-    def mongo_client(self, read_preference=None, timeout_millis=None):
+    def mongo_client(self, read_preference=None, timeout_millis=None, **kwargs):
         """Return the mongo_client connection."""
         raise NotImplementedError("NoOpFixture does not support a mongo_client")
 

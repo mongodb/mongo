@@ -30,6 +30,7 @@
 
 #include <memory>
 
+#include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sdam/server_description_builder.h"
 #include "mongo/client/streamable_replica_set_monitor_for_testing.h"
@@ -644,48 +645,6 @@ TEST_F(ShardSplitDonorServiceTest, ShardSplitDonorServiceTimeout) {
     ASSERT_TRUE(serviceInstance->isGarbageCollectable());
 }
 
-// Verify the recipient acceptance listener stops when the shard split aborts due to an error. If it
-// does not, the test will timeout.
-TEST_F(ShardSplitDonorServiceTest, ListenerTerminatesOnError) {
-    auto opCtx = makeOperationContext();
-    auto serviceContext = getServiceContext();
-
-    FailPointEnableBlock fp("abortShardSplitBeforeLeavingBlockingState");
-
-    auto listenerCompleted =
-        std::make_unique<FailPointEnableBlock>("pauseShardSplitRecipientListenerCompletion");
-    const auto initialTimes = listenerCompleted->initialTimesEntered();
-
-    // Ensure the listener is created.
-    ShardSplitDonorService::DonorStateMachine::setSplitAcceptanceTaskExecutor_forTest(_executor);
-    _skipAcceptanceFP.reset();
-
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
-    test::shard_split::reconfigToAddRecipientNodes(
-        serviceContext, _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
-
-    auto stateDocument = defaultStateDocument();
-
-    auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
-        opCtx.get(), _service, stateDocument.toBSON());
-    ASSERT(serviceInstance.get());
-
-    auto result = serviceInstance->decisionFuture().get(opCtx.get());
-
-    ASSERT(!!result.abortReason);
-    ASSERT_EQ(result.abortReason->code(), ErrorCodes::InternalError);
-    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kAborted);
-
-    serviceInstance->tryForget();
-
-    ASSERT_OK(serviceInstance->completionFuture().getNoThrow());
-    ASSERT_TRUE(serviceInstance->isGarbageCollectable());
-
-    // If the listener does not stop, this will hang indefinitely and the test will timeout.
-    (*listenerCompleted)->waitForTimesEntered(initialTimes + 1);
-    listenerCompleted.reset();
-}
-
 // Abort scenario : abortSplit called before startSplit.
 TEST_F(ShardSplitDonorServiceTest, CreateInstanceInAbortState) {
     auto opCtx = makeOperationContext();
@@ -1015,6 +974,7 @@ public:
         auto stateDocument = defaultStateDocument();
         stateDocument.setBlockTimestamp(Timestamp(1, 1));
         stateDocument.setState(ShardSplitDonorStateEnum::kBlocking);
+        stateDocument.setRecipientConnectionString(ConnectionString::forLocal());
 
         return stateDocument;
     }

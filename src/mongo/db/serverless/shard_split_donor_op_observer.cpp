@@ -138,14 +138,19 @@ void onBlockerInitialization(OperationContext* opCtx,
     // The primary create and sets the tenant access blocker to blocking within the
     // ShardSplitDonorService.
     if (isSecondary(opCtx)) {
-        auto recipientTagName = donorStateDoc.getRecipientTagName();
-        auto recipientSetName = donorStateDoc.getRecipientSetName();
-        invariant(recipientTagName);
-        invariant(recipientSetName);
+        auto recipientConnectionString = [stateDoc = donorStateDoc]() {
+            if (stateDoc.getRecipientConnectionString()) {
+                return *stateDoc.getRecipientConnectionString();
+            }
 
-        auto config = repl::ReplicationCoordinator::get(cc().getServiceContext())->getConfig();
-        auto recipientConnectionString =
-            serverless::makeRecipientConnectionString(config, *recipientTagName, *recipientSetName);
+            auto recipientTagName = stateDoc.getRecipientTagName();
+            invariant(recipientTagName);
+            auto recipientSetName = stateDoc.getRecipientSetName();
+            invariant(recipientSetName);
+            auto config = repl::ReplicationCoordinator::get(cc().getServiceContext())->getConfig();
+            return serverless::makeRecipientConnectionString(
+                config, *recipientTagName, *recipientSetName);
+        }();
 
         for (const auto& tenantId : tenantIds) {
             auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(

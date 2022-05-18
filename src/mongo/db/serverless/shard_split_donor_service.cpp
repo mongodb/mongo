@@ -58,7 +58,6 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(abortShardSplitBeforeLeavingBlockingState);
-MONGO_FAIL_POINT_DEFINE(pauseShardSplitRecipientListenerCompletion);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeBlockingState);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterBlocking);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterDecision);
@@ -66,6 +65,7 @@ MONGO_FAIL_POINT_DEFINE(skipShardSplitWaitForSplitAcceptance);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeRecipientCleanup);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterMarkingStateGarbageCollectable);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitRecipientCleanup);
+MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeLeavingBlockingState);
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
@@ -196,13 +196,6 @@ SemiFuture<void> makeRecipientAcceptSplitFuture(
                 for (auto& monitor : monitors) {
                     monitor->shutdown();
                 }
-
-                LOGV2(6634900,
-                      "Shutting down shard split recipient listener.",
-                      "id"_attr = migrationId,
-                      "recipientReady"_attr = listener->getFuture().isReady());
-
-                pauseShardSplitRecipientListenerCompletion.pauseWhileSet();
 
                 return s;
             })
@@ -416,10 +409,6 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
             .then([this, executor, abortToken] {
                 auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                 pauseShardSplitAfterBlocking.pauseWhileSet(opCtx.get());
-
-                if (MONGO_unlikely(abortShardSplitBeforeLeavingBlockingState.shouldFail())) {
-                    uasserted(ErrorCodes::InternalError, "simulate a shard split error");
-                }
 
                 return _waitForRecipientToReachBlockTimestamp(executor, abortToken);
             })
@@ -655,14 +644,34 @@ ShardSplitDonorService::DonorStateMachine::_waitForRecipientToAcceptSplitAndTrig
 
     LOGV2(6142501, "Waiting for recipient to accept the split.", "id"_attr = _migrationId);
 
-    return _splitAcceptancePromise.getFuture()
-        .thenRunOn(**executor)
+    return ExecutorFuture(**executor)
+        .then([&]() { return _splitAcceptancePromise.getFuture(); })
+        .then([this] {
+            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+            if (MONGO_unlikely(pauseShardSplitBeforeLeavingBlockingState.shouldFail())) {
+                pauseShardSplitBeforeLeavingBlockingState.execute([&](const BSONObj& data) {
+                    if (!data.hasField("blockTimeMS")) {
+                        pauseShardSplitBeforeLeavingBlockingState.pauseWhileSet(opCtx.get());
+                    } else {
+                        const auto blockTime = Milliseconds{data.getIntField("blockTimeMS")};
+                        LOGV2(8423359,
+                              "Keeping shard split in blocking state.",
+                              "blockTime"_attr = blockTime);
+                        opCtx->sleepFor(blockTime);
+                    }
+                });
+            }
+
+            if (MONGO_unlikely(abortShardSplitBeforeLeavingBlockingState.shouldFail())) {
+                uasserted(ErrorCodes::InternalError, "simulate a shard split error");
+            }
+        })
         .then([this, recipients, abortToken, remoteCommandExecutor] {
             LOGV2(6493901,
-                  "Triggering an election after applying the split config.",
+                  "Triggering an election after recipient has accepted the split.",
                   "id"_attr = _migrationId);
 
-            // replSetStepUp on a random node will succeed as long as it's note the most out-of-date
+            // replSetStepUp on a random node will succeed as long as it's not the most out-of-date
             // node (in that case at least another node will vote for it and the election will
             // succeed). Selecting a random node has a 2/3 chance to succeed for replSetStepUp. If
             // the first command fail, we know this node is the most out-of-date. Therefore we
@@ -679,7 +688,7 @@ ShardSplitDonorService::DonorStateMachine::_waitForRecipientToAcceptSplitAndTrig
                     if (!replSetStepUpStatus.isOK()) {
                         LOGV2(6493904,
                               "Failed to trigger an election on the recipient replica set.",
-                              "replSetStatus"_attr = replSetStepUpStatus);
+                              "status"_attr = replSetStepUpStatus);
                     }
 
                     // Even if replSetStepUp failed, the recipient nodes have joined the
@@ -690,7 +699,7 @@ ShardSplitDonorService::DonorStateMachine::_waitForRecipientToAcceptSplitAndTrig
                 });
         })
         .thenRunOn(**executor)
-        .onCompletion([this, executor, abortToken](Status status) {
+        .then([this, executor, abortToken]() {
             LOGV2(6142503, "Entering 'committed' state.", "id"_attr = _stateDoc.getId());
 
             return _updateStateDocument(executor, abortToken, ShardSplitDonorStateEnum::kCommitted)

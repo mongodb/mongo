@@ -5015,6 +5015,48 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
+  name: shard_split_causally_consistent_jscore_passthrough_gen
+  tags: ["shard_split"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: shard_split_multi_stmt_txn_jscore_passthrough_gen
+  tags: ["shard_split"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: shard_split_stepdown_jscore_passthrough_gen
+  tags: ["shard_split"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: shard_split_terminate_primary_jscore_passthrough_gen
+  tags: ["shard_split"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      fallback_num_sub_suites: 10
+
+- <<: *gen_task_template
+  name: shard_split_kill_primary_jscore_passthrough_gen
+  tags: ["shard_split"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      fallback_num_sub_suites: 10
+
+- <<: *gen_task_template
   name: tenant_migration_jscore_passthrough_gen
   tags: ["serverless"]
   commands:

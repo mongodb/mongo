@@ -366,6 +366,11 @@ class FileBasedStepdownLifecycle(object):
         os.remove(self.__stepdown_files.permitted)
 
 
+def is_shard_split(fixture):
+    """Used to determine if the provided fixture is an instance of the ShardSplitFixture class."""
+    return fixture.__class__.__name__ == 'ShardSplitFixture'
+
+
 class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
     def __init__(  # pylint: disable=too-many-arguments
             self, logger, mongos_fixtures, rs_fixtures, stepdown_interval_secs, terminate, kill,
@@ -417,6 +422,10 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
 
                 self._is_idle_evt.clear()
 
+                if is_shard_split(self._fixture):
+                    self._fixture.enter_step_down()
+                    self._rs_fixtures = [self._fixture.get_donor_rs()]
+
                 now = time.time()
                 if now - self._last_exec > self._stepdown_interval_secs:
                     self.logger.info("Starting stepdown of all primaries")
@@ -426,6 +435,10 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
                     self._last_exec = time.time()
                     self.logger.info("Completed stepdown of all primaries in %0d ms",
                                      (self._last_exec - now) * 1000)
+
+                if is_shard_split(self._fixture):
+                    self._rs_fixtures = []
+                    self._fixture.exit_step_down()
 
                 found_idle_request = self.__lifecycle.poll_for_idle_request()
                 if found_idle_request:

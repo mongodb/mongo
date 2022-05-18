@@ -1,3 +1,6 @@
+# This suite starts a 3-node replica sets and uses the ContinuousShardSplit hook to run background
+# shard split operations.
+
 config_variables:
 - &keyFile jstests/libs/authTestsKey
 - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
@@ -19,24 +22,23 @@ selector:
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
-  # These tests run getMore commands which are not supported in the tenant migration passthrough.
+  # Cursor ids will not survive rerouting between replica sets during a shard split.
   - requires_getmore
-  # Due to background tenant migrations, operations in the main test shell are not guaranteed to
+  # Due to background shard splits, operations in the main test shell are not guaranteed to
   # be causally consistent with operations in a parallel shell. The reason is that
   # TenantMigrationCommitted error is only thrown when the client does a write or a atClusterTime/
   # afterClusterTime or linearlizable read. Therefore, one of shell may not be aware that the
-  # migration has occurred and would not forward the read/write command to the right replica set.
+  # split has occurred and would not forward the read/write command to the right replica set.
   - uses_parallel_shell
   # Profile settings are stored in-memory only so are not transferred to the recipient.
   - requires_profiling
   # capped collections are banned in Serverless
   - requires_capped
-  # emptycapped command is blocked during tenant migration.
+  # emptycapped command is blocked during shard split.
   - requires_emptycapped
-  # Multi-updates that conflict with tenant migration are not retried by inject_tenant_prefix.js.
+  # Multi-updates that conflict with shard split are not retried by inject_tenant_prefix.js.
   - requires_multi_updates
-  # Full validation can cause ongoing queries to fail. This can affect the tenant migration
-  # process.
+  # Full validation can cause ongoing queries to fail. This can affect the shard split process.
   - uses_full_validation
   - tenant_migration_incompatible
   - shard_split_incompatible
@@ -63,6 +65,7 @@ executor:
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
+          # TODO(SERVER-66221): Remove the next line when dbhash checks are implemented in the ContinuousShardSplit hook.
           skipTenantMigrationDBHash: true
   hooks:
   # Hooks are set up in the order listed here, and torn down in the same order (not as a stack).
@@ -96,9 +99,13 @@ executor:
     common_mongod_options:
       set_parameters:
         enableTestCommands: 1
-        # To avoid routing commands in each test incorrectly, the ContinuousTenantMigration hook
-        # only runs donorForgetMigration against the donor of each migration when it is safe to do
-        # so. Therefore, the garbage collection delay doesn't need to be large.
+        failpoint.abortShardSplitBeforeLeavingBlockingState:
+            mode:
+              activationProbability: 0.5
+        failpoint.pauseShardSplitBeforeLeavingBlockingState:
+            mode: alwaysOn
+            data:
+              blockTimeMS: 250
         shardSplitGarbageCollectionDelayMS: 1
         ttlMonitorSleepSecs: 1
       auth: ''

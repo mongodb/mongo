@@ -448,19 +448,16 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
             return true;
         }
 
-        // TODO(SERVER-64619) No longer use a dummy connectiong string when it is no longer a
-        // required parameter.
-        std::string dummmyRecipientConnectionString = "mongodb://FAKE_URI/?replSet=INVALID";
-
         auto optionalTenants = doc.getTenantIds();
         invariant(optionalTenants);
         for (const auto& tenantId : optionalTenants.get()) {
+            invariant(doc.getRecipientConnectionString());
             auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
                 opCtx->getServiceContext(),
                 doc.getId(),
                 tenantId.toString(),
                 MigrationProtocolEnum::kMultitenantMigrations,
-                dummmyRecipientConnectionString);
+                doc.getRecipientConnectionString()->toString());
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                 .add(tenantId.toString(), mtab);
 

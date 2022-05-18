@@ -539,9 +539,9 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         # Check that the fixture is still running before stepping down or killing the primary.
         # This ensures we still detect some cases in which the fixture has already crashed.
         if not self.is_running():
-            raise pymongo.errors.ServerFailure("ReplicaSetFixture {} expected to be running in"
-                                               " ContinuousStepdown, but wasn't.".format(
-                                                   self.replset_name))
+            raise self.fixturelib.ServerFailure("ReplicaSetFixture {} expected to be running in"
+                                                " ContinuousStepdown, but wasn't.".format(
+                                                    self.replset_name))
 
         # If we're running with background reconfigs, it's possible to be in a scenario
         # where we kill a necessary voting node (i.e. in a 5 node repl set), only 2 are
@@ -633,7 +633,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                 break
 
             if time.time() - retry_start_time > retry_time_secs:
-                raise pymongo.errors.ServerFailure(
+                raise self.fixturelib.ServerFailure(
                     "The old primary on port {} of replica set {} did not step up in"
                     " {} seconds.".format(chosen_node.port, self.replset_name, retry_time_secs))
 

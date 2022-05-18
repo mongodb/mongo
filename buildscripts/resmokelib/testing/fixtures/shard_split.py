@@ -52,6 +52,9 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
             else self.config.NUM_REPLSET_NODES
 
         self.fixtures = []
+        self._can_teardown_retired_donor_rs = threading.Event()
+        # By default, we can always tear down the retired donor rs
+        self._can_teardown_retired_donor_rs.set()
 
         # Make the initial donor replica set
         donor_rs_name = "rs0"
@@ -177,12 +180,20 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
         with self.__lock:
             return self.fixtures[1:]
 
+    def _create_client(self, fixture, **kwargs):
+        return fixture.mongo_client(
+            username=self.auth_options["username"], password=self.auth_options["password"],
+            authSource=self.auth_options["authenticationDatabase"],
+            authMechanism=self.auth_options["authenticationMechanism"], **kwargs)
+
     def add_recipient_nodes(self, recipient_set_name, recipient_tag_name=None):
         """Build recipient nodes, and reconfig them into the donor as non-voting members."""
         recipient_tag_name = recipient_tag_name or "recipientNode"
+        donor_rs_name = self.get_donor_rs().replset_name
 
         self.logger.info(
-            f"Adding {self.num_nodes_per_replica_set} recipient nodes to donor replica set.")
+            f"Adding {self.num_nodes_per_replica_set} recipient nodes to donor replica set '{donor_rs_name}'."
+        )
 
         with self.__lock:
             self._port_index ^= 1  # Toggle the set of mongod ports between index 0 and 1
@@ -213,58 +224,137 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
             recipient_node.await_ready()
 
         # Reconfig the donor to add the recipient nodes as non-voting members
-        donor_client = self.get_donor_rs().get_primary().mongo_client()
-        interface.authenticate(donor_client, self.auth_options)
+        donor_client = self._create_client(self.get_donor_rs())
 
-        repl_config = donor_client.admin.command({"replSetGetConfig": 1})["config"]
-        repl_members = repl_config["members"]
+        while True:
+            try:
+                repl_config = donor_client.admin.command({"replSetGetConfig": 1})["config"]
+                repl_members = repl_config["members"]
 
-        # Removes recipient tags from donor nodes which were split from a previous donor
-        # TODO(SERVER-64823): Remove this code once the server implementation removes these tags
-        for member in repl_members:
-            if 'tags' in member:
-                if recipient_tag_name in member["tags"]:
-                    del member["tags"][recipient_tag_name]
+                # Removes recipient tags from donor nodes which were split from a previous donor
+                # TODO(SERVER-64823): Remove this code once the server implementation removes these tags
+                for member in repl_members:
+                    if 'tags' in member:
+                        if recipient_tag_name in member["tags"]:
+                            del member["tags"][recipient_tag_name]
 
-        for recipient_node in recipient_nodes:
-            repl_members.append({
-                "host": recipient_node.get_internal_connection_string(), "votes": 0, "priority": 0,
-                "tags": {recipient_tag_name: str(ObjectId())}
-            })
+                for recipient_node in recipient_nodes:
+                    # It is possible for the reconfig below to fail with a retryable error code like
+                    # 'InterruptedDueToReplStateChange'. In these cases, we need to run the reconfig
+                    # again, but some or all of the recipient nodes might have already been added to
+                    # the member list. Only add recipient nodes which have not yet been added on a
+                    # retry.
+                    recipient_host = recipient_node.get_internal_connection_string()
+                    recipient_entry = {
+                        "host": recipient_host, "votes": 0, "priority": 0,
+                        "tags": {recipient_tag_name: str(ObjectId())}
+                    }
+                    member_exists = False
+                    for index, member in enumerate(repl_members):
+                        if member["host"] == recipient_host:
+                            repl_members[index] = recipient_entry
+                            member_exists = True
 
-        # Re-index all members from 0
-        for idx, member in enumerate(repl_members):
-            member["_id"] = idx
+                    if not member_exists:
+                        repl_members.append(recipient_entry)
 
-        # Prepare the new config
-        repl_config["version"] = repl_config["version"] + 1
-        repl_config["members"] = repl_members
+                # Re-index all members from 0
+                for idx, member in enumerate(repl_members):
+                    member["_id"] = idx
 
-        self.logger.info(
-            f"Reconfiguring donor replica set to add non-voting recipient nodes: {repl_config}")
-        donor_client.admin.command(
-            {"replSetReconfig": repl_config, "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000})
+                # Prepare the new config
+                repl_config["version"] = repl_config["version"] + 1
+                repl_config["members"] = repl_members
 
-        # Wait for recipient nodes to become secondaries
-        self._await_recipient_nodes()
+                self.logger.info(
+                    f"Reconfiguring donor replica set to add non-voting recipient nodes: {repl_config}"
+                )
+                donor_client.admin.command({
+                    "replSetReconfig": repl_config,
+                    "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
+                })
+
+                # Wait for recipient nodes to become secondaries
+                self._await_recipient_nodes()
+                return
+            except pymongo.errors.ConnectionFailure as err:
+                self.logger.info(
+                    f"Retrying adding recipient nodes on replica set '{donor_rs_name}' after error: {str(err)}."
+                )
+                continue
 
     def _await_recipient_nodes(self):
         """Wait for recipient nodes to become available."""
         recipient_nodes = self.get_recipient_nodes()
         for recipient_node in recipient_nodes:
-            client = recipient_node.mongo_client(read_preference=pymongo.ReadPreference.SECONDARY)
+            recipient_client = self._create_client(recipient_node,
+                                                   read_preference=pymongo.ReadPreference.SECONDARY)
             while True:
                 self.logger.info(
                     f"Waiting for secondary on port {recipient_node.port} to become available.")
                 try:
-                    is_secondary = client.admin.command("isMaster")["secondary"]
+                    is_secondary = recipient_client.admin.command("isMaster")["secondary"]
                     if is_secondary:
                         break
                 except pymongo.errors.OperationFailure as err:
                     if err.code != ShardSplitFixture._INTERRUPTED_DUE_TO_STORAGE_CHANGE:
                         raise
+                except pymongo.errors.ConnectionFailure:
+                    pass
+
                 time.sleep(0.1)  # Wait a little bit before trying again.
             self.logger.info(f"Secondary on port {recipient_node.port} is now available.")
+
+    def remove_recipient_nodes(self, recipient_tag_name=None):
+        """Remove recipient nodes from the donor."""
+        recipient_tag_name = recipient_tag_name or "recipientNode"
+        donor_rs_name = self.get_donor_rs().replset_name
+        recipient_nodes = self.get_recipient_nodes()
+        with self.__lock:
+            # Reset the port-set, so we select the same ports next time.
+            self._port_index ^= 1
+
+            # Remove the recipient nodes from the internal fixture list.
+            donor_rs = next(iter(self.fixtures), None)
+            if donor_rs and not _is_replica_set_fixture(donor_rs):
+                raise ValueError("Invalid configuration, donor_rs is not a ReplicaSetFixture")
+            self.fixtures = [donor_rs]
+
+        donor_client = self._create_client(self.get_donor_rs())
+        while True:
+            try:
+                repl_config = donor_client.admin.command({"replSetGetConfig": 1})["config"]
+                repl_members = [
+                    member for member in repl_config["members"]
+                    if not 'tags' in member or not recipient_tag_name in member["tags"]
+                ]
+
+                # Re-index all members from 0
+                for idx, member in enumerate(repl_members):
+                    member["_id"] = idx
+
+                # Prepare the new config
+                repl_config["version"] = repl_config["version"] + 1
+                repl_config["members"] = repl_members
+
+                # It's possible that the recipient config has been removed in a previous remove attempt.
+                if "recipientConfig" in repl_config:
+                    del repl_config["recipientConfig"]
+
+                self.logger.info(f"Reconfiguring donor to remove recipient nodes: {repl_config}")
+                donor_client.admin.command({
+                    "replSetReconfig": repl_config,
+                    "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
+                })
+                break
+            except pymongo.errors.ConnectionFailure as err:
+                self.logger.info(
+                    f"Retrying removing recipient nodes from replica set {donor_rs_name} after error: {str(err)}."
+                )
+                continue
+
+        for recipient_node in reversed(recipient_nodes):
+            recipient_node.teardown(finished=True)
 
     def replace_donor_with_recipient(self, recipient_set_name):
         """Replace the current donor with the newly initiated recipient."""
@@ -288,5 +378,16 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
         with self.__lock:
             self.fixtures = [new_donor_rs]
 
+        self._can_teardown_retired_donor_rs.wait()
         self.logger.info(f"Retiring old donor replica set '{retired_donor_rs.replset_name}'.")
         retired_donor_rs.teardown(finished=True)
+
+    def enter_step_down(self):
+        """Called by the ContinuousStepDown hook to indicate that we are stepping down."""
+        self.logger.info("Entering stepdown, preventing donor from being retired.")
+        self._can_teardown_retired_donor_rs.clear()
+
+    def exit_step_down(self):
+        """Called by the ContinuousStepDown hook to indicate that we are done stepping down."""
+        self.logger.info("Exiting stepdown, donor can now be retired.")
+        self._can_teardown_retired_donor_rs.set()
