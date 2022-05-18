@@ -101,7 +101,7 @@ public:
             }
 
             for (auto doneFuture : futuresToWait) {
-                doneFuture.wait(opCtx);
+                doneFuture.get(opCtx);
             }
 
             // If commit actually went through, the resharding documents will be cleaned up. If

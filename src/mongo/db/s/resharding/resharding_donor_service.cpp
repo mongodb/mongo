@@ -450,12 +450,20 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
 Status ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(
     Status status, const CancellationToken& stepdownToken) {
     if (!status.isOK()) {
+        // If the stepdownToken was triggered, it takes priority in order to make sure that
+        // the promise is set with an error that can be retried with. If it ran into an
+        // unrecoverable error, it would have fasserted earlier.
+        auto statusForPromise = stepdownToken.isCanceled()
+            ? Status{ErrorCodes::InterruptedDueToReplStateChange,
+                     "Resharding operation donor state machine interrupted due to replica set "
+                     "stepdown"}
+            : status;
+
         stdx::lock_guard<Latch> lk(_mutex);
 
-        ensureFulfilledPromise(lk, _critSecWasAcquired, status);
-        ensureFulfilledPromise(lk, _critSecWasPromoted, status);
-
-        ensureFulfilledPromise(lk, _completionPromise, status);
+        ensureFulfilledPromise(lk, _critSecWasAcquired, statusForPromise);
+        ensureFulfilledPromise(lk, _critSecWasPromoted, statusForPromise);
+        ensureFulfilledPromise(lk, _completionPromise, statusForPromise);
     }
 
     if (stepdownToken.isCanceled()) {

@@ -467,6 +467,15 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMand
                                                boost::none);
             }
 
+            // If the stepdownToken was triggered, it takes priority in order to make sure that
+            // the promise is set with an error that the coordinator can retry with. If it ran into
+            // an unrecoverable error, it would have fasserted earlier.
+            auto statusForPromise = isCanceled
+                ? Status{ErrorCodes::InterruptedDueToReplStateChange,
+                         "Resharding operation recipient state machine interrupted due to replica "
+                         "set stepdown"}
+                : outerStatus;
+
             // Wait for all of the data replication components to halt. We ignore any data
             // replication errors because resharding is known to have failed already.
             stdx::lock_guard<Latch> lk(_mutex);
