@@ -569,8 +569,10 @@ void ThreadPoolTaskExecutor::signalEvent_inlock(const EventHandle& event,
                                                 stdx::unique_lock<Latch> lk) {
     invariant(event.isValid());
     auto eventState = checked_cast<EventState*>(getEventFromHandle(event));
-    invariant(!eventState->isSignaledFlag);
-    eventState->isSignaledFlag = true;
+    const auto wasSignaled = std::exchange(eventState->isSignaledFlag, true);
+    if (MONGO_unlikely(wasSignaled && _inShutdown_inlock()))
+        return;
+    invariant(!wasSignaled);
     eventState->isSignaledCondition.notify_all();
     _unsignaledEvents.erase(eventState->iter);
     scheduleIntoPool_inlock(&eventState->waiters, std::move(lk));

@@ -183,6 +183,9 @@ public:
      *
      * May be called up to one time per event.
      *
+     * Any unsignaled event will be signaled during shutdown, and subsequent attempts to signal the
+     * event will be ignored.
+     *
      * May be called by client threads or callbacks running in the executor.
      */
     virtual void signalEvent(const EventHandle& event) = 0;

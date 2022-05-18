@@ -263,6 +263,17 @@ TEST_F(ThreadPoolExecutorTest, ShutdownAndScheduleRaceDoesNotCrash) {
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status2);
 }
 
+TEST_F(ThreadPoolExecutorTest, NotifyEventAfterShutdown) {
+    auto& executor = getExecutor();
+    auto swHandle = executor.makeEvent();
+    ASSERT_OK(swHandle.getStatus());
+
+    executor.shutdown();
+    executor.join();
+
+    executor.signalEvent(swHandle.getValue());
+}
+
 }  // namespace
 }  // namespace executor
 }  // namespace mongo
