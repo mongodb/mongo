@@ -43,7 +43,7 @@ timestamp provides input into the system's \c all_durable timestamp.
 
 MongoDB specifies different commit and durable timestamps because prepared
 transactions are higher-level MongoDB operations, requiring cluster-level
-consensus on durability. Applications without similar requirements for prepared
+consensus on visibility. Applications without similar requirements for prepared
 transactions should set the durable and commit timestamps to the same time.
 
 \warning

@@ -1291,7 +1291,7 @@ struct __wt_session {
 	 * further merges.  This is a soft limit\, and chunks larger than this value can be created.
 	 * Must be larger than chunk_size., an integer between 100MB and 10TB; default \c 5GB.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_size, the maximum size of the in-memory chunk of an
-	 * LSM tree.  This limit is soft - it is possible for chunks to be temporarily larger than
+	 * LSM tree.  This limit is soft\, it is possible for chunks to be temporarily larger than
 	 * this value.  This overrides the \c memory_page_max setting., an integer between 512K and
 	 * 500MB; default \c 10MB.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_custom = (, configure the
@@ -2582,8 +2582,8 @@ struct __wt_connection {
 	 * No updates made to logged tables or updates made without an associated commit timestamp
 	 * will be discarded. See @ref timestamp_misc.
 	 *
-	 * Applications should close or reset all open cursors before the call, and no other API
-	 * calls should be made for the duration of the call.
+	 * Applications must resolve all running transactions and close or reset all open cursors
+	 * before the call, and no other API calls should be made for the duration of the call.
 	 *
 	 * @snippet ex_all.c rollback to stable
 	 *

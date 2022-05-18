@@ -27,9 +27,10 @@ stable timestamp.
 Logged tables and updates made without an associated commit timestamp are
 unaffected.
 
-The database must be quiescent during this process, and applications must close
-or reset all open cursors before calling the WT_CONNECTION::rollback_to_stable
-method.
+The database must be quiescent during this process: applications must resolve
+all running transactions and close or reset all open cursors before calling
+WT_CONNECTION::rollback_to_stable, and no other API calls should be made for
+the duration of the call.
 
 @section timestamps_misc_in_memory In-memory configurations and timestamps
 
