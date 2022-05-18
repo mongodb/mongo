@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, wttest
-from helper_tiered import TieredConfigMixin, storage_sources
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
@@ -37,12 +37,13 @@ class test_tiered02(wttest.WiredTigerTestCase, TieredConfigMixin):
     complex_dataset = [
         ('simple_ds', dict(complex_dataset=False)),
         
-        # Commented out compplex dataset that tests column groups and indexes because it crashes
+        # Commented out complex dataset that tests column groups and indexes because it crashes
         # in the middle of the test. FIXME: WT-9001
         #('complex_ds', dict(complex_dataset=True)),
     ]
 
     # Make scenarios for different cloud service providers
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered02', tiered_only=True)
     scenarios = make_scenarios(storage_sources, complex_dataset)
 
     uri = "table:test_tiered02"

@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import sys, wiredtiger, wttest
-from helper_tiered import TieredConfigMixin, tiered_storage_sources
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
 
 # test_alter02.py
@@ -64,6 +64,7 @@ class test_alter02(TieredConfigMixin, wttest.WiredTigerTestCase):
         ('no-reopen', dict(reopen=False)),
         ('reopen', dict(reopen=True)),
     ]
+    tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = make_scenarios(tiered_storage_sources, conn_log, types, tables, reopen)
 
     # This test varies the log setting.  Override the standard methods.

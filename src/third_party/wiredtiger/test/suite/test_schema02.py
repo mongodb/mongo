@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper_tiered import TieredConfigMixin, tiered_storage_sources
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
 
 # test_schema02.py
@@ -43,6 +43,7 @@ class test_schema02(TieredConfigMixin, wttest.WiredTigerTestCase):
         ('lsm', dict(type='lsm', idx_config=',type=lsm')),
     ]
 
+    tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = make_scenarios(tiered_storage_sources, types)
 
     def expect_failure_colgroup(self, name, configstr, match):

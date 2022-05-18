@@ -30,11 +30,13 @@
 # Check that importing tiered tables returns an error.
 
 import os, shutil, wiredtiger
-from helper_tiered import get_conn_config, storage_sources, TieredConfigMixin
+from helper_tiered import get_conn_config, gen_tiered_storage_sources, TieredConfigMixin
 from test_import01 import test_import_base
 from wtscenario import make_scenarios
+import wttest 
 
 class test_tiered13(test_import_base, TieredConfigMixin):
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered13', tiered_only=True)
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(storage_sources)
 
@@ -152,3 +154,4 @@ class test_tiered13(test_import_base, TieredConfigMixin):
         # Try to import via a renamed object with metadata.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.create(self.otheruri, import_meta), msg)
+

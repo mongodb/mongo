@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, shutil
-from helper_tiered import TieredConfigMixin, tiered_storage_sources
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from suite_subprocess import suite_subprocess
 import wttest
 from wtscenario import make_scenarios
@@ -60,6 +60,7 @@ class test_schema08(TieredConfigMixin, wttest.WiredTigerTestCase, suite_subproce
         ('no_ckpt', dict(ckpt=False)),
         ('with_ckpt', dict(ckpt=True)),
     ]
+    tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = make_scenarios(tiered_storage_sources, types, ops, ckpt)
     count = 0
     lsns = []

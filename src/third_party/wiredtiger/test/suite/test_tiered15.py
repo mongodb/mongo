@@ -29,7 +29,7 @@
 # test_tiered15.py
 #   Test the "type" configuration in session.create with tiered storage.
 
-from helper_tiered import TieredConfigMixin, tiered_storage_sources
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
 import wiredtiger, wttest
 
@@ -52,6 +52,7 @@ class test_tiered15(TieredConfigMixin, wttest.WiredTigerTestCase):
         ('nontiered_table', dict(is_tiered_table=False)),
     ]
 
+    tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = make_scenarios(tiered_storage_sources, types)
 
     def test_create_type_config(self):
