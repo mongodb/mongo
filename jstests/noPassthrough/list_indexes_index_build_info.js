@@ -4,11 +4,7 @@
  * indexes which are building, the indexBuildInfo document should be returned next to spec, and
  * should contain a buildUUID.
  *
- * @tags: [
- *     # Persistent storage engine needed for resumable index builds.
- *     requires_persistence,
- *     requires_replication,
- * ]
+ * @tags: [requires_replication]
  */
 
 (function() {
@@ -21,7 +17,7 @@ load("jstests/noPassthrough/libs/index_build.js");  // for IndexBuildTest
  * with, ensures that ready and in-progress indexes are formatted correctly in each output.
  */
 function assertListIndexesOutputsMatch(
-    withoutBuildInfo, withBuildInfo, readyIndexNames, buildingIndexNames, expectedBuildingInfo) {
+    withoutBuildInfo, withBuildInfo, readyIndexNames, buildingIndexNames) {
     const allIndexNames = readyIndexNames.concat(buildingIndexNames);
     assert.eq(
         withoutBuildInfo.map(i => i.name).sort(),
@@ -83,26 +79,6 @@ function assertListIndexesOutputsMatch(
                       'collection scan',
                       "Index expected to be in-progress building unexpected phaseStr: " +
                           tojson(withBuildInfo[i]));
-
-            // Index building, should have indexBuildInfo.opid.
-            assert(withBuildInfo[i].indexBuildInfo.hasOwnProperty('opid'),
-                   "Index expected to be in-progress building did not have indexBuildInfo.opid: " +
-                       tojson(withBuildInfo[i]));
-            assert.eq(
-                withBuildInfo[i].indexBuildInfo.opid,
-                expectedBuildingInfo[withBuildInfo[i].spec.name].opid,
-                "Index expected to be in-progress building has different opid from db.currentOp(): " +
-                    tojson(withBuildInfo[i]) + '; db.currentOp(): ' + tojson(db.currentOp()));
-
-            // Index building, should have indexBuildInfo.resumable.
-            assert(
-                withBuildInfo[i].indexBuildInfo.hasOwnProperty('resumable'),
-                "Index expected to be in-progress building did not have indexBuildInfo.resumable: " +
-                    tojson(withBuildInfo[i]));
-            assert.eq(withBuildInfo[i].indexBuildInfo.resumable,
-                      expectedBuildingInfo[withBuildInfo[i].spec.name].resumable,
-                      "Index expected to be in-progress building has unexpected resumable value: " +
-                          tojson(withBuildInfo[i]));
         }
     }
 }
@@ -157,42 +133,17 @@ assert.eq(listIndexesIncludeBuildUUIDsIndexBuildInfoFalseOutput, listIndexesDefa
 
 // Create a new index, this time intentionally pausing the index build halfway through in order to
 // test the in-progress index case.
-// For this index build to be resumable, we need to provide a commit quorum of all voting members,
-// which is also the default.
 const buildingIndexName = "b_1";
 IndexBuildTest.pauseIndexBuilds(conn);
-const awaitIndexBuild = IndexBuildTest.startIndexBuild(conn,
-                                                       coll.getFullName(),
-                                                       {b: 1},
-                                                       {name: buildingIndexName},
-                                                       [],
-                                                       /*commitQuorum=*/"votingMembers");
-// Provide a custom filter to target the op id of task on the index build thread pool,
-// not the client connection.
-const filter = {
-    connectionId: {$exists: false}
-};
-const buildingOpId =
-    IndexBuildTest.waitForIndexBuildToStart(db, collName, buildingIndexName, filter);
+const awaitIndexBuild = IndexBuildTest.startIndexBuild(
+    conn, coll.getFullName(), {b: 1}, {name: buildingIndexName}, [], 0);
+IndexBuildTest.waitForIndexBuildToStart(db, collName, buildingIndexName);
 
-// Add a non-resumable index build to the listIndexes result by providing a commit quorum of zero,
-// though any commit quorum other than the default of all voting members will do the job.
-const buildingIndexNameNonResumable = "c_1";
-const awaitIndexBuildNonResumable =
-    IndexBuildTest.startIndexBuild(conn,
-                                   coll.getFullName(),
-                                   {c: 1},
-                                   {name: buildingIndexNameNonResumable},
-                                   [],
-                                   /*commitQuorum=*/0);
-const buildingOpIdNonResumable =
-    IndexBuildTest.waitForIndexBuildToStart(db, collName, buildingIndexNameNonResumable, filter);
-
-// Wait for the new indexes to appear in listIndexes output.
+// Wait for the new index to appear in listIndexes output.
 assert.soonNoExcept(() => {
     listIndexesDefaultOutput =
         assert.commandWorked(db.runCommand({listIndexes: collName})).cursor.firstBatch;
-    assert(listIndexesDefaultOutput.length == 4);
+    assert(listIndexesDefaultOutput.length == 3);
     return true;
 });
 
@@ -201,19 +152,12 @@ assert.soonNoExcept(() => {
 listIndexesIncludeIndexBuildInfoOutput =
     assert.commandWorked(db.runCommand({listIndexes: collName, includeIndexBuildInfo: true}))
         .cursor.firstBatch;
-assertListIndexesOutputsMatch(
-    listIndexesDefaultOutput,
-    listIndexesIncludeIndexBuildInfoOutput,
-    ["_id_", doneIndexName],
-    [buildingIndexName, buildingIndexNameNonResumable],
-    {
-        [buildingIndexName]: {opid: buildingOpId, resumable: true},
-        [buildingIndexNameNonResumable]: {opid: buildingOpIdNonResumable, resumable: false}
-    });
+assertListIndexesOutputsMatch(listIndexesDefaultOutput,
+                              listIndexesIncludeIndexBuildInfoOutput,
+                              ["_id_", doneIndexName],
+                              [buildingIndexName]);
 
 IndexBuildTest.resumeIndexBuilds(conn);
-IndexBuildTest.waitForIndexBuildToStop(db, collName, buildingIndexNameNonResumable);
-awaitIndexBuildNonResumable();
 IndexBuildTest.waitForIndexBuildToStop(db, collName, buildingIndexName);
 awaitIndexBuild();
 rst.stopSet();

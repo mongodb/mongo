@@ -467,15 +467,6 @@ void ReplIndexBuildState::clearLastOpTimeBeforeInterceptors() {
 void ReplIndexBuildState::appendBuildInfo(BSONObjBuilder* builder) const {
     stdx::unique_lock<Latch> lk(_mutex);
 
-    // This allows listIndexes callers to identify how to kill the index build.
-    // Previously, users have to locate the index build in the currentOp command output
-    // for this information.
-    if (_opId) {
-        builder->append("opid", static_cast<int>(*_opId));
-    }
-
-    builder->append("resumable", !_lastOpTimeBeforeInterceptors.isNull());
-
     _indexBuildState.appendBuildInfo(builder);
 }
 
