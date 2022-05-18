@@ -49,29 +49,6 @@ ABT generateConjunctionOrDisjunction(Args&... args) {
     return result;
 }
 
-ABT generateCoerceToBool(ABT input, const std::string& varName) {
-    // Adapted from sbe_stage_builder_expression.cpp::generateCoerceToBoolExpression.
-
-    const auto makeNeqCheckFn = [&varName](ABT valExpr) {
-        return make<BinaryOp>(
-            Operations::Neq,
-            make<BinaryOp>(Operations::Cmp3w, make<Variable>(varName), std::move(valExpr)),
-            Constant::int64(0));
-    };
-
-    // If any of these are false, the branch is considered false for the purposes of the
-    // any logical expression.
-    ABT checkExists = make<FunctionCall>("exists", makeSeq(input));
-    ABT checkNotNull = make<UnaryOp>(Operations::Not, make<FunctionCall>("isNull", makeSeq(input)));
-    ABT checkNotFalse = makeNeqCheckFn(Constant::boolean(false));
-    ABT checkNotZero = makeNeqCheckFn(Constant::int64(0));
-
-    return make<Let>(varName,
-                     std::move(input),
-                     generateConjunctionOrDisjunction<true /*isConjunction*/>(
-                         checkExists, checkNotNull, checkNotFalse, checkNotZero));
-};
-
 std::pair<sbe::value::TypeTags, sbe::value::Value> convertFrom(const Value val) {
     // TODO: Either make this conversion unnecessary by changing the value representation in
     // ExpressionConstant, or provide a nicer way to convert directly from Document/Value to

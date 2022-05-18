@@ -54,6 +54,7 @@ public:
     void ensureArity(size_t arity);
 
     const std::string& getRootProjection() const;
+    const ABT& getRootProjVar() const;
 
     const std::string& getUniqueIdPrefix() const;
 
@@ -62,6 +63,7 @@ private:
     const bool _assertPathSort;
 
     const std::string _rootProjection;
+    const ABT _rootProjVar;
     const std::string _uniqueIdPrefix;
 
     std::stack<ABT> _stack;

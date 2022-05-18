@@ -38,6 +38,7 @@ ExpressionAlgebrizerContext::ExpressionAlgebrizerContext(const bool assertExprSo
     : _assertExprSort(assertExprSort),
       _assertPathSort(assertPathSort),
       _rootProjection(rootProjection),
+      _rootProjVar(make<Variable>(_rootProjection)),
       _uniqueIdPrefix(uniqueIdPrefix) {}
 
 void ExpressionAlgebrizerContext::push(ABT node) {
@@ -64,6 +65,10 @@ void ExpressionAlgebrizerContext::ensureArity(const size_t arity) {
 
 const std::string& ExpressionAlgebrizerContext::getRootProjection() const {
     return _rootProjection;
+}
+
+const ABT& ExpressionAlgebrizerContext::getRootProjVar() const {
+    return _rootProjVar;
 }
 
 const std::string& ExpressionAlgebrizerContext::getUniqueIdPrefix() const {

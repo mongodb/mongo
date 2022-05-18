@@ -122,38 +122,57 @@ public:
         ABT right = _ctx.pop();
         ABT left = _ctx.pop();
 
-        switch (expr->getOp()) {
-            case ExpressionCompare::CmpOp::EQ:
-                _ctx.push<BinaryOp>(Operations::Eq, std::move(left), std::move(right));
-                break;
+        const auto translateCmpOpFn = [](const ExpressionCompare::CmpOp op) {
+            switch (op) {
+                case ExpressionCompare::CmpOp::EQ:
+                    return Operations::Eq;
 
-            case ExpressionCompare::CmpOp::NE:
-                _ctx.push<BinaryOp>(Operations::Neq, std::move(left), std::move(right));
-                break;
+                case ExpressionCompare::CmpOp::NE:
+                    return Operations::Neq;
 
-            case ExpressionCompare::CmpOp::GT:
-                _ctx.push<BinaryOp>(Operations::Gt, std::move(left), std::move(right));
-                break;
+                case ExpressionCompare::CmpOp::GT:
+                    return Operations::Gt;
 
-            case ExpressionCompare::CmpOp::GTE:
-                _ctx.push<BinaryOp>(Operations::Gte, std::move(left), std::move(right));
-                break;
+                case ExpressionCompare::CmpOp::GTE:
+                    return Operations::Gte;
 
-            case ExpressionCompare::CmpOp::LT:
-                _ctx.push<BinaryOp>(Operations::Lt, std::move(left), std::move(right));
-                break;
+                case ExpressionCompare::CmpOp::LT:
+                    return Operations::Lt;
 
-            case ExpressionCompare::CmpOp::LTE:
-                _ctx.push<BinaryOp>(Operations::Lte, std::move(left), std::move(right));
-                break;
+                case ExpressionCompare::CmpOp::LTE:
+                    return Operations::Lte;
 
-            case ExpressionCompare::CmpOp::CMP:
-                _ctx.push<FunctionCall>("cmp3w", makeSeq(std::move(left), std::move(right)));
-                break;
+                case ExpressionCompare::CmpOp::CMP:
+                    return Operations::Cmp3w;
 
-            default:
-                MONGO_UNREACHABLE;
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        };
+
+        const auto addEvalFilterFn = [&](ABT path, ABT expr, const Operations op) {
+            PathAppender appender(make<PathCompare>(op, std::move(expr)));
+            appender.append(path);
+            _ctx.push<EvalFilter>(std::move(path), _ctx.getRootProjVar());
+        };
+
+        const Operations op = translateCmpOpFn(expr->getOp());
+        if (op != Operations::Cmp3w) {
+            // If we have EvalPaths coming from the left or on the right, add a PathCompare, and
+            // keep propagating the path.
+            if (auto leftPtr = left.cast<EvalPath>();
+                leftPtr != nullptr && leftPtr->getInput() == _ctx.getRootProjVar()) {
+                addEvalFilterFn(std::move(leftPtr->getPath()), std::move(right), op);
+                return;
+            }
+            if (auto rightPtr = right.cast<EvalPath>();
+                rightPtr != nullptr && rightPtr->getInput() == _ctx.getRootProjVar()) {
+                addEvalFilterFn(
+                    std::move(rightPtr->getPath()), std::move(left), reverseComparisonOp(op));
+                return;
+            }
         }
+        _ctx.push<BinaryOp>(op, std::move(left), std::move(right));
     }
 
     void visit(const ExpressionConcat* expr) override final {
@@ -166,7 +185,7 @@ public:
 
     void visit(const ExpressionCond* expr) override final {
         _ctx.ensureArity(3);
-        ABT cond = generateCoerceToBoolPopInput();
+        ABT cond = _ctx.pop();
         ABT thenCase = _ctx.pop();
         ABT elseCase = _ctx.pop();
         _ctx.push<If>(std::move(cond), std::move(thenCase), std::move(elseCase));
@@ -229,10 +248,9 @@ public:
         ABT path = translateFieldPath(
             fieldPath,
             make<PathIdentity>(),
-            [](const std::string& fieldName, const bool isLastElement, ABT input) {
-                return make<PathGet>(fieldName,
-                                     isLastElement ? std::move(input)
-                                                   : make<PathTraverse>(std::move(input)));
+            [](const std::string& fieldName, const bool /*isLastElement*/, ABT input) {
+                // No traverse.
+                return make<PathGet>(fieldName, std::move(input));
             },
             1ul);
 
@@ -250,12 +268,11 @@ public:
         ABT filter = _ctx.pop();
         ABT input = _ctx.pop();
 
-        _ctx.push<EvalPath>(make<PathTraverse>(make<PathLambda>(make<LambdaAbstraction>(
-                                varName,
-                                make<If>(generateCoerceToBoolInternal(std::move(filter)),
-                                         make<Variable>(varName),
-                                         Constant::nothing())))),
-                            std::move(input));
+        _ctx.push<EvalPath>(
+            make<PathTraverse>(make<PathLambda>(make<LambdaAbstraction>(
+                varName,
+                make<If>(std::move(filter), make<Variable>(varName), Constant::nothing())))),
+            std::move(input));
     }
 
     void visit(const ExpressionFloor* expr) override final {
@@ -464,7 +481,7 @@ public:
 
         ABTVector children;
         for (size_t i = 0; i < numCases; i++) {
-            children.emplace_back(generateCoerceToBoolPopInput());
+            children.emplace_back(_ctx.pop());
             children.emplace_back(_ctx.pop());
         }
 
@@ -739,24 +756,53 @@ private:
      * semantics.
      */
     void visitMultiBranchLogicExpression(const Expression* expr, Operations logicOp) {
-        invariant(logicOp == Operations::And || logicOp == Operations::Or);
+        const bool isAnd = logicOp == Operations::And;
+        invariant(isAnd || logicOp == Operations::Or);
         const size_t arity = expr->getChildren().size();
         _ctx.ensureArity(arity);
 
         if (arity == 0) {
             // Empty $and and $or always evaluate to their logical operator's identity value: true
             // and false, respectively.
-            const bool logicIdentityVal = (logicOp == Operations::And);
-            _ctx.push<Constant>(sbe::value::TypeTags::Boolean,
-                                sbe::value::bitcastFrom<bool>(logicIdentityVal));
+            _ctx.push(Constant::boolean(isAnd));
             return;
         }
 
-        ABT current = generateCoerceToBoolPopInput();
-        for (size_t i = 0; i < arity - 1; i++) {
-            current = make<BinaryOp>(logicOp, std::move(current), generateCoerceToBoolPopInput());
+        bool allFilters = true;
+        ABTVector children;
+        ABTVector childPaths;
+
+        for (size_t i = 0; i < arity; i++) {
+            ABT child = _ctx.pop();
+            if (auto filterPtr = child.cast<EvalFilter>(); allFilters && filterPtr != nullptr &&
+                filterPtr->getInput() == _ctx.getRootProjVar()) {
+                childPaths.push_back(filterPtr->getPath());
+            } else {
+                allFilters = false;
+            }
+            children.push_back(std::move(child));
         }
-        _ctx.push(std::move(current));
+
+        if (allFilters) {
+            // If all children are paths, place a path composition.
+            ABT result = make<PathIdentity>();
+            if (isAnd) {
+                for (ABT& child : childPaths) {
+                    maybeComposePath<PathComposeM>(result, std::move(child));
+                }
+            } else {
+                for (ABT& child : childPaths) {
+                    maybeComposePath<PathComposeA>(result, std::move(child));
+                }
+            }
+            _ctx.push<EvalFilter>(std::move(result), _ctx.getRootProjVar());
+        } else {
+            ABT result = std::move(children.front());
+            for (size_t i = 1; i < arity; i++) {
+                result = make<BinaryOp>(logicOp, std::move(result), std::move(children.at(i)));
+            }
+            _ctx.push(std::move(result));
+        }
     }
 
     void pushMultiArgFunctionFromTop(const std::string& functionName, const size_t argCount) {
@@ -786,14 +832,6 @@ private:
             current = make<BinaryOp>(op, std::move(current), _ctx.pop());
         }
         _ctx.push(std::move(current));
-    }
-
-    ABT generateCoerceToBoolInternal(ABT input) {
-        return generateCoerceToBool(std::move(input), getNextId("coerceToBool"));
-    }
-
-    ABT generateCoerceToBoolPopInput() {
-        return generateCoerceToBoolInternal(_ctx.pop());
     }
 
     std::string generateVariableName(const Variables::Id varId) {

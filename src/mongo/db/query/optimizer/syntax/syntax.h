@@ -171,6 +171,26 @@ inline constexpr bool isBinaryOp(Operations op) {
     return !isUnaryOp(op);
 }
 
+inline constexpr Operations reverseComparisonOp(Operations op) {
+    switch (op) {
+        case Operations::Eq:
+        case Operations::Neq:
+            return op;
+
+        case Operations::Lt:
+            return Operations::Gte;
+        case Operations::Lte:
+            return Operations::Gt;
+        case Operations::Gt:
+            return Operations::Lte;
+        case Operations::Gte:
+            return Operations::Lt;
+
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
 /**
  * This is a special inert ABT node. It is used by rewriters to preserve structural properties of
  * nodes during in-place rewriting.

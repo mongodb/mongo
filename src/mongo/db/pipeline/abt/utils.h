@@ -36,12 +36,6 @@
 
 namespace mongo::optimizer {
 
-/**
- * Generate an AST to compute "coerceToBool" on the input. Expects a variable name to use as a let
- * variable.
- */
-ABT generateCoerceToBool(ABT input, const std::string& varName);
-
 std::pair<sbe::value::TypeTags, sbe::value::Value> convertFrom(Value val);
 
 using ABTFieldNameFn =

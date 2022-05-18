@@ -68,6 +68,9 @@ public:
     void prepare(ABT&, const PathTraverse&);
     void transport(ABT&, const PathTraverse&, ABT&);
 
+    void transport(ABT& n, const PathComposeM& op, ABT& lhs, ABT& rhs);
+    void transport(ABT& n, const PathComposeA& op, ABT& lhs, ABT& rhs);
+
     void prepare(ABT&, const References& refs);
     void transport(ABT& n, const References& op, std::vector<ABT>&);
 

@@ -482,6 +482,30 @@ void ConstEval::transport(ABT&, const PathTraverse&, ABT&) {
     --_inCostlyCtx;
 }
 
+template <bool v>
+static void constEvalComposition(ABT& n, ABT& lhs, ABT& rhs) {
+    ABT c = make<PathConstant>(Constant::boolean(v));
+    if (lhs == c || rhs == c) {
+        std::swap(n, c);
+        return;
+    }
+
+    c = make<PathConstant>(Constant::boolean(!v));
+    if (lhs == c) {
+        std::swap(n, rhs);
+    } else if (rhs == c) {
+        std::swap(n, lhs);
+    }
+}
+
+void ConstEval::transport(ABT& n, const PathComposeM& op, ABT& lhs, ABT& rhs) {
+    constEvalComposition<false>(n, lhs, rhs);
+}
+
+void ConstEval::transport(ABT& n, const PathComposeA& op, ABT& lhs, ABT& rhs) {
+    constEvalComposition<true>(n, lhs, rhs);
+}
+
 void ConstEval::prepare(ABT&, const LambdaAbstraction&) {
     ++_inCostlyCtx;
 }

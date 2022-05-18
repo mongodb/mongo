@@ -120,7 +120,14 @@ public:
 
         ABT result = generateAggExpression(
             expr->getExpression().get(), _ctx.getRootProjection(), _ctx.getUniqueIdPrefix());
-        _ctx.push<PathConstant>(generateCoerceToBool(std::move(result), getNextId("coerceToBool")));
+
+        if (auto filterPtr = result.cast<EvalFilter>();
+            filterPtr != nullptr && filterPtr->getInput() == _ctx.getRootProjVar()) {
+            // If we have an EvalFilter, just return the path.
+            _ctx.push(std::move(filterPtr->getPath()));
+        } else {
+            _ctx.push<PathConstant>(std::move(result));
+        }
     }
 
     void visit(const GTEMatchExpression* expr) override {
@@ -176,23 +183,28 @@ public:
     }
 
     void visit(const InternalExprEqMatchExpression* expr) override {
-        unsupportedExpression(expr);
+        // Ignored. Translate to "true".
+        _ctx.push(make<PathConstant>(Constant::boolean(true)));
     }
 
     void visit(const InternalExprGTMatchExpression* expr) override {
-        unsupportedExpression(expr);
+        // Ignored. Translate to "true".
+        _ctx.push(make<PathConstant>(Constant::boolean(true)));
     }
 
     void visit(const InternalExprGTEMatchExpression* expr) override {
-        unsupportedExpression(expr);
+        // Ignored. Translate to "true".
+        _ctx.push(make<PathConstant>(Constant::boolean(true)));
     }
 
     void visit(const InternalExprLTMatchExpression* expr) override {
-        unsupportedExpression(expr);
+        // Ignored. Translate to "true".
+        _ctx.push(make<PathConstant>(Constant::boolean(true)));
     }
 
     void visit(const InternalExprLTEMatchExpression* expr) override {
-        unsupportedExpression(expr);
+        // Ignored. Translate to "true".
+        _ctx.push(make<PathConstant>(Constant::boolean(true)));
     }
 
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) override {
