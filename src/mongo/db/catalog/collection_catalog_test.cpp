@@ -642,8 +642,8 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
 
 // Test setting and fetching the profile level for a database.
 TEST_F(CollectionCatalogTest, DatabaseProfileLevel) {
-    std::string testDBNameFirst = "testdbfirst";
-    std::string testDBNameSecond = "testdbsecond";
+    DatabaseName testDBNameFirst(boost::none, "testdbfirst");
+    DatabaseName testDBNameSecond(boost::none, "testdbsecond");
 
     // Requesting a profile level that is not in the _databaseProfileLevel map should return the
     // default server-wide setting

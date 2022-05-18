@@ -79,13 +79,12 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
     const DatabaseName dbName(boost::none, NamespaceString::kLocalDb);
     const auto localDb = DatabaseHolder::get(opCtx)->getDb(opCtx, dbName);
     invariant(localDb);
-    AutoStatsTracker statsTracker(
-        opCtx,
-        NamespaceString::kRsOplogNamespace,
-        Top::LockType::ReadLocked,
-        AutoStatsTracker::LogMode::kUpdateTop,
-        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(NamespaceString::kLocalDb),
-        Date_t::max());
+    AutoStatsTracker statsTracker(opCtx,
+                                  NamespaceString::kRsOplogNamespace,
+                                  Top::LockType::ReadLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTop,
+                                  CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbName),
+                                  Date_t::max());
 
     auto exec = uassertStatusOK(getExecutorFind(opCtx,
                                                 &oplogRead.getCollection(),

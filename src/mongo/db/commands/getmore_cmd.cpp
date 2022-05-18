@@ -498,7 +498,7 @@ public:
                         nss,
                         Top::LockType::NotLocked,
                         AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.db()));
+                        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
                 }
             } else {
                 invariant(cursorPin->getExecutor()->lockPolicy() ==
@@ -528,7 +528,7 @@ public:
                     nss,
                     Top::LockType::ReadLocked,
                     AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                    CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.db()));
+                    CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
 
                 // Check whether we are allowed to read from this node after acquiring our locks.
                 uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(

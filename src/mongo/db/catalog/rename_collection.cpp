@@ -337,7 +337,7 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
         source,
         Top::LockType::NotLocked,
         AutoStatsTracker::LogMode::kUpdateCurOp,
-        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(source.db()));
+        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(source.dbName()));
 
     if (!targetColl) {
         return renameCollectionDirectly(opCtx, db, sourceColl->uuid(), source, target, options);
@@ -378,7 +378,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
         source,
         Top::LockType::NotLocked,
         AutoStatsTracker::LogMode::kUpdateCurOp,
-        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(source.db()));
+        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(source.dbName()));
 
     return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
         auto targetColl = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, target);
@@ -510,7 +510,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
         source,
         Top::LockType::NotLocked,
         AutoStatsTracker::LogMode::kUpdateCurOp,
-        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(source.db()));
+        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(source.dbName()));
 
     auto catalog = CollectionCatalog::get(opCtx);
     const auto sourceColl = catalog->lookupCollectionByNamespace(opCtx, source);

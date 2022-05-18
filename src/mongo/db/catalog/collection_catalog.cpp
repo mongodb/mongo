@@ -1091,12 +1091,12 @@ std::vector<DatabaseName> CollectionCatalog::getAllDbNames() const {
 }
 
 void CollectionCatalog::setDatabaseProfileSettings(
-    StringData dbName, CollectionCatalog::ProfileSettings newProfileSettings) {
+    const DatabaseName& dbName, CollectionCatalog::ProfileSettings newProfileSettings) {
     _databaseProfileSettings[dbName] = newProfileSettings;
 }
 
 CollectionCatalog::ProfileSettings CollectionCatalog::getDatabaseProfileSettings(
-    StringData dbName) const {
+    const DatabaseName& dbName) const {
     auto it = _databaseProfileSettings.find(dbName);
     if (it != _databaseProfileSettings.end()) {
         return it->second;
@@ -1105,7 +1105,7 @@ CollectionCatalog::ProfileSettings CollectionCatalog::getDatabaseProfileSettings
     return {serverGlobalParams.defaultProfile, ProfileFilter::getDefault()};
 }
 
-void CollectionCatalog::clearDatabaseProfileSettings(StringData dbName) {
+void CollectionCatalog::clearDatabaseProfileSettings(const DatabaseName& dbName) {
     _databaseProfileSettings.erase(dbName);
 }
 

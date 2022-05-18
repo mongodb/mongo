@@ -452,7 +452,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
 
     if (nss.isSystem()) {
         if (nss.isSystemDotProfile()) {
-            if (catalog->getDatabaseProfileLevel(_name.db()) != 0)
+            if (catalog->getDatabaseProfileLevel(_name) != 0)
                 return Status(ErrorCodes::IllegalOperation,
                               "turn off profiling before dropping system.profile collection");
         } else if (nss.isSystemDotViews()) {

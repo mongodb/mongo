@@ -196,7 +196,7 @@ Status _createView(OperationContext* opCtx,
             nss,
             Top::LockType::NotLocked,
             AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.db()));
+            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
 
         // If the view creation rolls back, ensure that the Top entry created for the view is
         // deleted.
@@ -312,7 +312,7 @@ Status _createTimeseries(OperationContext* opCtx,
                 bucketsNs,
                 Top::LockType::NotLocked,
                 AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.db()));
+                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.dbName()));
 
             // If the buckets collection and time-series view creation roll back, ensure that their
             // Top entries are deleted.
@@ -394,7 +394,7 @@ Status _createTimeseries(OperationContext* opCtx,
                                       ns,
                                       Top::LockType::NotLocked,
                                       AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                      catalog->getDatabaseProfileLevel(ns.db()));
+                                      catalog->getDatabaseProfileLevel(ns.dbName()));
 
         // If the buckets collection and time-series view creation roll back, ensure that their
         // Top entries are deleted.
@@ -515,7 +515,7 @@ Status _createCollection(OperationContext* opCtx,
             nss,
             Top::LockType::NotLocked,
             AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.db()));
+            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
 
         // If the collection creation rolls back, ensure that the Top entry created for the
         // collection is deleted.

@@ -79,7 +79,7 @@ public:
             // Since this operation is not directly writing locally we need to force its db
             // profile level increase in order to be logged in "<db>.system.profile"
             CurOp::get(opCtx)->raiseDbProfileLevel(
-                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(request().getDbName()));
+                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns().dbName()));
 
             auto coordinatorDoc = DropDatabaseCoordinatorDocument();
             coordinatorDoc.setShardingDDLCoordinatorMetadata(

@@ -102,7 +102,7 @@ MONGO_FAIL_POINT_DEFINE(waitInFilemd5DuringManualYield);
 
 Status _setProfileSettings(OperationContext* opCtx,
                            Database* db,
-                           StringData dbName,
+                           const DatabaseName& dbName,
                            mongo::CollectionCatalog::ProfileSettings newSettings) {
     invariant(db);
 
@@ -150,7 +150,7 @@ public:
 protected:
     CollectionCatalog::ProfileSettings _applyProfilingLevel(
         OperationContext* opCtx,
-        const std::string& dbName,
+        const DatabaseName& dbName,
         const ProfileCmdRequest& request) const final {
         const auto profilingLevel = request.getCommandParameter();
 
@@ -168,7 +168,7 @@ protected:
         // Accessing system.profile collection should not conflict with oplog application.
         ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
             opCtx->lockState());
-        AutoGetDb ctx(opCtx, dbName, dbMode);
+        AutoGetDb ctx(opCtx, dbName.db(), dbMode);
         Database* db = ctx.getDb();
 
         // Fetches the database profiling level + filter or the server default if the db does not
@@ -180,9 +180,7 @@ protected:
                 // When setting the profiling level, create the database if it didn't already exist.
                 // When just reading the profiling level, we do not create the database.
                 auto databaseHolder = DatabaseHolder::get(opCtx);
-                // TODO SERVER-63109 Make _setProfileSettings pass DatabaseName.
-                const DatabaseName tenantDbName(boost::none, dbName);
-                db = databaseHolder->openDb(opCtx, tenantDbName);
+                db = databaseHolder->openDb(opCtx, dbName);
             }
 
             auto newSettings = oldSettings;

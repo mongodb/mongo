@@ -814,14 +814,14 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
         AutoStatsTracker::LogMode logMode,
         const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs)
     : _autoCollForRead(opCtx, nsOrUUID, viewMode, deadline, secondaryNssOrUUIDs),
-      _statsTracker(
-          opCtx,
-          _autoCollForRead.getNss(),
-          Top::LockType::ReadLocked,
-          logMode,
-          CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_autoCollForRead.getNss().db()),
-          deadline,
-          secondaryNssOrUUIDs) {
+      _statsTracker(opCtx,
+                    _autoCollForRead.getNss(),
+                    Top::LockType::ReadLocked,
+                    logMode,
+                    CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(
+                        _autoCollForRead.getNss().dbName()),
+                    deadline,
+                    secondaryNssOrUUIDs) {
 
     hangBeforeAutoGetShardVersionCheck.executeIf(
         [&](auto&) { hangBeforeAutoGetShardVersionCheck.pauseWhileSet(opCtx); },
@@ -904,8 +904,8 @@ OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& n
     }
 
     stdx::lock_guard<Client> lk(*_opCtx->getClient());
-    currentOp->enter_inlock(
-        ns.c_str(), CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_db->name().db()));
+    currentOp->enter_inlock(ns.c_str(),
+                            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_db->name()));
 }
 
 AutoGetCollectionForReadCommandMaybeLockFree::AutoGetCollectionForReadCommandMaybeLockFree(

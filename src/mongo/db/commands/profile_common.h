@@ -78,7 +78,7 @@ protected:
     // set. On success, returns a struct indicating the previous profiling level and filter.
     virtual CollectionCatalog::ProfileSettings _applyProfilingLevel(
         OperationContext* opCtx,
-        const std::string& dbName,
+        const DatabaseName& dbName,
         const ProfileCmdRequest& request) const = 0;
 };
 

@@ -411,14 +411,14 @@ public:
     /**
      * Sets 'newProfileSettings' as the profiling settings for the database 'dbName'.
      */
-    void setDatabaseProfileSettings(StringData dbName, ProfileSettings newProfileSettings);
+    void setDatabaseProfileSettings(const DatabaseName& dbName, ProfileSettings newProfileSettings);
 
     /**
      * Fetches the profiling settings for database 'dbName'.
      *
      * Returns the server's default database profile settings if the database does not exist.
      */
-    ProfileSettings getDatabaseProfileSettings(StringData dbName) const;
+    ProfileSettings getDatabaseProfileSettings(const DatabaseName& dbName) const;
 
     /**
      * Fetches the profiling level for database 'dbName'.
@@ -428,14 +428,14 @@ public:
      * There is no corresponding setDatabaseProfileLevel; use setDatabaseProfileSettings instead.
      * This method only exists as a convenience.
      */
-    int getDatabaseProfileLevel(StringData dbName) const {
+    int getDatabaseProfileLevel(const DatabaseName& dbName) const {
         return getDatabaseProfileSettings(dbName).level;
     }
 
     /**
      * Clears the database profile settings entry for 'dbName'.
      */
-    void clearDatabaseProfileSettings(StringData dbName);
+    void clearDatabaseProfileSettings(const DatabaseName& dbName);
 
     /**
      * Statistics for the types of collections in the catalog.
@@ -605,7 +605,7 @@ private:
     using NamespaceCollectionMap =
         stdx::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
     using UncommittedViewsSet = stdx::unordered_set<NamespaceString>;
-    using DatabaseProfileSettingsMap = StringMap<ProfileSettings>;
+    using DatabaseProfileSettingsMap = stdx::unordered_map<DatabaseName, ProfileSettings>;
     using ViewsForDatabaseMap = stdx::unordered_map<DatabaseName, ViewsForDatabase>;
 
     CollectionCatalogMap _catalog;

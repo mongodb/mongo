@@ -110,7 +110,7 @@ public:
         // profile level increase in order to be logged in "<db>.system.profile"
         const auto& cmd = requestParser.request();
         CurOp::get(opCtx)->raiseDbProfileLevel(
-            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(cmd.getDbName()));
+            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(cmd.getNamespace().dbName()));
 
         boost::optional<FixedFCVRegion> fcvRegion;
         fcvRegion.emplace(opCtx);

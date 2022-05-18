@@ -51,7 +51,7 @@ public:
 protected:
     CollectionCatalog::ProfileSettings _applyProfilingLevel(
         OperationContext* opCtx,
-        const std::string& dbName,
+        const DatabaseName& dbName,
         const ProfileCmdRequest& request) const final {
         invariant(!opCtx->lockState()->isW());
 

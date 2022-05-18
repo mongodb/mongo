@@ -696,9 +696,12 @@ public:
         } else {
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
+                // TODO SERVER-66561: For getDatabaseProfileLevel, takes the passed in "const
+                // DatabaseName& dbname" directly.
                 // TODO: OldClientContext legacy, needs to be removed
                 CurOp::get(opCtx)->enter_inlock(
-                    dbname.c_str(), CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbname));
+                    dbname.c_str(),
+                    CollectionCatalog::get(opCtx)->getDatabaseProfileLevel({boost::none, dbname}));
             }
 
             db->getStats(opCtx, &result, includeFreeStorage, scale);
