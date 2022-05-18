@@ -274,7 +274,9 @@ struct Instruction {
         collCmp3w,
 
         fillEmpty,
+        fillEmptyConst,
         getField,
+        getFieldConst,
         getElement,
         collComparisonKey,
         getFieldOrElement,
@@ -318,6 +320,12 @@ struct Instruction {
         fail,
 
         lastInstruction  // this is just a marker used to calculate number of instructions
+    };
+
+    enum Constants : uint8_t {
+        Null,
+        True,
+        False,
     };
 
     // Make sure that values in this arrays are always in-sync with the enum.
@@ -391,8 +399,12 @@ struct Instruction {
                 return "collCmp3w";
             case fillEmpty:
                 return "fillEmpty";
+            case fillEmptyConst:
+                return "fillEmptyConst";
             case getField:
                 return "getField";
+            case getFieldConst:
+                return "getFieldConst";
             case getElement:
                 return "getElement";
             case collComparisonKey:
@@ -692,7 +704,9 @@ public:
     void appendFillEmpty() {
         appendSimpleInstruction(Instruction::fillEmpty);
     }
+    void appendFillEmpty(Instruction::Constants k);
     void appendGetField();
+    void appendGetField(value::TypeTags tag, value::Value val);
     void appendGetElement();
     void appendCollComparisonKey();
     void appendGetFieldOrElement();
@@ -947,6 +961,10 @@ private:
                                                              value::Value objValue,
                                                              value::TypeTags fieldTag,
                                                              value::Value fieldValue);
+
+    std::tuple<bool, value::TypeTags, value::Value> getField(value::TypeTags objTag,
+                                                             value::Value objValue,
+                                                             StringData fieldStr);
 
     std::tuple<bool, value::TypeTags, value::Value> getElement(value::TypeTags objTag,
                                                                value::Value objValue,

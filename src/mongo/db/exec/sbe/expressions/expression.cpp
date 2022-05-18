@@ -627,6 +627,34 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
             code.appendAccessVal(ctx.accumulator);
         }
 
+        // Optimize well known set of functions with constant arguments and generate their
+        // specialized variants.
+        if (_name == "fillEmpty" && _nodes[1]->as<EConstant>()) {
+            auto [tag, val] = _nodes[1]->as<EConstant>()->getConstant();
+            if (tag == value::TypeTags::Null) {
+                code.append(_nodes[0]->compileDirect(ctx));
+                code.appendFillEmpty(vm::Instruction::Null);
+
+                return code;
+            }
+            if (tag == value::TypeTags::Boolean) {
+                code.append(_nodes[0]->compileDirect(ctx));
+                code.appendFillEmpty(value::bitcastTo<bool>(val) ? vm::Instruction::True
+                                                                 : vm::Instruction::False);
+
+                return code;
+            }
+        } else if (_name == "getField" && _nodes[1]->as<EConstant>()) {
+            auto [tag, val] = _nodes[1]->as<EConstant>()->getConstant();
+
+            if (value::isString(tag)) {
+                code.append(_nodes[0]->compileDirect(ctx));
+                code.appendGetField(tag, val);
+
+                return code;
+            }
+        }
+
         // The order of evaluation is flipped for instruction functions. We may want to change the
         // evaluation code for those functions so we have the same behavior for all functions.
         for (size_t idx = 0; idx < _nodes.size(); ++idx) {

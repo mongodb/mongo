@@ -323,6 +323,14 @@ public:
      */
     virtual size_t estimateSize() const = 0;
 
+    /**
+     * Utility for casting to derived types.
+     */
+    template <typename T>
+    T* as() {
+        return dynamic_cast<T*>(this);
+    }
+
 protected:
     Vector _nodes;
 
@@ -412,7 +420,9 @@ public:
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
     size_t estimateSize() const final;
-
+    std::pair<value::TypeTags, value::Value> getConstant() const {
+        return {_tag, _val};
+    }
 
 private:
     value::TypeTags _tag;

@@ -107,7 +107,9 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     -2,  // collCmp3w
 
     -1,  // fillEmpty
+    0,   // fillEmptyConst
     -1,  // getField
+    0,   // getFieldConst
     -1,  // getElement
     -1,  // collComparisonKey
     -1,  // getFieldOrElement
@@ -207,7 +209,9 @@ std::string CodeFragment::toString() const {
             case Instruction::cmp3w:
             case Instruction::collCmp3w:
             case Instruction::fillEmpty:
+            case Instruction::fillEmptyConst:
             case Instruction::getField:
+            case Instruction::getFieldConst:
             case Instruction::getElement:
             case Instruction::getArraySize:
             case Instruction::collComparisonKey:
@@ -476,8 +480,33 @@ void CodeFragment::appendSimpleInstruction(Instruction::Tags tag) {
     offset += writeToMemory(offset, i);
 }
 
+void CodeFragment::appendFillEmpty(Instruction::Constants k) {
+    Instruction i;
+    i.tag = Instruction::fillEmptyConst;
+    adjustStackSimple(i);
+
+    auto offset = allocateSpace(sizeof(Instruction) + sizeof(k));
+
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, k);
+}
+
 void CodeFragment::appendGetField() {
     appendSimpleInstruction(Instruction::getField);
+}
+
+void CodeFragment::appendGetField(value::TypeTags tag, value::Value val) {
+    invariant(value::isString(tag));
+
+    Instruction i;
+    i.tag = Instruction::getFieldConst;
+    adjustStackSimple(i);
+
+    auto offset = allocateSpace(sizeof(Instruction) + sizeof(tag) + sizeof(val));
+
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, tag);
+    offset += writeToMemory(offset, val);
 }
 
 void CodeFragment::appendGetElement() {
@@ -672,6 +701,12 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::getField(value::TypeTa
 
     auto fieldStr = value::getStringView(fieldTag, fieldValue);
 
+    return getField(objTag, objValue, fieldStr);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::getField(value::TypeTags objTag,
+                                                                   value::Value objValue,
+                                                                   StringData fieldStr) {
     if (MONGO_unlikely(failOnPoisonedFieldLookup.shouldFail())) {
         uassert(4623399, "Lookup of $POISON", fieldStr != "POISON");
     }
@@ -5081,6 +5116,32 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                     }
                     break;
                 }
+                case Instruction::fillEmptyConst: {
+                    auto k = readFromMemory<Instruction::Constants>(pcPointer);
+                    pcPointer += sizeof(k);
+
+                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+                    if (lhsTag == value::TypeTags::Nothing) {
+                        switch (k) {
+                            case Instruction::Null:
+                                topStack(false, value::TypeTags::Null, 0);
+                                break;
+                            case Instruction::True:
+                                topStack(false,
+                                         value::TypeTags::Boolean,
+                                         value::bitcastFrom<bool>(true));
+                                break;
+                            case Instruction::False:
+                                topStack(false,
+                                         value::TypeTags::Boolean,
+                                         value::bitcastFrom<bool>(false));
+                                break;
+                            default:
+                                MONGO_UNREACHABLE;
+                        }
+                    }
+                    break;
+                }
                 case Instruction::getField: {
                     auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
                     popStack();
@@ -5093,6 +5154,24 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                     if (rhsOwned) {
                         value::releaseValue(rhsTag, rhsVal);
                     }
+                    if (lhsOwned) {
+                        value::releaseValue(lhsTag, lhsVal);
+                    }
+                    break;
+                }
+                case Instruction::getFieldConst: {
+                    auto tagField = readFromMemory<value::TypeTags>(pcPointer);
+                    pcPointer += sizeof(tagField);
+                    auto valField = readFromMemory<value::Value>(pcPointer);
+                    pcPointer += sizeof(valField);
+
+                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+
+                    auto [owned, tag, val] =
+                        getField(lhsTag, lhsVal, value::getStringView(tagField, valField));
+
+                    topStack(owned, tag, val);
+
                     if (lhsOwned) {
                         value::releaseValue(lhsTag, lhsVal);
                     }
