@@ -48,7 +48,7 @@ assert.commandFailed(res);
 assert.eq(res.code, ErrorCodes.TenantMigrationAborted);
 
 firstOperation.forget();
-test.cleanupSuccesfulAbortedOrCommitted(firstOperation.migrationId, tenantIds);
+test.cleanupSuccesfulAborted(firstOperation.migrationId, tenantIds);
 
 jsTestLog("Restarting replication on recipient nodes, and running new split operation");
 test.addRecipientNodes();

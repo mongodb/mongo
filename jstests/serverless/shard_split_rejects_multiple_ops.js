@@ -66,7 +66,7 @@ function commitShardSplitConcurrently() {
     }),
                                  117);  // ConflictingOperationInProgress
 
-    test.cleanupSuccesfulAbortedOrCommitted(operation.migrationId, tenantIds);
+    test.cleanupSuccesfulCommitted(operation.migrationId, tenantIds);
 
     // another split operation can start after garbage collection of the previous one.
     test.addRecipientNodes();

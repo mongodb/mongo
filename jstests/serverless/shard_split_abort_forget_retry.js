@@ -44,7 +44,7 @@ const test =
 
     jsTestLog(`Forgetting aborted shard split with migrationId: ${operation.migrationId}`);
     operation.forget();
-    test.cleanupSuccesfulAbortedOrCommitted(operation.migrationId, tenantIds);
+    test.cleanupSuccesfulAborted(operation.migrationId, tenantIds);
 
     // Try running a new shard split with the same tenantId. It should succeed, since the previous
     // shard split with the same tenantId was aborted.
@@ -58,7 +58,7 @@ const test =
     assertMigrationState(donorPrimary, operation2.migrationId, "committed");
 
     operation2.forget();
-    test.cleanupSuccesfulAbortedOrCommitted(operation2.migrationId, tenantIds);
+    test.cleanupSuccesfulCommitted(operation2.migrationId, tenantIds);
 })();
 
 (() => {
@@ -90,7 +90,7 @@ const test =
 
     jsTestLog(`Forgetting aborted shard split with migrationId: ${operation.migrationId}`);
     operation.forget();
-    test.cleanupSuccesfulAbortedOrCommitted(operation.migrationId, tenantIds);
+    test.cleanupSuccesfulAborted(operation.migrationId, tenantIds);
 
     // Try running a new shard split with the same tenantId. It should succeed, since the previous
     // shard split with the same tenantId was aborted.
@@ -103,7 +103,7 @@ const test =
 
     assertMigrationState(donorPrimary, operation2.migrationId, "committed");
     operation2.forget();
-    test.cleanupSuccesfulAbortedOrCommitted(operation2.migrationId, tenantIds);
+    test.cleanupSuccesfulCommitted(operation2.migrationId, tenantIds);
 })();
 
 test.stop();

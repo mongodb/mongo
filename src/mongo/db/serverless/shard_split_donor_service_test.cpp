@@ -494,11 +494,6 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
     ASSERT(!result.abortReason);
     ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
 
-    BSONObj splitConfigBson = mockReplSetReconfigCmd.getLatestConfig();
-    ASSERT_TRUE(splitConfigBson.hasField("replSetReconfig"));
-    auto splitConfig = repl::ReplSetConfig::parse(splitConfigBson["replSetReconfig"].Obj());
-    ASSERT(splitConfig.isSplitConfig());
-
     serviceInstance->tryForget();
 
     auto completionFuture = serviceInstance->completionFuture();
@@ -643,6 +638,57 @@ TEST_F(ShardSplitDonorServiceTest, ShardSplitDonorServiceTimeout) {
 
     ASSERT_OK(serviceInstance->completionFuture().getNoThrow());
     ASSERT_TRUE(serviceInstance->isGarbageCollectable());
+}
+
+TEST_F(ShardSplitDonorServiceTest, ReconfigToRemoveSplitConfig) {
+    auto opCtx = makeOperationContext();
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::reconfigToAddRecipientNodes(
+        getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
+
+    // Shard split service will send a stepUp request to the first node in the vector.
+    setUpReplSetUpCommandResult(&_recipientSet);
+
+    _skipAcceptanceFP.reset();
+
+    auto fpPtr = std::make_unique<FailPointEnableBlock>("pauseShardSplitBeforeSplitConfigRemoval");
+    auto initialTimesEntered = fpPtr->initialTimesEntered();
+
+    // Create and start the instance.
+    auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
+        opCtx.get(), _service, defaultStateDocument().toBSON());
+    ASSERT(serviceInstance.get());
+    ASSERT_EQ(_uuid, serviceInstance->getId());
+
+    waitForMonitorAndProcessHello();
+
+    waitForReplSetStepUp(Status::OK());
+
+    auto result = serviceInstance->decisionFuture().get();
+    ASSERT(!result.abortReason);
+    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
+
+    (*fpPtr)->waitForTimesEntered(initialTimesEntered + 1);
+
+    // Validate we currently have a splitConfig and set it as the mock's return value.
+    BSONObj splitConfigBson = mockReplSetReconfigCmd.getLatestConfig();
+    auto splitConfig = repl::ReplSetConfig::parse(splitConfigBson["replSetReconfig"].Obj());
+    ASSERT(splitConfig.isSplitConfig());
+    auto replCoord = repl::ReplicationCoordinator::get(getServiceContext());
+    dynamic_cast<repl::ReplicationCoordinatorMock*>(replCoord)->setGetConfigReturnValue(
+        splitConfig);
+
+    // Clear the failpoint and wait for completion.
+    fpPtr.reset();
+    serviceInstance->tryForget();
+
+    auto completionFuture = serviceInstance->completionFuture();
+    completionFuture.wait();
+
+    BSONObj finalConfigBson = mockReplSetReconfigCmd.getLatestConfig();
+    ASSERT_TRUE(finalConfigBson.hasField("replSetReconfig"));
+    auto finalConfig = repl::ReplSetConfig::parse(finalConfigBson["replSetReconfig"].Obj());
+    ASSERT(!finalConfig.isSplitConfig());
 }
 
 // Abort scenario : abortSplit called before startSplit.

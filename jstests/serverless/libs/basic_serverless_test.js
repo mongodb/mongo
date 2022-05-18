@@ -402,11 +402,10 @@ class BasicServerlessTest {
 
     /**
      * Remove the recipient nodes from the donor's config memberset and calls replSetReconfig on the
-     * updated local config.
+     * updated local config. It does not need to be called after a successfull split as the service
+     * reconfig itself in that case.
      */
     reconfigDonorSetAfterSplit() {
-        // TODO(SERVER-65730) we no longer will need to call this method explicitly in the test as
-        // it will be part of the commit shard split process.
         const primary = this.donor.getPrimary();
         const config = this.donor.getReplSetConfigFromNode();
         config.version++;
@@ -463,12 +462,23 @@ class BasicServerlessTest {
 
     /**
      * After calling the forgetShardSplit command, wait for the tenant access blockers to be removed
+     * then remove and stop the recipient nodes from the donor set.
+     * @param {migrationId} migration id of the committed shard split operation.
+     * @param {tenantIds}  tenant IDs that were used for the split operation.
+     */
+    cleanupSuccesfulCommitted(migrationId, tenantIds) {
+        this.waitForGarbageCollection(migrationId, tenantIds);
+        this.removeAndStopRecipientNodes();
+    }
+
+    /**
+     * After calling the forgetShardSplit command, wait for the tenant access blockers to be removed
      * then remove and stop the recipient nodes from the donor set and test and finally apply the
      * new config once the split has been cleaned up.
      * @param {migrationId} migration id of the committed shard split operation.
      * @param {tenantIds}  tenant IDs that were used for the split operation.
      */
-    cleanupSuccesfulAbortedOrCommitted(migrationId, tenantIds) {
+    cleanupSuccesfulAborted(migrationId, tenantIds) {
         this.waitForGarbageCollection(migrationId, tenantIds);
         this.removeAndStopRecipientNodes();
         this.reconfigDonorSetAfterSplit();
@@ -529,19 +539,6 @@ class BasicServerlessTest {
         this.removeRecipientsFromRstArgs(donorRstArgs);
         const donorRst = createRst(donorRstArgs, true);
         return donorRst.getPrimary();
-    }
-
-    /**
-     * After calling the forgetShardSplit command, wait for the tenant access blockers to be removed
-     * then remove and stop the recipient nodes from the donor set and test and finally apply the
-     * new config once the split has been cleaned up.
-     * @param {migrationId} migration id of the committed shard split operation.
-     * @param {tenantIds}  tenant IDs that were used for the split operation.
-     */
-    cleanupSuccesfulAbortedOrCommitted(migrationId, tenantIds) {
-        this.waitForGarbageCollection(migrationId, tenantIds);
-        this.removeAndStopRecipientNodes();
-        this.reconfigDonorSetAfterSplit();
     }
 }
 

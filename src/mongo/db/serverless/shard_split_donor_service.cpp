@@ -64,6 +64,7 @@ MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterDecision);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitWaitForSplitAcceptance);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeRecipientCleanup);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterMarkingStateGarbageCollectable);
+MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeSplitConfigRemoval);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitRecipientCleanup);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeLeavingBlockingState);
 
@@ -437,6 +438,13 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
     _completionPromise.setWith([&] {
         return ExecutorFuture(**executor)
             .then([&] { return _decisionPromise.getFuture().semi().ignoreValue(); })
+            .then([this, executor, primaryToken] {
+                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                pauseShardSplitBeforeSplitConfigRemoval.pauseWhileSetAndNotCanceled(opCtx.get(),
+                                                                                    primaryToken);
+
+                return _removeSplitConfigFromDonor(executor, primaryToken);
+            })
             .then([this, executor, primaryToken] {
                 auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                 pauseShardSplitAfterDecision.pauseWhileSet(opCtx.get());
@@ -1039,6 +1047,48 @@ ShardSplitDonorService::DonorStateMachine::_waitForForgetCmdThenMarkGarbageColle
         .then([this, self = shared_from_this(), executor, primaryToken](repl::OpTime opTime) {
             return _waitForMajorityWriteConcern(executor, std::move(opTime), primaryToken);
         });
+}
+
+ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_removeSplitConfigFromDonor(
+    const ScopedTaskExecutorPtr& executor, const CancellationToken& token) {
+    checkForTokenInterrupt(token);
+
+    auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
+    invariant(replCoord);
+
+    return AsyncTry([this, replCoord] {
+               auto config = replCoord->getConfig();
+               if (!config.isSplitConfig()) {
+                   return;
+               }
+
+               LOGV2(6573000,
+                     "Reconfiguring the donor to remove the split config.",
+                     "id"_attr = _migrationId,
+                     "config"_attr = config);
+
+               const auto updatedVersion = config.getConfigVersion() + 1;
+
+               BSONObjBuilder newConfigBob(
+                   config.toBSON().removeField("recipientConfig").removeField("version"));
+               newConfigBob.append("version", updatedVersion);
+
+               auto opCtxHolder = _cancelableOpCtxFactory->makeOperationContext(&cc());
+               auto newConfig = newConfigBob.obj();
+
+               DBDirectClient client(opCtxHolder.get());
+
+               BSONObj result;
+               const bool returnValue = client.runCommand(NamespaceString::kAdminDb.toString(),
+                                                          BSON("replSetReconfig" << newConfig),
+                                                          result);
+               uassert(
+                   ErrorCodes::BadValue, "Invalid return value for replSetReconfig", returnValue);
+               uassertStatusOK(getStatusFromCommandResult(result));
+           })
+        .until([](Status status) { return status.isOK(); })
+        .withBackoffBetweenIterations(kExponentialBackoff)
+        .on(**executor, token);
 }
 
 ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_cleanRecipientStateDoc(

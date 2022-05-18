@@ -170,6 +170,9 @@ private:
     ExecutorFuture<void> _waitForForgetCmdThenMarkGarbageCollectable(
         const ScopedTaskExecutorPtr& executor, const CancellationToken& primaryToken);
 
+    ExecutorFuture<void> _removeSplitConfigFromDonor(const ScopedTaskExecutorPtr& executor,
+                                                     const CancellationToken& token);
+
     ExecutorFuture<DurableState> _handleErrorOrEnterAbortedState(
         StatusWith<DurableState> durableState,
         const ScopedTaskExecutorPtr& executor,

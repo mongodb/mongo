@@ -26,7 +26,7 @@ assertMigrationState(test.getDonorPrimary(), operation.migrationId, "committed")
 
 operation.forget();
 
-test.cleanupSuccesfulAbortedOrCommitted(operation.migrationId, tenantIds);
+test.cleanupSuccesfulCommitted(operation.migrationId, tenantIds);
 
 test.stop();
 })();
