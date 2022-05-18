@@ -45,6 +45,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/local_oplog_info.h"
+#include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/rwc_defaults_commands_gen.h"
@@ -554,6 +555,17 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     if (::mongo::feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         createChangeStreamPreImagesCollection(opCtx);
+    }
+
+    // TODO: SERVER-65948 move the change collection creation logic from here to the PM-2502 hooks.
+    // The change collection will be created when the change stream is enabled.
+    if (::mongo::feature_flags::gFeatureFlagServerlessChangeStreams.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
+        auto status = changeCollectionManager.createChangeCollection(opCtx, boost::none);
+        if (!status.isOK()) {
+            fassert(6520900, status);
+        }
     }
 
     serverGlobalParams.validateFeaturesAsPrimary.store(true);
