@@ -3369,13 +3369,15 @@ void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result,
 void ReplicationCoordinatorImpl::processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) {
     EventHandle evh;
 
-    {
-        stdx::lock_guard<Latch> lock(_mutex);
-        evh = _processReplSetMetadata_inlock(replMetadata);
-    }
+    if (_needToUpdateTerm(replMetadata.getTerm())) {
+        {
+            stdx::lock_guard<Latch> lock(_mutex);
+            evh = _processReplSetMetadata_inlock(replMetadata);
+        }
 
-    if (evh) {
-        _replExecutor->waitForEvent(evh);
+        if (evh) {
+            _replExecutor->waitForEvent(evh);
+        }
     }
 }
 
@@ -3386,6 +3388,9 @@ void ReplicationCoordinatorImpl::cancelAndRescheduleElectionTimeout() {
 
 EventHandle ReplicationCoordinatorImpl::_processReplSetMetadata_inlock(
     const rpc::ReplSetMetadata& replMetadata) {
+    // Note that public method processReplSetMetadata() above depends on this method not needing
+    // to do anything when the term is up to date.  If that changes, be sure to update that
+    // method as well.
     return _updateTerm_inlock(replMetadata.getTerm());
 }
 
@@ -5902,6 +5907,11 @@ Status ReplicationCoordinatorImpl::updateTerm(OperationContext* opCtx, long long
 
     // Check we haven't acquired any lock, because potential stepdown needs global lock.
     dassert(!opCtx->lockState()->isLocked() || opCtx->lockState()->isNoop());
+
+    // If the term is already up to date, we can skip the update and the mutex acquisition.
+    if (!_needToUpdateTerm(term))
+        return Status::OK();
+
     TopologyCoordinator::UpdateTermResult updateTermResult;
     EventHandle finishEvh;
 
@@ -5921,6 +5931,10 @@ Status ReplicationCoordinatorImpl::updateTerm(OperationContext* opCtx, long long
     }
 
     return Status::OK();
+}
+
+bool ReplicationCoordinatorImpl::_needToUpdateTerm(long long term) {
+    return term > _termShadow.load();
 }
 
 EventHandle ReplicationCoordinatorImpl::_updateTerm_inlock(

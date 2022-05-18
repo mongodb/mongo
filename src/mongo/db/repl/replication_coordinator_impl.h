@@ -1434,6 +1434,13 @@ private:
      */
     void _updateLastCommittedOpTimeAndWallTime(WithLock lk);
 
+    /** Terms only increase, so if an incoming term is less than or equal to our
+     * current term (_termShadow), there is no need to take the mutex and call _updateTerm_inlock.
+     * Since _termShadow may be lagged, this may return true when the term does not need to be
+     * updated, which is harmless because _updateTerm_inlock will do nothing in that case.
+     */
+    bool _needToUpdateTerm(long long term);
+
     /**
      * Callback that attempts to set the current term in topology coordinator and
      * relinquishes primary if the term actually changes and we are primary.
