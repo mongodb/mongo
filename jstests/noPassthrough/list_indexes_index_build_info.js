@@ -14,7 +14,6 @@
 (function() {
 'use strict';
 
-load("jstests/libs/fail_point_util.js");
 load("jstests/noPassthrough/libs/index_build.js");  // for IndexBuildTest
 
 /**
@@ -104,22 +103,11 @@ function assertListIndexesOutputsMatch(
                       expectedBuildingInfo[withBuildInfo[i].spec.name].resumable,
                       "Index expected to be in-progress building has unexpected resumable value: " +
                           tojson(withBuildInfo[i]));
-
-            // Index building, should have indexBuildInfo.replicationState.
-            assert(
-                withBuildInfo[i].indexBuildInfo.hasOwnProperty('replicationState'),
-                "Index expected to be in-progress building did not have indexBuildInfo.replicationState: " +
-                    tojson(withBuildInfo[i]));
-            assert.eq(
-                withBuildInfo[i].indexBuildInfo.replicationState.state,
-                'In progress',
-                "Index expected to be in-progress building has unexpected replication state: " +
-                    tojson(withBuildInfo[i]));
         }
     }
 }
 
-const rst = ReplSetTest({nodes: [{}, {rsConfig: {votes: 0, priority: 0}}]});
+const rst = ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 
@@ -228,41 +216,5 @@ IndexBuildTest.waitForIndexBuildToStop(db, collName, buildingIndexNameNonResumab
 awaitIndexBuildNonResumable();
 IndexBuildTest.waitForIndexBuildToStop(db, collName, buildingIndexName);
 awaitIndexBuild();
-
-// The replication state includes two optional fields for the abort/commit timestamp
-// and the abort reason. We can confirm the presence of these fields in the listIndexes
-// output using an unique index build that is aborted due to a constraint violation.
-assert.commandWorked(coll.insert([{x: 1}, {x: 1}]));
-const secondary = rst.getSecondary();
-const secondaryColl = secondary.getCollection(coll.getFullName());
-const fp = configureFailPoint(secondary, 'hangBeforeCompletingAbort');
-try {
-    const buildingIndexNameUnique = 'x_1';
-    assert.commandFailedWithCode(
-        coll.createIndex({x: 1}, {name: buildingIndexNameUnique, unique: true}),
-        ErrorCodes.DuplicateKey);
-    fp.wait();
-    const indexes = IndexBuildTest.assertIndexes(
-        secondaryColl,
-        5,
-        ['_id_', doneIndexName, buildingIndexName, buildingIndexNameNonResumable],
-        [buildingIndexNameUnique],
-        {includeIndexBuildInfo: true});
-    const uniqueIndexBuildInfo = indexes[buildingIndexNameUnique].indexBuildInfo;
-    assert(uniqueIndexBuildInfo.hasOwnProperty('replicationState'),
-           'unique index info does not contain replicationState: ' + tojson(uniqueIndexBuildInfo));
-    const replicationState = uniqueIndexBuildInfo.replicationState;
-    assert.eq(replicationState.state,
-              'Aborted',
-              'Unexpected replication state: ' + tojson(uniqueIndexBuildInfo));
-    assert(replicationState.hasOwnProperty('timestamp'),
-           'replication state should contain abort timestamp: ' + tojson(uniqueIndexBuildInfo));
-    assert.eq(replicationState.code,
-              ErrorCodes.IndexBuildAborted,
-              'unexpected error code in replication state: ' + tojson(uniqueIndexBuildInfo));
-} finally {
-    fp.off();
-}
-
 rst.stopSet();
 })();
