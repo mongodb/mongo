@@ -41,13 +41,16 @@
 #include "mongo/stdx/future.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/concurrency/ticket.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
+class Ticket;
+
 class TicketHolder {
+    friend class Ticket;
+
 public:
     /**
      * Wait mode for ticket acquisition: interruptible or uninterruptible.
@@ -80,7 +83,6 @@ public:
                                                        AdmissionContext* admCtx,
                                                        Date_t until,
                                                        WaitMode waitMode) = 0;
-    virtual void release(AdmissionContext* admCtx, Ticket&& ticket) = 0;
 
     virtual Status resize(int newSize) = 0;
 
@@ -91,6 +93,9 @@ public:
     virtual int outof() const = 0;
 
     virtual void appendStats(BSONObjBuilder& b) const = 0;
+
+private:
+    virtual void _release(AdmissionContext* admCtx) noexcept = 0;
 };
 
 class SemaphoreTicketHolder final : public TicketHolder {
@@ -109,7 +114,6 @@ public:
                                                Date_t until,
                                                WaitMode waitMode) override final;
 
-    void release(AdmissionContext* admCtx, Ticket&& ticket) override final;
 
     Status resize(int newSize) override final;
 
@@ -122,6 +126,8 @@ public:
     void appendStats(BSONObjBuilder& b) const override final;
 
 private:
+    void _release(AdmissionContext* admCtx) noexcept override final;
+
 #if defined(__linux__)
     mutable sem_t _sem;
 
@@ -161,7 +167,6 @@ public:
                                                Date_t until,
                                                WaitMode waitMode) override final;
 
-    void release(AdmissionContext* admCtx, Ticket&& ticket) override final;
 
     Status resize(int newSize) override final;
 
@@ -176,6 +181,8 @@ public:
     void appendStats(BSONObjBuilder& b) const override final;
 
 private:
+    void _release(AdmissionContext* admCtx) noexcept override final;
+
     void _release(WithLock);
 
     Mutex _resizeMutex =
@@ -207,50 +214,60 @@ private:
     ServiceContext* _serviceContext;
 };
 
-class ScopedTicket {
-public:
-    ScopedTicket(OperationContext* opCtx, TicketHolder* holder, TicketHolder::WaitMode waitMode)
-        : _holder(holder), _ticket(_holder->waitForTicket(opCtx, &_admCtx, waitMode)) {}
+/**
+ * RAII-style movable token that gets generated when a ticket is acquired and is automatically
+ * released when going out of scope.
+ */
+class Ticket {
+    friend class SemaphoreTicketHolder;
+    friend class FifoTicketHolder;
 
-    ~ScopedTicket() {
-        _holder->release(&_admCtx, std::move(_ticket));
+public:
+    Ticket(Ticket&& t) : _ticketholder(t._ticketholder), _admissionContext(t._admissionContext) {
+        t._ticketholder = nullptr;
+        t._admissionContext = nullptr;
     }
 
-private:
-    AdmissionContext _admCtx;
-    TicketHolder* _holder;
-    Ticket _ticket;
-};
+    Ticket& operator=(Ticket&& t) {
+        invariant(!valid(), "Attempting to overwrite a valid ticket with another one");
+        _ticketholder = t._ticketholder;
+        _admissionContext = t._admissionContext;
+        t._ticketholder = nullptr;
+        t._admissionContext = nullptr;
+        return *this;
+    };
 
-class TicketHolderReleaser {
-    TicketHolderReleaser(const TicketHolderReleaser&) = delete;
-    TicketHolderReleaser& operator=(const TicketHolderReleaser&) = delete;
-
-public:
-    explicit TicketHolderReleaser(Ticket&& ticket, AdmissionContext* admCtx, TicketHolder* holder)
-        : _holder(holder), _ticket(std::move(ticket)), _admCtx(admCtx) {}
-
-
-    ~TicketHolderReleaser() {
-        if (_holder) {
-            _holder->release(_admCtx, std::move(_ticket));
+    ~Ticket() {
+        if (_ticketholder) {
+            _ticketholder->_release(_admissionContext);
         }
     }
 
-    bool hasTicket() const {
-        return _holder != nullptr;
-    }
-
-    void reset(TicketHolder* holder = nullptr) {
-        if (_holder) {
-            _holder->release(_admCtx, std::move(_ticket));
-        }
-        _holder = holder;
+    /**
+     * Returns whether or not a ticket is being held.
+     */
+    bool valid() {
+        return _ticketholder != nullptr;
     }
 
 private:
-    TicketHolder* _holder;
-    Ticket _ticket;
-    AdmissionContext* _admCtx;
+    Ticket(TicketHolder* ticketHolder, AdmissionContext* admissionContext)
+        : _ticketholder(ticketHolder), _admissionContext(admissionContext) {}
+
+    /**
+     * Discards the ticket without releasing it back to the ticketholder.
+     */
+    void discard() {
+        _ticketholder = nullptr;
+        _admissionContext = nullptr;
+    }
+
+    // No copy constructors.
+    Ticket(const Ticket&) = delete;
+    Ticket& operator=(const Ticket&) = delete;
+
+    TicketHolder* _ticketholder;
+    AdmissionContext* _admissionContext;
 };
+
 }  // namespace mongo

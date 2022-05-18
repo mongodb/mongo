@@ -1076,10 +1076,6 @@ void LockerImpl::releaseTicket() {
 }
 
 void LockerImpl::_releaseTicket() {
-    auto holder = shouldAcquireTicket() ? _ticketHolders->getTicketHolder(_modeForTicket) : nullptr;
-    if (holder) {
-        holder->release(&_admCtx, std::move(*_ticket));
-    }
     _ticket.reset();
     _clientState.store(kInactive);
 }

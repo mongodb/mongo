@@ -274,7 +274,6 @@ private:
             AdmissionContext admCtx;
             auto ticket = _tickets->waitForTicket(
                 opCtx.get(), &admCtx, TicketHolder::WaitMode::kUninterruptible);
-            TicketHolderReleaser whenDone(std::move(ticket), &admCtx, _tickets.get());
 
             _hotel.checkIn();
 

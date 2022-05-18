@@ -83,8 +83,8 @@ void BM_tryAcquire(benchmark::State& state) {
         attempted++;
         if (ticket) {
             acquired++;
-            p->ticketHolder->release(&admCtx, std::move(*ticket));
         }
+        ticket.reset();
         state.ResumeTiming();
     }
     state.counters["Attempted"] = attempted;
@@ -105,10 +105,11 @@ void BM_acquire(benchmark::State& state) {
     for (auto _ : state) {
         AdmissionContext admCtx;
         auto opCtx = p->opCtxs[state.thread_index].get();
-        auto ticket = p->ticketHolder->waitForTicket(opCtx, &admCtx, waitMode);
-        state.PauseTiming();
-        sleepmicros(1);
-        p->ticketHolder->release(&admCtx, std::move(ticket));
+        {
+            auto ticket = p->ticketHolder->waitForTicket(opCtx, &admCtx, waitMode);
+            state.PauseTiming();
+            sleepmicros(1);
+        }
         acquired++;
         state.ResumeTiming();
     }
@@ -132,10 +133,11 @@ void BM_release(benchmark::State& state) {
         AdmissionContext admCtx;
         auto opCtx = p->opCtxs[state.thread_index].get();
         state.PauseTiming();
-        auto ticket = p->ticketHolder->waitForTicket(opCtx, &admCtx, waitMode);
-        sleepmicros(1);
-        state.ResumeTiming();
-        p->ticketHolder->release(&admCtx, std::move(ticket));
+        {
+            auto ticket = p->ticketHolder->waitForTicket(opCtx, &admCtx, waitMode);
+            sleepmicros(1);
+            state.ResumeTiming();
+        }
         acquired++;
     }
     state.counters["Acquired"] = benchmark::Counter(acquired, benchmark::Counter::kIsRate);
@@ -158,11 +160,12 @@ void BM_acquireAndRelease(benchmark::State& state) {
     for (auto _ : state) {
         AdmissionContext admCtx;
         auto opCtx = p->opCtxs[state.thread_index].get();
-        auto ticket = p->ticketHolder->waitForTicket(opCtx, &admCtx, waitMode);
-        state.PauseTiming();
-        sleepmicros(1);
-        state.ResumeTiming();
-        p->ticketHolder->release(&admCtx, std::move(ticket));
+        {
+            auto ticket = p->ticketHolder->waitForTicket(opCtx, &admCtx, waitMode);
+            state.PauseTiming();
+            sleepmicros(1);
+            state.ResumeTiming();
+        }
         acquired++;
     }
     state.counters["Acquired"] = benchmark::Counter(acquired, benchmark::Counter::kIsRate);

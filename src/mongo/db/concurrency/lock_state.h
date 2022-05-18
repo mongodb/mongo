@@ -39,7 +39,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/spin_lock.h"
-#include "mongo/util/concurrency/ticket.h"
+#include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
 
