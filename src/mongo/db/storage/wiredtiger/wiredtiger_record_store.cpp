@@ -1935,7 +1935,7 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
     // data, and by creating a new session, we are preventing WT from being able to roll back that
     // transaction to free up cache space. If we do block on cache eviction here, we must consider
     // that the other session owned by this thread may be the one that needs to be rolled back. If
-    // this does time out, we will receive a WT_CACHE_FULL and throw an error.
+    // this does time out, we will receive a WT_ROLLBACK and throw an error.
     auto wtSession = sessRaii.getSession();
     invariantWTOK(wtSession->reconfigure(wtSession, "cache_max_wait_ms=1000"), wtSession);
 
@@ -1945,13 +1945,16 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
     // largest_key API returns the largest key in the table regardless of visibility. This ensures
     // we don't re-use RecordIds that are not visible.
     int ret = cursor->largest_key(cursor);
-    // TODO (SERVER-64461): Remove WT_CACHE_FULL error check after WT-8767
-    if (ret == WT_CACHE_FULL || ret == WT_ROLLBACK) {
+    if (ret == WT_ROLLBACK) {
         // Force the caller to rollback its transaction if we can't make progess with eviction.
         // TODO (SERVER-63620): Convert this to a different error code that is distinguishable from
         // a true write conflict.
+        auto rollbackReason = wtSession->get_rollback_reason(wtSession);
+        rollbackReason = rollbackReason ? rollbackReason : "undefined";
         throwWriteConflictException(
-            fmt::format("Cache full while performing initial write to '{}'", _ns));
+            fmt::format("Rollback ocurred while performing initial write to '{}'. Reason: '{}'",
+                        _ns,
+                        rollbackReason));
     } else if (ret != WT_NOTFOUND) {
         invariantWTOK(ret, wtSession);
         auto recordId = getKey(cursor);

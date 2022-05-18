@@ -64,8 +64,8 @@
 
 
 // From src/third_party/wiredtiger/src/include/txn.h
-#define WT_TXN_ROLLBACK_REASON_CACHE "oldest pinned transaction ID rolled back for eviction"
-
+#define WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION \
+    "oldest pinned transaction ID rolled back for eviction"
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(crashAfterUpdatingFirstTableLoggingSettings);
@@ -170,9 +170,9 @@ bool wasRollbackReasonCachePressure(WT_SESSION* session) {
     if (session) {
         const auto reason = session->get_rollback_reason(session);
         if (reason) {
-            return strncmp(WT_TXN_ROLLBACK_REASON_CACHE,
+            return strncmp(WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION,
                            reason,
-                           sizeof(WT_TXN_ROLLBACK_REASON_CACHE)) == 0;
+                           sizeof(WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION)) == 0;
         }
     }
     return false;
@@ -188,7 +188,7 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
             str::stream s;
             if (!prefix.empty())
                 s << prefix << " ";
-            s << retCode << ": " << WT_TXN_ROLLBACK_REASON_CACHE;
+            s << retCode << ": " << WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION;
             throwTemporarilyUnavailableException(s);
         }
 
