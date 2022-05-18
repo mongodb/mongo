@@ -27,6 +27,7 @@ def validate_and_update_config(parser, args):
     """Validate inputs and update config module."""
     _validate_options(parser, args)
     _update_config_vars(args)
+    _update_symbolizer_secrets()
     _validate_config(parser)
     _set_logging_config()
 
@@ -502,3 +503,13 @@ def _tags_from_list(tags_list):
             tags.extend([t for t in tag.split(",") if t != ""])
         return tags
     return None
+
+
+def _update_symbolizer_secrets():
+    """Open `expansions.yml`, get values for symbolizer secrets and update their values inside config.py ."""
+    if not _config.EVERGREEN_TASK_ID:
+        # not running on Evergreen
+        return
+    yml_data = utils.load_yaml_file(_config.EXPANSIONS_FILE)
+    _config.SYMBOLIZER_CLIENT_SECRET = yml_data.get("symbolizer_client_secret")
+    _config.SYMBOLIZER_CLIENT_ID = yml_data.get("symbolizer_client_id")

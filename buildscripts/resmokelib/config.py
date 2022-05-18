@@ -576,3 +576,12 @@ SHORTEN_LOGGER_NAME_CONFIG: dict = {}
 # that get loaded for multiversion tests can behave correctly on master and on v5.0; the latter
 # case runs 5.0 and 4.4 binaries and has this value set to True. Can be removed after 6.0.
 USE_LEGACY_MULTIVERSION = True
+
+# Expansions file location
+# in CI, the expansions file is located in the ${workdir}, one dir up
+# from src, the checkout directory
+EXPANSIONS_FILE = "../expansions.yml" if 'CI' in os.environ else None
+
+# Symbolizer secrets
+SYMBOLIZER_CLIENT_SECRET = None
+SYMBOLIZER_CLIENT_ID = None

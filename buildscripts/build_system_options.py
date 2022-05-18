@@ -9,7 +9,7 @@ class PathOptions:
     shared_library_folder_name = "lib"
 
     # extend the below list if there are new types of shared libraries
-    _shared_library_file_patterns = [r".+\.so(\.\d{1,})?$", r".+\.dylib$"]
+    _shared_library_file_patterns = [r".+\.so(\.(\d{1,}|debug))?$", r".+\.dylib$"]
     _compiled_shared_library_file_patterns = None
 
     @property

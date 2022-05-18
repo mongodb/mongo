@@ -10,6 +10,7 @@ import unittest
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import logging
+from buildscripts.resmokelib.testing.symbolizer_service import ResmokeSymbolizer
 
 
 # pylint: disable=attribute-defined-outside-init
@@ -54,7 +55,9 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
 
         for report in reports:
             if not isinstance(report, TestReport):
-                raise TypeError("reports must be a list of TestReport instances")
+                raise TypeError(
+                    f"reports must be a list of TestReport instances, current report is {type(report)}"
+                )
 
             with report._lock:  # pylint: disable=protected-access
                 for test_info in report.test_infos:
@@ -135,6 +138,15 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
 
     def stopTest(self, test):  # pylint: disable=invalid-name
         """Call after 'test' has run."""
+
+        # check if there are stacktrace files, if so, invoke the symbolizer here.
+        # If there are no stacktrace files for this job, we do not need to invoke the symbolizer at all.
+        # Take a lock to download the debug symbols if it hasn't already been downloaded.
+        # log symbolized output to test.logger.info()
+
+        symbolizer = ResmokeSymbolizer()
+        symbolizer.symbolize_test_logs(test)
+        # symbolization completed
 
         unittest.TestResult.stopTest(self, test)
 

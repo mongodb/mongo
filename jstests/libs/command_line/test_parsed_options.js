@@ -76,6 +76,8 @@ function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
         typeof expectedResult.parsed.storage.dbPath === "undefined") {
         delete getCmdLineOptsExpected.parsed.storage.dbPath;
     }
+    // Delete backtraceLogFile parameter, since we are generating unique value every time
+    delete getCmdLineOptsExpected.parsed.setParameter.backtraceLogFile;
 
     // Merge with the result that we expect
     expectedResult = mergeOptions(getCmdLineOptsExpected, expectedResult);
@@ -108,6 +110,8 @@ function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
         typeof expectedResult.parsed.storage.dbPath === "undefined") {
         delete getCmdLineOptsResult.parsed.storage.dbPath;
     }
+    // Delete backtraceLogFile parameter, since we are generating unique value every time
+    delete getCmdLineOptsResult.parsed.setParameter.backtraceLogFile;
 
     // Make sure the options are equal to what we expect
     assert.docEq(getCmdLineOptsResult.parsed, expectedResult.parsed);
