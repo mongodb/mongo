@@ -209,8 +209,7 @@ class WiredTigerTestCase(unittest.TestCase):
     @staticmethod
     def globalSetup(preserveFiles = False, removeAtStart = True, useTimestamp = False,
                     gdbSub = False, lldbSub = False, verbose = 1, builddir = None, dirarg = None,
-                    longtest = False, zstdtest = False, ignoreStdout = False, seedw = 0, seedz = 0, 
-                    hookmgr = None, ss_random_prefix = 0):
+                    longtest = False, zstdtest = False, ignoreStdout = False, seedw = 0, seedz = 0, hookmgr = None):
         WiredTigerTestCase._preserveFiles = preserveFiles
         d = 'WT_TEST' if dirarg == None else dirarg
         if useTimestamp:
@@ -237,7 +236,6 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._concurrent = False
         WiredTigerTestCase._seeds = [521288629, 362436069]
         WiredTigerTestCase._randomseed = False
-        WiredTigerTestCase._ss_random_prefix = ss_random_prefix
         WiredTigerTestCase._retriesAfterRollback = 0
         WiredTigerTestCase._testsRun = 0
         if hookmgr == None:
@@ -577,13 +575,6 @@ class WiredTigerTestCase(unittest.TestCase):
         exc_failure = (sys.exc_info() != (None, None, None))
 
         passed = not error and not failure and not exc_failure
-
-        # Download the files from the S3 bucket for tiered tests if the test fails or preserve is
-        # turned on.
-        if hasattr(self, 'ss_name') and self.ss_name == 's3_store' and \
-            ((not passed and not self.skipped) or (WiredTigerTestCase._preserveFiles)):
-                self.download_objects(self.bucket, self.bucket_prefix)
-                self.pr('downloading s3 files')
 
         self.pr('finishing')
 
@@ -968,9 +959,6 @@ def islongtest():
 
 def getseed():
     return WiredTigerTestCase._seeds
-
-def getss_random_prefix():
-    return WiredTigerTestCase._ss_random_prefix
 
 def runsuite(suite, parallel):
     suite_to_run = suite

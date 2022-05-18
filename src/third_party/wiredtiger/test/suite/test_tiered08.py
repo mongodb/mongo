@@ -33,7 +33,7 @@
 #
 
 import os, threading, time, wttest
-from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources, get_conn_config
+from helper_tiered import TieredConfigMixin, storage_sources, get_conn_config
 from wiredtiger import stat
 from wtthread import checkpoint_thread, flush_tier_thread
 from wtscenario import make_scenarios
@@ -43,9 +43,6 @@ from wtscenario import make_scenarios
 #   Run background checkpoints and flush_tier operations while inserting
 #   data into a table from another thread.
 class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
-
-    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered08', tiered_only=True)
-
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(storage_sources)
 
@@ -135,6 +132,6 @@ class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.reopen_conn()
 
         self.verify(key_count)
-        
+
 if __name__ == '__main__':
     wttest.run()

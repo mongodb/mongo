@@ -348,10 +348,6 @@ if __name__ == '__main__':
     args = sys.argv[1:]
     testargs = []
     hook_names = []
-    # Generate a random string to use as a prefix for the tiered test objects to group them under
-    # the same test run.
-    ss_random_prefix = str(random.randrange(1, 2147483646))
-
     while len(args) > 0:
         arg = args.pop(0)
         from unittest import defaultTestLoader as loader
@@ -571,7 +567,7 @@ if __name__ == '__main__':
     # That way, verbose printing can be done at the class definition level.
     wttest.WiredTigerTestCase.globalSetup(preserve, removeAtStart, timestamp, gdbSub, lldbSub,
                                           verbose, wt_builddir, dirarg, longtest, zstdtest,
-                                          ignoreStdout, seedw, seedz, hookmgr, ss_random_prefix)
+                                          ignoreStdout, seedw, seedz, hookmgr)
 
     # Without any tests listed as arguments, do discovery
     if len(testargs) == 0:

@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
-from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
+from helper_tiered import TieredConfigMixin, tiered_storage_sources
 from wtscenario import make_scenarios
 
 # test_schema07.py
@@ -37,7 +37,6 @@ class test_schema07(TieredConfigMixin, wttest.WiredTigerTestCase):
 
     conn_config = 'cache_size=10MB'
 
-    tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = make_scenarios(tiered_storage_sources)
 
     @wttest.longtest("Creating many tables shouldn't fill the cache")

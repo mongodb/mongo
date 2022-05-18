@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
-from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
+from helper_tiered import TieredConfigMixin, tiered_storage_sources
 from wtscenario import make_scenarios
 
 # test_schema05.py
@@ -57,7 +57,6 @@ class test_schema05(TieredConfigMixin, wttest.WiredTigerTestCase):
         ('index-after', { 'create_index' : 2 }),
     ]
 
-    tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = make_scenarios(tiered_storage_sources, index)
 
     def conn_extensions(self, extlist):

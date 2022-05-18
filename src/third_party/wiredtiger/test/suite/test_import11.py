@@ -32,7 +32,7 @@
 
 import glob, os, random, re, shutil, string
 import wttest
-from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
+from helper_tiered import TieredConfigMixin, tiered_storage_sources
 from wtscenario import make_scenarios
 
 # Shared base class used by import tests.
@@ -109,7 +109,6 @@ class test_import11(test_import_base):
     ts = [10*k for k in range(1, len(keys)+1)]
     create_config = 'allocation_size=512,key_format=u,value_format=u'
 
-    tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = make_scenarios(tiered_storage_sources)
 
     def create_and_populate(self, uri):

@@ -33,7 +33,7 @@
 
 import os
 import suite_random
-from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
+from helper_tiered import TieredConfigMixin, tiered_storage_sources
 import wtscenario, wttest
 
 try:
@@ -276,7 +276,6 @@ class test_schema03(TieredConfigMixin, wttest.WiredTigerTestCase):
     table_args_scenarios = wtscenario.quick_scenarios('s_extra_table_args',
         ['', ',type=file', ',type=lsm'], [0.5, 0.3, 0.2])
 
-    tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = wtscenario.make_scenarios(
         tiered_storage_sources, restart_scenarios, ntable_scenarios,
         ncolgroup_scenarios, nindex_scenarios, idx_args_scenarios,

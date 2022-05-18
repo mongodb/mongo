@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, re
-from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources, get_conn_config
+from helper_tiered import TieredConfigMixin, storage_sources, get_conn_config
 import wtscenario, wttest
 from wtdataset import SimpleDataSet
 
@@ -42,8 +42,6 @@ class test_tiered03(wttest.WiredTigerTestCase, TieredConfigMixin):
     # sharing would probably need to be reworked.
     uri = 'file:test_tiered03'
 
-    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered03', tiered_only=True)
-
     # Occasionally add a lot of records to vary the amount of work flush does.
     record_count_scenarios = wtscenario.quick_scenarios(
         'nrecs', [10, 10000], [0.9, 0.1])
@@ -55,7 +53,7 @@ class test_tiered03(wttest.WiredTigerTestCase, TieredConfigMixin):
     def conn_config(self):
         bucket_ret = self.bucket
 
-        # The bucket format for the S3 store is the name and the region separated by a semi-colon.
+        # The bucket format for the S3 store is the name and the region separataed by a semi-colon.
         if self.ss_name == 's3_store':
             cache_dir = self.bucket[:self.bucket.find(';')] + '-cache'
         else:

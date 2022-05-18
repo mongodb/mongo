@@ -2194,14 +2194,10 @@ tasks:
             # Only set verbose after having put the AWS access credentials into the environment.
             set -o verbose
 
-            virtualenv -p python3 venv
-            source venv/bin/activate
-            pip3 install boto3
-
             # Run S3 extension unit testing
             ext/storage_sources/s3_store/test/run_s3_unit_tests
             # Run Python testing for all tiered tests
-            ${test_env_vars|} python3 ../test/suite/run.py -j $(nproc) tiered
+            ${test_env_vars|} ${python_binary|python3} ../test/suite/run.py -j $(nproc) tiered
 
   - name: tiered-test-small
     tags: ["pull_request"]
@@ -2223,14 +2219,10 @@ tasks:
             # Only set verbose after having put the AWS access credentials into the environment.
             set -o verbose
 
-            virtualenv -p python3 venv
-            source venv/bin/activate
-            pip3 install boto3
-
             # Run S3 extension unit testing
             ext/storage_sources/s3_store/test/run_s3_unit_tests
             # Run Python testing for tiered06 
-            ${test_env_vars|} python3 ../test/suite/run.py -j $(nproc) tiered06
+            ${test_env_vars|} ${python_binary|python3} ../test/suite/run.py -j $(nproc) tiered06
 
 
   - name: spinlock-gcc-test

@@ -27,11 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-try:
-    import boto3
-except ImportError:
-    pass
-
 import datetime, inspect, os, random, wiredtiger
 
 # These routines help run the various storage sources. They are required to manage
@@ -89,61 +84,53 @@ def get_check(storage_source, tc, base, n):
     storage_source.assertEquals(tc.search(), wiredtiger.WT_NOTFOUND)
 
 # Generate a unique object prefix for the S3 store. 
-def generate_s3_prefix(random_prefix = '', test_name = ''):
+def generate_s3_prefix(test_name = ''):
     # Generates a unique prefix to be used with the object keys, eg:
     # "s3test/python/2022-31-01-16-34-10/623843294--".
-    # Objects with the prefix pattern "s3test/*" are deleted after a certain period of time 
+    # Objects with the prefex pattern "s3test/*" are deleted after a certain period of time 
     # according to the lifecycle rule on the S3 bucket. Should you wish to make any changes to the
-    # prefix pattern or lifecycle of the object, please speak to the release manager.
-    # Group all the python test objects under s3test/python/ 
+    # prefix pattern or lifecycle of the object, please speak to the release manager. 
     prefix = 's3test/python/'
-    # Group each test run together by random number and date. If a random prefix isn't provided
-    # generate a new one now.
-    if random_prefix is None:
-        random_prefix = str(random.randrange(1, 2147483646))
-    prefix += datetime.datetime.now().strftime('%Y-%m-%d-%H-%M') + '--' + random_prefix +'/'
-    # Group all scenarios from the same test under the same test name.
-    prefix += test_name + '/'
+    prefix += datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+    # Range upto int32_max, matches that of C++'s std::default_random_engine
+    prefix += '/' + str(random.randrange(1, 2147483646)) + '--'
 
-    # Generate a random number to differentiate object files for tests that use multiple bucket
-    # prefixes. It is important to generate unique prefixes for different tests in the same class,
+    # If the calling function has not provided a name, extract it from the stack.
+    # It is important to generate unique prefixes for different tests in the same class,
     # so that the database namespace do not collide.
-    # Range up to int32_max, matches that of C++'s std::default_random_engine
-    prefix += str(random.randrange(1, 2147483646)) + '--'
-
+    # 0th element on the stack is the current function. 1st element is the calling function.
+    if not test_name:
+        test_name = inspect.stack()[1][3]
+    prefix += test_name + '--'
     return prefix
 
-def gen_tiered_storage_sources(random_prefix='', test_name='', tiered_only=False):
-    tiered_storage_sources = [
-        ('dirstore', dict(is_tiered = True,
-            is_local_storage = True,
-            auth_token = get_auth_token('dir_store'),
-            bucket = get_bucket_name('dir_store', 0),
-            bucket1 = get_bucket_name('dir_store', 1),
-            bucket_prefix = "pfx_",
-            bucket_prefix1 = "pfx1_",
-            bucket_prefix2 = 'pfx2_',
-            num_ops=100,
-            ss_name = 'dir_store')),
-        ('s3', dict(is_tiered = True,
-            is_local_storage = False,
-            auth_token = get_auth_token('s3_store'),
-            bucket = get_bucket_name('s3_store', 0),
-            bucket1 = get_bucket_name('s3_store', 1),
-            bucket_prefix = generate_s3_prefix(random_prefix, test_name),
-            bucket_prefix1 = generate_s3_prefix(random_prefix, test_name),
-            bucket_prefix2 = generate_s3_prefix(random_prefix, test_name),
-            num_ops=20,
-            ss_name = 's3_store')),
-        ('non_tiered', dict(is_tiered = False)),
-    ]
+# Storage sources
+tiered_storage_sources = [
+    ('dirstore', dict(is_tiered = True,
+        is_local_storage = True,
+        auth_token = get_auth_token('dir_store'),
+        bucket = get_bucket_name('dir_store', 0),
+        bucket1 = get_bucket_name('dir_store', 1),
+        bucket_prefix = "pfx_",
+        bucket_prefix1 = "pfx1_",
+        bucket_prefix2 = 'pfx2_',
+        num_ops=100,
+        ss_name = 'dir_store')),
+    ('s3', dict(is_tiered = True,
+        is_local_storage = False,
+        auth_token = get_auth_token('s3_store'),
+        bucket = get_bucket_name('s3_store', 0),
+        bucket1 = get_bucket_name('s3_store', 1),
+        bucket_prefix = generate_s3_prefix(),
+        bucket_prefix1 = generate_s3_prefix(),
+        bucket_prefix2 = generate_s3_prefix(),
+        num_ops=20,
+        ss_name = 's3_store')),
+    ('non_tiered', dict(is_tiered = False)),            
+]
 
-    # Return a sublist to use for the tiered test scenarios as last item on list is not a scenario
-    # for the tiered tests.  
-    if tiered_only:
-        return tiered_storage_sources[:2]
-
-    return tiered_storage_sources
+# Sublist to use for the tiered test scenarios as last item on list is not a scenario.  
+storage_sources = tiered_storage_sources[:2]
 
 # This mixin class provides tiered storage configuration methods.
 class TieredConfigMixin:
@@ -207,23 +194,3 @@ class TieredConfigMixin:
                 self.skipTest('Tiered storage does not fully support alter operation.')
             else:
                 raise    
-
-    def download_objects(self, bucket_name, prefix):
-        # The bucket from the storage source is expected to be a name and a region, separated by a 
-        # semi-colon. eg: 'abcd;ap-southeast-2'.
-        bucket_name, region = bucket_name.split(';')
-        
-        # Get the bucket resource and list the objects within that bucket that match the prefix for a
-        # given test.
-        s3 = boto3.resource('s3')
-        bucket = s3.Bucket(bucket_name)
-        objects = list(bucket.objects.filter(Prefix=prefix))
-
-        # Create a directory within the test directory to download the objects to.
-        s3_object_files_path = 's3_objects/'
-        if not os.path.exists(s3_object_files_path):
-            os.makedirs(s3_object_files_path)
-
-        for o in objects:
-            filename = s3_object_files_path + '/' + o.key.split('/')[-1]
-            bucket.download_file(o.key, filename)
