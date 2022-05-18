@@ -160,14 +160,8 @@ private:
     const BSONObj _critSecReason;
 
     // The shard key of the collection, static for the duration of the coordinator and reflects the
-    // original command. Might be translated to timeseries shard key.
+    // original command
     boost::optional<ShardKeyPattern> _shardKeyPattern;
-
-    // The translated namespace for timeseries collection.
-    NamespaceString _resolvedNss;
-
-    // The translated request for timeseries collection.
-    CreateCollectionRequest _resolvedRequest;
 
     // Set on successful completion of the coordinator
     boost::optional<CreateCollectionResponse> _result;
