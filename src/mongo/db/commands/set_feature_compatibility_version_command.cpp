@@ -53,6 +53,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/persistent_task_store.h"
@@ -79,6 +80,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/vector_clock.h"
@@ -116,6 +118,41 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeUpdatingSessionDocs);
  * Ensures that only one instance of setFeatureCompatibilityVersion can run at a given time.
  */
 Lock::ResourceMutex commandMutex("setFCVCommandMutex");
+
+void createPartialConfigTransactionsIndex(OperationContext* opCtx) {
+    {
+        AutoGetCollection coll(opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IS);
+        if (!coll) {
+            // Early return to avoid implicitly creating config.transactions.
+            return;
+        }
+    }
+
+    DBDirectClient client(opCtx);
+
+    auto indexSpec = MongoDSessionCatalog::getConfigTxnPartialIndexSpec();
+
+    // Throws on error and is a noop if the index already exists.
+    client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace.ns(), {indexSpec});
+}
+
+void dropPartialConfigTransactionsIndex(OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
+
+    BSONObjBuilder cmdBuilder;
+    cmdBuilder.append("dropIndexes", NamespaceString::kSessionTransactionsTableNamespace.coll());
+    cmdBuilder.append("index", MongoDSessionCatalog::kConfigTxnsPartialIndexName);
+    auto dropIndexCmd = cmdBuilder.obj();
+
+    // Throws on error.
+    BSONObj result;
+    client.runCommand(
+        NamespaceString::kSessionTransactionsTableNamespace.db().toString(), dropIndexCmd, result);
+    const auto status = getStatusFromWriteCommandReply(result);
+    if (status != ErrorCodes::IndexNotFound && status != ErrorCodes::NamespaceNotFound) {
+        uassertStatusOK(status);
+    }
+}
 
 /**
  * Deletes the persisted default read/write concern document.
@@ -622,6 +659,10 @@ private:
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
         }
 
+        if (feature_flags::gFeatureFlagInternalTransactions.isEnabledOnVersion(requestedVersion)) {
+            createPartialConfigTransactionsIndex(opCtx);
+        }
+
         // Create the pre-images collection if the feature flag is enabled on the requested version.
         // TODO SERVER-61770: Remove once FCV 6.0 becomes last-lts.
         if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledOnVersion(
@@ -914,6 +955,10 @@ private:
                                                << NamespaceString::kTransactionCoordinatorsNamespace
                                                << " documents for internal transactions");
             }
+        }
+
+        if (!feature_flags::gFeatureFlagInternalTransactions.isEnabledOnVersion(requestedVersion)) {
+            dropPartialConfigTransactionsIndex(opCtx);
         }
 
         // TODO SERVER-64720 Remove when 6.0 becomes last LTS

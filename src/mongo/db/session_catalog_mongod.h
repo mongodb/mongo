@@ -37,6 +37,14 @@ class SessionsCollection;
 
 class MongoDSessionCatalog {
 public:
+    static const std::string kConfigTxnsPartialIndexName;
+
+    /**
+     * Returns the specification for the partial index on config.transactions used to support
+     * retryable transactions.
+     */
+    static BSONObj getConfigTxnPartialIndexSpec();
+
     /**
      * Invoked when the node enters the primary state. Ensures that the transactions collection is
      * created. Throws on severe exceptions due to which it is not safe to continue the step-up

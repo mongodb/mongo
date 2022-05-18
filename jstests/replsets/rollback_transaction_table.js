@@ -87,6 +87,18 @@ assert.commandWorked(downstream.getDB("config").transactions.renameCollection("f
 assert.commandWorked(downstream.getDB("config").foo.renameCollection("transactions"));
 assert(downstream.getDB("config").transactions.drop());
 assert.commandWorked(downstream.getDB("config").createCollection("transactions"));
+// Creating the index fails in FCVs lower than 6.0, but it isn't required in that configuration, so
+// it's safe to ignore that error.
+assert.commandWorkedOrFailedWithCode(downstream.getDB("config").runCommand({
+    createIndexes: "transactions",
+    indexes: [{
+        name: "parent_lsid",
+        key: {parentLsid: 1, "_id.txnNumber": 1, _id: 1},
+        partialFilterExpression: {parentLsid: {$exists: true}},
+        v: 2
+    }]
+}),
+                                     ErrorCodes.IllegalOperation);
 
 jsTestLog("Running a transaction on the 'downstream node' and waiting for it to replicate.");
 let firstLsid = {id: UUID()};

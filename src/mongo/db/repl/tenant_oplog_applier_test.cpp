@@ -35,6 +35,7 @@
 #include <boost/optional/optional_io.hpp>
 #include <vector>
 
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/op_observer_noop.h"
 #include "mongo/db/op_observer_registry.h"
@@ -50,6 +51,7 @@
 #include "mongo/db/repl/tenant_oplog_batcher.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/log_test.h"
@@ -320,6 +322,11 @@ TEST_F(TenantOplogApplierTest, NoOpsForLargeTransaction) {
 
 TEST_F(TenantOplogApplierTest, CommitUnpreparedTransaction_DataPartiallyApplied) {
     createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    {
+        DBDirectClient client(_opCtx.get());
+        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                             {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
+    }
     NamespaceString nss(dbName, "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto lsid = makeLogicalSessionId(_opCtx.get());
