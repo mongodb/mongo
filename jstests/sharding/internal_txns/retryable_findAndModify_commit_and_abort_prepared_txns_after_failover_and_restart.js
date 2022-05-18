@@ -1,8 +1,8 @@
 /*
  * Test that prepared retryable internal transactions with a findAndModify statement can commit and
- * abort after failover.
+ * abort after failover and restart.
  *
- * @tags: [requires_fcv_60, uses_transactions]
+ * @tags: [requires_fcv_60, uses_transactions, requires_persistence]
  */
 (function() {
 'use strict';
@@ -110,7 +110,7 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts = {
         enableFindAndModifyImageCollection: true
     });
 
-    // Test findAnModify without pre/post image when the image collection is enabled.
+    // Test findAnModify with pre/post image when the image collection is enabled.
     runTest(st, stepDownShard0PrimaryFunc, {
         runFindAndModifyWithPreOrPostImage: true,
         abortTxnAfterFailover: false,
@@ -121,7 +121,7 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts = {
         abortTxnAfterFailover: true,
         enableFindAndModifyImageCollection: true
     });
-    // Test findAnModify without pre/post image when the image collection is disabled.
+    // Test findAnModify with pre/post image when the image collection is disabled.
     runTest(st, stepDownShard0PrimaryFunc, {
         runFindAndModifyWithPreOrPostImage: true,
         abortTxnAfterFailover: false,
@@ -157,7 +157,7 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts = {
         enableFindAndModifyImageCollection: true
     });
 
-    // Test findAnModify without pre/post image when the image collection is enabled.
+    // Test findAnModify with pre/post image when the image collection is enabled.
     runTest(st, stepDownShard0PrimaryFunc, {
         runFindAndModifyWithPreOrPostImage: true,
         abortTxnAfterFailover: false,
@@ -168,13 +168,63 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts = {
         abortTxnAfterFailover: true,
         enableFindAndModifyImageCollection: true
     });
-    // Test findAnModify without pre/post image when the image collection is disabled.
+    // Test findAnModify with pre/post image when the image collection is disabled.
     runTest(st, stepDownShard0PrimaryFunc, {
         runFindAndModifyWithPreOrPostImage: true,
         abortTxnAfterFailover: false,
         enableFindAndModifyImageCollection: false
     });
     runTest(st, stepDownShard0PrimaryFunc, {
+        runFindAndModifyWithPreOrPostImage: true,
+        abortTxnAfterFailover: true,
+        enableFindAndModifyImageCollection: false
+    });
+
+    st.stop();
+}
+
+{
+    jsTest.log("Test when the old primary restarts");
+    const st = new ShardingTest({shards: 1, rs: {nodes: 1}});
+    const restartShard0Func = () => {
+        st.rs0.stopSet(null /* signal */, true /*forRestart */);
+        st.rs0.startSet({restart: true});
+        st.rs0.getPrimary();
+        // Wait for replication since it is illegal to run commitTransaction before the prepare
+        // oplog entry has been majority committed.
+        st.rs0.awaitReplication();
+    };
+
+    // Test findAnModify without pre/post image.
+    runTest(st, restartShard0Func, {
+        runFindAndModifyWithPreOrPostImage: false,
+        abortTxnAfterFailover: false,
+        enableFindAndModifyImageCollection: true
+    });
+    runTest(st, restartShard0Func, {
+        runFindAndModifyWithPreOrPostImage: false,
+        abortTxnAfterFailover: true,
+        enableFindAndModifyImageCollection: true
+    });
+
+    // Test findAnModify with pre/post image when the image collection is enabled.
+    runTest(st, restartShard0Func, {
+        runFindAndModifyWithPreOrPostImage: true,
+        abortTxnAfterFailover: false,
+        enableFindAndModifyImageCollection: true
+    });
+    runTest(st, restartShard0Func, {
+        runFindAndModifyWithPreOrPostImage: true,
+        abortTxnAfterFailover: true,
+        enableFindAndModifyImageCollection: true
+    });
+    // Test findAnModify with pre/post image when the image collection is disabled.
+    runTest(st, restartShard0Func, {
+        runFindAndModifyWithPreOrPostImage: true,
+        abortTxnAfterFailover: false,
+        enableFindAndModifyImageCollection: false
+    });
+    runTest(st, restartShard0Func, {
         runFindAndModifyWithPreOrPostImage: true,
         abortTxnAfterFailover: true,
         enableFindAndModifyImageCollection: false
