@@ -92,7 +92,7 @@ public:
             }
 
             for (auto doneFuture : futuresToWait) {
-                doneFuture.wait(opCtx);
+                doneFuture.get(opCtx);
             }
 
             // If abort actually went through, the resharding documents should be cleaned up.
