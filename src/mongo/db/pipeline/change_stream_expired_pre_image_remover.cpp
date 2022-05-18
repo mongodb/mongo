@@ -365,9 +365,10 @@ void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTim
                                auto params = std::make_unique<DeleteStageParams>();
                                params->isMulti = true;
 
-                               std::unique_ptr<BatchedDeleteStageBatchParams> batchParams;
+                               std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams;
                                if (isBatchedRemoval) {
-                                   batchParams = std::make_unique<BatchedDeleteStageBatchParams>();
+                                   batchedDeleteParams =
+                                       std::make_unique<BatchedDeleteStageParams>();
                                }
 
                                auto exec = InternalPlanner::deleteWithCollectionScan(
@@ -378,7 +379,7 @@ void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTim
                                    InternalPlanner::Direction::FORWARD,
                                    RecordIdBound(collectionRange.first),
                                    RecordIdBound(collectionRange.second),
-                                   std::move(batchParams));
+                                   std::move(batchedDeleteParams));
                                numberOfRemovals += exec->executeDelete();
                            });
     }

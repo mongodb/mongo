@@ -74,14 +74,14 @@ namespace mongo {
 namespace {
 const auto getTTLMonitor = ServiceContext::declareDecoration<std::unique_ptr<TTLMonitor>>();
 
-// Returns BatchedDeleteStageBatchParams pointer only if the feature flag and the server
+// Returns BatchedDeleteStageParams pointer only if the feature flag and the server
 // parameter are enabled.
-std::unique_ptr<BatchedDeleteStageBatchParams> getBatchedDeleteParamsIfEnabled(
+std::unique_ptr<BatchedDeleteStageParams> getBatchedDeleteParamsIfEnabled(
     const CollectionPtr& collection) {
     // Load batched delete parameters.
     if (feature_flags::gBatchMultiDeletes.isEnabled(serverGlobalParams.featureCompatibility) &&
         ttlMonitorBatchDeletes.load()) {
-        return std::make_unique<BatchedDeleteStageBatchParams>();
+        return std::make_unique<BatchedDeleteStageParams>();
     }
     return nullptr;
 }

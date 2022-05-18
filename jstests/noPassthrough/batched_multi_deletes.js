@@ -17,9 +17,8 @@ function validateBatchedDeletes(conn) {
     const coll = db.getCollection("c");
     const collName = coll.getName();
 
-    const docsPerBatchDefault = 100;  // BatchedDeleteStageBatchParams::targetBatchDocs
-    const collCount =
-        5017;  // Intentionally not a multiple of BatchedDeleteStageBatchParams::targetBatchDocs.
+    const docsPerBatchDefault = 100;  // batchedDeletesTargetBatchDocs.
+    const collCount = 5017;  // Intentionally not a multiple of batchedDeletesTargetBatchDocs.
 
     function validateDeletion(db, coll, docsPerBatch) {
         coll.drop();

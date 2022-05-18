@@ -182,29 +182,25 @@ public:
         return makeBatchedDeleteStage(ws, coll, _expCtx.get(), deleteParamsFilter);
     }
 
+    // Defaults batch params to be test defaults for targetBatchTimeMS and targetBatchDocs.
     std::unique_ptr<BatchedDeleteStage> makeBatchedDeleteStage(
         WorkingSet* ws,
         const CollectionPtr& coll,
         ExpressionContext* expCtx,
         CanonicalQuery* deleteParamsFilter = nullptr) {
 
-        auto batchParams = std::make_unique<BatchedDeleteStageBatchParams>();
-        batchParams->targetBatchDocs = targetBatchDocs;
-        batchParams->targetBatchTimeMS = targetBatchTimeMS;
-        return makeBatchedDeleteStage(ws,
-                                      coll,
-                                      expCtx,
-                                      std::move(batchParams),
-                                      std::make_unique<BatchedDeleteStagePassParams>(),
-                                      deleteParamsFilter);
+        auto batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
+        batchedDeleteParams->targetBatchDocs = targetBatchDocs;
+        batchedDeleteParams->targetBatchTimeMS = targetBatchTimeMS;
+        return makeBatchedDeleteStage(
+            ws, coll, expCtx, std::move(batchedDeleteParams), deleteParamsFilter);
     }
 
     std::unique_ptr<BatchedDeleteStage> makeBatchedDeleteStage(
         WorkingSet* ws,
         const CollectionPtr& coll,
         ExpressionContext* expCtx,
-        std::unique_ptr<BatchedDeleteStageBatchParams> batchedDeleteBatchParams,
-        std::unique_ptr<BatchedDeleteStagePassParams> batchedDeletePassParams,
+        std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
         CanonicalQuery* deleteParamsFilter = nullptr) {
 
         // DeleteStageParams must always be multi.
@@ -216,8 +212,7 @@ public:
         return std::make_unique<BatchedDeleteStage>(
             expCtx,
             std::move(deleteParams),
-            std::move(batchedDeleteBatchParams),
-            std::move(batchedDeletePassParams),
+            std::move(batchedDeleteParams),
             ws,
             coll,
             new CollectionScan(expCtx, coll, collScanParams, ws, nullptr));
@@ -698,18 +693,18 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsBasic) {
 
     WorkingSet ws;
 
+    auto batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
+
     auto targetBatchDocs = 10;
-    auto batchParams = std::make_unique<BatchedDeleteStageBatchParams>();
-    batchParams->targetBatchTimeMS = Milliseconds(0);
-    batchParams->targetBatchDocs = targetBatchDocs;
+    batchedDeleteParams->targetBatchTimeMS = Milliseconds(0);
+    batchedDeleteParams->targetBatchDocs = targetBatchDocs;
 
     // 'targetPassDocs' are only checked after each batch is committed.
     auto targetPassDocs = 20;
-    auto passParams = std::make_unique<BatchedDeleteStagePassParams>();
-    passParams->targetPassDocs = targetPassDocs;
+    batchedDeleteParams->targetPassDocs = targetPassDocs;
 
-    auto deleteStage = makeBatchedDeleteStage(
-        &ws, coll, _expCtx.get(), std::move(batchParams), std::move(passParams));
+    auto deleteStage =
+        makeBatchedDeleteStage(&ws, coll, _expCtx.get(), std::move(batchedDeleteParams));
     const BatchedDeleteStats* stats =
         static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 
@@ -768,19 +763,19 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsWithUnlimitedBatc
 
     WorkingSet ws;
 
+    auto batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
+
     auto targetBatchDocs = 0;
-    auto batchParams = std::make_unique<BatchedDeleteStageBatchParams>();
-    batchParams->targetBatchTimeMS = Milliseconds(0);
-    batchParams->targetBatchDocs = targetBatchDocs;
+    batchedDeleteParams->targetBatchTimeMS = Milliseconds(0);
+    batchedDeleteParams->targetBatchDocs = targetBatchDocs;
 
     // Since 'targetPassDocs' is only checked after each batch commit, and there are no batch
     // limits, it has no impact on the batched delete.
     auto targetPassDocs = 10;
-    auto passParams = std::make_unique<BatchedDeleteStagePassParams>();
-    passParams->targetPassDocs = targetPassDocs;
+    batchedDeleteParams->targetPassDocs = targetPassDocs;
 
-    auto deleteStage = makeBatchedDeleteStage(
-        &ws, coll, _expCtx.get(), std::move(batchParams), std::move(passParams));
+    auto deleteStage =
+        makeBatchedDeleteStage(&ws, coll, _expCtx.get(), std::move(batchedDeleteParams));
     const BatchedDeleteStats* stats =
         static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 
@@ -821,17 +816,17 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSBasic) {
 
     WorkingSet ws;
 
+    auto batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
+
     auto targetBatchDocs = 3;  // Lower the default number of documents in a batch for simplicity.
-    auto batchParams = std::make_unique<BatchedDeleteStageBatchParams>();
-    batchParams->targetBatchTimeMS = Milliseconds(0);
-    batchParams->targetBatchDocs = targetBatchDocs;
+    batchedDeleteParams->targetBatchTimeMS = Milliseconds(0);
+    batchedDeleteParams->targetBatchDocs = targetBatchDocs;
 
     auto targetPassTimeMS = Milliseconds(3);
-    auto passParams = std::make_unique<BatchedDeleteStagePassParams>();
-    passParams->targetPassTimeMS = targetPassTimeMS;
+    batchedDeleteParams->targetPassTimeMS = targetPassTimeMS;
 
-    auto deleteStage = makeBatchedDeleteStage(
-        &ws, coll, _expCtx.get(), std::move(batchParams), std::move(passParams));
+    auto deleteStage =
+        makeBatchedDeleteStage(&ws, coll, _expCtx.get(), std::move(batchedDeleteParams));
     const BatchedDeleteStats* stats =
         static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 
@@ -869,16 +864,16 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSWithUnlimitedBa
 
     WorkingSet ws;
 
-    auto batchParams = std::make_unique<BatchedDeleteStageBatchParams>();
-    batchParams->targetBatchTimeMS = Milliseconds(0);
-    batchParams->targetBatchDocs = 0;
+    auto batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
+
+    batchedDeleteParams->targetBatchTimeMS = Milliseconds(0);
+    batchedDeleteParams->targetBatchDocs = 0;
 
     auto targetPassTimeMS = Milliseconds(3);
-    auto passParams = std::make_unique<BatchedDeleteStagePassParams>();
-    passParams->targetPassTimeMS = targetPassTimeMS;
+    batchedDeleteParams->targetPassTimeMS = targetPassTimeMS;
 
-    auto deleteStage = makeBatchedDeleteStage(
-        &ws, coll, _expCtx.get(), std::move(batchParams), std::move(passParams));
+    auto deleteStage =
+        makeBatchedDeleteStage(&ws, coll, _expCtx.get(), std::move(batchedDeleteParams));
     const BatchedDeleteStats* stats =
         static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 
@@ -955,21 +950,21 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSReachedBeforeTa
     auto expectedDocsDeleted = batch0.size() + batch1.size() + batch2.size();
     ASSERT_LT(expectedDocsDeleted, targetPassDocs);
 
-    auto batchParams = std::make_unique<BatchedDeleteStageBatchParams>();
-    batchParams->targetBatchTimeMS = targetBatchTimeMS;
-    batchParams->targetBatchDocs = targetBatchDocs;
+    auto batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
 
-    auto passParams = std::make_unique<BatchedDeleteStagePassParams>();
-    passParams->targetPassTimeMS = targetPassTimeMS;
-    passParams->targetPassDocs = targetPassDocs;
+    batchedDeleteParams->targetBatchTimeMS = targetBatchTimeMS;
+    batchedDeleteParams->targetBatchDocs = targetBatchDocs;
+
+    batchedDeleteParams->targetPassTimeMS = targetPassTimeMS;
+    batchedDeleteParams->targetPassDocs = targetPassDocs;
 
     const CollectionPtr& coll = ctx.getCollection();
     ASSERT(coll);
 
     WorkingSet ws;
 
-    auto deleteStage = makeBatchedDeleteStage(
-        &ws, coll, _expCtx.get(), std::move(batchParams), std::move(passParams));
+    auto deleteStage =
+        makeBatchedDeleteStage(&ws, coll, _expCtx.get(), std::move(batchedDeleteParams));
     const BatchedDeleteStats* stats =
         static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
 

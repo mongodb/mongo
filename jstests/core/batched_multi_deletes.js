@@ -21,8 +21,7 @@ function populateAndMassDelete(queryPredicate) {
     const testDB = db.getSiblingDB('test');
     const coll = testDB['c'];
 
-    const collCount =
-        94321;  // Intentionally not a multiple of BatchedDeleteStageBatchParams::targetBatchDocs.
+    const collCount = 94321;  // Intentionally not a multiple of batchedDeletesTargetBatchDocs.
 
     coll.drop();
     assert.commandWorked(coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: x}))));

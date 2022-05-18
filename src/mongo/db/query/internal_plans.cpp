@@ -208,7 +208,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     Direction direction,
     boost::optional<RecordIdBound> minRecord,
     boost::optional<RecordIdBound> maxRecord,
-    std::unique_ptr<BatchedDeleteStageBatchParams> batchParams) {
+    std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams) {
     const auto& collection = *coll;
     invariant(collection);
     auto ws = std::make_unique<WorkingSet>();
@@ -225,10 +225,10 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 
     auto root = _collectionScan(expCtx, ws.get(), &collection, collScanParams);
 
-    if (batchParams) {
+    if (batchedDeleteParams) {
         root = std::make_unique<BatchedDeleteStage>(expCtx.get(),
                                                     std::move(params),
-                                                    std::move(batchParams),
+                                                    std::move(batchedDeleteParams),
                                                     ws.get(),
                                                     collection,
                                                     root.release());
@@ -295,7 +295,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     BoundInclusion boundInclusion,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     Direction direction,
-    std::unique_ptr<BatchedDeleteStageBatchParams> batchParams) {
+    std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams) {
     const auto& collection = *coll;
     invariant(collection);
     auto ws = std::make_unique<WorkingSet>();
@@ -313,10 +313,10 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
                                                  direction,
                                                  InternalPlanner::IXSCAN_FETCH);
 
-    if (batchParams) {
+    if (batchedDeleteParams) {
         root = std::make_unique<BatchedDeleteStage>(expCtx.get(),
                                                     std::move(params),
-                                                    std::move(batchParams),
+                                                    std::move(batchedDeleteParams),
                                                     ws.get(),
                                                     collection,
                                                     root.release());

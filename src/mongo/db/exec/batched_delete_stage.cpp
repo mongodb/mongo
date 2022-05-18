@@ -125,31 +125,16 @@ bool ensureStillMatchesAndUpdateStats(const CollectionPtr& collection,
     return write_stage_common::ensureStillMatches(collection, opCtx, ws, id, cq);
 }
 
-BatchedDeleteStage::BatchedDeleteStage(ExpressionContext* expCtx,
-                                       std::unique_ptr<DeleteStageParams> params,
-                                       std::unique_ptr<BatchedDeleteStageBatchParams> batchParams,
-                                       WorkingSet* ws,
-                                       const CollectionPtr& collection,
-                                       PlanStage* child)
-    : BatchedDeleteStage(expCtx,
-                         std::move(params),
-                         std::move(batchParams),
-                         std::make_unique<BatchedDeleteStagePassParams>(),
-                         ws,
-                         collection,
-                         child) {}
-
-BatchedDeleteStage::BatchedDeleteStage(ExpressionContext* expCtx,
-                                       std::unique_ptr<DeleteStageParams> params,
-                                       std::unique_ptr<BatchedDeleteStageBatchParams> batchParams,
-                                       std::unique_ptr<BatchedDeleteStagePassParams> passParams,
-                                       WorkingSet* ws,
-                                       const CollectionPtr& collection,
-                                       PlanStage* child)
+BatchedDeleteStage::BatchedDeleteStage(
+    ExpressionContext* expCtx,
+    std::unique_ptr<DeleteStageParams> params,
+    std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
+    WorkingSet* ws,
+    const CollectionPtr& collection,
+    PlanStage* child)
     : DeleteStage::DeleteStage(
           kStageType.rawData(), expCtx, std::move(params), ws, collection, child),
-      _batchParams(std::move(batchParams)),
-      _passParams(std::move(passParams)),
+      _batchedDeleteParams(std::move(batchedDeleteParams)),
       _stagedDeletesBuffer(ws),
       _stagedDeletesWatermarkBytes(0),
       _passTotalDocsStaged(0),
@@ -175,8 +160,9 @@ BatchedDeleteStage::BatchedDeleteStage(ExpressionContext* expCtx,
             !_params->numStatsForDoc);
     tassert(6303807,
             "batch size parameters must be greater than or equal to zero",
-            _batchParams->targetStagedDocBytes >= 0 && _batchParams->targetBatchDocs >= 0 &&
-                _batchParams->targetBatchTimeMS >= Milliseconds(0));
+            _batchedDeleteParams->targetStagedDocBytes >= 0 &&
+                _batchedDeleteParams->targetBatchDocs >= 0 &&
+                _batchedDeleteParams->targetBatchTimeMS >= Milliseconds(0));
 }
 
 BatchedDeleteStage::~BatchedDeleteStage() {}
@@ -386,8 +372,8 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
             }
 
             const Milliseconds elapsedMillis(batchTimer.millis());
-            if (_batchParams->targetBatchTimeMS != Milliseconds(0) &&
-                elapsedMillis >= _batchParams->targetBatchTimeMS) {
+            if (_batchedDeleteParams->targetBatchTimeMS != Milliseconds(0) &&
+                elapsedMillis >= _batchedDeleteParams->targetBatchTimeMS) {
                 // Met 'targetBatchTimeMS' after evaluating the staged delete at 'bufferOffset'.
                 break;
             }
@@ -486,17 +472,19 @@ PlanStage::StageState BatchedDeleteStage::_prepareToRetryDrainAfterWCE(
 }
 
 bool BatchedDeleteStage::_batchTargetMet() {
-    return (_batchParams->targetBatchDocs &&
-            _stagedDeletesBuffer.size() >= static_cast<size_t>(_batchParams->targetBatchDocs)) ||
-        (_batchParams->targetStagedDocBytes &&
+    return (_batchedDeleteParams->targetBatchDocs &&
+            _stagedDeletesBuffer.size() >=
+                static_cast<size_t>(_batchedDeleteParams->targetBatchDocs)) ||
+        (_batchedDeleteParams->targetStagedDocBytes &&
          _stagedDeletesWatermarkBytes >=
-             static_cast<unsigned long long>(_batchParams->targetStagedDocBytes));
+             static_cast<unsigned long long>(_batchedDeleteParams->targetStagedDocBytes));
 }
 
 bool BatchedDeleteStage::_passTargetMet() {
-    return (_passParams->targetPassDocs && _passTotalDocsStaged >= _passParams->targetPassDocs) ||
-        (_passParams->targetPassTimeMS != Milliseconds(0) &&
-         Milliseconds(_passTimer.millis()) >= _passParams->targetPassTimeMS);
+    return (_batchedDeleteParams->targetPassDocs &&
+            _passTotalDocsStaged >= _batchedDeleteParams->targetPassDocs) ||
+        (_batchedDeleteParams->targetPassTimeMS != Milliseconds(0) &&
+         Milliseconds(_passTimer.millis()) >= _batchedDeleteParams->targetPassTimeMS);
 }
 
 }  // namespace mongo

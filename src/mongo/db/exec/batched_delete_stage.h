@@ -37,37 +37,44 @@
 
 namespace mongo {
 
-/**
- * 'Batch' sizing parameters. A batch of staged document deletes is committed as soon
- * as one of the targets below is met, or upon reaching EOF.
- */
-struct BatchedDeleteStageBatchParams {
-    BatchedDeleteStageBatchParams()
+struct BatchedDeleteStageParams {
+    BatchedDeleteStageParams()
         : targetBatchDocs(gBatchedDeletesTargetBatchDocs.load()),
           targetBatchTimeMS(Milliseconds(gBatchedDeletesTargetBatchTimeMS.load())),
-          targetStagedDocBytes(gBatchedDeletesTargetStagedDocBytes.load()) {}
+          targetStagedDocBytes(gBatchedDeletesTargetStagedDocBytes.load()),
+          targetPassDocs(0),
+          targetPassTimeMS(Milliseconds(0)) {}
+
     //
-    // A 'batch' refers to the deletes executed in a single WriteUnitOfWork.
+    // A 'batch' refers to the deletes executed in a single WriteUnitOfWork. A batch of staged
+    // document deletes is committed as soon as one of the batch targets is met, or upon reach EOF.
+    //
+    // 'Batch' targets have no impact on the total number of documents removed in the batched delete
+    // operation.
     //
 
     // Documents staged for deletions are processed in a batch once this document count target is
     // met. A value of zero means unlimited.
     long long targetBatchDocs = 0;
+
     // A batch is committed as soon as this target execution time is met. Zero means unlimited.
     Milliseconds targetBatchTimeMS = Milliseconds(0);
+
     // Documents staged for deletions are processed in a batch once this size target is met.
     // Accounts for document size, not for indexes. A value of zero means unlimited.
     long long targetStagedDocBytes = 0;
-};
 
-/**
- * 'Pass' parameters. A 'pass' defines a approximate target number of documents or runtime after
- * which the deletion stops staging documents, executes any remaining deletes, and eventually
- * returns completion. 'Pass' parameters are approximate because they are checked at a per batch
- * commit granularity.
- */
-struct BatchedDeleteStagePassParams {
-    BatchedDeleteStagePassParams() : targetPassDocs(0), targetPassTimeMS(Milliseconds(0)) {}
+    //
+    // A 'pass' defines a approximate target number of documents or runtime after which the
+    // deletion stops staging documents, executes any remaining deletes, and eventually returns
+    // completion. 'Pass' parameters are approximate because they are checked at a per batch commit
+    // granularity.
+    //
+    // 'Pass' targets may impact the total number of documents removed in the batched delete
+    // operation. When set, there is no guarantee all matching documents will be removed in the
+    // operation. For this reason, 'pass' targets are only exposed to internal users for specific
+    // use cases.
+    //
 
     // Limits the amount of documents processed in a single pass. Once met, no more documents will
     // be fetched for delete - any remaining staged deletes will be executed provided they still
@@ -96,23 +103,12 @@ class BatchedDeleteStage final : public DeleteStage {
 
 public:
     static constexpr StringData kStageType = "BATCHED_DELETE"_sd;
-    // Preferred constructor that uses default 'BatchedDeleteStagePassParams'. Changing the
-    // 'BatchedDeletePassParams' from their default may cause the delete operation to only partially
-    // delete results that match the query and should only be done for specific internal operations.
     BatchedDeleteStage(ExpressionContext* expCtx,
                        std::unique_ptr<DeleteStageParams> params,
-                       std::unique_ptr<BatchedDeleteStageBatchParams> batchParams,
+                       std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
                        WorkingSet* ws,
                        const CollectionPtr& collection,
                        PlanStage* child);
-    BatchedDeleteStage(ExpressionContext* expCtx,
-                       std::unique_ptr<DeleteStageParams> params,
-                       std::unique_ptr<BatchedDeleteStageBatchParams> batchParams,
-                       std::unique_ptr<BatchedDeleteStagePassParams> passParams,
-                       WorkingSet* ws,
-                       const CollectionPtr& collection,
-                       PlanStage* child);
-
     ~BatchedDeleteStage();
 
     // Returns true when no more work can be done (there are no more deletes to commit).
@@ -163,10 +159,7 @@ private:
     bool _passTargetMet();
 
     // Batch targeting parameters.
-    std::unique_ptr<BatchedDeleteStageBatchParams> _batchParams;
-
-    // Pass targeting parameters.
-    std::unique_ptr<BatchedDeleteStagePassParams> _passParams;
+    std::unique_ptr<BatchedDeleteStageParams> _batchedDeleteParams;
 
     // Holds information for each document staged for delete.
     BatchedDeleteStageBuffer _stagedDeletesBuffer;

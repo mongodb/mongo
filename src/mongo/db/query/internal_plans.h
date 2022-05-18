@@ -90,7 +90,8 @@ public:
         PlanYieldPolicy::YieldPolicy yieldPolicy);
 
     /**
-     * Returns a FETCH => DELETE plan, or a FETCH => BATCHED_DELETE plan if 'batchParams' is set.
+     * Returns a FETCH => DELETE plan, or a FETCH => BATCHED_DELETE plan if 'batchedDeleteParams' is
+     * set.
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> deleteWithCollectionScan(
         OperationContext* opCtx,
@@ -100,7 +101,7 @@ public:
         Direction direction = FORWARD,
         boost::optional<RecordIdBound> minRecord = boost::none,
         boost::optional<RecordIdBound> maxRecord = boost::none,
-        std::unique_ptr<BatchedDeleteStageBatchParams> batchParams = nullptr);
+        std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams = nullptr);
 
     /**
      * Returns an index scan.  Caller owns returned pointer.
@@ -118,7 +119,7 @@ public:
 
     /**
      * Returns an IXSCAN => FETCH => DELETE plan, or an IXSCAN => FETCH => BATCHED_DELETE plan if
-     * 'batchParams' is set.
+     * 'batchedDeleteParams' is set.
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> deleteWithIndexScan(
         OperationContext* opCtx,
@@ -130,7 +131,7 @@ public:
         BoundInclusion boundInclusion,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         Direction direction = FORWARD,
-        std::unique_ptr<BatchedDeleteStageBatchParams> batchParams = nullptr);
+        std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams = nullptr);
 
     /**
      * Returns a scan over the 'shardKeyIdx'. If the 'shardKeyIdx' is a non-clustered index, returns

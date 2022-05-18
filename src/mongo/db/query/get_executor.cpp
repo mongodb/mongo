@@ -1676,13 +1676,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         !deleteStageParams->numStatsForDoc;
 
     if (batchDelete) {
-        root =
-            std::make_unique<BatchedDeleteStage>(cq->getExpCtxRaw(),
-                                                 std::move(deleteStageParams),
-                                                 std::make_unique<BatchedDeleteStageBatchParams>(),
-                                                 ws.get(),
-                                                 collection,
-                                                 root.release());
+        root = std::make_unique<BatchedDeleteStage>(cq->getExpCtxRaw(),
+                                                    std::move(deleteStageParams),
+                                                    std::make_unique<BatchedDeleteStageParams>(),
+                                                    ws.get(),
+                                                    collection,
+                                                    root.release());
     } else {
         root = std::make_unique<DeleteStage>(
             cq->getExpCtxRaw(), std::move(deleteStageParams), ws.get(), collection, root.release());
