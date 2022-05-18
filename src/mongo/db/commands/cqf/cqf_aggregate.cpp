@@ -52,12 +52,31 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
     boost::intrusive_ptr<ExpressionContext> expCtx,
     OperationContext* opCtx,
     const CollectionPtr& collection,
+    const boost::optional<BSONObj>& indexHint,
     const optimizer::ProjectionName& scanProjName,
-    const DisableIndexOptions disableIndexOptions) {
+    const DisableIndexOptions disableIndexOptions,
+    bool& disableScan) {
     using namespace optimizer;
 
     if (disableIndexOptions == DisableIndexOptions::DisableAll) {
         return {};
+    }
+
+    std::string indexHintName;
+    if (indexHint) {
+        const BSONElement element = indexHint->firstElement();
+        const StringData fieldName = element.fieldNameStringData();
+        if (fieldName == "$natural"_sd) {
+            if (!element.isNumber() || element.numberInt() != 1) {
+                uasserted(6624255, "Unsupported hint option");
+            }
+            // Do not add indexes.
+            return {};
+        } else if (fieldName == "$hint"_sd && element.type() == BSONType::String) {
+            indexHintName = element.valueStringData().toString();
+        }
+
+        disableScan = true;
     }
 
     const IndexCatalog& indexCatalog = *collection->getIndexCatalog();
@@ -76,6 +95,19 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
             descriptor.getIndexType() != IndexType::INDEX_BTREE) {
             // Not supported for now.
             continue;
+        }
+
+        if (indexHint) {
+            if (indexHintName.empty()) {
+                if (!SimpleBSONObjComparator::kInstance.evaluate(descriptor.keyPattern() ==
+                                                                 *indexHint)) {
+                    // Index key pattern does not match hint.
+                    continue;
+                }
+            } else if (indexHintName != descriptor.indexName()) {
+                // Index name does not match hint.
+                continue;
+            }
         }
 
         // SBE version is base 0.
@@ -280,10 +312,12 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
 static void populateAdditionalScanDefs(OperationContext* opCtx,
                                        boost::intrusive_ptr<ExpressionContext> expCtx,
                                        const Pipeline& pipeline,
+                                       const boost::optional<BSONObj>& indexHint,
                                        const size_t numberOfPartitions,
                                        PrefixId& prefixId,
                                        opt::unordered_map<std::string, ScanDefinition>& scanDefs,
-                                       const DisableIndexOptions disableIndexOptions) {
+                                       const DisableIndexOptions disableIndexOptions,
+                                       bool& disableScan) {
     for (const auto& involvedNss : pipeline.getInvolvedCollections()) {
         // TODO handle views?
         AutoGetCollectionForReadCommandMaybeLockFree ctx(
@@ -302,8 +336,13 @@ static void populateAdditionalScanDefs(OperationContext* opCtx,
         const ProjectionName& scanProjName = prefixId.getNextId("scan");
         if (collectionExists) {
             // TODO: add locks on used indexes?
-            indexDefs = buildIndexSpecsOptimizer(
-                expCtx, opCtx, collection, scanProjName, disableIndexOptions);
+            indexDefs = buildIndexSpecsOptimizer(expCtx,
+                                                 opCtx,
+                                                 collection,
+                                                 indexHint,
+                                                 scanProjName,
+                                                 disableIndexOptions,
+                                                 disableScan);
         }
 
         // For now handle only local parallelism (no over-the-network exchanges).
@@ -329,11 +368,17 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const NamespaceString& nss,
     const CollectionPtr& collection,
+    const boost::optional<BSONObj>& indexHint,
     const Pipeline& pipeline) {
     const bool collectionExists = collection != nullptr;
     const std::string uuidStr = collectionExists ? collection->uuid().toString() : "<missing_uuid>";
     const std::string collNameStr = nss.coll().toString();
     const std::string scanDefName = collNameStr + "_" + uuidStr;
+
+    if (indexHint && !pipeline.getInvolvedCollections().empty()) {
+        uasserted(6624256,
+                  "For now we can apply hints only for queries involving a single collection");
+    }
 
     QueryHints queryHints = getHintsFromQueryKnobs();
 
@@ -344,8 +389,13 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     opt::unordered_map<std::string, optimizer::IndexDefinition> indexDefs;
     if (collectionExists) {
         // TODO: add locks on used indexes?
-        indexDefs = buildIndexSpecsOptimizer(
-            expCtx, opCtx, collection, scanProjName, queryHints._disableIndexes);
+        indexDefs = buildIndexSpecsOptimizer(expCtx,
+                                             opCtx,
+                                             collection,
+                                             indexHint,
+                                             scanProjName,
+                                             queryHints._disableIndexes,
+                                             queryHints._disableScan);
     }
 
     const size_t numberOfPartitions = internalQueryDefaultDOP.load();
@@ -371,10 +421,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     populateAdditionalScanDefs(opCtx,
                                expCtx,
                                pipeline,
+                               indexHint,
                                numberOfPartitions,
                                prefixId,
                                scanDefs,
-                               queryHints._disableIndexes);
+                               queryHints._disableIndexes,
+                               queryHints._disableScan);
 
     Metadata metadata(std::move(scanDefs), numberOfPartitions);
 

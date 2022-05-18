@@ -949,7 +949,7 @@ Status runAggregate(OperationContext* opCtx,
 
             auto timeBegin = Date_t::now();
             execs.emplace_back(getSBEExecutorViaCascadesOptimizer(
-                opCtx, expCtx, nss, collections.getMainCollection(), *pipeline));
+                opCtx, expCtx, nss, collections.getMainCollection(), request.getHint(), *pipeline));
             auto elapsed =
                 (Date_t::now().toMillisSinceEpoch() - timeBegin.toMillisSinceEpoch()) / 1000.0;
             std::cerr << "Optimization took: " << elapsed << " s.\n";

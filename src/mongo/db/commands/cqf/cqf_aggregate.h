@@ -39,6 +39,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const NamespaceString& nss,
     const CollectionPtr& collection,
+    const boost::optional<BSONObj>& indexHint,
     const Pipeline& pipeline);
 
 }  // namespace mongo
