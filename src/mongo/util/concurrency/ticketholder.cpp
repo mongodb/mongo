@@ -238,7 +238,7 @@ boost::optional<Ticket> SemaphoreTicketHolder::waitForTicketUntil(OperationConte
     return Ticket{this, admCtx};
 }
 
-void SemaphoreTicketHolder::release(AdmissionContext* admCtx) {
+void SemaphoreTicketHolder::_release(AdmissionContext* admCtx) noexcept {
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _num++;
