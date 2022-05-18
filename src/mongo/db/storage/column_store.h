@@ -63,9 +63,9 @@ public:
     class WriteCursor {
     public:
         virtual ~WriteCursor() = default;
-        virtual void insert(PathView, RecordId, CellView) = 0;
-        virtual void remove(PathView, RecordId) = 0;
-        virtual void update(PathView, RecordId, CellView) = 0;
+        virtual void insert(PathView, const RecordId&, CellView) = 0;
+        virtual void remove(PathView, const RecordId&) = 0;
+        virtual void update(PathView, const RecordId&, CellView) = 0;
     };
 
     class CursorForPath {
@@ -77,10 +77,10 @@ public:
                 return {};
             return handleResult(_cursor->next());
         }
-        boost::optional<FullCellView> seekAtOrPast(RecordId rid) {
+        boost::optional<FullCellView> seekAtOrPast(const RecordId& rid) {
             return handleResult(_cursor->seekAtOrPast(_path, rid));
         }
-        boost::optional<FullCellView> seekExact(RecordId rid) {
+        boost::optional<FullCellView> seekExact(const RecordId& rid) {
             return handleResult(_cursor->seekExact(_path, rid));
         }
 
@@ -127,7 +127,7 @@ public:
     class BulkBuilder {
     public:
         virtual ~BulkBuilder() = default;
-        virtual void addCell(PathView, RecordId, CellView) = 0;
+        virtual void addCell(PathView, const RecordId&, CellView) = 0;
     };
 
     /**
@@ -263,9 +263,9 @@ public:
     // CRUD
     //
     virtual std::unique_ptr<WriteCursor> newWriteCursor(OperationContext*) = 0;
-    virtual void insert(OperationContext*, PathView, RecordId, CellView) = 0;
-    virtual void remove(OperationContext*, PathView, RecordId) = 0;
-    virtual void update(OperationContext*, PathView, RecordId, CellView) = 0;
+    virtual void insert(OperationContext*, PathView, const RecordId&, CellView) = 0;
+    virtual void remove(OperationContext*, PathView, const RecordId&) = 0;
+    virtual void update(OperationContext*, PathView, const RecordId&, CellView) = 0;
     virtual std::unique_ptr<Cursor> newCursor(OperationContext*) const = 0;
     std::unique_ptr<CursorForPath> newCursor(OperationContext* opCtx, PathView path) const {
         return std::make_unique<CursorForPath>(path, newCursor(opCtx));
@@ -354,8 +354,8 @@ protected:
     public:
         virtual ~Cursor() = default;
         virtual boost::optional<FullCellView> next() = 0;
-        virtual boost::optional<FullCellView> seekAtOrPast(PathView, RecordId) = 0;
-        virtual boost::optional<FullCellView> seekExact(PathView, RecordId) = 0;
+        virtual boost::optional<FullCellView> seekAtOrPast(PathView, const RecordId&) = 0;
+        virtual boost::optional<FullCellView> seekExact(PathView, const RecordId&) = 0;
 
         virtual void save() = 0;
         virtual void saveUnpositioned() {

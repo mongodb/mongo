@@ -130,12 +130,66 @@ void insertTest(int line,
             << "test:" << line << " path:" << path;
     });
 
-    for (auto [path, _] : expected) {
+    for (auto&& [path, _] : expected) {
         if (seenPaths.contains(path))
             continue;
 
         FAIL("Expected to see path in insert, but didn't") << "test:" << line << " path:" << path;
     }
+}
+
+void insertMultiTest(int line,
+                     const BSONObj& doc,
+                     const StringMap<UnencodedCellValue_ForTest>& expected) {
+    // Test with both 1 and 2 records because they use different code paths.
+    for (size_t size = 1; size <= 2; size++) {
+        BSONObj owner;
+        std::vector<BSONElement> elems;
+
+        auto recs = std::vector<BsonRecord>(size);
+        for (size_t i = 0; i < size; i++) {
+            recs[i].docPtr = &doc;
+            recs[i].id = RecordId(i);
+            recs[i].ts = Timestamp(i);
+        }
+
+        size_t counter = 0;
+        auto seenPaths = std::vector<StringSet>(size);
+        visitCellsForInsert(
+            recs, [&](PathView path, const BsonRecord& rec, const UnencodedCellView& cell) {
+                size_t i = counter++ % size;
+                ASSERT_EQ(rec.id.getLong(), int64_t(i));
+                ASSERT_EQ(rec.ts.asInt64(), int64_t(i));
+                ASSERT_EQ(&rec, &recs[i]);
+
+                seenPaths[i].insert(path.toString());
+
+                auto it = expected.find(path);
+                if (it == expected.end()) {
+                    FAIL("Unexpected path in insert") << "test:" << line << " path:" << path;
+                }
+                auto expectedCell = it->second.toView(owner, elems);
+                ASSERT_EQ(cell, expectedCell) << "test:" << line << " path:" << path;
+
+                // Round-trip the cell through encoder/parser and make sure we still agree.
+                BufBuilder encoder;
+                writeEncodedCell(cell, &encoder);
+                auto decoded = SplitCellView::parse({encoder.buf(), size_t(encoder.len())});
+                CellConverter converter;
+                ASSERT_EQ(converter.toUnencodedCellView(decoded), expectedCell)
+                    << "test:" << line << " path:" << path;
+            });
+
+        for (auto&& set : seenPaths) {
+            for (auto&& [path, _] : expected) {
+                if (set.contains(path))
+                    continue;
+
+                FAIL("Expected to see path in insert, but didn't")
+                    << "test:" << line << " path:" << path;
+            }
+        }
+    };
 }
 
 void deleteTest(int line,
@@ -151,7 +205,7 @@ void deleteTest(int line,
         }
     });
 
-    for (auto [path, _] : expected) {
+    for (auto&& [path, _] : expected) {
         if (seenPaths.contains(path))
             continue;
 
@@ -179,7 +233,7 @@ void updateToEmptyTest(int line,
             ASSERT(!cell) << "test:" << line << " path:" << path;
         });
 
-    for (auto [path, _] : expected) {
+    for (auto&& [path, _] : expected) {
         if (seenPaths.contains(path))
             continue;
 
@@ -214,7 +268,7 @@ void updateFromEmptyTest(int line,
             ASSERT_EQ(*cell, expectedCell) << "test:" << line << " path:" << path;
         });
 
-    for (auto [path, _] : expected) {
+    for (auto&& [path, _] : expected) {
         if (seenPaths.contains(path))
             continue;
 
@@ -244,6 +298,7 @@ void basicTests(int line, std::string json, StringMap<UnencodedCellValue_ForTest
     expected.insert({ColumnStore::kRowIdPath.toString(), {"", "", kHasSubPath}});
 
     insertTest(line, doc, expected);
+    insertMultiTest(line, doc, expected);
     deleteTest(line, doc, expected);
 
     expected.erase(ColumnStore::kRowIdPath);
@@ -724,7 +779,7 @@ void updateTest(int line,
                            }
                        });
 
-    for (auto [path, _] : expected) {
+    for (auto&& [path, _] : expected) {
         if (seenPaths.contains(path))
             continue;
 

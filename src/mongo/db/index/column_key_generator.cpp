@@ -102,6 +102,45 @@ public:
         }
     }
 
+    static void multiVisit(
+        const std::vector<BsonRecord>& recs,
+        function_ref<void(PathView, const BsonRecord& record, const UnencodedCellView&)> cb) {
+        const size_t count = recs.size();
+        if (count == 0)
+            return;
+
+        std::vector<ColumnShredder> shredders;
+        shredders.reserve(count);
+        for (auto&& rec : recs) {
+            shredders.emplace_back(*rec.docPtr);
+        }
+
+        if (count == 1) {
+            // Don't need to merge if just 1 record.
+            shredders[0].visitCells([&](PathView path, const UnencodedCellView& cell) {  //
+                cb(path, recs[0], cell);
+            });
+            return;
+        }
+
+        // Mapping: column name -> [raw cells and indexes to recs and shredders]
+        StringDataMap<std::vector<std::pair<RawCellValue*, size_t>>> columns;
+        for (size_t i = 0; i < count; i++) {
+            for (auto&& [path, rcv] : shredders[i]._paths) {
+                auto&& vec = columns[path];
+                if (vec.empty())
+                    vec.reserve(count);  // Optimize for columns existing in all records.
+                vec.emplace_back(&rcv, i);
+            }
+        }
+
+        for (auto&& [path, rows] : columns) {
+            for (auto&& [rcv, i] : rows) {
+                cb(path, recs[i], shredders[i].makeCellView(path, *rcv));
+            }
+        }
+    }
+
     static void visitDiff(const BSONObj& oldObj,
                           const BSONObj& newObj,
                           function_ref<void(DiffAction, PathView, const UnencodedCellView*)> cb) {
@@ -542,6 +581,12 @@ private:
 void visitCellsForInsert(const BSONObj& obj,
                          function_ref<void(PathView, const UnencodedCellView&)> cb) {
     ColumnShredder(obj).visitCells(cb);
+}
+
+void visitCellsForInsert(
+    const std::vector<BsonRecord>& recs,
+    function_ref<void(PathView, const BsonRecord& record, const UnencodedCellView&)> cb) {
+    ColumnShredder::multiVisit(recs, cb);
 }
 
 void visitPathsForDelete(const BSONObj& obj, function_ref<void(PathView)> cb) {

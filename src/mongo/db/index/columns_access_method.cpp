@@ -45,6 +45,13 @@
 
 
 namespace mongo {
+namespace {
+inline void inc(int64_t* counter) {
+    if (counter)
+        ++*counter;
+};
+}  // namespace
+
 ColumnStoreAccessMethod::ColumnStoreAccessMethod(IndexCatalogEntry* ice,
                                                  std::unique_ptr<ColumnStore> store)
     : _store(std::move(store)), _indexCatalogEntry(ice), _descriptor(ice->descriptor()) {}
@@ -167,33 +174,34 @@ Status ColumnStoreAccessMethod::BulkBuilder::commit(OperationContext* opCtx,
     return Status::OK();
 }
 
-void ColumnStoreAccessMethod::insertOne(OperationContext* opCtx,
-                                        SharedBufferFragmentBuilder& pooledBufferBuilder,
-                                        StringData path,
-                                        const column_keygen::UnencodedCellView& cell,
-                                        const RecordId& rid) {
-    PooledFragmentBuilder buf(pooledBufferBuilder);
-    column_keygen::writeEncodedCell(cell, &buf);
-    _store->insert(opCtx, path, rid, CellView{buf.buf(), static_cast<size_t>(buf.len())});
-}
-
 Status ColumnStoreAccessMethod::insert(OperationContext* opCtx,
                                        SharedBufferFragmentBuilder& pooledBufferBuilder,
                                        const CollectionPtr& coll,
                                        const std::vector<BsonRecord>& bsonRecords,
                                        const InsertDeleteOptions& options,
                                        int64_t* keysInsertedOut) {
-    int64_t numInserted = 0;
-    for (auto&& bsonRecord : bsonRecords) {
+    try {
+        PooledFragmentBuilder buf(pooledBufferBuilder);
+        auto cursor = _store->newWriteCursor(opCtx);
         column_keygen::visitCellsForInsert(
-            *bsonRecord.docPtr, [&](StringData path, const column_keygen::UnencodedCellView& cell) {
-                insertOne(opCtx, pooledBufferBuilder, path, cell, bsonRecord.id);
-                ++numInserted;
+            bsonRecords,
+            [&](StringData path,
+                const BsonRecord& rec,
+                const column_keygen::UnencodedCellView& cell) {
+                if (!rec.ts.isNull()) {
+                    uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(rec.ts));
+                }
+
+                buf.reset();
+                column_keygen::writeEncodedCell(cell, &buf);
+                cursor->insert(path, rec.id, CellView{buf.buf(), size_t(buf.len())});
+
+                inc(keysInsertedOut);
             });
+        return Status::OK();
+    } catch (const AssertionException& ex) {
+        return ex.toStatus();
     }
-    if (keysInsertedOut)
-        *keysInsertedOut = numInserted;
-    return Status::OK();
 }
 
 void ColumnStoreAccessMethod::remove(OperationContext* opCtx,
@@ -205,11 +213,10 @@ void ColumnStoreAccessMethod::remove(OperationContext* opCtx,
                                      const InsertDeleteOptions& options,
                                      int64_t* keysDeletedOut,
                                      CheckRecordId checkRecordId) {
+    auto cursor = _store->newWriteCursor(opCtx);
     column_keygen::visitPathsForDelete(obj, [&](StringData path) {
-        _store->remove(opCtx, path, rid);
-        if (keysDeletedOut) {
-            ++*keysDeletedOut;
-        }
+        cursor->remove(path, rid);
+        inc(keysDeletedOut);
     });
 }
 
@@ -222,31 +229,33 @@ Status ColumnStoreAccessMethod::update(OperationContext* opCtx,
                                        const InsertDeleteOptions& options,
                                        int64_t* keysInsertedOut,
                                        int64_t* keysDeletedOut) {
-    auto removeAndNote = [&](StringData path) {
-        _store->remove(opCtx, path, rid);
-        if (keysDeletedOut)
-            ++keysDeletedOut;
-    };
-    column_keygen::visitDiffForUpdate(oldDoc,
-                                      newDoc,
-                                      [&](column_keygen::DiffAction diffAction,
-                                          StringData path,
-                                          const column_keygen::UnencodedCellView* cell) {
-                                          switch (diffAction) {
-                                              case column_keygen::DiffAction::kDelete:
-                                                  return removeAndNote(path);
-                                              case column_keygen::DiffAction::kUpdate:
-                                                  removeAndNote(path);
-                                                  [[fallthrough]];
-                                              case column_keygen::DiffAction::kInsert: {
-                                                  invariant(cell);
-                                                  insertOne(
-                                                      opCtx, pooledBufferBuilder, path, *cell, rid);
-                                                  if (keysInsertedOut)
-                                                      ++*keysInsertedOut;
-                                              }
-                                          }
-                                      });
+    PooledFragmentBuilder buf(pooledBufferBuilder);
+    auto cursor = _store->newWriteCursor(opCtx);
+    column_keygen::visitDiffForUpdate(
+        oldDoc,
+        newDoc,
+        [&](column_keygen::DiffAction diffAction,
+            StringData path,
+            const column_keygen::UnencodedCellView* cell) {
+            if (diffAction == column_keygen::DiffAction::kDelete) {
+                cursor->remove(path, rid);
+                inc(keysDeletedOut);
+                return;
+            }
+
+            // kInsert and kUpdate are handled almost identically. If we switch to using
+            // `overwrite=true` cursors in WT, we could consider making them the same, although that
+            // might disadvantage other implementations of the storage engine API.
+            buf.reset();
+            column_keygen::writeEncodedCell(*cell, &buf);
+
+            const auto method = diffAction == column_keygen::DiffAction::kInsert
+                ? &ColumnStore::WriteCursor::insert
+                : &ColumnStore::WriteCursor::update;
+            (cursor.get()->*method)(path, rid, CellView{buf.buf(), size_t(buf.len())});
+
+            inc(keysInsertedOut);
+        });
     return Status::OK();
 }
 

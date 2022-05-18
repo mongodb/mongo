@@ -59,9 +59,9 @@ public:
     // CRUD
     //
     std::unique_ptr<ColumnStore::WriteCursor> newWriteCursor(OperationContext*) override;
-    void insert(OperationContext*, PathView, RecordId, CellView) override;
-    void remove(OperationContext*, PathView, RecordId) override;
-    void update(OperationContext*, PathView, RecordId, CellView) override;
+    void insert(OperationContext*, PathView, const RecordId&, CellView) override;
+    void remove(OperationContext*, PathView, const RecordId&) override;
+    void update(OperationContext*, PathView, const RecordId&, CellView) override;
     std::unique_ptr<ColumnStore::Cursor> newCursor(OperationContext*) const override;
 
     std::unique_ptr<ColumnStore::BulkBuilder> makeBulkBuilder(OperationContext* opCtx) override;
@@ -83,7 +83,7 @@ public:
 
     bool isEmpty(OperationContext* opCtx) override;
 
-    static std::string makeKey_ForTest(PathView path, RecordId id) {
+    static std::string makeKey_ForTest(PathView path, const RecordId& id) {
         return makeKey(path, id);
     }
 
@@ -92,8 +92,8 @@ private:
         return _uri;
     }
 
-    static std::string& makeKey(std::string& buffer, PathView, RecordId);
-    static std::string makeKey(PathView path, RecordId rid) {
+    static std::string& makeKey(std::string& buffer, PathView, const RecordId&);
+    static std::string makeKey(PathView path, const RecordId& rid) {
         std::string out;
         makeKey(out, path, rid);
         return out;

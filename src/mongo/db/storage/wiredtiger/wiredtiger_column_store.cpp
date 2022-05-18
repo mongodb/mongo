@@ -115,7 +115,9 @@ WiredTigerColumnStore::WiredTigerColumnStore(OperationContext* ctx,
       _desc(desc),
       _indexName(desc->indexName()) {}
 
-std::string& WiredTigerColumnStore::makeKey(std::string& buffer, PathView path, RecordId rid) {
+std::string& WiredTigerColumnStore::makeKey(std::string& buffer,
+                                            PathView path,
+                                            const RecordId& rid) {
     const auto ridSize =
         rid.withFormat([](RecordId::Null) -> unsigned long { return 0; },
                        [](int64_t) -> unsigned long { return sizeof(int64_t); },
@@ -143,9 +145,9 @@ public:
         _curwrap.assertInActiveTxn();
     }
 
-    void insert(PathView, RecordId, CellView) override;
-    void remove(PathView, RecordId) override;
-    void update(PathView, RecordId, CellView) override;
+    void insert(PathView, const RecordId&, CellView) override;
+    void remove(PathView, const RecordId&) override;
+    void update(PathView, const RecordId&, CellView) override;
 
     WT_CURSOR* c() {
         return _curwrap.get();
@@ -163,11 +165,11 @@ std::unique_ptr<ColumnStore::WriteCursor> WiredTigerColumnStore::newWriteCursor(
 
 void WiredTigerColumnStore::insert(OperationContext* opCtx,
                                    PathView path,
-                                   RecordId rid,
+                                   const RecordId& rid,
                                    CellView cell) {
     WriteCursor(opCtx, _uri, _tableId).insert(path, rid, cell);
 }
-void WiredTigerColumnStore::WriteCursor::insert(PathView path, RecordId rid, CellView cell) {
+void WiredTigerColumnStore::WriteCursor::insert(PathView path, const RecordId& rid, CellView cell) {
     dassert(_opCtx->lockState()->isWriteLocked());
 
     auto key = makeKey(path, rid);
@@ -187,10 +189,10 @@ void WiredTigerColumnStore::WriteCursor::insert(PathView path, RecordId rid, Cel
     }
 }
 
-void WiredTigerColumnStore::remove(OperationContext* opCtx, PathView path, RecordId rid) {
+void WiredTigerColumnStore::remove(OperationContext* opCtx, PathView path, const RecordId& rid) {
     WriteCursor(opCtx, _uri, _tableId).remove(path, rid);
 }
-void WiredTigerColumnStore::WriteCursor::remove(PathView path, RecordId rid) {
+void WiredTigerColumnStore::WriteCursor::remove(PathView path, const RecordId& rid) {
     dassert(_opCtx->lockState()->isWriteLocked());
 
     auto key = makeKey(path, rid);
@@ -207,11 +209,11 @@ void WiredTigerColumnStore::WriteCursor::remove(PathView path, RecordId rid) {
 }
 void WiredTigerColumnStore::update(OperationContext* opCtx,
                                    PathView path,
-                                   RecordId rid,
+                                   const RecordId& rid,
                                    CellView cell) {
     WriteCursor(opCtx, _uri, _tableId).update(path, rid, cell);
 }
-void WiredTigerColumnStore::WriteCursor::update(PathView path, RecordId rid, CellView cell) {
+void WiredTigerColumnStore::WriteCursor::update(PathView path, const RecordId& rid, CellView cell) {
     dassert(_opCtx->lockState()->isWriteLocked());
 
     auto key = makeKey(path, rid);
@@ -255,12 +257,12 @@ public:
 
         return curr();
     }
-    boost::optional<FullCellView> seekAtOrPast(PathView path, RecordId rid) override {
+    boost::optional<FullCellView> seekAtOrPast(PathView path, const RecordId& rid) override {
         makeKey(_buffer, path, rid);
         seekWTCursor();
         return curr();
     }
-    boost::optional<FullCellView> seekExact(PathView path, RecordId rid) override {
+    boost::optional<FullCellView> seekExact(PathView path, const RecordId& rid) override {
         makeKey(_buffer, path, rid);
         seekWTCursor(/*exactOnly*/ true);
         return curr();
@@ -399,7 +401,7 @@ public:
         _cursor->close(_cursor);
     }
 
-    void addCell(PathView path, RecordId rid, CellView cell) override {
+    void addCell(PathView path, const RecordId& rid, CellView cell) override {
         uasserted(ErrorCodes::NotImplemented, "WiredTigerColumnStore bulk builder");
     }
 

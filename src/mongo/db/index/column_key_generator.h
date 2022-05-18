@@ -31,6 +31,7 @@
 
 #include <iosfwd>
 
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/storage/column_store.h"
 #include "mongo/util/functional.h"
 
@@ -84,6 +85,21 @@ struct UnencodedCellView {
  */
 void visitCellsForInsert(const BSONObj& obj,
                          function_ref<void(PathView, const UnencodedCellView&)> cb);
+
+/**
+ * Visits all paths within obj and provides their cell values.
+ * Visit order is completely unspecified, so callers should not assume anything, but this function
+ * will attempt to perform the visits in an order optimized for inserting into a tree.
+ *
+ * Current implementation will visit all cells for a given path before moving on to the next path.
+ * Additionally, within each path, the cells will be visited in an order matching the order of their
+ * corresponding entries in the input vector. This will typically be ordered by RecordId since
+ * callers will typically pass records in that order, but this function neither relies on nor
+ * ensures that.
+ */
+void visitCellsForInsert(
+    const std::vector<BsonRecord>& recs,
+    function_ref<void(PathView, const BsonRecord& record, const UnencodedCellView&)> cb);
 
 /**
  * Visits all paths within obj. When deleting, you do not need to know about values.

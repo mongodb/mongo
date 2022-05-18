@@ -108,12 +108,6 @@ public:
     class BulkBuilder;
 
 private:
-    void insertOne(OperationContext*,
-                   SharedBufferFragmentBuilder&,
-                   StringData path,
-                   const column_keygen::UnencodedCellView& cell,
-                   const RecordId&);
-
     const std::unique_ptr<ColumnStore> _store;
     IndexCatalogEntry* const _indexCatalogEntry;  // owned by IndexCatalog
     const IndexDescriptor* const _descriptor;
