@@ -2,6 +2,7 @@
  * Test setFCV interactions with per-collection balancing settings
  *
  * @tags: [
+ *  multiversion_incompatible,
  *  requires_fcv_53,
  *  featureFlagPerCollBalancingSettings,
  * ]
