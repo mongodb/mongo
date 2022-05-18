@@ -1380,6 +1380,19 @@ function appendSetParameterArgs(argArray) {
                 argArray.push(...['--setParameter', "logComponentVerbosity=" + logVerbosityParam]);
             }
 
+            if (programMajorMinorVersion >= 530 &&
+                !argArrayContainsSetParameterValue("backtraceLogFile=")) {
+                let randomName = "";
+                let randomStrLen = 20;
+                const chars = "qwertyuiopasdfghjklzxcvbnm1234567890";
+                for (let i = 0; i <= randomStrLen; i++) {
+                    randomName += chars[((Math.random() * 1000) % chars.length) ^ 0];
+                }
+                const backtraceLogFilePath =
+                    MongoRunner.dataDir + "/" + randomName + Date.now() + ".stacktrace";
+                argArray.push(...["--setParameter", "backtraceLogFile=" + backtraceLogFilePath]);
+            }
+
             // When launching a 5.0 mongod, if we're mentioning the
             // `storeFindAndModifyImagesInSideCollection` setParameter and the corresponding feature
             // flag is not set, add it for good measure.

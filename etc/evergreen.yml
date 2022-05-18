@@ -1168,6 +1168,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: macos-enterprise-ninja
   display_name: "Ninja Build: macOS Enterprise"
@@ -1472,6 +1473,7 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - rhel80-xlarge
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-80-64-bit-dynamic-required-ninja
   display_name: "Ninja Build: Enterprise RHEL 8.0"
@@ -1619,6 +1621,7 @@ buildvariants:
 #  - name: server_selection_json_test_TG
 #    distros:
 #      - rhel80-large
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - &enterprise-rhel-80-64-bit-dynamic-classic-engine
   name: enterprise-rhel-80-64-bit-dynamic-classic-engine
@@ -2209,6 +2212,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
+  - name: generate_buildid_to_debug_symbols_mapping
 
 ################################
 # storage engine buildvariants #
@@ -2611,6 +2615,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_txns
   - name: unittest_shell_hang_analyzer_gen
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - <<: *rhel80-debug-aubsan-lite-required-template
   name: rhel80-debug-aubsan-lite-all-feature-flags-required
@@ -2650,6 +2655,7 @@ buildvariants:
 #    distros:
 #      - rhel80-xlarge
 #  - name: unittest_shell_hang_analyzer_gen
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel80-debug-tsan
   display_name: ~ TSAN Enterprise RHEL 8.0 DEBUG

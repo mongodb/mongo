@@ -96,16 +96,16 @@ def list_commands_for_api(api_version: str, mongod_or_mongos: str, install_dir: 
     if mongod_or_mongos == "mongod":
         logger = loggers.new_fixture_logger("MongoDFixture", 0)
         logger.parent = LOGGER
-        fixture: interface.Fixture = fixturelib.make_fixture("MongoDFixture", logger, 0,
-                                                             dbpath_prefix=dbpath.name,
-                                                             mongod_executable=mongod_executable)
+        fixture: interface.Fixture = fixturelib.make_fixture(
+            "MongoDFixture", logger, 0, dbpath_prefix=dbpath.name,
+            mongod_executable=mongod_executable, mongod_options={"set_parameters": {}})
     else:
         logger = loggers.new_fixture_logger("ShardedClusterFixture", 0)
         logger.parent = LOGGER
-        fixture = fixturelib.make_fixture("ShardedClusterFixture", logger, 0,
-                                          dbpath_prefix=dbpath.name,
-                                          mongos_executable=mongos_executable,
-                                          mongod_executable=mongod_executable, mongod_options={})
+        fixture = fixturelib.make_fixture(
+            "ShardedClusterFixture", logger, 0, dbpath_prefix=dbpath.name,
+            mongos_executable=mongos_executable, mongod_executable=mongod_executable,
+            mongod_options={"set_parameters": {}})
 
     fixture.setup()
     fixture.await_ready()
