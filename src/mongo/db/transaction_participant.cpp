@@ -324,13 +324,8 @@ TxnNumber fetchHighestTxnNumberWithInternalSessions(OperationContext* opCtx,
     TxnNumber highestTxnNumber{kUninitializedTxnNumber};
 
     const auto sessionCatalog = SessionCatalog::get(opCtx);
-    SessionKiller::Matcher matcher(
-        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx, parentLsid)});
-    sessionCatalog->scanSessions(matcher, [&](const ObservableSession& osession) {
-        const auto lsid = osession.getSessionId();
-        if (getParentSessionId(lsid) == parentLsid && isInternalSessionForRetryableWrite(lsid)) {
-            highestTxnNumber = std::max(highestTxnNumber, *osession.getSessionId().getTxnNumber());
-        }
+    sessionCatalog->scanSession(parentLsid, [&](const ObservableSession& osession) {
+        highestTxnNumber = osession.getHighestTxnNumberWithChildSessions();
     });
 
     performReadWithNoTimestampDBDirectClient(opCtx, [&](DBDirectClient* client) {
