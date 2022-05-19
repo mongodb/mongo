@@ -33,22 +33,6 @@ _icecream_version_min = parse_version("1.1rc2")
 _icecream_version_gcc_remote_cpp = parse_version("1.2")
 
 
-# I'd prefer to use value here, but amazingly, its __str__ returns the
-# *initial* value of the Value and not the built value, if
-# available. That seems like a bug. In the meantime, make our own very
-# sinmple Substition thing.
-class _BoundSubstitution:
-    def __init__(self, env, expression):
-        self.env = env
-        self.expression = expression
-        self.result = None
-
-    def __str__(self):
-        if self.result is None:
-            self.result = self.env.subst(self.expression)
-        return self.result
-
-
 def icecc_create_env(env, target, source, for_signature):
     # Safe to assume unix here because icecream only works on Unix
     mkdir = "mkdir -p ${TARGET.dir}"
@@ -450,35 +434,65 @@ def generate(env):
     if "ICECC_SCHEDULER" in env:
         env["ENV"]["USE_SCHEDULER"] = env["ICECC_SCHEDULER"]
 
-    # If ccache is in play we actually want the icecc binary in the
-    # CCACHE_PREFIX environment variable, not on the command line, per
-    # the ccache documentation on compiler wrappers. Otherwise, just
-    # put $ICECC on the command line. We wrap it in the magic "don't
-    # consider this part of the build signature" sigils in the hope
-    # that enabling and disabling icecream won't cause rebuilds. This
-    # is unlikely to really work, since above we have maybe changed
-    # compiler flags (things like -fdirectives-only), but we still try
-    # to do the right thing.
+    # Make a generator to expand to what icecream binary to use in
+    # the case where we are not a conftest or a deny list source file.
+    def icecc_generator(target, source, env, for_signature):
+        # TODO: SERVER-60915 use new conftest API
+        if "conftest" in str(target[0]):
+            return ''
+
+        if env.subst('$ICECC_LOCAL_COMPILATION_FILTER', target=target, source=source) == 'True':
+            return '$ICERUN'
+
+        return '$ICECREAM_RUN_ICECC'
+
+    env['ICECC_GENERATOR'] = icecc_generator
+
     if ccache_enabled:
+
+        # Don't want to overwrite some existing generator
+        # if there is an existing one, we will need to chain them
+        if env.get('SHELL_ENV_GENERATOR') is not None:
+            existing_gen = env.get('SHELL_ENV_GENERATOR')
+        else:
+            existing_gen = None
+
+        # If ccache is in play we actually want the icecc binary in the
+        # CCACHE_PREFIX environment variable, not on the command line, per
+        # the ccache documentation on compiler wrappers. Otherwise, just
+        # put $ICECC on the command line. We wrap it in the magic "don't
+        # consider this part of the build signature" sigils in the hope
+        # that enabling and disabling icecream won't cause rebuilds. This
+        # is unlikely to really work, since above we have maybe changed
+        # compiler flags (things like -fdirectives-only), but we still try
+        # to do the right thing.
+        #
         # If the path to CCACHE_PREFIX isn't absolute, then it will
         # look it up in PATH. That isn't what we want here, we make
         # the path absolute.
-        env['ENV']['CCACHE_PREFIX'] = _BoundSubstitution(env, "${ICECREAM_RUN_ICECC.abspath}")
-    else:
-        # Make a generator to expand to ICECC in the case where we are
-        # not a conftest. We never want to run conftests remotely.
-        # Ideally, we would do this for the CCACHE_PREFIX case above,
-        # but unfortunately if we did we would never actually see the
-        # conftests, because the BoundSubst means that we will never
-        # have a meaningful `target` variable when we are in ENV.
-        # Instead, rely on the ccache.py tool to do it's own filtering
-        # out of conftests.
-        def icecc_generator(target, source, env, for_signature):
-            if "conftest" not in str(target[0]):
-                return '$ICECREAM_RUN_ICECC'
-            return ''
-        env['ICECC_GENERATOR'] = icecc_generator
+        def icecc_ccache_prefix_gen(env, target, source):
+            # TODO: SERVER-60915 use new conftest API
+            if "conftest" in str(target[0]):
+                return env['ENV']
 
+            if existing_gen:
+                shell_env = existing_gen(env, target, source)
+            else:
+                shell_env = env['ENV'].copy()
+            shell_env['CCACHE_PREFIX'] = env.File(env.subst("$ICECC_GENERATOR", target=target, source=source)).abspath
+            return shell_env
+
+
+        env['SHELL_ENV_GENERATOR'] = icecc_ccache_prefix_gen
+
+    else:
+
+        # We wrap it in the magic "don't
+        # consider this part of the build signature" sigils in the hope
+        # that enabling and disabling icecream won't cause rebuilds. This
+        # is unlikely to really work, since above we have maybe changed
+        # compiler flags (things like -fdirectives-only), but we still try
+        # to do the right thing.
         icecc_string = "$( $ICECC_GENERATOR $)"
         env["CCCOM"] = " ".join([icecc_string, env["CCCOM"]])
         env["CXXCOM"] = " ".join([icecc_string, env["CXXCOM"]])

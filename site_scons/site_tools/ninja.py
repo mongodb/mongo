@@ -387,12 +387,16 @@ class SConsToNinjaTranslator:
 
             # Make sure we didn't generate an empty cmdline
             if cmdline:
+
+                env = node.env if node.env else self.env
+                sources = [get_path(src_file(s)) for s in node.sources]
+
                 ninja_build = {
                     "outputs": all_outputs,
                     "rule": "CMD",
                     "variables": {
                         "cmd": cmdline,
-                        "env": get_command_env(node.env if node.env else self.env),
+                        "env": get_command_env(env, all_outputs, sources),
                     },
                     "implicit": dependencies,
                 }
@@ -949,7 +953,7 @@ def get_comstr(env, action, targets, sources):
     return action.genstring(targets, sources, env)
 
 
-def get_command_env(env):
+def get_command_env(env, target, source):
     """
     Return a string that sets the enrivonment for any environment variables that
     differ between the OS environment and the SCons command ENV.
@@ -965,7 +969,7 @@ def get_command_env(env):
     # os.environ or differ from it. We assume if it's a new or
     # differing key from the process environment then it's
     # important to pass down to commands in the Ninja file.
-    ENV = get_default_ENV(env)
+    ENV = env.get('SHELL_ENV_GENERATOR', get_default_ENV)(env, target, source)
     scons_specified_env = {
         key: value
         for key, value in ENV.items()
@@ -998,7 +1002,7 @@ def get_command_env(env):
             # doesn't make builds on paths with spaces (Ninja and SCons issues)
             # nor expanding response file paths with spaces (Ninja issue) work.
             value = value.replace(r' ', r'$ ')
-            command_env += "export {}='{}';".format(key, value)
+            command_env += "export {}='{}';".format(key, env.subst(value, target=target, source=source))
 
     env["NINJA_ENV_VAR_CACHE"] = command_env
     return command_env
@@ -1054,7 +1058,7 @@ def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False, custom
         variables = {"rspc": rsp_content}
         variables[rule] = cmd
         if use_command_env:
-            variables["env"] = get_command_env(env)
+            variables["env"] = get_command_env(env, targets, sources)
 
             for key, value in custom_env.items():
                 variables["env"] += env.subst(
@@ -1101,7 +1105,7 @@ def get_generic_shell_command(env, node, action, targets, sources, executor=None
         rule,
         {
             "cmd": generate_command(env, node, action, targets, sources, executor=None),
-            "env": get_command_env(env),
+            "env": get_command_env(env, targets, sources),
         },
         # Since this function is a rule mapping provider, it must return a list of dependencies,
         # and usually this would be the path to a tool, such as a compiler, used for this rule.
