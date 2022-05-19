@@ -386,7 +386,7 @@ public:
     std::unique_ptr<Pipeline, PipelineDeleter> buildTestPipeline(
         const std::vector<BSONObj>& rawPipeline) {
         auto expCtx = getExpCtx();
-        expCtx->ns = NamespaceString("a.collection");
+        expCtx->ns = NamespaceString(boost::none, "a.collection");
         expCtx->inMongos = true;
 
         auto pipeline = Pipeline::parse(rawPipeline, expCtx);

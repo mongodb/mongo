@@ -241,7 +241,7 @@ public:
                 "namespaces cannot have embedded null characters",
                 _ns.find('\0') == std::string::npos);
 
-        auto db = _dotIndex == std::string::npos ? ns : ns.substr(0, _dotIndex);
+        auto db = _dotIndex == std::string::npos ? ns : ns.substr(0, ns.find('.'));
         _dbName = DatabaseName(tenantId, db);
     }
 

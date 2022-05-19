@@ -375,5 +375,6 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
     ASSERT_TRUE(lookupChangeStage->getNext().isEOF());
     ASSERT_TRUE(lookupChangeStage->getNext().isEOF());
 }
+
 }  // namespace
 }  // namespace mongo

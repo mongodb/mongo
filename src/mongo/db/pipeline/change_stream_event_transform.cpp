@@ -38,6 +38,7 @@
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 
 namespace mongo {
@@ -61,7 +62,10 @@ repl::OpTypeEnum getOplogOpType(const Document& oplog) {
 }
 
 Value makeChangeStreamNsField(const NamespaceString& nss) {
-    return Value(Document{{"db", nss.db()}, {"coll", nss.coll()}});
+    // For certain types, such as dropDatabase, the collection name may be empty and should be
+    // omitted. We never report the NamespaceString's tenantId in change stream events.
+    return Value(Document{{"db", nss.dbName().db()},
+                          {"coll", (nss.coll().empty() ? Value() : Value(nss.coll()))}});
 }
 
 void setResumeTokenForEvent(const ResumeTokenData& resumeTokenData, MutableDocument* doc) {
@@ -73,6 +77,16 @@ void setResumeTokenForEvent(const ResumeTokenData& resumeTokenData, MutableDocum
     const bool isSingleElementKey = true;
     doc->metadata().setSortKey(resumeToken, isSingleElementKey);
 }
+
+NamespaceString createNamespaceStringFromOplogEntry(Value tid, StringData ns) {
+    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+        auto tenantId = tid.missing() ? boost::none : boost::optional<TenantId>{tid.getOid()};
+        return NamespaceString(tenantId, ns);
+    }
+
+    return NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(ns);
+}
+
 }  // namespace
 
 ChangeStreamEventTransformation::ChangeStreamEventTransformation(
@@ -146,11 +160,12 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     // Extract the fields we need.
     Value ts = input[repl::OplogEntry::kTimestampFieldName];
     Value ns = input[repl::OplogEntry::kNssFieldName];
+    Value tenantId = input[repl::OplogEntry::kTidFieldName];
     checkValueType(ns, repl::OplogEntry::kNssFieldName, BSONType::String);
     Value uuid = input[repl::OplogEntry::kUuidFieldName];
     auto opType = getOplogOpType(input);
 
-    NamespaceString nss(ns.getString());
+    NamespaceString nss = createNamespaceStringFromOplogEntry(tenantId, ns.getStringData());
     Value id = input.getNestedField("o._id");
     // Non-replace updates have the _id in field "o2".
     StringData operationType;
@@ -251,15 +266,16 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 operationType = DocumentSourceChangeStream::kDropCollectionOpType;
 
                 // The "o.drop" field will contain the actual collection name.
-                nss = NamespaceString(nss.db(), nssField.getString());
+                nss = NamespaceString(nss.dbName(), nssField.getStringData());
             } else if (auto nssField = oField.getField("renameCollection"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kRenameCollectionOpType;
 
                 // The "o.renameCollection" field contains the namespace of the original collection.
-                nss = NamespaceString(nssField.getString());
+                nss = createNamespaceStringFromOplogEntry(tenantId, nssField.getStringData());
 
                 // The "to" field contains the target namespace for the rename.
-                const auto renameTargetNss = NamespaceString(oField["to"].getString());
+                const auto renameTargetNss =
+                    createNamespaceStringFromOplogEntry(tenantId, oField["to"].getStringData());
                 const auto renameTarget = makeChangeStreamNsField(renameTargetNss);
 
                 // The 'to' field predates the 'operationDescription' field which was added in 5.3.
@@ -277,32 +293,32 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
 
                 // Extract the database name from the namespace field and leave the collection name
                 // empty.
-                nss = NamespaceString(nss.db());
+                nss = NamespaceString(nss.tenantId(), nss.dbName().db());
             } else if (auto nssField = oField.getField("create"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateOpType;
-                nss = NamespaceString(nss.db(), nssField.getString());
+                nss = NamespaceString(nss.dbName(), nssField.getStringData());
                 operationDescription = Value(copyDocExceptFields(oField, {"create"_sd}));
             } else if (auto nssField = oField.getField("createIndexes"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateIndexesOpType;
-                nss = NamespaceString(nss.db(), nssField.getString());
+                nss = NamespaceString(nss.dbName(), nssField.getStringData());
                 // Wrap the index spec in an "indexes" array for consistency with commitIndexBuild.
                 auto indexSpec = Value(copyDocExceptFields(oField, {"createIndexes"_sd}));
                 operationDescription = Value(Document{{"indexes", std::vector<Value>{indexSpec}}});
             } else if (auto nssField = oField.getField("commitIndexBuild"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateIndexesOpType;
-                nss = NamespaceString(nss.db(), nssField.getString());
+                nss = NamespaceString(nss.dbName(), nssField.getStringData());
                 operationDescription = Value(Document{{"indexes", oField.getField("indexes")}});
             } else if (auto nssField = oField.getField("dropIndexes"); !nssField.missing()) {
                 const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();
                 operationType = DocumentSourceChangeStream::kDropIndexesOpType;
-                nss = NamespaceString(nss.db(), nssField.getString());
+                nss = NamespaceString(nss.dbName(), nssField.getStringData());
                 // Wrap the index spec in an "indexes" array for consistency with createIndexes
                 // and commitIndexBuild.
                 auto indexSpec = Value(copyDocExceptFields(o2Field, {"dropIndexes"_sd}));
                 operationDescription = Value(Document{{"indexes", std::vector<Value>{indexSpec}}});
             } else if (auto nssField = oField.getField("collMod"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kModifyOpType;
-                nss = NamespaceString(nss.db(), nssField.getString());
+                nss = NamespaceString(nss.dbName(), nssField.getStringData());
                 operationDescription = Value(copyDocExceptFields(oField, {"collMod"_sd}));
 
                 const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();
@@ -462,10 +478,9 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             doc.addField(DocumentSourceChangeStream::kPreImageIdField, Value(preImageId.toBSON()));
         }
     }
-    doc.addField(DocumentSourceChangeStream::kNamespaceField,
-                 operationType == DocumentSourceChangeStream::kDropDatabaseOpType
-                     ? Value(Document{{"db", nss.db()}})
-                     : makeChangeStreamNsField(nss));
+
+    // Add the 'ns' field to the change stream document, based on the final value of 'nss'.
+    doc.addField(DocumentSourceChangeStream::kNamespaceField, makeChangeStreamNsField(nss));
 
     // The event may have a documentKey OR an operationDescription, but not both. We already
     // validated this while creating the resume token.
@@ -506,6 +521,7 @@ Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
     const Document& input) const {
     Value ts = input[repl::OplogEntry::kTimestampFieldName];
     auto opType = getOplogOpType(input);
+    Value tenantId = input[repl::OplogEntry::kTidFieldName];
 
     StringData operationType;
     Value operationDescription;
@@ -551,7 +567,7 @@ Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
                  input[repl::OplogEntry::kWallClockTimeFieldName]);
 
     // The 'o._id' is the full namespace string of the view.
-    const auto nss = NamespaceString(oField["_id"].getString());
+    const auto nss = createNamespaceStringFromOplogEntry(tenantId, oField["_id"].getStringData());
     doc.addField(DocumentSourceChangeStream::kNamespaceField, makeChangeStreamNsField(nss));
     doc.addField(DocumentSourceChangeStream::kOperationDescriptionField, operationDescription);
 
@@ -570,7 +586,12 @@ ChangeStreamEventTransformer::ChangeStreamEventTransformer(
 
 ChangeStreamEventTransformation* ChangeStreamEventTransformer::getBuilder(
     const Document& oplog) const {
-    auto nss = NamespaceString(oplog[repl::OplogEntry::kNssFieldName].getStringData());
+    // 'nss' is only used here determine which type of transformation to use. This is not dependent
+    // on the tenantId, so it is safe to ignore the tenantId in the oplog entry. It is useful to
+    // avoid extracting the tenantId because we must make this determination for every change stream
+    // event, and the check should therefore be as optimized as possible.
+    auto nss = NamespaceString(boost::none, oplog[repl::OplogEntry::kNssFieldName].getStringData());
+
     if (!_isSingleCollStream && nss.isSystemDotViews()) {
         return _viewNsEventBuilder.get();
     }
