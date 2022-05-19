@@ -49,6 +49,18 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
+namespace {
+// TODO (SERVER-67423) Once UMCs can inject users/roles correctly,
+// we'll be able to pull them back out correctly.
+// For now, we have to mangle the namespace strings for consistency.
+NamespaceString patchForMultitenant(const NamespaceString& nss) {
+    if (nss.tenantId()) {
+        return NamespaceString(boost::none, nss.dbName().toStringWithTenantId(), nss.coll());
+    } else {
+        return nss;
+    }
+}
+}  // namespace
 
 AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() = default;
 AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() = default;
@@ -65,7 +77,7 @@ Status AuthzManagerExternalStateMongod::query(
     const std::function<void(const BSONObj&)>& resultProcessor) {
     try {
         DBDirectClient client(opCtx);
-        FindCommandRequest findRequest{collectionName};
+        FindCommandRequest findRequest{patchForMultitenant(collectionName)};
         findRequest.setFilter(filter);
         findRequest.setProjection(projection);
         client.find(std::move(findRequest), resultProcessor);
@@ -76,25 +88,24 @@ Status AuthzManagerExternalStateMongod::query(
 }
 
 Status AuthzManagerExternalStateMongod::findOne(OperationContext* opCtx,
-                                                const NamespaceString& collectionName,
+                                                const NamespaceString& nss,
                                                 const BSONObj& query,
                                                 BSONObj* result) {
-    AutoGetCollectionForReadCommandMaybeLockFree ctx(opCtx, collectionName);
+    AutoGetCollectionForReadCommandMaybeLockFree ctx(opCtx, patchForMultitenant(nss));
 
     BSONObj found;
     if (Helpers::findOne(opCtx, ctx.getCollection(), query, found)) {
         *result = found.getOwned();
         return Status::OK();
     }
-    return Status(ErrorCodes::NoMatchingDocument,
-                  str::stream() << "No document in " << collectionName.ns() << " matches "
-                                << query);
+    return {ErrorCodes::NoMatchingDocument,
+            str::stream() << "No document in " << nss.ns() << " matches " << query};
 }
 
 bool AuthzManagerExternalStateMongod::hasOne(OperationContext* opCtx,
-                                             const NamespaceString& collectionName,
+                                             const NamespaceString& nss,
                                              const BSONObj& query) {
-    AutoGetCollectionForReadCommandMaybeLockFree ctx(opCtx, collectionName);
+    AutoGetCollectionForReadCommandMaybeLockFree ctx(opCtx, patchForMultitenant(nss));
     return !Helpers::findOne(opCtx, ctx.getCollection(), query).isNull();
 }
 

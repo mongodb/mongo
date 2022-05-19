@@ -93,22 +93,12 @@ Status AuthzManagerExternalStateLocal::getStoredAuthorizationVersion(OperationCo
 
 namespace {
 
-// Temporary placeholder pending availability of NamespaceWithTenant.
-NamespaceString getNamespaceWithTenant(const NamespaceString& nss,
-                                       const boost::optional<TenantId>& tenant) {
-    if (tenant) {
-        return NamespaceString(str::stream() << tenant.get() << '_' << nss.db(), nss.coll());
-    } else {
-        return nss;
-    }
-}
-
 NamespaceString getUsersCollection(const boost::optional<TenantId>& tenant) {
-    return getNamespaceWithTenant(AuthorizationManager::usersCollectionNamespace, tenant);
+    return NamespaceString(tenant, NamespaceString::kAdminDb, NamespaceString::kSystemUsers);
 }
 
 NamespaceString getRolesCollection(const boost::optional<TenantId>& tenant) {
-    return getNamespaceWithTenant(AuthorizationManager::rolesCollectionNamespace, tenant);
+    return NamespaceString(tenant, NamespaceString::kAdminDb, NamespaceString::kSystemRoles);
 }
 
 void serializeResolvedRoles(BSONObjBuilder* user,
@@ -339,6 +329,13 @@ StatusWith<User> AuthzManagerExternalStateLocal::getUserObject(OperationContext*
         user.setRoles(makeRoleNameIteratorForContainer(directRoles));
     }
 
+    if (auto tenant = userName.getTenant()) {
+        // Apply TenantID for user to all roles (which are assumed to be part of the same tenant).
+        for (auto& role : directRoles) {
+            role = RoleName(role.getRole(), role.getDB(), tenant);
+        }
+    }
+
     handleAuthLocalGetUserFailPoint(directRoles);
 
     auto data = uassertStatusOK(resolveRoles(opCtx, directRoles, ResolveRoleOption::kAll));
@@ -399,6 +396,13 @@ Status AuthzManagerExternalStateLocal::getUserDescription(OperationContext* opCt
             rolesBuilder.append(role.toBSON());
         }
         rolesBuilder.doneFast();
+    }
+
+    if (auto tenant = userName.getTenant()) {
+        // Apply TenantID for user to all roles (which are assumed to be part of the same tenant).
+        for (auto& role : directRoles) {
+            role = RoleName(role.getRole(), role.getDB(), tenant);
+        }
     }
 
     handleAuthLocalGetUserFailPoint(directRoles);
@@ -726,45 +730,36 @@ public:
     };
 
     AuthzCollection() = default;
-    explicit AuthzCollection(const NamespaceString& nss) {
+    explicit AuthzCollection(const NamespaceString& nss) : _tenant(nss.tenantId()) {
+        // Capture events regardless of what Tenant they occured in,
+        // invalidators will purge cache on a per-tenant basis as needed.
+        auto db = nss.dbName().db();
+        auto coll = nss.coll();
+        if (db != NamespaceString::kAdminDb) {
+            return;
+        }
+
         // System-only collections.
-        if (nss == AuthorizationManager::versionCollectionNamespace) {
+        if (coll == AuthorizationManager::versionCollectionNamespace.coll()) {
             _type = AuthzCollectionType::kVersion;
             return;
         }
 
-        if (nss == AuthorizationManager::adminCommandNamespace) {
+        if (coll == AuthorizationManager::adminCommandNamespace.coll()) {
             _type = AuthzCollectionType::kAdmin;
             return;
         }
 
-        auto db = nss.db();
-        auto coll = nss.coll();
         if (coll == NamespaceString::kSystemUsers) {
-            if (db == NamespaceString::kAdminDb) {
-                // admin.system.users
-                _type = AuthzCollectionType::kUsers;
-                return;
-            } else if (auto tenant = isAdminDBWithTenant(db)) {
-                // {tenantID}_admin.system.users
-                _type = AuthzCollectionType::kUsers;
-                _tenant = std::move(tenant);
-                return;
-            }
-            return;  // none
+            // admin.system.users or {tenantID}_admin.system.users
+            _type = AuthzCollectionType::kUsers;
+            return;
         }
 
-        if (nss == AuthorizationManager::rolesCollectionNamespace) {
-            if (db == NamespaceString::kAdminDb) {
-                // admin.system.roles
-                _type = AuthzCollectionType::kRoles;
-                return;
-            } else if (auto tenant = isAdminDBWithTenant(db)) {
-                // {tenantID}_admin.system.roles
-                _type = AuthzCollectionType::kRoles;
-                _tenant = std::move(tenant);
-            }
-            return;  // none
+        if (coll == NamespaceString::kSystemRoles) {
+            // admin.system.roles or {tenantID}_admin.system.roles
+            _type = AuthzCollectionType::kRoles;
+            return;
         }
     }
 
@@ -785,39 +780,6 @@ public:
     }
 
 private:
-    /**
-     * Attempt to parse "{tenant}_admin" into a Tenant ID.
-     * Returns boost::none if the db is not in the above format.
-     *
-     * Temporary fixture pending availability of NamespaceWithTenant.
-     */
-    static boost::optional<TenantId> isAdminDBWithTenant(StringData db) {
-        constexpr std::size_t len =
-            (OID::kOIDSize * 2) + 1 /* '_' */ + NamespaceString::kAdminDb.size();
-        if (db.size() != len) {
-            // Not requisite size.
-            return boost::none;
-        }
-
-        if (db.substr((OID::kOIDSize * 2) + 1) != NamespaceString::kAdminDb) {
-            // Doesn't end with "admin"
-            return boost::none;
-        }
-
-        if (db[OID::kOIDSize * 2] != '_') {
-            // Not delimited by an underscore
-            return boost::none;
-        }
-
-        auto swOID = OID::parse(db.substr(0, OID::kOIDSize * 2));
-        if (!swOID.isOK()) {
-            // Not a valid OID
-            return boost::none;
-        }
-
-        return TenantId(swOID.getValue());
-    }
-
     AuthzCollectionType _type = AuthzCollectionType::kNone;
     boost::optional<TenantId> _tenant;
 };
@@ -872,7 +834,7 @@ void AuthzManagerExternalStateLocal::logOp(OperationContext* opCtx,
 
     _invalidateUserCache(opCtx, authzManager, op, coll, o, o2);
 
-    if (coll.isPrivilegeCollection() && !coll.getTenant() && (op == kOpInsert)) {
+    if (coll.isPrivilegeCollection() && (op == kOpInsert)) {
         _hasAnyPrivilegeDocuments.store(true);
     }
 }
