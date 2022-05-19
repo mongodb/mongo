@@ -252,10 +252,6 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         self._test = None
         self._test_report = test_report
         self._shell_options = shell_options
-        self._skip_dbhash = False
-        if "skipTenantMigrationDBHash" in self._shell_options["global_vars"]["TestData"]:
-            self._skip_dbhash = self._shell_options["global_vars"]["TestData"][
-                "skipTenantMigrationDBHash"]
 
         self.__lifecycle = TenantMigrationLifeCycle()
         # Event set when the thread has been stopped using the 'stop()' method.
@@ -412,8 +408,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
             # in the next test.
             if is_committed:
                 # Once we have committed a migration, run a dbhash check before rerouting commands.
-                if not self._skip_dbhash:
-                    self._check_tenant_migration_dbhash(migration_opts)
+                self._check_tenant_migration_dbhash(migration_opts)
 
                 # If the migration committed, to avoid routing commands incorrectly, wait for the
                 # donor/proxy to reroute at least one command before doing garbage collection. Stop

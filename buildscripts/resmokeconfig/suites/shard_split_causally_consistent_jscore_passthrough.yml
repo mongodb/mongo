@@ -131,8 +131,6 @@ executor:
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
-          # TODO(SERVER-66221): Remove the next line when dbhash checks are implemented in the ContinuousShardSplit hook.
-          skipTenantMigrationDBHash: true
   hooks:
   - class: ContinuousShardSplit
     shell_options:

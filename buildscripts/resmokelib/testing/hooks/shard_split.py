@@ -10,10 +10,10 @@ import bson
 import pymongo.errors
 
 from buildscripts.resmokelib import errors
-from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import shard_split
 from buildscripts.resmokelib.testing.fixtures.replicaset import ReplicaSetFixture
 from buildscripts.resmokelib.testing.hooks import interface
+from buildscripts.resmokelib.testing.hooks import dbhash_tenant_migration
 
 
 class ContinuousShardSplit(interface.Hook):  # pylint: disable=too-many-instance-attributes
@@ -177,7 +177,8 @@ class _ShardSplitOptions:
 
     def get_donor_primary(self):
         """Return a connection to the donor primary."""
-        return self.get_donor_rs().get_primary(timeout_secs=self.AWAIT_REPL_TIMEOUT_MINS)
+        return self.get_donor_rs().get_primary(
+            timeout_secs=self.shard_split_fixture.AWAIT_REPL_TIMEOUT_MINS)
 
     def get_donor_nodes(self):
         """Return the nodes for the current shard split fixture donor."""
@@ -339,11 +340,60 @@ class _ShardSplitThread(threading.Thread):  # pylint: disable=too-many-instance-
             authSource=self._auth_options["authenticationDatabase"],
             authMechanism=self._auth_options["authenticationMechanism"], **kwargs)
 
+    def _get_recipient_primary(self, split_opts, timeout_secs=None):
+        if timeout_secs is None:
+            timeout_secs = self._shard_split_fixture.AWAIT_REPL_TIMEOUT_MINS * 60
+        nodes = split_opts.get_recipient_nodes()
+        start = time.time()
+        clients = {}
+        while True:
+            for node in nodes:
+                now = time.time()
+                if (now - start) >= timeout_secs:
+                    msg = f"Timed out while waiting for a primary on replica set '{split_opts.recipient_set_name}'."
+                    self.logger.error(msg)
+                    raise errors.ServerFailure(msg)
+
+                try:
+                    if node.port not in clients:
+                        clients[node.port] = self._create_client(node)
+
+                    client = clients[node.port]
+                    is_master = client.admin.command("isMaster")["ismaster"]
+                    if is_master:
+                        return node
+                except pymongo.errors.ConnectionFailure:
+                    continue
+
+    def _check_split_dbhash(self, split_opts):
+        # Set the donor connection string, recipient connection string, and migration uuid string
+        # for the tenant migration dbhash check script.
+        self._shell_options["global_vars"]["TestData"].update({
+            "donorConnectionString":
+                split_opts.get_donor_primary().get_internal_connection_string(),
+            "recipientConnectionString":
+                self._get_recipient_primary(split_opts).get_internal_connection_string(),
+            "migrationIdString":
+                split_opts.migration_id.__str__()
+        })
+
+        # Synthetically invoke the CheckTenantMigrationDBHash hook. We call each of the hook's
+        # lifecycle methods here as if it were called by the resmoke test runner.
+        dbhash_test_case = dbhash_tenant_migration.CheckTenantMigrationDBHash(
+            self.logger, self._shard_split_fixture, self._shell_options)
+        dbhash_test_case.before_suite(self._test_report)
+        dbhash_test_case.before_test(self._test, self._test_report)
+        dbhash_test_case.after_test(self._test, self._test_report)
+        dbhash_test_case.after_suite(self._test_report)
+
     def _run_shard_split(self, split_opts):  # noqa: D205,D400
         donor_client = self._create_client(split_opts.get_donor_rs())
         is_committed = self._commit_shard_split(donor_client, split_opts)
 
         if is_committed:
+            # Once we have committed a split, run a dbhash check before rerouting commands.
+            self._check_split_dbhash(split_opts)
+
             # Wait for the donor/proxy to reroute at least one command before doing garbage
             # collection. Stop waiting when the test finishes.
             self._wait_for_reroute_or_test_completion(donor_client, split_opts)

@@ -639,22 +639,19 @@ function runCommandRetryOnTenantMigrationErrors(
                 // After getting a TenantMigrationCommitted error, wait for the python test fixture
                 // to do a dbhash check on the donor and recipient primaries before we retry the
                 // command on the recipient.
-                if (!TestData.skipTenantMigrationDBHash) {
-                    assert.soon(() => {
-                        let findRes =
-                            assert.commandWorked(originalRunCommand.apply(donorConnection, [
-                                "testTenantMigration",
-                                {
-                                    find: "dbhashCheck",
-                                    filter: {_id: migrationStateDoc._id},
-                                },
-                                0
-                            ]));
+                assert.soon(() => {
+                    let findRes = assert.commandWorked(originalRunCommand.apply(donorConnection, [
+                        "testTenantMigration",
+                        {
+                            find: "dbhashCheck",
+                            filter: {_id: migrationStateDoc._id},
+                        },
+                        0
+                    ]));
 
-                        const docs = findRes.cursor.firstBatch;
-                        return docs[0] != null;
-                    });
-                }
+                    const docs = findRes.cursor.firstBatch;
+                    return docs[0] != null;
+                });
 
                 recordRerouteDueToTenantMigration(donorConnection, migrationStateDoc);
 

@@ -383,8 +383,8 @@ var TenantMigrationUtil = (function() {
                         new CollInfos(recipientPrimaryConn, 'recipientPrimary', dbName);
                     recipientCollInfos.filter(recipientCollections);
 
-                    print(`checking db hash between donor: ${donorPrimaryConn} and recipient: ${
-                        recipientPrimaryConn}`);
+                    print(`checking db hash for tenant '${tenantId}' between donor: ${
+                        donorPrimaryConn.host}, and recipient: ${recipientPrimaryConn.host}`);
 
                     const collectionPrinted = new Set();
                     const success = DataConsistencyChecker.checkDBHash(donorDBHash,

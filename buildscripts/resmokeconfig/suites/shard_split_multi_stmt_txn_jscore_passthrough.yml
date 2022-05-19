@@ -279,8 +279,6 @@ executor:
             # Tests in this suite only read from primaries and only one node is electable, so causal
             # consistency is not required to read your own writes.
             causalConsistency: false
-          # TODO(SERVER-66221): Remove the next line when dbhash checks are implemented in the ContinuousShardSplit hook.
-          skipTenantMigrationDBHash: true
   hooks:
   - class: ContinuousShardSplit
     shell_options:

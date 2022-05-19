@@ -34,7 +34,12 @@ while (true) {
 }
 
 // We assume every db is under the tenant being migrated.
-TenantMigrationUtil.checkTenantDBHashes(donorRst, recipientRst, tenantId, excludedDBs);
+if (TestData.tenantIds) {
+    TestData.tenantIds.forEach(tenantId => TenantMigrationUtil.checkTenantDBHashes(
+                                   donorRst, recipientRst, tenantId, excludedDBs));
+} else {
+    TenantMigrationUtil.checkTenantDBHashes(donorRst, recipientRst, tenantId, excludedDBs);
+}
 
 // Mark that we have completed the dbhash check.
 assert.commandWorked(donorDB.runCommand(

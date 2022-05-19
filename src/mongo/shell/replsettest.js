@@ -2465,8 +2465,8 @@ var ReplSetTest = function(opts) {
                     const hasSecondaryIndexes =
                         replSetConfig.members[rst.getNodeId(secondary)].buildIndexes !== false;
 
-                    print(
-                        `checking db hash between primary: ${primary} and secondary ${secondary}`);
+                    print(`checking db hash between primary: ${primary.host}, and secondary: ${
+                        secondary.host}`);
                     success = DataConsistencyChecker.checkDBHash(primaryDBHash,
                                                                  primaryCollInfos,
                                                                  secondaryDBHash,
