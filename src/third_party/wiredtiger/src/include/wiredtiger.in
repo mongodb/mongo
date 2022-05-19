@@ -1094,8 +1094,6 @@ struct __wt_session {
 	 * object blocks from the system buffer cache after that many bytes from this object are
 	 * read or written into the buffer cache., an integer greater than or equal to 0; default \c
 	 * 0.}
-	 * @config{readonly, the file is read-only.  All methods that may modify a file are
-	 * disabled.  See @ref readonly for more information., a boolean flag; default \c false.}
 	 * @config{write_timestamp_usage, describe how timestamps are expected to be used on table
 	 * modifications.  The choices are the default\, which ensures that once timestamps are used
 	 * for a key\, they are always used\, and also that multiple updates to a key never use
@@ -1335,8 +1333,6 @@ struct __wt_session {
 	 * boolean flag; default \c false.}
 	 * @config{prefix_compression_min, minimum gain before prefix compression will be used on
 	 * row-store leaf pages., an integer greater than or equal to 0; default \c 4.}
-	 * @config{readonly, the file is read-only.  All methods that may modify a file are
-	 * disabled.  See @ref readonly for more information., a boolean flag; default \c false.}
 	 * @config{split_pct, the Btree page split size as a percentage of the maximum Btree page
 	 * size\, that is\, when a Btree page is split\, it will be split into smaller pages\, where
 	 * each page is the specified percentage of the maximum Btree page size., an integer between

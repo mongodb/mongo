@@ -244,10 +244,6 @@ file_runtime_config = common_runtime_config + [
         dirty blocks belonging to this object in the system buffer cache after that many bytes
         from this object are written into the buffer cache''',
         min=0),
-    Config('readonly', 'false', r'''
-        the file is read-only. All methods that may modify a file are disabled. See @ref readonly
-        for more information''',
-        type='boolean'),
 ]
 
 # Per-file configuration
@@ -392,6 +388,10 @@ file_meta = file_config + [
         LSN of the last checkpoint'''),
     Config('id', '', r'''
         the file's ID number'''),
+    Config('readonly', 'false', r'''
+        the file is read-only. All methods that modify a file are disabled. See @ref
+        readonly for more information''',
+        type='boolean'),
     Config('tiered_object', 'false', r'''
         this file is a tiered object. When opened on its own, it is marked as readonly and may
         be restricted in other ways''',
