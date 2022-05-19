@@ -10,6 +10,7 @@
 'use strict';
 load("jstests/replsets/rslib.js");
 load("jstests/sharding/libs/find_chunks_util.js");
+load("jstests/libs/feature_flag_util.js");
 
 // Replica set nodes started with --shardsvr do not enable key generation until they are added
 // to a sharded cluster and reject commands with gossiped clusterTime from users without the
@@ -184,15 +185,21 @@ assert.commandWorked(bulk.execute());
 
 s.startBalancer(60000);
 
-assert.soon(function() {
-    var d1Chunks = findChunksUtil.countChunksForNs(s.getDB("config"), 'test.foo', {shard: "d1"});
-    var d2Chunks = findChunksUtil.countChunksForNs(s.getDB("config"), 'test.foo', {shard: "d2"});
-    var totalChunks = findChunksUtil.countChunksForNs(s.getDB("config"), 'test.foo');
+// TODO SERVER-66378 adapt this test for data size aware balancing
+const balanceAccordingToDataSize = TestData.setParameters.featureFlagBalanceAccordingToDataSize;
+if (!balanceAccordingToDataSize) {
+    assert.soon(function() {
+        var d1Chunks =
+            findChunksUtil.countChunksForNs(s.getDB("config"), 'test.foo', {shard: "d1"});
+        var d2Chunks =
+            findChunksUtil.countChunksForNs(s.getDB("config"), 'test.foo', {shard: "d2"});
+        var totalChunks = findChunksUtil.countChunksForNs(s.getDB("config"), 'test.foo');
 
-    print("chunks: " + d1Chunks + " " + d2Chunks + " " + totalChunks);
+        print("chunks: " + d1Chunks + " " + d2Chunks + " " + totalChunks);
 
-    return d1Chunks > 0 && d2Chunks > 0 && (d1Chunks + d2Chunks == totalChunks);
-}, "Chunks failed to balance", 60000, 5000);
+        return d1Chunks > 0 && d2Chunks > 0 && (d1Chunks + d2Chunks == totalChunks);
+    }, "Chunks failed to balance", 60000, 5000);
+}
 
 // SERVER-33753: count() without predicate can be wrong on sharded collections.
 // assert.eq(s.getDB("test").foo.count(), num+1);

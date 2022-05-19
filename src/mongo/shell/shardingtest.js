@@ -642,11 +642,13 @@ var ShardingTest = function(params) {
     this.awaitBalance = function(collName, dbName, timeToWait) {
         timeToWait = timeToWait || 60000;
 
+        const mongos = this.s;
         assert.soon(function() {
-            var x = self.chunkDiff(collName, dbName);
-            print("chunk diff: " + x);
-            return x < 2;
-        }, "no balance happened", timeToWait);
+            return assert
+                .commandWorked(
+                    mongos.adminCommand({balancerCollectionStatus: dbName + '.' + collName}))
+                .balancerCompliant;
+        }, 'Timed out waiting for the collection to be balanced', timeToWait /* timeout */);
     };
 
     this.getShard = function(coll, query, includeEmpty) {

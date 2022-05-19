@@ -5,8 +5,9 @@
 (function() {
 'use strict';
 
-const chunkSizeMB = 1;
+load("jstests/libs/feature_flag_util.js");
 
+const chunkSizeMB = 1;
 let st = new ShardingTest({
     shards: 3,
     other: {
@@ -14,6 +15,14 @@ let st = new ShardingTest({
         chunkSize: chunkSizeMB
     }
 });
+
+// TODO SERVER-66378 adapt this test for data size aware balancing
+if (FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'),
+                              "BalanceAccordingToDataSize")) {
+    jsTestLog("Skipping as featureFlagBalanceAccordingToDataSize is enabled");
+    st.stop();
+    return;
+}
 
 function runBalancer(rounds) {
     st.startBalancer();

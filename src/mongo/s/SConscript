@@ -187,6 +187,7 @@ env.Library(
         'refine_collection_shard_key_coordinator_feature_flags.idl',
         'request_types/abort_reshard_collection.idl',
         'request_types/add_shard_request_type.cpp',
+        'request_types/get_stats_for_balancing.idl',
         'request_types/add_shard_to_zone_request_type.cpp',
         'request_types/auto_split_vector.idl',
         'request_types/balance_chunk_request_type.cpp',

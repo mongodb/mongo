@@ -11,6 +11,7 @@
 (function() {
 'use strict';
 
+load("jstests/libs/feature_flag_util.js");
 load('jstests/libs/fail_point_util.js');
 load('jstests/libs/parallel_shell_helpers.js');
 load("jstests/sharding/libs/find_chunks_util.js");
@@ -18,6 +19,13 @@ load("jstests/sharding/libs/shard_versioning_util.js");
 
 const st = new ShardingTest({shards: 2});
 const configDB = st.s.getDB("config");
+// TODO SERVER-66378 adapt this test for data size aware balancing
+if (FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'),
+                              "BalanceAccordingToDataSize")) {
+    jsTestLog("Skipping as featureFlagBalanceAccordingToDataSize is enabled");
+    st.stop();
+    return;
+}
 
 // Resets database dbName and enables sharding and establishes shard0 as primary, test case agnostic
 function setUpDatabaseAndEnableSharding(dbName) {

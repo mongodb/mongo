@@ -4,10 +4,18 @@
 (function() {
 'use strict';
 
+load("jstests/libs/feature_flag_util.js");
 load("jstests/sharding/libs/zone_changes_util.js");
 load("jstests/sharding/libs/find_chunks_util.js");
 
 let st = new ShardingTest({shards: 3});
+// TODO SERVER-66378 adapt this test for data size aware balancing
+if (FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'),
+                              "BalanceAccordingToDataSize")) {
+    jsTestLog("Skipping as featureFlagBalanceAccordingToDataSize is enabled");
+    st.stop();
+    return;
+}
 let primaryShard = st.shard0;
 let dbName = "test";
 let testDB = st.s.getDB(dbName);

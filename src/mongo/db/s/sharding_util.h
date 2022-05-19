@@ -50,14 +50,16 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
                                    const std::shared_ptr<executor::TaskExecutor>& executor);
 
 /**
- * Generic utility to send a command to a list of shards. Throws if one of the commands fails.
+ * Generic utility to send a command to a list of shards. If `throwOnError=true`, throws in case one
+ * of the commands fails.
  */
 std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     OperationContext* opCtx,
     StringData dbName,
     const BSONObj& command,
     const std::vector<ShardId>& shardIds,
-    const std::shared_ptr<executor::TaskExecutor>& executor);
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    bool throwOnError = true);
 
 /**
  * Unset the `noAutosplit` and `maxChunkSizeBytes` fields from:

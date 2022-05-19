@@ -66,9 +66,10 @@ struct MigrateInfo {
                 const NamespaceString& a_nss,
                 const UUID& a_uuid,
                 const BSONObj& a_min,
-                const BSONObj& a_max,
+                const boost::optional<BSONObj>& a_max,
                 const ChunkVersion& a_version,
-                MoveChunkRequest::ForceJumbo a_forceJumbo);
+                MoveChunkRequest::ForceJumbo a_forceJumbo,
+                boost::optional<int64_t> maxChunkSizeBytes = boost::none);
 
     std::string getName() const;
 
@@ -81,9 +82,15 @@ struct MigrateInfo {
     ShardId to;
     ShardId from;
     BSONObj minKey;
-    BSONObj maxKey;
+
+    // May be optional in case of moveRange
+    boost::optional<BSONObj> maxKey;
     ChunkVersion version;
     MoveChunkRequest::ForceJumbo forceJumbo;
+
+    // Set only in case of data-size aware balancing
+    // TODO SERVER-65322 make `optMaxChunkSizeBytes` non-optional
+    boost::optional<int64_t> optMaxChunkSizeBytes;
 };
 
 enum MigrationReason { none, drain, zoneViolation, chunksImbalance };
@@ -204,6 +211,18 @@ typedef stdx::variant<Status, StatusWith<AutoSplitVectorResponse>, StatusWith<Da
 
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;
 typedef std::map<ShardId, std::vector<ChunkType>> ShardToChunksMap;
+
+/*
+ * Keeps track of info needed for data size aware balancing.
+ */
+struct CollectionDataSizeInfoForBalancing {
+    CollectionDataSizeInfoForBalancing(std::map<ShardId, int64_t>&& shardToDataSizeMap,
+                                       long maxChunkSizeBytes)
+        : shardToDataSizeMap(std::move(shardToDataSizeMap)), maxChunkSizeBytes(maxChunkSizeBytes) {}
+
+    std::map<ShardId, int64_t> shardToDataSizeMap;
+    const int64_t maxChunkSizeBytes;
+};
 
 /**
  * Keeps track of zones for a collection.
@@ -364,11 +383,11 @@ public:
                                           const std::string& chunkTag);
 
     /**
-     * Returns a suggested set of chunks to move whithin a collection's shards, given the specified
-     * state of the shards (draining, max size reached, etc) and the number of chunks for that
-     * collection. If the policy doesn't recommend anything to move, it returns an empty vector. The
-     * entries in the vector do are all for separate source/destination shards and as such do not
-     * need to be done serially and can be scheduled in parallel.
+     * Returns a suggested set of chunks or ranges to move within a collection's shards, given the
+     * specified state of the shards (draining, max size reached, etc) and the number of chunks or
+     * data size for that collection. If the policy doesn't recommend anything to move, it returns
+     * an empty vector. The entries in the vector do are all for separate source/destination shards
+     * and as such do not need to be done serially and can be scheduled in parallel.
      *
      * The balancing logic calculates the optimum number of chunks per shard for each zone and if
      * any of the shards have chunks, which are sufficiently higher than this number, suggests
@@ -378,10 +397,12 @@ public:
      * used for migrations. Used so we don't return multiple conflicting migrations for the same
      * shard.
      */
-    static MigrateInfosWithReason balance(const ShardStatisticsVector& shardStats,
-                                          const DistributionStatus& distribution,
-                                          stdx::unordered_set<ShardId>* usedShards,
-                                          bool forceJumbo);
+    static MigrateInfosWithReason balance(
+        const ShardStatisticsVector& shardStats,
+        const DistributionStatus& distribution,
+        const boost::optional<CollectionDataSizeInfoForBalancing>& collDataSizeInfo,
+        stdx::unordered_set<ShardId>* usedShards,
+        bool forceJumbo);
 
     /**
      * Using the specified distribution information, returns a suggested better location for the
@@ -392,43 +413,69 @@ public:
                                                            const DistributionStatus& distribution);
 
 private:
-    /**
-     * Return the shard with the specified tag, which has the least number of chunks. If the tag is
-     * empty, considers all shards.
+    /*
+     * Only considers shards with the specified tag, all shards in case the tag is empty.
+     *
+     * Returns a tuple <ShardID, number of chunks> referring the shard with less chunks.
+     *
+     * If balancing based on collection size on shards:
+     *  - Returns a tuple <ShardID, amount of data in bytes> referring the shard with less data.
      */
-    static ShardId _getLeastLoadedReceiverShard(const ShardStatisticsVector& shardStats,
-                                                const DistributionStatus& distribution,
-                                                const std::string& tag,
-                                                const stdx::unordered_set<ShardId>& excludedShards);
+    static std::tuple<ShardId, int64_t> _getLeastLoadedReceiverShard(
+        const ShardStatisticsVector& shardStats,
+        const DistributionStatus& distribution,
+        const boost::optional<CollectionDataSizeInfoForBalancing>& collDataSizeInfo,
+        const std::string& tag,
+        const stdx::unordered_set<ShardId>& excludedShards);
 
     /**
-     * Return the shard which has the least number of chunks with the specified tag. If the tag is
-     * empty, considers all chunks.
+     * Only considers shards with the specified tag, all shards in case the tag is empty.
+     *
+     * If balancing based on number of chunks:
+     *  - Returns a tuple <ShardID, number of chunks> referring the shard with more chunks.
+     *
+     * If balancing based on collection size on shards:
+     *  - Returns a tuple <ShardID, amount of data in bytes> referring the shard with more data.
      */
-    static ShardId _getMostOverloadedShard(const ShardStatisticsVector& shardStats,
-                                           const DistributionStatus& distribution,
-                                           const std::string& chunkTag,
-                                           const stdx::unordered_set<ShardId>& excludedShards);
+    static std::tuple<ShardId, int64_t> _getMostOverloadedShard(
+        const ShardStatisticsVector& shardStats,
+        const DistributionStatus& distribution,
+        const boost::optional<CollectionDataSizeInfoForBalancing>& collDataSizeInfo,
+        const std::string& chunkTag,
+        const stdx::unordered_set<ShardId>& excludedShards);
 
     /**
      * Selects one chunk for the specified zone (if appropriate) to be moved in order to bring the
      * deviation of the shards chunk contents closer to even across all shards in the specified
      * zone. Takes into account and updates the shards, which have already been used for migrations.
      *
-     * The 'idealNumberOfChunksPerShardForTag' indicates what is the ideal number of chunks which
-     * each shard must have and is used to determine the imbalance and also to prevent chunks from
-     * moving when not necessary.
+     * Returns true if a migration was suggested, false otherwise. This method is intented to be
+     * called multiple times until all posible migrations for a zone have been selected.
+     */
+    static bool _singleZoneBalanceBasedOnChunks(const ShardStatisticsVector& shardStats,
+                                                const DistributionStatus& distribution,
+                                                const std::string& tag,
+                                                size_t totalNumberOfShardsWithTag,
+                                                std::vector<MigrateInfo>* migrations,
+                                                stdx::unordered_set<ShardId>* usedShards,
+                                                MoveChunkRequest::ForceJumbo forceJumbo);
+
+    /**
+     * Selects one range for the specified zone (if appropriate) to be moved in order to bring the
+     * deviation of the collection data size closer to even across all shards in the specified
+     * zone. Takes into account and updates the shards, which have already been used for migrations.
      *
      * Returns true if a migration was suggested, false otherwise. This method is intented to be
      * called multiple times until all posible migrations for a zone have been selected.
      */
-    static bool _singleZoneBalance(const ShardStatisticsVector& shardStats,
-                                   const DistributionStatus& distribution,
-                                   const std::string& tag,
-                                   size_t idealNumberOfChunksPerShardForTag,
-                                   std::vector<MigrateInfo>* migrations,
-                                   stdx::unordered_set<ShardId>* usedShards,
-                                   MoveChunkRequest::ForceJumbo forceJumbo);
+    static bool _singleZoneBalanceBasedOnDataSize(
+        const ShardStatisticsVector& shardStats,
+        const DistributionStatus& distribution,
+        const CollectionDataSizeInfoForBalancing& collDataSizeInfo,
+        const std::string& tag,
+        std::vector<MigrateInfo>* migrations,
+        stdx::unordered_set<ShardId>* usedShards,
+        MoveChunkRequest::ForceJumbo forceJumbo);
 };
 
 }  // namespace mongo

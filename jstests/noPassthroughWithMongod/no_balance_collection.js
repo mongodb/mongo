@@ -1,9 +1,21 @@
 // Tests whether the noBalance flag disables balancing for collections
 // @tags: [requires_sharding]
 
+(function() {
+"use strict";
+
 load("jstests/sharding/libs/find_chunks_util.js");
+load("jstests/libs/feature_flag_util.js");
 
 var st = new ShardingTest({shards: 2, mongos: 1});
+
+// TODO SERVER-66378 adapt this test for data size aware balancing
+if (FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'),
+                              "BalanceAccordingToDataSize")) {
+    jsTestLog("Skipping as featureFlagBalanceAccordingToDataSize is enabled");
+    st.stop();
+    return;
+}
 
 // First, test that shell helpers require an argument
 assert.throws(sh.disableBalancing, [], "sh.disableBalancing requires a collection");
@@ -109,3 +121,4 @@ if (lastMigration == null) {
 }
 
 st.stop();
+}());

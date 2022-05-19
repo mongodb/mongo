@@ -1,7 +1,16 @@
 (function() {
 'use strict';
 
+load("jstests/libs/feature_flag_util.js");
+
 var s = new ShardingTest({name: "migrateBig", shards: 2, other: {chunkSize: 1}});
+// TODO SERVER-66378 adapt this test for data size aware balancing
+if (FeatureFlagUtil.isEnabled(s.configRS.getPrimary().getDB('admin'),
+                              "BalanceAccordingToDataSize")) {
+    jsTestLog("Skipping as featureFlagBalanceAccordingToDataSize is enabled");
+    s.stop();
+    return;
+}
 
 assert.commandWorked(
     s.config.settings.update({_id: "balancer"}, {$set: {_waitForDelete: true}}, true));

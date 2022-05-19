@@ -77,6 +77,7 @@ private:
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ShardStatisticsVector& shardStats,
+        const boost::optional<CollectionDataSizeInfoForBalancing>& collDataSizeInfo,
         stdx::unordered_set<ShardId>* usedShards);
 
     // Source for obtaining cluster statistics. Not owned and must not be destroyed before the

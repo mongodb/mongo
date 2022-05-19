@@ -4,6 +4,8 @@
 (function() {
 'use strict';
 
+load("jstests/libs/feature_flag_util.js");
+
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
@@ -16,6 +18,14 @@ load("jstests/sharding/libs/find_chunks_util.js");
 // briefly authenticates as __system and recieves clusterTime metadata then will fail trying to
 // gossip that time later in setup.
 //
+
+// TODO SERVER-66378 adapt this test for data size aware balancing
+const dataSizeAwareBalancingFeatureFlag =
+    TestData.setParameters.featureFlagBalanceAccordingToDataSize;
+if (dataSizeAwareBalancingFeatureFlag) {
+    jsTestLog("Skipping as featureFlagBalanceAccordingToDataSize is enabled");
+    return;
+}
 
 var st = new ShardingTest({
     shards: 2,

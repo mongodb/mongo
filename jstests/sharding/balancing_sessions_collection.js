@@ -6,6 +6,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/feature_flag_util.js");
 load("jstests/sharding/libs/find_chunks_util.js");
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
@@ -112,6 +113,13 @@ const st = new ShardingTest({
     shards: numShards,
     other: {configOptions: {setParameter: {minNumChunksForSessionsCollection: kMinNumChunks}}}
 });
+// TODO SERVER-66378 adapt this test for data size aware balancing
+if (FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'),
+                              "BalanceAccordingToDataSize")) {
+    jsTestLog("Skipping as featureFlagBalanceAccordingToDataSize is enabled");
+    st.stop();
+    return;
+}
 const kSessionsNs = "config.system.sessions";
 const configDB = st.s.getDB("config");
 
