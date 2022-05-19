@@ -148,9 +148,8 @@ TEST(CanonicalQueryEncoderTest, ComputeKey) {
 
     // The computed key depends on which execution engine is enabled. As such, we disable SBE for
     // this test so that the test doesn't break should the default value of
-    // 'internalQueryEnableSlotBasedExecutionEngine' change in the future.
-    RAIIServerParameterControllerForTest controllerSBE(
-        "internalQueryEnableSlotBasedExecutionEngine", false);
+    // 'internalQueryForceClassicEngine' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", true);
 
     // No sorts
     testComputeKey("{}", "{}", "{}", "an@f");
@@ -224,9 +223,8 @@ TEST(CanonicalQueryEncoderTest, ComputeKey) {
 TEST(CanonicalQueryEncoderTest, EncodeNotEqualNullPredicates) {
     // The computed key depends on which execution engine is enabled. As such, we disable SBE for
     // this test so that the test doesn't break should the default value of
-    // 'internalQueryEnableSlotBasedExecutionEngine' change in the future.
-    RAIIServerParameterControllerForTest controllerSBE(
-        "internalQueryEnableSlotBasedExecutionEngine", false);
+    // 'internalQueryForceClassicEngine' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", true);
 
     // With '$eq', '$gte', and '$lte' negation comparison to 'null'.
     testComputeKey("{a: {$not: {$eq: null}}}", "{}", "{_id: 0, a: 1}", "ntnot_eq_null[eqa]|a@f");
@@ -246,9 +244,8 @@ TEST(CanonicalQueryEncoderTest, EncodeNotEqualNullPredicates) {
 TEST(CanonicalQueryEncoderTest, ComputeKeyEscaped) {
     // The computed key depends on which execution engine is enabled. As such, we disable SBE for
     // this test so that the test doesn't break should the default value of
-    // 'internalQueryEnableSlotBasedExecutionEngine' change in the future.
-    RAIIServerParameterControllerForTest controllerSBE(
-        "internalQueryEnableSlotBasedExecutionEngine", false);
+    // 'internalQueryForceClassicEngine' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", true);
     // Field name in query.
     testComputeKey("{'a,[]~|-<>': 1}", "{}", "{}", "eqa\\,\\[\\]\\~\\|\\-<>@f");
 
@@ -284,9 +281,8 @@ TEST(CanonicalQueryEncoderTest, ComputeKeyGeoWithin) {
 TEST(CanonicalQueryEncoderTest, ComputeKeyGeoNear) {
     // The computed key depends on which execution engine is enabled. As such, we disable SBE for
     // this test so that the test doesn't break should the default value of
-    // 'internalQueryEnableSlotBasedExecutionEngine' change in the future.
-    RAIIServerParameterControllerForTest controllerSBE(
-        "internalQueryEnableSlotBasedExecutionEngine", false);
+    // 'internalQueryForceClassicEngine' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", true);
 
     testComputeKey("{a: {$near: [0,0], $maxDistance:0.3 }}", "{}", "{}", "gnanrfl@f");
     testComputeKey("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}", "{}", "{}", "gnanssp@f");
@@ -301,8 +297,7 @@ TEST(CanonicalQueryEncoderTest, ComputeKeyGeoNear) {
 TEST(CanonicalQueryEncoderTest, ComputeKeyRegexDependsOnFlags) {
     // The computed key depends on which execution engine is enabled. As such, we enable SBE for
     // this test in order to ensure that we have coverage for both SBE and the classic engine.
-    RAIIServerParameterControllerForTest controllerSBE(
-        "internalQueryEnableSlotBasedExecutionEngine", true);
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", false);
     testComputeKey("{a: {$regex: \"sometext\"}}", "{}", "{}", "rea@t");
     testComputeKey("{a: {$regex: \"sometext\", $options: \"\"}}", "{}", "{}", "rea@t");
 
@@ -335,9 +330,8 @@ TEST(CanonicalQueryEncoderTest, ComputeKeyRegexDependsOnFlags) {
 TEST(CanonicalQueryEncoderTest, ComputeKeyMatchInDependsOnPresenceOfRegexAndFlags) {
     // The computed key depends on which execution engine is enabled. As such, we disable SBE for
     // this test so that the test doesn't break should the default value of
-    // 'internalQueryEnableSlotBasedExecutionEngine' change in the future.
-    RAIIServerParameterControllerForTest controllerSBE(
-        "internalQueryEnableSlotBasedExecutionEngine", false);
+    // 'internalQueryForceClassicEngine' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", true);
 
     // Test that an $in containing a single regex is unwrapped to $regex.
     testComputeKey("{a: {$in: [/foo/]}}", "{}", "{}", "rea@f");
@@ -386,9 +380,8 @@ TEST(CanonicalQueryEncoderTest, ComputeKeyMatchInDependsOnPresenceOfRegexAndFlag
 TEST(CanonicalQueryEncoderTest, CheckCollationIsEncoded) {
     // The computed key depends on which execution engine is enabled. As such, we disable SBE for
     // this test so that the test doesn't break should the default value of
-    // 'internalQueryEnableSlotBasedExecutionEngine' change in the future.
-    RAIIServerParameterControllerForTest controllerSBE(
-        "internalQueryEnableSlotBasedExecutionEngine", false);
+    // 'internalQueryForceClassicEngine' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", true);
 
     unique_ptr<CanonicalQuery> cq(canonicalize(
         fromjson("{a: 1, b: 1}"), {}, {}, fromjson("{locale: 'mock_reverse_string'}")));
@@ -400,8 +393,7 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBE) {
     // Generated cache keys should be treated as opaque to the user.
 
     // SBE must be enabled in order to generate SBE plan cache keys.
-    RAIIServerParameterControllerForTest controllerSBE(
-        "internalQueryEnableSlotBasedExecutionEngine", true);
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", false);
 
     // TODO SERVER-61314: Remove when featureFlagSbePlanCache is removed.
     RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbePlanCache", true);

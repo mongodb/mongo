@@ -42,8 +42,8 @@ st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
 
 let assertShardedGroupResultsMatch = (coll, pipeline) => {
     // Turns to the classic engine at the shard before figuring out its result.
-    assert.commandWorked(dbAtShard.adminCommand(
-        {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: false}));
+    assert.commandWorked(
+        dbAtShard.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
 
     // Collects the classic engine's result as the expected result, executing the pipeline at the
     // mongos.
@@ -52,8 +52,8 @@ let assertShardedGroupResultsMatch = (coll, pipeline) => {
             .cursor.firstBatch;
 
     // Turns to the SBE engine at the shard.
-    assert.commandWorked(dbAtShard.adminCommand(
-        {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: true}));
+    assert.commandWorked(
+        dbAtShard.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
 
     // Verifies that the SBE engine's results are same as the expected results, executing the
     // pipeline at the mongos.

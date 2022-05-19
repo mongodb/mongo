@@ -643,20 +643,6 @@ var _isMongodVersionEqualOrAfter = function(version1, version2) {
     return false;
 };
 
-// Returns if version2 came before version 1.
-var _isMongodVersionBefore = function(version1, version2) {
-    var versionParts1 = _convertVersionToIntegerArray(version1);
-    var versionParts2 = _convertVersionToIntegerArray(version2);
-    if (versionParts2[0] < versionParts1[0] ||
-        (versionParts2[0] === versionParts1[0] && versionParts2[1] < versionParts1[1]) ||
-        (versionParts2[0] === versionParts1[0] && versionParts2[1] === versionParts1[1] &&
-         versionParts2[2] < versionParts1[2])) {
-        return true;
-    }
-
-    return false;
-};
-
 // Removes a setParameter parameter from mongods or mongoses running a version that won't recognize
 // them.
 var _removeSetParameterIfBeforeVersion = function(
@@ -664,24 +650,6 @@ var _removeSetParameterIfBeforeVersion = function(
     var processString = isMongos ? "mongos" : "mongod";
     var versionCompatible = (opts.binVersion === "" || opts.binVersion === undefined ||
                              _isMongodVersionEqualOrAfter(requiredVersion, opts.binVersion));
-    if (!versionCompatible && opts.setParameter && opts.setParameter[parameterName] != undefined) {
-        print("Removing '" + parameterName + "' setParameter with value " +
-              opts.setParameter[parameterName] + " because it isn't compatible with " +
-              processString + " running version " + opts.binVersion);
-        delete opts.setParameter[parameterName];
-    }
-};
-
-// Similar to the function above, but accepts two versions such that if the configured binVersion is
-// between the specified versions, it removes the setParameter parameter.
-var _removeSetParameterIfBetweenSpecifiedVersions = function(
-    opts, parameterName, afterVersion, beforeVersion, isMongos = false) {
-    var processString = isMongos ? "mongos" : "mongod";
-    var versionCompatible = (opts.binVersion === "" || opts.binVersion === undefined ||
-                             // For 'opts.binVersion' to be compatible with 'parameterName', it must
-                             // be GTE 'afterVersion' or LT 'beforeVersion'.
-                             _isMongodVersionEqualOrAfter(afterVersion, opts.binVersion) ||
-                             _isMongodVersionBefore(beforeVersion, opts.binVersion));
     if (!versionCompatible && opts.setParameter && opts.setParameter[parameterName] != undefined) {
         print("Removing '" + parameterName + "' setParameter with value " +
               opts.setParameter[parameterName] + " because it isn't compatible with " +
@@ -735,8 +703,7 @@ MongoRunner.mongodOptions = function(opts = {}) {
         opts, "enableDefaultWriteConcernUpdatesForInitiate", "5.0.0");
     _removeSetParameterIfBeforeVersion(opts, "enableReconfigRollbackCommittedWritesCheck", "5.0.0");
     _removeSetParameterIfBeforeVersion(opts, "featureFlagRetryableFindAndModify", "5.0.0");
-    _removeSetParameterIfBetweenSpecifiedVersions(
-        opts, "internalQueryEnableSlotBasedExecutionEngine", "6.0.0", "5.1.0");
+    _removeSetParameterIfBeforeVersion(opts, "internalQueryForceClassicEngine", "5.1.0");
     _removeSetParameterIfBeforeVersion(opts, "allowMultipleArbiters", "5.3.0");
 
     if (!opts.logFile && opts.useLogFiles) {

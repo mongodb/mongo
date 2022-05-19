@@ -74,7 +74,7 @@ var $config = (function() {
             getParameter: 1,
             featureFlagShardedLookup: 1,
             featureFlagSBELookupPushdown: 1,
-            internalQueryEnableSlotBasedExecutionEngine: 1
+            internalQueryForceClassicEngine: 1
         });
         const isShardedLookupEnabled = getParam.hasOwnProperty("featureFlagShardedLookup") &&
             getParam.featureFlagShardedLookup.value;
@@ -97,9 +97,9 @@ var $config = (function() {
         assertWhenOwnColl.eq(this.numDocs, db[collName].find().itcount());
 
         const isLookupPushdownEnabled = getParam.hasOwnProperty("featureFlagSBELookupPushdown") &&
-            getParam.hasOwnProperty("internalQueryEnableSlotBasedExecutionEngine") &&
+            getParam.hasOwnProperty("internalQueryForceClassicEngine") &&
             getParam.featureFlagSBELookupPushdown.value &&
-            getParam.internalQueryEnableSlotBasedExecutionEngine.value;
+            !getParam.internalQueryForceClassicEngine.value;
 
         this.allowDiskUse = true;
         // If $lookup pushdown into SBE is enabled, we select a random join algorithm to use and

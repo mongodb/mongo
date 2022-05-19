@@ -216,8 +216,8 @@ assertSetParameterSucceeds("internalQuerySlotBasedExecutionMaxStaticIndexScanInt
 assertSetParameterFails("internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals", 0);
 assertSetParameterFails("internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals", -1);
 
-assertSetParameterSucceeds("internalQueryEnableSlotBasedExecutionEngine", true);
-assertSetParameterSucceeds("internalQueryEnableSlotBasedExecutionEngine", false);
+assertSetParameterSucceeds("internalQueryForceClassicEngine", true);
+assertSetParameterSucceeds("internalQueryForceClassicEngine", false);
 
 assertSetParameterSucceeds("internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin", 1);
 assertSetParameterFails("internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin", 0);

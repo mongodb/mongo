@@ -110,14 +110,14 @@ namespace {
  * pipeline to prepare for pushdown of $group and $lookup into the inner query layer so that it
  * can be executed using SBE.
  * Group stages are extracted from the pipeline when all of the following conditions are met:
- *    0. When the 'internalQueryEnableSlotBasedExecutionEngine' feature flag is 'true'.
+ *    0. When the 'internalQueryForceClassicEngine' feature flag is 'false'.
  *    1. When 'allowDiskUse' is false. We currently don't support spilling in the SBE HashAgg
  *       stage. This will change once that is supported when SERVER-58436 is complete.
  *    2. When the DocumentSourceGroup has 'doingMerge=false', this will change when we implement
  *       hash table spilling in SERVER-58436.
  *
  * Lookup stages are extracted from the pipeline when all of the following conditions are met:
- *    0. When the 'internalQueryEnableSlotBasedExecutionEngine' feature flag is 'true'.
+ *    0. When the 'internalQueryForceClassicEngine' feature flag is 'false'.
  *    1. When the 'featureFlagSBELookupPushdown' feature flag is 'true'.
  *    2. The $lookup uses only the 'localField'/'foreignField' syntax (no pipelines).
  *    3. The foreign collection is neither sharded nor a view.
@@ -138,7 +138,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
     }
 
     // No pushdown if we're using the classic engine.
-    if (!cq->getEnableSlotBasedExecutionEngine()) {
+    if (cq->getForceClassicEngine()) {
         return {};
     }
 

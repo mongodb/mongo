@@ -25,45 +25,61 @@ load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster()
     // Makes sure that the test db is sharded.
     assert.commandWorked(st.s0.adminCommand({enableSharding: db.getName()}));
 
-    let verifyShardedAccumulatorResultsOnBothEngine =
-        (isGreaterLastContinous, coll, pipeline, verifyThis) => {
-            const dbs = [
-                st.rs0.getPrimary().getDB(jsTestName()),
-                st.rs0.getSecondary().getDB(jsTestName()),
-                st.rs1.getPrimary().getDB(jsTestName()),
-                st.rs1.getSecondary().getDB(jsTestName())
-            ];
+    let verifyShardedAccumulatorResultsOnBothEngine = (isGreaterLastContinous,
+                                                       coll,
+                                                       pipeline,
+                                                       verifyThis) => {
+        const dbs = [
+            st.rs0.getPrimary().getDB(jsTestName()),
+            st.rs0.getSecondary().getDB(jsTestName()),
+            st.rs1.getPrimary().getDB(jsTestName()),
+            st.rs1.getSecondary().getDB(jsTestName())
+        ];
 
-            // In the last-lts, we don't have the 'internalQueryEnableSlotBasedExecutionEngine'
-            // query knob.
-            if (isGreaterLastContinous) {
-                // Turns to the classic engine at the shards.
-                dbs.forEach(
-                    (db) => assert.commandWorked(
-                        db.adminCommand(
-                            {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: false}),
-                        `at node ${db.getMongo().host}`));
+        function setEngine(db, turnOnSBE) {
+            // Based on which version we are running, set the appropriate parameter which
+            // controls the execution engine.
+            const res = db.adminCommand({
+                getParameter: 1,
+                internalQueryEnableSlotBasedExecutionEngine: 1,
+                internalQueryForceClassicEngine: 1
+            });
+
+            if (res.hasOwnProperty("internalQueryEnableSlotBasedExecutionEngine")) {
+                assert.commandWorked(
+                    db.adminCommand(
+                        {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: turnOnSBE}),
+                    `at node ${db.getMongo().host}`);
+            } else {
+                assert(res.hasOwnProperty("internalQueryForceClassicEngine"));
+                assert.commandWorked(
+                    db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: !turnOnSBE}),
+                    `at node ${db.getMongo().host}`);
             }
+        }
 
-            // Verifies that the classic engine's results are same as the expected results.
-            const classicRes = coll.aggregate(pipeline).toArray();
-            verifyThis(classicRes);
+        // In the last-lts, we don't have the 'internalQueryEnableSlotBasedExecutionEngine'
+        // query knob.
+        if (isGreaterLastContinous) {
+            // Turns to the classic engine at the shards.
+            dbs.forEach((db) => setEngine(db, false /* turnOnSBE */));
+        }
 
-            // In the last-lts, we have neither the 'internalQueryEnableSlotBasedExecutionEngine'
-            // query knob nor the SBE $group pushdown feature.
-            if (isGreaterLastContinous) {
-                // Turns to the SBE engine at the shards.
-                dbs.forEach(
-                    (db) => assert.commandWorked(
-                        db.adminCommand(
-                            {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: true}),
-                        `at node ${db.getMongo().host}`));
+        // Verifies that the classic engine's results are same as the expected results.
+        const classicRes = coll.aggregate(pipeline).toArray();
+        verifyThis(classicRes);
 
-                // Verifies that the SBE engine's results are same as the expected results.
-                const sbeRes = coll.aggregate(pipeline).toArray();
-                verifyThis(sbeRes);
-            }
-        };
+        // In the last-lts, we have neither the 'internalQueryEnableSlotBasedExecutionEngine'
+        // query knob nor the SBE $group pushdown feature.
+        if (isGreaterLastContinous) {
+            // Turns to the SBE engine at the shards.
+            dbs.forEach((db) => setEngine(db, true /* turnOnSBE */));
+
+            // Verifies that the SBE engine's results are same as the expected results.
+            const sbeRes = coll.aggregate(pipeline).toArray();
+            verifyThis(sbeRes);
+        }
+    };
 
     let shardCollectionByHashing = coll => {
         coll.drop();
