@@ -146,6 +146,6 @@ assert.commandFailedWithCode(db[kNewCollName1].createIndex({b: 1}),
                              ErrorCodes.TenantMigrationCommitted);
 
 operation.forget();
-shardSplitTest.cleanupSuccesfulAbortedOrCommitted(operation.migrationId, tenantIds);
+shardSplitTest.cleanupSuccesfulCommitted(operation.migrationId, tenantIds);
 shardSplitTest.stop();
 })();
