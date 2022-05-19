@@ -327,6 +327,7 @@ variables:
   - enterprise-rhel-82-arm64
   - enterprise-amazon2-arm64
   - enterprise-ubuntu1804-64
+  - enterprise-ubuntu2004-64
   - enterprise-windows
   - enterprise-windows-required
 
