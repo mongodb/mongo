@@ -221,8 +221,8 @@ public:
         return _explain;
     }
 
-    bool getEnableSlotBasedExecutionEngine() const {
-        return _enableSlotBasedExecutionEngine;
+    bool getForceClassicEngine() const {
+        return _forceClassicEngine;
     }
 
     void setSbeCompatible(bool sbeCompatible) {
@@ -304,8 +304,8 @@ private:
 
     bool _explain = false;
 
-    // Determines whether the SBE engine is enabled.
-    bool _enableSlotBasedExecutionEngine = false;
+    // Determines whether the classic engine must be used.
+    bool _forceClassicEngine = true;
 
     // True if this query can be executed by the SBE.
     bool _sbeCompatible = false;

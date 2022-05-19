@@ -92,7 +92,7 @@ Status clear(OperationContext* opCtx,
         // sbe::isQuerySbeCompatible here.
         const size_t plannerOptions = 0;
         if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() &&
-            cq->getEnableSlotBasedExecutionEngine() &&
+            !cq->getForceClassicEngine() &&
             sbe::isQuerySbeCompatible(&collection, cq.get(), plannerOptions)) {
             cq->setSbeCompatible(true);
             sbe::getPlanCache(opCtx).remove(

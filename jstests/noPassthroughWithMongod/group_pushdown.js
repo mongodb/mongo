@@ -79,7 +79,7 @@ let assertResultsMatchWithAndWithoutGroupPushdown = function(
     assertGroupPushdown(coll, pipeline, expectedResults, expectedGroupCountInExplain);
 
     // Turn sbe off.
-    db.adminCommand({setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: false});
+    db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true});
 
     // Sanity check the results when no pushdown happens.
     let resultNoGroupPushdown = coll.aggregate(pipeline).toArray();
@@ -87,7 +87,7 @@ let assertResultsMatchWithAndWithoutGroupPushdown = function(
 
     // Turn sbe on which will allow $group stages that contain supported accumulators to be pushed
     // down under certain conditions.
-    db.adminCommand({setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: true});
+    db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false});
 
     let resultWithGroupPushdown = coll.aggregate(pipeline).toArray();
     assert.sameMembers(resultNoGroupPushdown, resultWithGroupPushdown);
@@ -100,7 +100,7 @@ let assertResultsMatchWithAndWithoutProjectPushdown = function(
         {coll: coll, pipeline: pipeline, expectProjectToBePushedDown: expectProjectToBePushedDown});
 
     // Turn sbe off.
-    db.adminCommand({setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: false});
+    db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true});
 
     // Sanity check the results when no project pushdown happens.
     let resultNoProjectPushdown = coll.aggregate(pipeline).toArray();
@@ -108,7 +108,7 @@ let assertResultsMatchWithAndWithoutProjectPushdown = function(
 
     // Turn sbe on which will allow $group stages that contain supported accumulators to be pushed
     // down under certain conditions.
-    db.adminCommand({setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: true});
+    db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false});
 
     let resultWithProjectPushdown = coll.aggregate(pipeline).toArray();
     assert.sameMembers(resultNoProjectPushdown, resultWithProjectPushdown);
@@ -117,8 +117,8 @@ let assertResultsMatchWithAndWithoutProjectPushdown = function(
 let assertShardedGroupResultsMatch = function(coll, pipeline, expectedGroupCountInExplain = 1) {
     const originalSBEEngineStatus =
         assert
-            .commandWorked(db.adminCommand(
-                {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: false}))
+            .commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}))
             .was;
 
     const cmd = {
@@ -131,7 +131,7 @@ let assertShardedGroupResultsMatch = function(coll, pipeline, expectedGroupCount
 
     const classicalRes = coll.runCommand(cmd).cursor.firstBatch;
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: true}));
+        db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
     const explainCmd = {
         aggregate: coll.getName(),
         pipeline: pipeline,
@@ -147,7 +147,7 @@ let assertShardedGroupResultsMatch = function(coll, pipeline, expectedGroupCount
     assert.sameMembers(sbeRes, classicalRes);
 
     assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: originalSBEEngineStatus}));
+        {setParameter: 1, internalQueryForceClassicEngine: originalSBEEngineStatus}));
 };
 
 // Try a pipeline with no group stage.

@@ -667,7 +667,7 @@ CanonicalQuery::QueryShapeString encode(const CanonicalQuery& cq) {
 
     // This encoding can be removed once the classic query engine reaches EOL and SBE is used
     // exclusively for all query execution.
-    keyBuilder << kEncodeEngineSection << (cq.getEnableSlotBasedExecutionEngine() ? "t" : "f");
+    keyBuilder << kEncodeEngineSection << (cq.getForceClassicEngine() ? "f" : "t");
 
     return keyBuilder.str();
 }

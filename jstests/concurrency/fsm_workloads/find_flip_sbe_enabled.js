@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * Sets the internalQueryEnableSlotBasedExecutionEngine flag to true and false, and
- * asserts that find queries using the plan cache produce the correct results.
+ * Sets the internalQueryForceClassicEngine flag to true and false, and asserts that find queries
+ * using the plan cache produce the correct results.
  *
  * @tags: [
  *     # Our test infrastructure prevents tests which use the 'setParameter' command from running in
@@ -20,10 +20,10 @@ var $config = (function() {
 
     function setup(db, collName, cluster) {
         const originalParamValue =
-            db.adminCommand({getParameter: 1, internalQueryEnableSlotBasedExecutionEngine: 1});
+            db.adminCommand({getParameter: 1, internalQueryForceClassicEngine: 1});
         assertAlways.commandWorked(originalParamValue);
-        assert(originalParamValue.hasOwnProperty("internalQueryEnableSlotBasedExecutionEngine"));
-        this.originalParamValue = originalParamValue.internalQueryEnableSlotBasedExecutionEngine;
+        assert(originalParamValue.hasOwnProperty("internalQueryForceClassicEngine"));
+        this.originalParamValue = originalParamValue.internalQueryForceClassicEngine;
         const coll = db.getCollection(getCollectionName(collName));
         for (let i = 0; i < 10; ++i) {
             assertAlways.commandWorked(
@@ -35,14 +35,14 @@ var $config = (function() {
     }
 
     let states = (function() {
-        function setEnableSlotBasedExecutionEngineOn(db, collName) {
-            assertAlways.commandWorked(db.adminCommand(
-                {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: true}));
+        function setForceClassicEngineOn(db, collName) {
+            assertAlways.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
         }
 
-        function setEnableSlotBasedExecutionEngineOff(db, collName) {
-            assertAlways.commandWorked(db.adminCommand(
-                {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: false}));
+        function setForceClassicEngineOff(db, collName) {
+            assertAlways.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
         }
 
         function runQueriesAndCheckResults(db, collName) {
@@ -77,8 +77,8 @@ var $config = (function() {
         }
 
         return {
-            setEnableSlotBasedExecutionEngineOn: setEnableSlotBasedExecutionEngineOn,
-            setEnableSlotBasedExecutionEngineOff: setEnableSlotBasedExecutionEngineOff,
+            setForceClassicEngineOn: setForceClassicEngineOn,
+            setForceClassicEngineOff: setForceClassicEngineOff,
             runQueriesAndCheckResults: runQueriesAndCheckResults,
             createIndex: createIndex,
             dropIndex: dropIndex
@@ -86,36 +86,36 @@ var $config = (function() {
     })();
 
     let transitions = {
-        setEnableSlotBasedExecutionEngineOn: {
-            setEnableSlotBasedExecutionEngineOn: 0.1,
-            setEnableSlotBasedExecutionEngineOff: 0.1,
+        setForceClassicEngineOn: {
+            setForceClassicEngineOn: 0.1,
+            setForceClassicEngineOff: 0.1,
             runQueriesAndCheckResults: 0.8
         },
 
-        setEnableSlotBasedExecutionEngineOff: {
-            setEnableSlotBasedExecutionEngineOn: 0.1,
-            setEnableSlotBasedExecutionEngineOff: 0.1,
+        setForceClassicEngineOff: {
+            setForceClassicEngineOn: 0.1,
+            setForceClassicEngineOff: 0.1,
             runQueriesAndCheckResults: 0.8
         },
 
         runQueriesAndCheckResults: {
-            setEnableSlotBasedExecutionEngineOn: 0.1,
-            setEnableSlotBasedExecutionEngineOff: 0.1,
+            setForceClassicEngineOn: 0.1,
+            setForceClassicEngineOff: 0.1,
             runQueriesAndCheckResults: 0.78,
             createIndex: 0.02,
         },
 
         createIndex: {
-            setEnableSlotBasedExecutionEngineOn: 0.1,
-            setEnableSlotBasedExecutionEngineOff: 0.1,
+            setForceClassicEngineOn: 0.1,
+            setForceClassicEngineOff: 0.1,
             runQueriesAndCheckResults: 0.78,
             createIndex: 0.01,
             dropIndex: 0.01
         },
 
         dropIndex: {
-            setEnableSlotBasedExecutionEngineOn: 0.1,
-            setEnableSlotBasedExecutionEngineOff: 0.1,
+            setForceClassicEngineOn: 0.1,
+            setForceClassicEngineOff: 0.1,
             runQueriesAndCheckResults: 0.78,
             createIndex: 0.02,
         }
@@ -125,15 +125,15 @@ var $config = (function() {
         // Restore the original state of the ForceClassicEngine parameter.
         const setParam = this.originalParamValue;
         cluster.executeOnMongodNodes(function(db) {
-            assertAlways.commandWorked(db.adminCommand(
-                {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: setParam}));
+            assertAlways.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: setParam}));
         });
     }
 
     return {
         threadCount: 10,
         iterations: 100,
-        startState: 'setEnableSlotBasedExecutionEngineOn',
+        startState: 'setForceClassicEngineOff',
         states: states,
         transitions: transitions,
         setup: setup,
