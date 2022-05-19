@@ -169,6 +169,10 @@ class MongoDFixture(interface.Fixture):
 
     def get_node_info(self):
         """Return a list of NodeInfo objects."""
+        if self.mongod is None:
+            self.logger.warning("The mongod fixture has not been set up yet.")
+            return []
+
         info = interface.NodeInfo(full_name=self.logger.full_name, name=self.logger.name,
                                   port=self.port, pid=self.mongod.pid)
         return [info]

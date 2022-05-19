@@ -3,6 +3,7 @@
 import time
 import os.path
 import threading
+import shutil
 
 import pymongo
 from bson.objectid import ObjectId
@@ -13,6 +14,13 @@ import buildscripts.resmokelib.testing.fixtures.interface as interface
 def _is_replica_set_fixture(fixture):
     """Determine whether the passed in fixture is a ReplicaSetFixture."""
     return hasattr(fixture, 'replset_name')
+
+
+def _teardown_and_clean_node(node):
+    """Teardown the provided node and remove its data directory."""
+    node.teardown(finished=True)
+    # Remove the data directory for the node to prevent unbounded disk space utilization.
+    shutil.rmtree(node.get_dbpath_prefix(), ignore_errors=False)
 
 
 class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-many-instance-attributes
@@ -341,7 +349,9 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
                 if "recipientConfig" in repl_config:
                     del repl_config["recipientConfig"]
 
-                self.logger.info(f"Reconfiguring donor to remove recipient nodes: {repl_config}")
+                self.logger.info(
+                    f"Reconfiguring donor '{donor_rs_name}' to remove recipient nodes: {repl_config}"
+                )
                 donor_client.admin.command({
                     "replSetReconfig": repl_config,
                     "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
@@ -349,12 +359,13 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
                 break
             except pymongo.errors.ConnectionFailure as err:
                 self.logger.info(
-                    f"Retrying removing recipient nodes from replica set {donor_rs_name} after error: {str(err)}."
+                    f"Retrying removing recipient nodes from donor '{donor_rs_name}' after error: {str(err)}."
                 )
                 continue
 
+        self.logger.info("Tearing down recipient nodes and removing data directories.")
         for recipient_node in reversed(recipient_nodes):
-            recipient_node.teardown(finished=True)
+            _teardown_and_clean_node(recipient_node)
 
     def replace_donor_with_recipient(self, recipient_set_name):
         """Replace the current donor with the newly initiated recipient."""
@@ -380,7 +391,7 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
 
         self._can_teardown_retired_donor_rs.wait()
         self.logger.info(f"Retiring old donor replica set '{retired_donor_rs.replset_name}'.")
-        retired_donor_rs.teardown(finished=True)
+        _teardown_and_clean_node(retired_donor_rs)
 
     def enter_step_down(self):
         """Called by the ContinuousStepDown hook to indicate that we are stepping down."""

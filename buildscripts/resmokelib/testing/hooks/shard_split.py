@@ -240,10 +240,6 @@ class _ShardSplitThread(threading.Thread):  # pylint: disable=too-many-instance-
                 if not permitted:
                     break
 
-                if split_count >= 3:  # TODO(SERVER-66045): Remove this check and run unbounded splits
-                    time.sleep(self.POLL_INTERVAL_SECS)
-                    continue
-
                 self._is_idle_evt.clear()
 
                 split_opts = self._create_split_opts(split_count)
