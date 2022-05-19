@@ -53,15 +53,14 @@ const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
 // Mocks
 class MockParameterService : public ServerParameterService {
 public:
-    MockParameterService(std::function<ServerParameter*(StringData)> getIfExists)
-        : getIfExistsMock(getIfExists){};
+    MockParameterService(std::function<ServerParameter*(StringData)> get) : _getMock(get){};
 
-    const ServerParameter* getIfExists(StringData parameterName) {
-        return getIfExistsMock(parameterName);
+    ServerParameter* get(StringData parameterName) {
+        return _getMock(parameterName);
     }
 
 private:
-    std::function<ServerParameter*(StringData)> getIfExistsMock;
+    std::function<ServerParameter*(StringData)> _getMock;
 };
 
 class MockServerParameter : public ServerParameter {
@@ -272,7 +271,9 @@ TEST(SetClusterParameterCommand, ThrowsWhenParameterNotPresent) {
     auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->makeClient("SomeTest");
 
-    auto mpsPtr = std::make_unique<MockParameterService>([&](StringData s) { return nullptr; });
+    auto mpsPtr = std::make_unique<MockParameterService>([&](StringData s) {
+        return ServerParameterSet::getClusterParameterSet()->get("doesNotExistParam"_sd);
+    });
 
     Client* clientPtr = client.get();
 
@@ -291,7 +292,7 @@ TEST(SetClusterParameterCommand, ThrowsWhenParameterNotPresent) {
 
     ASSERT_THROWS_CODE(fixture.invoke(&spyCtx, testCmd, boost::none, kMajorityWriteConcern),
                        DBException,
-                       ErrorCodes::IllegalOperation);
+                       ErrorCodes::NoSuchKey);
 }
 }  // namespace
 }  // namespace mongo

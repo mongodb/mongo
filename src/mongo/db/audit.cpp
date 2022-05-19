@@ -257,6 +257,22 @@ void logRemoveOperation(Client* client, const NamespaceString& nss, const BSONOb
     invariant(client);
 }
 
+void logGetClusterParameter(
+    Client* client,
+    const stdx::variant<std::string, std::vector<std::string>>& requestedParameters) {
+    invariant(client);
+}
+
+void logSetClusterParameter(Client* client, const BSONObj& oldValue, const BSONObj& newValue) {
+    invariant(client);
+}
+
+void logUpdateCachedClusterParameter(Client* client,
+                                     const BSONObj& oldValue,
+                                     const BSONObj& newValue) {
+    invariant(client);
+}
+
 #endif
 
 }  // namespace audit

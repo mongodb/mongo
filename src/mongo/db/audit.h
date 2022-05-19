@@ -416,6 +416,27 @@ void logUpdateOperation(Client* client, const NamespaceString& nss, const BSONOb
  */
 void logRemoveOperation(Client* client, const NamespaceString& nss, const BSONObj& doc);
 
+/**
+ * Logs values of cluster server parameters requested via getClusterParameter.
+ */
+void logGetClusterParameter(
+    Client* client,
+    const stdx::variant<std::string, std::vector<std::string>>& requestedParameters);
+
+/**
+ * Logs old and new value of cluster server parameter when it is updated via setClusterParameter.
+ */
+void logSetClusterParameter(Client* client, const BSONObj& oldValue, const BSONObj& newValue);
+
+/**
+ * Logs old and new value of cluster server parameter when it gets updated in-memory in response to
+ * some on-disk change. This may be due to setClusterParameter or a replication event such as
+ * rollback.
+ */
+void logUpdateCachedClusterParameter(Client* client,
+                                     const BSONObj& oldValue,
+                                     const BSONObj& newValue);
+
 
 }  // namespace audit
 }  // namespace mongo

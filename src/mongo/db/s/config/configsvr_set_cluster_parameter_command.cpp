@@ -75,11 +75,7 @@ public:
                     StringData parameterName = commandElement.fieldName();
                     std::unique_ptr<ServerParameterService> sps =
                         std::make_unique<ClusterParameterService>();
-                    const ServerParameter* serverParameter = sps->getIfExists(parameterName);
-
-                    uassert(ErrorCodes::IllegalOperation,
-                            str::stream() << "Unknown Cluster Parameter " << parameterName,
-                            serverParameter != nullptr);
+                    const ServerParameter* serverParameter = sps->get(parameterName);
 
                     uassert(ErrorCodes::IllegalOperation,
                             "Cluster parameter value must be an object",

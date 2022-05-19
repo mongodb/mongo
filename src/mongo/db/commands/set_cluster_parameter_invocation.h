@@ -37,13 +37,13 @@ namespace mongo {
 
 class ServerParameterService {
 public:
-    virtual const ServerParameter* getIfExists(StringData parameterName) = 0;
+    virtual ServerParameter* get(StringData parameterName) = 0;
     virtual ~ServerParameterService() = default;
 };
 
 class ClusterParameterService final : public ServerParameterService {
 public:
-    const ServerParameter* getIfExists(StringData parameterName) override;
+    ServerParameter* get(StringData parameterName) override;
 };
 
 class DBClientService {

@@ -49,7 +49,7 @@ structs:
             strValue:
                 description: String value
                 type: string
-                default: ""
+                default: '""'
 
 server_parameters:
     cspTest:

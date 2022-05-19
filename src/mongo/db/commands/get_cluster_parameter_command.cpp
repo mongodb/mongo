@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
@@ -84,6 +85,8 @@ public:
             ServerParameterSet* clusterParameters = ServerParameterSet::getClusterParameterSet();
             std::vector<BSONObj> parameterValues;
             std::vector<std::string> parameterNames;
+
+            audit::logGetClusterParameter(opCtx->getClient(), cmdBody);
 
             // For each parameter, generate a BSON representation of it and retrieve its name.
             auto makeBSON = [&](ServerParameter* requestedParameter) {

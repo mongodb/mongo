@@ -69,7 +69,7 @@ void ClusterServerParameterOpObserver::onInserts(OperationContext* opCtx,
     }
 
     for (auto it = first; it != last; ++it) {
-        ClusterServerParameterInitializer::get(opCtx)->updateParameter(it->doc, kOplog);
+        ClusterServerParameterInitializer::get(opCtx)->updateParameter(opCtx, it->doc, kOplog);
     }
 }
 
@@ -80,7 +80,7 @@ void ClusterServerParameterOpObserver::onUpdate(OperationContext* opCtx,
         return;
     }
 
-    ClusterServerParameterInitializer::get(opCtx)->updateParameter(updatedDoc, kOplog);
+    ClusterServerParameterInitializer::get(opCtx)->updateParameter(opCtx, updatedDoc, kOplog);
 }
 
 void ClusterServerParameterOpObserver::aboutToDelete(OperationContext* opCtx,
@@ -117,7 +117,7 @@ void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
                                                 const OplogDeleteEntryArgs& args) {
     const auto& docName = aboutToDeleteDoc(opCtx);
     if (!docName.empty()) {
-        ClusterServerParameterInitializer::get(opCtx)->clearParameter(docName);
+        ClusterServerParameterInitializer::get(opCtx)->clearParameter(opCtx, docName);
     }
 }
 
@@ -125,7 +125,7 @@ void ClusterServerParameterOpObserver::onDropDatabase(OperationContext* opCtx,
                                                       const std::string& dbName) {
     if (dbName == NamespaceString::kConfigDb) {
         // Entire config DB deleted, reset to default state.
-        ClusterServerParameterInitializer::get(opCtx)->clearAllParameters();
+        ClusterServerParameterInitializer::get(opCtx)->clearAllParameters(opCtx);
     }
 }
 
@@ -137,7 +137,7 @@ repl::OpTime ClusterServerParameterOpObserver::onDropCollection(
     CollectionDropType dropType) {
     if (isConfigNamespace(collectionName)) {
         // Entire collection deleted, reset to default state.
-        ClusterServerParameterInitializer::get(opCtx)->clearAllParameters();
+        ClusterServerParameterInitializer::get(opCtx)->clearAllParameters(opCtx);
     }
 
     return {};
@@ -152,7 +152,7 @@ void ClusterServerParameterOpObserver::postRenameCollection(
     bool stayTemp) {
     if (isConfigNamespace(fromCollection)) {
         // Same as collection dropped from a config point of view.
-        ClusterServerParameterInitializer::get(opCtx)->clearAllParameters();
+        ClusterServerParameterInitializer::get(opCtx)->clearAllParameters(opCtx);
     }
 
     if (isConfigNamespace(toCollection)) {

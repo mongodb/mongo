@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
@@ -84,6 +85,8 @@ public:
             const stdx::variant<std::string, std::vector<std::string>>& cmdBody =
                 request().getCommandParameter();
             ServerParameterSet* clusterParameters = ServerParameterSet::getClusterParameterSet();
+
+            audit::logGetClusterParameter(opCtx->getClient(), cmdBody);
 
             std::vector<std::string> requestedParameterNames;
             BSONObjBuilder queryDocBuilder;

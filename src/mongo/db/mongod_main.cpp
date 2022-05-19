@@ -382,7 +382,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 #endif
 
     logProcessDetails(nullptr);
-    audit::logStartupOptions(Client::getCurrent(), serverGlobalParams.parsedOpts);
 
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
 
@@ -831,6 +830,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             return EXIT_NET_ERROR;
         }
     }
+
+    // Startup options are written to the audit log at the end of startup so that cluster server
+    // parameters are guaranteed to have been initialized from disk at this point.
+    audit::logStartupOptions(Client::getCurrent(), serverGlobalParams.parsedOpts);
 
     serviceContext->notifyStartupComplete();
 

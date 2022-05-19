@@ -349,7 +349,7 @@ function testInvalidClusterParameterCommands(conn) {
         // Assert that setting a nonexistent parameter on the primary returns an error.
         assert.commandFailedWithCode(
             adminDB.runCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}),
-            ErrorCodes.IllegalOperation);
+            ErrorCodes.NoSuchKey);
 
         // Assert that running setClusterParameter with a scalar value fails.
         assert.commandFailedWithCode(
@@ -375,7 +375,7 @@ function testInvalidClusterParameterCommands(conn) {
         // Assert that setting a nonexistent parameter on the mongos returns an error.
         assert.commandFailedWithCode(
             adminDB.runCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}),
-            ErrorCodes.IllegalOperation);
+            ErrorCodes.NoSuchKey);
 
         // Assert that running setClusterParameter with a scalar value fails.
         assert.commandFailedWithCode(

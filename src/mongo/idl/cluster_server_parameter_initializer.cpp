@@ -30,6 +30,7 @@
 #include "mongo/idl/cluster_server_parameter_initializer.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -58,7 +59,9 @@ ClusterServerParameterInitializer* ClusterServerParameterInitializer::get(
     return &getInstance(serviceContext);
 }
 
-void ClusterServerParameterInitializer::updateParameter(BSONObj doc, StringData mode) {
+void ClusterServerParameterInitializer::updateParameter(OperationContext* opCtx,
+                                                        BSONObj doc,
+                                                        StringData mode) {
     auto nameElem = doc[kIdField];
     if (nameElem.type() != String) {
         LOGV2_DEBUG(6226301,
@@ -91,19 +94,33 @@ void ClusterServerParameterInitializer::updateParameter(BSONObj doc, StringData 
         return;
     }
 
+    BSONObjBuilder oldValueBob;
+    sp->append(opCtx, oldValueBob, name.toString());
+    audit::logUpdateCachedClusterParameter(opCtx->getClient(), oldValueBob.obj(), doc);
+
     uassertStatusOK(sp->set(doc));
 }
 
-void ClusterServerParameterInitializer::clearParameter(ServerParameter* sp) {
+void ClusterServerParameterInitializer::clearParameter(OperationContext* opCtx,
+                                                       ServerParameter* sp) {
     if (sp->getClusterParameterTime() == LogicalTime::kUninitialized) {
         // Nothing to clear.
         return;
     }
 
+    BSONObjBuilder oldValueBob;
+    sp->append(opCtx, oldValueBob, sp->name());
+
     uassertStatusOK(sp->reset());
+
+    BSONObjBuilder newValueBob;
+    sp->append(opCtx, newValueBob, sp->name());
+
+    audit::logUpdateCachedClusterParameter(
+        opCtx->getClient(), oldValueBob.obj(), newValueBob.obj());
 }
 
-void ClusterServerParameterInitializer::clearParameter(StringData id) {
+void ClusterServerParameterInitializer::clearParameter(OperationContext* opCtx, StringData id) {
     auto* sp = ServerParameterSet::getClusterParameterSet()->getIfExists(id);
     if (!sp) {
         LOGV2_DEBUG(6226303,
@@ -113,20 +130,21 @@ void ClusterServerParameterInitializer::clearParameter(StringData id) {
         return;
     }
 
-    clearParameter(sp);
+    clearParameter(opCtx, sp);
 }
 
-void ClusterServerParameterInitializer::clearAllParameters() {
+void ClusterServerParameterInitializer::clearAllParameters(OperationContext* opCtx) {
     const auto& params = ServerParameterSet::getClusterParameterSet()->getMap();
     for (const auto& it : params) {
-        clearParameter(it.second);
+        clearParameter(opCtx, it.second);
     }
 }
 
 void ClusterServerParameterInitializer::initializeAllParametersFromDisk(OperationContext* opCtx) {
-    doLoadAllParametersFromDisk(opCtx, "initializing"_sd, [this](BSONObj doc, StringData mode) {
-        updateParameter(doc, mode);
-    });
+    doLoadAllParametersFromDisk(
+        opCtx, "initializing"_sd, [this](OperationContext* opCtx, BSONObj doc, StringData mode) {
+            updateParameter(opCtx, doc, mode);
+        });
 }
 
 void ClusterServerParameterInitializer::resynchronizeAllParametersFromDisk(
@@ -138,15 +156,17 @@ void ClusterServerParameterInitializer::resynchronizeAllParametersFromDisk(
     }
 
     doLoadAllParametersFromDisk(
-        opCtx, "resynchronizing"_sd, [this, &unsetSettings](BSONObj doc, StringData mode) {
+        opCtx,
+        "resynchronizing"_sd,
+        [this, &unsetSettings](OperationContext* opCtx, BSONObj doc, StringData mode) {
             unsetSettings.erase(doc[kIdField].str());
-            updateParameter(doc, mode);
+            updateParameter(opCtx, doc, mode);
         });
 
     // For all known settings which were not present in this resync,
     // explicitly clear any value which may be present in-memory.
     for (const auto& setting : unsetSettings) {
-        clearParameter(setting);
+        clearParameter(opCtx, setting);
     }
 }
 
