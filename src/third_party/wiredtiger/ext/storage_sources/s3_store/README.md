@@ -32,13 +32,14 @@ This method will find an existing system installation of the SDK and will not re
 $ mkdir build && cd build
 
 # Configure and run cmake with Ninja
-cmake -DENABLE_PYTHON=1 -DHAVE_DIAGNOSTIC=1 -DENABLE_S3=1 -DENABLE_STRICT=0 -DCMAKE_CXX_FLAGS="-ggdb" -G Ninja ../.
+cmake -DENABLE_PYTHON=1 -DHAVE_DIAGNOSTIC=1 -DHAVE_UNITTEST=1 -DENABLE_S3=1 -DENABLE_STRICT=0 -DCMAKE_CXX_FLAGS="-ggdb" -G Ninja ../.
 ninja
 ```
 
 * Setting the `IMPORT_S3_SDK` flag is optional for this build method.
 * `ENABLE_S3` will default to looking for a local installation of the SDK.
 * `CMAKE_CXX_FLAGS="-ggdb"` should be set to enable gdb for debugging information.
+* `HAVE_UNITTEST` should be set to 1 so the Catch2 framework for S3 Unit tests is installed.
 * `ENABLE_STRICT` should be set to 0.
     This is to to turn off strict compiler warnings so it does not pick up different formatting errors of the 3rd party dependencies.
 
@@ -52,7 +53,7 @@ This method configures CMake to download, compile, and install the AWS SDK while
 $ mkdir build && cd build
 
 # Configure and run cmake with Ninja
-cmake -DENABLE_PYTHON=1 -DHAVE_DIAGNOSTIC=1 -DIMPORT_S3_SDK=external -DENABLE_S3=1 -DENABLE_STRICT=0 -DCMAKE_CXX_FLAGS="-ggdb" -G Ninja ../.
+cmake -DENABLE_PYTHON=1 -DHAVE_DIAGNOSTIC=1 -DHAVE_UNITTEST=1 -DIMPORT_S3_SDK=external -DENABLE_S3=1 -DENABLE_STRICT=0 -DCMAKE_CXX_FLAGS="-ggdb" -G Ninja ../.
 ninja
 ```
 
@@ -75,7 +76,9 @@ python3 ../test/suite/run.py -v 4 tiered
 ```bash
 # Once WiredTiger has been built with the S3 Extension, run the tests from the build directory
 cd build
-ctest --verbose -R ${TEST NAME}
+ext/storage_sources/s3_store/test/run_s3_unit_tests 
 ```
 
-To add any additional unit testing, adding the file into the `ext/storage_sources/s3_store/test` directory will allow the test to be picked up by the `CMakeLists.txt` and be incorporated and run with the above instructions.
+To add any additional unit testing, add to the file `test_s3_connection.cpp`, alternatively if you
+wish to add a new test file, add it to the `SOURCES` list in`create_test_executable()` 
+(in `s3_store/test/CMakeLists.txt`). 
