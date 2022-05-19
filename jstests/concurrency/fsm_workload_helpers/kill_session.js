@@ -4,6 +4,9 @@
  * State function that kills a random session from config.system.sessions.
  */
 function killSession(db, collName) {
+    load("jstests/libs/killed_session_util.js");
+
+    print("Starting killSession");
     let ourSessionWasKilled;
     do {
         ourSessionWasKilled = false;
@@ -37,8 +40,7 @@ function killSession(db, collName) {
             res = db.runCommand({killSessions: [{id: sessionUUID}]});
             assertAlways.commandWorked(res);
         } catch (e) {
-            if (e.code == ErrorCodes.Interrupted || e.code == ErrorCodes.CursorKilled ||
-                e.code == ErrorCodes.CursorNotFound) {
+            if (KilledSessionUtil.isKilledSessionCode(e.code)) {
                 // This session was killed when running either listSessions or killSesssions.
                 // We should retry.
                 ourSessionWasKilled = true;
@@ -48,4 +50,5 @@ function killSession(db, collName) {
             throw e;
         }
     } while (ourSessionWasKilled);
+    print("Finished killSession");
 }
