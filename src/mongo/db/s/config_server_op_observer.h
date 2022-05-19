@@ -87,7 +87,7 @@ public:
                    std::vector<InsertStatement>::const_iterator end,
                    bool fromMigrate) override;
 
-    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override {}
+    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override;
 
     void aboutToDelete(OperationContext* opCtx,
                        const NamespaceString& nss,
@@ -175,7 +175,7 @@ public:
 
     void onApplyOps(OperationContext* opCtx,
                     const std::string& dbName,
-                    const BSONObj& applyOpCmd) override;
+                    const BSONObj& applyOpCmd) override {}
 
     void onEmptyCapped(OperationContext* opCtx,
                        const NamespaceString& collectionName,

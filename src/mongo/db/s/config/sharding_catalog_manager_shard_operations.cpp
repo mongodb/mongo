@@ -67,6 +67,7 @@
 #include "mongo/db/s/user_writes_critical_section_document_gen.h"
 #include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/transaction_api.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor.h"
@@ -807,46 +808,6 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     return shardType.getName();
 }
 
-BSONObj makeCommitRemoveShardCommand(const std::string& removedShardName,
-                                     const std::string& controlShardName,
-                                     const Timestamp& newTopologyTime) {
-    // Remove removeShard's document.
-    BSONArrayBuilder updates;
-    {
-        BSONObjBuilder op;
-        op.append("op", "d");
-        op.appendBool("b", false);  // No upserting
-        op.append("ns", ShardType::ConfigNS.ns());
-
-        BSONObjBuilder n(op.subobjStart("o"));
-        n.append(ShardType::name(), removedShardName);
-        n.done();
-
-        updates.append(op.obj());
-    }
-
-    // Update controlShard's topologyTime.
-    {
-        BSONObjBuilder op;
-        op.append("op", "u");
-        op.appendBool("b", false);
-        op.append("ns", ShardType::ConfigNS.ns());
-
-        BSONObjBuilder n(op.subobjStart("o"));
-        n.append("$set", BSON(ShardType::topologyTime() << newTopologyTime));
-        n.done();
-
-        BSONObjBuilder q(op.subobjStart("o2"));
-        q.append(ShardType::name(), controlShardName);
-        q.done();
-
-        updates.append(op.obj());
-    }
-
-    return BSON("applyOps" << updates.arr() << "alwaysUpsert" << false << "writeConcern"
-                           << ShardingCatalogClient::kLocalWriteConcern.toBSON());
-}
-
 RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                                         const ShardId& shardId) {
     const auto name = shardId.toString();
@@ -985,24 +946,8 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // Tick clusterTime to get a new topologyTime for this mutation of the topology.
     auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
 
-    // Use applyOps to both remove the shard's document and update topologyTime on another document.
-    auto command =
-        makeCommitRemoveShardCommand(name, controlShardName, newTopologyTime.asTimestamp());
-
-    StatusWith<Shard::CommandResponse> applyOpsCommandResponse =
-        configShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            NamespaceString::kAdminDb.toString(),
-            command,
-            Shard::RetryPolicy::kIdempotent);
-
-    uassertStatusOKWithContext(applyOpsCommandResponse,
-                               str::stream()
-                                   << "error completing removeShard operation on: " << name);
-    uassertStatusOKWithContext(applyOpsCommandResponse.getValue().commandStatus,
-                               str::stream()
-                                   << "error completing removeShard operation on: " << name);
+    // Remove the shard's document and update topologyTime within a transaction.
+    _removeShardInTransaction(opCtx, name, controlShardName, newTopologyTime.asTimestamp());
 
     shardLock.unlock();
 
@@ -1287,6 +1232,52 @@ void ShardingCatalogManager::_standardizeClusterParameters(OperationContext* opC
     } else {
         _pushClusterParametersToNewShard(opCtx, targeter, clusterParameterDocs.docs);
     }
+}
+
+void ShardingCatalogManager::_removeShardInTransaction(OperationContext* opCtx,
+                                                       const std::string& removedShardName,
+                                                       const std::string& controlShardName,
+                                                       const Timestamp& newTopologyTime) {
+    auto removeShardFn = [removedShardName, controlShardName, newTopologyTime](
+                             const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+        write_ops::DeleteCommandRequest deleteOp(ShardType::ConfigNS);
+        deleteOp.setDeletes({[&]() {
+            write_ops::DeleteOpEntry entry;
+            entry.setMulti(false);
+            entry.setQ(BSON(ShardType::name() << removedShardName));
+            return entry;
+        }()});
+        return txnClient.runCRUDOp(deleteOp, {})
+            .thenRunOn(txnExec)
+            .then([&txnClient, removedShardName, controlShardName, newTopologyTime](
+                      auto deleteResponse) {
+                uassertStatusOK(deleteResponse.toStatus());
+
+                write_ops::UpdateCommandRequest updateOp(ShardType::ConfigNS);
+                updateOp.setUpdates({[&]() {
+                    write_ops::UpdateOpEntry entry;
+                    entry.setUpsert(false);
+                    entry.setMulti(false);
+                    entry.setQ(BSON(ShardType::name() << controlShardName));
+                    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+                        BSON("$set" << BSON(ShardType::topologyTime() << newTopologyTime))));
+                    return entry;
+                }()});
+
+                return txnClient.runCRUDOp(updateOp, {});
+            })
+            .thenRunOn(txnExec)
+            .then([removedShardName](auto updateResponse) {
+                uassertStatusOK(updateResponse.toStatus());
+                LOGV2_DEBUG(
+                    6583701, 1, "Finished removing shard ", "shard"_attr = removedShardName);
+            })
+            .semi();
+    };
+    txn_api::SyncTransactionWithRetries txn(
+        opCtx, Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(), nullptr);
+
+    txn.run(opCtx, removeShardFn);
 }
 
 }  // namespace mongo
