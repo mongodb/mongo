@@ -31,6 +31,25 @@ assert.commandWorked(collB.insert({a: 6, b: 5}));
 assert.commandWorked(collB.insert({a: 6, b: 6}));
 assert.commandWorked(collB.insert({a: 7, b: 7}));
 
+{
+    // Assert plan with nested fields. The top-level fields should be covered by the scans.
+    const res = collA.explain("executionStats").aggregate([
+        {$lookup: {from: "collB", localField: "a.a1", foreignField: "b.b1", as: "out"}}
+    ]);
+
+    const binaryJoinNode = res.queryPlanner.winningPlan.optimizerPlan.child.child.child;
+    assert.eq("BinaryJoin", binaryJoinNode.nodeType);
+
+    const leftScan = binaryJoinNode.leftChild.child;
+    assert.eq("PhysicalScan", leftScan.nodeType);
+    assert(leftScan.fieldProjectionMap.hasOwnProperty("_id"));
+    assert(leftScan.fieldProjectionMap.hasOwnProperty("a"));
+
+    const rightScan = binaryJoinNode.rightChild;
+    assert.eq("PhysicalScan", rightScan.nodeType);
+    assert(rightScan.fieldProjectionMap.hasOwnProperty("b"));
+}
+
 try {
     // TODO: these results need to be updated as the lookup implementation is completed. See
     // comments visitor of DocumentSourceLookUp in abt_document_source_visitor.

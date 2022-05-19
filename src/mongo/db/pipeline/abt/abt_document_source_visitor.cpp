@@ -523,31 +523,49 @@ public:
                                      isLastElement ? std::move(input)
                                                    : make<PathTraverse>(std::move(input)));
             });
+
+        auto localPathProjName = _ctx.getNextId("localPath");
+        entry = _ctx.getNode();
+        _ctx.setNode<EvaluationNode>(
+            entry._rootProjection,
+            localPathProjName,
+            make<EvalPath>(std::move(localPathGet), make<Variable>(entry._rootProjection)),
+            std::move(entry._node));
+
         auto localProjName = _ctx.getNextId("local");
         entry = _ctx.getNode();
         _ctx.setNode<EvaluationNode>(
             entry._rootProjection,
             localProjName,
-            make<FunctionCall>("fillEmpty",
-                               makeSeq(make<EvalPath>(std::move(localPathGet),
-                                                      make<Variable>(entry._rootProjection)),
-                                       Constant::null())),
+            make<FunctionCall>(
+                "fillEmpty",
+                makeSeq(make<Variable>(std::move(localPathProjName)), Constant::null())),
             std::move(entry._node));
+
         const auto& foreignPath = source->getForeignField();
-        ABT foreignPathCmp = translateFieldPath(
+        ABT foreignSimplePath = translateFieldPath(
             *foreignPath,
             make<PathCompare>(Operations::EqMember, make<Variable>(localProjName)),
-            [](const std::string& fieldName, const bool isLastElement, ABT input) {
+            [](const std::string& fieldName, const bool /*isLastElement*/, ABT input) {
                 return make<PathGet>(fieldName, make<PathTraverse>(std::move(input)));
             });
-        ProjectionName foreignProjName = scanProjName;
+
+        // Retain only the top-level get into foreignSimplePath.
+        ABT foreignPathCmp = make<PathIdentity>();
+        std::swap(foreignPathCmp, foreignSimplePath.cast<PathGet>()->getPath());
+
+        ProjectionName foreignProjName = _ctx.getNextId("remotePath");
+        pipelineABT = make<EvaluationNode>(
+            foreignProjName,
+            make<EvalPath>(std::move(foreignSimplePath), make<Variable>(scanProjName)),
+            std::move(pipelineABT));
 
         entry = _ctx.getNode();
         _ctx.setNode<BinaryJoinNode>(
             std::move(entry._rootProjection),
             JoinType::Left,
             ProjectionNameSet{},
-            make<EvalFilter>(std::move(foreignPathCmp), make<Variable>(foreignProjName)),
+            make<EvalFilter>(std::move(foreignPathCmp), make<Variable>(std::move(foreignProjName))),
             std::move(entry._node),
             std::move(pipelineABT));
 
