@@ -439,6 +439,10 @@ Status Balancer::moveRange(OperationContext* opCtx,
         return std::tuple<ShardId, BSONObj>{chunk.getShardId(), chunk.getMin()};
     }();
 
+    if (fromShardId == request.getToShard()) {
+        return Status::OK();
+    }
+
     ShardsvrMoveRange shardSvrRequest(nss);
     shardSvrRequest.setDbName(NamespaceString::kAdminDb);
     shardSvrRequest.setMoveRangeRequestBase(request.getMoveRangeRequestBase());
@@ -1012,10 +1016,15 @@ int Balancer::_moveChunks(OperationContext* opCtx,
     std::vector<std::pair<const MigrateInfo&, SemiFuture<void>>> rebalanceMigrationsAndResponses,
         defragmentationMigrationsAndResponses;
     auto requestMigration = [&](const MigrateInfo& migrateInfo) -> SemiFuture<void> {
-        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
-            opCtx, migrateInfo.nss, repl::ReadConcernLevel::kMajorityReadConcern);
-        auto maxChunkSizeBytes =
-            coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
+        auto maxChunkSizeBytes = [&]() {
+            if (migrateInfo.optMaxChunkSizeBytes.has_value()) {
+                return *migrateInfo.optMaxChunkSizeBytes;
+            }
+
+            auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
+                opCtx, migrateInfo.nss, repl::ReadConcernLevel::kMajorityReadConcern);
+            return coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
+        }();
 
         if (serverGlobalParams.featureCompatibility.isLessThan(
                 multiversion::FeatureCompatibilityVersion::kVersion_6_0)) {
@@ -1029,18 +1038,14 @@ int Balancer::_moveChunks(OperationContext* opCtx,
         MoveRangeRequestBase requestBase(migrateInfo.to);
         requestBase.setWaitForDelete(balancerConfig->waitForDelete());
         requestBase.setMin(migrateInfo.minKey);
-        if (!feature_flags::gNoMoreAutoSplitter.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            // Issue the equivalent of a `moveChunk` if the auto-splitter is enabled
-            requestBase.setMax(migrateInfo.maxKey);
-        }
+        requestBase.setMax(migrateInfo.maxKey);
 
         ShardsvrMoveRange shardSvrRequest(migrateInfo.nss);
         shardSvrRequest.setDbName(NamespaceString::kAdminDb);
         shardSvrRequest.setMoveRangeRequestBase(requestBase);
         shardSvrRequest.setMaxChunkSizeBytes(maxChunkSizeBytes);
         shardSvrRequest.setFromShard(migrateInfo.from);
-        shardSvrRequest.setEpoch(coll.getEpoch());
+        shardSvrRequest.setEpoch(migrateInfo.version.epoch());
         const auto [secondaryThrottle, wc] =
             getSecondaryThrottleAndWriteConcern(balancerConfig->getSecondaryThrottle());
         shardSvrRequest.setSecondaryThrottle(secondaryThrottle);

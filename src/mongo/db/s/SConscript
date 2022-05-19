@@ -381,7 +381,6 @@ env.Library(
         'flush_routing_table_cache_updates_command.cpp',
         'get_database_version_command.cpp',
         'get_shard_version_command.cpp',
-        'get_stats_for_balancing.idl',
         'migration_chunk_cloner_source_legacy_commands.cpp',
         'migration_destination_manager_legacy_commands.cpp',
         'move_primary_coordinator_document.idl',

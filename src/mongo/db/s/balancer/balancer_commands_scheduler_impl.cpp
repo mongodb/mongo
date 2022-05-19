@@ -255,11 +255,12 @@ SemiFuture<void> BalancerCommandsSchedulerImpl::requestMoveChunk(
     auto externalClientInfo =
         issuedByRemoteUser ? boost::optional<ExternalClientInfo>(opCtx) : boost::none;
 
+    invariant(migrateInfo.maxKey.has_value(), "Bound not present when requesting move chunk");
     auto commandInfo = std::make_shared<MoveChunkCommandInfo>(migrateInfo.nss,
                                                               migrateInfo.from,
                                                               migrateInfo.to,
                                                               migrateInfo.minKey,
-                                                              migrateInfo.maxKey,
+                                                              *migrateInfo.maxKey,
                                                               commandSettings.maxChunkSizeBytes,
                                                               commandSettings.secondaryThrottle,
                                                               commandSettings.waitForDelete,

@@ -40,6 +40,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/db/s/sharding_config_server_parameters_gen.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/bits.h"
 #include "mongo/s/balancer_configuration.h"
@@ -48,6 +49,8 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/get_stats_for_balancing_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -96,6 +99,84 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
     }
 
     return {std::move(distribution)};
+}
+
+stdx::unordered_map<NamespaceString, CollectionDataSizeInfoForBalancing>
+getDataSizeInfoForCollections(OperationContext* opCtx,
+                              const std::vector<CollectionType>& collections) {
+    const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
+    uassertStatusOK(balancerConfig->refreshAndCheck(opCtx));
+
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    const auto shardIds = shardRegistry->getAllShardIds(opCtx);
+
+    // Map to be returned, incrementally populated with the collected statistics
+    stdx::unordered_map<NamespaceString, CollectionDataSizeInfoForBalancing> dataSizeInfoMap;
+
+    std::vector<NamespaceWithOptionalUUID> namespacesWithUUIDsForStatsRequest;
+    for (const auto& coll : collections) {
+        const auto& nss = coll.getNss();
+        const auto maxChunkSizeBytes =
+            coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
+
+        dataSizeInfoMap.emplace(
+            nss,
+            CollectionDataSizeInfoForBalancing(std::map<ShardId, int64_t>(), maxChunkSizeBytes));
+
+        NamespaceWithOptionalUUID nssWithUUID(nss);
+        nssWithUUID.setUUID(coll.getUuid());
+        namespacesWithUUIDsForStatsRequest.push_back(nssWithUUID);
+    }
+
+    ShardsvrGetStatsForBalancing req{namespacesWithUUIDsForStatsRequest};
+    req.setScaleFactor(1);
+    const auto reqObj = req.toBSON({});
+
+    const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    const auto responsesFromShards =
+        sharding_util::sendCommandToShards(opCtx,
+                                           NamespaceString::kAdminDb.toString(),
+                                           reqObj,
+                                           shardIds,
+                                           executor,
+                                           false /* throwOnError */);
+
+    for (auto&& response : responsesFromShards) {
+        try {
+            const auto& shardId = response.shardId;
+            const auto errorContext =
+                "Failed to get stats for balancing from shard '{}'"_format(shardId.toString());
+            const auto responseValue =
+                uassertStatusOKWithContext(std::move(response.swResponse), errorContext);
+
+            const ShardsvrGetStatsForBalancingReply reply =
+                ShardsvrGetStatsForBalancingReply::parse(
+                    IDLParserErrorContext("ShardsvrGetStatsForBalancingReply"),
+                    std::move(responseValue.data));
+            const auto collStatsFromShard = reply.getStats();
+
+            invariant(collStatsFromShard.size() == collections.size());
+            for (const auto& stats : collStatsFromShard) {
+                invariant(dataSizeInfoMap.contains(stats.getNs()));
+                dataSizeInfoMap.at(stats.getNs()).shardToDataSizeMap[shardId] = stats.getCollSize();
+            }
+        } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& ex) {
+            // Handle `removeShard`: skip shards removed during a balancing round
+            LOGV2_DEBUG(6581603,
+                        1,
+                        "Skipping shard for the current balancing round",
+                        "error"_attr = redact(ex));
+        }
+    }
+
+    return dataSizeInfoMap;
+}
+
+const CollectionDataSizeInfoForBalancing getDataSizeInfoForCollection(OperationContext* opCtx,
+                                                                      const NamespaceString& nss) {
+    const auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+    std::vector<CollectionType> vec{coll};
+    return std::move(getDataSizeInfoForCollections(opCtx, vec).at(nss));
 }
 
 /**
@@ -343,15 +424,17 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
 
     std::shuffle(collections.begin(), collections.end(), _random);
 
-    for (const auto& coll : collections) {
-        const NamespaceString& nss(coll.getNss());
+    static constexpr auto kStatsForBalancingBatchSize = 20;
 
+    std::vector<CollectionType> collBatch;
+    for (auto collIt = collections.begin(); collIt != collections.end();) {
+        const auto& coll = *(collIt++);
         if (!coll.getAllowBalance() || !coll.getAllowMigrations() || !coll.getPermitMigrations() ||
             coll.getDefragmentCollection()) {
             LOGV2_DEBUG(5966401,
                         1,
                         "Not balancing explicitly disabled collection",
-                        "namespace"_attr = nss,
+                        "namespace"_attr = coll.getNss(),
                         "allowBalance"_attr = coll.getAllowBalance(),
                         "allowMigrations"_attr = coll.getAllowMigrations(),
                         "permitMigrations"_attr = coll.getPermitMigrations(),
@@ -359,23 +442,47 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
             continue;
         }
 
-        auto candidatesStatus =
-            _getMigrateCandidatesForCollection(opCtx, nss, shardStats, usedShards);
-        if (candidatesStatus == ErrorCodes::NamespaceNotFound) {
-            // Namespace got dropped before we managed to get to it, so just skip it
-            continue;
-        } else if (!candidatesStatus.isOK()) {
-            LOGV2_WARNING(21853,
-                          "Unable to balance collection {namespace}: {error}",
-                          "Unable to balance collection",
-                          "namespace"_attr = nss.ns(),
-                          "error"_attr = candidatesStatus.getStatus());
+        collBatch.push_back(coll);
+        if (collBatch.size() < kStatsForBalancingBatchSize && collIt < collections.end()) {
+            // keep Accumulating in the batch
             continue;
         }
 
-        candidateChunks.insert(candidateChunks.end(),
-                               std::make_move_iterator(candidatesStatus.getValue().first.begin()),
-                               std::make_move_iterator(candidatesStatus.getValue().first.end()));
+        boost::optional<stdx::unordered_map<NamespaceString, CollectionDataSizeInfoForBalancing>>
+            collsDataSizeInfo;
+        if (feature_flags::gBalanceAccordingToDataSize.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            collsDataSizeInfo.emplace(getDataSizeInfoForCollections(opCtx, collBatch));
+        }
+
+        for (const auto& collFromBatch : collBatch) {
+            const auto& nss = collFromBatch.getNss();
+
+            boost::optional<CollectionDataSizeInfoForBalancing> optDataSizeInfo;
+            if (collsDataSizeInfo.has_value()) {
+                optDataSizeInfo.emplace(std::move(collsDataSizeInfo->at(nss)));
+            }
+
+            auto candidatesStatus = _getMigrateCandidatesForCollection(
+                opCtx, nss, shardStats, optDataSizeInfo, usedShards);
+            if (candidatesStatus == ErrorCodes::NamespaceNotFound) {
+                // Namespace got dropped before we managed to get to it, so just skip it
+                continue;
+            } else if (!candidatesStatus.isOK()) {
+                LOGV2_WARNING(21853,
+                              "Unable to balance collection",
+                              "namespace"_attr = nss.ns(),
+                              "error"_attr = candidatesStatus.getStatus());
+                continue;
+            }
+
+            candidateChunks.insert(
+                candidateChunks.end(),
+                std::make_move_iterator(candidatesStatus.getValue().first.begin()),
+                std::make_move_iterator(candidatesStatus.getValue().first.end()));
+        }
+
+        collBatch.clear();
     }
 
     return candidateChunks;
@@ -396,7 +503,14 @@ StatusWith<MigrateInfosWithReason> BalancerChunkSelectionPolicyImpl::selectChunk
 
     stdx::unordered_set<ShardId> usedShards;
 
-    auto candidatesStatus = _getMigrateCandidatesForCollection(opCtx, nss, shardStats, &usedShards);
+    boost::optional<CollectionDataSizeInfoForBalancing> optCollDataSizeInfo;
+    if (feature_flags::gBalanceAccordingToDataSize.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        optCollDataSizeInfo.emplace(getDataSizeInfoForCollection(opCtx, nss));
+    }
+
+    auto candidatesStatus = _getMigrateCandidatesForCollection(
+        opCtx, nss, shardStats, optCollDataSizeInfo, &usedShards);
     if (!candidatesStatus.isOK()) {
         return candidatesStatus.getStatus();
     }
@@ -519,6 +633,7 @@ BalancerChunkSelectionPolicyImpl::_getMigrateCandidatesForCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardStatisticsVector& shardStats,
+    const boost::optional<CollectionDataSizeInfoForBalancing>& collDataSizeInfo,
     stdx::unordered_set<ShardId>* usedShards) {
     auto routingInfoStatus =
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss);
@@ -575,6 +690,7 @@ BalancerChunkSelectionPolicyImpl::_getMigrateCandidatesForCollection(
     return BalancerPolicy::balance(
         shardStats,
         distribution,
+        collDataSizeInfo,
         usedShards,
         Grid::get(opCtx)->getBalancerConfiguration()->attemptToBalanceJumboChunks());
 }

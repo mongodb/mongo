@@ -434,11 +434,12 @@ TEST_F(BalancerCommandsSchedulerTest, MoveChunkCommandGetsPersistedOnDiskWhenReq
             ASSERT_EQ(kNss, recoveredCommand->getNameSpace());
             ASSERT_EQ(migrateInfo.from, recoveredCommand->getTarget());
             ASSERT_TRUE(recoveredCommand->requiresDistributedLock());
+
             MoveChunkCommandInfo originalCommandInfo(migrateInfo.nss,
                                                      migrateInfo.from,
                                                      migrateInfo.to,
                                                      migrateInfo.minKey,
-                                                     migrateInfo.maxKey,
+                                                     *migrateInfo.maxKey,
                                                      requestSettings.maxChunkSizeBytes,
                                                      requestSettings.secondaryThrottle,
                                                      requestSettings.waitForDelete,
@@ -464,7 +465,7 @@ TEST_F(BalancerCommandsSchedulerTest, PersistedCommandsAreReissuedWhenRecovering
     auto requestSettings = getMoveChunkSettings(kCustomizedMaxChunkSizeBytes);
     MigrationType recoveryInfo(migrateInfo.nss,
                                migrateInfo.minKey,
-                               migrateInfo.maxKey,
+                               *migrateInfo.maxKey,
                                migrateInfo.from,
                                migrateInfo.to,
                                migrateInfo.version,

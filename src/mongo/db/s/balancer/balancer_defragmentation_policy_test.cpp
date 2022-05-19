@@ -630,7 +630,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoChunkCanBeMovedAndMergedWi
     ASSERT_EQ(biggestChunk.getShard(), moveAction.from);
     ASSERT_EQ(smallestChunk.getShard(), moveAction.to);
     ASSERT_BSONOBJ_EQ(biggestChunk.getMin(), moveAction.minKey);
-    ASSERT_BSONOBJ_EQ(biggestChunk.getMax(), moveAction.maxKey);
+    ASSERT_BSONOBJ_EQ(biggestChunk.getMax(), *moveAction.maxKey);
 
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction == boost::none);

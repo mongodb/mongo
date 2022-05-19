@@ -3,9 +3,17 @@
 (function() {
 'use strict';
 
+load("jstests/libs/feature_flag_util.js");
 load("jstests/sharding/libs/find_chunks_util.js");
 
 var st = new ShardingTest({shards: 3, mongos: 1});
+// TODO SERVER-66378 adapt this test for data size aware balancing
+if (FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'),
+                              "BalanceAccordingToDataSize")) {
+    jsTestLog("Skipping as featureFlagBalanceAccordingToDataSize is enabled");
+    st.stop();
+    return;
+}
 
 assert.commandWorked(st.s0.adminCommand({enablesharding: 'test'}));
 st.ensurePrimaryShard('test', st.shard1.shardName);
