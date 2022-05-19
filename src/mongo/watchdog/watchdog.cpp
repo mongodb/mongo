@@ -158,6 +158,9 @@ void WatchdogPeriodicThread::doLoop() {
                     return (startTime + _period) <= preciseClockSource->now() ||
                         _state == State::kShutdownRequested;
                 });
+            } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>&) {
+                LOGV2_DEBUG(6644400, 1, "Watchdog interrupted due to storage change. Retrying.");
+                continue;
             } catch (const DBException& e) {
                 // The only bad status is when we are in shutdown
                 if (!opCtx->getServiceContext()->getKillAllOperations()) {
