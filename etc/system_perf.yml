@@ -1432,7 +1432,9 @@ buildvariants:
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_query
       - name: change_streams_latency
+      - name: change_streams_preimage_latency
       - name: change_streams_throughput
+      - name: change_streams_preimage_throughput
       - name: change_streams_listen_throughput
       - name: industry_benchmarks
       - name: industry_benchmarks_wmajority
@@ -1561,7 +1563,9 @@ buildvariants:
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_query
       - name: change_streams_throughput
+      - name: change_streams_preimage_throughput
       - name: change_streams_latency
+      - name: change_streams_preimage_latency
       - name: change_streams_listen_throughput
       - name: snapshot_reads
       - name: secondary_reads
