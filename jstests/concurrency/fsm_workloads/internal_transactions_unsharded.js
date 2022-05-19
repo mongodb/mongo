@@ -46,6 +46,10 @@ var $config = extendWorkload($config, function($config, $super) {
 
     // The number of documents assigned to a thread when the workload starts.
     $config.data.partitionSize = 200;
+    // The batch size for the find command to look up the documents assigned to a thread. Use a
+    // large batch size so that a getMore command is never needed since getMore is not retryable and
+    // so running it is not allowed in the suites with stepdown/kill/terminate.
+    $config.data.batchSizeForDocsLookUp = 1000;
     // The counter values for the documents assigned to a thread. The map is populated during
     // the init state and is updated after every write in the other states. Used to verify that
     // updates aren't double applied.
@@ -113,12 +117,24 @@ var $config = extendWorkload($config, function($config, $super) {
         return this.generateRandomInt(1, 2);
     };
 
-    $config.data.getDB = function getDB(db, executionCtxType) {
-        const dbName = db.getName();
+    $config.data.startSessions = function startSessions(db) {
+        this.mongo = db.getMongo();
+        this.nonRetryableWriteSession = this.mongo.startSession(
+            {causalConsistency: this.shouldUseCausalConsistency, retryWrites: false});
+        this.retryableWriteSession = this.mongo.startSession(
+            {causalConsistency: this.shouldUseCausalConsistency, retryWrites: true});
+        this.sessions = [this.nonRetryableWriteSession, this.retryableWriteSession];
 
+        print(`Started a non-retryable write session ${
+            tojsononeline(this.nonRetryableWriteSession.getSessionId())}`);
+        print(`Started a retryable write session ${
+            tojsononeline(this.retryableWriteSession.getSessionId())}`);
+    };
+
+    $config.data.getInternalTransactionDB = function getDB(executionCtxType, dbName) {
         switch (executionCtxType) {
             case this.executionContextTypes.kNoClientSession:
-                return db.getMongo().getDB(dbName);
+                return this.mongo.getDB(dbName);
             case this.executionContextTypes.kClientSession:
                 return this.nonRetryableWriteSession.getDatabase(dbName);
             case this.executionContextTypes.kClientRetryableWrite:
@@ -129,6 +145,12 @@ var $config = extendWorkload($config, function($config, $super) {
             default:
                 throw Error("Unknown execution context");
         }
+    };
+
+    $config.data.getCollectionForDocumentChecks = function getCollectionForDocumentChecks(
+        defaultDb, txnDb, collName) {
+        assert.eq(defaultDb.getMongo().host, txnDb.getMongo().host);
+        return txnDb.getCollection(collName);
     };
 
     $config.data.getMaxClusterTime = function getMaxClusterTime(sessions) {
@@ -149,34 +171,74 @@ var $config = extendWorkload($config, function($config, $super) {
     const updateOpFieldName = "updateOp";
     const findAndModifyOpFieldName = "findAndModifyOp";
 
-    $config.data.getQueryForDocument = function getQueryForDocument(collection, doc) {
+    $config.data.isDirtyDocument = function isDirtyDocument(doc) {
+        for (const executionCtxType in this.dirtyDocs) {
+            if (doc._id in this.dirtyDocs[executionCtxType]) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    $config.data.getQueryForDocument = function getQueryForDocument(doc) {
         return {_id: doc._id, tid: this.tid};
     };
 
-    $config.data.getRandomDocument = function getRandomDocument(collection) {
+    $config.data.getRandomDocument = function getRandomDocument(db, collName) {
+        const aggregateCmdObj = {
+            aggregate: collName,
+            cursor: {},
+            pipeline: [{$match: {tid: this.tid}}, {$sample: {size: 1}}],
+        };
         // Use linearizable read concern to guarantee any subsequent transaction snapshot will
         // include the found document. Skip if the test has a default read concern or requires
         // casual consistency because in both cases the default read concern should provide this
         // guarantee already.
-        const doc = (TestData.defaultReadConcernLevel || this.shouldUseCausalConsistency)
-            ? collection.findOne({tid: this.tid})
-            : collection.findOne({tid: this.tid}, {}, {}, "linearizable");
-        assert.neq(doc, null);
-        return doc;
+        if (!TestData.defaultReadConcernLevel &&
+            !db.getSession().getOptions().isCausalConsistency()) {
+            aggregateCmdObj.readConcern = {level: "linearizable"};
+        }
+
+        let numTries = 0;
+        const numDocs = Object.keys(this.expectedCounters).length;
+        while (numTries < numDocs) {
+            print("Finding a random document " +
+                  tojsononeline({aggregateCmdObj, numTries, numDocs}));
+            const aggRes = assert.commandWorked(db.runCommand(aggregateCmdObj));
+            const doc = aggRes.cursor.firstBatch[0];
+            print("Found a random document " +
+                  tojsononeline({doc, isDirty: this.isDirtyDocument(doc)}));
+            if (!this.isDirtyDocument(doc)) {
+                return doc;
+            }
+            numTries++;
+        }
+        throw Error("Could not find a clean document");
     };
 
-    $config.data.generateRandomDocument = function generateRandomDocument() {
-        return {_id: UUID(), tid: this.tid, counter: 0};
+    $config.data.generateRandomDocument = function generateRandomDocument(tid) {
+        return {_id: UUID(), tid: tid, counter: 0};
     };
 
-    $config.data.generateRandomInsert = function generateRandomInsert(collection) {
-        const docToInsert = this.generateRandomDocument(collection);
+    $config.data.generateRandomInsert = function generateRandomInsert(db, collName) {
+        const docToInsert = this.generateRandomDocument(this.tid);
         docToInsert[insertOpFieldName] = 0;
-        return docToInsert;
+
+        const cmdObj = {insert: collName, documents: [docToInsert]};
+        const checkResponseFunc = (res) => {
+            assert.eq(res.n, 1, res);
+        };
+        const checkDocsFunc = (collection) => {
+            assert.eq(collection.findOne({_id: docToInsert._id}), docToInsert);
+            this.expectedCounters[docToInsert._id] = docToInsert.counter;
+        };
+        const docId = docToInsert._id;
+
+        return {cmdObj, checkResponseFunc, checkDocsFunc, docId};
     };
 
-    $config.data.generateRandomUpdate = function generateRandomUpdate(collection) {
-        const docToUpdate = this.getRandomDocument(collection);
+    $config.data.generateRandomUpdate = function generateRandomUpdate(db, collName) {
+        const docToUpdate = this.getRandomDocument(db, collName);
         assert.neq(docToUpdate, null);
 
         const updatedDoc = Object.assign({}, docToUpdate);
@@ -190,21 +252,50 @@ var $config = extendWorkload($config, function($config, $super) {
             $inc: {counter: 1}
         };
 
-        return {docToUpdate, updatedDoc, update};
+        const cmdObj = {
+            update: collName,
+            updates: [{q: this.getQueryForDocument(docToUpdate), u: update}]
+        };
+        const checkResponseFunc = (res) => {
+            assert.eq(res.n, 1, res);
+            assert.eq(res.nModified, 1, res);
+        };
+        const checkDocsFunc = (collection) => {
+            assert.isnull(collection.findOne(docToUpdate));
+            assert.eq(collection.findOne(this.getQueryForDocument(docToUpdate)), updatedDoc);
+            this.expectedCounters[docToUpdate._id] = updatedDoc.counter;
+        };
+        const docId = docToUpdate._id;
+
+        return {cmdObj, checkResponseFunc, checkDocsFunc, docId};
     };
 
-    $config.data.generateRandomDelete = function generateRandomDelete(collection) {
-        const docToDelete = this.getRandomDocument(collection);
+    $config.data.generateRandomDelete = function generateRandomDelete(db, collName) {
+        const docToDelete = this.getRandomDocument(db, collName);
         assert.neq(docToDelete, null);
-        return docToDelete;
+
+        const cmdObj = {
+            delete: collName,
+            deletes: [{q: this.getQueryForDocument(docToDelete), limit: 1}]
+        };
+        const checkResponseFunc = (res) => {
+            assert.eq(res.n, 1, res);
+        };
+        const checkDocsFunc = (collection) => {
+            assert.isnull(collection.findOne(docToDelete));
+            delete this.expectedCounters[docToDelete._id];
+        };
+        const docId = docToDelete._id;
+
+        return {cmdObj, checkResponseFunc, checkDocsFunc, docId};
     };
 
-    $config.data.generateRandomFindAndModify = function generateRandomFindAndModify(collection) {
+    $config.data.generateRandomFindAndModify = function generateRandomFindAndModify(db, collName) {
         const isUpsert = this.generateRandomBool();
         const imageType = this.generateRandomImageType();
 
         const docToUpdate =
-            isUpsert ? this.generateRandomDocument(collection) : this.getRandomDocument(collection);
+            isUpsert ? this.generateRandomDocument(this.tid) : this.getRandomDocument(db, collName);
 
         const updatedDoc = Object.assign({}, docToUpdate);
         updatedDoc[findAndModifyOpFieldName] = docToUpdate.hasOwnProperty(findAndModifyOpFieldName)
@@ -217,7 +308,35 @@ var $config = extendWorkload($config, function($config, $super) {
             $inc: {counter: 1}
         };
 
-        return {docToUpdate, updatedDoc, update, isUpsert, imageType};
+        const cmdObj = {
+            findAndModify: collName,
+            query: this.getQueryForDocument(docToUpdate),
+            update: update
+        };
+        cmdObj.upsert = isUpsert;
+        if (imageType == this.imageTypes.kPostImage) {
+            cmdObj.new = true;
+        }
+        const checkResponseFunc = (res) => {
+            assert.eq(res.lastErrorObject.n, 1, res);
+            if (isUpsert) {
+                assert.eq(res.lastErrorObject.updatedExisting, false, res);
+                assert.eq(res.lastErrorObject.upserted, updatedDoc._id, res);
+            } else {
+                assert.eq(res.lastErrorObject.updatedExisting, true, res);
+                assert.eq(res.value,
+                          imageType == this.imageTypes.kPreImage ? docToUpdate : updatedDoc,
+                          res);
+            }
+        };
+        const checkDocsFunc = (collection) => {
+            assert.isnull(collection.findOne(docToUpdate));
+            assert.neq(collection.findOne(updatedDoc), null);
+            this.expectedCounters[docToUpdate._id] = updatedDoc.counter;
+        };
+        const docId = docToUpdate._id;
+
+        return {cmdObj, checkResponseFunc, checkDocsFunc, docId};
     };
 
     /**
@@ -230,41 +349,42 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     /**
-     * Runs the given the write command 'writeCmdObj' inside an internal transaction using the given
-     * client 'executionCtxType'.
+     * Runs the command specified by 'crudOp.cmdObj' inside an internal transaction using the
+     * specified client 'executionCtxType'.
      */
     $config.data.runInternalTransaction = function runInternalTransaction(
-        db, collection, executionCtxType, writeCmdObj, checkResponseFunc, checkDocsFunc, docId) {
+        defaultDb, collName, executionCtxType, crudOp) {
         // The testInternalTransactions command below runs with the session setting defined by
         // 'executionCtxType'.
         fsm.forceRunningOutsideTransaction(this);
 
-        if (executionCtxType == this.executionContextTypes.kClientRetryableWrite) {
-            writeCmdObj.stmtId = NumberInt(1);
-        }
-
         // Add an insert command to each transaction so that when this workload is running on a
         // sharded cluster there can be a mix of single-shard and cross-shard transactions.
-        const docToInsert = this.generateRandomInsert(collection);
-        const insertCmdObj = {insert: collection.getName(), documents: [docToInsert]};
-        if (executionCtxType == this.executionContextTypes.kClientRetryableWrite) {
-            insertCmdObj.stmtId = NumberInt(-1);
-        }
+        const insertOp = this.generateRandomInsert(defaultDb, collName);
 
-        const testInternalTxnCmdObj = {
+        if (executionCtxType == this.executionContextTypes.kClientRetryableWrite) {
+            crudOp.cmdObj.stmtId = NumberInt(1);
+            insertOp.cmdObj.stmtId = NumberInt(-1);
+        }
+        const internalTxnTestCmdObj = {
             testInternalTransactions: 1,
             commandInfos: [
-                {dbName: db.getName(), command: writeCmdObj},
-                {dbName: db.getName(), command: insertCmdObj}
+                {dbName: defaultDb.getName(), command: crudOp.cmdObj},
+                {dbName: defaultDb.getName(), command: insertOp.cmdObj}
             ],
         };
-        print(`Running an internal transaction using a test command ${
-            tojsononeline(testInternalTxnCmdObj)}: ${tojsononeline({executionCtxType})}`);
+        if (this.useClusterClient) {
+            internalTxnTestCmdObj.useClusterClient = true;
+        }
 
-        let runFunc = () => {
-            let res;
+        print(`Running an internal transaction using a test command ${
+            tojsononeline(internalTxnTestCmdObj)}: ${tojsononeline({executionCtxType})}`);
+        const txnDb = this.getInternalTransactionDB(executionCtxType, defaultDb.getName());
+
+        let res;
+        const runFunc = () => {
             try {
-                res = db.adminCommand(testInternalTxnCmdObj);
+                res = txnDb.adminCommand(internalTxnTestCmdObj);
                 print(`Response: ${tojsononeline(res)}`);
                 assert.commandWorked(res);
             } catch (e) {
@@ -275,45 +395,65 @@ var $config = extendWorkload($config, function($config, $super) {
                 }
                 throw e;
             }
-
-            res.responses.forEach(innerRes => {
-                assert.commandWorked(innerRes);
-            });
-            if (executionCtxType == this.executionContextTypes.kClientRetryableWrite) {
-                // If the command was retried, 'responses' would only contain the response for
-                // 'writeCmdObj'.
-                assert.lte(res.responses.length, 2);
-            } else {
-                assert.eq(res.responses.length, 2);
-            }
-            const writeCmdRes = res.responses[0];
-            checkResponseFunc(writeCmdRes);
-            if (res.responses.length == 2) {
-                const insertCmdRes = res.responses[1];
-                assert.eq(insertCmdRes.n, 1, insertCmdRes);
-            }
         };
 
         print("Starting internal transaction");
-        this.dirtyDocs[executionCtxType][docId] = Object.keys(writeCmdObj)[0];
-        this.dirtyDocs[executionCtxType][docToInsert._id] = "insert";
+        this.dirtyDocs[executionCtxType][crudOp.docId] = Object.keys(crudOp.cmdObj)[0];
+        this.dirtyDocs[executionCtxType][insertOp.docId] = "insert";
+
         if (executionCtxType == this.executionContextTypes.kClientTransaction) {
             withTxnAndAutoRetry(
-                db.getSession(), runFunc, {retryOnKilledSession: this.retryOnKilledSession});
+                txnDb.getSession(), runFunc, {retryOnKilledSession: this.retryOnKilledSession});
         } else {
             runFunc();
         }
-        delete this.dirtyDocs[executionCtxType][docId];
-        delete this.dirtyDocs[executionCtxType][docToInsert._id];
-        print("Finished internal transaction");
 
-        checkDocsFunc();
-        assert.eq(collection.findOne({_id: docToInsert._id}), docToInsert);
-        this.expectedCounters[docToInsert._id] = docToInsert.counter;
+        // Check responses.
+        res.responses.forEach(innerRes => {
+            assert.commandWorked(innerRes);
+        });
+        if (executionCtxType == this.executionContextTypes.kClientRetryableWrite) {
+            // If the command was retried, 'responses' would only contain the response for
+            // 'crudOp.cmdObj'.
+            assert.lte(res.responses.length, 2);
+        } else {
+            assert.eq(res.responses.length, 2);
+        }
+        const crudRes = res.responses[0];
+        crudOp.checkResponseFunc(crudRes);
+        if (res.responses.length == 2) {
+            const insertRes = res.responses[1];
+            insertOp.checkResponseFunc(insertRes);
+        }
+
+        // Check documents.
+        const collection = this.getCollectionForDocumentChecks(defaultDb, txnDb, collName);
+        crudOp.checkDocsFunc(collection);
+        insertOp.checkDocsFunc(collection);
+
+        delete this.dirtyDocs[executionCtxType][crudOp.docId];
+        delete this.dirtyDocs[executionCtxType][insertOp.docId];
+        print("Finished internal transaction");
+    };
+
+    $config.data.insertInitialDocuments = function insertInitialDocuments(db, collName, tid) {
+        let bulk = db.getCollection(collName).initializeUnorderedBulkOp();
+        for (let i = 0; i < this.partitionSize; ++i) {
+            const doc = this.generateRandomDocument(tid);
+            bulk.insert(doc);
+        }
+        assert.commandWorked(bulk.execute());
     };
 
     $config.setup = function setup(db, collName, cluster) {
         assert.commandWorked(db.createCollection(collName, {writeConcern: {w: "majority"}}));
+        if (this.insertInitialDocsOnSetUp) {
+            // There isn't a way to determine what the thread ids are in setup phase so just assume
+            // that they are [0, 1, ..., this.threadCount-1].
+            for (let tid = 0; tid < this.threadCount; ++tid) {
+                this.insertInitialDocuments(db, collName, tid);
+            }
+        }
 
         // Store the findAndModify images in the oplog half of the time.
         const enableFindAndModifyImageCollection = this.generateRandomBool();
@@ -341,151 +481,59 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function init(db, collName) {
         $super.states.init.apply(this, arguments);
 
-        this.nonRetryableWriteSession = db.getMongo().startSession(
-            {causalConsistency: this.shouldUseCausalConsistency, retryWrites: false});
-        this.retryableWriteSession = db.getMongo().startSession(
-            {causalConsistency: this.shouldUseCausalConsistency, retryWrites: true});
-        print(`Started a non-retryable write session ${
-            tojsononeline(this.nonRetryableWriteSession.getSessionId())}`);
-        print(`Started a retryable write session ${
-            tojsononeline(this.retryableWriteSession.getSessionId())}`);
-
-        const collection = db.getCollection(collName);
-        let bulk = collection.initializeUnorderedBulkOp();
-        for (let i = 0; i < this.partitionSize; ++i) {
-            const doc = this.generateRandomDocument(collection);
-            bulk.insert(doc);
-            this.expectedCounters[doc._id] = doc.counter;
+        if (!this.insertInitialDocsOnSetUp) {
+            this.insertInitialDocuments(db, collName, this.tid);
         }
-        assert.commandWorked(bulk.execute());
+
+        const docs = assert
+                         .commandWorked(db.runCommand({
+                             find: collName,
+                             filter: {tid: this.tid},
+                             batchSize: this.batchSizeForDocsLookUp,
+                         }))
+                         .cursor.firstBatch;
+        assert.eq(docs.length, this.partitionSize);
+        docs.forEach(doc => {
+            this.expectedCounters[doc._id] = doc.counter;
+        });
+
+        this.startSessions(db);
     };
 
     $config.states.internalTransactionForInsert = function internalTransactionForInsert(db,
                                                                                         collName) {
+        print("Starting internalTransactionForInsert");
         const executionCtxType = this.generateRandomExecutionContext();
-        db = this.getDB(db, executionCtxType);
-        const collection = db.getCollection(collName);
-
-        const docToInsert = this.generateRandomInsert(collection);
-        const insertCmdObj = {insert: collection.getName(), documents: [docToInsert]};
-        const checkResponseFunc = (res) => {
-            assert.eq(res.n, 1, res);
-        };
-        const checkDocsFunc = () => {
-            assert.eq(collection.findOne({_id: docToInsert._id}), docToInsert);
-            this.expectedCounters[docToInsert._id] = docToInsert.counter;
-        };
-
-        this.runInternalTransaction(db,
-                                    collection,
-                                    executionCtxType,
-                                    insertCmdObj,
-                                    checkResponseFunc,
-                                    checkDocsFunc,
-                                    docToInsert._id);
+        const insertOp = this.generateRandomInsert(db, collName);
+        this.runInternalTransaction(db, collName, executionCtxType, insertOp);
+        print("Finished internalTransactionForInsert");
     };
 
     $config.states.internalTransactionForUpdate = function internalTransactionForUpdate(db,
                                                                                         collName) {
+        print("Starting internalTransactionForUpdate");
         const executionCtxType = this.generateRandomExecutionContext();
-        db = this.getDB(db, executionCtxType);
-        const collection = db.getCollection(collName);
-
-        const {docToUpdate, updatedDoc, update} = this.generateRandomUpdate(collection);
-        const updateCmdObj = {
-            update: collection.getName(),
-            updates: [{q: this.getQueryForDocument(collection, docToUpdate), u: update}]
-        };
-        const checkResponseFunc = (res) => {
-            assert.eq(res.n, 1, res);
-            assert.eq(res.nModified, 1, res);
-        };
-        const checkDocsFunc = () => {
-            assert.isnull(collection.findOne(docToUpdate));
-            assert.eq(collection.findOne(this.getQueryForDocument(collection, docToUpdate)),
-                      updatedDoc);
-            this.expectedCounters[docToUpdate._id] = updatedDoc.counter;
-        };
-
-        this.runInternalTransaction(db,
-                                    collection,
-                                    executionCtxType,
-                                    updateCmdObj,
-                                    checkResponseFunc,
-                                    checkDocsFunc,
-                                    docToUpdate._id);
+        const updateOp = this.generateRandomUpdate(db, collName);
+        this.runInternalTransaction(db, collName, executionCtxType, updateOp);
+        print("Finished internalTransactionForUpdate");
     };
 
     $config.states.internalTransactionForDelete = function internalTransactionForDelete(db,
                                                                                         collName) {
+        print("Starting internalTransactionForDelete");
         const executionCtxType = this.generateRandomExecutionContext();
-        db = this.getDB(db, executionCtxType);
-        const collection = db.getCollection(collName);
-
-        const docToDelete = this.generateRandomDelete(collection);
-        const deleteCmdObj = {
-            delete: collection.getName(),
-            deletes: [{q: this.getQueryForDocument(collection, docToDelete), limit: 1}]
-        };
-        const checkResponseFunc = (res) => {
-            assert.eq(res.n, 1, res);
-        };
-        const checkDocsFunc = () => {
-            assert.isnull(collection.findOne(docToDelete));
-            delete this.expectedCounters[docToDelete._id];
-        };
-
-        this.runInternalTransaction(db,
-                                    collection,
-                                    executionCtxType,
-                                    deleteCmdObj,
-                                    checkResponseFunc,
-                                    checkDocsFunc,
-                                    docToDelete._id);
+        const deleteOp = this.generateRandomDelete(db, collName);
+        this.runInternalTransaction(db, collName, executionCtxType, deleteOp);
+        print("Finished internalTransactionForDelete");
     };
 
     $config.states.internalTransactionForFindAndModify =
         function internalTransactionForFindAndModify(db, collName) {
+        print("Starting internalTransactionForFindAndModify");
         const executionCtxType = this.generateRandomExecutionContext();
-        db = this.getDB(db, executionCtxType);
-        const collection = db.getCollection(collName);
-
-        const {docToUpdate, updatedDoc, update, isUpsert, imageType} =
-            this.generateRandomFindAndModify(collection);
-        const findAndModifyCmdObj = {
-            findAndModify: collection.getName(),
-            query: this.getQueryForDocument(collection, docToUpdate),
-            update: update
-        };
-        findAndModifyCmdObj.upsert = isUpsert;
-        if (imageType == this.imageTypes.kPostImage) {
-            findAndModifyCmdObj.new = true;
-        }
-        const checkResponseFunc = (res) => {
-            assert.eq(res.lastErrorObject.n, 1, res);
-            if (isUpsert) {
-                assert.eq(res.lastErrorObject.updatedExisting, false, res);
-                assert.eq(res.lastErrorObject.upserted, updatedDoc._id, res);
-            } else {
-                assert.eq(res.lastErrorObject.updatedExisting, true, res);
-                assert.eq(res.value,
-                          imageType == this.imageTypes.kPreImage ? docToUpdate : updatedDoc,
-                          res);
-            }
-        };
-        const checkDocsFunc = () => {
-            assert.isnull(collection.findOne(docToUpdate));
-            assert.neq(collection.findOne(updatedDoc), null);
-            this.expectedCounters[docToUpdate._id] = updatedDoc.counter;
-        };
-
-        this.runInternalTransaction(db,
-                                    collection,
-                                    executionCtxType,
-                                    findAndModifyCmdObj,
-                                    checkResponseFunc,
-                                    checkDocsFunc,
-                                    docToUpdate._id);
+        const findAndModifyOp = this.generateRandomFindAndModify(db, collName);
+        this.runInternalTransaction(db, collName, executionCtxType, findAndModifyOp);
+        print("Finished internalTransactionForFindAndModify");
     };
 
     /**
@@ -493,6 +541,8 @@ var $config = extendWorkload($config, function($config, $super) {
      * expected values.
      */
     $config.states.verifyDocuments = function verifyDocuments(db, collName) {
+        print("Starting verifyDocuments");
+
         for (const executionCtxType in this.expectDirtyDocs) {
             const numDirtyDocs = Object.keys(this.dirtyDocs[executionCtxType]).length;
             print(`Dirty documents: ${tojsononeline({
@@ -514,28 +564,26 @@ var $config = extendWorkload($config, function($config, $super) {
 
         // Run the find command with batch size equal to the number of documents + 1 to avoid
         // running getMore commands as getMore's are not retryable upon network errors.
-        const numExpectedDocs = Object.keys(this.expectedCounters).length;
+        const numDocsExpected = Object.keys(this.expectedCounters).length;
         const findCmdObj = {
             find: collName,
             filter: {tid: this.tid},
-            batchSize: numExpectedDocs + 1,
+            batchSize: this.batchSizeForDocsLookUp,
         };
         if (this.shouldUseCausalConsistency) {
-            findCmdObj.readConcern = {
-                afterClusterTime: this.getMaxClusterTime(
-                    [this.nonRetryableWriteSession, this.retryableWriteSession])
-            };
+            findCmdObj.readConcern = {afterClusterTime: this.getMaxClusterTime(this.sessions)};
             if (TestData.runningWithShardStepdowns) {
                 findCmdObj.readConcern.level = "majority";
             }
         }
         const docs = assert.commandWorked(db.runCommand(findCmdObj)).cursor.firstBatch;
+        print("verifyDocuments " +
+              tojsononeline(
+                  {findCmdObj, numDocsFound: docs.length, numDocsExpected: numDocsExpected}));
 
         docs.forEach(doc => {
-            for (const executionCtxType in this.dirtyDocs) {
-                if (doc._id in this.dirtyDocs[executionCtxType]) {
-                    return;
-                }
+            if (this.isDirtyDocument(doc)) {
+                return;
             }
             assert(doc._id in this.expectedCounters, tojson(doc));
             const expectedCounter = this.expectedCounters[doc._id];
@@ -543,6 +591,8 @@ var $config = extendWorkload($config, function($config, $super) {
                 return 'unexpected counter value, doc: ' + tojson(doc);
             });
         });
+
+        print("Finished verifyDocuments");
     };
 
     if ($config.passConnectionCache) {
@@ -617,11 +667,10 @@ var $config = extendWorkload($config, function($config, $super) {
             verifyDocuments: 0.2
         },
         verifyDocuments: {
-            internalTransactionForInsert: 0.2,
-            internalTransactionForUpdate: 0.2,
-            internalTransactionForDelete: 0.2,
-            internalTransactionForFindAndModify: 0.2,
-            verifyDocuments: 0.2
+            internalTransactionForInsert: 0.25,
+            internalTransactionForUpdate: 0.25,
+            internalTransactionForDelete: 0.25,
+            internalTransactionForFindAndModify: 0.25,
         }
     };
 

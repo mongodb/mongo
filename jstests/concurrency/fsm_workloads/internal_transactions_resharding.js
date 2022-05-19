@@ -26,28 +26,21 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.currentShardKeyIndex = -1;
     $config.data.reshardingCount = 0;
 
-    $config.data.getQueryForDocument = function getQueryForDocument(collection, doc) {
+    $config.data.getQueryForDocument = function getQueryForDocument(doc) {
         // The query for a write command against a sharded collection must contain the shard key.
-        const defaultShardKeyFieldName = this.shardKeyField[collection.getName()];
-        return {
-            _id: doc._id,
-            tid: this.tid,
-            [defaultShardKeyFieldName]: doc[defaultShardKeyFieldName],
-            [customShardKeyFieldName]: doc[customShardKeyFieldName]
-        };
+        const query = $super.data.getQueryForDocument.apply(this, arguments);
+        query[customShardKeyFieldName] = doc[customShardKeyFieldName];
+        return query;
     };
 
-    $config.data.generateRandomDocument = function generateRandomDocument(collection) {
-        const defaultShardKeyFieldName = this.shardKeyField[collection.getName()];
-        return {
-            _id: UUID(),
-            tid: this.tid,
-            [defaultShardKeyFieldName]:
-                this.generateRandomInt(this.partition.lower, this.partition.upper - 1),
-            [customShardKeyFieldName]:
-                this.generateRandomInt(this.partition.lower, this.partition.upper - 1),
-            counter: 0
-        };
+    $config.data.generateRandomDocument = function generateRandomDocument(tid, {partition} = {}) {
+        const doc = $super.data.generateRandomDocument.apply(this, arguments);
+        if (partition === undefined) {
+            partition = this.partition;
+        }
+        assert.neq(partition, null);
+        doc[customShardKeyFieldName] = this.generateRandomInt(partition.lower, partition.upper - 1);
+        return doc;
     };
 
     $config.data.isAcceptableRetryError = function isAcceptableRetryError(res) {
@@ -154,11 +147,10 @@ var $config = extendWorkload($config, function($config, $super) {
         },
         verifyDocuments: {
             reshardCollection: 0.2,
-            internalTransactionForInsert: 0.15,
-            internalTransactionForUpdate: 0.15,
-            internalTransactionForDelete: 0.15,
-            internalTransactionForFindAndModify: 0.15,
-            verifyDocuments: 0.2
+            internalTransactionForInsert: 0.2,
+            internalTransactionForUpdate: 0.2,
+            internalTransactionForDelete: 0.2,
+            internalTransactionForFindAndModify: 0.2,
         }
     };
 

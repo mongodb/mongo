@@ -64,11 +64,10 @@ var $config = extendWorkload($config, function($config, $super) {
         },
         verifyDocuments: {
             moveChunk: 0.2,
-            internalTransactionForInsert: 0.15,
-            internalTransactionForUpdate: 0.15,
-            internalTransactionForDelete: 0.15,
-            internalTransactionForFindAndModify: 0.15,
-            verifyDocuments: 0.2
+            internalTransactionForInsert: 0.2,
+            internalTransactionForUpdate: 0.2,
+            internalTransactionForDelete: 0.2,
+            internalTransactionForFindAndModify: 0.2,
         }
     };
 

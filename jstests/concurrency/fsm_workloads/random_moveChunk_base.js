@@ -125,7 +125,17 @@ var $config = extendWorkload($config, function($config, $super) {
         this.ownedIds[collName] = [];
 
         // Search the collection to find the _ids of docs assigned to this thread.
-        const docsOwnedByThread = db[collName].find({tid: this.tid}).toArray();
+        const docsOwnedByThread =
+            assert
+                .commandWorked(db.runCommand({
+                    find: collName,
+                    filter: {tid: this.tid},
+                    // Use a large batch size so that a getMore command is never needed since
+                    // getMore is not retryable and so running it is not allowed in the suites with
+                    // stepdown/kill/terminate.
+                    batchSize: 1000,
+                }))
+                .cursor.firstBatch;
         assert.neq(0, docsOwnedByThread.size);
         docsOwnedByThread.forEach(doc => {
             this.ownedIds[collName].push(doc._id);
