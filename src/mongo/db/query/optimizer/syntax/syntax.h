@@ -138,6 +138,7 @@ inline bool operator!=(const ABT& left, const ABT& right) {
 #define PATHSYNTAX_OPNAMES(F)   \
     /* comparison operations */ \
     F(Eq)                       \
+    F(EqMember)                 \
     F(Neq)                      \
     F(Gt)                       \
     F(Gte)                      \

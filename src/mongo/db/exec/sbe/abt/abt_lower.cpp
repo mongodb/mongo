@@ -642,12 +642,30 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const BinaryJoinNode& n,
     auto outerProjects =
         convertRequiredProjectionsToSlots(leftChildProps, true /*addRIDProjection*/);
 
+    const auto& rightChildProps = _nodeToGroupPropsMap.at(n.getRightChild().cast<Node>());
+
+    auto innerProjects =
+        convertRequiredProjectionsToSlots(rightChildProps, false /*addRIDProjection*/);
+
+    sbe::JoinType joinType = [&]() {
+        switch (n.getJoinType()) {
+            case JoinType::Inner:
+                return sbe::JoinType::Inner;
+            case JoinType::Left:
+                return sbe::JoinType::Left;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }();
+
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
     return sbe::makeS<sbe::LoopJoinStage>(std::move(outerStage),
                                           std::move(innerStage),
                                           std::move(outerProjects),
                                           std::move(correlatedSlots),
+                                          std::move(innerProjects),
                                           std::move(expr),
+                                          joinType,
                                           planNodeId);
 }
 

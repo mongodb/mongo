@@ -34,6 +34,8 @@
 #include "mongo/db/exec/sbe/vm/vm.h"
 
 namespace mongo::sbe {
+enum class JoinType { Inner, Left, Right };
+
 /**
  * Implements a traditional nested loop join. For each advance from the 'outer' child, re-opens the
  * 'inner' child and calls 'getNext()' on the inner child until EOF. The caller can optionally
@@ -55,11 +57,21 @@ namespace mongo::sbe {
  */
 class LoopJoinStage final : public PlanStage {
 public:
+    // Legacy constructor.
     LoopJoinStage(std::unique_ptr<PlanStage> outer,
                   std::unique_ptr<PlanStage> inner,
                   value::SlotVector outerProjects,
                   value::SlotVector outerCorrelated,
                   std::unique_ptr<EExpression> predicate,
+                  PlanNodeId nodeId);
+
+    LoopJoinStage(std::unique_ptr<PlanStage> outer,
+                  std::unique_ptr<PlanStage> inner,
+                  value::SlotVector outerProjects,
+                  value::SlotVector outerCorrelated,
+                  value::SlotVector innerProjects,
+                  std::unique_ptr<EExpression> predicate,
+                  JoinType joinType,
                   PlanNodeId nodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
@@ -93,16 +105,28 @@ private:
     // Set of correlated variables from the outer side that are visible on the inner side.
     const value::SlotVector _outerCorrelated;
 
+    const value::SlotVector _innerProjects;
+
     // Predicate to filter the joint set. If not set then the result is a cross product.
     // Note: the predicate resolves the slots it's using through this stage's public accessors,
     // meaning that if they are coming from the 'outer', they must be projected by the 'outer'.
     const std::unique_ptr<EExpression> _predicate;
+
+    const JoinType _joinType;
+
     vm::ByteCode _bytecode;
     std::unique_ptr<vm::CodeFragment> _predicateCode;
+
+    // Switching between the input and Nothing/null for outer joins. Unused for inner joins.
+    value::SlotMap<value::SwitchAccessor> _outProjectAccessors;
+    // Defaults to Nothing. We have to explicitely reset to null if we want the null extenstion.
+    value::OwnedValueAccessor _constant;
 
     // '_outerProjects' as a set (for faster checking of accessors, provided by the 'outer' child).
     value::SlotSet _outerRefs;
 
+    PlanState _innerState{PlanState::IS_EOF};
+    bool _innerReturned{false};
     bool _reOpenInner{false};
     bool _outerGetNext{false};
     LoopJoinStats _specificStats;

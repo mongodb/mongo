@@ -42,20 +42,44 @@ LoopJoinStage::LoopJoinStage(std::unique_ptr<PlanStage> outer,
                              value::SlotVector outerCorrelated,
                              std::unique_ptr<EExpression> predicate,
                              PlanNodeId nodeId)
+    : LoopJoinStage(std::move(outer),
+                    std::move(inner),
+                    std::move(outerProjects),
+                    std::move(outerCorrelated),
+                    value::SlotVector{},
+                    std::move(predicate),
+                    JoinType::Inner,
+                    nodeId) {}
+
+LoopJoinStage::LoopJoinStage(std::unique_ptr<PlanStage> outer,
+                             std::unique_ptr<PlanStage> inner,
+                             value::SlotVector outerProjects,
+                             value::SlotVector outerCorrelated,
+                             value::SlotVector innerProjects,
+                             std::unique_ptr<EExpression> predicate,
+                             JoinType joinType,
+                             PlanNodeId nodeId)
     : PlanStage("nlj"_sd, nodeId),
       _outerProjects(std::move(outerProjects)),
       _outerCorrelated(std::move(outerCorrelated)),
-      _predicate(std::move(predicate)) {
+      _innerProjects(std::move(innerProjects)),
+      _predicate(std::move(predicate)),
+      _joinType(joinType) {
     _children.emplace_back(std::move(outer));
     _children.emplace_back(std::move(inner));
+
+    invariant(_joinType == JoinType::Inner || _joinType == JoinType::Left);
 }
+
 
 std::unique_ptr<PlanStage> LoopJoinStage::clone() const {
     return std::make_unique<LoopJoinStage>(_children[0]->clone(),
                                            _children[1]->clone(),
                                            _outerProjects,
                                            _outerCorrelated,
+                                           _innerProjects,
                                            _predicate ? _predicate->clone() : nullptr,
+                                           _joinType,
                                            _commonStats.nodeId);
 }
 
@@ -75,6 +99,13 @@ void LoopJoinStage::prepare(CompileCtx& ctx) {
         ctx.popCorrelated();
     }
 
+    if (_joinType == JoinType::Left) {
+        for (auto slot : _innerProjects) {
+            _outProjectAccessors.emplace(
+                slot, value::SwitchAccessor{{_children[1]->getAccessor(ctx, slot), &_constant}});
+        }
+    }
+
     if (_predicate) {
         ctx.root = this;
         _predicateCode = _predicate->compile(ctx);
@@ -85,7 +116,12 @@ value::SlotAccessor* LoopJoinStage::getAccessor(CompileCtx& ctx, value::SlotId s
     if (_outerRefs.count(slot)) {
         return _children[0]->getAccessor(ctx, slot);
     }
-
+    if (_joinType == JoinType::Left) {
+        if (auto it = _outProjectAccessors.find(slot); it != _outProjectAccessors.end()) {
+            return &it->second;
+        }
+        return ctx.getAccessor(slot);
+    }
     return _children[1]->getAccessor(ctx, slot);
 }
 
@@ -100,6 +136,13 @@ void LoopJoinStage::open(bool reOpen) {
 }
 
 void LoopJoinStage::openInner() {
+    // Reset back to the inputs.
+    for (auto&& [k, v] : _outProjectAccessors) {
+        v.setIndex(0);
+    }
+    _innerState = PlanState::ADVANCED;
+    _innerReturned = false;
+
     // (re)open the inner side as it can see the correlated value now.
     _children[1]->open(_reOpenInner);
     _reOpenInner = true;
@@ -120,26 +163,34 @@ PlanState LoopJoinStage::getNext() {
     }
 
     for (;;) {
-        auto state = PlanState::IS_EOF;
         bool pass = false;
 
-        do {
-            state = _children[1]->getNext();
-            if (state == PlanState::ADVANCED) {
+        while (_innerState == PlanState::ADVANCED && !pass) {
+            _innerState = _children[1]->getNext();
+            if (_innerState == PlanState::ADVANCED) {
                 if (!_predicateCode) {
                     pass = true;
                 } else {
                     pass = _bytecode.runPredicate(_predicateCode.get());
                 }
             }
-        } while (state == PlanState::ADVANCED && !pass);
+        }
 
-        if (state == PlanState::ADVANCED) {
+        if (_innerState == PlanState::ADVANCED) {
+            _innerReturned = true;
             return trackPlanState(PlanState::ADVANCED);
         }
-        invariant(state == PlanState::IS_EOF);
+        invariant(_innerState == PlanState::IS_EOF);
 
-        state = getNextOuterSide();
+        if (_joinType == JoinType::Left && !_innerReturned) {
+            for (auto&& [k, v] : _outProjectAccessors) {
+                v.setIndex(1);
+            }
+            _innerReturned = true;
+            return trackPlanState(PlanState::ADVANCED);
+        }
+
+        auto state = getNextOuterSide();
         if (state != PlanState::ADVANCED) {
             return trackPlanState(state);
         }
