@@ -68,8 +68,6 @@ public:
 
     const NamespaceString& ns() const final;
 
-    void init(std::unique_ptr<IndexAccessMethod> accessMethod) final;
-
     const std::string& getIdent() const final {
         return _ident;
     }
@@ -87,6 +85,8 @@ public:
     const IndexAccessMethod* accessMethod() const final {
         return _accessMethod.get();
     }
+
+    void setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) final;
 
     bool isHybridBuilding() const final {
         return _indexBuildInterceptor != nullptr;

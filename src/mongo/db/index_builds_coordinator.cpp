@@ -71,6 +71,7 @@ MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildSecondDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulk);
 MONGO_FAIL_POINT_DEFINE(hangAfterInitializingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangBeforeCompletingAbort);
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeCommit);
 MONGO_FAIL_POINT_DEFINE(failIndexBuildOnCommit);
 
 namespace {
@@ -433,9 +434,8 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         WriteUnitOfWork wuow(opCtx);
 
         for (size_t i = 0; i < indexNames.size(); i++) {
-            bool includeUnfinished = false;
-            auto descriptor =
-                indexCatalog->findIndexByName(opCtx, indexNames[i], includeUnfinished);
+            auto descriptor = indexCatalog->findIndexByName(
+                opCtx, indexNames[i], IndexCatalog::InclusionPolicy::kReady);
             if (descriptor) {
                 Status s = indexCatalog->dropIndex(opCtx, descriptor);
                 if (!s.isOK()) {
@@ -474,8 +474,11 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
             // If the unfinished index is in the IndexCatalog, drop it through there, otherwise drop
             // it from the DurableCatalog. Rollback-via-refetch does not clear any in-memory state,
             // so we should do it manually here.
-            includeUnfinished = true;
-            descriptor = indexCatalog->findIndexByName(opCtx, indexNames[i], includeUnfinished);
+            descriptor = indexCatalog->findIndexByName(
+                opCtx,
+                indexNames[i],
+                IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished |
+                    IndexCatalog::InclusionPolicy::kFrozen);
             if (descriptor) {
                 Status s = indexCatalog->dropUnfinishedIndex(opCtx, descriptor);
                 if (!s.isOK()) {
@@ -704,14 +707,14 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
 
             IndexCatalog* indexCatalog = coll->getIndexCatalog();
 
-            const bool includeUnfinished = false;
             for (const auto& spec : oplogEntry.indexSpecs) {
                 std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
                 uassert(ErrorCodes::BadValue,
                         str::stream() << "Index spec is missing the 'name' field " << spec,
                         !name.empty());
 
-                if (auto desc = indexCatalog->findIndexByName(opCtx, name, includeUnfinished)) {
+                if (auto desc = indexCatalog->findIndexByName(
+                        opCtx, name, IndexCatalog::InclusionPolicy::kReady)) {
                     uassertStatusOK(indexCatalog->dropIndex(opCtx, desc));
                 }
             }
@@ -912,7 +915,8 @@ void IndexBuildsCoordinator::applyAbortIndexBuild(OperationContext* opCtx,
             const IndexDescriptor* desc = indexCatalog->findIndexByName(
                 opCtx,
                 indexSpec.getStringField(IndexDescriptor::kIndexNameFieldName),
-                /*includeUnfinishedIndexes=*/true);
+                IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished |
+                    IndexCatalog::InclusionPolicy::kFrozen);
 
             LOGV2(6455400,
                   "Dropping unfinished index during oplog recovery as standalone",
@@ -2377,6 +2381,11 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     IndexBuildAction action,
     const IndexBuildOptions& indexBuildOptions,
     const Timestamp& commitIndexBuildTimestamp) {
+
+    if (MONGO_unlikely(hangIndexBuildBeforeCommit.shouldFail())) {
+        LOGV2(4841706, "Hanging before committing index build");
+        hangIndexBuildBeforeCommit.pauseWhileSet();
+    }
 
     Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
 

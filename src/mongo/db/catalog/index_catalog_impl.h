@@ -90,9 +90,10 @@ public:
      *
      * @return null if cannot find
      */
-    const IndexDescriptor* findIndexByName(OperationContext* opCtx,
-                                           StringData name,
-                                           bool includeUnfinishedIndexes = false) const override;
+    const IndexDescriptor* findIndexByName(
+        OperationContext* opCtx,
+        StringData name,
+        const InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const override;
 
     /**
      * Find index by matching key pattern and collation spec.  The key pattern and collation spec
@@ -108,7 +109,7 @@ public:
         OperationContext* opCtx,
         const BSONObj& key,
         const BSONObj& collationSpec,
-        bool includeUnfinishedIndexes = false) const override;
+        const InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const override;
 
     /**
      * Find indexes with a matching key pattern, putting them into the vector 'matches'.  The key
@@ -118,7 +119,7 @@ public:
      */
     void findIndexesByKeyPattern(OperationContext* opCtx,
                                  const BSONObj& key,
-                                 bool includeUnfinishedIndexes,
+                                 const InclusionPolicy inclusionPolicy,
                                  std::vector<const IndexDescriptor*>* matches) const override;
 
     /**
@@ -140,10 +141,11 @@ public:
                                                      bool requireSingleKey,
                                                      std::string* errMsg = nullptr) const override;
 
-    void findIndexByType(OperationContext* opCtx,
-                         const std::string& type,
-                         std::vector<const IndexDescriptor*>& matches,
-                         bool includeUnfinishedIndexes = false) const override;
+    void findIndexByType(
+        OperationContext* opCtx,
+        const std::string& type,
+        std::vector<const IndexDescriptor*>& matches,
+        const InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const override;
 
 
     /**
@@ -169,7 +171,7 @@ public:
 
     using IndexIterator = IndexCatalog::IndexIterator;
     std::unique_ptr<IndexIterator> getIndexIterator(
-        OperationContext* const opCtx, const bool includeUnfinishedIndexes) const override;
+        OperationContext* const opCtx, const InclusionPolicy inclusionPolicy) const override;
 
     // ---- index set modifiers ------
 
@@ -374,15 +376,15 @@ private:
     /**
      * Checks whether there are any spec conflicts with existing ready indexes or in-progress index
      * builds. Also checks whether any limits set on this server would be exceeded by building the
-     * index. 'includeUnfinishedIndexes' dictates whether in-progress index builds are checked for
-     * conflicts, along with ready indexes.
+     * index. 'inclusionPolicy' dictates whether in-progress index builds are checked for conflicts,
+     * along with ready indexes.
      *
      * Returns IndexAlreadyExists for both ready and in-progress index builds. Can also return other
      * errors.
      */
     Status _doesSpecConflictWithExisting(OperationContext* opCtx,
                                          const BSONObj& spec,
-                                         const bool includeUnfinishedIndexes) const;
+                                         const InclusionPolicy inclusionPolicy) const;
 
     /**
      * Returns true if the replica set member's config has {buildIndexes:false} set, which means
@@ -400,5 +402,6 @@ private:
 
     IndexCatalogEntryContainer _readyIndexes;
     IndexCatalogEntryContainer _buildingIndexes;
+    IndexCatalogEntryContainer _frozenIndexes;
 };
 }  // namespace mongo
