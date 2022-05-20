@@ -3004,6 +3004,8 @@ tasks:
   - *f_expansions_write
   - *kill_processes
   - *cleanup_environment
+  - func: "set up venv"
+  - func: "upload pip requirements"
   - command: subprocess.exec
     type: test
     params:
@@ -7413,6 +7415,7 @@ task_groups:
   - func: "generate compile expansions"
   teardown_group:
   - func: "f_expansions_write"
+  - func: "attach report"
   - func: "umount shared scons directory"
   - func: "cleanup environment"
   setup_task:

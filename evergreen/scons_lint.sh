@@ -3,7 +3,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 
 cd src
 
-set -o errexit
+set -o pipefail
 set -o verbose
 
 activate_venv
@@ -18,4 +18,8 @@ export MYPY="$(
 )"
 echo "Found mypy executable at '$MYPY'"
 export extra_flags=""
-eval ${compile_env} python3 ./buildscripts/scons.py ${compile_flags} $extra_flags --stack-size=1024 GITDIFFFLAGS="${revision}" REVISION="${revision}" ENTERPRISE_REV="${enterprise_rev}" ${targets}
+eval ${compile_env} python3 ./buildscripts/scons.py ${compile_flags} $extra_flags --stack-size=1024 GITDIFFFLAGS="${revision}" REVISION="${revision}" ENTERPRISE_REV="${enterprise_rev}" ${targets} | tee scons-lint.log
+exit_code=$?
+
+$python ./buildscripts/simple_report.py --test-name "${targets}" --log-file scons-lint.log --exit-code $exit_code
+exit $exit_code
