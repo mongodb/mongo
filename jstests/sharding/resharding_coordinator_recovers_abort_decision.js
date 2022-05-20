@@ -9,8 +9,8 @@ load("jstests/libs/parallelTester.js");
 load("jstests/libs/parallel_shell_helpers.js");
 load("jstests/sharding/libs/resharding_test_fixture.js");
 
-const reshardingTest =
-    new ReshardingTest({enableElections: true, logComponentVerbosity: tojson({sharding: 2})});
+const reshardingTest = new ReshardingTest(
+    {enableElections: true, logComponentVerbosity: tojson({sharding: 2, network: 4})});
 reshardingTest.setup();
 
 const donorShardNames = reshardingTest.donorShardNames;
