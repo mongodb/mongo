@@ -135,7 +135,7 @@ const NamespaceString& IndexCatalogEntryImpl::ns() const {
     return _descriptor->parentNS();
 }
 
-void IndexCatalogEntryImpl::init(std::unique_ptr<IndexAccessMethod> accessMethod) {
+void IndexCatalogEntryImpl::setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) {
     invariant(!_accessMethod);
     _accessMethod = std::move(accessMethod);
 }

@@ -179,6 +179,12 @@ public:
         std::unique_ptr<std::vector<IndexCatalogEntry*>> _ownedContainer;
     };
 
+    enum class InclusionPolicy {
+        kReady = 1 << 0,
+        kUnfinished = 1 << 1,
+        kFrozen = 1 << 2,
+    };
+
     IndexCatalog() = default;
     virtual ~IndexCatalog() = default;
 
@@ -217,7 +223,7 @@ public:
     virtual const IndexDescriptor* findIndexByName(
         OperationContext* const opCtx,
         const StringData name,
-        const bool includeUnfinishedIndexes = false) const = 0;
+        const InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const = 0;
 
     /**
      * Find index by matching key pattern and collation spec.  The key pattern and collation spec
@@ -233,7 +239,7 @@ public:
         OperationContext* const opCtx,
         const BSONObj& key,
         const BSONObj& collationSpec,
-        const bool includeUnfinishedIndexes = false) const = 0;
+        const InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const = 0;
 
     /**
      * Find indexes with a matching key pattern, putting them into the vector 'matches'.  The key
@@ -244,7 +250,7 @@ public:
     virtual void findIndexesByKeyPattern(
         OperationContext* const opCtx,
         const BSONObj& key,
-        const bool includeUnfinishedIndexes,
+        const InclusionPolicy inclusionPolicy,
         std::vector<const IndexDescriptor*>* const matches) const = 0;
 
     /**
@@ -266,10 +272,11 @@ public:
         const bool requireSingleKey,
         std::string* errMsg = nullptr) const = 0;
 
-    virtual void findIndexByType(OperationContext* const opCtx,
-                                 const std::string& type,
-                                 std::vector<const IndexDescriptor*>& matches,
-                                 const bool includeUnfinishedIndexes = false) const = 0;
+    virtual void findIndexByType(
+        OperationContext* const opCtx,
+        const std::string& type,
+        std::vector<const IndexDescriptor*>& matches,
+        const InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const = 0;
 
     /**
      * Reload the index definition for 'oldDesc' from the CollectionCatalogEntry.  'oldDesc'
@@ -309,7 +316,7 @@ public:
      * Returns an iterator for the index descriptors in this IndexCatalog.
      */
     virtual std::unique_ptr<IndexIterator> getIndexIterator(
-        OperationContext* const opCtx, const bool includeUnfinishedIndexes) const = 0;
+        OperationContext* const opCtx, const InclusionPolicy inclusionPolicy) const = 0;
 
     // ---- index set modifiers ------
 
@@ -506,4 +513,16 @@ public:
 
     virtual void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) = 0;
 };
+
+inline IndexCatalog::InclusionPolicy operator|(IndexCatalog::InclusionPolicy lhs,
+                                               IndexCatalog::InclusionPolicy rhs) {
+    return static_cast<IndexCatalog::InclusionPolicy>(
+        static_cast<std::underlying_type_t<IndexCatalog::InclusionPolicy>>(lhs) |
+        static_cast<std::underlying_type_t<IndexCatalog::InclusionPolicy>>(rhs));
+}
+
+inline bool operator&(IndexCatalog::InclusionPolicy lhs, IndexCatalog::InclusionPolicy rhs) {
+    return static_cast<std::underlying_type_t<IndexCatalog::InclusionPolicy>>(lhs) &
+        static_cast<std::underlying_type_t<IndexCatalog::InclusionPolicy>>(rhs);
+}
 }  // namespace mongo
