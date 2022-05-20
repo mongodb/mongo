@@ -86,7 +86,8 @@ public:
                              const MultikeyPaths& expectedMultikeyPaths) {
         IndexCatalog* indexCatalog = collection->getIndexCatalog();
         std::vector<const IndexDescriptor*> indexes;
-        indexCatalog->findIndexesByKeyPattern(_opCtx.get(), keyPattern, false, &indexes);
+        indexCatalog->findIndexesByKeyPattern(
+            _opCtx.get(), keyPattern, IndexCatalog::InclusionPolicy::kReady, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
         auto desc = indexes[0];
         const IndexCatalogEntry* ice = indexCatalog->getEntry(desc);

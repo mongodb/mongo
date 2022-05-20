@@ -93,7 +93,8 @@ public:
         Collection* collection = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(
             &_opCtx, NamespaceString(ns()));
         std::vector<const IndexDescriptor*> indexes;
-        collection->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
+        collection->getIndexCatalog()->findIndexesByKeyPattern(
+            &_opCtx, obj, IndexCatalog::InclusionPolicy::kReady, &indexes);
         return indexes.empty() ? nullptr : indexes[0];
     }
 

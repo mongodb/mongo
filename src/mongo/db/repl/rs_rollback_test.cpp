@@ -686,7 +686,8 @@ TEST_F(RSRollbackTest, RollingBackCreateAndDropOfSameIndexIgnoresBothCommands) {
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT(indexCatalog);
         ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
-        auto indexDescriptor = indexCatalog->findIndexByName(_opCtx.get(), "a_1", false);
+        auto indexDescriptor = indexCatalog->findIndexByName(
+            _opCtx.get(), "a_1", IndexCatalog::InclusionPolicy::kReady);
         ASSERT(!indexDescriptor);
     }
 }
@@ -736,7 +737,8 @@ TEST_F(RSRollbackTest, RollingBackCreateIndexAndRenameWithLongName) {
         ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
 
         std::vector<const IndexDescriptor*> indexes;
-        indexCatalog->findIndexesByKeyPattern(_opCtx.get(), BSON("b" << 1), false, &indexes);
+        indexCatalog->findIndexesByKeyPattern(
+            _opCtx.get(), BSON("b" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
         ASSERT(indexes.size() == 0);
     }
 }
@@ -783,12 +785,14 @@ TEST_F(RSRollbackTest, RollingBackDropAndCreateOfSameIndexNameWithDifferentSpecs
         ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Dropped index in rollback"));
         ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Created index in rollback"));
         std::vector<const IndexDescriptor*> indexes;
-        indexCatalog->findIndexesByKeyPattern(_opCtx.get(), BSON("a" << 1), false, &indexes);
+        indexCatalog->findIndexesByKeyPattern(
+            _opCtx.get(), BSON("a" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
         ASSERT(indexes.size() == 1);
         ASSERT(indexes[0]->indexName() == "a_1");
 
         std::vector<const IndexDescriptor*> indexes2;
-        indexCatalog->findIndexesByKeyPattern(_opCtx.get(), BSON("b" << 1), false, &indexes2);
+        indexCatalog->findIndexesByKeyPattern(
+            _opCtx.get(), BSON("b" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes2);
         ASSERT(indexes2.size() == 0);
     }
 }
