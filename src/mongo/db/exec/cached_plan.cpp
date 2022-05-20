@@ -137,10 +137,12 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
             if (_results.size() >= numResults) {
                 // Once a plan returns enough results, stop working. There is no need to replan.
+                _bestPlanChosen = true;
                 return Status::OK();
             }
         } else if (PlanStage::IS_EOF == state) {
             // Cached plan hit EOF quickly enough. No need to replan.
+            _bestPlanChosen = true;
             return Status::OK();
         } else if (PlanStage::NEED_YIELD == state) {
             invariant(id == WorkingSet::INVALID_ID);
@@ -239,6 +241,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
             "query"_attr = redact(_canonicalQuery->toStringShort()),
             "planSummary"_attr = explainer->getPlanSummary(),
             "shouldCache"_attr = (shouldCache ? "yes" : "no"));
+        _bestPlanChosen = true;
         return Status::OK();
     }
 
@@ -271,6 +274,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
                 "query"_attr = redact(_canonicalQuery->toStringShort()),
                 "planSummary"_attr = explainer->getPlanSummary(),
                 "shouldCache"_attr = (shouldCache ? "yes" : "no"));
+    _bestPlanChosen = true;
     return Status::OK();
 }
 

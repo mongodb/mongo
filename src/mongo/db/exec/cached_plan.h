@@ -88,6 +88,10 @@ public:
      */
     Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
 
+    bool bestPlanChosen() const {
+        return _bestPlanChosen;
+    }
+
 private:
     /**
      * Uses the QueryPlanner and the MultiPlanStage to re-generate candidate plans for this
@@ -130,6 +134,9 @@ private:
 
     // Stats
     CachedPlanStats _specificStats;
+
+    // Picked best plan
+    bool _bestPlanChosen = false;
 };
 
 }  // namespace mongo
