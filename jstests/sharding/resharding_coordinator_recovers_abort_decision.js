@@ -48,9 +48,19 @@ reshardingTest.withReshardingInBackground(
         // Wait until participants are aware of the resharding operation.
         reshardingTest.awaitCloneTimestampChosen();
 
+        const ns = sourceCollection.getFullName();
         awaitAbort = startParallelShell(funWithArgs(function(ns) {
                                             db.adminCommand({abortReshardCollection: ns});
-                                        }, sourceCollection.getFullName()), mongos.port);
+                                        }, ns), mongos.port);
+
+        // Wait for the coordinator to have persisted its decision to abort the resharding operation
+        // as a result of the abortReshardCollection command being processed.
+        assert.soon(() => {
+            const coordinatorDoc =
+                mongos.getCollection("config.reshardingOperations").findOne({ns: ns});
+
+            return coordinatorDoc !== null && coordinatorDoc.state === "aborting";
+        });
     },
     {
         expectedErrorCode: ErrorCodes.ReshardCollectionAborted,
