@@ -15,6 +15,7 @@
 'use strict';
 
 load("jstests/libs/fixture_helpers.js");
+load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
 
 var cmdRes;
 var cursorId;
@@ -157,6 +158,23 @@ cmdRes = assert.commandWorked(db.runCommand({
 assert.gt(cmdRes.cursor.id, NumberLong(0));
 assert.eq(cmdRes.cursor.ns, coll.getFullName());
 assert.eq(cmdRes.cursor.firstBatch.length, 0);
+
+// The code below will test for the tailable, awaitData cursor being awaken once a matching document
+// is inserted and expects the document to be returned in the next batch. However, the logic without
+// waiting for the timeout in order to receive the data only works if the read concern is not set to
+// majority. The reason for this is that the primary node will notify the waiting cursor on document
+// being inserted on its node and not on the majority of nodes. However, since the read concern is
+// set to majority, the awaken cursor won't find the newly inserted document, as at that time it is
+// present on the primary only. Therefore it will be waiting till the timeout. In order to avoid the
+// waiting we stop running this test if read concern majority.
+const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
+if (topology.type !== Topology.kStandalone) {
+    const readConcern =
+        assert.commandWorked(db.adminCommand({getDefaultRWConcern: 1})).defaultReadConcern;
+    if (readConcern.level == "majority") {
+        return;
+    }
+}
 
 // Test that a getMore command on a tailable, awaitData cursor does not return a new batch to
 // the user if a document was inserted, but it did not match the filter.
