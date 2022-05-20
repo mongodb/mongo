@@ -52,7 +52,6 @@ structs:
             continuation:
                 type: bool
                 description: "Whether there are more split points available for the requested range"
-                default: false # TODO (SERVER-64350): Remove the default value after 6.0 branching.
 
 commands:
   autoSplitVector:

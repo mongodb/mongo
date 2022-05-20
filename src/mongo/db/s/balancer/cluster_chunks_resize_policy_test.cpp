@@ -169,7 +169,7 @@ TEST_F(ClusterChunksResizePolicyTest,
     auto autoSplitVectorAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
 
     std::vector<BSONObj> splitPoints{kKeyAtZero};
-    DefragmentationActionResponse splitVectorResult = AutoSplitVectorResponse(splitPoints);
+    DefragmentationActionResponse splitVectorResult = AutoSplitVectorResponse(splitPoints, false);
 
     _clusterChunksResizePolicy.applyActionResult(_opCtx, *nextAction, splitVectorResult);
 
@@ -200,8 +200,7 @@ TEST_F(ClusterChunksResizePolicyTest,
     auto autoSplitVectorAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
 
     std::vector<BSONObj> splitPoints{kKeyAtZero};
-    AutoSplitVectorResponse splitVectorResult(splitPoints);
-    splitVectorResult.setContinuation(true);
+    AutoSplitVectorResponse splitVectorResult(splitPoints, true);
     _clusterChunksResizePolicy.applyActionResult(_opCtx, *nextAction, splitVectorResult);
 
     nextAction = _clusterChunksResizePolicy.getNextStreamingAction(_opCtx);
@@ -229,7 +228,7 @@ TEST_F(ClusterChunksResizePolicyTest, ThePolicyGeneratesNoActionAfterReceivingAn
     auto autoSplitVectorAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
 
     std::vector<BSONObj> splitPoints{};
-    AutoSplitVectorResponse splitVectorResult(splitPoints);
+    AutoSplitVectorResponse splitVectorResult(splitPoints, false);
     _clusterChunksResizePolicy.applyActionResult(_opCtx, *nextAction, splitVectorResult);
 
     nextAction = _clusterChunksResizePolicy.getNextStreamingAction(_opCtx);
@@ -281,7 +280,7 @@ TEST_F(ClusterChunksResizePolicyTest,
     auto nextAction = _clusterChunksResizePolicy.getNextStreamingAction(_opCtx);
 
     std::vector<BSONObj> splitPoints{kKeyAtZero};
-    DefragmentationActionResponse splitVectorResult = AutoSplitVectorResponse(splitPoints);
+    DefragmentationActionResponse splitVectorResult = AutoSplitVectorResponse(splitPoints, false);
 
     _clusterChunksResizePolicy.applyActionResult(_opCtx, *nextAction, splitVectorResult);
 
@@ -320,7 +319,7 @@ TEST_F(ClusterChunksResizePolicyTest,
     auto originalSplitVectorAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
 
     std::vector<BSONObj> splitPoints{kKeyAtZero};
-    DefragmentationActionResponse splitVectorResult = AutoSplitVectorResponse(splitPoints);
+    DefragmentationActionResponse splitVectorResult = AutoSplitVectorResponse(splitPoints, false);
 
     _clusterChunksResizePolicy.applyActionResult(_opCtx, *nextAction, splitVectorResult);
 
@@ -367,12 +366,14 @@ TEST_F(ClusterChunksResizePolicyTest, ThePolicyCompletesWhenAllActionsAreAcknowl
     ASSERT_FALSE(noAction.is_initialized());
 
     // As splitVectors are acknowledged, splitChunk Actions are generated
-    StatusWith<AutoSplitVectorResponse> splitVectorResult1 = AutoSplitVectorResponse({kKeyAtZero});
+    StatusWith<AutoSplitVectorResponse> splitVectorResult1 =
+        AutoSplitVectorResponse({kKeyAtZero}, false);
     _clusterChunksResizePolicy.applyActionResult(_opCtx, *splitVectorForChunk1, splitVectorResult1);
     auto splitChunkForChunk1 = _clusterChunksResizePolicy.getNextStreamingAction(_opCtx);
     ASSERT_TRUE(stdx::holds_alternative<SplitInfoWithKeyPattern>(*splitChunkForChunk1));
 
-    StatusWith<AutoSplitVectorResponse> splitVectorResult2 = AutoSplitVectorResponse({kKeyAtForty});
+    StatusWith<AutoSplitVectorResponse> splitVectorResult2 =
+        AutoSplitVectorResponse({kKeyAtForty}, false);
     _clusterChunksResizePolicy.applyActionResult(_opCtx, *splitVectorForChunk2, splitVectorResult2);
     auto splitChunkForChunk2 = _clusterChunksResizePolicy.getNextStreamingAction(_opCtx);
     ASSERT_TRUE(stdx::holds_alternative<SplitInfoWithKeyPattern>(*splitChunkForChunk2));

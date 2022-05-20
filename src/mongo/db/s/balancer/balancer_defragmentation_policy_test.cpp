@@ -812,8 +812,7 @@ TEST_F(BalancerDefragmentationPolicyTest,
     auto autoSplitAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
 
     std::vector<BSONObj> splitPoints{BSON("x" << 5)};
-    AutoSplitVectorResponse resp{splitPoints};
-    resp.setContinuation(false);
+    AutoSplitVectorResponse resp{splitPoints, false};
     _defragmentationPolicy.applyActionResult(operationContext(), autoSplitAction, StatusWith(resp));
 
     // Under the setup of this test, the stream should only contain only a split action over the
@@ -840,8 +839,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAutoSplitWithNoSplitPointsDoesNotT
     auto autoSplitAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
 
     std::vector<BSONObj> splitPoints;
-    AutoSplitVectorResponse resp{splitPoints};
-    resp.setContinuation(false);
+    AutoSplitVectorResponse resp{splitPoints, false};
     _defragmentationPolicy.applyActionResult(operationContext(), autoSplitAction, StatusWith(resp));
 
     // The stream should now be empty
@@ -857,8 +855,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestMoreThan16MBSplitPointsTriggersSpl
     auto autoSplitAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
 
     std::vector<BSONObj> splitPoints{BSON("x" << 5)};
-    AutoSplitVectorResponse resp{splitPoints};
-    resp.setContinuation(true);
+    AutoSplitVectorResponse resp{splitPoints, true};
     _defragmentationPolicy.applyActionResult(operationContext(), autoSplitAction, StatusWith(resp));
 
     // The stream should now contain one Split action with the split points from above and one
@@ -887,8 +884,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestFailedSplitChunkActionGetsReissued
     auto autoSplitAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
 
     std::vector<BSONObj> splitPoints{BSON("x" << 5)};
-    AutoSplitVectorResponse resp{splitPoints};
-    resp.setContinuation(false);
+    AutoSplitVectorResponse resp{splitPoints, false};
     _defragmentationPolicy.applyActionResult(operationContext(), autoSplitAction, StatusWith(resp));
 
     // The stream should now contain the split action for the recently AutoSplitVector-ed range.
@@ -921,8 +917,7 @@ TEST_F(BalancerDefragmentationPolicyTest,
     auto autoSplitAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
 
     std::vector<BSONObj> splitPoints{BSON("x" << 5)};
-    AutoSplitVectorResponse resp{splitPoints};
-    resp.setContinuation(false);
+    AutoSplitVectorResponse resp{splitPoints, false};
     _defragmentationPolicy.applyActionResult(operationContext(), autoSplitAction, StatusWith(resp));
 
     // The stream should now contain the split action for the recently AutoSplitVector-ed range.
