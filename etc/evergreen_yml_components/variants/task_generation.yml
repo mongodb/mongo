@@ -3,6 +3,7 @@
 buildvariants:
 - name: generate-tasks-for-version
   display_name: "Generate tasks for evergreen version"
+  batchtime: 0
   modules:
   - enterprise
   run_on:
