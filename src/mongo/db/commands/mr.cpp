@@ -566,7 +566,11 @@ void State::prepTempCollection() {
                 _opCtx, finalColl->getCatalogId());
 
             std::unique_ptr<IndexCatalog::IndexIterator> ii =
-                finalColl->getIndexCatalog()->getIndexIterator(_opCtx, true);
+                finalColl->getIndexCatalog()->getIndexIterator(
+                    _opCtx,
+                    IndexCatalog::InclusionPolicy::kReady |
+                        IndexCatalog::InclusionPolicy::kUnfinished |
+                        IndexCatalog::InclusionPolicy::kFrozen);
             // Iterate over finalColl's indexes.
             while (ii->more()) {
                 const IndexDescriptor* currIndex = ii->next()->descriptor();
@@ -1173,7 +1177,10 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp) {
 
         bool foundIndex = false;
         std::unique_ptr<IndexCatalog::IndexIterator> ii =
-            autoIncColl.getCollection()->getIndexCatalog()->getIndexIterator(_opCtx, true);
+            autoIncColl.getCollection()->getIndexCatalog()->getIndexIterator(
+                _opCtx,
+                IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished |
+                    IndexCatalog::InclusionPolicy::kFrozen);
         // Iterate over incColl's indexes.
         while (ii->more()) {
             const IndexDescriptor* currIndex = ii->next()->descriptor();
