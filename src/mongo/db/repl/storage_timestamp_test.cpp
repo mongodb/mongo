@@ -816,6 +816,8 @@ private:
 };
 
 TEST_F(StorageTimestampTest, SecondaryInsertTimes) {
+    Lock::GlobalWrite lk{_opCtx};  // avoid global lock upgrade during applyOps.
+
     // In order for applyOps to assign timestamps, we must be in non-replicated mode.
     repl::UnreplicatedWritesBlock uwb(_opCtx);
 
