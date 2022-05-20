@@ -39,7 +39,11 @@ function initAndFillShardedCollection(db, collName, shardNames) {
             coll.insert({x: nextShardKeyValue++});
         }
 
-        assert.commandWorked(db.adminCommand({split: ns, middle: {x: nextShardKeyValue}}));
+        // Need to retry split command to avoid conflicting with moveChunks issued by the balancer.
+        assert.soonNoExcept(() => {
+            assert.commandWorked(db.adminCommand({split: ns, middle: {x: nextShardKeyValue}}));
+            return true;
+        });
 
         const lastInsertedShardKeyValue = nextShardKeyValue - 1;
 
