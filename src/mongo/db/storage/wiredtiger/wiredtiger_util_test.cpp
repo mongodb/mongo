@@ -433,33 +433,24 @@ TEST(WiredTigerUtilTest, GenerateVerboseConfiguration) {
     // Perform each test in their own limited scope in order to establish different
     // severity levels.
     {
-        // Set the WiredTiger Verify LOGV2 component severity to the Log level.
+        // Set the WiredTiger Checkpoint LOGV2 component severity to the Log level.
         auto severityGuard = unittest::MinimumLoggedSeverityGuard{
-            logv2::LogComponent::kWiredTigerVerify, logv2::LogSeverity::Log()};
-        // Generate the configuration string and verify the default severity of the verify component
-        // is at the Log level.
+            logv2::LogComponent::kWiredTigerCheckpoint, logv2::LogSeverity::Log()};
+        // Generate the configuration string and verify the default severity of the
+        // checkpoint component is at the Log level.
         std::string config = WiredTigerUtil::generateWTVerboseConfiguration();
-        ASSERT_TRUE(config.find("verify:0") != std::string::npos);
-        ASSERT_TRUE(config.find("verify:1") == std::string::npos);
+        ASSERT_TRUE(config.find("checkpoint:0") != std::string::npos);
+        ASSERT_TRUE(config.find("checkpoint:1") == std::string::npos);
     }
     {
-        // Set the WiredTiger Verify LOGV2 component severity to the Debug(1) level. The component
-        // will continue to log at the LOG level.
+        // Set the WiredTiger Checkpoint LOGV2 component severity to the Debug(1) level.
+        // We want to ensure this setting is subsequently reflected in a new WiredTiger
+        // verbose configuration string.
         auto severityGuard = unittest::MinimumLoggedSeverityGuard{
-            logv2::LogComponent::kWiredTigerVerify, logv2::LogSeverity::Debug(1)};
+            logv2::LogComponent::kWiredTigerCheckpoint, logv2::LogSeverity::Debug(1)};
         std::string config = WiredTigerUtil::generateWTVerboseConfiguration();
-        ASSERT_TRUE(config.find("verify:0") != std::string::npos);
-        ASSERT_TRUE(config.find("verify:1") == std::string::npos);
-    }
-    {
-        // Set the WiredTiger Verify LOGV2 component severity to the Debug(2) level. We want to
-        // ensure this setting is subsequently reflected in a new WiredTiger verbose configuration
-        // string.
-        auto severityGuard = unittest::MinimumLoggedSeverityGuard{
-            logv2::LogComponent::kWiredTigerVerify, logv2::LogSeverity::Debug(2)};
-        std::string config = WiredTigerUtil::generateWTVerboseConfiguration();
-        ASSERT_TRUE(config.find("verify:1") != std::string::npos);
-        ASSERT_TRUE(config.find("verify:0") == std::string::npos);
+        ASSERT_TRUE(config.find("checkpoint:1") != std::string::npos);
+        ASSERT_TRUE(config.find("checkpoint:0") == std::string::npos);
     }
 }
 
