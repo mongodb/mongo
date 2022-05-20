@@ -43,9 +43,11 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/multi_iterator.h"
+#include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/sample_from_timeseries_bucket.h"
 #include "mongo/db/exec/shard_filter.h"
@@ -80,6 +82,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
@@ -1049,13 +1052,37 @@ PipelineD::buildInnerQueryExecutorGeneric(const CollectionPtr& collection,
 
             // Get source stage
             PlanStage* rootStage = execImpl->getRootStage();
-            while (rootStage && rootStage->getChildren().size() == 1) {
+            while (rootStage &&
+                   (rootStage->getChildren().size() == 1 ||
+                    rootStage->stageType() == STAGE_MULTI_PLAN)) {
                 switch (rootStage->stageType()) {
                     case STAGE_FETCH:
                         rootStage = rootStage->child().get();
                         break;
                     case STAGE_SHARDING_FILTER:
                         rootStage = rootStage->child().get();
+                        break;
+                    case STAGE_MULTI_PLAN:
+                        if (auto mps = static_cast<MultiPlanStage*>(rootStage)) {
+                            if (mps->bestPlanChosen() && mps->bestPlanIdx()) {
+                                rootStage = (mps->getChildren())[*(mps->bestPlanIdx())].get();
+                            } else {
+                                rootStage = nullptr;
+                                tasserted(6655801,
+                                          "Expected multiplanner to have selected a bestPlan.");
+                            }
+                        }
+                        break;
+                    case STAGE_CACHED_PLAN:
+                        if (auto cp = static_cast<CachedPlanStage*>(rootStage)) {
+                            if (cp->bestPlanChosen()) {
+                                rootStage = rootStage->child().get();
+                            } else {
+                                rootStage = nullptr;
+                                tasserted(6655802,
+                                          "Expected cached plan to have selected a bestPlan.");
+                            }
+                        }
                         break;
                     default:
                         rootStage = nullptr;

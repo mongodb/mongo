@@ -20,7 +20,7 @@
 (function() {
 "use strict";
 
-load('jstests/libs/analyze_plan.js');              // For getPlanStage().
+load('jstests/libs/analyze_plan.js');  // For getPlanStage(), getPlanCacheKeyFromExplain.
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load('jstests/libs/fixture_helpers.js');  // For getPrimaryForNodeHostingDatabase and isMongos.
 load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
@@ -54,16 +54,9 @@ function getCacheEntryForQuery(query) {
     return null;
 }
 
-function getPlanCacheKeyFromExplain(explainRes) {
-    const hash = FixtureHelpers.isMongos(db)
-        ? explainRes.queryPlanner.winningPlan.shards[0].planCacheKey
-        : explainRes.queryPlanner.planCacheKey;
-    assert.eq(typeof (hash), "string");
-    return hash;
-}
-
 function getPlanCacheKey(query) {
-    return getPlanCacheKeyFromExplain(assert.commandWorked(coll.explain().find(query).finish()));
+    return getPlanCacheKeyFromExplain(assert.commandWorked(coll.explain().find(query).finish()),
+                                      db);
 }
 
 const query = {
@@ -138,8 +131,8 @@ assert.eq(ixScans.length, 0);
 
 // Check that the shapes are different since the query which matches on a string will not
 // be eligible to use the b.$** index (since the index has a different collation).
-assert.neq(getPlanCacheKeyFromExplain(queryWithoutStringExplain),
-           getPlanCacheKeyFromExplain(queryWithStringExplain));
+assert.neq(getPlanCacheKeyFromExplain(queryWithoutStringExplain, db),
+           getPlanCacheKeyFromExplain(queryWithStringExplain, db));
 })();
 
 // Check that indexability discriminators work with partial wildcard indexes.
@@ -160,7 +153,7 @@ assert.eq(ixScans.length, 0);
 
 // Check that the shapes are different since the query which searches for a value not
 // included by the partial filter expression won't be eligible to use the $** index.
-assert.neq(getPlanCacheKeyFromExplain(queryIndexedExplain),
-           getPlanCacheKeyFromExplain(queryUnindexedExplain));
+assert.neq(getPlanCacheKeyFromExplain(queryIndexedExplain, db),
+           getPlanCacheKeyFromExplain(queryUnindexedExplain, db));
 })();
 })();
