@@ -72,11 +72,9 @@ structs:
 
 types:
     # The canonical serialisation format for ChunkVersions
-    #
-    # TODO (SERVER-65530): Use IDL directly instead of this custom parser/serialiser
     ChunkVersion:
         bson_serialization_type: any
         description: An object representing a chunk version for a collection.
         cpp_type: ChunkVersion
         serializer: ChunkVersion::serializeToBSON
-        deserializer: ChunkVersion::fromBSONPositionalOrNewerFormat
+        deserializer: ChunkVersion::parse

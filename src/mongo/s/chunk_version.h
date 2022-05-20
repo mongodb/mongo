@@ -214,30 +214,7 @@ public:
     }
 
     static ChunkVersion parse(const BSONElement& element);
-    void serialize(StringData field, BSONObjBuilder* builder);
-
-    /**
-     * Serializes the version held by this object to 'out' in the form:
-     * {..., <field>: {0:<combined major/minor, 1: <epoch>, 2: <Timestamp>}}
-     *  or
-     * { ..., <field> : {t: <Timestamp>, e: <OID>, v: <major/minor> }}.
-     *
-     * Depending on the FCV version
-     */
-    void serializeToPositionalWronlyEcondedOr60AsBSON(StringData fieldName,
-                                                      BSONObjBuilder* builder) const;
-
-    /**
-     * Serializes the version held by this object to 'out' in the form:
-     *  { ..., <field>: [ <combined major/minor>, <OID epoch>, <Timestamp> ], ... }.
-     *  or
-     * { ..., <field> : {t: <Timestamp>, e: <OID>, v: <major/minor> }}.
-     *
-     * Depending on the FCV version
-     */
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const;
-    void serializeToPositionalFormatWronglyEncodedAsBSON(StringData fieldName,
-                                                         BSONObjBuilder* builder) const;
+    void serializeToBSON(StringData field, BSONObjBuilder* builder) const;
 
     /**
      * NOTE: This format is being phased out. Use serializeToBSON instead.

@@ -58,19 +58,6 @@ types:
         cpp_type: "mongo::MigrationSessionId"
         deserializer: "mongo::MigrationSessionId::fromString"
         serializer: "mongo::MigrationSessionId::toString"
-    # DO NOT add any  usages of this format.
-    #
-    # Type used to transition from wrongly encoded chunk version to new format in disk
-    # In pre 6.0 versions will serialize chunk version as:
-    #   { 0: <major/minor>, 1: <epoch>, 2: <timestamp> } (note the array encoded as a BSON object)
-    # From 6.0 on the chunk version serialized will be:
-    #   { v: <major/version>, e: <epoch>, t: <timestamp>}
-    ChunkVersionArrayWronglyEncodedOr60Format:
-        bson_serialization_type: any
-        description: An object representing a chunk version for a collection.
-        cpp_type: ChunkVersion
-        serializer: ChunkVersion::serializeToPositionalWronlyEcondedOr60AsBSON
-        deserializer: ChunkVersion::fromBSONPositionalOrNewerFormat
 
 structs:
     migrationCoordinatorDocument:
@@ -107,7 +94,7 @@ structs:
                 type: chunk_range
                 description: "The range being migrated."
             preMigrationChunkVersion:
-                type: ChunkVersionArrayWronglyEncodedOr60Format
+                type: ChunkVersion
                 description: "The version, at the start of the migration, of the chunk being moved."
             decision:
                 type: Decision

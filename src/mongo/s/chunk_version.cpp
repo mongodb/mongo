@@ -218,59 +218,11 @@ ChunkVersion ChunkVersion::parse(const BSONElement& element) {
                         parsedVersion.getTimestamp());
 }
 
-void ChunkVersion::serialize(StringData field, BSONObjBuilder* builder) {
+void ChunkVersion::serializeToBSON(StringData field, BSONObjBuilder* builder) const {
     ChunkVersion60Format version;
     version.setGeneration({_epoch, _timestamp});
     version.setPlacement(Timestamp(majorVersion(), minorVersion()));
     builder->append(field, version.toBSON());
-}
-
-void ChunkVersion::serializeToPositionalWronlyEcondedOr60AsBSON(StringData field,
-                                                                BSONObjBuilder* builder) const {
-    if (feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        ChunkVersion60Format version;
-        version.setGeneration({_epoch, _timestamp});
-        version.setPlacement(Timestamp(majorVersion(), minorVersion()));
-        builder->append(field, version.toBSON());
-    } else {
-        serializeToPositionalFormatWronglyEncodedAsBSON(field, builder);
-    }
-}
-
-void ChunkVersion::serializeToBSON(StringData field, BSONObjBuilder* builder) const {
-    if (feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        ChunkVersion60Format version;
-        version.setGeneration({_epoch, _timestamp});
-        version.setPlacement(Timestamp(majorVersion(), minorVersion()));
-        builder->append(field, version.toBSON());
-    } else {
-        BSONArrayBuilder arr(builder->subarrayStart(field));
-        arr.appendTimestamp(_combined);
-        arr.append(_epoch);
-        arr.append(_timestamp);
-    }
-}
-
-void ChunkVersion::serializeToPositionalFormatWronglyEncodedAsBSON(StringData field,
-                                                                   BSONObjBuilder* builder) const {
-    if (feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        ChunkVersion60Format version;
-        version.setGeneration({_epoch, _timestamp});
-        version.setPlacement(Timestamp(majorVersion(), minorVersion()));
-        builder->append(field, version.toBSON());
-    } else {
-        BSONObjBuilder subObjBuilder(builder->subobjStart(field));
-        subObjBuilder.appendElements([&] {
-            BSONArrayBuilder arr;
-            arr.appendTimestamp(_combined);
-            arr.append(_epoch);
-            arr.append(_timestamp);
-            return arr.obj();
-        }());
-    }
 }
 
 void ChunkVersion::appendLegacyWithField(BSONObjBuilder* out, StringData field) const {
