@@ -602,21 +602,19 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                     "namespace"_attr = coll);
             }
 
-            // Two-phase index drop ensures that the underlying data table for an index in the
-            // catalog is not dropped until the index removal from the catalog has been majority
-            // committed and become part of the latest checkpoint. Therefore, there should almost
-            // never be a case where the index catalog entry remains but the index table (identified
-            // by ident) has been removed.
-            //
-            // There is an exception to this due to the fact that we drop the index ident without a
-            // timestamp when restarting an index build for startup recovery. Then, if we experience
-            // an unclean shutdown before a checkpoint is taken, the subsequent startup recovery can
-            // see the now-dropped ident referenced by the old index catalog entry.
-            invariant(engineIdents.find(indexIdent) != engineIdents.end() ||
-                          lastShutdownState == LastShutdownState::kUnclean,
-                      str::stream() << "Failed to find an index data table matching " << indexIdent
-                                    << " for durable index catalog entry " << indexMetaData.spec
-                                    << " in collection " << coll);
+            if (!engineIdents.count(indexIdent)) {
+                // There are cetain cases where the catalog entry may reference an index ident which
+                // is no longer present. One example of this is when an unclean shutdown occurs
+                // before a checkpoint is taken during startup recovery. Since we drop the index
+                // ident without a timestamp when restarting the index build for startup recovery,
+                // the subsequent startup recovery can see the now-dropped ident referenced by the
+                // old index catalog entry.
+                LOGV2(6386500,
+                      "Index catalog entry ident not found",
+                      "ident"_attr = indexIdent,
+                      "entry"_attr = indexMetaData.spec,
+                      "namespace"_attr = coll);
+            }
 
             // Any index build with a UUID is an unfinished two-phase build and must be restarted.
             // There are no special cases to handle on primaries or secondaries. An index build may
@@ -818,8 +816,10 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
 
         // No need to remove the indexes from the IndexCatalog because eliminating the Collection
         // will have the same effect.
-        auto ii =
-            coll->getIndexCatalog()->getIndexIterator(opCtx, true /* includeUnfinishedIndexes */);
+        auto ii = coll->getIndexCatalog()->getIndexIterator(
+            opCtx,
+            IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished |
+                IndexCatalog::InclusionPolicy::kFrozen);
         while (ii->more()) {
             const IndexCatalogEntry* ice = ii->next();
 
@@ -1252,7 +1252,9 @@ int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, StringData d
     catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, [&](const CollectionPtr& collection) {
         size += collection->getRecordStore()->storageSize(opCtx);
 
-        auto it = collection->getIndexCatalog()->getIndexIterator(opCtx, true);
+        auto it = collection->getIndexCatalog()->getIndexIterator(
+            opCtx,
+            IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
         while (it->more()) {
             size += _engine->getIdentSize(opCtx, it->next()->getIdent());
         }

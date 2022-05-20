@@ -261,7 +261,7 @@ public:
                 BSONObj keyPatternObj = keyPatternElement.Obj();
                 std::vector<const IndexDescriptor*> indexes;
                 collection->getIndexCatalog()->findIndexesByKeyPattern(
-                    opCtx, keyPatternObj, false, &indexes);
+                    opCtx, keyPatternObj, IndexCatalog::InclusionPolicy::kReady, &indexes);
                 uassert(16890,
                         str::stream() << "Can't find index: " << keyPatternObj,
                         !indexes.empty());

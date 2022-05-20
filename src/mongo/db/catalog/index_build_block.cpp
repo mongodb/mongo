@@ -94,7 +94,9 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
 
     _indexName = _spec.getStringField("name");
     auto descriptor = collection->getIndexCatalog()->findIndexByName(
-        opCtx, _indexName, true /* includeUnfinishedIndexes */);
+        opCtx,
+        _indexName,
+        IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
 
     auto indexCatalogEntry = descriptor->getEntry();
 
@@ -279,14 +281,18 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
 const IndexCatalogEntry* IndexBuildBlock::getEntry(OperationContext* opCtx,
                                                    const CollectionPtr& collection) const {
     auto descriptor = collection->getIndexCatalog()->findIndexByName(
-        opCtx, _indexName, true /* includeUnfinishedIndexes */);
+        opCtx,
+        _indexName,
+        IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
 
     return descriptor->getEntry();
 }
 
 IndexCatalogEntry* IndexBuildBlock::getEntry(OperationContext* opCtx, Collection* collection) {
     auto descriptor = collection->getIndexCatalog()->findIndexByName(
-        opCtx, _indexName, true /* includeUnfinishedIndexes */);
+        opCtx,
+        _indexName,
+        IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
 
     return descriptor->getEntry();
 }

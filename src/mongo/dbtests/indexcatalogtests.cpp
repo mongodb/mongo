@@ -81,7 +81,8 @@ public:
 
         ASSERT_TRUE(_catalog->numIndexesReady(&opCtx) == numFinishedIndexesStart + 2);
 
-        std::unique_ptr<IndexCatalog::IndexIterator> ii = _catalog->getIndexIterator(&opCtx, false);
+        std::unique_ptr<IndexCatalog::IndexIterator> ii =
+            _catalog->getIndexIterator(&opCtx, IndexCatalog::InclusionPolicy::kReady);
         int indexesIterated = 0;
         bool foundIndex = false;
         while (ii->more()) {

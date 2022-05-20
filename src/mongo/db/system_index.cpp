@@ -149,7 +149,8 @@ Status verifySystemIndexes(OperationContext* opCtx) {
 
             // Make sure the old unique index from v2.4 on system.users doesn't exist.
             std::vector<const IndexDescriptor*> indexes;
-            indexCatalog->findIndexesByKeyPattern(opCtx, v1SystemUsersKeyPattern, false, &indexes);
+            indexCatalog->findIndexesByKeyPattern(
+                opCtx, v1SystemUsersKeyPattern, IndexCatalog::InclusionPolicy::kReady, &indexes);
 
             if (!indexes.empty()) {
                 fassert(ErrorCodes::AmbiguousIndexKeyPattern, indexes.size() == 1);
@@ -160,7 +161,8 @@ Status verifySystemIndexes(OperationContext* opCtx) {
             }
 
             // Ensure that system indexes exist for the user collection.
-            indexCatalog->findIndexesByKeyPattern(opCtx, v3SystemUsersKeyPattern, false, &indexes);
+            indexCatalog->findIndexesByKeyPattern(
+                opCtx, v3SystemUsersKeyPattern, IndexCatalog::InclusionPolicy::kReady, &indexes);
             if (indexes.empty()) {
                 try {
                     generateSystemIndexForExistingCollection(
@@ -182,7 +184,8 @@ Status verifySystemIndexes(OperationContext* opCtx) {
             invariant(indexCatalog);
 
             std::vector<const IndexDescriptor*> indexes;
-            indexCatalog->findIndexesByKeyPattern(opCtx, v3SystemRolesKeyPattern, false, &indexes);
+            indexCatalog->findIndexesByKeyPattern(
+                opCtx, v3SystemRolesKeyPattern, IndexCatalog::InclusionPolicy::kReady, &indexes);
             if (indexes.empty()) {
                 try {
                     generateSystemIndexForExistingCollection(

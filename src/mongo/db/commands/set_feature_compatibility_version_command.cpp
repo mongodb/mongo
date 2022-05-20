@@ -696,7 +696,10 @@ private:
 
                 SimpleBSONObjUnorderedSet indexKeyPatterns;
                 auto indexIterator = coll->getIndexCatalog()->getIndexIterator(
-                    opCtx, /* includeUnfinishedIndexes  */ true);
+                    opCtx,
+                    IndexCatalog::InclusionPolicy::kReady |
+                        IndexCatalog::InclusionPolicy::kUnfinished |
+                        IndexCatalog::InclusionPolicy::kFrozen);
                 while (indexIterator->more()) {
                     auto indexKeyPattern = indexIterator->next()->descriptor()->keyPattern();
                     uassert(ErrorCodes::CannotDowngrade,

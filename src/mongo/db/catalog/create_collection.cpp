@@ -289,8 +289,11 @@ Status _createTimeseries(OperationContext* opCtx,
                     coll->getCollectionOptions().matchesStorageOptions(
                         bucketsOptions, CollatorFactoryInterface::get(opCtx->getServiceContext()));
                 if (expireAfterSeconds && !bucketsOptions.clusteredIndex) {
-                    auto indexDescriptor =
-                        coll->getIndexCatalog()->findIndexByName(opCtx, indexName, true);
+                    auto indexDescriptor = coll->getIndexCatalog()->findIndexByName(
+                        opCtx,
+                        indexName,
+                        IndexCatalog::InclusionPolicy::kReady |
+                            IndexCatalog::InclusionPolicy::kUnfinished);
                     existingBucketCollectionIsCompatible &=
                         indexDescriptor && indexDescriptor->infoObj().woCompare(indexSpec) == 0;
                 }
