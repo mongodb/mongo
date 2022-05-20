@@ -338,7 +338,7 @@ public:
      * corresponds to that has one or more child transaction sessions being tracked in the
      * SessionCatalog.
      */
-    const TxnNumber getHighestTxnNumberWithChildSessions() const {
+    TxnNumber getHighestTxnNumberWithChildSessions() const {
         return _sri->highestTxnNumberWithChildSessions;
     }
 
