@@ -78,8 +78,7 @@ void _validateIndexesInternalStructure(OperationContext* opCtx,
     // Need to use the IndexCatalog here because the 'validateState->indexes' object hasn't been
     // constructed yet. It must be initialized to ensure we're validating all indexes.
     const IndexCatalog* indexCatalog = validateState->getCollection()->getIndexCatalog();
-    const std::unique_ptr<IndexCatalog::IndexIterator> it =
-        indexCatalog->getIndexIterator(opCtx, false);
+    const auto it = indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
 
     // Validate Indexes Internal Structure, checking if index files have been compromised or
     // corrupted.
@@ -458,7 +457,10 @@ void _validateCatalogEntry(OperationContext* opCtx,
     }
 
     const auto& indexCatalog = collection->getIndexCatalog();
-    auto indexIt = indexCatalog->getIndexIterator(opCtx, /*includeUnfinishedIndexes=*/true);
+    auto indexIt = indexCatalog->getIndexIterator(opCtx,
+                                                  IndexCatalog::InclusionPolicy::kReady |
+                                                      IndexCatalog::InclusionPolicy::kUnfinished |
+                                                      IndexCatalog::InclusionPolicy::kFrozen);
 
     while (indexIt->more()) {
         const IndexCatalogEntry* indexEntry = indexIt->next();

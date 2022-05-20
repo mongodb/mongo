@@ -122,7 +122,7 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
     }
 }
 
-void IndexCatalogEntryImpl::init(std::unique_ptr<IndexAccessMethod> accessMethod) {
+void IndexCatalogEntryImpl::setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) {
     invariant(!_accessMethod);
     _accessMethod = std::move(accessMethod);
 }
@@ -370,7 +370,8 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
 }
 
 std::shared_ptr<Ident> IndexCatalogEntryImpl::getSharedIdent() const {
-    return {shared_from_this(), _accessMethod->getIdentPtr()};  // aliasing constructor
+    return _accessMethod ? std::shared_ptr<Ident>{shared_from_this(), _accessMethod->getIdentPtr()}
+                         : nullptr;
 }
 
 // ----

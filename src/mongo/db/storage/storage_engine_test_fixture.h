@@ -183,7 +183,10 @@ public:
         Collection* collection =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx,
                                                                                        collNs);
-        auto descriptor = collection->getIndexCatalog()->findIndexByName(opCtx, key, true);
+        auto descriptor = collection->getIndexCatalog()->findIndexByName(
+            opCtx,
+            key,
+            IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
         collection->indexBuildSuccess(opCtx, descriptor->getEntry());
     }
 

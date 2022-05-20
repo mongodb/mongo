@@ -288,7 +288,8 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
             }
         } else {
             std::vector<const IndexDescriptor*> indexes;
-            coll->getIndexCatalog()->findIndexesByKeyPattern(opCtx, keyPattern, false, &indexes);
+            coll->getIndexCatalog()->findIndexesByKeyPattern(
+                opCtx, keyPattern, IndexCatalog::InclusionPolicy::kReady, &indexes);
 
             if (indexes.size() > 1) {
                 return {ErrorCodes::AmbiguousIndexKeyPattern,

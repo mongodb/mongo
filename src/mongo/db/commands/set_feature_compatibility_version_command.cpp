@@ -758,7 +758,10 @@ private:
                         auto indexCatalog = collection->getIndexCatalog();
 
                         auto indexIt = indexCatalog->getIndexIterator(
-                            opCtx, /*includeUnfinishedIndexes=*/true);
+                            opCtx,
+                            IndexCatalog::InclusionPolicy::kReady |
+                                IndexCatalog::InclusionPolicy::kUnfinished |
+                                IndexCatalog::InclusionPolicy::kFrozen);
                         while (indexIt->more()) {
                             auto indexEntry = indexIt->next();
                             if (auto filter = indexEntry->getFilterExpression()) {
@@ -783,8 +786,11 @@ private:
                             return true;
                         }
 
-                        indexIt = indexCatalog->getIndexIterator(opCtx,
-                                                                 /*includeUnfinishedIndexes=*/true);
+                        indexIt = indexCatalog->getIndexIterator(
+                            opCtx,
+                            IndexCatalog::InclusionPolicy::kReady |
+                                IndexCatalog::InclusionPolicy::kUnfinished |
+                                IndexCatalog::InclusionPolicy::kFrozen);
                         while (indexIt->more()) {
                             auto indexEntry = indexIt->next();
                             // Secondary indexes on time-series measurements are only supported
@@ -873,7 +879,10 @@ private:
                     opCtx, tenantDbName, MODE_X, [&](const CollectionPtr& collection) {
                         auto indexCatalog = collection->getIndexCatalog();
                         auto indexIt = indexCatalog->getIndexIterator(
-                            opCtx, true /* includeUnfinishedIndexes */);
+                            opCtx,
+                            IndexCatalog::InclusionPolicy::kReady |
+                                IndexCatalog::InclusionPolicy::kUnfinished |
+                                IndexCatalog::InclusionPolicy::kFrozen);
                         while (indexIt->more()) {
                             auto indexEntry = indexIt->next();
                             uassert(

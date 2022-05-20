@@ -2704,8 +2704,10 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
         }
 
         auto indexCatalog = collection->getIndexCatalog();
-        buildingIndex = indexCatalog->getEntry(
-            indexCatalog->findIndexByName(_opCtx, "a_1_b_1", /* includeUnfinished */ true));
+        buildingIndex = indexCatalog->getEntry(indexCatalog->findIndexByName(
+            _opCtx,
+            "a_1_b_1",
+            IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished));
         ASSERT(buildingIndex);
 
         ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, collection.get()));

@@ -151,8 +151,8 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     BSONObjBuilder indexDetails;
     std::vector<std::string> indexBuilds;
 
-    std::unique_ptr<IndexCatalog::IndexIterator> it =
-        indexCatalog->getIndexIterator(opCtx, /*includeUnfinishedIndexes=*/true);
+    auto it = indexCatalog->getIndexIterator(
+        opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
     while (it->more()) {
         const IndexCatalogEntry* entry = it->next();
         const IndexDescriptor* descriptor = entry->descriptor();

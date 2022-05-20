@@ -64,7 +64,7 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
 
     // Iterate and print each index's table of documents.
     const auto indexCatalog = coll->getIndexCatalog();
-    const auto it = indexCatalog->getIndexIterator(opCtx, /*includeUnfinished*/ false);
+    const auto it = indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
     while (it->more()) {
         const auto indexCatalogEntry = it->next();
         const auto indexDescriptor = indexCatalogEntry->descriptor();

@@ -1782,7 +1782,8 @@ uint64_t CollectionImpl::getIndexSize(OperationContext* opCtx,
                                       int scale) const {
     const IndexCatalog* idxCatalog = getIndexCatalog();
 
-    std::unique_ptr<IndexCatalog::IndexIterator> ii = idxCatalog->getIndexIterator(opCtx, true);
+    auto ii = idxCatalog->getIndexIterator(
+        opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
 
     uint64_t totalSize = 0;
 
@@ -1804,8 +1805,8 @@ uint64_t CollectionImpl::getIndexSize(OperationContext* opCtx,
 
 uint64_t CollectionImpl::getIndexFreeStorageBytes(OperationContext* const opCtx) const {
     const auto idxCatalog = getIndexCatalog();
-    const bool includeUnfinished = true;
-    auto indexIt = idxCatalog->getIndexIterator(opCtx, includeUnfinished);
+    auto indexIt = idxCatalog->getIndexIterator(
+        opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
 
     uint64_t totalSize = 0;
     while (indexIt->more()) {
@@ -1829,8 +1830,7 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
     // 1) store index specs
     std::vector<BSONObj> indexSpecs;
     {
-        std::unique_ptr<IndexCatalog::IndexIterator> ii =
-            _indexCatalog->getIndexIterator(opCtx, false);
+        auto ii = _indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
         while (ii->more()) {
             const IndexDescriptor* idx = ii->next()->descriptor();
             indexSpecs.push_back(idx->infoObj().getOwned());

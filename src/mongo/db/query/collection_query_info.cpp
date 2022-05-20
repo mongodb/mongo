@@ -90,12 +90,13 @@ CollectionQueryInfo::PlanCacheState::PlanCacheState(OperationContext* opCtx,
 
     // TODO We shouldn't need to include unfinished indexes, but we must here because the index
     // catalog may be in an inconsistent state.  SERVER-18346.
-    const bool includeUnfinishedIndexes = true;
-    std::unique_ptr<IndexCatalog::IndexIterator> ii =
-        collection->getIndexCatalog()->getIndexIterator(opCtx, includeUnfinishedIndexes);
+    auto ii = collection->getIndexCatalog()->getIndexIterator(
+        opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
-        indexCores.emplace_back(indexInfoFromIndexCatalogEntry(*ice));
+        if (ice->accessMethod()) {
+            indexCores.emplace_back(indexInfoFromIndexCatalogEntry(*ice));
+        }
     }
 
     planCacheIndexabilityState.updateDiscriminators(indexCores);
@@ -117,8 +118,8 @@ const UpdateIndexData& CollectionQueryInfo::getIndexKeys(OperationContext* opCtx
 void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx, const CollectionPtr& coll) {
     _indexedPaths.clear();
 
-    std::unique_ptr<IndexCatalog::IndexIterator> it =
-        coll->getIndexCatalog()->getIndexIterator(opCtx, true);
+    auto it = coll->getIndexCatalog()->getIndexIterator(
+        opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
     while (it->more()) {
         const IndexCatalogEntry* entry = it->next();
         const IndexDescriptor* descriptor = entry->descriptor();
@@ -238,9 +239,8 @@ void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx,
 }
 
 void CollectionQueryInfo::init(OperationContext* opCtx, const CollectionPtr& coll) {
-    const bool includeUnfinishedIndexes = false;
-    std::unique_ptr<IndexCatalog::IndexIterator> ii =
-        coll->getIndexCatalog()->getIndexIterator(opCtx, includeUnfinishedIndexes);
+    auto ii =
+        coll->getIndexCatalog()->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
     while (ii->more()) {
         const IndexDescriptor* desc = ii->next()->descriptor();
         CollectionIndexUsageTrackerDecoration::get(coll->getSharedDecorations())

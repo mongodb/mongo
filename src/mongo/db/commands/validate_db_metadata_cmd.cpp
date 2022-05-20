@@ -215,8 +215,10 @@ public:
 
             // Ensure there are no unstable indexes.
             const auto* indexCatalog = collection->getIndexCatalog();
-            std::unique_ptr<IndexCatalog::IndexIterator> ii =
-                indexCatalog->getIndexIterator(opCtx, true /* includeUnfinishedIndexes */);
+            auto ii = indexCatalog->getIndexIterator(
+                opCtx,
+                IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished |
+                    IndexCatalog::InclusionPolicy::kFrozen);
             while (ii->more()) {
                 // Check if the index is allowed in API version 1.
                 const IndexDescriptor* desc = ii->next()->descriptor();

@@ -63,7 +63,8 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
 
     const IndexCatalog& indexCatalog = *collection->getIndexCatalog();
     opt::unordered_map<std::string, IndexDefinition> result;
-    auto indexIterator = indexCatalog.getIndexIterator(opCtx, false /*includeUnfinished*/);
+    auto indexIterator =
+        indexCatalog.getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
 
     while (indexIterator->more()) {
         const IndexCatalogEntry& catalogEntry = *indexIterator->next();

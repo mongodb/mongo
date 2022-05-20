@@ -128,8 +128,8 @@ boost::optional<Timestamp> computeNewestVisibleIndexTimestamp(OperationContext* 
 
     Timestamp currentNewestVisible = Timestamp::min();
 
-    std::unique_ptr<IndexCatalog::IndexIterator> ii =
-        collection->getIndexCatalog()->getIndexIterator(opCtx, /*includeUnfinishedIndexes*/ true);
+    auto ii = collection->getIndexCatalog()->getIndexIterator(
+        opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
         auto minVisibleSnapshot = ice->getMinimumVisibleSnapshot();
