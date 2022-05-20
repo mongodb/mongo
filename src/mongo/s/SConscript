@@ -602,6 +602,7 @@ env.Program(
     AIB_COMPONENTS_EXTRA=[
         "core",
         "default",
+        "devcore",
         "dist",
         "dist-test",
         "servers",

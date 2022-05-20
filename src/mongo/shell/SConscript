@@ -334,6 +334,7 @@ if not has_option('noshell') and usemozjs:
         AIB_COMPONENTS_EXTRA=[
             "core",
             "default",
+            "devcore",
             "dist",
             "dist-test",
             "shell",
