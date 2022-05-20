@@ -146,7 +146,7 @@ unique_ptr<PlanStage> getIxScanPlan(ExpressionContext* expCtx,
                                     int desiredFooValue) {
     std::vector<const IndexDescriptor*> indexes;
     coll->getIndexCatalog()->findIndexesByKeyPattern(
-        expCtx->opCtx, BSON("foo" << 1), false, &indexes);
+        expCtx->opCtx, BSON("foo" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
     ASSERT_EQ(indexes.size(), 1U);
 
     IndexScanParams ixparams(expCtx->opCtx, coll, indexes[0]);

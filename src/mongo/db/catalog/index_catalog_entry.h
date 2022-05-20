@@ -64,8 +64,6 @@ public:
     inline IndexCatalogEntry(IndexCatalogEntry&&) = delete;
     inline IndexCatalogEntry& operator=(IndexCatalogEntry&&) = delete;
 
-    virtual void init(std::unique_ptr<IndexAccessMethod> accessMethod) = 0;
-
     virtual const std::string& getIdent() const = 0;
     virtual std::shared_ptr<Ident> getSharedIdent() const = 0;
 
@@ -74,6 +72,8 @@ public:
     virtual const IndexDescriptor* descriptor() const = 0;
 
     virtual IndexAccessMethod* accessMethod() const = 0;
+
+    virtual void setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) = 0;
 
     virtual bool isHybridBuilding() const = 0;
 

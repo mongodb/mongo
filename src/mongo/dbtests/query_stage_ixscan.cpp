@@ -97,7 +97,8 @@ public:
     IndexScan* createIndexScanSimpleRange(BSONObj startKey, BSONObj endKey) {
         IndexCatalog* catalog = _coll->getIndexCatalog();
         std::vector<const IndexDescriptor*> indexes;
-        catalog->findIndexesByKeyPattern(&_opCtx, BSON("x" << 1), false, &indexes);
+        catalog->findIndexesByKeyPattern(
+            &_opCtx, BSON("x" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
 
         // We are not testing indexing here so use maximal bounds
@@ -120,7 +121,8 @@ public:
                                int direction = 1) {
         IndexCatalog* catalog = _coll->getIndexCatalog();
         std::vector<const IndexDescriptor*> indexes;
-        catalog->findIndexesByKeyPattern(&_opCtx, BSON("x" << 1), false, &indexes);
+        catalog->findIndexesByKeyPattern(
+            &_opCtx, BSON("x" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
 
         IndexScanParams params(&_opCtx, _collPtr, indexes[0]);

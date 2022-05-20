@@ -109,9 +109,13 @@ Status checkReplState(OperationContext* opCtx,
 StatusWith<const IndexDescriptor*> getDescriptorByKeyPattern(OperationContext* opCtx,
                                                              const IndexCatalog* indexCatalog,
                                                              const BSONObj& keyPattern) {
-    const bool includeUnfinished = true;
     std::vector<const IndexDescriptor*> indexes;
-    indexCatalog->findIndexesByKeyPattern(opCtx, keyPattern, includeUnfinished, &indexes);
+    indexCatalog->findIndexesByKeyPattern(opCtx,
+                                          keyPattern,
+                                          IndexCatalog::InclusionPolicy::kReady |
+                                              IndexCatalog::InclusionPolicy::kUnfinished |
+                                              IndexCatalog::InclusionPolicy::kFrozen,
+                                          &indexes);
     if (indexes.empty()) {
         return Status(ErrorCodes::IndexNotFound,
                       str::stream() << "can't find index with key: " << keyPattern);
@@ -340,7 +344,6 @@ void dropReadyIndexes(OperationContext* opCtx,
         return;
     }
 
-    bool includeUnfinished = true;
     for (const auto& indexName : indexNames) {
         if (collDescription.isSharded()) {
             uassert(
@@ -350,7 +353,11 @@ void dropReadyIndexes(OperationContext* opCtx,
                     opCtx, collection, indexCatalog, indexName, collDescription.getKeyPattern()));
         }
 
-        auto desc = indexCatalog->findIndexByName(opCtx, indexName, includeUnfinished);
+        auto desc = indexCatalog->findIndexByName(opCtx,
+                                                  indexName,
+                                                  IndexCatalog::InclusionPolicy::kReady |
+                                                      IndexCatalog::InclusionPolicy::kUnfinished |
+                                                      IndexCatalog::InclusionPolicy::kFrozen);
         if (!desc) {
             uasserted(ErrorCodes::IndexNotFound,
                       str::stream() << "index not found with name [" << indexName << "]");
@@ -509,7 +516,6 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
             // the index catalog. This would indicate that while we yielded our locks during the
             // abort phase, a new identical index was created.
             auto indexCatalog = collection->getWritableCollection(opCtx)->getIndexCatalog();
-            const bool includeUnfinished = false;
             for (const auto& indexName : indexNames) {
                 auto collDescription =
                     CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
@@ -524,7 +530,12 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
                                                  collDescription.getKeyPattern()));
                 }
 
-                auto desc = indexCatalog->findIndexByName(opCtx, indexName, includeUnfinished);
+                auto desc =
+                    indexCatalog->findIndexByName(opCtx,
+                                                  indexName,
+                                                  IndexCatalog::InclusionPolicy::kReady |
+                                                      IndexCatalog::InclusionPolicy::kUnfinished |
+                                                      IndexCatalog::InclusionPolicy::kFrozen);
                 if (!desc) {
                     // A similar index wasn't created while we yielded the locks during abort.
                     continue;
