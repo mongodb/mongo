@@ -1277,7 +1277,7 @@ std::string WiredTigerUtil::generateWTVerboseConfiguration() {
         cfg << ",";
 
         int level;
-        if (severity.toInt() >= logv2::LogSeverity::Debug(1).toInt())
+        if (severity.toInt() >= logv2::LogSeverity::Debug(2).toInt())
             level = WT_VERBOSE_DEBUG;
         else
             level = WT_VERBOSE_INFO;
