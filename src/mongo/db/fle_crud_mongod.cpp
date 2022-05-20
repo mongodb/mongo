@@ -77,16 +77,16 @@ ThreadPool::Options getThreadPoolOptions() {
 }
 
 void setMongosFieldsInReply(OperationContext* opCtx, write_ops::WriteCommandReplyBase* replyBase) {
-    // Set these fields only if not set
-    if (replyBase->getOpTime().has_value() && replyBase->getElectionId().has_value()) {
-        return;
-    }
-
-    // Undocumented repl fields that mongos depends on.
+    // Update the OpTime for the reply to current OpTime
+    //
+    // The OpTime in the reply reflects the OpTime of when the request was run, not when it was
+    // committed. The Transaction API propagates the OpTime from the commit transaction onto the
+    // current thread so grab it from TLS and change the OpTime on the reply.
+    //
     auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
     const auto replMode = replCoord->getReplicationMode();
-    if (replMode != repl::ReplicationCoordinator::modeNone) {
 
+    if (replMode != repl::ReplicationCoordinator::modeNone) {
         replyBase->setOpTime(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp());
         replyBase->setElectionId(replCoord->getElectionId());
     }
