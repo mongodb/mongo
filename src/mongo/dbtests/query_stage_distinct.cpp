@@ -130,7 +130,8 @@ public:
 
         // Set up the distinct stage.
         std::vector<const IndexDescriptor*> indexes;
-        coll->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, BSON("a" << 1), false, &indexes);
+        coll->getIndexCatalog()->findIndexesByKeyPattern(
+            &_opCtx, BSON("a" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
 
         DistinctParams params{&_opCtx, indexes[0]};
@@ -196,7 +197,8 @@ public:
 
         // Set up the distinct stage.
         std::vector<const IndexDescriptor*> indexes;
-        coll->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, BSON("a" << 1), false, &indexes);
+        coll->getIndexCatalog()->findIndexesByKeyPattern(
+            &_opCtx, BSON("a" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
         verify(indexes.size() == 1);
 
         DistinctParams params{&_opCtx, indexes[0]};
@@ -263,7 +265,7 @@ public:
 
         std::vector<const IndexDescriptor*> indices;
         coll->getIndexCatalog()->findIndexesByKeyPattern(
-            &_opCtx, BSON("a" << 1 << "b" << 1), false, &indices);
+            &_opCtx, BSON("a" << 1 << "b" << 1), IndexCatalog::InclusionPolicy::kReady, &indices);
         ASSERT_EQ(1U, indices.size());
 
         DistinctParams params{&_opCtx, indices[0]};

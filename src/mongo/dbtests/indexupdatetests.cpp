@@ -214,8 +214,10 @@ public:
 
         ASSERT_OK(indexer.init(_opCtx, coll, spec, MultiIndexBlock::kNoopOnInitFn).getStatus());
 
-        auto desc =
-            coll->getIndexCatalog()->findIndexByName(_opCtx, "a", true /* includeUnfinished */);
+        auto desc = coll->getIndexCatalog()->findIndexByName(
+            _opCtx,
+            "a",
+            IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
         ASSERT(desc);
 
         // Hybrid index builds check duplicates explicitly.
