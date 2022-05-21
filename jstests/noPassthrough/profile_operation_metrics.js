@@ -1,10 +1,12 @@
 /**
  * Tests that resource consumption metrics are reported in the profiler.
  *
+ * TODO: SERVER-66644 Re-enable this test by removing the `__TEMPORARILY_DISABLED__` tag.
  * @tags: [
  *   requires_capped,
  *   requires_replication,
  *   requires_wiredtiger,
+ *   __TEMPORARILY_DISABLED__
  * ]
  */
 (function() {
