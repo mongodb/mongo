@@ -101,6 +101,7 @@ only certain components:
 * `install-mongo` or `install-shell`
 * `install-servers` (includes `mongod` and `mongos`)
 * `install-core` (includes `mongod`, `mongos`, `mongo`)
+* `install-devcore` (includes `mongod`, `mongos`, and `mongo`; the name is forward-compatible with 6.0+ branches)
 * `install-all`
 
 
