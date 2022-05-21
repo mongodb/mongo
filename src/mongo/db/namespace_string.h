@@ -76,6 +76,9 @@ public:
     // Name for the system views collection
     static constexpr StringData kSystemDotViewsCollectionName = "system.views"_sd;
 
+    // Name for the change stream change collection.
+    static constexpr StringData kChangeStreamChangeCollection = "system.change_collection"_sd;
+
     // Names of privilege document collections
     static constexpr StringData kSystemUsers = "system.users"_sd;
     static constexpr StringData kSystemRoles = "system.roles"_sd;
@@ -454,6 +457,11 @@ public:
      * Returns whether the specified namespace is config.system.preimages.
      */
     bool isChangeStreamPreImagesCollection() const;
+
+    /**
+     * Returns whether the specified namespace is config.system.changeCollection.
+     */
+    bool isChangeStreamChangeCollection() const;
 
     /**
      * Returns whether the specified namespace is config.image_collection.

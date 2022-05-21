@@ -243,6 +243,10 @@ bool NamespaceString::isLegalClientSystemNS(
         return true;
     }
 
+    if (isChangeStreamChangeCollection()) {
+        return true;
+    }
+
     return false;
 }
 
@@ -400,6 +404,10 @@ bool NamespaceString::isChangeStreamPreImagesCollection() const {
     return ns() == kChangeStreamPreImagesNamespace.ns();
 }
 
+bool NamespaceString::isChangeStreamChangeCollection() const {
+    return db() == kConfigDb && coll() == kChangeStreamChangeCollection;
+}
+
 bool NamespaceString::isConfigImagesCollection() const {
     return ns() == kConfigImagesNamespace.ns();
 }
@@ -424,7 +432,8 @@ NamespaceString NamespaceString::getTimeseriesViewNamespace() const {
 }
 
 bool NamespaceString::isImplicitlyReplicated() const {
-    if (isChangeStreamPreImagesCollection() || isConfigImagesCollection() || isChangeCollection()) {
+    if (isChangeStreamPreImagesCollection() || isConfigImagesCollection() || isChangeCollection() ||
+        isChangeStreamChangeCollection()) {
         // Implicitly replicated namespaces are replicated, although they only replicate a subset of
         // writes.
         invariant(isReplicated());

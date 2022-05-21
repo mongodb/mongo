@@ -55,6 +55,15 @@ Status createCollection(OperationContext* opCtx,
                         const NamespaceString& ns,
                         const CreateCommand& cmd);
 
+
+/**
+ * Creates the collection or the view as described by 'options'.
+ */
+Status createCollection(OperationContext* opCtx,
+                        const NamespaceString& ns,
+                        const CollectionOptions& options,
+                        const boost::optional<BSONObj>& idIndex);
+
 /**
  * Creates the change stream pre-images collection. The collection is clustered by the primary key,
  * _id.
