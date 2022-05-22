@@ -73,7 +73,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
     // This workload sets the 'storeFindAndModifyImagesInSideCollection' parameter to a random bool
     // during setup() and restores the original value during teardown().
-    $config.data.originalStoreFindAndModifyImagesInSideCollection = undefined;
+    $config.data.originalStoreFindAndModifyImagesInSideCollection = {};
 
     // Determine if this workload needs to use causally consistent sessions.
     $config.data.shouldUseCausalConsistency = (() => {
@@ -445,6 +445,30 @@ var $config = extendWorkload($config, function($config, $super) {
         assert.commandWorked(bulk.execute());
     };
 
+    $config.data.overrideStoreFindAndModifyImagesInSideCollection =
+        function overrideStoreFindAndModifyImagesInSideCollection(cluster) {
+        // Store the findAndModify images in the oplog half of the time.
+        const enableFindAndModifyImageCollection = this.generateRandomBool();
+        cluster.executeOnMongodNodes((db) => {
+            const res = assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                storeFindAndModifyImagesInSideCollection: enableFindAndModifyImageCollection
+            }));
+            this.originalStoreFindAndModifyImagesInSideCollection[db.getMongo().host] = res.was;
+        });
+    };
+
+    $config.data.restoreStoreFindAndModifyImagesInSideCollection =
+        function restoreStoreFindAndModifyImagesInSideCollection(cluster) {
+        cluster.executeOnMongodNodes((db) => {
+            assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                storeFindAndModifyImagesInSideCollection:
+                    this.originalStoreFindAndModifyImagesInSideCollection[db.getMongo().host]
+            }));
+        });
+    };
+
     $config.setup = function setup(db, collName, cluster) {
         assert.commandWorked(db.createCollection(collName, {writeConcern: {w: "majority"}}));
         if (this.insertInitialDocsOnSetUp) {
@@ -454,24 +478,11 @@ var $config = extendWorkload($config, function($config, $super) {
                 this.insertInitialDocuments(db, collName, tid);
             }
         }
-
-        // Store the findAndModify images in the oplog half of the time.
-        const enableFindAndModifyImageCollection = this.generateRandomBool();
-        this.originalStoreFindAndModifyImagesInSideCollection =
-            assert
-                .commandWorked(db.adminCommand({
-                    setParameter: 1,
-                    storeFindAndModifyImagesInSideCollection: enableFindAndModifyImageCollection
-                }))
-                .was;
+        this.overrideStoreFindAndModifyImagesInSideCollection(cluster);
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
-        assert.commandWorked(db.adminCommand({
-            setParameter: 1,
-            storeFindAndModifyImagesInSideCollection:
-                this.originalStoreFindAndModifyImagesInSideCollection
-        }));
+        this.restoreStoreFindAndModifyImagesInSideCollection(cluster);
     };
 
     /**

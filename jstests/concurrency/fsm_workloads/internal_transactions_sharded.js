@@ -17,10 +17,6 @@ load('jstests/concurrency/fsm_workloads/internal_transactions_unsharded.js');
 load('jstests/libs/fail_point_util.js');
 
 var $config = extendWorkload($config, function($config, $super) {
-    // This workload sets the 'storeFindAndModifyImagesInSideCollection' parameter to a random bool
-    // during setup() and restores the original value during teardown().
-    $config.data.originalStoreFindAndModifyImagesInSideCollection = {};
-
     $config.data.getQueryForDocument = function getQueryForDocument(doc) {
         // The query for a write command against a sharded collection must contain the shard key.
         const query = $super.data.getQueryForDocument.apply(this, arguments);
@@ -109,24 +105,7 @@ var $config = extendWorkload($config, function($config, $super) {
             }
         }
 
-        const enableFindAndModifyImageCollection = this.generateRandomBool();
-        cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                storeFindAndModifyImagesInSideCollection: enableFindAndModifyImageCollection
-            }));
-            this.originalStoreFindAndModifyImagesInSideCollection[db.getMongo().host] = res.was;
-        });
-    };
-
-    $config.teardown = function teardown(db, collName, cluster) {
-        cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                storeFindAndModifyImagesInSideCollection:
-                    this.originalStoreFindAndModifyImagesInSideCollection[db.getMongo().host]
-            }));
-        });
+        this.overrideStoreFindAndModifyImagesInSideCollection(cluster);
     };
 
     return $config;
