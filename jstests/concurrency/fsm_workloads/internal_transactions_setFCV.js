@@ -76,6 +76,8 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.setup = function(db, collName, cluster) {
+        $super.setup.apply(this, arguments);
+
         if (cluster.isSharded()) {
             // Set the transactionLifetimeLimitSeconds to 60 seconds so that cross-shard
             // transactions that start between when setFCV aborts unprepared transactions and when
@@ -93,6 +95,8 @@ var $config = extendWorkload($config, function($config, $super) {
     const fcvValues = [lastLTSFCV, lastContinuousFCV, latestFCV];
 
     $config.teardown = function(db, collName, cluster) {
+        $super.teardown.apply(this, arguments);
+
         assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
         if (cluster.isSharded()) {
