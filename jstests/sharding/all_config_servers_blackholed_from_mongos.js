@@ -9,6 +9,7 @@
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
+TestData.skipCheckRoutingTableConsistency = true;
 
 (function() {
 'use strict';
@@ -46,11 +47,6 @@ jsTest.log('Doing write operation on a new database and collection');
 assert.writeError(
     st.s.getDB('NonExistentDB')
         .TestColl.insert({_id: 0, value: 'This value will never be inserted'}, {maxTimeMS: 15000}));
-
-jsTest.log('Resuming communication between mongos and config servers before teardown');
-st.forEachConfigServer((configSvr) => {
-    configSvr.discardMessagesFrom(st.s, 0.0);
-});
 
 st.stop();
 }());
