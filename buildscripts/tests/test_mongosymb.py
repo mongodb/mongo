@@ -5,29 +5,29 @@ import unittest
 from buildscripts import mongosymb as under_test
 
 
-class TestParseVersion(unittest.TestCase):
-    def test_parse_version_with_patch(self):
+class TestGetVersion(unittest.TestCase):
+    def test_get_version_with_patch(self):
         trace_doc = {
             "processInfo": {
                 "mongodbVersion": "6.0.0-alpha0-37-ge1d28c1-patch-6257e60a32f417196bc25169"
             }
         }
-        version = under_test.parse_version(trace_doc)
-        self.assertEqual(version, "6257e60a32f417196bc25169")
+        version = under_test.get_version(trace_doc)
+        self.assertEqual(version, "6.0.0-alpha0-37-ge1d28c1-patch-6257e60a32f417196bc25169")
 
-    def test_parse_version_without_patch(self):
+    def test_get_version_without_patch(self):
         trace_doc = {"processInfo": {"mongodbVersion": "6.1.0-alpha-504-g0c8a142"}}
-        version = under_test.parse_version(trace_doc)
-        self.assertEqual(version, None)
+        version = under_test.get_version(trace_doc)
+        self.assertEqual(version, "6.1.0-alpha-504-g0c8a142")
 
-    def test_parse_version_no_mongodb_version(self):
+    def test_get_version_no_mongodb_version(self):
         trace_doc = {"processInfo": {}}
-        version = under_test.parse_version(trace_doc)
+        version = under_test.get_version(trace_doc)
         self.assertEqual(version, None)
 
-    def test_parse_version_no_process_info(self):
+    def test_get_version_no_process_info(self):
         trace_doc = {}
-        version = under_test.parse_version(trace_doc)
+        version = under_test.get_version(trace_doc)
         self.assertEqual(version, None)
 
 

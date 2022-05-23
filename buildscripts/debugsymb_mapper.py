@@ -4,11 +4,13 @@ import json
 import logging
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
 import time
-import typing
+from json import JSONDecoder
+from typing import Optional, Tuple, Generator, Dict, List, NamedTuple
 
 import requests
 
@@ -20,30 +22,95 @@ from buildscripts.util.oauth import get_client_cred_oauth_credentials, Configs
 from buildscripts.resmokelib.setup_multiversion.setup_multiversion import SetupMultiversion, download
 from buildscripts.build_system_options import PathOptions
 
+BUILD_INFO_RE = re.compile(r"Build Info: ({(\n.*)*})")
+MONGOD = "mongod"
 
-class LinuxBuildIDExtractor:
-    """Parse readlef command output & extract Build ID."""
 
-    default_executable_path = "readelf"
-
-    def __init__(self, executable_path: str = None):
-        """Initialize instance."""
-
-        self.executable_path = executable_path or self.default_executable_path
-
-    def callreadelf(self, binary_path: str) -> str:
-        """Call readelf command for given binary & return string output."""
-
-        args = [self.executable_path, "-n", binary_path]
-        process = subprocess.Popen(args=args, close_fds=True, stdin=subprocess.PIPE,
-                                   stdout=subprocess.PIPE)
-        process.wait()
-        return process.stdout.read().decode()
+class CmdClient:
+    """Client to run commands."""
 
     @staticmethod
-    def extractbuildid(out: str) -> typing.Optional[str]:
-        """Parse readelf output and extract Build ID from it."""
+    def run(args: List[str]) -> str:
+        """
+        Run command with args.
 
+        :param args: Argument list.
+        :return: Command output.
+        """
+
+        out = subprocess.run(args, close_fds=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                             check=False)
+        return out.stdout.strip().decode()
+
+
+class BuildIdOutput(NamedTuple):
+    """
+    Build ID and command output.
+
+    * build_id: Build ID or None.
+    * cmd_output: Command output.
+    """
+
+    build_id: Optional[str]
+    cmd_output: str
+
+
+class BinVersionOutput(NamedTuple):
+    """
+    Mongodb bin version and command output.
+
+    * mongodb_version: Bin version.
+    * cmd_output: Command output.
+    """
+
+    mongodb_version: Optional[str]
+    cmd_output: str
+
+
+class CmdOutputExtractor:
+    """Data extractor from command output."""
+
+    def __init__(self, cmd_client: Optional[CmdClient] = None,
+                 json_decoder: Optional[JSONDecoder] = None) -> None:
+        """
+        Initialize.
+
+        :param cmd_client: Client to run commands.
+        :param json_decoder: JSONDecoder object.
+        """
+        self.cmd_client = cmd_client if cmd_client is not None else CmdClient()
+        self.json_decoder = json_decoder if json_decoder is not None else JSONDecoder()
+
+    def get_build_id(self, bin_path: str) -> BuildIdOutput:
+        """
+        Get build ID from readelf command.
+
+        :param bin_path: Path to binary of the build.
+        :return: Build ID or None and command output.
+        """
+        out = self.cmd_client.run(["readelf", "-n", bin_path])
+        build_id = self._extract_build_id(out)
+        return BuildIdOutput(build_id, out)
+
+    def get_bin_version(self, bin_path: str) -> BinVersionOutput:
+        """
+        Get mongodb bin version from `{bin} --version` command.
+
+        :param bin_path: Path to mongodb binary.
+        :return: Bin version or None and command output.
+        """
+        out = self.cmd_client.run([os.path.abspath(bin_path), "--version"])
+        mongodb_version = self._get_mongodb_version(out)
+        return BinVersionOutput(mongodb_version, out)
+
+    @staticmethod
+    def _extract_build_id(out: str) -> Optional[str]:
+        """
+        Parse readelf output and extract Build ID from it.
+
+        :param out: readelf command output.
+        :return: Build ID on None.
+        """
         build_id = None
         for line in out.splitlines():
             line = line.strip()
@@ -53,13 +120,21 @@ class LinuxBuildIDExtractor:
                 build_id = line.split(': ')[1]
         return build_id
 
-    def run(self, binary_path: str) -> typing.Tuple[str, str]:
-        """Perform all necessary actions to get Build ID."""
+    def _get_mongodb_version(self, out: str) -> Optional[str]:
+        """
+        Parse version command output and extract mongodb version.
 
-        readelfout = self.callreadelf(binary_path)
-        buildid = self.extractbuildid(readelfout)
+        :param out: Version command output.
+        :return: Version or None.
+        """
+        mongodb_version = None
 
-        return buildid, readelfout
+        search = BUILD_INFO_RE.search(out)
+        if search:
+            build_info = self.json_decoder.decode(search.group(1))
+            mongodb_version = build_info.get("version")
+
+        return mongodb_version
 
 
 class DownloadOptions(object):
@@ -88,19 +163,22 @@ class Mapper:
     default_client_credentials_user_name = "client-user"
     default_creds_file_path = os.path.join(os.getcwd(), '.symbolizer_credentials.json')
 
-    def __init__(self, version: str, client_id: str, client_secret: str, variant: str,
+    def __init__(self, evg_version: str, evg_variant: str, client_id: str, client_secret: str,
                  cache_dir: str = None, web_service_base_url: str = None,
                  logger: logging.Logger = None):
         """
         Initialize instance.
 
-        :param version: version string
-        :param variant: build variant string
-        :param cache_dir: full path to cache directory as a string
-        :param web_service_base_url: URL of symbolizer web service
+        :param evg_version: Evergreen version ID.
+        :param evg_variant: Evergreen build variant name.
+        :param client_id: Client id for Okta Oauth.
+        :param client_secret: Secret key for Okta Oauth.
+        :param cache_dir: Full path to cache directory as a string.
+        :param web_service_base_url: URL of symbolizer web service.
+        :param logger: Debug symbols mapper logger.
         """
-        self.version = version
-        self.variant = variant
+        self.evg_version = evg_version
+        self.evg_variant = evg_variant
         self.cache_dir = cache_dir or self.default_cache_dir
         self.web_service_base_url = web_service_base_url or self.default_web_service_base_url
 
@@ -113,8 +191,8 @@ class Mapper:
         self.http_client = requests.Session()
 
         self.multiversion_setup = SetupMultiversion(
-            DownloadOptions(download_symbols=True, download_binaries=True), variant=self.variant,
-            ignore_failed_push=True)
+            DownloadOptions(download_symbols=True, download_binaries=True),
+            variant=self.evg_variant, ignore_failed_push=True)
         self.debug_symbols_url = None
         self.url = None
         self.configs = Configs(
@@ -139,7 +217,7 @@ class Mapper:
                 data = json.loads(cfile.read())
                 access_token, expire_time = data.get("access_token"), data.get("expire_time")
                 if time.time() < expire_time:
-                    # credentials hasn't expired yet
+                    # credentials haven't expired yet
                     self.http_client.headers.update({"Authorization": f"Bearer {access_token}"})
                     return
 
@@ -147,7 +225,7 @@ class Mapper:
                                                         configs=self.configs)
         self.http_client.headers.update({"Authorization": f"Bearer {credentials.access_token}"})
 
-        # write credentials to local file for further useage
+        # write credentials to local file for further usage
         with open(self.default_creds_file_path, "w") as cfile:
             cfile.write(
                 json.dumps({
@@ -184,7 +262,7 @@ class Mapper:
     def setup_urls(self):
         """Set up URLs using multiversion."""
 
-        urlinfo = self.multiversion_setup.get_urls(self.version, self.variant)
+        urlinfo = self.multiversion_setup.get_urls(self.evg_version, self.evg_variant)
 
         download_symbols_url = urlinfo.urls.get("mongo-debugsymbols.tgz", None)
         binaries_url = urlinfo.urls.get("Binaries", "")
@@ -194,7 +272,7 @@ class Mapper:
 
         if not download_symbols_url:
             self.logger.error("Couldn't find URL for debug symbols. Version: %s, URLs dict: %s",
-                              self.version, urlinfo.urls)
+                              self.evg_version, urlinfo.urls)
             raise ValueError(f"Debug symbols URL not found. URLs dict: {urlinfo.urls}")
 
         self.debug_symbols_url = download_symbols_url
@@ -233,14 +311,14 @@ class Mapper:
         tarball_full_path = download.download_from_s3(url)
         return tarball_full_path
 
-    def generate_build_id_mapping(self) -> typing.Generator[typing.Dict[str, str], None, None]:
+    def generate_build_id_mapping(self) -> Generator[Dict[str, str], None, None]:
         """
         Extract build id from binaries and creates new dict using them.
 
         :return: mapped data as dict
         """
 
-        readelf_extractor = LinuxBuildIDExtractor()
+        extractor = CmdOutputExtractor()
 
         debug_symbols_path = self.download(self.debug_symbols_url)
         debug_symbols_unpacked_path = self.unpack(debug_symbols_path)
@@ -262,6 +340,17 @@ class Mapper:
         self.logger.info("INSIDE unpacked binaries/dist-test: %s",
                          os.listdir(binaries_unpacked_path))
 
+        mongod_bin = os.path.join(binaries_unpacked_path, self.path_options.main_binary_folder_name,
+                                  MONGOD)
+        bin_version_output = extractor.get_bin_version(mongod_bin)
+
+        if bin_version_output.mongodb_version is None:
+            self.logger.error("mongodb version could not be extracted. \n`%s --version` output: %s",
+                              mongod_bin, bin_version_output.cmd_output)
+            return
+        else:
+            self.logger.info("Extracted mongodb version: %s", bin_version_output.mongodb_version)
+
         # start with main binary folder
         for binary in self.selected_binaries:
             full_bin_path = os.path.join(debug_symbols_unpacked_path,
@@ -271,16 +360,21 @@ class Mapper:
                 self.logger.error("Could not find binary at %s", full_bin_path)
                 return
 
-            build_id, readelf_out = readelf_extractor.run(full_bin_path)
+            build_id_output = extractor.get_build_id(full_bin_path)
 
-            if not build_id:
+            if not build_id_output.build_id:
                 self.logger.error("Build ID couldn't be extracted. \nReadELF output %s",
-                                  readelf_out)
+                                  build_id_output.cmd_output)
                 return
+            else:
+                self.logger.info("Extracted build ID: %s", build_id_output.build_id)
 
             yield {
-                'url': self.url, 'debug_symbols_url': self.debug_symbols_url, 'build_id': build_id,
-                'file_name': binary, 'version': self.version
+                'url': self.url,
+                'debug_symbols_url': self.debug_symbols_url,
+                'build_id': build_id_output.build_id,
+                'file_name': binary,
+                'version': bin_version_output.mongodb_version,
             }
 
         # move to shared libraries folder.
@@ -306,18 +400,21 @@ class Mapper:
                 self.logger.error("Could not find binary at %s", sofile_path)
                 return
 
-            build_id, readelf_out = readelf_extractor.run(sofile_path)
+            build_id_output = extractor.get_build_id(sofile_path)
 
-            if not build_id:
-                self.logger.error("Build ID couldn't be extracted. \nReadELF out %s", readelf_out)
+            if not build_id_output.build_id:
+                self.logger.error("Build ID couldn't be extracted. \nReadELF out %s",
+                                  build_id_output.cmd_output)
                 return
+            else:
+                self.logger.info("Extracted build ID: %s", build_id_output.build_id)
 
             yield {
                 'url': self.url,
                 'debug_symbols_url': self.debug_symbols_url,
-                'build_id': build_id,
+                'build_id': build_id_output.build_id,
                 'file_name': sofile,
-                'version': self.version,
+                'version': bin_version_output.mongodb_version,
             }
 
     def run(self):
@@ -355,8 +452,8 @@ def make_argument_parser(parser=None, **kwargs):
 def main(options):
     """Execute mapper here. Main entry point."""
 
-    mapper = Mapper(version=options.version, variant=options.variant, client_id=options.client_id,
-                    client_secret=options.client_secret,
+    mapper = Mapper(evg_version=options.version, evg_variant=options.variant,
+                    client_id=options.client_id, client_secret=options.client_secret,
                     web_service_base_url=options.web_service_base_url)
 
     # when used as a context manager, mapper instance automatically cleans files/folders after finishing its job.
