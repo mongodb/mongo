@@ -775,21 +775,65 @@ generateGenericMultiIntervalIndexScan(StageBuilderState& state,
 /**
  * Checks if we can create a single interval index scan plan. Creation of the single interval index
  * scan plans is preferred due to lower query latency as a result of faster plan recovery from the
- * cache.
+ * cache. The rule for checking if 'iets' resolve to a single interval is as follows:
+ * - an optional sequence of '$eq' or constant point intervals followed by
+ * - an optional single interval of a comparison match expression or a constant interval or an
+ * intersection of two such nodes followed by
+ * - an optional sequence of unbounded intervals [MinKey, MaxKey].
  */
 bool canGenerateSingleIntervalIndexScan(const std::vector<interval_evaluation_tree::IET>& iets) {
-    if (iets.size() != 1) {
-        return false;
+    // Represents different allowed states while checking if the 'iets' could be represented as a
+    // single interval.
+    enum class State { EqOrConstPoint, ComparisonOrConstRange, UnboundedInterval };
+    auto isComparisonOrSingleConst = [&](const interval_evaluation_tree::IET& iet) {
+        const auto evalNodePtr = iet.cast<interval_evaluation_tree::EvalNode>();
+        const auto constNodePtr = iet.cast<interval_evaluation_tree::ConstNode>();
+        const bool isComparison = evalNodePtr &&
+            ComparisonMatchExpression::isComparisonMatchExpression(evalNodePtr->matchType());
+        const bool isConstSingleInterval = constNodePtr && constNodePtr->oil.intervals.size() == 1;
+        return isComparison || isConstSingleInterval;
+    };
+
+    auto currentState{State::EqOrConstPoint};
+    for (const auto& iet : iets) {
+        const auto evalNodePtr = iet.cast<interval_evaluation_tree::EvalNode>();
+        const auto constNodePtr = iet.cast<interval_evaluation_tree::ConstNode>();
+        const auto intersectNodePtr = iet.cast<interval_evaluation_tree::IntersectNode>();
+        const bool isEq = evalNodePtr && evalNodePtr->matchType() == MatchExpression::MatchType::EQ;
+        const bool isConstSinglePoint = constNodePtr && constNodePtr->oil.isPoint();
+        const bool isSimpleIntersection = intersectNodePtr &&
+            isComparisonOrSingleConst(intersectNodePtr->get<0>()) &&
+            isComparisonOrSingleConst(intersectNodePtr->get<1>());
+        const bool isMinToMax = constNodePtr && constNodePtr->oil.isMinToMax();
+
+        switch (currentState) {
+            case State::EqOrConstPoint:
+                if (isEq || isConstSinglePoint) {
+                    continue;
+                } else if (isComparisonOrSingleConst(iet) || isSimpleIntersection) {
+                    currentState = State::ComparisonOrConstRange;
+                } else {
+                    return false;
+                }
+                break;
+            case State::ComparisonOrConstRange:
+                if (!isMinToMax) {
+                    return false;
+                }
+
+                // Transition to the next state as we allow only one bounded range, after that all
+                // remaining fields must be unbounded.
+                currentState = State::UnboundedInterval;
+                break;
+            case State::UnboundedInterval:
+                if (!isMinToMax) {
+                    return false;
+                }
+                break;
+        }
     }
 
-    const auto evalNodePtr = iets[0].cast<interval_evaluation_tree::EvalNode>();
-    const bool isEvalNodeAndAllowedMatchType = evalNodePtr
-        ? ComparisonMatchExpression::isComparisonMatchExpression(evalNodePtr->matchType())
-        : false;
-    const auto constNodePtr = iets[0].cast<interval_evaluation_tree::ConstNode>();
-    const bool isOneConstNodeInterval =
-        constNodePtr ? constNodePtr->oil.intervals.size() == 1 : false;
-    return isEvalNodeAndAllowedMatchType || isOneConstNodeInterval;
+    return true;
 }
 }  // namespace
 
