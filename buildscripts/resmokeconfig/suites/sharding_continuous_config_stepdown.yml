@@ -242,6 +242,11 @@ selector:
   # Expects reshardCollection executes without config server stepdown
   - jstests/sharding/shard_encrypted_collection.js
 
+  # Runs commands against mongos which target the config server primary and may fail with
+  # FailedToSatisfyReadPreference when electing a new primary of the config server replica
+  # set takes a while.
+  - jstests/sharding/move_chunk_respects_maxtimems.js
+
   exclude_with_any_tags:
   - does_not_support_stepdowns
 
