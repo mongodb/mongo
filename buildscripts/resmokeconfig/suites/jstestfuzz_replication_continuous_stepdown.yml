@@ -32,7 +32,6 @@ executor:
       global_vars:
         TestData:
           skipValidationOnInvalidViewDefinitions: true
-          forceValidationWithFeatureCompatibilityVersion: latestFCV
   fixture:
     class: ReplicaSetFixture
     mongod_options:
