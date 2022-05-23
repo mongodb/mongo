@@ -145,8 +145,6 @@ build_sys['develop']="cmake"
 build_sys['mongodb-5.0']="autoconf"
 build_sys['mongodb-4.4']="autoconf"
 build_sys['mongodb-4.2']="autoconf"
-build_sys['mongodb-4.0']="autoconf"
-build_sys['mongodb-3.6']="autoconf"
 
 # Release branches.
 #

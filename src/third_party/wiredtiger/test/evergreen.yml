@@ -241,7 +241,7 @@ functions:
             git checkout $branch
 
             # Java API is removed in newer branches via WT-6675.
-            if [ $branch == "mongodb-4.2" ] || [ $branch == "mongodb-4.0" ]; then
+            if [ $branch == "mongodb-4.2" ]; then
               pushd build_posix
               sh reconf
               ../configure CFLAGS="-DMIGHT_NOT_RUN -Wno-error" --enable-java --enable-python --enable-strict
@@ -4194,7 +4194,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    doc_update_branches: develop,mongodb-6.0,mongodb-5.0,mongodb-4.4,mongodb-4.2,mongodb-4.0
+    doc_update_branches: develop,mongodb-6.0,mongodb-5.0,mongodb-4.4,mongodb-4.2
   tasks:
     - name: doc-update
 

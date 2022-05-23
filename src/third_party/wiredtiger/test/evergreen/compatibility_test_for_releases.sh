@@ -531,7 +531,7 @@ upgrade_to_latest=false
 # The 2 arrays should be adjusted over time when newer branches are created,
 # or older branches are EOL.
 newer_release_branches=(develop mongodb-5.0 mongodb-4.4 mongodb-4.2)
-older_release_branches=(mongodb-4.2 mongodb-4.0 mongodb-3.6)
+older_release_branches=(mongodb-4.2 mongodb-4.0)
 
 # This array is used to generate compatible configuration files between releases, because
 # upgrade/downgrade test runs each build's format test program on the second build's
@@ -567,7 +567,7 @@ build_sys['mongodb-5.0']="autoconf"
 build_sys['mongodb-4.4']="autoconf"
 build_sys['mongodb-4.2']="autoconf"
 build_sys['mongodb-4.0']="autoconf"
-build_sys['mongodb-3.6']="autoconf"
+
 
 #############################################################
 # usage string
