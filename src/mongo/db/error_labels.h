@@ -39,6 +39,7 @@ static constexpr StringData kTransientTransaction = "TransientTransactionError"_
 static constexpr StringData kRetryableWrite = "RetryableWriteError"_sd;
 static constexpr StringData kNonResumableChangeStream = "NonResumableChangeStreamError"_sd;
 static constexpr StringData kResumableChangeStream = "ResumableChangeStreamError"_sd;
+static constexpr StringData kNoWritesPerformed = "NoWritesPerformed"_sd;
 }  // namespace ErrorLabel
 
 class ErrorLabelBuilder {
@@ -49,14 +50,18 @@ public:
                       boost::optional<ErrorCodes::Error> code,
                       boost::optional<ErrorCodes::Error> wcCode,
                       bool isInternalClient,
-                      bool isMongos)
+                      bool isMongos,
+                      const repl::OpTime& lastOpBeforeRun,
+                      const repl::OpTime& lastOpAfterRun)
         : _opCtx(opCtx),
           _sessionOptions(sessionOptions),
           _commandName(commandName),
           _code(code),
           _wcCode(wcCode),
           _isInternalClient(isInternalClient),
-          _isMongos(isMongos) {}
+          _isMongos(isMongos),
+          _lastOpBeforeRun(lastOpBeforeRun),
+          _lastOpAfterRun(lastOpAfterRun) {}
 
     void build(BSONArrayBuilder& labels) const;
 
@@ -64,6 +69,7 @@ public:
     bool isRetryableWriteError() const;
     bool isResumableChangeStreamError() const;
     bool isNonResumableChangeStreamError() const;
+    bool isErrorWithNoWritesPerformed() const;
 
 private:
     bool _isCommitOrAbort() const;
@@ -74,6 +80,8 @@ private:
     boost::optional<ErrorCodes::Error> _wcCode;
     bool _isInternalClient;
     bool _isMongos;
+    repl::OpTime _lastOpBeforeRun;
+    repl::OpTime _lastOpAfterRun;
 };
 
 /**
@@ -85,7 +93,9 @@ BSONObj getErrorLabels(OperationContext* opCtx,
                        boost::optional<ErrorCodes::Error> code,
                        boost::optional<ErrorCodes::Error> wcCode,
                        bool isInternalClient,
-                       bool isMongos);
+                       bool isMongos,
+                       const repl::OpTime& lastOpBeforeRun,
+                       const repl::OpTime& lastOpAfterRun);
 
 /**
  * Whether a write error in a transaction should be labelled with "TransientTransactionError".

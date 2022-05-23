@@ -504,7 +504,9 @@ void ParseAndRunCommand::_updateStatsAndApplyErrorLabels(const Status& status) {
                                           status.code(),
                                           boost::none,
                                           false /* isInternalClient */,
-                                          true /* isMongos */);
+                                          true /* isMongos */,
+                                          repl::OpTime{},
+                                          repl::OpTime{});
 
 
         _errorBuilder->appendElements(errorLabels);

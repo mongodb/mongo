@@ -137,18 +137,38 @@ bool ErrorLabelBuilder::isResumableChangeStreamError() const {
     return swLitePipe.isOK() && swLitePipe.getValue().hasChangeStream();
 }
 
+bool ErrorLabelBuilder::isErrorWithNoWritesPerformed() const {
+    if (!_code && !_wcCode) {
+        return false;
+    }
+    if (_lastOpBeforeRun.isNull() || _lastOpAfterRun.isNull()) {
+        // Last OpTimes are unknown or not usable for determining whether or not a write was
+        // attempted.
+        return false;
+    }
+    return _lastOpBeforeRun == _lastOpAfterRun;
+}
+
 void ErrorLabelBuilder::build(BSONArrayBuilder& labels) const {
     // PLEASE CONSULT DRIVERS BEFORE ADDING NEW ERROR LABELS.
     bool hasTransientTransactionOrRetryableWriteError = false;
     if (isTransientTransactionError()) {
         labels << ErrorLabel::kTransientTransaction;
         hasTransientTransactionOrRetryableWriteError = true;
-    } else if (isRetryableWriteError()) {
-        // In the rare case where RetryableWriteError and TransientTransactionError are not mutually
-        // exclusive, only append the TransientTransactionError label so users know to retry the
-        // entire transaction.
-        labels << ErrorLabel::kRetryableWrite;
-        hasTransientTransactionOrRetryableWriteError = true;
+    } else {
+        if (isRetryableWriteError()) {
+            // In the rare case where RetryableWriteError and TransientTransactionError are not
+            // mutually exclusive, only append the TransientTransactionError label so users know to
+            // retry the entire transaction.
+            labels << ErrorLabel::kRetryableWrite;
+            hasTransientTransactionOrRetryableWriteError = true;
+            if (isErrorWithNoWritesPerformed()) {
+                // The NoWritesPerformed error label is only relevant for retryable writes so that
+                // drivers can determine what error to return when faced with multiple errors (see
+                // SERVER-66479 and DRIVERS-2327).
+                labels << ErrorLabel::kNoWritesPerformed;
+            }
+        }
     }
 
     // Change streams cannot run in a transaction, and cannot be a retryable write. Since these
@@ -171,7 +191,9 @@ BSONObj getErrorLabels(OperationContext* opCtx,
                        boost::optional<ErrorCodes::Error> code,
                        boost::optional<ErrorCodes::Error> wcCode,
                        bool isInternalClient,
-                       bool isMongos) {
+                       bool isMongos,
+                       const repl::OpTime& lastOpBeforeRun,
+                       const repl::OpTime& lastOpAfterRun) {
     if (MONGO_unlikely(errorLabelsOverride(opCtx))) {
         // This command was failed by a failCommand failpoint. Thus, we return the errorLabels
         // specified in the failpoint to supress any other error labels that would otherwise be
@@ -184,8 +206,15 @@ BSONObj getErrorLabels(OperationContext* opCtx,
     }
 
     BSONArrayBuilder labelArray;
-    ErrorLabelBuilder labelBuilder(
-        opCtx, sessionOptions, commandName, code, wcCode, isInternalClient, isMongos);
+    ErrorLabelBuilder labelBuilder(opCtx,
+                                   sessionOptions,
+                                   commandName,
+                                   code,
+                                   wcCode,
+                                   isInternalClient,
+                                   isMongos,
+                                   lastOpBeforeRun,
+                                   lastOpAfterRun);
     labelBuilder.build(labelArray);
 
     return (labelArray.arrSize() > 0) ? BSON(kErrorLabelsFieldName << labelArray.arr()) : BSONObj();
