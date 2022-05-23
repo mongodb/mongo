@@ -245,6 +245,21 @@ public:
      */
     enum class UseJournalListener { kUpdate, kSkip };
 
+    // RAII type to block and unblock the WiredTigerSessionCache to shut down.
+    class BlockShutdown {
+    public:
+        BlockShutdown(WiredTigerSessionCache* cache) : _cache(cache) {
+            _cache->_shuttingDown.fetchAndAdd(1);
+        }
+
+        ~BlockShutdown() {
+            _cache->_shuttingDown.fetchAndSubtract(1);
+        }
+
+    private:
+        WiredTigerSessionCache* _cache;
+    };
+
     /**
      * Indicates that WiredTiger should be configured to cache cursors.
      */
@@ -374,7 +389,7 @@ private:
     WiredTigerSnapshotManager _snapshotManager;
 
     // Used as follows:
-    //   The low 31 bits are a count of active calls to releaseSession.
+    //   The low 31 bits are a count of active calls that need to block shutdown.
     //   The high bit is a flag that is set if and only if we're shutting down.
     AtomicWord<unsigned> _shuttingDown;
     static const uint32_t kShuttingDownMask = 1 << 31;
