@@ -802,6 +802,28 @@ tasks:
             {scale: 1,
              schema: denormalized}
 
+  - name: tpch_10_normalized
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tpch"
+          test_control_params: |
+            {scale: 10,
+             schema: normalized}
+
+  - name: tpch_10_denormalized
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tpch"
+          test_control_params: |
+            {scale: 10,
+             schema: denormalized}
+
   - name: non_sharded_workloads
     priority: 5
     commands:
@@ -1080,6 +1102,8 @@ buildvariants:
       - name: bestbuy_query
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
 
   - name: linux-standalone-all-feature-flags
     display_name: Linux Standalone (all feature flags)
@@ -1100,6 +1124,8 @@ buildvariants:
       - name: schedule_patch_auto_tasks
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
 
   - name: compile-rhel70
     display_name: Compile for Atlas-like
@@ -1163,6 +1189,8 @@ buildvariants:
       - name: tpcc
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
       - name: industry_benchmarks_wmajority
       - name: sb_large_scale
       - name: sb_timeseries
@@ -1572,6 +1600,9 @@ buildvariants:
       - name: tpcc
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
+      # TODO: Enable in SERVER-66572.
+      # - name: tpch_10_normalized
+      # - name: tpch_10_denormalized
       - name: linkbench
       - name: linkbench2
       - name: tsbs_load
@@ -1625,6 +1656,9 @@ buildvariants:
       - name: tpcc
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
+      # TODO: Enable in SERVER-66572.
+      # - name: tpch_10_normalized
+      # - name: tpch_10_denormalized
       - name: linkbench
       - name: linkbench2
       # Time-series collections are available since v5.0.
@@ -1678,6 +1712,9 @@ buildvariants:
       - name: tpcc
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
+      # TODO: Enable in SERVER-66572.
+      # - name: tpch_10_normalized
+      # - name: tpch_10_denormalized
       - name: linkbench
       - name: linkbench2
       # Time-series collections are available since v5.0.
@@ -1735,6 +1772,9 @@ buildvariants:
       - name: tpcc
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
+      # TODO: Enable in SERVER-66572.
+      # - name: tpch_10_normalized
+      # - name: tpch_10_denormalized
       - name: linkbench
       - name: linkbench2
       # Time-series collections are available since v5.0.
