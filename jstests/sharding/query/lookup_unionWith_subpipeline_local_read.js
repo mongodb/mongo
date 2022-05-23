@@ -2,7 +2,9 @@
  * Tests $lookup, $graphLookup, and $unionWith in a sharded environment to verify the local read
  * behavior of subpipelines dispatched as part of these stages.
  *
- * @tags: [requires_majority_read_concern, requires_fcv_51, featureFlagShardedLookup]
+ * # Ban this test in pre-6.0 versions because the SBE is disabled in v6.0 but enabled in v5.3,
+ * # which could be problematic in multiversion tasks.
+ * @tags: [requires_majority_read_concern, requires_fcv_60, featureFlagShardedLookup]
  */
 
 (function() {
