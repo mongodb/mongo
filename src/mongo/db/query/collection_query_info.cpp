@@ -144,6 +144,8 @@ void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx, const Collec
                     _indexedPaths.addPath(path);
                 }
             }
+        } else if (descriptor->getAccessMethodName() == IndexNames::COLUMN) {
+            _indexedPaths.allPathsIndexed();
         } else if (descriptor->getAccessMethodName() == IndexNames::TEXT) {
             fts::FTSSpec ftsSpec(descriptor->infoObj());
 
