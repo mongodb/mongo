@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, random, wttest
-from helper_tiered import TieredConfigMixin, storage_sources
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtdataset import TrackedSimpleDataSet, TrackedComplexDataSet
 from wtscenario import make_scenarios
 
@@ -35,13 +35,16 @@ from wtscenario import make_scenarios
 #    Test somewhat arbitrary combinations of flush_tier, checkpoint, restarts,
 #    data additions and updates.
 class test_tiered14(wttest.WiredTigerTestCase, TieredConfigMixin):
+
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered14', tiered_only=True)
+
     uri = "table:test_tiered14-{}"   # format for subtests
 
     # FIXME-WT-7833: enable the commented scenarios and run the
     # test with the --long option.
 
     # The multiplier makes the size of keys and values progressively larger.
-    # A multipler of 0 makes the keys and values a single length.
+    # A multiplier of 0 makes the keys and values a single length.
     multiplier = [
         ('0', dict(multiplier=0)),
         ('S', dict(multiplier=1)),

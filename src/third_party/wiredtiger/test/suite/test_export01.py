@@ -34,7 +34,7 @@
 #     directory, and then performing operation on the backup directory.
 
 from helper import copy_wiredtiger_home
-from helper_tiered import TieredConfigMixin, tiered_storage_sources
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
 import os, wttest
 
@@ -44,6 +44,7 @@ class test_export01(TieredConfigMixin, wttest.WiredTigerTestCase):
     types = [
         ('table', dict(type = 'table:')),
     ]
+    tiered_storage_sources = gen_tiered_storage_sources()
 
     scenarios = make_scenarios(tiered_storage_sources, types)
 

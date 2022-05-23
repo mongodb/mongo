@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, wiredtiger, wttest
-from helper_tiered import  TieredConfigMixin, storage_sources, get_check
+from helper_tiered import  TieredConfigMixin, gen_tiered_storage_sources, get_check
 from wtscenario import make_scenarios
 
 StorageSource = wiredtiger.StorageSource  # easy access to constants
@@ -35,6 +35,8 @@ StorageSource = wiredtiger.StorageSource  # easy access to constants
 # test_tiered07.py
 #    Basic tiered storage API for schema operations.
 class test_tiered07(wttest.WiredTigerTestCase, TieredConfigMixin):
+
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered07', tiered_only=True)
 
     # FIXME-WT-8897 Disabled S3 (only indexing dirstore in storage sources) as S3 directory listing 
     # is interpreting a directory to end in a '/', whereas the code in the tiered storage doesn't 

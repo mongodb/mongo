@@ -29,11 +29,12 @@
 # test_tiered16.py
 #    Basic test for the remove_shared configuration in session.drop.
 
-from helper_tiered import TieredConfigMixin, tiered_storage_sources
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
 import os, wiredtiger, wttest
 
 class test_tiered16(TieredConfigMixin, wttest.WiredTigerTestCase):
+    tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = make_scenarios(tiered_storage_sources)
 
     def check_cache(self, cache_dir, expect1):

@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper_tiered import TieredConfigMixin, tiered_storage_sources
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
 
 # test_alter03.py
@@ -36,6 +36,7 @@ class test_alter03(TieredConfigMixin, wttest.WiredTigerTestCase):
     name = "alter03"
 
     # Build all scenarios
+    tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = make_scenarios(tiered_storage_sources)
 
     def verify_metadata(self, table_metastr, lsm_metastr, file_metastr):
