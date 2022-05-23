@@ -174,8 +174,8 @@ getDataSizeInfoForCollections(OperationContext* opCtx,
     return dataSizeInfoMap;
 }
 
-const CollectionDataSizeInfoForBalancing getDataSizeInfoForCollection(OperationContext* opCtx,
-                                                                      const NamespaceString& nss) {
+CollectionDataSizeInfoForBalancing getDataSizeInfoForCollection(OperationContext* opCtx,
+                                                                const NamespaceString& nss) {
     const auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
     std::vector<CollectionType> vec{coll};
     return std::move(getDataSizeInfoForCollections(opCtx, vec).at(nss));
