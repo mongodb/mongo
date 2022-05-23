@@ -212,6 +212,38 @@ class test_truncate_empty(wttest.WiredTigerTestCase):
             ',key_format=' + self.keyfmt + ',value_format=S')
         self.assertEqual(self.session.truncate(uri, None, None, None), 0)
 
+# Test truncation timestamp handling.
+class test_truncate_timestamp(wttest.WiredTigerTestCase):
+    name = 'test_truncate'
+    conn_config = 'log=(enabled=true)'
+
+    scenarios = make_scenarios([
+        ('file', dict(type='file:')),
+        ('table', dict(type='table:'))
+    ])
+
+    # Test truncation without a timestamp, expect errors.
+    def test_truncate_no_ts(self):
+        uri = self.type + self.name
+        msg = '/truncate operations may not yet be included/'
+
+        ds = SimpleDataSet(self, uri, 100, config='log=(enabled=false)')
+        ds.populate()
+
+        self.session.begin_transaction("no_timestamp=true")
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.truncate(uri, None, None, None), msg)
+
+    # Test truncation of a logged object without a timestamp, expect success.
+    def test_truncate_log_no_ts(self):
+        uri = self.type + self.name
+
+        ds = SimpleDataSet(self, uri, 100, config='log=(enabled=true)')
+        ds.populate()
+
+        self.session.begin_transaction("no_timestamp=true")
+        self.session.truncate(uri, None, None, None)
+
 # Test session.truncate.
 class test_truncate_cursor(wttest.WiredTigerTestCase):
     name = 'test_truncate'
