@@ -69,23 +69,22 @@ __wt_random_init_seed(WT_SESSION_IMPL *session, WT_RAND_STATE volatile *rnd_stat
     WT_RAND_STATE rnd;
     uint32_t v;
 
+    __wt_epoch(session, &ts);
+
     /*
      * Use this, instead of __wt_random_init if we need to vary the initial state of the RNG. This
      * is (currently) only used by test programs, where, for example, an initial set of test data is
      * created by a single thread, and we want more variability in the initial state of the RNG.
      *
-     * A nanosecond seed only gives us 10^9 bits (assuming it's perfect), so sample it twice and
-     * generate an initial random number to use as our seed, using algorithm "xor" from Marsaglia,
-     * "Xorshift RNGs".
+     * Take the seconds and nanoseconds from the clock as seeds, and smear that value across the
+     * value space, using algorithm "xor" from Marsaglia, "Xorshift RNGs".
      */
-    __wt_epoch(session, &ts);
-    v = (uint32_t)ts.tv_nsec;
+    v = (uint32_t)ts.tv_sec;
     v ^= v << 13;
     v ^= v >> 17;
     v ^= v << 5;
     M_W(rnd) = v + 521288629;
 
-    __wt_epoch(session, &ts);
     v = (uint32_t)ts.tv_nsec;
     v ^= v << 13;
     v ^= v >> 17;
@@ -106,10 +105,11 @@ __wt_random(WT_RAND_STATE volatile *rnd_state) WT_GCC_FUNC_ATTRIBUTE((visibility
     uint32_t w, z;
 
     /*
-     * Take a copy of the random state so we can ensure that the calculation operates on the state
-     * consistently regardless of concurrent calls with the same random state.
+     * Generally, every thread should have their own RNG state, but it's not guaranteed. Take a copy
+     * of the random state so we can ensure that the calculation operates on the state consistently
+     * regardless of concurrent calls with the same random state.
      */
-    rnd = *rnd_state;
+    WT_ORDERED_READ(rnd, *rnd_state);
     w = M_W(rnd);
     z = M_Z(rnd);
 
