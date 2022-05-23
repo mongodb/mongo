@@ -31,10 +31,12 @@
 #include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
+#include "mongo/s/request_types/shardsvr_join_migrations_request_gen.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/fail_point.h"
@@ -48,6 +50,35 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(pauseSubmissionsFailPoint);
 MONGO_FAIL_POINT_DEFINE(deferredCleanupCompletedCheckpoint);
+
+void waitForQuiescedCluster(OperationContext* opCtx) {
+    const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    ShardsvrJoinMigrations joinShardOnMigrationsRequest;
+    joinShardOnMigrationsRequest.setDbName(NamespaceString::kAdminDb);
+
+    auto unquiescedShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+
+    const auto responses =
+        sharding_util::sendCommandToShards(opCtx,
+                                           NamespaceString::kAdminDb.toString(),
+                                           joinShardOnMigrationsRequest.toBSON({}),
+                                           unquiescedShardIds,
+                                           executor,
+                                           false /*throwOnError*/);
+    for (const auto& r : responses) {
+        auto responseOutcome = r.swResponse.isOK()
+            ? getStatusFromCommandResult(r.swResponse.getValue().data)
+            : r.swResponse.getStatus();
+
+        if (!responseOutcome.isOK()) {
+            LOGV2_WARNING(6648001,
+                          "Could not complete _ShardsvrJoinMigrations on shard",
+                          "error"_attr = responseOutcome,
+                          "shard"_attr = r.shardId);
+        }
+    }
+}
+
 
 Status processRemoteResponse(const executor::RemoteCommandResponse& remoteResponse) {
     if (!remoteResponse.status.isOK()) {
@@ -126,7 +157,7 @@ std::vector<RequestData> rebuildRequestsFromRecoveryInfo(
         FindCommandRequest findRequest{MigrationType::ConfigNS};
         dbClient.find(std::move(findRequest), ReadPreferenceSetting{}, documentProcessor);
     } catch (const DBException& e) {
-        LOGV2_ERROR(5847215, "Failed to load requests to recover", "error"_attr = redact(e));
+        LOGV2_ERROR(5847215, "Failed to fetch requests to recover", "error"_attr = redact(e));
     }
 
     return rebuiltRequests;
@@ -179,14 +210,26 @@ void BalancerCommandsSchedulerImpl::start(OperationContext* opCtx,
     if (!_executor) {
         _executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     }
-    auto requestsToRecover = rebuildRequestsFromRecoveryInfo(opCtx, defaultValues);
-    _numRequestsToRecover = requestsToRecover.size();
-    _state = _numRequestsToRecover == 0 ? SchedulerState::Running : SchedulerState::Recovering;
+    _state = SchedulerState::Recovering;
 
-    for (auto& requestToRecover : requestsToRecover) {
-        _enqueueRequest(lg, std::move(requestToRecover));
+    try {
+        waitForQuiescedCluster(opCtx);
+    } catch (const DBException& e) {
+        LOGV2_WARNING(
+            6648002, "Could not join migration activity on shards", "error"_attr = redact(e));
     }
+    auto requestsToRecover = rebuildRequestsFromRecoveryInfo(opCtx, defaultValues);
 
+    _numRequestsToRecover = requestsToRecover.size();
+    if (_numRequestsToRecover == 0) {
+        LOGV2(6648003, "Balancer scheduler recovery complete. Switching to regular execution");
+        _state = SchedulerState::Running;
+    } else {
+        for (auto& requestToRecover : requestsToRecover) {
+            // TODO I'd prefer to simply delete the entries.
+            _enqueueRequest(lg, std::move(requestToRecover));
+        }
+    }
     _workerThreadHandle = stdx::thread([this] { _workerThread(); });
 }
 

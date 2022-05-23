@@ -421,6 +421,7 @@ env.Library(
         'shardsvr_drop_database_participant_command.cpp',
         'shardsvr_drop_indexes_command.cpp',
         'shardsvr_get_stats_for_balancing_command.cpp',
+        'shardsvr_join_migrations_command.cpp',
         'shardsvr_merge_chunks_command.cpp',
         'shardsvr_move_primary_command.cpp',
         'shardsvr_move_range_command.cpp',
