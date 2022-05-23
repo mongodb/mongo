@@ -362,6 +362,7 @@ class PathResolver(DbgFileResolver):
                 search_parameters = {"build_id": build_id}
                 if version:
                     search_parameters["version"] = version
+                print(f"Getting data from service... Search parameters: {search_parameters}")
                 response = self.http_client.get(f"{self.host}/find_by_id", params=search_parameters)
                 if response.status_code != 200:
                     sys.stderr.write(
@@ -416,7 +417,7 @@ def parse_input(trace_doc, dbg_path_resolver):
         return {so_entry["b"]: so_entry for so_entry in somap_list if "b" in so_entry}
 
     base_addr_map = make_base_addr_map(trace_doc["processInfo"]["somap"])
-    version = parse_version(trace_doc)
+    version = get_version(trace_doc)
 
     frames = []
     for frame in trace_doc["backtrace"]:
@@ -449,19 +450,14 @@ def parse_input(trace_doc, dbg_path_resolver):
     return frames
 
 
-def parse_version(trace_doc: Dict[str, Any]) -> Optional[str]:
-    """Parse version from trace doc.
-
-    In evergreen patches `mongodbVersion` is appended by `-patch-{version}`.
-    We want to use this version value to distinguish patch builds.
-
-    :param trace_doc: traceback object
-    :return: version string or None
+def get_version(trace_doc: Dict[str, Any]) -> Optional[str]:
     """
-    version = trace_doc.get("processInfo", {}).get("mongodbVersion")
-    if version and "patch" in version:
-        return version.split("-")[-1]
-    return None
+    Get version from trace doc.
+
+    :param trace_doc: Traceback dict.
+    :return: Version string or None.
+    """
+    return trace_doc.get("processInfo", {}).get("mongodbVersion")
 
 
 def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path, dsym_hint, input_format,
