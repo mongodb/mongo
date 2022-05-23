@@ -29,9 +29,8 @@
 #include "wt_internal.h"
 
 /*
- * This is an implementation of George Marsaglia's multiply-with-carry pseudo- random number
- * generator. Computationally fast, with reasonable randomness properties, and a claimed period of >
- * 2^60.
+ * An implementation of George Marsaglia's multiply-with-carry pseudo-random number generator.
+ * Computationally fast, with reasonable randomness properties, and a claimed period of > 2^60.
  *
  * Be very careful about races here. Multiple threads can call __wt_random concurrently, and it is
  * okay if those concurrent calls get the same return value. What is *not* okay is if
@@ -60,9 +59,7 @@ __wt_random_init(WT_RAND_STATE volatile *rnd_state) WT_GCC_FUNC_ATTRIBUTE((visib
 
 /*
  * __wt_random_init_seed --
- *     Initialize the state of a 32-bit pseudo-random number. Use this, instead of __wt_random_init
- *     if we are running with multiple threads and we want each thread to initialize its own random
- *     state based on a different random seed.
+ *     Initialize the state of a 32-bit pseudo-random number.
  */
 void
 __wt_random_init_seed(WT_SESSION_IMPL *session, WT_RAND_STATE volatile *rnd_state)
@@ -70,10 +67,30 @@ __wt_random_init_seed(WT_SESSION_IMPL *session, WT_RAND_STATE volatile *rnd_stat
 {
     struct timespec ts;
     WT_RAND_STATE rnd;
+    uint32_t v;
+
+    /*
+     * Use this, instead of __wt_random_init if we need to vary the initial state of the RNG. This
+     * is (currently) only used by test programs, where, for example, an initial set of test data is
+     * created by a single thread, and we want more variability in the initial state of the RNG.
+     *
+     * A nanosecond seed only gives us 10^9 bits (assuming it's perfect), so sample it twice and
+     * generate an initial random number to use as our seed, using algorithm "xor" from Marsaglia,
+     * "Xorshift RNGs".
+     */
+    __wt_epoch(session, &ts);
+    v = (uint32_t)ts.tv_nsec;
+    v ^= v << 13;
+    v ^= v >> 17;
+    v ^= v << 5;
+    M_W(rnd) = v + 521288629;
 
     __wt_epoch(session, &ts);
-    M_W(rnd) = (uint32_t)(ts.tv_nsec + 521288629);
-    M_Z(rnd) = (uint32_t)(ts.tv_nsec + 362436069);
+    v = (uint32_t)ts.tv_nsec;
+    v ^= v << 13;
+    v ^= v >> 17;
+    v ^= v << 5;
+    M_Z(rnd) = v + 362436069;
 
     *rnd_state = rnd;
 }

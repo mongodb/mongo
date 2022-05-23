@@ -292,6 +292,7 @@ MULTIBLOCK
 MUTEX
 Manos
 MapViewOfFile
+Marsaglia
 Marsaglia's
 Mellor
 Memrata
@@ -381,6 +382,7 @@ RLE
 RLEs
 RMW
 RNG
+RNGs
 RPC
 RTS
 RUNDIR
@@ -532,6 +534,7 @@ Wunused
 XP
 Xcode
 Xcode/
+Xorshift
 YCSB
 Yann
 ZSTD
