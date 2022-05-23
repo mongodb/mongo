@@ -693,11 +693,12 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtLastAppliedTimestamp(WT_SES
                                     RoundUpReadTimestamp::kRound);
     auto status = txnOpen.setReadSnapshot(*lastApplied);
     fassert(4847501, status);
-    txnOpen.done();
 
     // We might have rounded to oldest between calling getLastApplied and setReadSnapshot. We
     // need to get the actual read timestamp we used.
-    return _getTransactionReadTimestamp(session);
+    auto readTimestamp = _getTransactionReadTimestamp(session);
+    txnOpen.done();
+    return readTimestamp;
 }
 
 Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp(WT_SESSION* session) {
@@ -754,11 +755,11 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp(WT_SESSI
                                     RoundUpReadTimestamp::kRound);
     auto status = txnOpen.setReadSnapshot(readTimestamp);
     fassert(51066, status);
-    txnOpen.done();
 
     // We might have rounded to oldest between calling getAllDurable and setReadSnapshot. We
     // need to get the actual read timestamp we used.
     readTimestamp = _getTransactionReadTimestamp(session);
+    txnOpen.done();
     return readTimestamp;
 }
 
