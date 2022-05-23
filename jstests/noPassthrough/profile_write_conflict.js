@@ -15,6 +15,9 @@ load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load("jstests/libs/fail_point_util.js");  // for 'configureFailPoint()'
 load("jstests/libs/profiler.js");         // for 'getLatestProfilerEntry()'
 
+const conn = MongoRunner.runMongod();
+const db = conn.getDB("test");
+
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 const coll = testDB.getCollection("test");
@@ -230,4 +233,6 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     assert.eq(profileObj.nUpserted, 1, profileObj);
     assert.gt(profileObj.writeConflicts, 0, profileObj);
 }
+
+MongoRunner.stopMongod(conn);
 })();

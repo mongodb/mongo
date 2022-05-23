@@ -15,7 +15,6 @@ selector:
   - jstests/core/profile2.js
   - jstests/core/profile3.js
   - jstests/core/profile_findandmodify.js
-  - jstests/core/profile_write_conflict.js
   - jstests/core/top.js
   - jstests/core/views/views_stats.js
 
