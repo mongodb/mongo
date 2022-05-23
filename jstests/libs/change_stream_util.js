@@ -15,6 +15,16 @@ const ChangeStreamWatchMode = Object.freeze({
 });
 
 /**
+ * Returns a truncated json object if the size of 'jsonObj' is greater than 'maxErrorSizeBytes'.
+ */
+function tojsonMaybeTruncate(jsonObj) {
+    // Maximum size for the json object.
+    const maxErrorSizeBytes = 1024 * 1024;
+
+    return tojson(jsonObj).substring(0, maxErrorSizeBytes);
+}
+
+/**
  * Returns true if server version is 5.1 or above. Version 5.1 and above optimizes the change stream
  * pipeline.
  *
@@ -133,17 +143,25 @@ function canonicalizeEventForTesting(event, expected) {
 
     return event;
 }
+
 /**
- * Helper to check whether a change stream event matches the given expected event. Ignores the
- * resume token and clusterTime unless they are explicitly listed in the expectedEvent.
+ * Returns true if a change stream event matches the given expected event, false otherwise. Ignores
+ * the resume token, clusterTime, and other unknowable fields unless they are explicitly listed in
+ * the expected event.
+ */
+function isChangeStreamEventEq(actualEvent, expectedEvent) {
+    const testEvent = canonicalizeEventForTesting(Object.assign({}, actualEvent), expectedEvent);
+    return friendlyEqual(sortDoc(testEvent), sortDoc(expectedEvent));
+}
+
+/**
+ * Helper to check whether a change event matches the given expected event. Throws assertion failure
+ * if change events do not match.
  */
 function assertChangeStreamEventEq(actualEvent, expectedEvent) {
-    const testEvent = canonicalizeEventForTesting(Object.assign({}, actualEvent), expectedEvent);
-
-    assert.docEq(testEvent,
-                 expectedEvent,
-                 "Change did not match expected change. Expected change: " + tojson(expectedEvent) +
-                     ", Actual change: " + tojson(testEvent));
+    assert(isChangeStreamEventEq(actualEvent, expectedEvent),
+           () => "Change events did not match. Expected: " + tojsonMaybeTruncate(expectedEvent) +
+               ", Actual: " + tojsonMaybeTruncate(testEvent));
 }
 
 function ChangeStreamTest(_db, name = "ChangeStreamTest") {
@@ -227,7 +245,8 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
         if (nextBatch.length === 0) {
             return null;
         }
-        assert.eq(nextBatch.length, 1, "Batch length wasn't 0 or 1: " + tojson(cursor));
+        assert.eq(
+            nextBatch.length, 1, "Batch length wasn't 0 or 1: " + tojsonMaybeTruncate(cursor));
         return nextBatch[0];
     }
 
@@ -250,14 +269,14 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
                         cursor.id,
                         NumberLong(0),
                         "Cursor has been closed unexpectedly. Observed change stream events: " +
-                            tojson(changes));
+                            tojsonMaybeTruncate(changes));
                     cursor = self.getNextBatch(cursor);
                     changes[i] = getNextDocFromCursor(cursor);
                     return changes[i] !== null;
                 },
                 () => {
                     return "timed out waiting for another result from the change stream, observed changes: " +
-                        tojson(changes) + ", expected changes: " + numChanges;
+                        tojsonMaybeTruncate(changes) + ", expected changes: " + numChanges;
                 });
         }
 
@@ -286,8 +305,9 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
         } else if (!expectInvalidate) {
             assert(!isInvalidated(observedChanges[numChangesSeen]),
                    "Change was invalidated when it should not have been. Number of changes seen: " +
-                       numChangesSeen + ", observed changes: " + tojson(observedChanges) +
-                       ", expected changes: " + tojson(expectedChanges));
+                       numChangesSeen +
+                       ", observed changes: " + tojsonMaybeTruncate(observedChanges) +
+                       ", expected changes: " + tojsonMaybeTruncate(expectedChanges));
         }
     }
 
@@ -332,14 +352,12 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
 
         let changes = self.getNextChanges(cursor, expectedNumChanges, skipFirstBatch);
         if (ignoreOrder) {
-            const errMsgFunc = () => `${tojson(changes)} != ${tojson(expectedChanges)}`;
+            const errMsgFunc = () =>
+                `${tojsonMaybeTruncate(changes)} != ${tojsonMaybeTruncate(expectedChanges)}`;
             assert.eq(changes.length, expectedNumChanges, errMsgFunc);
             for (let i = 0; i < changes.length; i++) {
                 assert(expectedChanges.some(expectedChange => {
-                    return _convertExceptionToReturnStatus(() => {
-                        assertChangeStreamEventEq(changes[i], expectedChange);
-                        return true;
-                    })();
+                    return isChangeStreamEventEq(changes[i], expectedChange);
                 }),
                        errMsgFunc);
             }
@@ -352,11 +370,14 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
         // If we expect invalidation, the final change should have operation type "invalidate".
         if (expectInvalidate) {
             assert(isInvalidated(changes[changes.length - 1]),
-                   "Last change was not invalidated when it was expected: " + tojson(changes));
+                   "Last change was not invalidated when it was expected: " +
+                       tojsonMaybeTruncate(changes));
 
             // We make sure that the next batch kills the cursor after an invalidation entry.
             let finalCursor = self.getNextBatch(cursor);
-            assert.eq(finalCursor.id, 0, "Final cursor was not killed: " + tojson(finalCursor));
+            assert.eq(finalCursor.id,
+                      0,
+                      "Final cursor was not killed: " + tojsonMaybeTruncate(finalCursor));
         }
 
         return changes;
@@ -386,7 +407,8 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
      */
     self.assertNoChange = function(cursor) {
         cursor = self.getNextBatch(cursor);
-        assert.eq(0, cursor.nextBatch.length, () => "Cursor had changes: " + tojson(cursor));
+        assert.eq(
+            0, cursor.nextBatch.length, () => "Cursor had changes: " + tojsonMaybeTruncate(cursor));
     };
 
     /**
@@ -398,11 +420,14 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
 
         if (expectInvalidate) {
             assert(isInvalidated(changes[changes.length - 1]),
-                   "Last change was not invalidated when it was expected: " + tojson(changes));
+                   "Last change was not invalidated when it was expected: " +
+                       tojsonMaybeTruncate(changes));
 
             // We make sure that the next batch kills the cursor after an invalidation entry.
             let finalCursor = self.getNextBatch(cursor);
-            assert.eq(finalCursor.id, 0, "Final cursor was not killed: " + tojson(finalCursor));
+            assert.eq(finalCursor.id,
+                      0,
+                      "Final cursor was not killed: " + tojsonMaybeTruncate(finalCursor));
         }
 
         return changes[0];
@@ -520,9 +545,10 @@ ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrow
         // csCursor.hasNext() to throw the expected code before assert.soon() times out.
         const csCursor = new DBCommandCursor(db, res, 1);
         assert.soon(() => csCursor.hasNext());
-        assert(false, `Unexpected result from cursor: ${tojson(csCursor.next())}`);
+        assert(false, `Unexpected result from cursor: ${tojsonMaybeTruncate(csCursor.next())}`);
     } catch (error) {
-        assert.eq(error.code, expectedCode, `Caught unexpected error: ${tojson(error)}`);
+        assert.eq(
+            error.code, expectedCode, `Caught unexpected error: ${tojsonMaybeTruncate(error)}`);
         return true;
     }
     assert(false, "expected this to be unreachable");
