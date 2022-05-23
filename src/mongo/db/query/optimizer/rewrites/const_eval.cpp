@@ -492,9 +492,9 @@ static void constEvalComposition(ABT& n, ABT& lhs, ABT& rhs) {
 
     c = make<PathConstant>(Constant::boolean(!v));
     if (lhs == c) {
-        std::swap(n, rhs);
+        n = std::move(rhs);
     } else if (rhs == c) {
-        std::swap(n, lhs);
+        n = std::move(lhs);
     }
 }
 
