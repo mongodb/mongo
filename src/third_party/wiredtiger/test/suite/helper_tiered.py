@@ -192,17 +192,6 @@ class TieredConfigMixin:
             extlist.skip_if_missing = True
         extlist.extension('storage_sources', self.ss_name + config)
 
-    # Wrapper around session.alter call
-    def alter(self, uri, alter_param):
-        # Tiered storage does not fully support alter operation. FIXME WT-9027.
-        try:
-            self.session.alter(uri, alter_param)
-        except BaseException as err:
-            if self.is_tiered_scenario() and str(err) == 'Operation not supported':
-                self.skipTest('Tiered storage does not fully support alter operation.')
-            else:
-                raise    
-
     def download_objects(self, bucket_name, prefix):
         import boto3
         # The bucket from the storage source is expected to be a name and a region, separated by a 

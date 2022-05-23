@@ -220,9 +220,9 @@ class test_alter02(TieredConfigMixin, wttest.WiredTigerTestCase):
             self.conn.close()
             self.ConnectionOpen()
 
-        self.alter(uri, alter_param)
+        self.session.alter(uri, alter_param)
         if special:
-            self.alter(suburi, alter_param)
+            self.session.alter(suburi, alter_param)
         self.verify_metadata(log_str)
         # Put some more data in table.
         c = self.session.open_cursor(uri, None)

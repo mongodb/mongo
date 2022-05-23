@@ -134,14 +134,15 @@ class test_alter04(TieredConfigMixin, wttest.WiredTigerTestCase):
         # for all allowed settings.
         for a in self.cache_alter:
             alter_param = '%s=%s' % (self.setting, a)
-            self.alter(uri, alter_param)
+            self.session.alter(uri, alter_param)
             if self.reopen:
                 self.reopen_conn()
+
             special = self.use_cg or self.use_index
             if not special:
                 self.verify_metadata(alter_param)
             else:
-                self.alter(suburi, alter_param)
+                self.session.alter(suburi, alter_param)
                 self.verify_metadata(alter_param)
 
 if __name__ == '__main__':

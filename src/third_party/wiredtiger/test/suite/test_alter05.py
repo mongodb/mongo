@@ -89,7 +89,7 @@ class test_alter05(TieredConfigMixin, wttest.WiredTigerTestCase):
         prev_alter_checkpoints = self.get_stat(wiredtiger.stat.conn.session_table_alter_trigger_checkpoint)
 
         # Alter the table and verify.
-        self.alter(uri, 'log=(enabled=false)')
+        self.session.alter(uri, 'log=(enabled=false)')
         self.verify_metadata('log=(enabled=false)')
 
         alter_checkpoints = self.get_stat(wiredtiger.stat.conn.session_table_alter_trigger_checkpoint)
@@ -104,7 +104,7 @@ class test_alter05(TieredConfigMixin, wttest.WiredTigerTestCase):
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         self.assertRaisesException(wiredtiger.WiredTigerError,
-            lambda: self.alter(uri, 'log=(enabled=true)'))
+            lambda: self.session.alter(uri, 'log=(enabled=true)'))
         self.verify_metadata('log=(enabled=false)')
 
         alter_checkpoints = self.get_stat(wiredtiger.stat.conn.session_table_alter_trigger_checkpoint)

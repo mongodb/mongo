@@ -72,9 +72,9 @@ class test_schema08(TieredConfigMixin, wttest.WiredTigerTestCase, suite_subproce
 
     def do_alter(self, uri, suburi):
         alter_param = 'cache_resident=true'
-        self.alter(uri, alter_param)
+        self.session.alter(uri, alter_param)
         if suburi != None:
-            self.alter(suburi, alter_param)
+            self.session.alter(suburi, alter_param)
 
     def do_ops(self, uri, suburi):
         if (self.schema_ops == 'none'):

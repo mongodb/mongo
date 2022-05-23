@@ -164,7 +164,7 @@ class test_alter01(TieredConfigMixin, wttest.WiredTigerTestCase):
                     cache_str = 'cache_resident=%s' % c
                     alter_param += ',%s' % cache_str
                 if alter_param != '':
-                    self.alter(uri, alter_param)
+                    self.session.alter(uri, alter_param)
                     if self.reopen:
                         self.reopen_conn()
                     special = self.use_cg or self.use_index
@@ -172,7 +172,7 @@ class test_alter01(TieredConfigMixin, wttest.WiredTigerTestCase):
                         self.verify_metadata(access_str)
                         self.verify_metadata(cache_str)
                     else:
-                        self.alter(suburi, alter_param)
+                        self.session.alter(suburi, alter_param)
                         self.verify_metadata(access_str)
                         self.verify_metadata(cache_str)
 
