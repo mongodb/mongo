@@ -101,15 +101,6 @@ public:
                                       const BSONObj& cmdObj,
                                       BSONObjBuilder* result) override;
 
-    Status applyChunkOpsDeprecated(OperationContext* opCtx,
-                                   const BSONArray& updateOps,
-                                   const BSONArray& preCondition,
-                                   const UUID& uuid,
-                                   const NamespaceString& nss,
-                                   const ChunkVersion& lastChunkVersion,
-                                   const WriteConcernOptions& writeConcern,
-                                   repl::ReadConcernLevel readConcern) override;
-
     StatusWith<BSONObj> getGlobalSettings(OperationContext* opCtx, StringData key) override;
 
     StatusWith<VersionType> getConfigVersion(OperationContext* opCtx,

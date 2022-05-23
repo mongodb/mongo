@@ -121,17 +121,6 @@ bool ShardingCatalogClientMock::runUserManagementReadCommand(OperationContext* o
     return true;
 }
 
-Status ShardingCatalogClientMock::applyChunkOpsDeprecated(OperationContext* opCtx,
-                                                          const BSONArray& updateOps,
-                                                          const BSONArray& preCondition,
-                                                          const UUID& uuid,
-                                                          const NamespaceString& nss,
-                                                          const ChunkVersion& lastChunkVersion,
-                                                          const WriteConcernOptions& writeConcern,
-                                                          repl::ReadConcernLevel readConcern) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
 StatusWith<BSONObj> ShardingCatalogClientMock::getGlobalSettings(OperationContext* opCtx,
                                                                  StringData key) {
     return {ErrorCodes::InternalError, "Method not implemented"};
