@@ -995,12 +995,8 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, bool *preparedp)
              *
              * The visibility information is not referenced on the page so we need to ensure that
              * the value is globally visible at the point in time where we read the page into cache.
-             *
-             * Skip if reading from a checkpoint because visible_all uses the current oldest txnid,
-             * which is not in general the checkpoint's oldest txnid, and may make things visible
-             * that shouldn't be.
              */
-            if (!btree->huffman_value && !WT_READING_CHECKPOINT(session) &&
+            if (!btree->huffman_value &&
               (WT_TIME_WINDOW_IS_EMPTY(&unpack.tw) ||
                 (!WT_TIME_WINDOW_HAS_STOP(&unpack.tw) &&
                   __wt_txn_tw_start_visible_all(session, &unpack.tw))))

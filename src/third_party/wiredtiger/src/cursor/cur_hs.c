@@ -449,13 +449,11 @@ __curhs_prev_visible(WT_SESSION_IMPL *session, WT_CURSOR_HS *hs_cursor)
             break;
 
         /*
-         * If the stop time pair on the tombstone in the history store is already globally visible
-         * we can skip it. But only if we aren't reading from a checkpoint. If we're reading from a
-         * checkpoint, we need to see the world as of the checkpoint, and visible-all checks refer
-         * to the current world.
+         * If the stop time pair on the tombstone in the history store is already globally visible,
+         * it is outdated and we must skip it rather than returning NOTFOUND. Subsequent entries
+         * might have later stop times and we might need to return one of them.
          */
-        if (!WT_READING_CHECKPOINT(session) &&
-          __wt_txn_tw_stop_visible_all(session, &cbt->upd_value->tw)) {
+        if (__wt_txn_tw_stop_visible_all(session, &cbt->upd_value->tw)) {
             WT_STAT_CONN_DATA_INCR(session, cursor_prev_hs_tombstone);
             continue;
         }
@@ -548,13 +546,11 @@ __curhs_next_visible(WT_SESSION_IMPL *session, WT_CURSOR_HS *hs_cursor)
             break;
 
         /*
-         * If the stop time pair on the tombstone in the history store is already globally visible
-         * we can skip it. But only if we aren't reading from a checkpoint. If we're reading from a
-         * checkpoint, we need to see the world as of the checkpoint, and visible-all checks refer
-         * to the current world.
+         * If the stop time pair on the tombstone in the history store is already globally visible,
+         * it is outdated and we must skip it rather than returning NOTFOUND. Subsequent entries
+         * might have later stop times and we might need to return one of them.
          */
-        if (!WT_READING_CHECKPOINT(session) &&
-          __wt_txn_tw_stop_visible_all(session, &cbt->upd_value->tw)) {
+        if (__wt_txn_tw_stop_visible_all(session, &cbt->upd_value->tw)) {
             WT_STAT_CONN_DATA_INCR(session, cursor_next_hs_tombstone);
             continue;
         }

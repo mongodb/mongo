@@ -514,8 +514,24 @@ __wt_txn_pinned_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *pinned_tsp)
 static inline bool
 __txn_visible_all_id(WT_SESSION_IMPL *session, uint64_t id)
 {
+    WT_TXN *txn;
     uint64_t oldest_id;
 
+    txn = session->txn;
+
+    /*
+     * When reading from a checkpoint, all readers use the same snapshot, so a transaction is
+     * globally visible if it is visible in that snapshot. Note that this can cause things that were
+     * not globally visible yet when the checkpoint is taken to become globally visible in the
+     * checkpoint. This is expected (it is like all the old running transactions exited) -- but note
+     * that it's important that the inverse change (something globally visible when the checkpoint
+     * was taken becomes not globally visible in the checkpoint) never happen as this violates basic
+     * assumptions about visibility. (And, concretely, it can cause stale history store entries to
+     * come back to life and produce wrong answers.)
+     */
+    if (WT_READING_CHECKPOINT(session))
+        return (__wt_txn_visible_id_snapshot(
+          id, txn->snap_min, txn->snap_max, txn->snapshot, txn->snapshot_count));
     oldest_id = __wt_txn_oldest_id(session);
 
     return (WT_TXNID_LT(id, oldest_id));
@@ -551,6 +567,11 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t times
     /* Timestamp check. */
     if (timestamp == WT_TS_NONE)
         return (true);
+
+    /* When reading a checkpoint, use the checkpoint state instead of the current state. */
+    if (WT_READING_CHECKPOINT(session))
+        return (session->txn->checkpoint_oldest_timestamp != WT_TS_NONE &&
+          timestamp <= session->txn->checkpoint_oldest_timestamp);
 
     /* If no oldest timestamp has been supplied, updates have to stay in cache. */
     __wt_txn_pinned_timestamp(session, &pinned_ts);
