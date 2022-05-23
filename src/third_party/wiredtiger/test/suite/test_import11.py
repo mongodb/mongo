@@ -31,7 +31,7 @@
 #
 
 import glob, os, random, re, shutil, string
-import wttest
+import wiredtiger, wttest
 from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
 
@@ -159,6 +159,32 @@ class test_import11(test_import_base):
         self.copy_files('.', newdir)
         self.copy_files(self.bucket, os.path.join(newdir, self.bucket))
         self.copy_files(self.cache_bucket, os.path.join(newdir, self.cache_bucket))
+
+        # Export the metadata for the current file object 2.
+        table_config=""
+        meta_c = self.session.open_cursor('metadata:', None, None)
+        for k, v in meta_c:
+            if k.startswith(self.uri_a):
+                table_config = cursor[k]
+        meta_c.close()
+
+        # The file_metadata configuration should not be allowed in the tiered storage scenario.
+        if self.is_tiered_scenario():
+            msg = "/import for tiered storage is incompatible with the 'file_metadata' setting/"
+
+            # Test we cannot use the file_metadata with a tiered table.
+            invalid_config = 'import=(enabled,repair=false,file_metadata=(' + table_config + '))'
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.session.create(self.uri_a, invalid_config), msg)
+
+            # Test we cannot use the file_metadata with a tiered table and an export file.
+            invalid_config = 'import=(enabled,repair=false,file_metadata=(' + table_config + '),metadata_file="WiredTiger.export")'
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.session.create(self.uri_a, invalid_config), msg)
+
+            msg = "/Invalid argument/"
+
+            # Test importing a tiered table with no import configuration.
+            invalid_config = 'import=(enabled,repair=false)'
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.session.create(self.uri_a, invalid_config), msg)
 
         import_config = 'import=(enabled,repair=false,metadata_file="WiredTiger.export")'
 
