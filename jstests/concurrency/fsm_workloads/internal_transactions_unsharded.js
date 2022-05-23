@@ -381,8 +381,8 @@ var $config = extendWorkload($config, function($config, $super) {
             tojsononeline(internalTxnTestCmdObj)}: ${tojsononeline({executionCtxType})}`);
         const txnDb = this.getInternalTransactionDB(executionCtxType, defaultDb.getName());
 
-        let res;
         const runFunc = () => {
+            let res;
             try {
                 res = txnDb.adminCommand(internalTxnTestCmdObj);
                 print(`Response: ${tojsononeline(res)}`);
@@ -395,6 +395,24 @@ var $config = extendWorkload($config, function($config, $super) {
                 }
                 throw e;
             }
+
+            // Check responses.
+            res.responses.forEach(innerRes => {
+                assert.commandWorked(innerRes);
+            });
+            if (executionCtxType == this.executionContextTypes.kClientRetryableWrite) {
+                // If the command was retried, 'responses' would only contain the response for
+                // 'crudOp.cmdObj'.
+                assert.lte(res.responses.length, 2);
+            } else {
+                assert.eq(res.responses.length, 2);
+            }
+            const crudRes = res.responses[0];
+            crudOp.checkResponseFunc(crudRes);
+            if (res.responses.length == 2) {
+                const insertRes = res.responses[1];
+                insertOp.checkResponseFunc(insertRes);
+            }
         };
 
         print("Starting internal transaction");
@@ -406,24 +424,6 @@ var $config = extendWorkload($config, function($config, $super) {
                 txnDb.getSession(), runFunc, {retryOnKilledSession: this.retryOnKilledSession});
         } else {
             runFunc();
-        }
-
-        // Check responses.
-        res.responses.forEach(innerRes => {
-            assert.commandWorked(innerRes);
-        });
-        if (executionCtxType == this.executionContextTypes.kClientRetryableWrite) {
-            // If the command was retried, 'responses' would only contain the response for
-            // 'crudOp.cmdObj'.
-            assert.lte(res.responses.length, 2);
-        } else {
-            assert.eq(res.responses.length, 2);
-        }
-        const crudRes = res.responses[0];
-        crudOp.checkResponseFunc(crudRes);
-        if (res.responses.length == 2) {
-            const insertRes = res.responses[1];
-            insertOp.checkResponseFunc(insertRes);
         }
 
         // Check documents.
