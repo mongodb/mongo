@@ -38,7 +38,7 @@ commands:
   commitReshardCollection:
     description: "The public commitReshardCollection command on mongos."
     command_name: commitReshardCollection
-    strict: false
+    strict: true
     namespace: type
     api_version: ""
     type: namespacestring

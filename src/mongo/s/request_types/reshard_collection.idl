@@ -39,7 +39,7 @@ commands:
   reshardCollection:
     description: "The public reshardCollection command on mongos."
     command_name: reshardCollection
-    strict: false
+    strict: true
     namespace: type
     api_version: ""
     type: namespacestring
