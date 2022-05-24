@@ -244,9 +244,6 @@ if (typeof _threadInject != "undefined") {
             "collmod_convert_to_unique_apply_ops.js",
             "collmod_convert_to_unique_violations.js",
             "collmod_convert_to_unique_violations_size_limit.js",
-
-            // This test sets fail points which can cause other tests to fail.
-            "profile_write_conflict.js",
         ]);
 
         // Get files, including files in subdirectories.
