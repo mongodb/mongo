@@ -32,17 +32,23 @@
 #include "mongo/executor/connection_pool_stats.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/server_feature_flags_gen.h"
 
 namespace mongo {
 namespace executor {
 
-ConnectionStatsPer::ConnectionStatsPer(
-    size_t nInUse, size_t nAvailable, size_t nCreated, size_t nRefreshing, size_t nRefreshed)
+ConnectionStatsPer::ConnectionStatsPer(size_t nInUse,
+                                       size_t nAvailable,
+                                       size_t nCreated,
+                                       size_t nRefreshing,
+                                       size_t nRefreshed,
+                                       size_t nWasNeverUsed)
     : inUse(nInUse),
       available(nAvailable),
       created(nCreated),
       refreshing(nRefreshing),
-      refreshed(nRefreshed) {}
+      refreshed(nRefreshed),
+      wasNeverUsed(nWasNeverUsed) {}
 
 ConnectionStatsPer::ConnectionStatsPer() = default;
 
@@ -52,6 +58,7 @@ ConnectionStatsPer& ConnectionStatsPer::operator+=(const ConnectionStatsPer& oth
     created += other.created;
     refreshing += other.refreshing;
     refreshed += other.refreshed;
+    wasNeverUsed += other.wasNeverUsed;
 
     return *this;
 }
@@ -78,14 +85,20 @@ void ConnectionPoolStats::updateStatsForHost(std::string pool,
     totalCreated += newStats.created;
     totalRefreshing += newStats.refreshing;
     totalRefreshed += newStats.refreshed;
+    totalWasNeverUsed += newStats.wasNeverUsed;
 }
 
 void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFTDC) {
+    const auto isCCHMEnabled = gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV();
+
     result.appendNumber("totalInUse", static_cast<long long>(totalInUse));
     result.appendNumber("totalAvailable", static_cast<long long>(totalAvailable));
     result.appendNumber("totalCreated", static_cast<long long>(totalCreated));
     result.appendNumber("totalRefreshing", static_cast<long long>(totalRefreshing));
     result.appendNumber("totalRefreshed", static_cast<long long>(totalRefreshed));
+    if (isCCHMEnabled)
+        result.appendNumber("totalNeverUsed", static_cast<long long>(totalWasNeverUsed));
+
 
     if (forFTDC) {
         BSONObjBuilder poolBuilder(result.subobjStart("connectionsInUsePerPool"));
@@ -118,6 +131,9 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
             poolInfo.appendNumber("poolCreated", static_cast<long long>(poolStats.created));
             poolInfo.appendNumber("poolRefreshing", static_cast<long long>(poolStats.refreshing));
             poolInfo.appendNumber("poolRefreshed", static_cast<long long>(poolStats.refreshed));
+            if (isCCHMEnabled)
+                poolInfo.appendNumber("poolNeverUsed",
+                                      static_cast<long long>(poolStats.wasNeverUsed));
 
             for (const auto& host : poolStats.statsByHost) {
                 BSONObjBuilder hostInfo(poolInfo.subobjStart(host.first.toString()));
@@ -127,6 +143,9 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
                 hostInfo.appendNumber("created", static_cast<long long>(hostStats.created));
                 hostInfo.appendNumber("refreshing", static_cast<long long>(hostStats.refreshing));
                 hostInfo.appendNumber("refreshed", static_cast<long long>(hostStats.refreshed));
+                if (isCCHMEnabled)
+                    hostInfo.appendNumber("neverUsed",
+                                          static_cast<long long>(hostStats.wasNeverUsed));
             }
         }
     }
@@ -142,6 +161,8 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
             hostInfo.appendNumber("created", static_cast<long long>(hostStats.created));
             hostInfo.appendNumber("refreshing", static_cast<long long>(hostStats.refreshing));
             hostInfo.appendNumber("refreshed", static_cast<long long>(hostStats.refreshed));
+            if (isCCHMEnabled)
+                hostInfo.appendNumber("neverUsed", static_cast<long long>(hostStats.wasNeverUsed));
         }
     }
 }

@@ -41,8 +41,12 @@ namespace executor {
  * a parent ConnectionPoolStats object and should not need to be created directly.
  */
 struct ConnectionStatsPer {
-    ConnectionStatsPer(
-        size_t nInUse, size_t nAvailable, size_t nCreated, size_t nRefreshing, size_t nRefreshed);
+    ConnectionStatsPer(size_t nInUse,
+                       size_t nAvailable,
+                       size_t nCreated,
+                       size_t nRefreshing,
+                       size_t nRefreshed,
+                       size_t nWasNeverUsed);
 
     ConnectionStatsPer();
 
@@ -53,6 +57,7 @@ struct ConnectionStatsPer {
     size_t created = 0u;
     size_t refreshing = 0u;
     size_t refreshed = 0u;
+    size_t wasNeverUsed = 0u;
 };
 
 /**
@@ -71,6 +76,7 @@ struct ConnectionPoolStats {
     size_t totalCreated = 0u;
     size_t totalRefreshing = 0u;
     size_t totalRefreshed = 0u;
+    size_t totalWasNeverUsed = 0u;
     boost::optional<ShardingTaskExecutorPoolController::MatchingStrategy> strategy;
 
     using StatsByHost = std::map<HostAndPort, ConnectionStatsPer>;

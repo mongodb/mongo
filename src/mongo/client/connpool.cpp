@@ -593,6 +593,7 @@ void DBConnectionPool::appendConnectionStats(executor::ConnectionPoolStats* stat
                                                    static_cast<size_t>(i->second.numAvailable()),
                                                    static_cast<size_t>(i->second.numCreated()),
                                                    0,
+                                                   0,
                                                    0};
             stats->updateStatsForHost("global", host, hostStats);
         }
