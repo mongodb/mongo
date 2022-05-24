@@ -1102,6 +1102,7 @@ if GetOption('help'):
     try:
         Help('\nThe following variables may also be set like scons VARIABLE=value\n', append=True)
         Help(env_vars.GenerateHelpText(variables_only_env), append=True)
+        Help('\nThe \'list-targets\' target can be built to list useful comprehensive build targets\n', append=True)
     except TypeError:
         # The append=true kwarg is only supported in scons>=2.4. Without it, calls to Help() clobber
         # the automatically generated options help, which we don't want. Users on older scons

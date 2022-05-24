@@ -23,6 +23,7 @@
 # TODO: Handle chmod state
 
 from collections import defaultdict, namedtuple
+from typing import List
 
 import SCons
 from SCons.Tool import install
@@ -535,17 +536,16 @@ def list_components(env, **kwargs):
     for key in env[ALIAS_MAP]:
         print("\t", key)
 
-
-def list_recursive(mapping, counter=0):
+def list_hierarchical_aib_recursive(mapping, counter=0):
     if counter == 0:
         print("  " * counter, mapping.id)
     counter += 1
     for dep in mapping.dependencies:
         print("  " * counter, dep.id)
-        list_recursive(dep, counter=counter)
+        list_hierarchical_aib_targets(dep, counter=counter)
 
 
-def list_targets(dag_mode=False):
+def list_hierarchical_aib_targets(dag_mode=False):
     def target_lister(env, **kwargs):
         if dag_mode:
             installed_files = set(env.FindInstalledFiles())
@@ -553,7 +553,42 @@ def list_targets(dag_mode=False):
                 scan_for_transitive_install(f, env, None)
 
         mapping = env[ALIAS_MAP][env[META_COMPONENT]][env[META_ROLE]]
-        list_recursive(mapping)
+        list_hierarchical_aib_recursive(mapping)
+
+    return target_lister
+
+
+def list_recursive(mapping) -> List[str]:
+    items = set()
+    items.add(mapping.id)
+    for dep in mapping.dependencies:
+        items |= list_recursive(dep)
+    return items
+
+
+def list_targets():
+    def target_lister(env, **kwargs):
+        mapping = env[ALIAS_MAP][env[META_COMPONENT]][env[META_ROLE]]
+        tasks = sorted(list(env[TASKS].keys()))
+        roles = sorted(list(env[ROLE_DECLARATIONS].keys()))
+        targets_with_role = list(list_recursive(mapping)) + [mapping.id]
+        targets: List[str] = []
+        for target_role in targets_with_role:
+            # Does this target_role end with one of our speicifed roles
+            matching_roles = list(filter(target_role.endswith, [f"-{role}" for role in roles]))
+            assert len(matching_roles) == 1
+
+            targets.append(target_role[:-len(matching_roles[0])])
+
+        # dedup and sort targets
+        targets = sorted(list(set(targets)))
+        print("The following are AIB targets. Note that runtime role is implied if not specified. For example, install-mongod")
+        tasks_str = ','.join(tasks)
+        print(f"TASK={{{tasks_str}}}")
+        roles_str = ','.join(roles)
+        print(f"ROLE={{{roles_str}}}")
+        for target in targets:
+            print(f"  TASK-{target}-ROLE")
 
     return target_lister
 
@@ -608,11 +643,14 @@ def generate(env):  # pylint: disable=too-many-statements
     env.Alias("list-aib-components", [], [list_components])
     env.AlwaysBuild("list-aib-components")
 
-    env.Alias("list-aib-targets", [], [list_targets(dag_mode=False)])
-    env.AlwaysBuild("list-aib-targets")
+    env.Alias("list-hierarchical-aib-targets", [], [list_hierarchical_aib_targets(dag_mode=False)])
+    env.AlwaysBuild("list-hierarchical-aib-targets")
 
-    env.Alias("list-aib-dag", [], [list_targets(dag_mode=True)])
-    env.AlwaysBuild("list-aib-dag")
+    env.Alias("list-hierarchical-aib-dag", [], [list_hierarchical_aib_targets(dag_mode=True)])
+    env.AlwaysBuild("list-hierarchical-aib-dag")
+
+    env.Alias("list-targets", [], [list_targets()])
+    env.AlwaysBuild("list-targets")
 
     for builder in ["Program", "SharedLibrary", "LoadableModule", "StaticLibrary"]:
         builder = env["BUILDERS"][builder]
