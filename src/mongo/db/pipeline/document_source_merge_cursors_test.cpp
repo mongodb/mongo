@@ -71,7 +71,7 @@ const std::vector<HostAndPort> kTestShardHosts = {HostAndPort("FakeShard1Host", 
                                                   HostAndPort("FakeShard2Host", 12345),
                                                   HostAndPort("FakeShard3Host", 12345)};
 
-const NamespaceString kTestNss = NamespaceString("test.mergeCursors"_sd);
+const NamespaceString kTestNss = NamespaceString(boost::none, "test.mergeCursors"_sd);
 const HostAndPort kTestHost = HostAndPort("localhost:27017"_sd);
 
 const CursorId kExhaustedCursorID = 0;

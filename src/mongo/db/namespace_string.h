@@ -327,7 +327,7 @@ public:
         Allow,  // Deprecated
     };
 
-    boost::optional<TenantId> tenantId() const {
+    const boost::optional<TenantId>& tenantId() const {
         return _dbName.tenantId();
     }
 
@@ -336,7 +336,7 @@ public:
         return StringData(_dbName.toString());
     }
 
-    DatabaseName dbName() const {
+    const DatabaseName& dbName() const {
         return _dbName;
     }
 

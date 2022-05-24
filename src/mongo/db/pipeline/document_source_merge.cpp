@@ -257,7 +257,7 @@ BSONObj extractMergeOnFieldsFromDoc(const Document& doc, const std::set<FieldPat
  * explicitly specified, it will be defaulted to 'defaultDb'.
  */
 DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(const BSONElement& spec,
-                                                                StringData defaultDb) {
+                                                                const DatabaseName& defaultDb) {
     NamespaceString targetNss;
     DocumentSourceMergeSpec mergeSpec;
 
@@ -278,7 +278,7 @@ DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(const BSONElemen
             // target namespace collection is empty, we'll use the default database name as a target
             // database, and the provided namespace value as a collection name.
             targetNss = {defaultDb, targetNss.ns()};
-        } else if (targetNss.db().empty()) {
+        } else if (targetNss.dbName().db().empty()) {
             // Use the default database name if it wasn't specified explicilty.
             targetNss = {defaultDb, targetNss.coll()};
         }
@@ -316,7 +316,7 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
                                                                            typeName(spec.type())),
             spec.type() == BSONType::String || spec.type() == BSONType::Object);
 
-    auto mergeSpec = parseMergeSpecAndResolveTargetNamespace(spec, nss.db());
+    auto mergeSpec = parseMergeSpecAndResolveTargetNamespace(spec, nss.dbName());
     auto targetNss = mergeSpec.getTargetNss();
 
     uassert(ErrorCodes::InvalidNamespace,
@@ -451,7 +451,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
             "{} only supports a string or object argument, not {}"_format(kStageName, spec.type()),
             spec.type() == BSONType::String || spec.type() == BSONType::Object);
 
-    auto mergeSpec = parseMergeSpecAndResolveTargetNamespace(spec, expCtx->ns.db());
+    auto mergeSpec = parseMergeSpecAndResolveTargetNamespace(spec, expCtx->ns.dbName());
     auto targetNss = mergeSpec.getTargetNss();
     auto whenMatched =
         mergeSpec.getWhenMatched() ? mergeSpec.getWhenMatched()->mode : kDefaultWhenMatched;

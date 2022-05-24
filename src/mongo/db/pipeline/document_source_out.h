@@ -115,7 +115,7 @@ private:
                       const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourceWriter(kStageName.rawData(), std::move(outputNs), expCtx) {}
 
-    static NamespaceString parseNsFromElem(const BSONElement& spec, const StringData& defaultDB);
+    static NamespaceString parseNsFromElem(const BSONElement& spec, const DatabaseName& defaultDB);
 
     void initialize() override;
 

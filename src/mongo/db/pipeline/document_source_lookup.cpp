@@ -89,7 +89,8 @@ void lookupPipeValidator(const Pipeline& pipeline) {
 // {from: {db: "config", coll: "cache.chunks.*"}, ...} or
 // {from: {db: "local", coll: "oplog.rs"}, ...} or
 // {from: {db: "local", coll: "tenantMigration.oplogView"}, ...} .
-NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem, StringData defaultDb) {
+NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
+                                                   const DatabaseName& defaultDb) {
     // The object syntax only works for 'cache.chunks.*', 'local.oplog.rs', and
     // 'local.tenantMigration.oplogViewwhich' which are not user namespaces so object type is
     // omitted from the error message below.
@@ -104,6 +105,7 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem, Stri
 
     // Valdate the db and coll names.
     auto spec = NamespaceSpec::parse({elem.fieldNameStringData()}, elem.embeddedObject());
+    // TODO SERVER-62491 Use system tenantId to construct nss if running in serverless.
     auto nss = NamespaceString(spec.getDb().value_or(""), spec.getColl().value_or(""));
     uassert(
         ErrorCodes::FailedToParse,
@@ -309,9 +311,9 @@ std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LitePars
     NamespaceString fromNss;
     if (!fromElement) {
         validateLookupCollectionlessPipeline(pipelineElem);
-        fromNss = NamespaceString::makeCollectionlessAggregateNSS(nss.db());
+        fromNss = NamespaceString::makeCollectionlessAggregateNSS(nss.dbName());
     } else {
-        fromNss = parseLookupFromAndResolveNamespace(fromElement, nss.db());
+        fromNss = parseLookupFromAndResolveNamespace(fromElement, nss.dbName());
     }
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "invalid $lookup namespace: " << fromNss.ns(),
@@ -1025,9 +1027,11 @@ void DocumentSourceLookUp::serializeToArray(
     std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
 
     // Support alternative $lookup from config.cache.chunks* namespaces.
+    //
+    // Do not include the tenantId in serialized 'from' namespace.
     auto fromValue = (pExpCtx->ns.db() == _fromNs.db())
         ? Value(_fromNs.coll())
-        : Value(Document{{"db", _fromNs.db()}, {"coll", _fromNs.coll()}});
+        : Value(Document{{"db", _fromNs.dbName().db()}, {"coll", _fromNs.coll()}});
 
     MutableDocument output(
         Document{{getSourceName(), Document{{"from", fromValue}, {"as", _as.fullPath()}}}});
@@ -1208,7 +1212,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
         }
 
         if (argName == kFromField) {
-            fromNs = parseLookupFromAndResolveNamespace(argument, pExpCtx->ns.db());
+            fromNs = parseLookupFromAndResolveNamespace(argument, pExpCtx->ns.dbName());
             continue;
         }
 
@@ -1241,7 +1245,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
 
     if (fromNs.ns().empty()) {
         validateLookupCollectionlessPipeline(pipeline);
-        fromNs = NamespaceString::makeCollectionlessAggregateNSS(pExpCtx->ns.db());
+        fromNs = NamespaceString::makeCollectionlessAggregateNSS(pExpCtx->ns.dbName());
     }
     uassert(ErrorCodes::FailedToParse, "must specify 'as' field for a $lookup", !as.empty());
 

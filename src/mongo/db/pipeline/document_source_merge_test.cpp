@@ -35,6 +35,7 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_merge.h"
+#include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
 
 namespace mongo {
@@ -96,7 +97,7 @@ public:
 
 TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfMergeSpecIsString) {
     const auto& defaultDb = getExpCtx()->ns.db();
-    const auto& targetColl = "target_collection";
+    const std::string targetColl = "target_collection";
     auto spec = BSON("$merge" << targetColl);
     auto mergeStage = createMergeStage(spec);
     ASSERT(mergeStage);
@@ -106,7 +107,7 @@ TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfMergeSpecIsString) {
 
 TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfIntoIsString) {
     const auto& defaultDb = getExpCtx()->ns.db();
-    const auto& targetColl = "target_collection";
+    const std::string targetColl = "target_collection";
     auto spec = BSON("$merge" << BSON("into" << targetColl));
     auto mergeStage = createMergeStage(spec);
     ASSERT(mergeStage);
@@ -116,8 +117,8 @@ TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfIntoIsString) {
 
 TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfIntoIsObject) {
     const auto& defaultDb = getExpCtx()->ns.db();
-    const auto& targetDb = "target_db";
-    const auto& targetColl = "target_collection";
+    const std::string targetDb = "target_db";
+    const std::string targetColl = "target_collection";
     auto spec = BSON("$merge" << BSON("into" << BSON("coll" << targetColl)));
     auto mergeStage = createMergeStage(spec);
     ASSERT(mergeStage);
@@ -948,6 +949,59 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfOnFieldHaveDuplicates) {
                                  << BSON_ARRAY("_id"
                                                << "_id")));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 31465);
+}
+
+using DocumentSourceMergeServerlessTest = ServerlessAggregationContextFixture;
+
+TEST_F(DocumentSourceMergeServerlessTest,
+       LiteParsedDocumentSourceLookupContainsExpectedNamespacesInServerless) {
+    const std::string targetColl = "target_collection";
+
+    auto tenantId = TenantId(OID::gen());
+    NamespaceString nss(tenantId, "test", "testColl");
+    std::vector<BSONObj> pipeline;
+
+    auto stageSpec = BSON("$merge" << targetColl);
+    auto liteParsedLookup = DocumentSourceMerge::LiteParsed::parse(nss, stageSpec.firstElement());
+    auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
+    ASSERT_EQ(1, namespaceSet.size());
+    ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, "test", "target_collection")));
+
+    // TODO SERVER-66708 Add a test case once IDL parsed objects have access to tenantId.
+}
+
+TEST_F(DocumentSourceMergeServerlessTest, CreateFromBSONContainsExpectedNamespacesInServerless) {
+    auto expCtx = getExpCtx();
+    ASSERT(expCtx->ns.tenantId());
+
+    const std::string targetColl = "target_collection";
+
+    // Pass collection name as a string.
+    auto spec = BSON("$merge" << targetColl);
+    auto mergeStage = DocumentSourceMerge::createFromBson(spec.firstElement(), expCtx);
+    auto mergeSource = static_cast<DocumentSourceMerge*>(mergeStage.get());
+    ASSERT(mergeStage);
+    ASSERT(mergeSource->getOutputNs().tenantId());
+    ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
+
+    // Assert the tenantId is not included in the serialized namespace.
+    auto serialized = mergeSource->serialize().getDocument();
+    auto expectedDoc = Document{{"db", expCtx->ns.dbName().db()}, {"coll", targetColl}};
+    ASSERT_DOCUMENT_EQ(serialized["$merge"][kIntoFieldName].getDocument(), expectedDoc);
+
+    // Pass collection name as an object.
+    spec = BSON("$merge" << BSON("into" << BSON("coll" << targetColl)));
+    mergeStage = DocumentSourceMerge::createFromBson(spec.firstElement(), expCtx);
+    mergeSource = static_cast<DocumentSourceMerge*>(mergeStage.get());
+    ASSERT(mergeSource);
+    ASSERT(mergeSource->getOutputNs().tenantId());
+    ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
+
+    // Assert the tenantId is not included in the serialized namespace.
+    serialized = mergeSource->serialize().getDocument();
+    ASSERT_DOCUMENT_EQ(serialized["$merge"][kIntoFieldName].getDocument(), expectedDoc);
+
+    // TODO SERVER-66708 Add a test case once IDL parsed objects have access to tenantId.
 }
 
 }  // namespace

@@ -76,7 +76,7 @@ DocumentSourceOut::~DocumentSourceOut() {
 }
 
 NamespaceString DocumentSourceOut::parseNsFromElem(const BSONElement& spec,
-                                                   const StringData& defaultDB) {
+                                                   const DatabaseName& defaultDB) {
     if (spec.type() == BSONType::String) {
         return NamespaceString(defaultDB, spec.valueStringData());
     } else if (spec.type() == BSONType::Object) {
@@ -85,7 +85,7 @@ NamespaceString DocumentSourceOut::parseNsFromElem(const BSONElement& spec,
                 str::stream() << "If an object is passed to " << kStageName
                               << " it must have exactly 2 fields: 'db' and 'coll'",
                 nsObj.nFields() == 2 && nsObj.hasField("coll") && nsObj.hasField("db"));
-        return NamespaceString(nsObj["db"].String(), nsObj["coll"].String());
+        return NamespaceString(defaultDB.tenantId(), nsObj["db"].String(), nsObj["coll"].String());
     } else {
         uassert(16990,
                 "{} only supports a string or object argument, but found {}"_format(
@@ -98,7 +98,7 @@ NamespaceString DocumentSourceOut::parseNsFromElem(const BSONElement& spec,
 std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
 
-    NamespaceString targetNss = parseNsFromElem(spec, nss.db());
+    NamespaceString targetNss = parseNsFromElem(spec, nss.dbName());
     uassert(ErrorCodes::InvalidNamespace,
             "Invalid {} target namespace, {}"_format(kStageName, targetNss.ns()),
             targetNss.isValid());
@@ -113,7 +113,8 @@ void DocumentSourceOut::initialize() {
     // to be the target collection once we are done.
     // Note that this temporary collection name is used by MongoMirror and thus should not be
     // changed without consultation.
-    _tempNs = NamespaceString(str::stream() << outputNs.db() << ".tmp.agg_out." << UUID::gen());
+    _tempNs = NamespaceString(str::stream()
+                              << outputNs.dbName().toString() << ".tmp.agg_out." << UUID::gen());
 
     // Save the original collection options and index specs so we can check they didn't change
     // during computation.
@@ -138,7 +139,7 @@ void DocumentSourceOut::initialize() {
         cmd.appendElementsUnique(_originalOutOptions);
 
         pExpCtx->mongoProcessInterface->createCollection(
-            pExpCtx->opCtx, _tempNs.db().toString(), cmd.done());
+            pExpCtx->opCtx, _tempNs.dbName().toString(), cmd.done());
     }
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -203,12 +204,14 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto targetNS = parseNsFromElem(elem, expCtx->ns.db());
+    auto targetNS = parseNsFromElem(elem, expCtx->ns.dbName());
     return create(targetNS, expCtx);
 }
 
 Value DocumentSourceOut::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(DOC(kStageName << DOC("db" << _outputNs.db() << "coll" << _outputNs.coll())));
+    // Do not include the tenantId in the serialized 'outputNs'.
+    return Value(
+        DOC(kStageName << DOC("db" << _outputNs.dbName().db() << "coll" << _outputNs.coll())));
 }
 
 void DocumentSourceOut::waitWhileFailPointEnabled() {

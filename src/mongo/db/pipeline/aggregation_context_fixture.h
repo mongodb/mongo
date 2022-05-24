@@ -46,7 +46,7 @@ namespace mongo {
 class AggregationContextFixture : public ServiceContextTest {
 public:
     AggregationContextFixture()
-        : AggregationContextFixture(NamespaceString("unittests.pipeline_test")) {}
+        : AggregationContextFixture(NamespaceString(boost::none, "unittests", "pipeline_test")) {}
 
     AggregationContextFixture(NamespaceString nss) {
         auto service = getServiceContext();
@@ -75,4 +75,12 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
     boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
 };
+
+class ServerlessAggregationContextFixture : public AggregationContextFixture {
+public:
+    ServerlessAggregationContextFixture()
+        : AggregationContextFixture(
+              NamespaceString(TenantId(OID::gen()), "unittests", "pipeline_test")) {}
+};
+
 }  // namespace mongo

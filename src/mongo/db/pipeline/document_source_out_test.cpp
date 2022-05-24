@@ -114,5 +114,66 @@ TEST_F(DocumentSourceOutTest, SerializeToString) {
     ASSERT_EQ(reSerialized["$out"]["coll"].getStringData(), "some_collection");
 }
 
+using DocumentSourceOutServerlessTest = ServerlessAggregationContextFixture;
+
+TEST_F(DocumentSourceOutServerlessTest,
+       LiteParsedDocumentSourceLookupContainsExpectedNamespacesInServerless) {
+    auto tenantId = TenantId(OID::gen());
+    NamespaceString nss(tenantId, "test", "testColl");
+    std::vector<BSONObj> pipeline;
+
+    auto stageSpec = BSON("$out"
+                          << "some_collection");
+    auto liteParsedLookup = DocumentSourceOut::LiteParsed::parse(nss, stageSpec.firstElement());
+    auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
+    ASSERT_EQ(1, namespaceSet.size());
+    ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, "test", "some_collection")));
+
+    // The tenantId for the outputNs should be the same as that on the expCtx despite outputting
+    // into different dbs.
+    stageSpec = BSON("$out" << BSON("db"
+                                    << "target_db"
+                                    << "coll"
+                                    << "some_collection"));
+    liteParsedLookup = DocumentSourceOut::LiteParsed::parse(nss, stageSpec.firstElement());
+    namespaceSet = liteParsedLookup->getInvolvedNamespaces();
+    ASSERT_EQ(1, namespaceSet.size());
+    ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, "target_db", "some_collection")));
+}
+
+TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespacesInServerless) {
+    auto expCtx = getExpCtx();
+    ASSERT(expCtx->ns.tenantId());
+    auto defaultDb = expCtx->ns.dbName();
+
+    const std::string targetColl = "target_collection";
+    auto spec = BSON("$out" << targetColl);
+    auto outStage = DocumentSourceOut::createFromBson(spec.firstElement(), expCtx);
+    auto outSource = static_cast<DocumentSourceOut*>(outStage.get());
+    ASSERT(outSource);
+    ASSERT_EQ(outSource->getOutputNs(), NamespaceString(defaultDb, targetColl));
+
+    // Assert the tenantId is not included in the serialized namespace.
+    auto serialized = outSource->serialize().getDocument();
+    auto expectedDoc = Document{{"db", expCtx->ns.dbName().db()}, {"coll", targetColl}};
+    ASSERT_DOCUMENT_EQ(serialized["$out"].getDocument(), expectedDoc);
+
+    // The tenantId for the outputNs should be the same as that on the expCtx despite outputting
+    // into different dbs.
+    const std::string targetDb = "target_db";
+    spec = BSON("$out" << BSON("db" << targetDb << "coll" << targetColl));
+    outStage = DocumentSourceOut::createFromBson(spec.firstElement(), expCtx);
+    outSource = static_cast<DocumentSourceOut*>(outStage.get());
+    ASSERT(outSource);
+    ASSERT(outSource->getOutputNs().tenantId());
+    ASSERT_EQ(*outSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
+    ASSERT_EQ(outSource->getOutputNs().dbName().db(), targetDb);
+
+    // Assert the tenantId is not included in the serialized namespace.
+    serialized = outSource->serialize().getDocument();
+    expectedDoc = Document{{"db", targetDb}, {"coll", targetColl}};
+    ASSERT_DOCUMENT_EQ(serialized["$out"].getDocument(), expectedDoc);
+}
+
 }  // namespace
 }  // namespace mongo

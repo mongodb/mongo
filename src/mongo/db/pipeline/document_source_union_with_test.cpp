@@ -175,7 +175,7 @@ TEST_F(DocumentSourceUnionWithTest, UnionsWithNonEmptySubPipelines) {
 
 TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithPipeline) {
     auto expCtx = getExpCtx();
-    NamespaceString nsToUnionWith(expCtx->ns.db(), "coll");
+    NamespaceString nsToUnionWith(expCtx->ns.dbName(), "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {nsToUnionWith.coll().toString(), {nsToUnionWith, std::vector<BSONObj>()}}});
     auto bson =
@@ -195,7 +195,7 @@ TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithPipeline) {
 
 TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithoutPipeline) {
     auto expCtx = getExpCtx();
-    NamespaceString nsToUnionWith(expCtx->ns.db(), "coll");
+    NamespaceString nsToUnionWith(expCtx->ns.dbName(), "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {nsToUnionWith.coll().toString(), {nsToUnionWith, std::vector<BSONObj>()}}});
     auto bson = BSON("$unionWith" << nsToUnionWith.coll());
@@ -214,7 +214,7 @@ TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithoutPipeline) {
 
 TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithoutPipelineExtraSubobject) {
     auto expCtx = getExpCtx();
-    NamespaceString nsToUnionWith(expCtx->ns.db(), "coll");
+    NamespaceString nsToUnionWith(expCtx->ns.dbName(), "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {nsToUnionWith.coll().toString(), {nsToUnionWith, std::vector<BSONObj>()}}});
     auto bson = BSON("$unionWith" << BSON("coll" << nsToUnionWith.coll()));
@@ -233,7 +233,7 @@ TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithoutPipelineExtraSubobje
 
 TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
     auto expCtx = getExpCtx();
-    NamespaceString nsToUnionWith(expCtx->ns.db(), "coll");
+    NamespaceString nsToUnionWith(expCtx->ns.dbName(), "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {nsToUnionWith.coll().toString(), {nsToUnionWith, std::vector<BSONObj>()}}});
     ASSERT_THROWS_CODE(
@@ -395,7 +395,7 @@ TEST_F(DocumentSourceUnionWithTest, DependencyAnalysisReportsReferencedFieldsBef
 
 TEST_F(DocumentSourceUnionWithTest, RespectsViewDefinition) {
     auto expCtx = getExpCtx();
-    NamespaceString nsToUnionWith(expCtx->ns.db(), "coll");
+    NamespaceString nsToUnionWith(expCtx->ns.dbName(), "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {nsToUnionWith.coll().toString(),
          {nsToUnionWith, std::vector<BSONObj>{fromjson("{$match: {_id: {$mod: [2, 0]}}}")}}}});
@@ -427,8 +427,8 @@ TEST_F(DocumentSourceUnionWithTest, RespectsViewDefinition) {
 
 TEST_F(DocumentSourceUnionWithTest, ConcatenatesViewDefinitionToPipeline) {
     auto expCtx = getExpCtx();
-    NamespaceString viewNsToUnionWith(expCtx->ns.db(), "view");
-    NamespaceString nsToUnionWith(expCtx->ns.db(), "coll");
+    NamespaceString viewNsToUnionWith(expCtx->ns.dbName(), "view");
+    NamespaceString nsToUnionWith(expCtx->ns.dbName(), "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {viewNsToUnionWith.coll().toString(),
          {nsToUnionWith, std::vector<BSONObj>{fromjson("{$match: {_id: {$mod: [2, 0]}}}")}}}});
@@ -465,7 +465,7 @@ TEST_F(DocumentSourceUnionWithTest, ConcatenatesViewDefinitionToPipeline) {
 
 TEST_F(DocumentSourceUnionWithTest, RejectUnionWhenDepthLimitIsExceeded) {
     auto expCtx = getExpCtx();
-    NamespaceString fromNs("test", "coll");
+    NamespaceString fromNs(boost::none, "test", "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
 
@@ -591,5 +591,60 @@ TEST_F(DocumentSourceUnionWithTest, StricterConstraintsFromSubSubPipelineAreInhe
                                          StageConstraints::UnionRequirement::kAllowed);
     ASSERT_TRUE(unionStage.constraints(Pipeline::SplitState::kUnsplit) == expectedConstraints);
 }
+
+using DocumentSourceUnionWithServerlessTest = ServerlessAggregationContextFixture;
+
+TEST_F(DocumentSourceUnionWithServerlessTest,
+       LiteParsedDocumentSourceLookupContainsExpectedNamespacesInServerless) {
+    auto tenantId = TenantId(OID::gen());
+    NamespaceString nss(tenantId, "test", "testColl");
+    std::vector<BSONObj> pipeline;
+
+    auto stageSpec = BSON("$unionWith"
+                          << "some_coll");
+    auto liteParsedLookup =
+        DocumentSourceUnionWith::LiteParsed::parse(nss, stageSpec.firstElement());
+    auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
+    ASSERT_EQ(1, namespaceSet.size());
+    ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, "test", "some_coll")));
+
+    stageSpec = BSON("$unionWith" << BSON("coll"
+                                          << "some_coll"
+                                          << "pipeline" << BSONArray()));
+    liteParsedLookup = DocumentSourceUnionWith::LiteParsed::parse(nss, stageSpec.firstElement());
+    namespaceSet = liteParsedLookup->getInvolvedNamespaces();
+    ASSERT_EQ(1, namespaceSet.size());
+    ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, "test", "some_coll")));
+}
+
+TEST_F(DocumentSourceUnionWithServerlessTest,
+       CreateFromBSONContainsExpectedNamespacesInServerless) {
+    auto expCtx = getExpCtx();
+    ASSERT(expCtx->ns.tenantId());
+
+    NamespaceString unionWithNs(expCtx->ns.tenantId(), "test", "some_coll");
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {unionWithNs.coll().toString(), {unionWithNs, std::vector<BSONObj>()}}});
+
+    auto spec = BSON("$unionWith"
+                     << "some_coll");
+    auto unionWithStage = DocumentSourceUnionWith::createFromBson(spec.firstElement(), expCtx);
+    auto pipeline =
+        Pipeline::create({DocumentSourceMock::createForTest(expCtx), unionWithStage}, expCtx);
+    auto involvedNssSet = pipeline->getInvolvedCollections();
+    ASSERT_EQ(involvedNssSet.size(), 1UL);
+    ASSERT_EQ(1ul, involvedNssSet.count(unionWithNs));
+
+    spec = BSON("$unionWith" << BSON("coll"
+                                     << "some_coll"
+                                     << "pipeline" << BSONArray()));
+    unionWithStage = DocumentSourceUnionWith::createFromBson(spec.firstElement(), expCtx);
+    pipeline =
+        Pipeline::create({DocumentSourceMock::createForTest(expCtx), unionWithStage}, expCtx);
+    involvedNssSet = pipeline->getInvolvedCollections();
+    ASSERT_EQ(involvedNssSet.size(), 1UL);
+    ASSERT_EQ(1ul, involvedNssSet.count(unionWithNs));
+}
+
 }  // namespace
 }  // namespace mongo

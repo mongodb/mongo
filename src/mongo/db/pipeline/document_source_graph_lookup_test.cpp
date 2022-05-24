@@ -82,6 +82,7 @@ private:
 // system.tenantMigration.oplogView} can be round tripped.
 TEST_F(DocumentSourceGraphLookUpTest, LookupReParseSerializedStageWithFromDBAndColl) {
     auto expCtx = getExpCtx();
+    // TODO SERVER-62491 Use system tenantId for nss 'local.system.tenantMigration.oplogView'.
     NamespaceString fromNs("local", "system.tenantMigration.oplogView");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
@@ -125,7 +126,7 @@ TEST_F(DocumentSourceGraphLookUpTest, LookupReParseSerializedStageWithFromDBAndC
 // local.system.tenantMigration.oplogView.
 TEST_F(DocumentSourceGraphLookUpTest, RejectsPipelineFromDBAndCollNotLocalDBOrRsOplogView) {
     auto expCtx = getExpCtx();
-    NamespaceString fromNs("test", "coll");
+    NamespaceString fromNs(boost::none, "test", "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
 
@@ -143,7 +144,7 @@ TEST_F(DocumentSourceGraphLookUpTest, RejectsPipelineFromDBAndCollNotLocalDBOrRs
 // not "system.tenantMigration.oplogView".
 TEST_F(DocumentSourceGraphLookUpTest, RejectsPipelineFromDBAndCollNotRsOplogView) {
     auto expCtx = getExpCtx();
-    NamespaceString fromNs("local", "coll");
+    NamespaceString fromNs(boost::none, "local", "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
 
@@ -161,7 +162,7 @@ TEST_F(DocumentSourceGraphLookUpTest, RejectsPipelineFromDBAndCollNotRsOplogView
 // "system.tenantMigration.oplogView" but "db" is not "local".
 TEST_F(DocumentSourceGraphLookUpTest, RejectsPipelineFromDBAndCollNotLocalDB) {
     auto expCtx = getExpCtx();
-    NamespaceString fromNs("test", "system.tenantMigration.oplogView");
+    NamespaceString fromNs(boost::none, "test", "system.tenantMigration.oplogView");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
 
@@ -184,7 +185,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
 
     std::deque<DocumentSource::GetNextResult> fromContents{Document{{"to", 0}}};
 
-    NamespaceString fromNs("test", "graph_lookup");
+    NamespaceString fromNs(boost::none, "test", "graph_lookup");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
@@ -213,7 +214,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
     std::deque<DocumentSource::GetNextResult> fromContents{
         Document{{"_id", "a"_sd}, {"to", 0}, {"from", 1}}, Document{{"to", 1}}};
 
-    NamespaceString fromNs("test", "graph_lookup");
+    NamespaceString fromNs(boost::none, "test", "graph_lookup");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
@@ -242,7 +243,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
 
     std::deque<DocumentSource::GetNextResult> fromContents{Document{{"to", 0}}};
 
-    NamespaceString fromNs("test", "graph_lookup");
+    NamespaceString fromNs(boost::none, "test", "graph_lookup");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
@@ -286,7 +287,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
     std::deque<DocumentSource::GetNextResult> fromContents{
         Document(to1), Document(to2), Document(to0from1), Document(to0from2)};
 
-    NamespaceString fromNs("test", "graph_lookup");
+    NamespaceString fromNs(boost::none, "test", "graph_lookup");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
@@ -350,7 +351,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePauses) {
     std::deque<DocumentSource::GetNextResult> fromContents{
         Document{{"_id", "a"_sd}, {"to", 0}, {"from", 1}}, Document{{"_id", "b"_sd}, {"to", 1}}};
 
-    NamespaceString fromNs("test", "foreign");
+    NamespaceString fromNs(boost::none, "test", "foreign");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
@@ -418,7 +419,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
     std::deque<DocumentSource::GetNextResult> fromContents{
         Document{{"_id", "a"_sd}, {"to", 0}, {"from", 1}}, Document{{"_id", "b"_sd}, {"to", 1}}};
 
-    NamespaceString fromNs("test", "foreign");
+    NamespaceString fromNs(boost::none, "test", "foreign");
 
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
@@ -484,7 +485,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
 
 TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportAsFieldIsModified) {
     auto expCtx = getExpCtx();
-    NamespaceString fromNs("test", "foreign");
+    NamespaceString fromNs(boost::none, "test", "foreign");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
     expCtx->mongoProcessInterface =
@@ -509,7 +510,7 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportAsFieldIsModified) 
 
 TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportFieldsModifiedByAbsorbedUnwind) {
     auto expCtx = getExpCtx();
-    NamespaceString fromNs("test", "foreign");
+    NamespaceString fromNs(boost::none, "test", "foreign");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
     expCtx->mongoProcessInterface =
@@ -541,7 +542,7 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupWithComparisonExpressionForStar
     auto inputMock =
         DocumentSourceMock::createForTest(Document({{"_id", 0}, {"a", 1}, {"b", 2}}), expCtx);
 
-    NamespaceString fromNs("test", "foreign");
+    NamespaceString fromNs(boost::none, "test", "foreign");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
     std::deque<DocumentSource::GetNextResult> fromContents{Document{{"_id", 0}, {"to", true}},
@@ -606,7 +607,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldExpandArraysAtEndOfConnectFromField)
                                                            Document(middle3),
                                                            Document(sinkDoc)};
 
-    NamespaceString fromNs("test", "graph_lookup");
+    NamespaceString fromNs(boost::none, "test", "graph_lookup");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
@@ -679,7 +680,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldNotExpandArraysWithinArraysAtEndOfCo
     std::deque<DocumentSource::GetNextResult> fromContents{
         Document(startDoc), Document(target1), Document(target2), Document(soloDoc)};
 
-    NamespaceString fromNs("test", "graph_lookup");
+    NamespaceString fromNs(boost::none, "test", "graph_lookup");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
@@ -711,6 +712,61 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldNotExpandArraysWithinArraysAtEndOfCo
     ASSERT(arrayContains(expCtx, resultsArray, Value(target2)));
     ASSERT(!arrayContains(expCtx, resultsArray, Value(soloDoc)));
     ASSERT(graphLookupStage->getNext().isEOF());
+}
+
+
+using DocumentSourceUnionWithServerlessTest = ServerlessAggregationContextFixture;
+
+TEST_F(DocumentSourceUnionWithServerlessTest,
+       LiteParsedDocumentSourceLookupContainsExpectedNamespacesInServerless) {
+    auto expCtx = getExpCtx();
+    auto originalBSON = BSON("$graphLookup" << BSON("from"
+                                                    << "foo"
+                                                    << "startWith"
+                                                    << "$x"
+                                                    << "connectFromField"
+                                                    << "id"
+                                                    << "connectToField"
+                                                    << "id"
+                                                    << "as"
+                                                    << "connections"));
+
+    std::vector<BSONObj> pipeline;
+    NamespaceString nss(expCtx->ns.dbName(), "testColl");
+    auto liteParsedLookup =
+        DocumentSourceGraphLookUp::LiteParsed::parse(nss, originalBSON.firstElement());
+    auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
+    ASSERT_EQ(1, namespaceSet.size());
+    ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(expCtx->ns.dbName(), "foo")));
+}
+
+TEST_F(DocumentSourceUnionWithServerlessTest,
+       CreateFromBSONContainsExpectedNamespacesInServerless) {
+    auto expCtx = getExpCtx();
+    auto tenantId = expCtx->ns.tenantId();
+    ASSERT(tenantId);
+
+    NamespaceString graphLookupNs(expCtx->ns.dbName(), "foo");
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {graphLookupNs.coll().toString(), {graphLookupNs, std::vector<BSONObj>()}}});
+
+    auto spec = BSON("$graphLookup" << BSON("from"
+                                            << "foo"
+                                            << "startWith"
+                                            << "$x"
+                                            << "connectFromField"
+                                            << "id"
+                                            << "connectToField"
+                                            << "id"
+                                            << "as"
+                                            << "connections"));
+    auto graphLookupStage = DocumentSourceGraphLookUp::createFromBson(spec.firstElement(), expCtx);
+
+    auto pipeline =
+        Pipeline::create({DocumentSourceMock::createForTest(expCtx), graphLookupStage}, expCtx);
+    auto involvedNssSet = pipeline->getInvolvedCollections();
+    ASSERT_EQ(involvedNssSet.size(), 1UL);
+    ASSERT_EQ(1ul, involvedNssSet.count(graphLookupNs));
 }
 
 }  // namespace

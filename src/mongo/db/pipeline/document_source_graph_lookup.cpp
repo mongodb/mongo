@@ -61,7 +61,7 @@ namespace {
 //
 // {from: {db: "local", coll: "system.tenantMigration.oplogView"}, ...}.
 NamespaceString parseGraphLookupFromAndResolveNamespace(const BSONElement& elem,
-                                                        StringData defaultDb) {
+                                                        const DatabaseName& defaultDb) {
     // The object syntax only works for 'local.system.tenantMigration.oplogView' which is not a user
     // namespace so object type is omitted from the error message below.
     uassert(ErrorCodes::FailedToParse,
@@ -79,6 +79,7 @@ NamespaceString parseGraphLookupFromAndResolveNamespace(const BSONElement& elem,
 
     // Valdate the db and coll names.
     auto spec = NamespaceSpec::parse({elem.fieldNameStringData()}, elem.embeddedObject());
+    // TODO SERVER-62491 Use system tenantId to construct nss.
     auto nss = NamespaceString(spec.getDb().value_or(""), spec.getColl().value_or(""));
     uassert(ErrorCodes::FailedToParse,
             str::stream()
@@ -109,7 +110,7 @@ std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> DocumentSourceGraphLookUp
             fromElement);
 
     return std::make_unique<LiteParsed>(
-        spec.fieldName(), parseGraphLookupFromAndResolveNamespace(fromElement, nss.db()));
+        spec.fieldName(), parseGraphLookupFromAndResolveNamespace(fromElement, nss.dbName()));
 }
 
 REGISTER_DOCUMENT_SOURCE(graphLookup,
@@ -548,9 +549,10 @@ void DocumentSourceGraphLookUp::checkMemoryUsage() {
 
 void DocumentSourceGraphLookUp::serializeToArray(
     std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
+    // Do not include tenantId in serialized 'from' namespace.
     auto fromValue = (pExpCtx->ns.db() == _from.db())
         ? Value(_from.coll())
-        : Value(Document{{"db", _from.db()}, {"coll", _from.coll()}});
+        : Value(Document{{"db", _from.dbName().db()}, {"coll", _from.coll()}});
 
     // Serialize default options.
     MutableDocument spec(DOC("from" << fromValue << "as" << _as.fullPath() << "connectToField"
@@ -750,7 +752,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
         }
 
         if (argName == "from") {
-            from = parseGraphLookupFromAndResolveNamespace(argument, expCtx->ns.db().toString());
+            from = parseGraphLookupFromAndResolveNamespace(argument, expCtx->ns.dbName());
         } else if (argName == "as") {
             as = argument.String();
         } else if (argName == "connectFromField") {
