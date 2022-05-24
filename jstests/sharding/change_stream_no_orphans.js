@@ -9,7 +9,7 @@
  *   - Test case 4: Transaction to shard updating both orphaned and owned documents
  *
  * @tags: [
- *   requires_fcv_53,
+ *   requires_fcv_60,
  *   featureFlagNoChangeStreamEventsDueToOrphans,
  * ]
  */
