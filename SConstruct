@@ -2,7 +2,6 @@
 
 import atexit
 import copy
-import datetime
 import errno
 import json
 import os
@@ -957,6 +956,11 @@ env_vars.Add('MSVC_VERSION',
     help='Sets the version of Visual C++ to use (e.g. 14.2 for VS2019, 14.3 for VS2022)',
     default="14.3")
 
+env_vars.Add('NINJA_BUILDDIR',
+    help="Location for shared Ninja state",
+    default="$BUILD_DIR/ninja",
+)
+
 env_vars.Add('NINJA_PREFIX',
     default="build",
     help="""A prefix to add to the beginning of generated ninja
@@ -1207,7 +1211,6 @@ envDict = dict(BUILD_ROOT=buildDir,
                CONFIG_HEADER_DEFINES={},
                LIBDEPS_TAG_EXPANSIONS=[],
                )
-
 
 # By default, we will get the normal SCons tool search. But if the
 # user has opted into the next gen tools, add our experimental tool
@@ -4760,7 +4763,7 @@ if get_option('ninja') != 'disabled':
             env.FatalError("Use of ccache is mandatory with --ninja and icecream older than 1.2. You are running {}.".format(env['ICECREAM_VERSION']))
 
     ninja_builder = Tool("ninja")
-    env["NINJA_BUILDDIR"] = env.Dir("$BUILD_DIR/ninja")
+    env["NINJA_BUILDDIR"] = env.Dir("$NINJA_BUILDDIR")
     ninja_builder.generate(env)
 
     ninjaConf = Configure(env, help=False, custom_tests = {
