@@ -13,7 +13,6 @@
 (function() {
 'use strict';
 
-load("jstests/libs/feature_flag_util.js");
 load("jstests/sharding/libs/find_chunks_util.js");
 
 /**
@@ -46,24 +45,23 @@ var HourAndMinute = function(hour, minutes) {
     };
 };
 
-var st = new ShardingTest({shards: 2});
-// TODO SERVER-66378 adapt this test for data size aware balancing
-if (FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'),
-                              "BalanceAccordingToDataSize")) {
-    jsTestLog("Skipping as featureFlagBalanceAccordingToDataSize is enabled");
-    st.stop();
-    return;
-}
-var configDB = st.s.getDB('config');
-assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
-assert.commandWorked(configDB.adminCommand({shardCollection: 'test.user', key: {_id: 1}}));
+const st = new ShardingTest({shards: 2, other: {chunkSize: 1, enableAutoSplit: false}});
+const dbName = 'test';
+const collName = 'user';
+const ns = dbName + '.' + collName;
+const configDB = st.s.getDB('config');
+assert.commandWorked(configDB.adminCommand({enableSharding: dbName}));
+assert.commandWorked(configDB.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
+const bigString = 'X'.repeat(1024 * 1024);  // 1MB
+const coll = st.s.getDB(dbName).getCollection(collName);
 for (var x = 0; x < 150; x += 10) {
-    configDB.adminCommand({split: 'test.user', middle: {_id: x}});
+    coll.insert({_id: x, s: bigString});
+    configDB.adminCommand({split: ns, middle: {_id: x}});
 }
 
 var shard0Chunks =
-    findChunksUtil.findChunksByNs(configDB, 'test.user', {shard: st.shard0.shardName}).count();
+    findChunksUtil.findChunksByNs(configDB, ns, {shard: st.shard0.shardName}).count();
 
 var startDate = new Date();
 var hourMinStart = new HourAndMinute(startDate.getHours(), startDate.getMinutes());
@@ -83,7 +81,7 @@ st.startBalancer();
 st.waitForBalancer(true, 60000);
 
 var shard0ChunksAfter =
-    findChunksUtil.findChunksByNs(configDB, 'test.user', {shard: st.shard0.shardName}).count();
+    findChunksUtil.findChunksByNs(configDB, ns, {shard: st.shard0.shardName}).count();
 assert.eq(shard0Chunks, shard0ChunksAfter);
 
 assert.commandWorked(configDB.settings.update(
@@ -98,7 +96,7 @@ assert.commandWorked(configDB.settings.update(
 st.waitForBalancer(true, 60000);
 
 shard0ChunksAfter =
-    findChunksUtil.findChunksByNs(configDB, 'test.user', {shard: st.shard0.shardName}).count();
+    findChunksUtil.findChunksByNs(configDB, ns, {shard: st.shard0.shardName}).count();
 assert.neq(shard0Chunks, shard0ChunksAfter);
 
 st.stop();

@@ -4,8 +4,6 @@
 (function() {
 'use strict';
 
-load("jstests/libs/feature_flag_util.js");
-
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
@@ -18,14 +16,6 @@ load("jstests/sharding/libs/find_chunks_util.js");
 // briefly authenticates as __system and recieves clusterTime metadata then will fail trying to
 // gossip that time later in setup.
 //
-
-// TODO SERVER-66378 adapt this test for data size aware balancing
-const dataSizeAwareBalancingFeatureFlag =
-    TestData.setParameters.featureFlagBalanceAccordingToDataSize;
-if (dataSizeAwareBalancingFeatureFlag) {
-    jsTestLog("Skipping as featureFlagBalanceAccordingToDataSize is enabled");
-    return;
-}
 
 var st = new ShardingTest({
     shards: 2,
@@ -98,12 +88,8 @@ st.startBalancer();
 // Make sure we've done at least some splitting, so the balancer will work
 assert.gt(findChunksUtil.findChunksByNs(configDB, 'test.foo').count(), 2);
 
-// Make sure we eventually balance all the chunks we've created
-assert.soon(function() {
-    var x = st.chunkDiff("foo", "test");
-    print("chunk diff: " + x);
-    return x < 2 && configDB.locks.findOne({_id: 'test.foo'}).state == 0;
-}, "no balance happened", 15 * 60 * 1000);
+// Make sure we eventually balance the 'test.foo' collection
+st.awaitBalance('foo', 'test', 60 * 1000);
 
 var map = function() {
     emit(this.i, this.j);

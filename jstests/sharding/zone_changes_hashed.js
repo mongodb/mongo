@@ -48,14 +48,7 @@ function findHighestChunkBounds(chunkBounds) {
     return highestBounds;
 }
 
-let st = new ShardingTest({shards: 3});
-// TODO SERVER-66378 adapt this test for data size aware balancing
-if (FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'),
-                              "BalanceAccordingToDataSize")) {
-    jsTestLog("Skipping as featureFlagBalanceAccordingToDataSize is enabled");
-    st.stop();
-    return;
-}
+const st = new ShardingTest({shards: 3, other: {chunkSize: 1, enableAutoSplitter: false}});
 let primaryShard = st.shard0;
 let dbName = "test";
 let testDB = st.s.getDB(dbName);
@@ -64,8 +57,8 @@ let coll = testDB.hashed;
 let ns = coll.getFullName();
 let shardKey = {x: "hashed"};
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, primaryShard.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard.shardName}));
 
 jsTest.log(
     "Shard the collection. The command creates two chunks on each of the shards by default.");
@@ -74,7 +67,15 @@ let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).sort({min: 1}).toArr
 let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
 
 jsTest.log("Insert docs (one for each chunk) and check that they end up on the right shards.");
-let docs = [{x: -25}, {x: -18}, {x: -5}, {x: -1}, {x: 5}, {x: 10}];
+const bigString = 'X'.repeat(1024 * 1024);  // 1MB
+let docs = [
+    {x: -25, s: bigString},
+    {x: -18, s: bigString},
+    {x: -5, s: bigString},
+    {x: -1, s: bigString},
+    {x: 5, s: bigString},
+    {x: 10, s: bigString}
+];
 assert.commandWorked(coll.insert(docs));
 
 let docChunkBounds = [];
@@ -134,7 +135,10 @@ shardTags = {
 };
 assertShardTags(configDB, shardTags);
 
-let numChunksToMove = zoneChunkBounds["zoneB"].length / 2;
+const balanceAccordingToDataSize = FeatureFlagUtil.isEnabled(
+    st.configRS.getPrimary().getDB('admin'), "BalanceAccordingToDataSize");
+let numChunksToMove = balanceAccordingToDataSize ? zoneChunkBounds["zoneB"].length
+                                                 : zoneChunkBounds["zoneB"].length / 2;
 runBalancer(st, numChunksToMove);
 shardChunkBounds = {
     [st.shard0.shardName]: zoneChunkBounds["zoneB"].slice(0, numChunksToMove),

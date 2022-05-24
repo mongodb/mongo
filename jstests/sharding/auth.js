@@ -175,18 +175,19 @@ awaitRSClientHosts(s.s, d2.nodes, {ok: true});
 
 s.getDB("test").foo.remove({});
 
-var num = 10000;
+var num = 10;
 assert.commandWorked(s.s.adminCommand({split: "test.foo", middle: {x: num / 2}}));
+const bigString = 'X'.repeat(1024 * 1024);  // 1MB
 var bulk = s.getDB("test").foo.initializeUnorderedBulkOp();
 for (i = 0; i < num; i++) {
-    bulk.insert({_id: i, x: i, abc: "defg", date: new Date(), str: "all the talk on the market"});
+    bulk.insert({_id: i, x: i, abc: "defg", date: new Date(), str: bigString});
 }
 assert.commandWorked(bulk.execute());
 
 s.startBalancer(60000);
 
-// TODO SERVER-66378 adapt this test for data size aware balancing
-const balanceAccordingToDataSize = TestData.setParameters.featureFlagBalanceAccordingToDataSize;
+const balanceAccordingToDataSize =
+    FeatureFlagUtil.isEnabled(s.getDB('admin'), "BalanceAccordingToDataSize");
 if (!balanceAccordingToDataSize) {
     assert.soon(function() {
         var d1Chunks =
@@ -241,7 +242,7 @@ if (numDocs != num) {
 // This call also waits for any ongoing balancing to stop
 s.stopBalancer(60000);
 
-var cursor = s.getDB("test").foo.find({x: {$lt: 500}});
+var cursor = s.getDB("test").foo.find({x: {$lt: 5}});
 
 var count = 0;
 while (cursor.hasNext()) {
@@ -249,7 +250,7 @@ while (cursor.hasNext()) {
     count++;
 }
 
-assert.eq(count, 500);
+assert.eq(count, 5);
 
 logout(adminUser);
 
