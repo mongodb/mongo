@@ -75,6 +75,12 @@ var $config = extendWorkload($config, function($config, $super) {
     // during setup() and restores the original value during teardown().
     $config.data.originalStoreFindAndModifyImagesInSideCollection = {};
 
+    // This workload supports setting the 'transactionLifetimeLimitSeconds' to 45 seconds
+    // (configurable) during setup() and restoring the original value during teardown().
+    $config.data.lowerTransactionLifetimeLimitSeconds = false;
+    $config.data.transactionLifetimeLimitSeconds = 45;
+    $config.data.originalTransactionLifetimeLimitSeconds = {};
+
     // Determine if this workload needs to use causally consistent sessions.
     $config.data.shouldUseCausalConsistency = (() => {
         if (TestData.runningWithCausalConsistency !== undefined) {
@@ -469,6 +475,28 @@ var $config = extendWorkload($config, function($config, $super) {
         });
     };
 
+    $config.data.overrideTransactionLifetimeLimit = function overrideTransactionLifetimeLimit(
+        cluster) {
+        cluster.executeOnMongodNodes((db) => {
+            const res = assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                transactionLifetimeLimitSeconds: this.transactionLifetimeLimitSeconds
+            }));
+            this.originalTransactionLifetimeLimitSeconds[db.getMongo().host] = res.was;
+        });
+    };
+
+    $config.data.restoreTransactionLifetimeLimit = function restoreTransactionLifetimeLimit(
+        cluster) {
+        cluster.executeOnMongodNodes((db) => {
+            assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                transactionLifetimeLimitSeconds:
+                    this.originalTransactionLifetimeLimitSeconds[db.getMongo().host]
+            }));
+        });
+    };
+
     $config.setup = function setup(db, collName, cluster) {
         assert.commandWorked(db.createCollection(collName, {writeConcern: {w: "majority"}}));
         if (this.insertInitialDocsOnSetUp) {
@@ -479,10 +507,16 @@ var $config = extendWorkload($config, function($config, $super) {
             }
         }
         this.overrideStoreFindAndModifyImagesInSideCollection(cluster);
+        if (this.lowerTransactionLifetimeLimitSeconds) {
+            this.overrideTransactionLifetimeLimit(cluster);
+        }
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
         this.restoreStoreFindAndModifyImagesInSideCollection(cluster);
+        if (this.lowerTransactionLifetimeLimitSeconds) {
+            this.restoreTransactionLifetimeLimit(cluster);
+        }
     };
 
     /**
@@ -509,6 +543,7 @@ var $config = extendWorkload($config, function($config, $super) {
         });
 
         this.startSessions(db);
+        this.initTime = new Date();
     };
 
     $config.states.internalTransactionForInsert = function internalTransactionForInsert(db,
