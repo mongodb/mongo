@@ -38,7 +38,7 @@ commands:
   cleanupReshardCollection:
     description: "The public cleanupReshardCollection command on mongos."
     command_name: cleanupReshardCollection
-    strict: false
+    strict: true
     namespace: type
     api_version: ""
     type: namespacestring
