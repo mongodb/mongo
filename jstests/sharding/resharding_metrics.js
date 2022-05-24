@@ -2,7 +2,6 @@
 'use strict';
 
 load("jstests/libs/discover_topology.js");
-load("jstests/libs/feature_flag_util.js");  // For isEnabled.
 load("jstests/sharding/libs/resharding_test_fixture.js");
 
 const kNamespace = 'test.resharding';
@@ -46,12 +45,6 @@ const inputCollection = reshardingTest.createShardedCollection({
         {min: {oldKey: 0}, max: {oldKey: MaxKey}, shard: donorShardNames[1]},
     ],
 });
-
-if (!FeatureFlagUtil.isEnabled(inputCollection.getDB(), "ShardingDataTransformMetrics")) {
-    jsTestLog("Skipping as featureFlagShardingDataTransformMetrics is not enabled");
-    reshardingTest.teardown();
-    return;
-}
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 const topology = DiscoverTopology.findConnectedNodes(inputCollection.getMongo());

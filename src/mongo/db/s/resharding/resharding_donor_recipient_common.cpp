@@ -252,9 +252,7 @@ ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
                                  sourceUUID,
                                  reshardingFields.getDonorFields()->getTempReshardingNss(),
                                  reshardingFields.getDonorFields()->getReshardingKey().toBSON());
-    if (ShardingDataTransformMetrics::isEnabled()) {
-        commonMetadata.setStartTime(reshardingFields.getStartTime());
-    }
+    commonMetadata.setStartTime(reshardingFields.getStartTime());
     donorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
 
     return donorDoc;
@@ -285,13 +283,13 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
                                                    sourceUUID,
                                                    nss,
                                                    metadata.getShardKeyPattern().toBSON());
-    if (ShardingDataTransformMetrics::isEnabled()) {
-        commonMetadata.setStartTime(reshardingFields.getStartTime());
-        ReshardingRecipientMetrics metrics;
-        metrics.setApproxDocumentsToCopy(recipientFields->getApproxDocumentsToCopy());
-        metrics.setApproxBytesToCopy(recipientFields->getApproxBytesToCopy());
-        recipientDoc.setMetrics(std::move(metrics));
-    }
+    commonMetadata.setStartTime(reshardingFields.getStartTime());
+
+    ReshardingRecipientMetrics metrics;
+    metrics.setApproxDocumentsToCopy(recipientFields->getApproxDocumentsToCopy());
+    metrics.setApproxBytesToCopy(recipientFields->getApproxBytesToCopy());
+    recipientDoc.setMetrics(std::move(metrics));
+
     recipientDoc.setCommonReshardingMetadata(std::move(commonMetadata));
 
     return recipientDoc;

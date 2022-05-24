@@ -40,7 +40,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_coordinator_commit_monitor.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
@@ -122,11 +122,6 @@ auto makeExecutor() {
 void CoordinatorCommitMonitorTest::setUp() {
     ConfigServerTestFixture::setUp();
 
-    auto clockSource = getServiceContext()->getFastClockSource();
-    auto metrics = ReshardingMetrics::get(getServiceContext());
-    metrics->onStart(ReshardingMetrics::Role::kCoordinator, clockSource->now());
-    metrics->setCoordinatorState(CoordinatorStateEnum::kApplying);
-
     auto hostNameForShard = [](const ShardId& shard) -> std::string {
         return fmt::format("{}:1234", shard.toString());
     };
@@ -155,6 +150,7 @@ void CoordinatorCommitMonitorTest::setUp() {
 
     _cancellationSource = std::make_unique<CancellationSource>();
 
+    auto clockSource = getServiceContext()->getFastClockSource();
     _metrics = std::make_shared<ReshardingMetricsNew>(
         UUID::gen(),
         BSON("y" << 1),

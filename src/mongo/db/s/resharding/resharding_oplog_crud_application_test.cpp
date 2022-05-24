@@ -47,7 +47,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_state.h"
@@ -112,7 +112,6 @@ public:
                         CollectionMetadata(makeChunkManagerForOutputCollection(), _myDonorId));
             }
 
-            _metrics = std::make_unique<ReshardingMetrics>(getServiceContext());
             _metricsNew =
                 ReshardingMetricsNew::makeInstance(_sourceUUID,
                                                    BSON(_newShardKey << 1),
@@ -128,7 +127,6 @@ public:
                 0U,
                 _myDonorId,
                 makeChunkManagerForSourceCollection(),
-                _metrics.get(),
                 _oplogApplierMetrics.get());
         }
     }
@@ -343,7 +341,6 @@ private:
         getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
 
     std::unique_ptr<ReshardingOplogApplicationRules> _applier;
-    std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingMetricsNew> _metricsNew;
     std::unique_ptr<ReshardingOplogApplierMetrics> _oplogApplierMetrics;
 };

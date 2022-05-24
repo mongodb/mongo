@@ -34,7 +34,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include <set>
@@ -97,7 +96,9 @@ public:
     void reportForServerStatus(BSONObjBuilder* bob) const;
 
     void onStarted();
-    void onCompletion(ReshardingOperationStatusEnum status);
+    void onSuccess();
+    void onFailure();
+    void onCanceled();
 
     void setLastOpEndingChunkImbalance(int64_t imbalanceCount);
 

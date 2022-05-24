@@ -35,7 +35,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 #include "mongo/db/s/sharding_data_transform_metrics.h"
 #include "mongo/db/service_context.h"
@@ -109,23 +108,17 @@ public:
         }
 
         Response typedRun(OperationContext* opCtx) {
-            if (ShardingDataTransformMetrics::isEnabled()) {
-                auto instances =
-                    getReshardingStateMachines<ReshardingRecipientService,
-                                               ReshardingRecipientService::RecipientStateMachine>(
-                        opCtx, ns());
-                if (instances.empty()) {
-                    return Response{boost::none, boost::none};
-                }
-                invariant(instances.size() == 1);
-                const auto& metrics = instances[0]->getMetrics();
-                return Response{duration_cast<Milliseconds>(metrics.getOperationRunningTimeSecs()),
-                                metrics.getHighEstimateRemainingTimeMillis()};
-            } else {
-                auto metrics = ReshardingMetrics::get(opCtx->getServiceContext());
-                return Response{metrics->getOperationElapsedTime(),
-                                metrics->getOperationRemainingTime()};
+            auto instances =
+                getReshardingStateMachines<ReshardingRecipientService,
+                                           ReshardingRecipientService::RecipientStateMachine>(opCtx,
+                                                                                              ns());
+            if (instances.empty()) {
+                return Response{boost::none, boost::none};
             }
+            invariant(instances.size() == 1);
+            const auto& metrics = instances[0]->getMetrics();
+            return Response{duration_cast<Milliseconds>(metrics.getOperationRunningTimeSecs()),
+                            metrics.getHighEstimateRemainingTimeMillis()};
         }
     };
 } _shardsvrReshardingOperationTime;

@@ -203,10 +203,9 @@ public:
                                                                std::move(existingUUID),
                                                                std::move(tempReshardingNss),
                                                                request().getKey());
-                if (ShardingDataTransformMetrics::isEnabled()) {
-                    commonMetadata.setStartTime(
-                        opCtx->getServiceContext()->getFastClockSource()->now());
-                }
+                commonMetadata.setStartTime(
+                    opCtx->getServiceContext()->getFastClockSource()->now());
+
                 coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
                 coordinatorDoc.setZones(request().getZones());
                 coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());

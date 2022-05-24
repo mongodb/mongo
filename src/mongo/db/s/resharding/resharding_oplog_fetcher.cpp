@@ -45,7 +45,6 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
@@ -327,10 +326,8 @@ bool ReshardingOplogFetcher::consume(Client* client,
         [this, &batchesProcessed, &moreToCome, &opCtxRaii, &batchFetchTimer, factory](
             const std::vector<BSONObj>& batch,
             const boost::optional<BSONObj>& postBatchResumeToken) {
-            if (ShardingDataTransformMetrics::isEnabled()) {
-                _env->metricsNew()->onOplogEntriesFetched(batch.size(),
-                                                          Milliseconds(batchFetchTimer.millis()));
-            }
+            _env->metricsNew()->onOplogEntriesFetched(batch.size(),
+                                                      Milliseconds(batchFetchTimer.millis()));
 
             ThreadClient client(fmt::format("ReshardingFetcher-{}-{}",
                                             _reshardingUUID.toString(),
@@ -357,14 +354,10 @@ bool ReshardingOplogFetcher::consume(Client* client,
                 uassertStatusOK(toWriteTo->insertDocument(opCtx, InsertStatement{doc}, nullptr));
                 wuow.commit();
 
-                if (ShardingDataTransformMetrics::isEnabled()) {
-                    _env->metricsNew()->onLocalInsertDuringOplogFetching(
-                        Milliseconds(insertTimer.millis()));
-                }
+                _env->metricsNew()->onLocalInsertDuringOplogFetching(
+                    Milliseconds(insertTimer.millis()));
 
                 ++_numOplogEntriesCopied;
-
-                _env->metrics()->onOplogEntriesFetched(1);
 
                 auto [p, f] = makePromiseFuture<void>();
                 {
@@ -409,10 +402,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
 
                     // Also include synthetic oplog in the fetched count so it can match up with the
                     // total oplog applied count in the end.
-                    _env->metrics()->onOplogEntriesFetched(1);
-                    if (ShardingDataTransformMetrics::isEnabled()) {
-                        _env->metricsNew()->onOplogEntriesFetched(1, Milliseconds(0));
-                    }
+                    _env->metricsNew()->onOplogEntriesFetched(1, Milliseconds(0));
 
                     auto [p, f] = makePromiseFuture<void>();
                     {

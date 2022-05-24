@@ -37,7 +37,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/cancelable_operation_context.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/async_requests_sender.h"
@@ -210,13 +209,8 @@ ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture() const {
             return RemainingOperationTimes{Milliseconds(0), Milliseconds::max()};
         })
         .then([this, anchor = shared_from_this()](RemainingOperationTimes remainingTimes) {
-            auto metrics = ReshardingMetrics::get(cc().getServiceContext());
-            metrics->setMinRemainingOperationTime(remainingTimes.min);
-            metrics->setMaxRemainingOperationTime(remainingTimes.max);
-            if (ShardingDataTransformMetrics::isEnabled()) {
-                _metricsNew->setCoordinatorHighEstimateRemainingTimeMillis(remainingTimes.max);
-                _metricsNew->setCoordinatorLowEstimateRemainingTimeMillis(remainingTimes.min);
-            }
+            _metricsNew->setCoordinatorHighEstimateRemainingTimeMillis(remainingTimes.max);
+            _metricsNew->setCoordinatorLowEstimateRemainingTimeMillis(remainingTimes.min);
 
             // Check if all recipient shards are within the commit threshold.
             if (remainingTimes.max <= _threshold)

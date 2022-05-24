@@ -46,7 +46,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_oplog_batch_applier.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
@@ -57,6 +57,7 @@
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
@@ -110,7 +111,6 @@ public:
                     opCtx.get(), nss, CollectionOptions{});
             }
 
-            _metrics = std::make_unique<ReshardingMetrics>(serviceContext);
             _metricsNew =
                 ReshardingMetricsNew::makeInstance(UUID::gen(),
                                                    BSON("y" << 1),
@@ -126,7 +126,6 @@ public:
                 0U,
                 _myDonorId,
                 makeChunkManagerForSourceCollection(),
-                _metrics.get(),
                 _applierMetrics.get());
 
             _sessionApplication =
@@ -363,7 +362,6 @@ private:
         getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
     const NamespaceString _myOplogBufferNss = getLocalOplogBufferNamespace(_sourceUUID, _myDonorId);
 
-    std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingMetricsNew> _metricsNew;
     std::unique_ptr<ReshardingOplogApplierMetrics> _applierMetrics;
 

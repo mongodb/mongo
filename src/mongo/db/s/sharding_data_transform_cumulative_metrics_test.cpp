@@ -232,7 +232,7 @@ TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsSucceededCount)
         ASSERT_EQ(report.getObjectField(kTestMetricsName).getIntField("countSucceeded"), 0);
     }
 
-    _cumulativeMetrics.onCompletion(ReshardingOperationStatusEnum::kSuccess);
+    _cumulativeMetrics.onSuccess();
 
     {
         BSONObjBuilder bob;
@@ -254,7 +254,7 @@ TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsFailedCount) {
         ASSERT_EQ(report.getObjectField(kTestMetricsName).getIntField("countFailed"), 0);
     }
 
-    _cumulativeMetrics.onCompletion(ReshardingOperationStatusEnum::kFailure);
+    _cumulativeMetrics.onFailure();
 
     {
         BSONObjBuilder bob;
@@ -276,7 +276,7 @@ TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsCanceledCount) 
         ASSERT_EQ(report.getObjectField(kTestMetricsName).getIntField("countCanceled"), 0);
     }
 
-    _cumulativeMetrics.onCompletion(ReshardingOperationStatusEnum::kCanceled);
+    _cumulativeMetrics.onCanceled();
 
     {
         BSONObjBuilder bob;

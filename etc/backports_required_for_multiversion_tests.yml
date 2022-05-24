@@ -256,9 +256,10 @@ last-continuous:
       test_file: jstests/sharding/resharding_abort_command.js
     - ticket: SERVER-66078
       test_file: jstests/sharding/data_size_aware_balancing_sessions_collection.js
-
     - ticket: SERVER-66379
       test_file: jstests/core/or_to_in.js
+    - ticket: SERVER-66422
+      test_file: jstests/sharding/resharding_metrics.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -650,6 +651,8 @@ last-lts:
       test_file: jstests/sharding/data_size_aware_balancing_sessions_collection.js
     - ticket: SERVER-66379
       test_file: jstests/core/or_to_in.js
+    - ticket: SERVER-66422
+      test_file: jstests/sharding/resharding_metrics.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

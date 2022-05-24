@@ -7,7 +7,6 @@
 (function() {
 "use strict";
 load("jstests/libs/discover_topology.js");
-load("jstests/libs/feature_flag_util.js");  // For isEnabled.
 load("jstests/libs/parallelTester.js");
 load("jstests/sharding/libs/resharding_test_fixture.js");
 
@@ -261,19 +260,9 @@ const runAbortWithFailpoint = (failpointName, failpointNodeType, abortLocation, 
     const reshardingMetrics =
         configsvr.getDB('admin').serverStatus({}).shardingStatistics.resharding;
 
-    let reshardingOperationsFinalCount = 0;
-    let reshardingSuccessesFinalCount = 0;
-    let reshardingCanceledFinalCount = 0;
-
-    if (FeatureFlagUtil.isEnabled(configsvr.getDB('admin'), "ShardingDataTransformMetrics")) {
-        reshardingOperationsFinalCount = reshardingMetrics.countStarted;
-        reshardingSuccessesFinalCount = reshardingMetrics.countSucceeded;
-        reshardingCanceledFinalCount = reshardingMetrics.countCanceled;
-    } else {
-        reshardingOperationsFinalCount = reshardingMetrics.countReshardingOperations;
-        reshardingSuccessesFinalCount = reshardingMetrics.countReshardingSuccessful;
-        reshardingCanceledFinalCount = reshardingMetrics.countReshardingCanceled;
-    }
+    let reshardingOperationsFinalCount = reshardingMetrics.countStarted;
+    let reshardingSuccessesFinalCount = reshardingMetrics.countSucceeded;
+    let reshardingCanceledFinalCount = reshardingMetrics.countCanceled;
 
     assert.eq(reshardingOperationsFinalCount, 1);
 

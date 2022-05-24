@@ -51,7 +51,6 @@
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier.h"
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
@@ -163,41 +162,8 @@ void buildStateDocumentMetricsForUpdate(BSONObjBuilder& bob,
     }
 }
 
-ShardingDataTransformCumulativeMetrics::RecipientStateEnum toMetricsState(
-    RecipientStateEnum enumVal) {
-    using MetricsEnum = ShardingDataTransformCumulativeMetrics::RecipientStateEnum;
-
-    switch (enumVal) {
-        case RecipientStateEnum::kUnused:
-            return MetricsEnum::kUnused;
-
-        case RecipientStateEnum::kAwaitingFetchTimestamp:
-            return MetricsEnum::kAwaitingFetchTimestamp;
-
-        case RecipientStateEnum::kCreatingCollection:
-            return MetricsEnum::kCreatingCollection;
-
-        case RecipientStateEnum::kCloning:
-            return MetricsEnum::kCloning;
-
-        case RecipientStateEnum::kApplying:
-            return MetricsEnum::kApplying;
-
-        case RecipientStateEnum::kError:
-            return MetricsEnum::kError;
-
-        case RecipientStateEnum::kStrictConsistency:
-            return MetricsEnum::kStrictConsistency;
-
-        case RecipientStateEnum::kDone:
-            return MetricsEnum::kDone;
-
-        default:
-            invariant(false,
-                      str::stream() << "Unexpected resharding coordinator state: "
-                                    << RecipientState_serializer(enumVal));
-            MONGO_UNREACHABLE;
-    }
+ReshardingMetricsNew::RecipientState toMetricsState(RecipientStateEnum state) {
+    return ReshardingMetricsNew::RecipientState(state);
 }
 
 }  // namespace
@@ -224,10 +190,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
     ReshardingDataReplicationFactory dataReplicationFactory)
     : repl::PrimaryOnlyService::TypedInstance<RecipientStateMachine>(),
       _recipientService{recipientService},
-      _metricsNew{
-          ShardingDataTransformMetrics::isEnabled()
-              ? ReshardingMetricsNew::initializeFrom(recipientDoc, getGlobalServiceContext())
-              : nullptr},
+      _metricsNew{ReshardingMetricsNew::initializeFrom(recipientDoc, getGlobalServiceContext())},
       _metadata{recipientDoc.getCommonReshardingMetadata()},
       _minimumOperationDuration{Milliseconds{recipientDoc.getMinimumOperationDurationMillis()}},
       _recipientCtx{recipientDoc.getMutableState()},
@@ -256,9 +219,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       }()) {
     invariant(_externalState);
 
-    if (ShardingDataTransformMetrics::isEnabled()) {
-        _metricsNew->onStateTransition(boost::none, toMetricsState(_recipientCtx.getState()));
-    }
+    _metricsNew->onStateTransition(boost::none, toMetricsState(_recipientCtx.getState()));
 }
 
 ExecutorFuture<void>
@@ -417,8 +378,6 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                                 _metadata.getSourceNss(),
                                 _critSecReason,
                                 ShardingCatalogClient::kLocalWriteConcern);
-
-                        _metrics()->leaveCriticalSection(getCurrentTime());
                     }
                 })
                 .then([this, executor, &factory] {
@@ -458,15 +417,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMand
                        self = shared_from_this(),
                        outerStatus = status,
                        isCanceled = stepdownToken.isCanceled()](Status dataReplicationHaltStatus) {
-            if (isCanceled) {
-                // Interrupt occurred, ensure the metrics get shut down.
-                _metrics()->onStepDown(ReshardingMetrics::Role::kRecipient);
-            }
-
-            if (ShardingDataTransformMetrics::isEnabled()) {
-                _metricsNew->onStateTransition(toMetricsState(_recipientCtx.getState()),
-                                               boost::none);
-            }
+            _metricsNew->onStateTransition(toMetricsState(_recipientCtx.getState()), boost::none);
 
             // If the stepdownToken was triggered, it takes priority in order to make sure that
             // the promise is set with an error that the coordinator can retry with. If it ran into
@@ -553,16 +504,7 @@ void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status)
 boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode,
     MongoProcessInterface::CurrentOpSessionsMode) noexcept {
-    if (ShardingDataTransformMetrics::isEnabled()) {
-        return _metricsNew->reportForCurrentOp();
-    }
-
-    ReshardingMetrics::ReporterOptions options(ReshardingMetrics::Role::kRecipient,
-                                               _metadata.getReshardingUUID(),
-                                               _metadata.getSourceNss(),
-                                               _metadata.getReshardingKey().toBSON(),
-                                               false);
-    return _metrics()->reportForCurrentOp(options);
+    return _metricsNew->reportForCurrentOp();
 }
 
 void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChanges(
@@ -608,12 +550,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                   ReshardingRecipientService::RecipientStateMachine::CloneDetails cloneDetails) {
             _transitionToCreatingCollection(
                 cloneDetails, (*executor)->now() + _minimumOperationDuration, factory);
-            _metrics()->setDocumentsToCopy(cloneDetails.approxDocumentsToCopy,
-                                           cloneDetails.approxBytesToCopy);
-            if (ShardingDataTransformMetrics::isEnabled()) {
-                _metricsNew->setDocumentsToCopyCounts(cloneDetails.approxDocumentsToCopy,
-                                                      cloneDetails.approxBytesToCopy);
-            }
+            _metricsNew->setDocumentsToCopyCounts(cloneDetails.approxDocumentsToCopy,
+                                                  cloneDetails.approxBytesToCopy);
         });
 }
 
@@ -687,7 +625,6 @@ ReshardingRecipientService::RecipientStateMachine::_makeDataReplication(Operatio
     }
 
     return _dataReplicationFactory(opCtx,
-                                   _metrics(),
                                    _metricsNew.get(),
                                    &_applierMetricsMap,
                                    _metadata,
@@ -806,8 +743,6 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                         _metadata.getSourceNss(),
                         _critSecReason,
                         ShardingCatalogClient::kLocalWriteConcern);
-
-                _metrics()->enterCriticalSection(getCurrentTime());
             }
 
             _transitionToStrictConsistency(factory);
@@ -911,11 +846,7 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     _updateRecipientDocument(
         std::move(newRecipientCtx), std::move(cloneDetails), std::move(configStartTime), factory);
 
-    _metrics()->setRecipientState(newState);
-
-    if (ShardingDataTransformMetrics::isEnabled()) {
-        _metricsNew->onStateTransition(toMetricsState(oldState), toMetricsState(newState));
-    }
+    _metricsNew->onStateTransition(toMetricsState(oldState), toMetricsState(newState));
 
     LOGV2_INFO(5279506,
                "Transitioned resharding recipient state",
@@ -940,13 +871,10 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToCreatingCol
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToCloning(
     const CancelableOperationContextFactory& factory) {
-    if (ShardingDataTransformMetrics::isEnabled()) {
-        _metricsNew->onCopyingBegin();
-    }
+    _metricsNew->onCopyingBegin();
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kCloning);
     _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
-    _metrics()->startCopyingDocuments(getCurrentTime());
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToApplying(
@@ -954,13 +882,9 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToApplying(
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kApplying);
     _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
-    auto currentTime = getCurrentTime();
-    _metrics()->endCopyingDocuments(currentTime);
-    _metrics()->startApplyingOplogEntries(currentTime);
-    if (ShardingDataTransformMetrics::isEnabled()) {
-        _metricsNew->onCopyingEnd();
-        _metricsNew->onApplyingBegin();
-    }
+
+    _metricsNew->onCopyingEnd();
+    _metricsNew->onApplyingBegin();
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToStrictConsistency(
@@ -968,11 +892,8 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToStrictConsi
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kStrictConsistency);
     _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
-    auto currentTime = getCurrentTime();
-    _metrics()->endApplyingOplogEntries(currentTime);
-    if (ShardingDataTransformMetrics::isEnabled()) {
-        _metricsNew->onApplyingEnd();
-    }
+
+    _metricsNew->onApplyingEnd();
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToError(
@@ -1131,10 +1052,8 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
                               *configStartTime);
         }
 
-        if (ShardingDataTransformMetrics::isEnabled()) {
-            buildStateDocumentMetricsForUpdate(
-                setBuilder, _metricsNew.get(), newRecipientCtx.getState());
-        }
+        buildStateDocumentMetricsForUpdate(
+            setBuilder, _metricsNew.get(), newRecipientCtx.getState());
 
         setBuilder.doneFast();
     }
@@ -1175,23 +1094,10 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
 
             WriteUnitOfWork wuow(opCtx.get());
 
-            opCtx->recoveryUnit()->onCommit(
-                [this, aborted](boost::optional<Timestamp> unusedCommitTime) {
-                    stdx::lock_guard<Latch> lk(_mutex);
-                    if (aborted) {
-                        _metrics()->onCompletion(ReshardingMetrics::Role::kRecipient,
-                                                 _userCanceled.get() == true
-                                                     ? ReshardingOperationStatusEnum::kCanceled
-                                                     : ReshardingOperationStatusEnum::kFailure,
-                                                 getCurrentTime());
-                    } else {
-                        _metrics()->onCompletion(ReshardingMetrics::Role::kRecipient,
-                                                 ReshardingOperationStatusEnum::kSuccess,
-                                                 getCurrentTime());
-                    }
-
-                    _completionPromise.emplaceValue();
-                });
+            opCtx->recoveryUnit()->onCommit([this](boost::optional<Timestamp> unusedCommitTime) {
+                stdx::lock_guard<Latch> lk(_mutex);
+                _completionPromise.emplaceValue();
+            });
 
             deleteObjects(opCtx.get(),
                           *coll,
@@ -1204,25 +1110,19 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
         });
 }
 
-ReshardingMetrics* ReshardingRecipientService::RecipientStateMachine::_metrics() const {
-    return ReshardingMetrics::get(cc().getServiceContext());
-}
-
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_startMetrics(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& abortToken) {
     if (_recipientCtx.getState() > RecipientStateEnum::kAwaitingFetchTimestamp) {
-        _metrics()->onStepUp(ReshardingMetrics::Role::kRecipient);
         return _restoreMetricsWithRetry(executor, abortToken);
     }
-    _metrics()->onStart(ReshardingMetrics::Role::kRecipient, getCurrentTime());
+
     return ExecutorFuture<void>(**executor);
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_restoreMetricsWithRetry(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& abortToken) {
-    _metrics()->setRecipientState(_recipientCtx.getState());
     return _retryingCancelableOpCtxFactory
         ->withAutomaticRetry(
             [this, executor, abortToken](const auto& factory) { _restoreMetrics(factory); })
@@ -1250,8 +1150,8 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
             documentBytesCopied = tempReshardingColl->dataSize(opCtx.get());
             documentCountCopied = tempReshardingColl->numRecords(opCtx.get());
         }
-        if (ShardingDataTransformMetrics::isEnabled() &&
-            _recipientCtx.getState() == RecipientStateEnum::kCloning) {
+
+        if (_recipientCtx.getState() == RecipientStateEnum::kCloning) {
             // Before cloning, these values are 0. After cloning these values are written to the
             // metrics section of the recipient state document and restored during metrics
             // initialization. This is so that applied oplog entries that add or remove documents do
@@ -1296,9 +1196,7 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
             }
         }
 
-        if (ShardingDataTransformMetrics::isEnabled()) {
-            progressDocList.emplace_back(donor.getShardId(), progressDoc);
-        }
+        progressDocList.emplace_back(donor.getShardId(), progressDoc);
     }
 
     // Restore stats here where interrupts will never occur, this is to ensure we will only update
@@ -1321,12 +1219,8 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
         _applierMetricsMap.emplace(shardId, std::move(applierMetrics));
     }
 
-    if (ShardingDataTransformMetrics::isEnabled()) {
-        _metricsNew->restoreOplogEntriesFetched(oplogEntriesFetched);
-    }
-
-    _metrics()->restoreForCurrentOp(
-        documentCountCopied, documentBytesCopied, oplogEntriesFetched, oplogEntriesApplied);
+    _metricsNew->restoreOplogEntriesFetched(oplogEntriesFetched);
+    _metricsNew->restoreOplogEntriesApplied(oplogEntriesApplied);
 }
 
 CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortSource(

@@ -61,13 +61,9 @@ BSONObj createOriginalCommand(const NamespaceString& nss, BSONObj shardKey) {
 }
 
 Date_t readStartTime(const CommonReshardingMetadata& metadata, ClockSource* fallbackSource) {
-    try {
-        const auto& startTime = metadata.getStartTime();
-        tassert(6503901,
-                "Metadata is missing start time despite feature flag being enabled",
-                startTime.has_value());
+    if (const auto& startTime = metadata.getStartTime()) {
         return startTime.get();
-    } catch (const DBException&) {
+    } else {
         return fallbackSource->now();
     }
 }
@@ -168,6 +164,136 @@ void ReshardingMetricsNew::restoreRecipientSpecificFields(
 void ReshardingMetricsNew::restoreCoordinatorSpecificFields(
     const ReshardingCoordinatorDocument& document) {
     restorePhaseDurationFields(document);
+}
+
+ReshardingMetricsNew::DonorState::DonorState(DonorStateEnum enumVal) : _enumVal(enumVal) {}
+
+ShardingDataTransformCumulativeMetrics::DonorStateEnum ReshardingMetricsNew::DonorState::toMetrics()
+    const {
+    using MetricsEnum = ShardingDataTransformCumulativeMetrics::DonorStateEnum;
+
+    switch (_enumVal) {
+        case DonorStateEnum::kUnused:
+            return MetricsEnum::kUnused;
+
+        case DonorStateEnum::kPreparingToDonate:
+            return MetricsEnum::kPreparingToDonate;
+
+        case DonorStateEnum::kDonatingInitialData:
+            return MetricsEnum::kDonatingInitialData;
+
+        case DonorStateEnum::kDonatingOplogEntries:
+            return MetricsEnum::kDonatingOplogEntries;
+
+        case DonorStateEnum::kPreparingToBlockWrites:
+            return MetricsEnum::kPreparingToBlockWrites;
+
+        case DonorStateEnum::kError:
+            return MetricsEnum::kError;
+
+        case DonorStateEnum::kBlockingWrites:
+            return MetricsEnum::kBlockingWrites;
+
+        case DonorStateEnum::kDone:
+            return MetricsEnum::kDone;
+        default:
+            invariant(false,
+                      str::stream() << "Unexpected resharding coordinator state: "
+                                    << DonorState_serializer(_enumVal));
+            MONGO_UNREACHABLE;
+    }
+}
+
+DonorStateEnum ReshardingMetricsNew::DonorState::getState() const {
+    return _enumVal;
+}
+
+ReshardingMetricsNew::RecipientState::RecipientState(RecipientStateEnum enumVal)
+    : _enumVal(enumVal) {}
+
+ShardingDataTransformCumulativeMetrics::RecipientStateEnum
+ReshardingMetricsNew::RecipientState::toMetrics() const {
+    using MetricsEnum = ShardingDataTransformCumulativeMetrics::RecipientStateEnum;
+
+    switch (_enumVal) {
+        case RecipientStateEnum::kUnused:
+            return MetricsEnum::kUnused;
+
+        case RecipientStateEnum::kAwaitingFetchTimestamp:
+            return MetricsEnum::kAwaitingFetchTimestamp;
+
+        case RecipientStateEnum::kCreatingCollection:
+            return MetricsEnum::kCreatingCollection;
+
+        case RecipientStateEnum::kCloning:
+            return MetricsEnum::kCloning;
+
+        case RecipientStateEnum::kApplying:
+            return MetricsEnum::kApplying;
+
+        case RecipientStateEnum::kError:
+            return MetricsEnum::kError;
+
+        case RecipientStateEnum::kStrictConsistency:
+            return MetricsEnum::kStrictConsistency;
+
+        case RecipientStateEnum::kDone:
+            return MetricsEnum::kDone;
+
+        default:
+            invariant(false,
+                      str::stream() << "Unexpected resharding coordinator state: "
+                                    << RecipientState_serializer(_enumVal));
+            MONGO_UNREACHABLE;
+    }
+}
+
+RecipientStateEnum ReshardingMetricsNew::RecipientState::getState() const {
+    return _enumVal;
+}
+
+ReshardingMetricsNew::CoordinatorState::CoordinatorState(CoordinatorStateEnum enumVal)
+    : _enumVal(enumVal) {}
+
+ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum
+ReshardingMetricsNew::CoordinatorState::toMetrics() const {
+    switch (_enumVal) {
+        case CoordinatorStateEnum::kUnused:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kUnused;
+
+        case CoordinatorStateEnum::kInitializing:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kInitializing;
+
+        case CoordinatorStateEnum::kPreparingToDonate:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kPreparingToDonate;
+
+        case CoordinatorStateEnum::kCloning:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kCloning;
+
+        case CoordinatorStateEnum::kApplying:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kApplying;
+
+        case CoordinatorStateEnum::kBlockingWrites:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kBlockingWrites;
+
+        case CoordinatorStateEnum::kAborting:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kAborting;
+
+        case CoordinatorStateEnum::kCommitting:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kCommitting;
+
+        case CoordinatorStateEnum::kDone:
+            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kDone;
+        default:
+            invariant(false,
+                      str::stream() << "Unexpected resharding coordinator state: "
+                                    << CoordinatorState_serializer(_enumVal));
+            MONGO_UNREACHABLE;
+    }
+}
+
+CoordinatorStateEnum ReshardingMetricsNew::CoordinatorState::getState() const {
+    return _enumVal;
 }
 
 }  // namespace mongo
