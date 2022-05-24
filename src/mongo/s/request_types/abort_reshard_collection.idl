@@ -38,7 +38,7 @@ commands:
   abortReshardCollection:
     description: "The public abortReshardCollection command on mongos."
     command_name: abortReshardCollection
-    strict: false
+    strict: true
     namespace: type
     api_version: ""
     type: namespacestring
