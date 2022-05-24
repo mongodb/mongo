@@ -87,10 +87,10 @@ getKillAllSessionsByPatternImpersonateData(const KillAllSessionsByPattern& patte
     }
 
     if (pattern.getRoles()) {
-        roles.reserve(pattern.getUsers()->size());
+        roles.reserve(pattern.getRoles()->size());
 
-        for (auto&& user : pattern.getUsers().get()) {
-            roles.emplace_back(user.getUser(), user.getDb());
+        for (auto&& role : pattern.getRoles().get()) {
+            roles.emplace_back(role.getRole(), role.getDb());
         }
     }
 
