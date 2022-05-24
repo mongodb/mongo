@@ -18,8 +18,18 @@ elapsed_secs=$((end_time - start_time))
 cd ../../
 mkdir -p src/jepsen-mongodb
 sudo docker cp jepsen-control:/jepsen/mongodb/store src/jepsen-mongodb/store
-cp jepsen/docker/jepsen_${task_name}_${execution}.log src/jepsen-mongodb
+cp jepsen/docker/jepsen_${task_name}_${execution}.log src/jepsen-mongodb/
 sudo docker cp jepsen-control:/jepsen/mongodb src/jepsen-workdir
 
-cd src/jepsen-mongodb
-. ../evergreen/jepsen_report.sh
+cd src
+activate_venv
+$python buildscripts/jepsen_report.py --start_time=$start_time --end_time=$end_time --elapsed=$elapsed_secs --emit_status_files --store ./jepsen-mongodb jepsen-mongodb/jepsen_${task_name}_${execution}.log
+exit_code=$?
+cat report.json
+
+if [ -f "jepsen_system_fail.txt" ]; then
+  mv jepsen_system_fail.txt jepsen-mongodb/jepsen_system_failure_${task_name}_${execution}
+  exit 0
+fi
+
+exit $exit_code

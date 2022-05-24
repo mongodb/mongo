@@ -16,6 +16,11 @@ mkdir -p $TMPDIR
 export _JAVA_OPTIONS=-Djava.io.tmpdir=$TMPDIR
 
 start_time=$(date +%s)
+# XXX Do not run this test in a loop or with Jepsen's repeat flag
+# the report generator (jepsen_report.sh) does not support parsing more than one
+# test at a time. If you need to run these tests with a repeat flag, you
+# will need to adopt buildscripts/jepsen_report.py to support the log output
+# of older-style Jepsen tests
 lein run test --test ${jepsen_test_name} \
   --mongodb-dir ../ \
   --working-dir ${workdir}/src/jepsen-workdir \

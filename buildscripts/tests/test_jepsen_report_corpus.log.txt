@@ -1,0 +1,67 @@
+INFO [2022-04-20 02:46:34,505] jepsen test runner - jepsen.core {:perf
+ {:latency-graph {:valid? true},
+  :rate-graph {:valid? true},
+  :valid? true},
+ :clock {:valid? true},
+ :stats
+ {:valid? true,
+  :count 5768,
+  :ok-count 4930,
+  :fail-count 0,
+  :info-count 838,
+  :by-f
+  {:txn
+   {:valid? true,
+    :count 5768,
+    :ok-count 4930,
+    :fail-count 0,
+    :info-count 838}}},
+ :exceptions {:valid? true},
+ :workload {:valid? true},
+ :valid? true}
+
+
+Everything looks good! ヽ(‘ー`)ノ
+
+
+
+# Successful tests
+
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220419T235350.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220419T235940.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T000533.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T001131.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T001724.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T002316.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T002909.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T003502.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T004057.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T004651.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T005244.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T005837.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T010429.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T011021.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T011617.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T012210.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T012802.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T013356.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T014154.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T014746.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T015338.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T015931.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T020525.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T021116.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T021708.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T022301.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T022854.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T023446.000Z
+store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20220420T024039.000Z
+
+# Crashed tests
+
+mongodb list-append w:majority r:majority tw:majority tr:snapshot partition
+
+29 successes
+0 unknown
+1 crashed
+0 failures
