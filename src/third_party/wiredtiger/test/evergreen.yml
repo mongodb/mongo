@@ -1115,6 +1115,17 @@ tasks:
         vars:
           test_path: test/cppsuite/search_near_03
 
+  - name: cppsuite-bounded-cursor-perf-default
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "cppsuite test"
+        vars:
+          test_config_filename: configs/bounded_cursor_perf_default.txt
+          test_name: bounded_cursor_perf
+
   - name: cppsuite-operations-test-stress
     depends_on:
       - name: compile
@@ -1179,6 +1190,19 @@ tasks:
       - func: "upload test stats"
         vars:
           test_path: test/cppsuite/search_near_03
+
+  - name: cppsuite-bounded-cursor-perf-stress
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "cppsuite test"
+        vars:
+          test_config_filename: configs/bounded_cursor_perf_stress.txt
+          test_name: bounded_cursor_perf
+      - func: "upload test stats"
+        vars:
+          test_path: test/cppsuite/bounded_cursor_perf
 
   # End of cppsuite test tasks.
   # Start of csuite test tasks
@@ -4179,6 +4203,7 @@ buildvariants:
     - name: cppsuite-search-near-01-stress
     - name: cppsuite-search-near-02-stress
     - name: cppsuite-search-near-03-stress
+    - name: cppsuite-bounded-cursor-perf-stress
 
 - name: package
   display_name: "~ Package"

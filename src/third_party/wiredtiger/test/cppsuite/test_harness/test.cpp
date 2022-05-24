@@ -38,6 +38,7 @@
 #include "thread_manager.h"
 #include "timestamp_manager.h"
 #include "util/api_const.h"
+#include "util/perf_plotter.h"
 
 namespace test_harness {
 test::test(const test_args &args) : _args(args)
@@ -173,6 +174,10 @@ test::run()
           _workload_tracking->get_schema_table_name(),
           _workload_generator->get_database().get_collection_ids());
     }
+
+    /* Log perf stats. */
+    perf_plotter::instance().output_perf_file(_args.test_name);
+
     logger::log_msg(LOG_INFO, "SUCCESS");
 }
 } // namespace test_harness
