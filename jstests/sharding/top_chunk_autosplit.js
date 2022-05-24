@@ -3,8 +3,11 @@
  * of 5MB across all sharding tests in wiredTiger.
  * @tags: [resource_intensive]
  */
+(function() {
+'use strict';
 load('jstests/sharding/autosplit_include.js');
 load("jstests/sharding/libs/find_chunks_util.js");
+load("jstests/libs/feature_flag_util.js");  // for FeatureFlagUtil.isEnabled
 
 function shardSetup(shardConfig, dbName, collName) {
     var st = new ShardingTest(shardConfig);
@@ -64,14 +67,14 @@ function runTest(test) {
         // Add tags to each shard
         var tags = test.shards[i].tags || [];
         for (j = 0; j < tags.length; j++) {
-            sh.addShardTag(test.shards[i].name, tags[j]);
+            st.addShardTag(test.shards[i].name, tags[j]);
         }
     }
 
     // Add tag ranges associated to a tag
     var tagRanges = test.tagRanges || [];
     for (var j = 0; j < tagRanges.length; j++) {
-        sh.addTagRange(db + "." + collName,
+        st.addTagRange(db + "." + collName,
                        {x: tagRanges[j].range.min},
                        {x: tagRanges[j].range.max},
                        tagRanges[j].tag);
@@ -105,7 +108,7 @@ function runTest(test) {
     for (var i = 0; i < test.shards.length; i++) {
         var tags = test.shards[i].tags || [];
         for (j = 0; j < tags.length; j++) {
-            sh.removeShardTag(test.shards[i].name, tags[j]);
+            st.removeShardTag(test.shards[i].name, tags[j]);
         }
     }
 
@@ -137,6 +140,16 @@ var collName = "coll";
 
 var st = shardSetup(
     {name: "topchunk", shards: 4, chunkSize: 1, other: {enableAutoSplit: true}}, dbName, collName);
+
+// TODO SERVER-66652 remove this test after 7.0 branches out
+const noMoreAutoSplitterFeatureFlag =
+    FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'), "NoMoreAutoSplitter");
+if (noMoreAutoSplitterFeatureFlag) {
+    jsTestLog("Skipping as featureFlagNoMoreAutosplitter is enabled");
+    st.stop();
+    return;
+}
+
 var db = st.getDB(dbName);
 var coll = db[collName];
 var configDB = st.s.getDB('config');
@@ -380,3 +393,4 @@ if (unsupported.indexOf(st.rs0.getPrimary().adminCommand({serverStatus: 1}).stor
 }
 
 st.stop();
+})();

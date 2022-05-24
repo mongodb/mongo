@@ -5,8 +5,18 @@
 'use strict';
 load('jstests/sharding/autosplit_include.js');
 load("jstests/sharding/libs/find_chunks_util.js");
+load("jstests/libs/feature_flag_util.js");  // for FeatureFlagUtil.isEnabled
 
 var st = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1, enableAutoSplit: true}});
+
+// TODO SERVER-66652 remove this test after 7.0 branches out
+const noMoreAutoSplitterFeatureFlag =
+    FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'), "NoMoreAutoSplitter");
+if (noMoreAutoSplitterFeatureFlag) {
+    jsTestLog("Skipping as featureFlagNoMoreAutosplitter is enabled");
+    st.stop();
+    return;
+}
 
 /* Return total number of chunks for a specific collection */
 function getNumChunksForColl(coll) {
