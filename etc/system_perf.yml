@@ -104,7 +104,7 @@ modules:
     repo: git@github.com:gregorynoma/tsbs.git
     prefix: ${workdir}/src
     branch: master
-    ref: 225e713010463582712dca30ffcfc70c7d661663
+    ref: 027f4b2d83267ae69d2740855654b4a7cac72498
   - name: mongo-perf
     repo: git@github.com:mongodb/mongo-perf.git
     prefix: ${workdir}/src
@@ -585,6 +585,20 @@ tasks:
       - func: f_run_dsi_workload
         vars:
           test_control: "tsbs_query"
+
+  - name: tsbs_query_sharded
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query_sharded"
+
+  - name: tsbs_query_sharded_balancer
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query_sharded_balancer"
 
   - name: tsbs_query_manual_bucketing
     priority: 5
@@ -1439,6 +1453,8 @@ buildvariants:
       - name: change_streams_latency
       - name: change_streams_listen_throughput
       - name: change_streams_multi_mongos
+      - name: tsbs_query_sharded
+      - name: tsbs_query_sharded_balancer
 
   - name: linux-shard-lite-audit
     display_name: Linux Shard Lite Cluster Audit
@@ -1496,6 +1512,8 @@ buildvariants:
       - name: move_chunk_waiting_workloads
       - name: retryable_writes_workloads
       - name: smoke_test
+      - name: tsbs_query_sharded
+      - name: tsbs_query_sharded_balancer
 
   - name: linux-shard-lite-cwrwc
     display_name: Linux Shard Lite Cluster CWRWC
