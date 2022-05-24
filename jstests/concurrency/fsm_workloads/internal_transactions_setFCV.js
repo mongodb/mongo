@@ -21,9 +21,6 @@ load('jstests/libs/override_methods/retry_on_killed_session.js');
 var $config = extendWorkload($config, function($config, $super) {
     $config.data.retryOnKilledSession = true;
 
-    // TODO (SERVER-66213): Use the default transactionLifetimeLimitSeconds.
-    $config.data.originalTransactionLifetimeLimitSeconds = {};
-
     $config.data.expectDirtyDocs = {
         // The client is either not using a session or is using a session without retryable writes
         // enabled. Therefore, when a write is interrupted, they cannot retry the write to verify if
@@ -76,38 +73,23 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.setup = function(db, collName, cluster) {
-        $super.setup.apply(this, arguments);
-
         if (cluster.isSharded()) {
             // Set the transactionLifetimeLimitSeconds to 60 seconds so that cross-shard
             // transactions that start between when setFCV aborts unprepared transactions and when
             // setFCV starts waiting for the global lock do not get stuck trying to enter the
             // "prepared" state (since persisting the participant list requires the IX lock on the
             // config.transaction_coordinators collection).
-            cluster.executeOnMongodNodes((db) => {
-                const res = assert.commandWorked(
-                    db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 60}));
-                this.originalTransactionLifetimeLimitSeconds[db.getMongo().host] = res.was;
-            });
+            // TODO (SERVER-66213): Use the default transactionLifetimeLimitSeconds.
+            this.lowerTransactionLifetimeLimitSeconds = true;
         }
+        $super.setup.apply(this, arguments);
     };
 
     const fcvValues = [lastLTSFCV, lastContinuousFCV, latestFCV];
 
     $config.teardown = function(db, collName, cluster) {
         $super.teardown.apply(this, arguments);
-
         assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-
-        if (cluster.isSharded()) {
-            cluster.executeOnMongodNodes((db) => {
-                const res = assert.commandWorked(db.adminCommand({
-                    setParameter: 1,
-                    transactionLifetimeLimitSeconds:
-                        this.originalTransactionLifetimeLimitSeconds[db.getMongo().host]
-                }));
-            });
-        }
     };
 
     $config.states.setFCV = function(db, collName) {

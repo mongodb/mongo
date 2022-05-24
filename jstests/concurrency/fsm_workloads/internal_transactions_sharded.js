@@ -106,6 +106,9 @@ var $config = extendWorkload($config, function($config, $super) {
         }
 
         this.overrideStoreFindAndModifyImagesInSideCollection(cluster);
+        if (this.lowerTransactionLifetimeLimitSeconds) {
+            this.overrideTransactionLifetimeLimit(cluster);
+        }
     };
 
     return $config;
