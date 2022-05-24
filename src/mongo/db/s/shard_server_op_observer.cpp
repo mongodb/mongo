@@ -196,7 +196,9 @@ void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
             return balancerConfig->getMaxChunkSizeBytes();
         }();
 
-        if (balancerConfig->getShouldAutoSplit() && chunkManager.allowAutoSplit() &&
+        if (!feature_flags::gNoMoreAutoSplitter.isEnabled(
+                serverGlobalParams.featureCompatibility) &&
+            balancerConfig->getShouldAutoSplit() && chunkManager.allowAutoSplit() &&
             chunkWritesTracker->shouldSplit(maxChunkSizeBytes)) {
             auto chunkSplitStateDriver =
                 ChunkSplitStateDriver::tryInitiateSplit(chunkWritesTracker);

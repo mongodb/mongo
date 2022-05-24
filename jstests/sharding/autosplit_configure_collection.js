@@ -11,6 +11,7 @@
 'use strict';
 load('jstests/sharding/autosplit_include.js');
 load("jstests/sharding/libs/find_chunks_util.js");
+load("jstests/libs/feature_flag_util.js");  // for FeatureFlagUtil.isEnabled
 
 let st = new ShardingTest({
     name: "auto1",
@@ -18,6 +19,15 @@ let st = new ShardingTest({
     mongos: 1,
     other: {enableAutoSplit: true},
 });
+
+// TODO SERVER-66652 remove this test after 7.0 branches out
+const noMoreAutoSplitterFeatureFlag =
+    FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'), "NoMoreAutoSplitter");
+if (noMoreAutoSplitterFeatureFlag) {
+    jsTestLog("Skipping as featureFlagNoMoreAutosplitter is enabled");
+    st.stop();
+    return;
+}
 
 const fullNS = "test.foo";
 const bigString = "X".repeat(1024 * 1024 / 16);  // 65 KB
