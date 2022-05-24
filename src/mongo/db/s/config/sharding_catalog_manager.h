@@ -664,6 +664,16 @@ private:
      */
     void _standardizeClusterParameters(OperationContext* opCtx, RemoteCommandTargeter* targeter);
 
+
+    /**
+     * Execute the migration chunk updates using the internal transaction API.
+     */
+    void _commitChunkMigrationInTransaction(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        std::shared_ptr<const ChunkType> migratedChunk,
+        std::shared_ptr<const std::vector<ChunkType>> splitChunks,
+        std::shared_ptr<ChunkType> controlChunk);
     /**
      * Use the internal transaction API to remove a shard.
      */
