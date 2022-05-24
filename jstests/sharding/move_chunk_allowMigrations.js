@@ -17,15 +17,8 @@ load('jstests/libs/parallel_shell_helpers.js');
 load("jstests/sharding/libs/find_chunks_util.js");
 load("jstests/sharding/libs/shard_versioning_util.js");
 
-const st = new ShardingTest({shards: 2});
+const st = new ShardingTest({shards: 2, other: {chunkSize: 1, enableAutoSplit: false}});
 const configDB = st.s.getDB("config");
-// TODO SERVER-66378 adapt this test for data size aware balancing
-if (FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'),
-                              "BalanceAccordingToDataSize")) {
-    jsTestLog("Skipping as featureFlagBalanceAccordingToDataSize is enabled");
-    st.stop();
-    return;
-}
 
 // Resets database dbName and enables sharding and establishes shard0 as primary, test case agnostic
 function setUpDatabaseAndEnableSharding(dbName) {
@@ -153,12 +146,14 @@ function testAllowMigrationsFalseDisablesBalancer(allowMigrations, collBSetNoBal
     assert.commandWorked(st.s.adminCommand({shardCollection: collA.getFullName(), key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({shardCollection: collB.getFullName(), key: {_id: 1}}));
 
+    const bigString = 'X'.repeat(1024 * 1024);  // 1MB
+
     // Split both collections into 4 chunks so balancing can occur.
     for (let coll of [collA, collB]) {
-        coll.insert({_id: 1});
-        coll.insert({_id: 10});
-        coll.insert({_id: 20});
-        coll.insert({_id: 30});
+        coll.insert({_id: 1, s: bigString});
+        coll.insert({_id: 10, s: bigString});
+        coll.insert({_id: 20, s: bigString});
+        coll.insert({_id: 30, s: bigString});
 
         assert.commandWorked(st.splitAt(coll.getFullName(), {_id: 10}));
         assert.commandWorked(st.splitAt(coll.getFullName(), {_id: 20}));

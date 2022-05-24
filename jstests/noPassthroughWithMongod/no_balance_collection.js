@@ -7,15 +7,7 @@
 load("jstests/sharding/libs/find_chunks_util.js");
 load("jstests/libs/feature_flag_util.js");
 
-var st = new ShardingTest({shards: 2, mongos: 1});
-
-// TODO SERVER-66378 adapt this test for data size aware balancing
-if (FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'),
-                              "BalanceAccordingToDataSize")) {
-    jsTestLog("Skipping as featureFlagBalanceAccordingToDataSize is enabled");
-    st.stop();
-    return;
-}
+const st = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1, enableAutoSplit: false}});
 
 // First, test that shell helpers require an argument
 assert.throws(sh.disableBalancing, [], "sh.disableBalancing requires a collection");
@@ -24,23 +16,31 @@ assert.throws(sh.enableBalancing, [], "sh.enableBalancing requires a collection"
 var shardAName = st.shard0.shardName;
 var shardBName = st.shard1.shardName;
 
-var collA = st.s.getCollection(jsTest.name() + ".collA");
-var collB = st.s.getCollection(jsTest.name() + ".collB");
+const dbName = jsTest.name();
+const collAName = 'collA';
+const collBName = 'collB';
+const collA = st.s.getCollection(dbName + '.' + collAName);
+const collB = st.s.getCollection(dbName + '.' + collBName);
 
 // Shard two collections
 st.shardColl(collA, {_id: 1}, false);
 st.shardColl(collB, {_id: 1}, false);
 
-// Split into a lot of chunks so balancing can occur
-var totalNumChunks = 10;
-var numChunksPerShard = totalNumChunks / 2;
-for (var i = 0; i < totalNumChunks - 1; i++) {  // 10 chunks total
-    collA.getMongo().getDB("admin").runCommand({split: collA + "", middle: {_id: i}});
-    collA.getMongo().getDB("admin").runCommand({split: collB + "", middle: {_id: i}});
-}
-
 // Disable balancing on one collection
 sh.disableBalancing(collB);
+
+// Insert 10MB data so balancing can occur
+const bigString = 'X'.repeat(1024 * 1024);  // 1MB
+const bulkA = collA.initializeUnorderedBulkOp();
+var bulkB = collB.initializeUnorderedBulkOp();
+for (var i = 0; i < 10; i++) {
+    bulkA.insert({_id: i, s: bigString});
+    assert.commandWorked(st.s.adminCommand({split: collA.getFullName(), middle: {_id: i}}));
+    bulkB.insert({_id: i, s: bigString});
+    assert.commandWorked(st.s.adminCommand({split: collB.getFullName(), middle: {_id: i}}));
+}
+assert.commandWorked(bulkA.execute());
+assert.commandWorked(bulkB.execute());
 
 jsTest.log("Balancing disabled on " + collB);
 printjson(collA.getDB().getSiblingDB("config").collections.find().toArray());
@@ -48,18 +48,7 @@ printjson(collA.getDB().getSiblingDB("config").collections.find().toArray());
 st.startBalancer();
 
 // Make sure collA gets balanced
-assert.soon(function() {
-    var shardAChunks =
-        findChunksUtil
-            .findChunksByNs(st.s.getDB("config"), collA.getFullName(), {shard: shardAName})
-            .itcount();
-    var shardBChunks =
-        findChunksUtil
-            .findChunksByNs(st.s.getDB("config"), collA.getFullName(), {shard: shardBName})
-            .itcount();
-    printjson({shardA: shardAChunks, shardB: shardBChunks});
-    return (shardAChunks == numChunksPerShard) && (shardAChunks == shardBChunks);
-}, "" + collA + " chunks not balanced!", 5 * 60 * 1000);
+st.awaitBalance(collAName, dbName, 60 * 1000);
 
 jsTest.log("Chunks for " + collA + " are balanced.");
 
@@ -77,18 +66,7 @@ assert(shardAChunks == 0 || shardBChunks == 0);
 sh.enableBalancing(collB);
 
 // Make sure that collB is now balanced
-assert.soon(function() {
-    var shardAChunks =
-        findChunksUtil
-            .findChunksByNs(st.s.getDB("config"), collB.getFullName(), {shard: shardAName})
-            .itcount();
-    var shardBChunks =
-        findChunksUtil
-            .findChunksByNs(st.s.getDB("config"), collB.getFullName(), {shard: shardBName})
-            .itcount();
-    printjson({shardA: shardAChunks, shardB: shardBChunks});
-    return (shardAChunks == numChunksPerShard) && (shardAChunks == shardBChunks);
-}, "" + collB + " chunks not balanced!", 5 * 60 * 1000);
+st.awaitBalance(collBName, dbName, 60 * 1000);
 
 jsTest.log("Chunks for " + collB + " are balanced.");
 
@@ -100,16 +78,14 @@ sh.disableBalancing(collB);
 db = st.s0.getDB("config");
 st.waitForBalancer(true, 60000);
 
-// Make sure auto-migrates on insert don't move chunks
+// Make sure auto-migrates on insert don't move data
 var lastMigration = sh._lastMigration(collB);
 
-var bulk = collB.initializeUnorderedBulkOp();
-// Reduce the amount of data on live-record buildvariant
-var n = (TestData.undoRecorderPath ? 100000 : 1000000);
-for (var i = 0; i < n; i++) {
-    bulk.insert({_id: i, hello: "world"});
+bulkB = collB.initializeUnorderedBulkOp();
+for (var i = 10; i < 20; i++) {
+    bulkB.insert({_id: i, s: bigString});
 }
-assert.commandWorked(bulk.execute());
+assert.commandWorked(bulkB.execute());
 
 printjson(lastMigration);
 printjson(sh._lastMigration(collB));
