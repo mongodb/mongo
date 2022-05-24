@@ -571,8 +571,8 @@ buildvariants:
     # strip from the top of the default path before appending to the GCOV_PREFIX (if any).
     gcov_environment: GCOV_PREFIX=$(pwd) GCOV_PREFIX_STRIP=4
     # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
-    exec_timeout_secs: 16200 # 4.5 hour timeout
-    timeout_secs: 9000 # 2.5 hour idle timeout
+    exec_timeout_secs: 32400 # 9 hour timeout
+    timeout_secs: 21600 # 7 hour idle timeout
     use_scons_cache: false
     # llvm-cov is too old in the v3 toolchain to handle the same options that
     # gcov does. However, this version of clang still produces .gcda files that
@@ -634,8 +634,8 @@ buildvariants:
     # strip from the top of the default path before appending to the GCOV_PREFIX (if any).
     gcov_environment: GCOV_PREFIX=$(pwd) GCOV_PREFIX_STRIP=4
     # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
-    exec_timeout_secs: 16200 # 4.5 hour timeout
-    timeout_secs: 9000 # 2.5 hour idle timeout
+    exec_timeout_secs: 32400 # 9 hour timeout
+    timeout_secs: 21600 # 7 hour idle timeout
     use_scons_cache: false
     gcov_tool: /opt/mongodbtoolchain/v4/bin/llvm-cov gcov
     num_scons_link_jobs_available: 0.99
