@@ -26,7 +26,6 @@ executor:
         TestData:
           skipValidationOnInvalidViewDefinitions: true
           skipValidationOnNamespaceNotFound: false
-          forceValidationWithFeatureCompatibilityVersion: latestFCV
   fixture:
     class: ReplicaSetFixture
     mongod_options:
