@@ -34,7 +34,6 @@ else
 		exit 1;
 	fi
 
-	# For files in the src directory, camel case style is not allowed.
 	# Ignore styling errors of external libraries.
 	if expr "$f" : 'src/' > /dev/null &&
 	  ! expr "$f" : 'src/os_win/' > /dev/null &&
@@ -43,9 +42,20 @@ else
 	  ! expr "$f" : 'src/.*/hash_city.*' > /dev/null &&
 	  ! expr "$f" : 'src/.*/huffman.*' > /dev/null &&
 	  ! expr "$f" : 'src/checksum.*' > /dev/null; then
+
+		# Camel case style is not allowed.
 		if egrep -r -n '\b[a-z]+[A-Z]' $f | egrep -v ':[     ]+\*|"|UNCHECKED_STRING'; then
 			echo "$f: Styling requires variables that use underscores to separate parts of a name instead of camel casing.";
 		fi
+		
+		# Return values should be wrapped in parentheses.
+		egrep -r -n '^[^*/"]*[[:space:]]*return [^(]' $f > $t;
+		test -s $t && {
+			echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+			echo 'Add parentheses to return values indicated below in file '"$f"
+			echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+			cat $t
+		}
 	fi
 
 	# Remove non-ascii characters and substitute some expressions with accepted version.

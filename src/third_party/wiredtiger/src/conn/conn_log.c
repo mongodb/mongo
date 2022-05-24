@@ -93,18 +93,18 @@ static uint16_t
 __logmgr_get_log_version(WT_VERSION version)
 {
     if (!__wt_version_defined(version))
-        return WT_NO_VALUE;
+        return (WT_NO_VALUE);
 
     if (__wt_version_lt(version, WT_LOG_V2_VERSION))
-        return 1;
+        return (1);
     else if (__wt_version_lt(version, WT_LOG_V3_VERSION))
-        return 2;
+        return (2);
     else if (__wt_version_lt(version, WT_LOG_V4_VERSION))
-        return 3;
+        return (3);
     else if (__wt_version_lt(version, WT_LOG_V5_VERSION))
-        return 4;
+        return (4);
     else
-        return WT_LOG_VERSION;
+        return (WT_LOG_VERSION);
 }
 
 /*

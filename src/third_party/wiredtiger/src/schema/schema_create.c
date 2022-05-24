@@ -375,7 +375,7 @@ __create_import_cmp_uri(const void *a, const void *b)
     ae = (WT_IMPORT_ENTRY *)a;
     be = (WT_IMPORT_ENTRY *)b;
 
-    return strcmp(ae->uri, be->uri);
+    return (strcmp(ae->uri, be->uri));
 }
 
 /*
@@ -394,11 +394,11 @@ __create_import_cmp_id(const void *a, const void *b)
 
     res = ae->file_id - be->file_id;
     if (res < 0)
-        return -1;
+        return (-1);
     else if (res > 0)
-        return 1;
+        return (1);
     else
-        return 0;
+        return (0);
 }
 
 /*

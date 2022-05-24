@@ -199,5 +199,6 @@ int
 wiredtiger_calc_modify(WT_SESSION *wt_session, const WT_ITEM *oldv, const WT_ITEM *newv,
   size_t maxdiff, WT_MODIFY *entries, int *nentriesp)
 {
-    return __wt_calc_modify((WT_SESSION_IMPL *)wt_session, oldv, newv, maxdiff, entries, nentriesp);
+    return (
+      __wt_calc_modify((WT_SESSION_IMPL *)wt_session, oldv, newv, maxdiff, entries, nentriesp));
 }

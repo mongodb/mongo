@@ -147,7 +147,7 @@ __alter_get_object_id_range(WT_SESSION_IMPL *session, WT_TIERED *tiered, const c
 err:
     __wt_free(session, value);
 
-    return ret;
+    return (ret);
 }
 
 /*
