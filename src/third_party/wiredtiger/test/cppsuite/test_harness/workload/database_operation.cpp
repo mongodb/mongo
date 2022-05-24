@@ -83,7 +83,7 @@ database_operation::populate(
     key_count = config->get_int(KEY_COUNT_PER_COLLECTION);
     value_size = config->get_int(VALUE_SIZE);
     thread_count = config->get_int(THREAD_COUNT);
-    testutil_assert(collection_count % thread_count == 0);
+    testutil_assert(thread_count == 0 || collection_count % thread_count == 0);
     testutil_assert(value_size > 0);
     key_size = config->get_int(KEY_SIZE);
     testutil_assert(key_size > 0);

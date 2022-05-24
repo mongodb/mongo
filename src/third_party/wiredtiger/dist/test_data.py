@@ -240,6 +240,7 @@ methods = {
     'burst_inserts' : Method(test_config + [
                         Config("burst_duration", 90, r'''
                             How long the insertions will occur for.''')]),
+    'cursor_bound_01' : Method(test_config),
     'hs_cleanup' : Method(test_config),
     'operations_test' : Method(test_config),
     'search_near_01' : Method(test_config + [
