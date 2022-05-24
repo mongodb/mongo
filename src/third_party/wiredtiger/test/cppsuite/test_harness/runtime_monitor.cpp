@@ -35,6 +35,7 @@
 #include "runtime_monitor.h"
 #include "util/api_const.h"
 #include "util/logger.h"
+#include "util/perf_plotter.h"
 
 namespace test_harness {
 
@@ -313,8 +314,8 @@ runtime_monitor::finish()
 {
     component::finish();
 
-    /* Save stats. */
-    save_stats(_test_name);
+    /* Append stats to perf plotter. */
+    append_stats();
 
     /* Check the post run statistics now. */
     bool success = true;
@@ -352,27 +353,18 @@ runtime_monitor::finish()
 }
 
 /*
- * This function generates a file that contains the values of the different statistics that need to
- * be saved as indicated by the configuration file.
+ * This function appends the values of the different statistics that need to be saved as indicated
+ * by the configuration file to the perf plotter.
  */
 void
-runtime_monitor::save_stats(const std::string &filename)
+runtime_monitor::append_stats()
 {
-    std::string stat_info = "[{\"info\":{\"test_name\": \"" + filename + "\"},\"metrics\": [";
-
     for (const auto &stat : _stats) {
-        if (stat->get_save())
-            stat_info += "{\"name\":\"" + stat->get_name() +
-              "\",\"value\":" + stat->get_value_str(_cursor) + "},";
+        if (stat->get_save()) {
+            auto stat_str = "{\"name\":\"" + stat->get_name() +
+              "\",\"value\":" + stat->get_value_str(_cursor) + "}";
+            perf_plotter::instance().add_stat(stat_str);
+        }
     }
-
-    /* Remove last extra comma. */
-    if (stat_info.back() == ',')
-        stat_info.pop_back();
-
-    std::ofstream file(filename + ".json");
-    file << stat_info << "]}]";
-    file.close();
 }
-
 } // namespace test_harness

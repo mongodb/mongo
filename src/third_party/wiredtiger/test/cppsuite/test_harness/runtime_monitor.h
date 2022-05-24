@@ -127,7 +127,7 @@ class runtime_monitor : public component {
     void finish() override final;
 
     private:
-    void save_stats(const std::string &filename);
+    void append_stats();
 
     private:
     scoped_session _session;

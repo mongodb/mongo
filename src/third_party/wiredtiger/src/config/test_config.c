@@ -100,6 +100,20 @@ static const WT_CONFIG_CHECK confchk_workload_tracking_subconfigs[] = {
   {"tracking_key_format", "string", NULL, NULL, NULL, 0},
   {"tracking_value_format", "string", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
+static const WT_CONFIG_CHECK confchk_bounded_cursor_perf[] = {
+  {"cache_size_mb", "int", NULL, "min=0,max=100000000000", NULL, 0},
+  {"checkpoint_manager", "category", NULL, NULL, confchk_checkpoint_manager_subconfigs, 2},
+  {"compression_enabled", "boolean", NULL, NULL, NULL, 0},
+  {"duration_seconds", "int", NULL, "min=0,max=1000000", NULL, 0},
+  {"enable_logging", "boolean", NULL, NULL, NULL, 0},
+  {"reverse_collator", "boolean", NULL, NULL, NULL, 0},
+  {"runtime_monitor", "category", NULL, NULL, confchk_runtime_monitor_subconfigs, 6},
+  {"statistics_config", "category", NULL, NULL, confchk_statistics_config_subconfigs, 2},
+  {"timestamp_manager", "category", NULL, NULL, confchk_timestamp_manager_subconfigs, 4},
+  {"workload_generator", "category", NULL, NULL, confchk_workload_generator_subconfigs, 8},
+  {"workload_tracking", "category", NULL, NULL, confchk_workload_tracking_subconfigs, 4},
+  {NULL, NULL, NULL, NULL, NULL, 0}};
+
 static const WT_CONFIG_CHECK confchk_burst_inserts[] = {
   {"burst_duration", "string", NULL, NULL, NULL, 0},
   {"cache_size_mb", "int", NULL, "min=0,max=100000000000", NULL, 0},
@@ -215,6 +229,32 @@ static const WT_CONFIG_CHECK confchk_test_template[] = {
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_ENTRY config_entries[] = {
+  {"bounded_cursor_perf",
+    "cache_size_mb=0,checkpoint_manager=(enabled=false,op_rate=1s),"
+    "compression_enabled=false,duration_seconds=0,"
+    "enable_logging=false,reverse_collator=false,"
+    "runtime_monitor=(cache_hs_insert=(max=1,min=0,postrun=false,"
+    "runtime=false,save=false),cc_pages_removed=(max=1,min=0,"
+    "postrun=false,runtime=false,save=false),enabled=true,op_rate=1s,"
+    "stat_cache_size=(max=1,min=0,postrun=false,runtime=false,"
+    "save=false),stat_db_size=(max=1,min=0,postrun=false,"
+    "runtime=false,save=false)),"
+    "statistics_config=(enable_logging=true,type=all),"
+    "timestamp_manager=(enabled=true,oldest_lag=1,op_rate=1s,"
+    "stable_lag=1),workload_generator=(custom_config=(key_size=5,"
+    "op_rate=1s,ops_per_transaction=(max=1,min=0),thread_count=0,"
+    "value_size=5),enabled=true,insert_config=(key_size=5,op_rate=1s,"
+    "ops_per_transaction=(max=1,min=0),thread_count=0,value_size=5),"
+    "op_rate=1s,populate_config=(collection_count=1,"
+    "key_count_per_collection=0,key_size=5,thread_count=1,"
+    "value_size=5),read_config=(key_size=5,op_rate=1s,"
+    "ops_per_transaction=(max=1,min=0),thread_count=0,value_size=5),"
+    "remove_config=(op_rate=1s,ops_per_transaction=(max=1,min=0),"
+    "thread_count=0),update_config=(key_size=5,op_rate=1s,"
+    "ops_per_transaction=(max=1,min=0),thread_count=0,value_size=5)),"
+    "workload_tracking=(enabled=true,op_rate=1s,"
+    "tracking_key_format=QSQ,tracking_value_format=iS)",
+    confchk_bounded_cursor_perf, 11},
   {"burst_inserts",
     "burst_duration=90,cache_size_mb=0,"
     "checkpoint_manager=(enabled=false,op_rate=1s),"
