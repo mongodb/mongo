@@ -60,6 +60,18 @@
 
 namespace mongo {
 
+namespace {
+/**
+ * Rather than call std::abort directly, assertion and invariant failures that wish to abort the
+ * process should call this function, which ensures that std::abort is invoked at most once per
+ * process even if multiple threads attempt to abort the process concurrently.
+ */
+MONGO_COMPILER_NORETURN void callAbort() {
+    [[maybe_unused]] static auto initOnce = (std::abort(), 0);
+    MONGO_COMPILER_UNREACHABLE;
+}
+}  // namespace
+
 AssertionCount assertionCount;
 
 AssertionCount::AssertionCount() : regular(0), warning(0), msg(0), user(0), rollovers(0) {}
@@ -104,7 +116,7 @@ MONGO_COMPILER_NOINLINE void verifyFailed(const char* expr, const char* file, un
     // this is so we notice in buildbot
     LOGV2_FATAL_CONTINUE(
         23078, "\n\n***aborting after verify() failure as this is a debug/test build\n\n");
-    std::abort();
+    callAbort();
 #endif
     error_details::throwExceptionForStatus(Status(ErrorCodes::UnknownError, temp.str()));
 }
@@ -120,7 +132,7 @@ MONGO_COMPILER_NOINLINE void invariantFailed(const char* expr,
                          "line"_attr = line);
     breakpoint();
     LOGV2_FATAL_CONTINUE(23080, "\n\n***aborting after invariant() failure\n\n");
-    std::abort();
+    callAbort();
 }
 
 MONGO_COMPILER_NOINLINE void invariantFailedWithMsg(const char* expr,
@@ -136,7 +148,7 @@ MONGO_COMPILER_NOINLINE void invariantFailedWithMsg(const char* expr,
                          "line"_attr = line);
     breakpoint();
     LOGV2_FATAL_CONTINUE(23082, "\n\n***aborting after invariant() failure\n\n");
-    std::abort();
+    callAbort();
 }
 
 MONGO_COMPILER_NOINLINE void invariantOKFailed(const char* expr,
@@ -152,7 +164,7 @@ MONGO_COMPILER_NOINLINE void invariantOKFailed(const char* expr,
                          "line"_attr = line);
     breakpoint();
     LOGV2_FATAL_CONTINUE(23084, "\n\n***aborting after invariant() failure\n\n");
-    std::abort();
+    callAbort();
 }
 
 MONGO_COMPILER_NOINLINE void invariantOKFailedWithMsg(const char* expr,
@@ -171,7 +183,7 @@ MONGO_COMPILER_NOINLINE void invariantOKFailedWithMsg(const char* expr,
         "line"_attr = line);
     breakpoint();
     LOGV2_FATAL_CONTINUE(23086, "\n\n***aborting after invariant() failure\n\n");
-    std::abort();
+    callAbort();
 }
 
 MONGO_COMPILER_NOINLINE void invariantStatusOKFailed(const Status& status,
@@ -185,7 +197,7 @@ MONGO_COMPILER_NOINLINE void invariantStatusOKFailed(const Status& status,
                          "line"_attr = line);
     breakpoint();
     LOGV2_FATAL_CONTINUE(23088, "\n\n***aborting after invariant() failure\n\n");
-    std::abort();
+    callAbort();
 }
 
 MONGO_COMPILER_NOINLINE void fassertFailedWithLocation(int msgid,
@@ -199,7 +211,7 @@ MONGO_COMPILER_NOINLINE void fassertFailedWithLocation(int msgid,
                          "line"_attr = line);
     breakpoint();
     LOGV2_FATAL_CONTINUE(23090, "\n\n***aborting after fassert() failure\n\n");
-    std::abort();
+    callAbort();
 }
 
 MONGO_COMPILER_NOINLINE void fassertFailedNoTraceWithLocation(int msgid,
@@ -229,7 +241,7 @@ MONGO_COMPILER_NORETURN void fassertFailedWithStatusWithLocation(int msgid,
                          "line"_attr = line);
     breakpoint();
     LOGV2_FATAL_CONTINUE(23094, "\n\n***aborting after fassert() failure\n\n");
-    std::abort();
+    callAbort();
 }
 
 MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgid,
