@@ -204,6 +204,11 @@ structs:
             description: "ECCDerivedFromDataToken"
             type: bindata_generic
             cpp_name: eccDerivedToken
+          e:
+            description: "ServerDataEncryptionLevel1Token"
+            type: bindata_generic
+            cpp_name: serverEncryptionToken
+            optional: true # For backwards compat, make this optional
           cm:
             description: "Queryable Encryption max counter"
             type: long
