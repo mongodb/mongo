@@ -142,6 +142,7 @@ import_compatibility_test()
 # considered 'mature' versions.)
 declare -A build_sys
 build_sys['develop']="cmake"
+build_sys['mongodb-6.0']="cmake"
 build_sys['mongodb-5.0']="autoconf"
 build_sys['mongodb-4.4']="autoconf"
 build_sys['mongodb-4.2']="autoconf"
@@ -150,7 +151,7 @@ build_sys['mongodb-4.2']="autoconf"
 #
 # Go all the way back to mongodb-4.2 since that's the first release where we don't support live
 # import.
-release_branches=(develop mongodb-5.0 mongodb-4.4 mongodb-4.2)
+release_branches=(develop mongodb-6.0 mongodb-5.0 mongodb-4.4 mongodb-4.2)
 
 # Build each of the release branches.
 for b in ${release_branches[@]}; do
