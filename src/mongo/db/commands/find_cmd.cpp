@@ -737,7 +737,7 @@ public:
             // Increment this metric once we have generated a response and we know it will return
             // documents.
             auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-            metricsCollector.incrementDocUnitsReturned(docUnitsReturned);
+            metricsCollector.incrementDocUnitsReturned(nss.ns(), docUnitsReturned);
             query_request_helper::validateCursorResponse(result->getBodyBuilder().asTempObj());
         }
 

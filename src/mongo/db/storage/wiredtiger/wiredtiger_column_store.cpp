@@ -181,7 +181,7 @@ void WiredTigerColumnStore::WriteCursor::insert(PathView path, const RecordId& r
     int ret = WT_OP_CHECK(wiredTigerCursorInsert(_opCtx, c()));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-    metricsCollector.incrementOneIdxEntryWritten(keyItem.size);
+    metricsCollector.incrementOneIdxEntryWritten(std::string(c()->uri), keyItem.size);
 
     // TODO: SERVER-65978, we may have to specially handle WT_DUPLICATE_KEY error here.
     if (ret) {
@@ -205,7 +205,7 @@ void WiredTigerColumnStore::WriteCursor::remove(PathView path, const RecordId& r
     invariantWTOK(ret, c()->session);
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-    metricsCollector.incrementOneIdxEntryWritten(keyItem.size);
+    metricsCollector.incrementOneIdxEntryWritten(std::string(c()->uri), keyItem.size);
 }
 void WiredTigerColumnStore::update(OperationContext* opCtx,
                                    PathView path,
@@ -225,7 +225,7 @@ void WiredTigerColumnStore::WriteCursor::update(PathView path, const RecordId& r
     int ret = WT_OP_CHECK(wiredTigerCursorUpdate(_opCtx, c()));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-    metricsCollector.incrementOneIdxEntryWritten(keyItem.size);
+    metricsCollector.incrementOneIdxEntryWritten(std::string(c()->uri), keyItem.size);
 
     // TODO: SERVER-65978, may want to handle WT_NOTFOUND specially.
     if (ret != 0)
@@ -329,7 +329,7 @@ private:
         invariantWTOK(ret, c->session);
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-        metricsCollector.incrementOneCursorSeek();
+        metricsCollector.incrementOneCursorSeek(std::string(c->uri));
 
         _eof = false;
 

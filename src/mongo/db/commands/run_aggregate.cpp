@@ -289,7 +289,7 @@ bool handleCursorCommand(OperationContext* opCtx,
     responseBuilder.done(cursorId, nsForCursor.ns());
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementDocUnitsReturned(docUnitsReturned);
+    metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
 
     return static_cast<bool>(cursor);
 }

@@ -222,12 +222,12 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetrics) {
     {
         ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
 
-        operationMetrics.incrementOneDocRead(2);
-        operationMetrics.incrementOneIdxEntryRead(8);
+        operationMetrics.incrementOneDocRead("", 2);
+        operationMetrics.incrementOneIdxEntryRead("", 8);
         operationMetrics.incrementKeysSorted(16);
         operationMetrics.incrementSorterSpills(32);
-        operationMetrics.incrementDocUnitsReturned(makeDocUnits(64));
-        operationMetrics.incrementOneCursorSeek();
+        operationMetrics.incrementDocUnitsReturned("", makeDocUnits(64));
+        operationMetrics.incrementOneCursorSeek("");
     }
 
     ASSERT(operationMetrics.hasCollectedMetrics());
@@ -249,12 +249,12 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetrics) {
     {
         ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
 
-        operationMetrics.incrementOneDocRead(32);
-        operationMetrics.incrementOneIdxEntryRead(128);
+        operationMetrics.incrementOneDocRead("", 32);
+        operationMetrics.incrementOneIdxEntryRead("", 128);
         operationMetrics.incrementKeysSorted(256);
         operationMetrics.incrementSorterSpills(512);
-        operationMetrics.incrementDocUnitsReturned(makeDocUnits(1024));
-        operationMetrics.incrementOneCursorSeek();
+        operationMetrics.incrementDocUnitsReturned("", makeDocUnits(1024));
+        operationMetrics.incrementOneCursorSeek("");
     }
 
     metricsCopy = globalResourceConsumption.getDbMetrics();
@@ -279,12 +279,12 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsSecondary) {
     {
         ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
 
-        operationMetrics.incrementOneDocRead(2);
-        operationMetrics.incrementOneIdxEntryRead(8);
+        operationMetrics.incrementOneDocRead("", 2);
+        operationMetrics.incrementOneIdxEntryRead("", 8);
         operationMetrics.incrementKeysSorted(16);
         operationMetrics.incrementSorterSpills(32);
-        operationMetrics.incrementDocUnitsReturned(makeDocUnits(64));
-        operationMetrics.incrementOneCursorSeek();
+        operationMetrics.incrementDocUnitsReturned("", makeDocUnits(64));
+        operationMetrics.incrementOneCursorSeek("");
     }
 
     auto metricsCopy = globalResourceConsumption.getDbMetrics();
@@ -304,12 +304,12 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsSecondary) {
     {
         ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
 
-        operationMetrics.incrementOneDocRead(32);
-        operationMetrics.incrementOneIdxEntryRead(128);
+        operationMetrics.incrementOneDocRead("", 32);
+        operationMetrics.incrementOneIdxEntryRead("", 128);
         operationMetrics.incrementKeysSorted(256);
         operationMetrics.incrementSorterSpills(512);
-        operationMetrics.incrementDocUnitsReturned(makeDocUnits(1024));
-        operationMetrics.incrementOneCursorSeek();
+        operationMetrics.incrementDocUnitsReturned("", makeDocUnits(1024));
+        operationMetrics.incrementOneCursorSeek("");
     }
 
     metricsCopy = globalResourceConsumption.getDbMetrics();
@@ -333,22 +333,22 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsAcrossStates) {
     {
         ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
 
-        operationMetrics.incrementOneDocRead(2);
-        operationMetrics.incrementOneIdxEntryRead(8);
+        operationMetrics.incrementOneDocRead("", 2);
+        operationMetrics.incrementOneIdxEntryRead("", 8);
         operationMetrics.incrementKeysSorted(16);
         operationMetrics.incrementSorterSpills(32);
-        operationMetrics.incrementDocUnitsReturned(makeDocUnits(64));
-        operationMetrics.incrementOneCursorSeek();
+        operationMetrics.incrementDocUnitsReturned("", makeDocUnits(64));
+        operationMetrics.incrementOneCursorSeek("");
 
         ASSERT_OK(repl::ReplicationCoordinator::get(_opCtx.get())
                       ->setFollowerMode(repl::MemberState::RS_SECONDARY));
 
-        operationMetrics.incrementOneDocRead(32);
-        operationMetrics.incrementOneIdxEntryRead(128);
+        operationMetrics.incrementOneDocRead("", 32);
+        operationMetrics.incrementOneIdxEntryRead("", 128);
         operationMetrics.incrementKeysSorted(256);
         operationMetrics.incrementSorterSpills(512);
-        operationMetrics.incrementDocUnitsReturned(makeDocUnits(1024));
-        operationMetrics.incrementOneCursorSeek();
+        operationMetrics.incrementDocUnitsReturned("", makeDocUnits(1024));
+        operationMetrics.incrementOneCursorSeek("");
     }
 
     auto metricsCopy = globalResourceConsumption.getAndClearDbMetrics();
@@ -377,22 +377,22 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsAcrossStates) {
     {
         ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
 
-        operationMetrics.incrementOneDocRead(2);
-        operationMetrics.incrementOneIdxEntryRead(8);
+        operationMetrics.incrementOneDocRead("", 2);
+        operationMetrics.incrementOneIdxEntryRead("", 8);
         operationMetrics.incrementKeysSorted(16);
         operationMetrics.incrementSorterSpills(32);
-        operationMetrics.incrementDocUnitsReturned(makeDocUnits(64));
-        operationMetrics.incrementOneCursorSeek();
+        operationMetrics.incrementDocUnitsReturned("", makeDocUnits(64));
+        operationMetrics.incrementOneCursorSeek("");
 
         ASSERT_OK(repl::ReplicationCoordinator::get(_opCtx.get())
                       ->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
-        operationMetrics.incrementOneDocRead(32);
-        operationMetrics.incrementOneIdxEntryRead(128);
+        operationMetrics.incrementOneDocRead("", 32);
+        operationMetrics.incrementOneIdxEntryRead("", 128);
         operationMetrics.incrementKeysSorted(256);
         operationMetrics.incrementSorterSpills(512);
-        operationMetrics.incrementDocUnitsReturned(makeDocUnits(1024));
-        operationMetrics.incrementOneCursorSeek();
+        operationMetrics.incrementDocUnitsReturned("", makeDocUnits(1024));
+        operationMetrics.incrementOneCursorSeek("");
     }
 
     metricsCopy = globalResourceConsumption.getAndClearDbMetrics();
@@ -427,21 +427,21 @@ TEST_F(ResourceConsumptionMetricsTest, DocumentUnitsRead) {
         ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
 
         // Each of these should be counted as 1 document unit (unit size = 128).
-        operationMetrics.incrementOneDocRead(2);
-        operationMetrics.incrementOneDocRead(4);
-        operationMetrics.incrementOneDocRead(8);
-        operationMetrics.incrementOneDocRead(16);
-        operationMetrics.incrementOneDocRead(32);
-        operationMetrics.incrementOneDocRead(64);
-        operationMetrics.incrementOneDocRead(128);
+        operationMetrics.incrementOneDocRead("", 2);
+        operationMetrics.incrementOneDocRead("", 4);
+        operationMetrics.incrementOneDocRead("", 8);
+        operationMetrics.incrementOneDocRead("", 16);
+        operationMetrics.incrementOneDocRead("", 32);
+        operationMetrics.incrementOneDocRead("", 64);
+        operationMetrics.incrementOneDocRead("", 128);
         expectedBytes += 2 + 4 + 8 + 16 + 32 + 64 + 128;
         expectedUnits += 7;
 
         // Each of these should be counted as 2 document units (unit size = 128).
-        operationMetrics.incrementOneDocRead(129);
-        operationMetrics.incrementOneDocRead(200);
-        operationMetrics.incrementOneDocRead(255);
-        operationMetrics.incrementOneDocRead(256);
+        operationMetrics.incrementOneDocRead("", 129);
+        operationMetrics.incrementOneDocRead("", 200);
+        operationMetrics.incrementOneDocRead("", 255);
+        operationMetrics.incrementOneDocRead("", 256);
         expectedBytes += 129 + 200 + 255 + 256;
         expectedUnits += 8;
     }
@@ -462,21 +462,21 @@ TEST_F(ResourceConsumptionMetricsTest, DocumentUnitsWritten) {
         ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
 
         // Each of these should be counted as 1 document unit (unit size = 128).
-        operationMetrics.incrementOneDocWritten(2);
-        operationMetrics.incrementOneDocWritten(4);
-        operationMetrics.incrementOneDocWritten(8);
-        operationMetrics.incrementOneDocWritten(16);
-        operationMetrics.incrementOneDocWritten(32);
-        operationMetrics.incrementOneDocWritten(64);
-        operationMetrics.incrementOneDocWritten(128);
+        operationMetrics.incrementOneDocWritten("", 2);
+        operationMetrics.incrementOneDocWritten("", 4);
+        operationMetrics.incrementOneDocWritten("", 8);
+        operationMetrics.incrementOneDocWritten("", 16);
+        operationMetrics.incrementOneDocWritten("", 32);
+        operationMetrics.incrementOneDocWritten("", 64);
+        operationMetrics.incrementOneDocWritten("", 128);
         expectedBytes += 2 + 4 + 8 + 16 + 32 + 64 + 128;
         expectedUnits += 7;
 
         // Each of these should be counted as 2 document units (unit size = 128).
-        operationMetrics.incrementOneDocWritten(129);
-        operationMetrics.incrementOneDocWritten(200);
-        operationMetrics.incrementOneDocWritten(255);
-        operationMetrics.incrementOneDocWritten(256);
+        operationMetrics.incrementOneDocWritten("", 129);
+        operationMetrics.incrementOneDocWritten("", 200);
+        operationMetrics.incrementOneDocWritten("", 255);
+        operationMetrics.incrementOneDocWritten("", 256);
         expectedBytes += 129 + 200 + 255 + 256;
         expectedUnits += 8;
     }
@@ -496,50 +496,50 @@ TEST_F(ResourceConsumptionMetricsTest, TotalUnitsWritten) {
         ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
 
         // Each of these should be counted as 1 total unit (unit size = 128).
-        operationMetrics.incrementOneDocWritten(2);
-        operationMetrics.incrementOneDocWritten(4);
-        operationMetrics.incrementOneDocWritten(8);
-        operationMetrics.incrementOneDocWritten(16);
-        operationMetrics.incrementOneDocWritten(32);
-        operationMetrics.incrementOneDocWritten(64);
-        operationMetrics.incrementOneDocWritten(128);
+        operationMetrics.incrementOneDocWritten("", 2);
+        operationMetrics.incrementOneDocWritten("", 4);
+        operationMetrics.incrementOneDocWritten("", 8);
+        operationMetrics.incrementOneDocWritten("", 16);
+        operationMetrics.incrementOneDocWritten("", 32);
+        operationMetrics.incrementOneDocWritten("", 64);
+        operationMetrics.incrementOneDocWritten("", 128);
         expectedUnits += 7;
 
         // Each of these should be counted as 2 total units (unit size = 128).
-        operationMetrics.incrementOneDocWritten(129);
-        operationMetrics.incrementOneDocWritten(200);
-        operationMetrics.incrementOneDocWritten(255);
-        operationMetrics.incrementOneDocWritten(256);
+        operationMetrics.incrementOneDocWritten("", 129);
+        operationMetrics.incrementOneDocWritten("", 200);
+        operationMetrics.incrementOneDocWritten("", 255);
+        operationMetrics.incrementOneDocWritten("", 256);
         expectedUnits += 8;
 
         // Each of these groups should be counted as 1 total unit, combining documents with index
         // bytes written.
 
         // Index writes prior to document write.
-        operationMetrics.incrementOneDocWritten(0);
-        operationMetrics.incrementOneIdxEntryWritten(2);
-        operationMetrics.incrementOneDocWritten(5);
+        operationMetrics.incrementOneDocWritten("", 0);
+        operationMetrics.incrementOneIdxEntryWritten("", 2);
+        operationMetrics.incrementOneDocWritten("", 5);
         expectedUnits += 1;
 
         // Index writes after document write.
-        operationMetrics.incrementOneDocWritten(2);
-        operationMetrics.incrementOneIdxEntryWritten(126);
+        operationMetrics.incrementOneDocWritten("", 2);
+        operationMetrics.incrementOneIdxEntryWritten("", 126);
         expectedUnits += 1;
 
         // No index writes.
-        operationMetrics.incrementOneDocWritten(129);
+        operationMetrics.incrementOneDocWritten("", 129);
         expectedUnits += 2;
 
-        operationMetrics.incrementOneDocWritten(127);
-        operationMetrics.incrementOneIdxEntryWritten(1);
+        operationMetrics.incrementOneDocWritten("", 127);
+        operationMetrics.incrementOneIdxEntryWritten("", 1);
         expectedUnits += 1;
 
         // Exceeds unit size and thus counts as 2 units.
-        operationMetrics.incrementOneDocWritten(1);
-        operationMetrics.incrementOneIdxEntryWritten(1);
-        operationMetrics.incrementOneIdxEntryWritten(1);
-        operationMetrics.incrementOneIdxEntryWritten(1);
-        operationMetrics.incrementOneIdxEntryWritten(128);
+        operationMetrics.incrementOneDocWritten("", 1);
+        operationMetrics.incrementOneIdxEntryWritten("", 1);
+        operationMetrics.incrementOneIdxEntryWritten("", 1);
+        operationMetrics.incrementOneIdxEntryWritten("", 1);
+        operationMetrics.incrementOneIdxEntryWritten("", 128);
         expectedUnits += 2;
     }
 
@@ -560,33 +560,33 @@ TEST_F(ResourceConsumptionMetricsTest, IdxEntryUnitsRead) {
         gIndexEntryUnitSizeBytes = 16;
 
         // Each of these should be counted as 1 document unit.
-        operationMetrics.incrementOneIdxEntryRead(2);
-        operationMetrics.incrementOneIdxEntryRead(4);
-        operationMetrics.incrementOneIdxEntryRead(8);
-        operationMetrics.incrementOneIdxEntryRead(16);
+        operationMetrics.incrementOneIdxEntryRead("", 2);
+        operationMetrics.incrementOneIdxEntryRead("", 4);
+        operationMetrics.incrementOneIdxEntryRead("", 8);
+        operationMetrics.incrementOneIdxEntryRead("", 16);
         expectedBytes += 2 + 4 + 8 + 16;
         expectedUnits += 4;
 
         // Each of these should be counted as 2 document unit.
-        operationMetrics.incrementOneIdxEntryRead(17);
-        operationMetrics.incrementOneIdxEntryRead(31);
-        operationMetrics.incrementOneIdxEntryRead(32);
+        operationMetrics.incrementOneIdxEntryRead("", 17);
+        operationMetrics.incrementOneIdxEntryRead("", 31);
+        operationMetrics.incrementOneIdxEntryRead("", 32);
         expectedBytes += 17 + 31 + 32;
         expectedUnits += 6;
 
         gIndexEntryUnitSizeBytes = 32;
 
         // Each of these should be counted as 1 document unit.
-        operationMetrics.incrementOneIdxEntryRead(17);
-        operationMetrics.incrementOneIdxEntryRead(31);
-        operationMetrics.incrementOneIdxEntryRead(32);
+        operationMetrics.incrementOneIdxEntryRead("", 17);
+        operationMetrics.incrementOneIdxEntryRead("", 31);
+        operationMetrics.incrementOneIdxEntryRead("", 32);
         expectedBytes += 17 + 31 + 32;
         expectedUnits += 3;
 
         // Each of these should be counted as 2 document units.
-        operationMetrics.incrementOneIdxEntryRead(33);
-        operationMetrics.incrementOneIdxEntryRead(63);
-        operationMetrics.incrementOneIdxEntryRead(64);
+        operationMetrics.incrementOneIdxEntryRead("", 33);
+        operationMetrics.incrementOneIdxEntryRead("", 63);
+        operationMetrics.incrementOneIdxEntryRead("", 64);
         expectedBytes += 33 + 63 + 64;
         expectedUnits += 6;
     }
@@ -609,33 +609,33 @@ TEST_F(ResourceConsumptionMetricsTest, IdxEntryUnitsWritten) {
         gIndexEntryUnitSizeBytes = 16;
 
         // Each of these should be counted as 1 document unit.
-        operationMetrics.incrementOneIdxEntryWritten(2);
-        operationMetrics.incrementOneIdxEntryWritten(4);
-        operationMetrics.incrementOneIdxEntryWritten(8);
-        operationMetrics.incrementOneIdxEntryWritten(16);
+        operationMetrics.incrementOneIdxEntryWritten("", 2);
+        operationMetrics.incrementOneIdxEntryWritten("", 4);
+        operationMetrics.incrementOneIdxEntryWritten("", 8);
+        operationMetrics.incrementOneIdxEntryWritten("", 16);
         expectedBytes += 2 + 4 + 8 + 16;
         expectedUnits += 4;
 
         // Each of these should be counted as 2 document units.
-        operationMetrics.incrementOneIdxEntryWritten(17);
-        operationMetrics.incrementOneIdxEntryWritten(31);
-        operationMetrics.incrementOneIdxEntryWritten(32);
+        operationMetrics.incrementOneIdxEntryWritten("", 17);
+        operationMetrics.incrementOneIdxEntryWritten("", 31);
+        operationMetrics.incrementOneIdxEntryWritten("", 32);
         expectedBytes += 17 + 31 + 32;
         expectedUnits += 6;
 
         gIndexEntryUnitSizeBytes = 32;
 
         // Each of these should be counted as 1 document unit.
-        operationMetrics.incrementOneIdxEntryWritten(17);
-        operationMetrics.incrementOneIdxEntryWritten(31);
-        operationMetrics.incrementOneIdxEntryWritten(32);
+        operationMetrics.incrementOneIdxEntryWritten("", 17);
+        operationMetrics.incrementOneIdxEntryWritten("", 31);
+        operationMetrics.incrementOneIdxEntryWritten("", 32);
         expectedBytes += 17 + 31 + 32;
         expectedUnits += 3;
 
         // Each of these should be counted as 2 document units.
-        operationMetrics.incrementOneIdxEntryWritten(33);
-        operationMetrics.incrementOneIdxEntryWritten(63);
-        operationMetrics.incrementOneIdxEntryWritten(64);
+        operationMetrics.incrementOneIdxEntryWritten("", 33);
+        operationMetrics.incrementOneIdxEntryWritten("", 63);
+        operationMetrics.incrementOneIdxEntryWritten("", 64);
         expectedBytes += 33 + 63 + 64;
         expectedUnits += 6;
     }
@@ -712,9 +712,9 @@ TEST_F(ResourceConsumptionMetricsTest, CursorSeeks) {
 
     {
         ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
-        operationMetrics.incrementOneCursorSeek();
-        operationMetrics.incrementOneCursorSeek();
-        operationMetrics.incrementOneCursorSeek();
+        operationMetrics.incrementOneCursorSeek("");
+        operationMetrics.incrementOneCursorSeek("");
+        operationMetrics.incrementOneCursorSeek("");
 
         expectedSeeks += 3;
     }

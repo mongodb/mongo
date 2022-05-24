@@ -98,6 +98,7 @@ namespace mongo::logv2 {
     X(kTenantMigration,        , "tenantMigration"       , "TENANT_M", kDefault) \
     X(kConnectionPool,         , "connectionPool"        , "CONNPOOL", kNetwork) \
     X(kTest,                   , "test"                  , "TEST"    , kDefault) \
+    X(kResourceConsumption,    , "resourceConsumption"   , "RES_CONS", kDefault) \
     X(kNumLogComponents,       , "total"                 , "TOTAL"   , kNumLogComponents) \
     /**/
 // clang-format on

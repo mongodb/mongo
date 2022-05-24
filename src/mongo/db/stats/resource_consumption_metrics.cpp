@@ -37,7 +37,7 @@
 #include "mongo/db/stats/operation_resource_consumption_gen.h"
 #include "mongo/logv2/log.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResourceConsumption
 
 
 namespace mongo {
@@ -239,36 +239,83 @@ inline void ResourceConsumption::MetricsCollector::_doIfCollecting(Func&& func) 
     func();
 }
 
-void ResourceConsumption::MetricsCollector::incrementOneDocRead(size_t docBytesRead) {
-    _doIfCollecting([&]() { _metrics.readMetrics.docsRead.observeOne(docBytesRead); });
+void ResourceConsumption::MetricsCollector::incrementOneDocRead(std::string uri,
+                                                                size_t docBytesRead) {
+    _doIfCollecting([&]() {
+        LOGV2_DEBUG(6523900,
+                    1,
+                    "ResourceConsumption::MetricsCollector::incrementOneDocRead",
+                    "uri"_attr = uri,
+                    "bytes"_attr = docBytesRead);
+        _metrics.readMetrics.docsRead.observeOne(docBytesRead);
+    });
 }
 
-void ResourceConsumption::MetricsCollector::incrementOneIdxEntryRead(size_t bytesRead) {
-    _doIfCollecting([&]() { _metrics.readMetrics.idxEntriesRead.observeOne(bytesRead); });
+void ResourceConsumption::MetricsCollector::incrementOneIdxEntryRead(std::string uri,
+                                                                     size_t bytesRead) {
+    _doIfCollecting([&]() {
+        LOGV2_DEBUG(6523901,
+                    1,
+                    "ResourceConsumption::MetricsCollector::incrementOneIdxEntryRead",
+                    "uri"_attr = uri,
+                    "bytes"_attr = bytesRead);
+        _metrics.readMetrics.idxEntriesRead.observeOne(bytesRead);
+    });
 }
 
 void ResourceConsumption::MetricsCollector::incrementKeysSorted(size_t keysSorted) {
-    _doIfCollecting([&]() { _metrics.readMetrics.keysSorted += keysSorted; });
+    _doIfCollecting([&]() {
+        LOGV2_DEBUG(6523902,
+                    1,
+                    "ResourceConsumption::MetricsCollector::incrementKeysSorted",
+                    "keysSorted"_attr = keysSorted);
+        _metrics.readMetrics.keysSorted += keysSorted;
+    });
 }
 
 void ResourceConsumption::MetricsCollector::incrementSorterSpills(size_t spills) {
-    _doIfCollecting([&]() { _metrics.readMetrics.sorterSpills += spills; });
+    _doIfCollecting([&]() {
+        LOGV2_DEBUG(6523903,
+                    1,
+                    "ResourceConsumption::MetricsCollector::incrementSorterSpills",
+                    "spills"_attr = spills);
+        _metrics.readMetrics.sorterSpills += spills;
+    });
 }
 
 void ResourceConsumption::MetricsCollector::incrementDocUnitsReturned(
-    DocumentUnitCounter docUnits) {
-    _doIfCollecting([&]() { _metrics.readMetrics.docsReturned += docUnits; });
+    std::string ns, DocumentUnitCounter docUnits) {
+    _doIfCollecting([&]() {
+        LOGV2_DEBUG(6523904,
+                    1,
+                    "ResourceConsumption::MetricsCollector::incrementDocUnitsReturned",
+                    "ns"_attr = ns,
+                    "docUnits"_attr = docUnits.units());
+        _metrics.readMetrics.docsReturned += docUnits;
+    });
 }
 
-void ResourceConsumption::MetricsCollector::incrementOneDocWritten(size_t bytesWritten) {
+void ResourceConsumption::MetricsCollector::incrementOneDocWritten(std::string uri,
+                                                                   size_t bytesWritten) {
     _doIfCollecting([&] {
+        LOGV2_DEBUG(6523905,
+                    1,
+                    "ResourceConsumption::MetricsCollector::incrementOneDocWritten",
+                    "uri"_attr = uri,
+                    "bytesWritten"_attr = bytesWritten);
         _metrics.writeMetrics.docsWritten.observeOne(bytesWritten);
         _metrics.writeMetrics.totalWritten.observeOneDocument(bytesWritten);
     });
 }
 
-void ResourceConsumption::MetricsCollector::incrementOneIdxEntryWritten(size_t bytesWritten) {
+void ResourceConsumption::MetricsCollector::incrementOneIdxEntryWritten(std::string uri,
+                                                                        size_t bytesWritten) {
     _doIfCollecting([&] {
+        LOGV2_DEBUG(6523906,
+                    1,
+                    "ResourceConsumption::MetricsCollector::incrementOneIdxEntryWritten",
+                    "uri"_attr = uri,
+                    "bytesWritten"_attr = bytesWritten);
         _metrics.writeMetrics.idxEntriesWritten.observeOne(bytesWritten);
         _metrics.writeMetrics.totalWritten.observeOneIndexEntry(bytesWritten);
     });
@@ -297,8 +344,14 @@ bool ResourceConsumption::MetricsCollector::endScopedCollecting() {
     return wasCollecting;
 }
 
-void ResourceConsumption::MetricsCollector::incrementOneCursorSeek() {
-    _doIfCollecting([&] { _metrics.readMetrics.cursorSeeks++; });
+void ResourceConsumption::MetricsCollector::incrementOneCursorSeek(std::string uri) {
+    _doIfCollecting([&] {
+        LOGV2_DEBUG(6523907,
+                    1,
+                    "ResourceConsumption::MetricsCollector::incrementOneCursorSeek",
+                    "uri"_attr = uri);
+        _metrics.readMetrics.cursorSeeks++;
+    });
 }
 
 ResourceConsumption::ScopedMetricsCollector::ScopedMetricsCollector(OperationContext* opCtx,

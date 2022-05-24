@@ -403,7 +403,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflict
         docUnitsReturned.observeOne(docFound->objsize());
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-        metricsCollector.incrementDocUnitsReturned(docUnitsReturned);
+        metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
     }
 
     return buildResponse(exec.get(), request.getRemove().value_or(false), docFound);
@@ -506,7 +506,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflict
         docUnitsReturned.observeOne(docFound->objsize());
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-        metricsCollector.incrementDocUnitsReturned(docUnitsReturned);
+        metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
     }
 
     return buildResponse(exec.get(), request.getRemove().value_or(false), docFound);
