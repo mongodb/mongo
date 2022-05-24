@@ -236,7 +236,7 @@ private:
     CacheExclusive<AtomicWord<std::int64_t>> _tfoAccepted{0};
 
     // TFO info determined at startup.
-    std::int64_t _tfoKernelSetting;
+    std::int64_t _tfoKernelSetting{0};
     bool _tfoKernelSupportServer{false};
     bool _tfoKernelSupportClient{false};
 };
