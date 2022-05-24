@@ -19,7 +19,6 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-
 """Pseudo-builders for building and registering libfuzzer tests.
 """
 from SCons.Script import Action
@@ -48,17 +47,14 @@ def build_cpp_libfuzzer_test(env, target, source, **kwargs):
     myenv.Prepend(LINKFLAGS=[sanitizer_option])
 
     libfuzzer_test_components = {"tests", "fuzzertests"}
-    if "AIB_COMPONENT" in kwargs and not kwargs["AIB_COMPONENTS"].endswith(
-        "-fuzzertest"
-    ):
+    if "AIB_COMPONENT" in kwargs and not kwargs["AIB_COMPONENTS"].endswith("-fuzzertest"):
         kwargs["AIB_COMPONENT"] += "-fuzzertest"
 
     if "AIB_COMPONENTS_EXTRA" in kwargs:
-        libfuzzer_test_components = set(kwargs["AIB_COMPONENTS_EXTRA"]).union(
-            libfuzzer_test_components
-        )
+        libfuzzer_test_components = set(
+            kwargs["AIB_COMPONENTS_EXTRA"]).union(libfuzzer_test_components)
 
-    kwargs["AIB_COMPONENTS_EXTRA"] =  list(libfuzzer_test_components)
+    kwargs["AIB_COMPONENTS_EXTRA"] = list(libfuzzer_test_components)
 
     # Fuzzer tests are inherenently undecidable (see
     # mongo_test_execution.py for details on undecidability).

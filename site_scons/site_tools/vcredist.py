@@ -137,8 +137,7 @@ def generate(env):
         vs_version = int(msvc_major) + int(msvc_minor)
         vs_version_next = vs_version + 1
         vs_version_range = "[{vs_version}.0, {vs_version_next}.0)".format(
-            vs_version=vs_version, vs_version_next=vs_version_next
-        )
+            vs_version=vs_version, vs_version_next=vs_version_next)
 
         if not programfilesx86:
             programfilesx86 = _get_programfiles()
@@ -146,25 +145,19 @@ def generate(env):
                 return
 
         # Use vswhere (it has a fixed stable path) to query where Visual Studio is installed.
-        env["MSVS"]["VSINSTALLDIR"] = (
-            subprocess.check_output(
-                [
-                    os.path.join(
-                        programfilesx86,
-                        "Microsoft Visual Studio",
-                        "Installer",
-                        "vswhere.exe",
-                    ),
-                    "-version",
-                    vs_version_range,
-                    "-property",
-                    "installationPath",
-                    "-nologo",
-                ]
-            )
-            .decode("utf-8")
-            .strip()
-        )
+        env["MSVS"]["VSINSTALLDIR"] = (subprocess.check_output([
+            os.path.join(
+                programfilesx86,
+                "Microsoft Visual Studio",
+                "Installer",
+                "vswhere.exe",
+            ),
+            "-version",
+            vs_version_range,
+            "-property",
+            "installationPath",
+            "-nologo",
+        ]).decode("utf-8").strip())
 
     vsinstall_dir = env["MSVS"]["VSINSTALLDIR"]
 
@@ -179,19 +172,15 @@ def generate(env):
         # TOOO: This x64 needs to be abstracted away. Is it the host
         # arch, or the target arch? My guess is host.
         vsruntime_key_name = "SOFTWARE\\Microsoft\\VisualStudio\\{msvc_major}.0\\VC\\Runtimes\\x64".format(
-            msvc_major=msvc_major
-        )
+            msvc_major=msvc_major)
         vsruntime_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, vsruntime_key_name)
-        vslib_version, vslib_version_type = winreg.QueryValueEx(
-            vsruntime_key, "Version"
-        )
+        vslib_version, vslib_version_type = winreg.QueryValueEx(vsruntime_key, "Version")
     except WindowsError:
         return
 
     # Fallback to directory search if we don't find the expected version
-    redist_path = os.path.join(
-        redist_root, re.match("v(\d+\.\d+\.\d+)\.\d+", vslib_version).group(1)
-    )
+    redist_path = os.path.join(redist_root,
+                               re.match("v(\d+\.\d+\.\d+)\.\d+", vslib_version).group(1))
     if not os.path.isdir(redist_path):
         redist_path = None
         dirs = os.listdir(redist_root)
@@ -228,9 +217,7 @@ def generate(env):
     if not expansion:
         return
 
-    vcredist_candidates = [
-        c.format(expansion) for c in vcredist_search_template_sequence
-    ]
+    vcredist_candidates = [c.format(expansion) for c in vcredist_search_template_sequence]
     for candidate in vcredist_candidates:
         candidate = os.path.join(redist_path, candidate)
         if os.path.isfile(candidate):

@@ -6,9 +6,9 @@ env.InjectThirdParty(libraries=['abseil-cpp'])
 
 env.Library(
     target="absl_numeric",
-    source = [
-      "abseil-cpp/absl/numeric/int128.cc",
-    ]
+    source=[
+        "abseil-cpp/absl/numeric/int128.cc",
+    ],
 )
 
 env.Library(
@@ -17,7 +17,7 @@ env.Library(
         "abseil-cpp/absl/hash/internal/city.cc",
         "abseil-cpp/absl/hash/internal/hash.cc",
         "abseil-cpp/absl/hash/internal/wyhash.cc",
-    ]
+    ],
 )
 
 env.Library(
@@ -28,7 +28,7 @@ env.Library(
     LIBDEPS=[
         "absl_hash",
         "absl_throw_delegate",
-    ]
+    ],
 )
 
 env.Library(
@@ -36,6 +36,5 @@ env.Library(
     source=[
         "abseil-cpp/absl/base/internal/throw_delegate.cc",
     ],
-    LIBDEPS=[
-    ]
+    LIBDEPS=[],
 )

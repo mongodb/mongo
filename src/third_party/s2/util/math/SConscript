@@ -14,11 +14,14 @@ elif env.TargetOSIs('windows'):
     # C4305: 'initializing': truncation from '...' to '...'
     env.Append(CCFLAGS=['/wd4305'])
 
-env.Library("math",
-          [ "mathutil.cc",
-           # "mathlimits.cc",
-          ],
-          LIBDEPS=[
-              '$BUILD_DIR/mongo/base',
-              '$BUILD_DIR/third_party/s2/base/base_s2',
-          ])
+env.Library(
+    "math",
+    [
+        "mathutil.cc",
+        # "mathlimits.cc",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/third_party/s2/base/base_s2',
+    ],
+)

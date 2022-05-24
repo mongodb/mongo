@@ -72,68 +72,70 @@ env.Library(
 )
 
 env.Library(
-    target='boost_iostreams', 
+    target='boost_iostreams',
     source=[
         'libs/iostreams/src/file_descriptor.cpp',
         'libs/iostreams/src/mapped_file.cpp',
-        ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/util/boost_assert_shim',
-            'boost_system',
-        ])
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/boost_assert_shim',
+        'boost_system',
+    ],
+)
 
-boost_thread_source = dict( 
-    posix=[
-        'libs/thread/src/pthread/once.cpp', 
-        'libs/thread/src/pthread/thread.cpp'
-    ], 
+boost_thread_source = dict(
+    posix=['libs/thread/src/pthread/once.cpp', 'libs/thread/src/pthread/thread.cpp'],
     windows=[
-        'libs/thread/src/win32/thread.cpp', 
+        'libs/thread/src/win32/thread.cpp',
         'libs/thread/src/win32/thread_primitives.cpp',
         'libs/thread/src/win32/tss_dll.cpp',
         'libs/thread/src/win32/tss_pe.cpp',
-    ] 
-).get(env['TARGET_OS_FAMILY'], 'UNKNOWN_OS_FAMILY_FOR_BOOST_THREADS__%s' % env['TARGET_OS_FAMILY'])
+    ],
+).get(
+    env['TARGET_OS_FAMILY'],
+    'UNKNOWN_OS_FAMILY_FOR_BOOST_THREADS__%s' % env['TARGET_OS_FAMILY'],
+)
 
-boost_thread_defines = dict( 
-    posix=['BOOST_THREAD_PTHREAD'], 
-    windows=['BOOST_THREAD_WIN32'] 
-).get(env['TARGET_OS_FAMILY'], 'UNKNOWN_OS_FAMILY_FOR_BOOST_THREADS__%s' % env['TARGET_OS_FAMILY'])
+boost_thread_defines = dict(
+    posix=['BOOST_THREAD_PTHREAD'],
+    windows=['BOOST_THREAD_WIN32'],
+).get(
+    env['TARGET_OS_FAMILY'],
+    'UNKNOWN_OS_FAMILY_FOR_BOOST_THREADS__%s' % env['TARGET_OS_FAMILY'],
+)
 
 threadlib_env = env.Clone()
 threadlib_env.Append(CPPDEFINES=['BOOST_THREAD_BUILD_LIB'] + boost_thread_defines)
 threadlib_env.Library(
-    target='boost_thread', 
+    target='boost_thread',
     source=[
         'libs/thread/src/future.cpp',
     ] + boost_thread_source,
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/boost_assert_shim',
-    ]
+    ],
 )
 
 loglib_env = env.Clone()
-loglib_env.AppendUnique(
-    CPPDEFINES=[
-        'BOOST_LOG_USE_COMPILER_TLS',
-        'BOOST_LOG_USE_STD_REGEX',
-        'BOOST_LOG_WITHOUT_DEFAULT_FACTORIES',
-        'BOOST_LOG_WITHOUT_IPC',
-        'BOOST_LOG_WITHOUT_SETTINGS_PARSERS',
-    ])
+loglib_env.AppendUnique(CPPDEFINES=[
+    'BOOST_LOG_USE_COMPILER_TLS',
+    'BOOST_LOG_USE_STD_REGEX',
+    'BOOST_LOG_WITHOUT_DEFAULT_FACTORIES',
+    'BOOST_LOG_WITHOUT_IPC',
+    'BOOST_LOG_WITHOUT_SETTINGS_PARSERS',
+])
 if env.ToolchainIs('msvc'):
-    # warning C4828: The file contains a character starting at offset 0x6009 that is illegal in 
+    # warning C4828: The file contains a character starting at offset 0x6009 that is illegal in
     # the current source character set (codepage 65001).
     loglib_env.AppendUnique(CCFLAGS=['/wd4828'])
 
     # permissions.cpp includes windows.h directly, causing issues with boost winapi (error C2116 and C2733)
-    loglib_env.AppendUnique(
-    CPPDEFINES=[
+    loglib_env.AppendUnique(CPPDEFINES=[
         'BOOST_USE_WINDOWS_H',
     ])
 
 loglib_env.Library(
-    target='boost_log', 
+    target='boost_log',
     source=[
         'libs/log/src/attribute_name.cpp',
         'libs/log/src/attribute_set.cpp',
@@ -172,5 +174,5 @@ loglib_env.Library(
         '$BUILD_DIR/mongo/util/boost_assert_shim',
         'boost_filesystem',
         'boost_thread',
-    ]
+    ],
 )

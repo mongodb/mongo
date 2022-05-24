@@ -25,13 +25,13 @@ env.Library(
     source=[
         'command_generic_argument.cpp',
         'generic_argument.idl',
-        'idl_parser.cpp'
+        'idl_parser.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/tenant_id',
-    ]
+    ],
 )
 
 env.Library(
@@ -72,7 +72,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
-    ]
+    ],
 )
 
 env.Library(
@@ -98,7 +98,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         'cluster_server_parameter',
-    ]
+    ],
 )
 
 env.CppUnitTest(
@@ -183,7 +183,6 @@ env.CppUnitTest(
         'unittest.idl',
         'unittest_import.idl',
     ],
-
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authprivilege',

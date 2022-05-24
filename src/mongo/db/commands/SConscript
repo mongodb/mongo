@@ -15,7 +15,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
         "server_status_core",
-    ]
+    ],
 )
 
 env.Library(
@@ -27,7 +27,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-    ]
+    ],
 )
 
 env.Library(
@@ -190,7 +190,7 @@ env.Library(
         'feature_compatibility_parsers',
         'server_status',
         'test_commands_enabled',
-    ]
+    ],
 )
 
 env.Library(
@@ -200,7 +200,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
-    ]
+    ],
 )
 
 env.Library(
@@ -219,7 +219,7 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/client_metadata',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         'test_commands_enabled',
-    ]
+    ],
 )
 
 env.Library(
@@ -235,7 +235,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/storage/backup_cursor_hooks',
         'fsync_locked',
-    ]
+    ],
 )
 
 env.Library(
@@ -262,8 +262,7 @@ env.Library(
     source=[
         'fsync_locked.cpp',
     ],
-    LIBDEPS=[
-    ],
+    LIBDEPS=[],
 )
 
 env.Library(
@@ -618,7 +617,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/s/write_ops/cluster_write_ops',
-        'cluster_server_parameter_cmds_idl'
+        'cluster_server_parameter_cmds_idl',
     ],
 )
 
@@ -641,7 +640,7 @@ env.Library(
 env.Library(
     target='current_op_common',
     source=[
-        'current_op_common.cpp'
+        'current_op_common.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands',
@@ -651,7 +650,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/service_context',
-        'test_commands_enabled'
+        'test_commands_enabled',
     ],
 )
 
@@ -701,7 +700,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/serverless/serverless_types_idl',
         '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/idl/idl_parser',
-    ]
+    ],
 )
 env.Library(
     target='txn_cmd_request',
@@ -713,7 +712,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/idl/idl_parser',
-    ]
+    ],
 )
 
 env.Library(
@@ -725,7 +724,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/write_concern_options',
         '$BUILD_DIR/mongo/idl/idl_parser',
-    ]
+    ],
 )
 
 env.Library(
@@ -734,16 +733,13 @@ env.Library(
         'map_reduce_agg.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands/servers',
-        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/commands/servers', '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/index/index_access_methods',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongo_process_interface',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongod_process_interface_factory',
-        '$BUILD_DIR/mongo/db/query/map_reduce_output_format',
-        '$BUILD_DIR/mongo/db/query_exec',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        'map_reduce_parser'
-    ]
+        '$BUILD_DIR/mongo/db/query/map_reduce_output_format', '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/idl/idl_parser', 'map_reduce_parser'
+    ],
 )
 
 env.CppUnitTest(

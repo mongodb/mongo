@@ -6,11 +6,11 @@ env.Library(
     target='query_sbe_plan_stats',
     source=[
         'stages/plan_stats.cpp',
-        ],
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        ]
-    )
+    ],
+)
 
 env.Library(
     target='query_sbe_values',
@@ -29,7 +29,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_index_bounds',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/util/regex_util',
-    ]
+    ],
 )
 
 sbeEnv = env.Clone()
@@ -50,19 +50,19 @@ sbeEnv.Library(
         'vm/arith.cpp',
         'vm/datetime.cpp',
         'vm/vm.cpp',
-        ],
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/storage/record_store_base',
         '$BUILD_DIR/third_party/shim_snappy',
         'query_sbe_values',
-        ],
+    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/sorter/sorter_idl',
-         ]
-    )
+    ],
+)
 
 sbeEnv.Library(
     target='query_sbe_stages',
@@ -87,7 +87,7 @@ sbeEnv.Library(
         'stages/union.cpp',
         'stages/unique.cpp',
         'stages/unwind.cpp',
-        ],
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
@@ -103,14 +103,14 @@ sbeEnv.Library(
         '$BUILD_DIR/third_party/shim_snappy',
         'query_sbe_plan_stats',
         'query_sbe_values',
-        ],
+    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/sorter/sorter_idl',
         'query_sbe',
         'query_sbe_storage',
-         ]
-    )
+    ],
+)
 
 env.Library(
     target='query_sbe_storage',
@@ -119,27 +119,25 @@ env.Library(
         'stages/column_scan.cpp',
         'stages/ix_scan.cpp',
         'stages/scan.cpp',
-        ],
+    ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/index/index_access_method',
-        '$BUILD_DIR/mongo/db/storage/execution_context',
-        'query_sbe'
-        ]
-    )
+        '$BUILD_DIR/mongo/db/db_raii', '$BUILD_DIR/mongo/db/index/index_access_method',
+        '$BUILD_DIR/mongo/db/storage/execution_context', 'query_sbe'
+    ],
+)
 
 env.Library(
     target='query_sbe_abt',
     source=[
         'abt/abt_lower.cpp',
-        ],
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
         'query_sbe',
         'query_sbe_stages',
         'query_sbe_storage',
-        ]
-    )
+    ],
+)
 
 env.Library(
     target='sbe_plan_stage_test',
@@ -216,7 +214,7 @@ env.CppUnitTest(
         'values/slot_printer_test.cpp',
         'values/value_serialization_test.cpp',
         "values/value_test.cpp",
-        'values/write_value_to_stream_test.cpp'
+        'values/write_value_to_stream_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
@@ -233,15 +231,15 @@ env.Library(
     target='sbe_abt_test_util',
     source=[
         'abt/sbe_abt_test_util.cpp',
-        ],
+    ],
     LIBDEPS=[
-            "$BUILD_DIR/mongo/db/auth/authmocks",
-            '$BUILD_DIR/mongo/db/query/query_test_service_context',
-            '$BUILD_DIR/mongo/db/query_exec',
-            '$BUILD_DIR/mongo/db/service_context_test_fixture',
-            'query_sbe_abt',
-        ]
-    )
+        "$BUILD_DIR/mongo/db/auth/authmocks",
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        'query_sbe_abt',
+    ],
+)
 
 env.CppUnitTest(
     target='sbe_abt_test',
@@ -251,6 +249,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/unittest/unittest',
-        'sbe_abt_test_util'
+        'sbe_abt_test_util',
     ],
 )

@@ -39,7 +39,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
-    ]
+    ],
 )
 
 env.Library(
@@ -54,7 +54,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
-    ]
+    ],
 )
 
 env.Library(
@@ -72,7 +72,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/cluster_auth_mode',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
-    ]
+    ],
 )
 
 env.Library(
@@ -85,7 +85,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'ssl_options',
-    ]
+    ],
 )
 
 if not get_option('ssl') == 'off':
@@ -99,10 +99,8 @@ if not get_option('ssl') == 'off':
                 '$BUILD_DIR/mongo/base',
                 'ssl_options',
             ],
-            LIBDEPS_PRIVATE=[
-                '$BUILD_DIR/mongo/crypto/symmetric_crypto'
-            ]
-        );
+            LIBDEPS_PRIVATE=['$BUILD_DIR/mongo/crypto/symmetric_crypto'],
+        )
 
     env.Library(
         target='ssl_manager',
@@ -192,7 +190,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
     ],
 )
-
 
 if http_client == "off":
     env.Library(
@@ -287,5 +284,4 @@ if get_option('ssl') == 'on':
             '$BUILD_DIR/mongo/util/concurrency/thread_pool',
             '$BUILD_DIR/mongo/util/version_impl',
         ],
-)
-
+    )

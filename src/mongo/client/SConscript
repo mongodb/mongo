@@ -8,7 +8,7 @@ env = env.Clone()
 
 env.SConscript(
     dirs=['sdam'],
-    exports=['env']
+    exports=['env'],
 )
 
 # Contains only the core ConnectionString functionality, *not* the ability to call connect() and
@@ -38,10 +38,9 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/db/service_context'
+        '$BUILD_DIR/mongo/db/service_context',
     ],
 )
-
 
 if get_option('ssl') == 'on':
     env.Library(
@@ -53,7 +52,7 @@ if get_option('ssl') == 'on':
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/server_options_core', # For object_check.h
+            '$BUILD_DIR/mongo/db/server_options_core',  # For object_check.h
             '$BUILD_DIR/mongo/idl/idl_parser',
         ],
     )
@@ -72,7 +71,7 @@ if get_option('ssl') == 'on':
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/server_options_core', # For object_check.h
+            '$BUILD_DIR/mongo/db/server_options_core',  # For object_check.h
             '$BUILD_DIR/mongo/idl/idl_parser',
             '$BUILD_DIR/third_party/shim_kms_message',
             'sasl_aws_common',
@@ -143,7 +142,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/executor/remote_command',
         'internal_auth',
-        'sasl_client'
+        'sasl_client',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',
@@ -247,7 +246,7 @@ clientDriverEnv.Library(
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
-    ]
+    ],
 )
 
 env.Library(
@@ -258,7 +257,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
-    ]
+    ],
 )
 
 env.Library(
@@ -370,7 +369,7 @@ if wiredtiger:
             'server_discovery_monitor_test.cpp',
             'server_ping_monitor_test.cpp',
             'streamable_replica_set_monitor_error_handler_test.cpp',
-            'streamable_replica_set_monitor_discovery_time_processor_test.cpp'
+            'streamable_replica_set_monitor_discovery_time_processor_test.cpp',
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/client/sdam/sdam',
@@ -467,10 +466,6 @@ env.CppIntegrationTest(
 
 env.Library(
     target='dbclient_mockcursor',
-    source=[
-        'dbclient_mockcursor.cpp'
-    ],
-    LIBDEPS_PRIVATE=[
-        'clientdriver_minimal'
-    ],
+    source=['dbclient_mockcursor.cpp'],
+    LIBDEPS_PRIVATE=['clientdriver_minimal'],
 )

@@ -92,7 +92,8 @@ def _add_scanner(builder):
         return new_results
 
     builder.target_scanner = SCons.Scanner.Scanner(
-        function=new_scanner, path_function=path_function
+        function=new_scanner,
+        path_function=path_function,
     )
 
 
@@ -101,8 +102,7 @@ def generate(env):
         return
 
     env["ARFLAGS"] = SCons.Util.CLVar(
-        [arflag if arflag != "rc" else "rcsTD" for arflag in env["ARFLAGS"]]
-    )
+        [arflag if arflag != "rc" else "rcsTD" for arflag in env["ARFLAGS"]])
 
     # Disable running ranlib, since we added 's' above
     env["RANLIBCOM"] = ""

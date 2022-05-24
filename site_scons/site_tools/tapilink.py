@@ -26,6 +26,7 @@ import subprocess
 # TODO: DRY this with abilink.py by moving duplicated code out to a common
 # support module.
 
+
 def _detect(env):
     try:
         tapi = env["TAPI"]
@@ -70,8 +71,10 @@ def _add_scanner(builder):
         return (getattr(env.Entry(o).attributes, "tbd", o) for o in old_scanner(node, env, path))
 
     builder.target_scanner = SCons.Scanner.Scanner(
-        function=new_scanner, path_function=path_function
+        function=new_scanner,
+        path_function=path_function,
     )
+
 
 def _add_action(builder):
     actions = builder.action
@@ -83,12 +86,11 @@ def _add_action(builder):
     # invoking TAPI proves to be expensive, we could address this by
     # instead post-processing the "real" .tbd file to strip out the
     # UUID, and then potentially even feed it into a hash algorithm.
-    builder.action = actions + SCons.Action.Action(
-        [
-            "$TAPI stubify -o ${TARGET.base}.tbd ${TARGET}",
-            "$TAPI stubify --no-uuids -o ${TARGET.base}.tbd.no_uuid ${TARGET}"
-        ]
-    )
+    builder.action = actions + SCons.Action.Action([
+        "$TAPI stubify -o ${TARGET.base}.tbd ${TARGET}",
+        "$TAPI stubify --no-uuids -o ${TARGET.base}.tbd.no_uuid ${TARGET}",
+    ])
+
 
 def exists(env):
     result = _detect(env) != None

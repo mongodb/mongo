@@ -92,7 +92,8 @@ env.Benchmark(
     ],
     LIBDEPS=[
         'lock_manager',
-    ])
+    ],
+)
 
 env.CppUnitTest(
     target='db_concurrency_test',
@@ -112,5 +113,5 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/progress_meter',
         'exception_util',
         'lock_manager',
-    ]
+    ],
 )

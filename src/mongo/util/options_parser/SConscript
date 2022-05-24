@@ -35,8 +35,11 @@ optsEnv.Library(
 # library because some code that is shared between many different binaries needs to link against the
 # options_parser library, but not all these binaries need to actually run the option parsing.
 # Linking against this library will cause the option parsing initializer to actually be run.
-env.Library('options_parser_init', ['options_parser_init.cpp'],
-                                    LIBDEPS=['options_parser'])
+env.Library(
+    'options_parser_init',
+    ['options_parser_init.cpp'],
+    LIBDEPS=['options_parser'],
+)
 
 env.CppUnitTest(
     target='options_parser_test',

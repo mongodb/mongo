@@ -20,9 +20,8 @@ else:
 
 env.Append(LIBS=[
     'msi',
-    'user32'
-    ]
-)
+    'user32',
+])
 
 ca = env.SharedLibrary(
     target='mongoca',

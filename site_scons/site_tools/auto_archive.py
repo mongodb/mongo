@@ -76,9 +76,7 @@ def add_package_name_alias(env, component, role, name):
     """Add a package name mapping for the combination of component and role."""
     # Verify we didn't get a None or empty string for any argument
     if not name:
-        raise Exception(
-            "when setting a package name alias must provide a name parameter"
-        )
+        raise Exception("when setting a package name alias must provide a name parameter")
     if not component:
         raise Exception("No component provided for package name alias")
     if not role:
@@ -90,7 +88,8 @@ def get_package_name(env, component, role):
     """Return the package file name for the component and role combination."""
     basename = env[PACKAGE_ALIAS_MAP].get(
         # TODO: silent roles shouldn't be included here
-        (component, role), "{component}-{role}".format(component=component, role=role)
+        (component, role),
+        "{component}-{role}".format(component=component, role=role),
     )
 
     return basename
@@ -234,11 +233,7 @@ def archive_builder(source, target, env, for_signature):
     # Collect all the installed files for our entry. This is doing a pure DAG
     # walk idea of what should be. So we filter out any that are not in the
     # installed set.
-    transitive_files = [
-        f for f in
-        collect_transitive_files(env, entry)
-        if f in installed
-    ]
+    transitive_files = [f for f in collect_transitive_files(env, entry) if f in installed]
     if not transitive_files:
         return []
 
@@ -258,7 +253,7 @@ def archive_builder(source, target, env, for_signature):
 
     return "{prefix} {files}".format(
         prefix=command_prefix,
-        files=" ".join(relative_files)
+        files=" ".join(relative_files),
     )
 
 
@@ -274,11 +269,11 @@ def generate(env):
         action=SCons.Action.CommandGeneratorAction(
             archive_builder,
             {"cmdstr": "Building package ${TARGETS[0]} from ${SOURCES[1:]}"},
-        )
-    )
+        ))
     env.Append(BUILDERS={"AutoArchive": bld})
     env["AUTO_ARCHIVE_TARBALL_SUFFIX"] = env.get(
-        "AUTO_ARCHIVE_TARBALL_SUFFIX", "tar.gz"
+        "AUTO_ARCHIVE_TARBALL_SUFFIX",
+        "tar.gz",
     )
     env["AUTO_ARCHIVE_ZIP_SUFFIX"] = env.get("AUTO_ARCHIVE_ZIP_SUFFIX", "zip")
     env[PACKAGE_ALIAS_MAP] = {}
@@ -297,5 +292,4 @@ def generate(env):
             "tar": (auto_archive_gen(env, make_archive_script, "tar"), False),
             "zip": (auto_archive_gen(env, make_archive_script, "zip"), False),
             "archive": (auto_archive_gen(env, make_archive_script, "auto"), False),
-        }
-    )
+        })

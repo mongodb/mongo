@@ -262,11 +262,13 @@ cpp_defines = {
 
 libs = []
 
+
 def removeIfPresent(lst, item):
     try:
         lst.remove(item)
     except ValueError:
         pass
+
 
 def float53_object(target, source, extra_defines=None):
     source = "LIBRARY/float128/" + source + ".c"
@@ -280,13 +282,13 @@ def float53_object(target, source, extra_defines=None):
         obj_env.Append(CCFLAGS='-w')
     return obj_env.LibraryObject(target, source)
 
+
 # Set OS Defines
 if env.TargetOSIs('darwin'):
     cpp_defines['LINUX'] = '1'
     cpp_defines['mach'] = '1'
     extra_objects = [
-        float53_object('dpml_log1p_t', 'dpml_log',
-            [('LOG1P', '1'), ('efi2', '1'), ('EFI2', '1')])
+        float53_object('dpml_log1p_t', 'dpml_log', [('LOG1P', '1'), ('efi2', '1'), ('EFI2', '1')])
     ]
     files += extra_objects
 
@@ -341,14 +343,13 @@ if env.TargetOSIs('windows'):
     # C4477: incorrect scanf format string
     env.Append(CCFLAGS=['/wd4477'])
 
-
 if env.ToolchainIs('msvc'):
     removeIfPresent(env['CCFLAGS'], '/W3')
 else:
     env.Append(CCFLAGS='-w')
 
-
 libenv = env.Clone()
+
 
 # On windows and macos we don't have this problem, but on other
 # platforms we do, where the system ligbcc may duplicate symbols that
@@ -367,11 +368,13 @@ def export_file_generator(target, source, env, for_signature):
     if env.TargetOSIs('posix'):
         return env.File(env.subst("${TARGET.base}.version_script", target=target))
 
+
 def export_flag_generator(target, source, env, for_signature):
     if env.TargetOSIs('darwin'):
         return "-Wl,-exported_symbols_list,"
     if env.TargetOSIs('posix'):
         return "-Wl,--version-script,"
+
 
 if env.TargetOSIs('darwin', 'posix'):
     libenv.AppendUnique(
@@ -388,11 +391,14 @@ inteldecimal_library = libenv.Library(
     LIBS=libenv['LIBS'] + libs,
     LIBDEPS_TAGS=[
         'init-no-global-side-effects',
-    ]
+    ],
 )
 
 if 'EXPORT_FILE_GEN' in libenv:
-    libenv.Depends(inteldecimal_library, libenv.subst('$EXPORT_FILE_GEN', target=inteldecimal_library))
+    libenv.Depends(
+        inteldecimal_library,
+        libenv.subst('$EXPORT_FILE_GEN', target=inteldecimal_library),
+    )
 
 if env["BUILDERS"].get("Ninja", None) is not None:
     Return()
@@ -437,9 +443,9 @@ readtest_input = env.AutoInstall(
 env.Depends(readtest_input, readtest)
 
 readtest_dict = {
-    '@readtest_python_interpreter@' : sys.executable.replace('\\', r'\\'),
-    '@readtest_program@' : readtest[0].name,
-    '@readtest_input@' : readtest_input[0].name,
+    '@readtest_python_interpreter@': sys.executable.replace('\\', r'\\'),
+    '@readtest_program@': readtest[0].name,
+    '@readtest_input@': readtest_input[0].name,
 }
 
 readtest_wrapper = env.Substfile(

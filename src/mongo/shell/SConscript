@@ -34,7 +34,8 @@ generateJSErrorCodes = env.Command(
         '$BUILD_DIR/mongo/base/error_codes.yml',
         'error_codes.tpl.js',
     ],
-    action=['$PYTHON ${SOURCES[0]} ${SOURCES[1]} ${SOURCES[2]} ${TARGETS[0]}'])
+    action=['$PYTHON ${SOURCES[0]} ${SOURCES[1]} ${SOURCES[2]} ${TARGETS[0]}'],
+)
 env.Alias('generated-sources', generateJSErrorCodes)
 
 # Files added here need to be added in scripting/engine.cpp and buildscripts/vcxproj.header as well.
@@ -57,7 +58,7 @@ js_header = env.JSHeader(
         "utils_auth.js",
         "utils.js",
         "utils_sh.js",
-    ]
+    ],
 )
 
 env.Alias('generated-sources', js_header)
@@ -139,7 +140,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/security_token',
-    ]
+    ],
 )
 
 if get_option('ssl') == 'on':
@@ -191,8 +192,7 @@ if get_option('ssl') == 'on':
                 # TODO(SERVER-59992): Remove -Wno-class-memacces where possible.
                 '-Wno-unknown-warning-option',
                 '-Wno-class-memaccess',
-            ],
-        )
+            ], )
 
         scriptingEnv.InjectMozJS()
 
@@ -228,7 +228,7 @@ env.Library(
     target="linenoise",
     source=[
         "linenoise.cpp",
-        "mk_wcwidth.cpp"
+        "mk_wcwidth.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -288,7 +288,6 @@ if not has_option('noshell') and jsEngine:
         LIBDEPS=[
             # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
         ],
-
     )
 
     env.Library(
@@ -322,14 +321,15 @@ if not has_option('noshell') and jsEngine:
         shellEnv.Append(LIBS=["winmm"])
 
         generatedMongoManifest = shellEnv.Substfile(
-                'mongo.manifest.in',
-                SUBST_DICT=[
-                    ('@mongo_version_major@', version_parts[0]),
-                    ('@mongo_version_minor@', version_parts[1]),
-                    ('@mongo_version_patch@', version_parts[2]),
-                    ('@mongo_version_extra@', version_parts[3]),
-                    ('@mongo_version_extra_str@', version_extra),
-                ])
+            'mongo.manifest.in',
+            SUBST_DICT=[
+                ('@mongo_version_major@', version_parts[0]),
+                ('@mongo_version_minor@', version_parts[1]),
+                ('@mongo_version_patch@', version_parts[2]),
+                ('@mongo_version_extra@', version_parts[3]),
+                ('@mongo_version_extra_str@', version_extra),
+            ],
+        )
         shellEnv.Alias('generated-sources', generatedMongoManifest)
         shellEnv.Depends("mongo.res", generatedMongoManifest)
 
@@ -358,12 +358,10 @@ if not has_option('noshell') and jsEngine:
         ],
     )
 
-
 env.CppUnitTest(
     target='shell_test',
     source=[
-        'kms_test.cpp' if get_option('ssl') == 'on' else [],
-        'shell_options_test.cpp',
+        'kms_test.cpp' if get_option('ssl') == 'on' else [], 'shell_options_test.cpp',
         'shell_utils_test.cpp'
     ],
     LIBDEPS=[

@@ -19,11 +19,11 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-
 """Pseudo-builders for building and registering unit tests."""
 from SCons.Script import Action
 
 from site_scons.mongo import insort_wrapper
+
 
 def exists(env):
     return True
@@ -53,9 +53,8 @@ def build_cpp_unit_test(env, target, source, **kwargs):
         unit_test_components = {"tests"}
 
     if "AIB_COMPONENTS_EXTRA" in kwargs:
-        kwargs["AIB_COMPONENTS_EXTRA"] = set(kwargs["AIB_COMPONENTS_EXTRA"]).union(
-            unit_test_components
-        )
+        kwargs["AIB_COMPONENTS_EXTRA"] = set(
+            kwargs["AIB_COMPONENTS_EXTRA"]).union(unit_test_components)
     else:
         kwargs["AIB_COMPONENTS_EXTRA"] = list(unit_test_components)
 

@@ -16,11 +16,11 @@ env.SConscript(
 
 # WorkingSet target and associated test
 env.Library(
-    target = "working_set",
-    source = [
+    target="working_set",
+    source=[
         "working_set.cpp",
     ],
-    LIBDEPS = [
+    LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/service_context",
@@ -29,21 +29,21 @@ env.Library(
 )
 
 env.Library(
-    target = "scoped_timer",
-    source = [
+    target="scoped_timer",
+    source=[
         "scoped_timer.cpp",
     ],
-    LIBDEPS = [
+    LIBDEPS=[
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
 
 env.Library(
-    target = "js_function",
-    source = [
+    target="js_function",
+    source=[
         "js_function.cpp",
     ],
-    LIBDEPS = [
+    LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/query/query_knobs',
         '$BUILD_DIR/mongo/db/service_context',
@@ -52,15 +52,15 @@ env.Library(
 )
 
 env.Library(
-    target = "bucket_unpacker",
-    source = [
+    target="bucket_unpacker",
+    source=[
         "bucket_unpacker.cpp",
     ],
-    LIBDEPS = [
+    LIBDEPS=[
         "$BUILD_DIR/mongo/db/matcher/expressions",
         "document_value/document_value",
     ],
-    LIBDEPS_PRIVATE = [
+    LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/bson/util/bson_column",
         "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
     ],
@@ -95,17 +95,17 @@ env.Library(
         'inclusion_projection_executor.cpp',
         'projection_executor_builder.cpp',
         'projection_executor_utils.cpp',
-        'projection_node.cpp'
+        'projection_node.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/matcher/expressions'
+        '$BUILD_DIR/mongo/db/matcher/expressions',
     ],
 )
 
 env.Library(
     target='stagedebug_cmd',
     source=[
-        'stagedebug_cmd.cpp'
+        'stagedebug_cmd.cpp',
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/index/index_access_methods",
@@ -139,7 +139,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/bson/util/bson_column", 
+        "$BUILD_DIR/mongo/bson/util/bson_column",
         "$BUILD_DIR/mongo/db/auth/authmocks",
         "$BUILD_DIR/mongo/db/query/collation/collator_factory_mock",
         "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",

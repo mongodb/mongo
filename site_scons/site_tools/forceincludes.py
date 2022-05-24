@@ -22,6 +22,7 @@
 
 import SCons
 
+
 def _add_scanner(builder):
     # We are taking over the target scanner here. If we want to not do
     # that we need to invent a ListScanner concept to inject. What if
@@ -35,7 +36,9 @@ def _add_scanner(builder):
 
         # If all nodes could not be resolved, there are missing headers.
         if not all(fis):
-            missing_headers = [header for node, header in zip(fis, env.get('FORCEINCLUDES')) if not node]
+            missing_headers = [
+                header for node, header in zip(fis, env.get('FORCEINCLUDES')) if not node
+            ]
             errstring = f"Could not find force include header(s): {missing_headers} in any path in CPPPATH:\n"
             for cpppath in env.get('CPPPATH', []):
                 errstring += f"\t{env.Dir(cpppath).path}\n"
@@ -60,6 +63,7 @@ def _add_scanner(builder):
         argument=builder.source_scanner,
     )
 
+
 def generate(env, **kwargs):
     if not 'FORCEINCLUDEPREFIX' in env:
         if 'msvc' in env.get('TOOLS', []):
@@ -82,11 +86,11 @@ def generate(env, **kwargs):
         # would enable discovery.
         CCFLAGS=[
             '$_FORCEINCLUDES',
-        ]
-    )
+        ])
 
     for object_builder in SCons.Tool.createObjBuilders(env):
         _add_scanner(object_builder)
+
 
 def exists(env):
     return True

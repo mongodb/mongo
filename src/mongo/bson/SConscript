@@ -58,7 +58,7 @@ asioEnv.InjectThirdParty('asio')
 asioEnv.CppIntegrationTest(
     target='bson_integration_test',
     source=[
-        'ugly_bson_integration_test.cpp'
+        'ugly_bson_integration_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/executor/network_interface',

@@ -19,8 +19,7 @@ env = env.Clone(
     # breaks that. It also seems to interfere with building with the
     # sanitizers, which use linker maps that reference backtrace. This
     # may be an ld.gold bug.
-    DISALLOW_VISHIDDEN=True,
-)
+    DISALLOW_VISHIDDEN=True, )
 
 unwind_root = env.Dir(".").srcnode()
 unwind_platform = unwind_root.Dir("platform/${TARGET_OS}_${TARGET_ARCH}")
@@ -122,45 +121,41 @@ elif env['TARGET_ARCH'] == 's390x':
 else:
     env.FatalError(f"{env['TARGET_ARCH']} unsupported by libunwind.")
 
-env.Append(
-    CCFLAGS=[
-        '-fexceptions',
-        '-Wno-unused-result',
-        '-Wno-pointer-sign',
-        '-Wno-incompatible-pointer-types',
-        '-Wno-unused-variable',
-    ])
+env.Append(CCFLAGS=[
+    '-fexceptions',
+    '-Wno-unused-result',
+    '-Wno-pointer-sign',
+    '-Wno-incompatible-pointer-types',
+    '-Wno-unused-variable',
+])
 
 if env['TARGET_ARCH'] == 'ppc64le':
-    env.Append(
-        CCFLAGS=[
-            '-Wno-unused-value'
-        ])
+    env.Append(CCFLAGS=[
+        '-Wno-unused-value',
+    ])
 
 if env.ToolchainIs('clang'):
     env.Append(CCFLAGS=['-Wno-header-guard'])
 
-env.Append(
-    CPPPATH=[
-        unwind_platform.Dir("build/include"),
-        unwind_root.Dir("dist/src"),
-        unwind_root.Dir("dist/include"),
-        unwind_root.Dir("dist/include/tdep-${UNWIND_TARGET_ARCH}"),
-    ])
+env.Append(CPPPATH=[
+    unwind_platform.Dir("build/include"),
+    unwind_root.Dir("dist/src"),
+    unwind_root.Dir("dist/include"),
+    unwind_root.Dir("dist/include/tdep-${UNWIND_TARGET_ARCH}"),
+])
 
 # propagates to consumers that inject (depend on) unwind.
 env.RegisterConsumerModifications(
     CPPPATH=[unwind_platform.Dir("install/include")],
-    SYSLIBDEPS_PRIVATE=[env['LIBDEPS_LZMA_SYSLIBDEP']])
+    SYSLIBDEPS_PRIVATE=[env['LIBDEPS_LZMA_SYSLIBDEP']],
+)
 
-env.Append(
-    SYSLIBDEPS_PRIVATE=[env['LIBDEPS_LZMA_SYSLIBDEP']])
+env.Append(SYSLIBDEPS_PRIVATE=[env['LIBDEPS_LZMA_SYSLIBDEP']])
 
-env.Append(
-    CPPDEFINES=[
-        'HAVE_CONFIG_H',
-        '_GNU_SOURCE',
-    ])
+env.Append(CPPDEFINES=[
+    'HAVE_CONFIG_H',
+    '_GNU_SOURCE',
+])
 
 unwind_sources = unwind_common_sources + unwind_platform_sources
 

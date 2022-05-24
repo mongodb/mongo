@@ -14,7 +14,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/idl/server_parameter',
-    ]
+    ],
 )
 
 env.Library(
@@ -24,7 +24,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
-    ]
+    ],
 )
 
 env.Library(
@@ -36,7 +36,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         'oplog_entry',
-    ]
+    ],
 )
 
 env.Library(
@@ -127,7 +127,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'replication_auth',
-    ]
+    ],
 )
 
 env.Library(
@@ -173,7 +173,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'repl_server_parameters',
-    ]
+    ],
 )
 
 env.Library(
@@ -296,8 +296,7 @@ env.Library(
     source=[
         'replication_recovery.cpp',
     ],
-    LIBDEPS=[
-    ],
+    LIBDEPS=[],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
@@ -388,7 +387,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
     ],
 )
-
 
 env.Library(
     target='oplog_interface_local',
@@ -550,7 +548,7 @@ env.Library(
 env.Library(
     target='optime_base',
     source=[
-        'optime_base.idl'
+        'optime_base.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -626,7 +624,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/namespace_string',
         'oplog_entry',
         'optime',
-    ]
+    ],
 )
 
 env.Library(
@@ -639,7 +637,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/exec/document_value/document_value'
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
     ],
 )
 
@@ -662,7 +660,7 @@ env.Library(
     ],
     LIBDEPS=[
         'replica_set_messages',
-    ]
+    ],
 )
 
 env.Library(
@@ -686,7 +684,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
         '$BUILD_DIR/mongo/idl/server_parameter',
         'repl_server_parameters',
-    ]
+    ],
 )
 
 env.Library(
@@ -816,26 +814,30 @@ env.Library(
     ],
 )
 
-env.Library('read_concern_args',
-            [
-                'read_concern_args.cpp'
-            ],
-            LIBDEPS=[
-                '$BUILD_DIR/mongo/base',
-                '$BUILD_DIR/mongo/bson/util/bson_extract',
-                '$BUILD_DIR/mongo/db/logical_time',
-                '$BUILD_DIR/mongo/db/read_write_concern_provenance',
-                'optime',
-            ])
+env.Library(
+    'read_concern_args',
+    [
+        'read_concern_args.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/logical_time',
+        '$BUILD_DIR/mongo/db/read_write_concern_provenance',
+        'optime',
+    ],
+)
 
-env.Library('speculative_majority_read_info',
-            [
-                'speculative_majority_read_info.cpp'
-            ],
-            LIBDEPS=[
-                '$BUILD_DIR/mongo/base',
-                'optime',
-            ])
+env.Library(
+    'speculative_majority_read_info',
+    [
+        'speculative_majority_read_info.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'optime',
+    ],
+)
 
 env.Library(
     target='replica_set_messages',
@@ -873,7 +875,7 @@ env.Library(
         '$BUILD_DIR/mongo/idl/server_parameter',
         'repl_server_parameters',
         'split_horizon',
-    ]
+    ],
 )
 
 env.Library(
@@ -1027,7 +1029,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/progress_meter',
         'repl_server_parameters',
         'replication_auth',
-    ]
+    ],
 )
 
 env.Library(
@@ -1056,7 +1058,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/progress_meter',
         'oplog',
         'repl_server_parameters',
-    ]
+    ],
 )
 
 env.Library(
@@ -1149,7 +1151,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-    ]
+    ],
 )
 
 env.Library(
@@ -1166,7 +1168,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'repl_server_parameters',
         'replication_consistency_markers_impl',
-    ]
+    ],
 )
 
 env.Library(
@@ -1184,7 +1186,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/idl/idl_parser',
         'read_concern_args',
-    ]
+    ],
 )
 
 env.Library(
@@ -1210,14 +1212,14 @@ env.Library(
         'repl_sync_shared_data',
         'rollback_checker',
         'storage_interface',
-        'tenant_migration_access_blocker'
+        'tenant_migration_access_blocker',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/executor/scoped_task_executor',
         'repl_server_parameters',
-    ]
+    ],
 )
 
 env.Library(
@@ -1401,7 +1403,7 @@ env.Library(
         'tenant_migration_cloners',
         'tenant_migration_state_machine_idl',
         'tenant_oplog_processing',
-    ]
+    ],
 )
 
 env.Library(
@@ -1430,7 +1432,7 @@ env.Library(
         'repl_coordinator_interface',
         'tenant_migration_decoration',
         'tenant_migration_errors',
-        'tenant_migration_state_machine_idl'
+        'tenant_migration_state_machine_idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
@@ -1530,7 +1532,7 @@ env.Library(
         'oplog',
         'oplog_entry',
         'replmocks',
-    ]
+    ],
 )
 
 env.Library(
@@ -1611,7 +1613,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/util/version_impl',
             'idempotency_test_fixture',
             'tenant_migration_donor_service',
-        ]
+        ],
     )
 
     env.CppUnitTest(
@@ -1779,7 +1781,7 @@ env.CppUnitTest(
         'repl_coordinator_test_fixture',
         'repl_server_parameters',
         'topology_coordinator',
-    ]
+    ],
 )
 
 env.CppUnitTest(
@@ -1793,7 +1795,7 @@ env.CppUnitTest(
         'repl_coordinator_impl',
         'repl_coordinator_test_fixture',
         'topology_version_observer',
-    ]
+    ],
 )
 
 env.Library(
@@ -1960,7 +1962,7 @@ env.Library(
     target='tenant_oplog_processing',
     source=[
         'tenant_oplog_batcher.cpp',
-        'tenant_oplog_applier.cpp'
+        'tenant_oplog_applier.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
@@ -1970,7 +1972,7 @@ env.Library(
         'oplog',
         'oplog_application',
         'oplog_application_interface',
-        'repl_server_parameters'
+        'repl_server_parameters',
     ],
 )
 

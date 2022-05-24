@@ -12,7 +12,7 @@ env.SConscript(
         'optimizer',
     ],
     exports=[
-        'env'
+        'env',
     ],
 )
 
@@ -86,7 +86,7 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/matcher/expressions",
-    ]
+    ],
 )
 
 env.Library(
@@ -101,7 +101,7 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/exec/sbe/query_sbe",
         "canonical_query",
-    ]
+    ],
 )
 
 env.Library(
@@ -268,7 +268,7 @@ env.Library(
         '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/third_party/shim_pcrecpp',
-    ]
+    ],
 )
 
 env.Library(
@@ -281,8 +281,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/service_context",
         "collation/collator_factory_mock",
     ],
-    LIBDEPS_PRIVATE=[
-    ],
+    LIBDEPS_PRIVATE=[],
 )
 
 env.Library(
@@ -329,7 +328,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/pipeline/expression_context',
     ],
- )
+)
 
 env.Library(
     target="plan_yield_policy",
@@ -345,7 +344,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/storage/recovery_unit_base',
     ],
- )
+)
 
 env.CppUnitTest(
     target="db_query_test",

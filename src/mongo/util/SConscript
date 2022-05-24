@@ -21,19 +21,23 @@ js_engine_ver = get_option("js-engine") if get_option("server-js") == "on" else 
 
 module_list = ',\n'.join(['"{0}"_sd'.format(x) for x in env['MONGO_MODULES']])
 
+
 # Render the MONGO_BUILDINFO_ENVIRONMENT_DATA dict into an initializer for a
 # `std::vector<VersionInfoInterface::BuildInfoField>`.
 def fmtBuildInfo(data):
     def fmtBool(val):
         return "true" if val else "false"
+
     def fmtStr(val):
         return 'R"({0})"_sd'.format(val.replace("\\", r"\\"))
+
     def fmtObj(obj):
-        return '{{{}, {}, {}, {}}}'.format(fmtStr(obj['key']),
-                                           fmtStr(env.subst(obj['value'])),
-                                           fmtBool(obj['inBuildInfo']),
-                                           fmtBool(obj['inVersion']))
-    return ',\n'.join([fmtObj(obj) for _,obj in data.items()])
+        return '{{{}, {}, {}, {}}}'.format(
+            fmtStr(obj['key']), fmtStr(env.subst(obj['value'])), fmtBool(obj['inBuildInfo']),
+            fmtBool(obj['inVersion']))
+
+    return ',\n'.join([fmtObj(obj) for _, obj in data.items()])
+
 
 buildInfoInitializer = fmtBuildInfo(env['MONGO_BUILDINFO_ENVIRONMENT_DATA'])
 
@@ -51,7 +55,8 @@ generatedVersionFile = env.Substfile(
         ('@buildinfo_allocator@', env['MONGO_ALLOCATOR']),
         ('@buildinfo_modules@', module_list),
         ('@buildinfo_environment_data@', buildInfoInitializer),
-    ])
+    ],
+)
 env.Alias('generated-sources', generatedVersionFile)
 
 if env.TargetOSIs('windows'):
@@ -64,7 +69,8 @@ if env.TargetOSIs('windows'):
             ('@mongo_version_minor@', version_parts[1]),
             ('@mongo_version_patch@', version_parts[2]),
             ('@mongo_git_hash@', env['MONGO_GIT_HASH']),
-        ])
+        ],
+    )
     env.Alias('generated-sources', generatedResourceConstantFile)
 
 # Shim library for boost to depend on
@@ -101,22 +107,22 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-    ]
+    ],
 )
 
 env.Library(
     target='intrusive_counter',
     source=[
         'intrusive_counter.cpp',
-        ],
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-    ]
+    ],
 )
 
 env.Library(
     target='log_and_backoff',
-    source= [
+    source=[
         'log_and_backoff.cpp',
     ],
     LIBDEPS=[
@@ -126,7 +132,7 @@ env.Library(
 
 env.Library(
     target='regex_util',
-    source= [
+    source=[
         'regex_util.cpp',
     ],
     LIBDEPS=[
@@ -166,7 +172,7 @@ env.Library(
 env.Library(
     target='clock_source_mock',
     source=[
-        'clock_source_mock.cpp'
+        'clock_source_mock.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -287,7 +293,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
-    ]
+    ],
 )
 
 env.Library(
@@ -297,7 +303,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-    ]
+    ],
 )
 
 env.CppUnitTest(
@@ -310,7 +316,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/tracing_support',
     ],
 )
-
 
 env.CppUnitTest(
     target='thread_safety_context_test',
@@ -332,12 +337,10 @@ if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
 
         # If our changes to tcmalloc are ever upstreamed, this should become set based on a top
         # level configure check, though its effects should still be scoped just to these files.
-        tcmspEnv.Append(
-            CPPDEFINES=[
-                'MONGO_HAVE_GPERFTOOLS_GET_THREAD_CACHE_SIZE',
-                'MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS'
-            ]
-        )
+        tcmspEnv.Append(CPPDEFINES=[
+            'MONGO_HAVE_GPERFTOOLS_GET_THREAD_CACHE_SIZE',
+            'MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS',
+        ])
 
     if not use_system_version_of_library('valgrind'):
         # Include valgrind since tcmalloc disables itself while running under valgrind
@@ -351,8 +354,7 @@ if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
             'tcmalloc_parameters.idl',
             'heap_profiler.cpp',
         ],
-        LIBDEPS=[
-        ],
+        LIBDEPS=[],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/db/commands/server_status',
             '$BUILD_DIR/mongo/idl/server_parameter',
@@ -401,7 +403,7 @@ env.Library(
 if get_option('use-diagnostic-latches') == 'on':
     env.Library(
         target='diagnostic_info',
-        source= [
+        source=[
             'diagnostic_info.cpp',
         ],
         LIBDEPS=[
@@ -412,7 +414,7 @@ if get_option('use-diagnostic-latches') == 'on':
 
     env.Library(
         target='latch_analyzer',
-        source= [
+        source=[
             'latch_analyzer.cpp',
         ],
         LIBDEPS=[
@@ -442,7 +444,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        'net/network', # this is for using listener to check elapsed time
+        'net/network',  # this is for using listener to check elapsed time
     ],
 )
 
@@ -511,7 +513,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
-    ]
+    ],
 )
 
 env.Library(
@@ -540,8 +542,7 @@ env.Benchmark(
     source=[
         'decimal_counter_bm.cpp',
     ],
-    LIBDEPS=[
-    ],
+    LIBDEPS=[],
 )
 
 env.Benchmark(
@@ -549,8 +550,7 @@ env.Benchmark(
     source=[
         'itoa_bm.cpp',
     ],
-    LIBDEPS=[
-    ],
+    LIBDEPS=[],
 )
 
 env.Benchmark(
@@ -558,8 +558,7 @@ env.Benchmark(
     source=[
         'future_bm.cpp',
     ],
-    LIBDEPS=[
-    ],
+    LIBDEPS=[],
 )
 
 env.Library(
@@ -568,15 +567,14 @@ env.Library(
         'future_util.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/executor/task_executor_interface'
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
     ],
 )
 
 env.Benchmark(
     target='hash_table_bm',
     source='hash_table_bm.cpp',
-    LIBDEPS=[
-    ],
+    LIBDEPS=[],
 )
 
 if env.TargetOSIs('linux'):
@@ -612,8 +610,8 @@ if not use_system_version_of_library("icu"):
         source=[
             "generate_icu_init_cpp.py",
             ("$BUILD_DIR/third_party/icu4c-57.1/source/mongo_sources/icudt57l.dat"
-                if endian == "little"
-                else "$BUILD_DIR/third_party/icu4c-57.1/source/mongo_sources/icudt57b.dat"),
+             if endian == "little" else
+             "$BUILD_DIR/third_party/icu4c-57.1/source/mongo_sources/icudt57b.dat"),
         ],
         action="$PYTHON ${SOURCES[0]} -o $TARGET -i ${SOURCES[1]}",
     )
@@ -633,8 +631,7 @@ if not use_system_version_of_library("icu"):
             ("U_DISABLE_RENAMING", 1),
             ("U_STATIC_IMPLEMENTATION", 1),
             ("U_USING_ICU_NAMESPACE", 0),
-        ],
-    )
+        ], )
 
 # When using ICU from third_party, icu_init.cpp will load a subset of
 # ICU's data files using udata_setCommonData() in an initializer.
@@ -769,7 +766,7 @@ if env.TargetOSIs('windows'):
         ],
         LIBS=[
             'shell32',
-            env['LIBS']
+            env['LIBS'],
         ],
     )
 
@@ -781,11 +778,9 @@ env.Benchmark(
 stacktraceEnv = env.Clone()
 if use_libunwind:
     stacktraceEnv.InjectThirdParty(libraries=['unwind'])
-    stacktraceEnv.AppendUnique(
-        LIBDEPS=[
-            '$BUILD_DIR/third_party/shim_unwind',
-        ],
-    )
+    stacktraceEnv.AppendUnique(LIBDEPS=[
+        '$BUILD_DIR/third_party/shim_unwind',
+    ], )
 
     stacktraceEnv.CppUnitTest(
         target=[
@@ -851,4 +846,3 @@ env.Benchmark(
         'processinfo',
     ],
 )
-

@@ -9,7 +9,5 @@ env.CppUnitTest(
     source=[
         'algebra_test.cpp',
     ],
-    LIBDEPS=[
-
-    ]
+    LIBDEPS=[],
 )

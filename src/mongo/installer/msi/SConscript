@@ -35,14 +35,17 @@ env['WIXUIEXT'] = r'$WIXPATH\WixUIExtension.dll'
 env['WIXUTILEXT'] = r'$WIXPATH\WixUtilExtension.dll'
 
 if not 'VCREDISTMERGEMODULEPATH' in env['MSVS']:
-    print("SCons tool setup did not configure the path to the vcredist merge modules, disabling MSI installer")
+    print(
+        "SCons tool setup did not configure the path to the vcredist merge modules, disabling MSI installer"
+    )
     Return()
 
-sourcesList = [ "BinaryFragment.wxs",
-            "FeatureFragment.wxs",
-            "LicensingFragment.wxs",
-            "UIFragment.wxs",
-            ]
+sourcesList = [
+    "BinaryFragment.wxs",
+    "FeatureFragment.wxs",
+    "LicensingFragment.wxs",
+    "UIFragment.wxs",
+]
 
 # Need to do this in order to get scons to translate path separators into native format
 buildDir = env.Dir("$BUILD_DIR").path
@@ -61,13 +64,13 @@ enterpriseToolBuildDir = buildDir + r'\mongo\db\modules\enterprise'
 msi_flavor = '2008R2Plus'
 msi_platform = 'x64'
 
-if 'enterprise' in env['MONGO_MODULES']: # Enterprise
-  msi_edition = 'Enterprise'
-else: # Community
-  if get_option('ssl') == 'on':
-    msi_edition = 'SSL'
-  else:
-    msi_edition = 'Standard'
+if 'enterprise' in env['MONGO_MODULES']:  # Enterprise
+    msi_edition = 'Enterprise'
+else:  # Community
+    if get_option('ssl') == 'on':
+        msi_edition = 'SSL'
+    else:
+        msi_edition = 'Standard'
 
 full_version = env['MONGO_VERSION'].partition('-')[0]
 
@@ -94,7 +97,6 @@ objects = ["$BUILD_DIR/msi/" + file.replace(".wxs", ".wixobj") for file in sourc
 # GUID generation for us rather then build a database of GUIDs in our build system
 # For major updates, we are going to create a new directory/productid/upgrade_code ie, 2.6 -> 3.0
 
-
 # candle: compile .wxs files into .wixobjs
 candle_targets = env.Command(
     target=objects,
@@ -103,21 +105,16 @@ candle_targets = env.Command(
         '"$WIXCANDLE" -wx'
         # cannot have anything other than x.x.x.x in version string.
         # we should choose a fourth version number that reflects pre-ness.
-        ' -dMongoDBMajorVersion=' + major_version +
-        ' -dMongoDBVersion=' + full_version +
+        ' -dMongoDBMajorVersion=' + major_version + ' -dMongoDBVersion=' + full_version +
         ' -dLicenseSource=distsrc'
         r' -dEnterpriseBase=' + enterprisebase + '\\'
-        ' -dBinarySource=' + "\"$DESTDIR\\$PREFIX_BINDIR\"" +
-        ' -dMergeModulesBasePath=' + "\"${MSVS['VCREDISTMERGEMODULEPATH']}\"" +
-        ' -dMergeModuleFileCRT=' + env.GetMergeModuleNameForFeature('CRT') +
-        ' -dEdition=' + msi_edition +
-        ' -d"ProductId=*\"'
-        ' -dUpgradeCode=' + upgrade_code +
-        ' -dCustomActionDll=' + "\"$DESTDIR\\$PREFIX_BINDIR\\mongoca.dll\"" +
-        ' -dConfiguration=Release'
+        ' -dBinarySource=' + "\"$DESTDIR\\$PREFIX_BINDIR\"" + ' -dMergeModulesBasePath=' +
+        "\"${MSVS['VCREDISTMERGEMODULEPATH']}\"" + ' -dMergeModuleFileCRT=' +
+        env.GetMergeModuleNameForFeature('CRT') + ' -dEdition=' + msi_edition + ' -d"ProductId=*\"'
+        ' -dUpgradeCode=' + upgrade_code + ' -dCustomActionDll=' +
+        "\"$DESTDIR\\$PREFIX_BINDIR\\mongoca.dll\"" + ' -dConfiguration=Release'
         ' -dOutDir=' + buildDir + r'\msi'
-        ' -dPlatform=' + msi_platform +
-        ' -dFlavor=' + msi_flavor +
+        ' -dPlatform=' + msi_platform + ' -dFlavor=' + msi_flavor +
         r' -dProjectDir=buildscripts\packaging\msi\\'
         ' -dProjectName=MongoDB'
         ' -dTargetDir=' + buildDir + r'\msi'
@@ -125,13 +122,11 @@ candle_targets = env.Command(
         ' -dTargetFileName=${SERVER_ARCHIVE}'
         r' -dSaslSource=c:\sasl\bin'
         r' -dSnmpSource=c:\snmp\bin'
-        r' -dSslSource=' + env['WINDOWS_OPENSSL_BIN'] +
-        ' -out ' + buildDir + r'\msi\\'
-        ' -arch ' + msi_platform +
-        ' -ext "$WIXUIEXT"'
+        r' -dSslSource=' + env['WINDOWS_OPENSSL_BIN'] + ' -out ' + buildDir + r'\msi\\'
+        ' -arch ' + msi_platform + ' -ext "$WIXUIEXT"'
         ' -ext "$WIXUTILEXT"'
         ' $SOURCES'
-    ]
+    ],
 )
 
 pre_msi = env.Command(
@@ -155,34 +150,34 @@ pre_msi = env.Command(
         #    so this consistency check can be ignored.
         # -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa368954(v=vs.85).aspx
         ' -sice:ICE30'
-
         ' -ext "$WIXUIEXT"'
         ' -ext "$WIXUTILEXT"'
         ' ${SOURCES}'
-    ]
+    ],
 )
 
-env.Depends(pre_msi, [
-    '#/buildscripts/packaging/msi/mongod.yaml',
+env.Depends(
+    pre_msi,
+    [
+        '#/buildscripts/packaging/msi/mongod.yaml',
 
-    # This could potentially be a superset of what we actually
-    # require to build the MSI, but it should never be a subset.
-    env.Alias('install-dist'),
+        # This could potentially be a superset of what we actually
+        # require to build the MSI, but it should never be a subset.
+        env.Alias('install-dist'),
 
-    # We also need the mongoca DLL.
-    env.Alias('install-msi-util')
-])
+        # We also need the mongoca DLL.
+        env.Alias('install-msi-util')
+    ],
+)
 
 env.NoCache(pre_msi)
 
 msi = env.Command(
     target='$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.msi',
     source=pre_msi,
-    action=[
-        r'$PYTHON buildscripts\msitrim.py ${SOURCES} ${TARGET}'
-    ]
+    action=[r'$PYTHON buildscripts\msitrim.py ${SOURCES} ${TARGET}'],
 )
 env.AlwaysBuild(msi)
 env.NoCache(msi)
 
-env.Alias( "msi" , msi )
+env.Alias("msi", msi)

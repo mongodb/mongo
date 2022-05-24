@@ -13,11 +13,9 @@ env = env.Clone()
 # Add any "global" dependencies here. This is where we make every build node
 # depend on a list of other build nodes, such as an allocator or libunwind
 # or libstdx or similar.
-env.AppendUnique(
-    LIBDEPS_GLOBAL=[
-        '$BUILD_DIR/third_party/shim_allocator',
-    ],
-)
+env.AppendUnique(LIBDEPS_GLOBAL=[
+    '$BUILD_DIR/third_party/shim_allocator',
+], )
 
 # NOTE: We must do third_party first as it adds methods to the environment
 # that we need in the mongo sconscript
@@ -40,7 +38,6 @@ env.InjectThirdParty(libraries=[
     'safeint',
     'variant',
 ])
-
 
 # It would be somewhat better if this could be applied down in
 # `src/mongo/SConscript`, since the goal of doing it here rather than

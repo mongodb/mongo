@@ -5,14 +5,15 @@ import shutil
 import stat
 
 
-
 def _copy(src, dst):
     shutil.copy2(src, dst)
     st = os.stat(src)
     os.chmod(dst, stat.S_IMODE(st[stat.ST_MODE]) | stat.S_IWRITE)
 
+
 def _symlink(src, dst):
     os.symlink(os.path.relpath(src, os.path.dirname(dst)), dst)
+
 
 def _hardlink(src, dst):
     try:
@@ -20,14 +21,17 @@ def _hardlink(src, dst):
     except:
         _copy(src, dst)
 
+
 available_actions = {
-    "copy" : _copy,
-    "hardlink" : _hardlink,
-    "symlink" : _symlink,
+    "copy": _copy,
+    "hardlink": _hardlink,
+    "symlink": _symlink,
 }
+
 
 class _CopytreeError(EnvironmentError):
     pass
+
 
 def _generate_install_actions(base_action):
 
@@ -81,7 +85,6 @@ def _generate_install_actions(base_action):
         if errors:
             raise _CopytreeError(errors)
 
-
     #
     # Functions doing the actual work of the Install Builder.
     #
@@ -92,7 +95,9 @@ def _generate_install_actions(base_action):
         if os.path.isdir(source):
             if os.path.exists(dest):
                 if not os.path.isdir(dest):
-                    raise SCons.Errors.UserError("cannot overwrite non-directory `%s' with a directory `%s'" % (str(dest), str(source)))
+                    raise SCons.Errors.UserError(
+                        "cannot overwrite non-directory `%s' with a directory `%s'" % (str(dest),
+                                                                                       str(source)))
             else:
                 parent = os.path.split(dest)[0]
                 if not os.path.exists(parent):
@@ -112,7 +117,8 @@ def _generate_install_actions(base_action):
         required symlinks."""
 
         if os.path.isdir(source):
-            raise SCons.Errors.UserError("cannot install directory `%s' as a version library" % str(source) )
+            raise SCons.Errors.UserError(
+                "cannot install directory `%s' as a version library" % str(source))
         else:
             # remove the link if it is already there
             try:

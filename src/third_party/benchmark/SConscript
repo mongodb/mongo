@@ -21,27 +21,31 @@ env.Append(
     ],
 )
 
-src_dir=env.Dir('dist/src')
+src_dir = env.Dir('dist/src')
 
 env.Library(
     target="benchmark",
-    source=env.File([
-        'benchmark_api_internal.cc',
-        'benchmark.cc',
-        'benchmark_name.cc',
-        'benchmark_register.cc',
-        'benchmark_runner.cc',
-        'colorprint.cc',
-        'commandlineflags.cc',
-        'complexity.cc',
-        'console_reporter.cc',
-        'counter.cc',
-        'csv_reporter.cc',
-        'json_reporter.cc',
-        'reporter.cc',
-        'sleep.cc',
-        'statistics.cc',
-        'string_util.cc',
-        'sysinfo.cc',
-        'timers.cc',
-    ], src_dir))
+    source=env.File(
+        [
+            'benchmark_api_internal.cc',
+            'benchmark.cc',
+            'benchmark_name.cc',
+            'benchmark_register.cc',
+            'benchmark_runner.cc',
+            'colorprint.cc',
+            'commandlineflags.cc',
+            'complexity.cc',
+            'console_reporter.cc',
+            'counter.cc',
+            'csv_reporter.cc',
+            'json_reporter.cc',
+            'reporter.cc',
+            'sleep.cc',
+            'statistics.cc',
+            'string_util.cc',
+            'sysinfo.cc',
+            'timers.cc',
+        ],
+        src_dir,
+    ),
+)

@@ -61,7 +61,10 @@ class DistSrcArchive:
             )
         elif filename.endswith("zip"):
             return DistSrcZipArchive(
-                "zip", zipfile.ZipFile(filename, "a"), filename, "a",
+                "zip",
+                zipfile.ZipFile(filename, "a"),
+                filename,
+                "a",
             )
 
     def close(self):
@@ -89,13 +92,13 @@ class DistSrcTarArchive(DistSrcArchive):
         )
 
     def append_file_contents(
-        self,
-        filename,
-        file_contents,
-        mtime=None,
-        mode=0o644,
-        uname="root",
-        gname="root",
+            self,
+            filename,
+            file_contents,
+            mtime=None,
+            mode=0o644,
+            uname="root",
+            gname="root",
     ):
         if mtime is None:
             mtime = time.time()
@@ -109,7 +112,9 @@ class DistSrcTarArchive(DistSrcArchive):
         if self.archive_mode == "r":
             self.archive_file.close()
             self.archive_file = tarfile.open(
-                self.archive_name, "a", format=tarfile.PAX_FORMAT,
+                self.archive_name,
+                "a",
+                format=tarfile.PAX_FORMAT,
             )
             self.archive_mode = "a"
         self.archive_file.addfile(file_metadata, fileobj=file_buf)
@@ -141,13 +146,13 @@ class DistSrcZipArchive(DistSrcArchive):
         )
 
     def append_file_contents(
-        self,
-        filename,
-        file_contents,
-        mtime=None,
-        mode=0o644,
-        uname="root",
-        gname="root",
+            self,
+            filename,
+            file_contents,
+            mtime=None,
+            mode=0o644,
+            uname="root",
+            gname="root",
     ):
         if mtime is None:
             mtime = time.time()
@@ -187,15 +192,14 @@ def distsrc_action_generator(source, target, env, for_signature):
         print("Invalid file format for distsrc. Must be tar or zip file")
         env.Exit(1)
 
-    git_cmd = (
-        '"%s" archive --format %s --output %s --prefix ${MONGO_DIST_SRC_PREFIX} HEAD'
-        % (git_path, target_ext, target[0])
-    )
+    git_cmd = ('"%s" archive --format %s --output %s --prefix ${MONGO_DIST_SRC_PREFIX} HEAD' %
+               (git_path, target_ext, target[0]))
 
     return [
         SCons.Action.Action(git_cmd, "Running git archive for $TARGET"),
         SCons.Action.Action(
-            run_distsrc_callbacks, "Running distsrc callbacks for $TARGET"
+            run_distsrc_callbacks,
+            "Running distsrc callbacks for $TARGET",
         ),
     ]
 
@@ -206,9 +210,7 @@ def add_callback(env, fn):
 
 def generate(env, **kwargs):
     env.AddMethod(add_callback, "AddDistSrcCallback")
-    env["BUILDERS"]["__DISTSRC"] = SCons.Builder.Builder(
-        generator=distsrc_action_generator,
-    )
+    env["BUILDERS"]["__DISTSRC"] = SCons.Builder.Builder(generator=distsrc_action_generator, )
 
     def DistSrc(env, target, **kwargs):
         result = env.__DISTSRC(target=target, source=[], **kwargs)

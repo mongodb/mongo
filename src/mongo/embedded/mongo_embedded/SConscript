@@ -19,18 +19,14 @@ env.AutoInstall(
 )
 
 mongoEmbeddedEnv = env.Clone()
-mongoEmbeddedEnv.AppendUnique(
-    CPPDEFINES=[
-        'MONGO_EMBEDDED_COMPILING',
-    ],
-)
+mongoEmbeddedEnv.AppendUnique(CPPDEFINES=[
+    'MONGO_EMBEDDED_COMPILING',
+], )
 
 if get_option('link-model') == 'static':
-    mongoEmbeddedEnv.AppendUnique(
-        CPPDEFINES=[
-            'MONGO_EMBEDDED_STATIC',
-        ],
-    )
+    mongoEmbeddedEnv.AppendUnique(CPPDEFINES=[
+        'MONGO_EMBEDDED_STATIC',
+    ], )
 elif get_option('link-model') == 'dynamic-sdk':
     # TODO(SERVER-59134): This fails to honor the libdeps-debug flag
     mongoEmbeddedEnv['LIBDEPS_SHLIBEMITTER'] = partial(
@@ -39,11 +35,9 @@ elif get_option('link-model') == 'dynamic-sdk':
         visibility_map=libdeps.dependency_visibility_honored,
     )
 
-mongoEmbeddedEnv.AppendUnique(
-    SHLINKFLAGS=[
-        '$MONGO_EXPORT_FILE_SHLINKFLAGS',
-    ],
-)
+mongoEmbeddedEnv.AppendUnique(SHLINKFLAGS=[
+    '$MONGO_EXPORT_FILE_SHLINKFLAGS',
+], )
 
 if mongoEmbeddedEnv.TargetOSIs('darwin'):
     # The current version and compatibility are the *minor* ABI
@@ -57,9 +51,7 @@ if mongoEmbeddedEnv.TargetOSIs('darwin'):
         SHLINKFLAGS=[
             '-Wl,-current_version,1',
             '-Wl,-compatibility_version,1',
-        ],
-    )
-
+        ], )
 
 mongoEmbeddedTargets = mongoEmbeddedEnv.Library(
     target='mongo_embedded',

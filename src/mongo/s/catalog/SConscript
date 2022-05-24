@@ -29,8 +29,8 @@ env.Library(
         'sharding_catalog_client',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/logical_session_id_helpers'
-    ]
+        '$BUILD_DIR/mongo/db/logical_session_id_helpers',
+    ],
 )
 
 env.Library(
@@ -40,6 +40,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/client/shard_interface',
-        'sharding_catalog_client'
-    ]
+        'sharding_catalog_client',
+    ],
 )

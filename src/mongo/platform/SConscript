@@ -21,7 +21,7 @@ env.CppUnitTest(
         'stack_locator_test.cpp',
         'decimal128_test.cpp',
         'decimal128_bson_test.cpp',
-        'overflow_arithmetic_test.cpp'
+        'overflow_arithmetic_test.cpp',
     ],
 )
 
@@ -30,8 +30,7 @@ env.Benchmark(
     source=[
         'endian_bm.cpp',
     ],
-    LIBDEPS=[
-    ],
+    LIBDEPS=[],
 )
 
 if not get_option("link-model") == "dynamic":
@@ -52,7 +51,7 @@ env.Library(
 env.Library(
     target="visibility_test_lib1",
     source=[
-        "visibility_test_lib1.cpp"
+        "visibility_test_lib1.cpp",
     ],
     LIBDEPS_NO_INHERIT=[
         '$BUILD_DIR/third_party/shim_allocator',
@@ -67,7 +66,7 @@ env.Library(
 env.Library(
     target="visibility_test_lib2",
     source=[
-        "visibility_test_lib2.cpp"
+        "visibility_test_lib2.cpp",
     ],
     LIBDEPS_NO_INHERIT=[
         '$BUILD_DIR/third_party/shim_allocator',

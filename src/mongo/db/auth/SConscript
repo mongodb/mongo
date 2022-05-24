@@ -87,7 +87,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/op_observer_util',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
         'auth',
-    ]
+    ],
 )
 
 env.Library(
@@ -120,7 +120,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/multitenancy',
         'auth_types',
-    ]
+    ],
 )
 
 env.Library(
@@ -208,7 +208,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/api_parameters',
-        '$BUILD_DIR/mongo/db/audit', # audit:logLogout in AuthZSession.
+        '$BUILD_DIR/mongo/db/audit',  # audit:logLogout in AuthZSession.
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/caching',
@@ -304,7 +304,7 @@ env.Library(
         "$BUILD_DIR/mongo/util/net/ssl_manager",
         "$BUILD_DIR/mongo/util/net/ssl_parameters_auth",
         'cluster_auth_mode',
-        'security_key'
+        'security_key',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/server_options_core',
@@ -407,7 +407,7 @@ env.Library(
         'sasl_options.idl',
     ],
     LIBDEPS=[
-        'sasl_options'
+        'sasl_options',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/net/network',
@@ -466,7 +466,7 @@ env.Library(
         'authz_session_external_state_s.cpp',
         'user_cache_invalidator_job.cpp',
         'user_cache_invalidator_job_parameters.idl',
-        ],
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
     ],
@@ -513,7 +513,7 @@ env.Library(
     source=[
         'ldap_operation_stats.cpp',
         'ldap_cumulative_operation_stats.cpp',
-        'user_cache_acquisition_stats.cpp'
+        'user_cache_acquisition_stats.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',

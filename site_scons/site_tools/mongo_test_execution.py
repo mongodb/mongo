@@ -29,6 +29,7 @@ import auto_install_binaries
 _proof_scanner_cache_key = "proof_scanner_cache"
 _associated_proof = "associated_proof_key"
 
+
 def proof_generator_command_scanner_func(node, env, path):
     results = getattr(node.attributes, _proof_scanner_cache_key, None)
     if results is not None:
@@ -37,19 +38,21 @@ def proof_generator_command_scanner_func(node, env, path):
     setattr(node.attributes, _proof_scanner_cache_key, results)
     return results
 
+
 proof_generator_command_scanner = SCons.Scanner.Scanner(
     function=proof_generator_command_scanner_func,
     path_function=None,
-    recursive=True
+    recursive=True,
 )
+
 
 def auto_prove_task(env, component, role):
     entry = auto_install_binaries.get_alias_map_entry(env, component, role)
     return [
-        getattr(f.attributes, _associated_proof)
-        for f in entry.files
+        getattr(f.attributes, _associated_proof) for f in entry.files
         if hasattr(f.attributes, _associated_proof)
     ]
+
 
 def generate_test_execution_aliases(env, test):
     installed = [test]
@@ -90,7 +93,8 @@ def generate_test_execution_aliases(env, test):
         verbose_source_command = test_env.Command(
             target=f"#+{target_name}-{source_name}",
             source=installed[0],
-            action="$( $ICERUN $) ${SOURCES[0]} -fileNameFilter $TEST_SOURCE_FILE_NAME $UNITTEST_FLAGS",
+            action=
+            "$( $ICERUN $) ${SOURCES[0]} -fileNameFilter $TEST_SOURCE_FILE_NAME $UNITTEST_FLAGS",
             TEST_SOURCE_FILE_NAME=source_name,
             NINJA_POOL="console",
         )
@@ -102,7 +106,10 @@ def generate_test_execution_aliases(env, test):
 
         alias = env.Alias(f'+{source_name}', verbose_source_command)
         if len(alias[0].children()) > 1:
-            raise SCons.Errors.BuildError(alias[0].children()[0], f"Multiple unit test programs contain a source file named '{source_name}' which would result in an ambiguous test execution alias. Unit test source filenames are required to be globally unique.")
+            raise SCons.Errors.BuildError(
+                alias[0].children()[0],
+                f"Multiple unit test programs contain a source file named '{source_name}' which would result in an ambiguous test execution alias. Unit test source filenames are required to be globally unique."
+            )
 
     proof_generator_command = test_env.Command(
         target=[
@@ -110,11 +117,8 @@ def generate_test_execution_aliases(env, test):
             '${SOURCE}.status',
         ],
         source=installed[0],
-        action=SCons.Action.Action(
-            "$PROOF_GENERATOR_COMMAND",
-            "$PROOF_GENERATOR_COMSTR"
-        ),
-        source_scanner=proof_generator_command_scanner
+        action=SCons.Action.Action("$PROOF_GENERATOR_COMMAND", "$PROOF_GENERATOR_COMSTR"),
+        source_scanner=proof_generator_command_scanner,
     )
 
     # We assume tests are provable by default, but some tests may not
@@ -128,10 +132,7 @@ def generate_test_execution_aliases(env, test):
     proof_analyzer_command = test_env.Command(
         target='${SOURCES[1].base}.proof',
         source=proof_generator_command,
-        action=SCons.Action.Action(
-            "$PROOF_ANALYZER_COMMAND",
-            "$PROOF_ANALYZER_COMSTR"
-        )
+        action=SCons.Action.Action("$PROOF_ANALYZER_COMMAND", "$PROOF_ANALYZER_COMSTR"),
     )
 
     proof_analyzer_alias = env.Alias(
@@ -143,6 +144,7 @@ def generate_test_execution_aliases(env, test):
 
     # TODO: Should we enable proof at the file level?
 
+
 def exists(env):
     return True
 
@@ -153,14 +155,13 @@ def generate(env):
     env.AddMethod(generate_test_execution_aliases, "GenerateTestExecutionAliases")
 
     env["TEST_EXECUTION_SUFFIX_DENYLIST"] = env.get(
-        "TEST_EXECUTION_SUFFIX_DENYLIST", [".in"]
+        "TEST_EXECUTION_SUFFIX_DENYLIST",
+        [".in"],
     )
 
-    env.AppendUnique(
-        AIB_TASKS={
-            "prove": (auto_prove_task, False),
-        }
-    )
+    env.AppendUnique(AIB_TASKS={
+        "prove": (auto_prove_task, False),
+    })
 
     # TODO: Should we have some sort of prefix_xdir for the output location for these? Something like
     # $PREFIX_VARCACHE and which in our build is pre-populated to $PREFIX/var/cache/mongo or similar?

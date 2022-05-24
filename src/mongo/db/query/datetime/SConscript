@@ -8,25 +8,21 @@ timeZoneEnv = env.Clone()
 timeZoneEnv.InjectThirdParty(libraries=['timelib'])
 timeZoneEnv.Library(
     target='date_time_support',
-    source=[
-        'date_time_support.cpp'
-    ],
+    source=['date_time_support.cpp'],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/third_party/shim_timelib',
-    ]
+    ],
 )
 
 timeZoneEnv.Library(
     target='init_timezone_data',
-    source=[
-        'init_timezone_data.cpp'
-    ],
+    source=['init_timezone_data.cpp'],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/third_party/shim_timelib',
         'date_time_support',
-    ]
+    ],
 )
 
 timeZoneEnv.CppUnitTest(
@@ -36,7 +32,7 @@ timeZoneEnv.CppUnitTest(
     ],
     LIBDEPS=[
         'date_time_support',
-    ]
+    ],
 )
 
 timeZoneEnv.CppLibfuzzerTest(
@@ -46,5 +42,5 @@ timeZoneEnv.CppLibfuzzerTest(
     ],
     LIBDEPS=[
         'date_time_support',
-    ]
+    ],
 )

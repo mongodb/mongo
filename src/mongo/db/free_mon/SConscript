@@ -68,7 +68,6 @@ else:
         ],
     )
 
-
 fmEnv.CppUnitTest(
     target='db_free_mon_test',
     source=[

@@ -129,5 +129,5 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         'mongos_process_interface',
         'shardsvr_process_interface',
-    ]
+    ],
 )

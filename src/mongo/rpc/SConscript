@@ -138,7 +138,7 @@ env.Library(
 
 env.Library(
     target=[
-        'metadata_impersonated_user'
+        'metadata_impersonated_user',
     ],
     source=[
         'metadata/impersonated_user_metadata.cpp',
@@ -153,7 +153,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options',
     ],
 )
-
 
 env.Library(
     target='client_metadata',
@@ -199,14 +198,14 @@ if wiredtiger:
             'metadata',
             'rewrite_state_change_errors',
             'rpc',
-        ]
+        ],
     )
 
 env.CppIntegrationTest(
     target='rpc_integration_test',
     source=[
         'op_msg_integration_test.cpp',
-        'op_legacy_integration_test.cpp'
+        'op_legacy_integration_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_network',

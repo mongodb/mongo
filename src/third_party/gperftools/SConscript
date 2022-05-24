@@ -9,8 +9,7 @@ Import("selected_experimental_optimizations")
 env = env.Clone(
     # Building with hidden visibility interferes with intercepting the
     # libc allocation functions.
-    DISALLOW_VISHIDDEN=True,
-)
+    DISALLOW_VISHIDDEN=True, )
 
 # If we don't have a frame pointer, we need to tell tcmalloc so that
 # it doesn't try to select a frame pointer based unwinder like
@@ -35,16 +34,13 @@ if not fp or debugBuild:
         CPPDEFINES=[
             'NO_FRAME_POINTER',
             'TCMALLOC_DONT_PREFER_LIBUNWIND' if debugBuild else None,
-        ],
-    )
+        ], )
 
 if use_libunwind:
-    env.Append(
-        CPPDEFINES=[
-            ("HAVE_LIBUNWIND_H", "1"),
-            'HAVE_UCONTEXT_H',
-        ],
-    )
+    env.Append(CPPDEFINES=[
+        ("HAVE_LIBUNWIND_H", "1"),
+        'HAVE_UCONTEXT_H',
+    ], )
     env.InjectThirdParty(libraries=['unwind'])
 
 files = [
@@ -69,7 +65,7 @@ files = [
     'src/static_vars.cc',
     'src/symbolize.cc',
     'src/thread_cache.cc',
-    ]
+]
 
 if env.TargetOSIs('windows'):
     files += [
@@ -77,7 +73,7 @@ if env.TargetOSIs('windows'):
         'src/windows/port.cc',
         'src/windows/system-alloc.cc',
         'src/fake_stacktrace_scope.cc',
-        ]
+    ]
 
     # warning C4141: 'inline': used more than once
     # warning C4305: 'argument': truncation from 'ssize_t' to 'double'
@@ -88,7 +84,7 @@ else:
         'src/emergency_malloc_for_stacktrace.cc',
         'src/maybe_threads.cc',
         'src/system-alloc.cc',
-        ]
+    ]
 
     if not debugBuild:
         files += ['src/tcmalloc.cc']
@@ -98,9 +94,7 @@ else:
     # gperftools has some sloppy write calls that emit warnings
     env.Append(CXXFLAGS=["-Wno-unused-result"])
 
-env.Append(
-    CPPDEFINES=["NO_HEAP_CHECK"],
-)
+env.Append(CPPDEFINES=["NO_HEAP_CHECK"], )
 
 # The build system doesn't define NDEBUG globally for historical reasons, however, TCMalloc
 # expects that NDEBUG is used to select between preferring the mmap or the sbrk allocator. For
@@ -108,7 +102,7 @@ env.Append(
 # production deployment configuration. See the use of NDEBUG and kDebugMode in
 # src/system-alloc.cc for more details.
 if not debugBuild:
-    env.Append( CPPDEFINES=["NDEBUG"] )
+    env.Append(CPPDEFINES=["NDEBUG"])
 
 # For debug builds we want to capture stacks during (de)allocations,
 # but we don't want to pay that cost for release builds. For non-debug
@@ -122,17 +116,21 @@ if (not debugBuild) or (not env['TARGET_ARCH'] in ['x86_64', 'i386']):
 gperftools_root = env.Dir("#/src/third_party/gperftools")
 gperftools_platform = gperftools_root.Dir("platform/${TARGET_OS}_${TARGET_ARCH}")
 
-env.Append(CPPPATH=[gperftools_platform.Dir("internal/src"),
-                    gperftools_root.Dir("dist/src")])
+env.Append(CPPPATH=[
+    gperftools_platform.Dir("internal/src"),
+    gperftools_root.Dir("dist/src"),
+])
 
 # propagates to consumers that Inject (depend on) gperftools.
 env.RegisterConsumerModifications(CPPPATH=[gperftools_platform.Dir("include")])
+
 
 def removeIfPresent(lst, item):
     try:
         lst.remove(item)
     except ValueError:
         pass
+
 
 env['CCFLAGS_WERROR'] = []
 env['CXXFLAGS_WERROR'] = []
@@ -146,13 +144,11 @@ if not env.TargetOSIs('windows'):
 
 # GCC on PowerPC under C++11 mode does not define __linux which gperftools depends on
 if env['TARGET_ARCH'] == 'ppc64le':
-    env.Append( CPPDEFINES=[ "__linux"] )
+    env.Append(CPPDEFINES=["__linux"])
 
 env.Library(
     target='tcmalloc_minimal',
-    source=[
-        env.Dir('dist').File(f) for f in files
-    ],
+    source=[env.Dir('dist').File(f) for f in files],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/third_party/shim_unwind' if use_libunwind else [],
     ],

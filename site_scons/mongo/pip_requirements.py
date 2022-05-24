@@ -28,11 +28,9 @@ def verify_requirements(requirements_file: str, silent: bool = False):
             print(*args, **kwargs)
 
     def raiseSuggestion(ex, pip_pkg):
-        raise MissingRequirements(
-            f"{ex}\n"
-            f"Try running:\n"
-            f"    {sys.executable} -m pip install {pip_pkg}"
-        ) from ex
+        raise MissingRequirements(f"{ex}\n"
+                                  f"Try running:\n"
+                                  f"    {sys.executable} -m pip install {pip_pkg}") from ex
 
     # Import the prequisites for this function, providing hints on failure.
     try:
@@ -65,8 +63,8 @@ def verify_requirements(requirements_file: str, silent: bool = False):
     except pkg_resources.ResolutionError as ex:
         raiseSuggestion(
             ex,
-            f"-r {requirements_file}")
-
+            f"-r {requirements_file}",
+        )
 
     verbose("Resolved to these distributions:")
     for dist in sorted(set([f"    {dist.key} {dist.version}" for dist in dists])):

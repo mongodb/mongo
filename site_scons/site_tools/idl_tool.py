@@ -19,7 +19,6 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-
 """IDL Compiler Scons Tool."""
 
 import os.path
@@ -39,9 +38,7 @@ def idlc_emitter(target, source, env):
     first_source = str(source[0])
 
     if not first_source.endswith(".idl"):
-        raise ValueError(
-            "Bad idl file name '%s', it must end with '.idl' " % (first_source)
-        )
+        raise ValueError("Bad idl file name '%s', it must end with '.idl' " % (first_source))
 
     base_file_name, _ = SCons.Util.splitext(str(target[0]))
     target_source = env.File(base_file_name + "_gen.cpp")
@@ -79,16 +76,12 @@ def idl_scanner(node, env, path):
 
     try:
         with open(str(node), encoding="utf-8") as file_stream:
-            parsed_doc = idlc.parser.parse(
-                file_stream, str(node), resolver
-            )
+            parsed_doc = idlc.parser.parse(file_stream, str(node), resolver)
     except OSError:
         return nodes_deps_list
 
     if not parsed_doc.errors and parsed_doc.spec.imports is not None:
-        nodes_deps_list.extend(
-            [env.File(d) for d in sorted(parsed_doc.spec.imports.dependencies)]
-        )
+        nodes_deps_list.extend([env.File(d) for d in sorted(parsed_doc.spec.imports.dependencies)])
 
     setattr(node.attributes, "IDL_NODE_DEPS", nodes_deps_list)
     return nodes_deps_list
@@ -122,20 +115,20 @@ def generate(env):
     env["IDLC"] = "$PYTHON buildscripts/idl/idlc.py"
     base_dir = env.Dir("$BUILD_DIR").path
     env["IDLCFLAGS"] = [
-        "--include", "src",
-        "--base_dir", base_dir,
-        "--target_arch", "$TARGET_ARCH",
+        "--include",
+        "src",
+        "--base_dir",
+        base_dir,
+        "--target_arch",
+        "$TARGET_ARCH",
     ]
     env["IDLCCOM"] = "$IDLC $IDLCFLAGS --header ${TARGETS[1]} --output ${TARGETS[0]} $SOURCES"
     env["IDLCCOMSTR"] = ("Generating ${TARGETS[0]}"
-        if not env.get("VERBOSE", "").lower() in ['true', '1']
-        else None)
+                         if not env.get("VERBOSE", "").lower() in ['true', '1'] else None)
     env["IDLCSUFFIX"] = ".idl"
 
     global IDL_GLOBAL_DEPS
-    IDL_GLOBAL_DEPS = env.Glob("#buildscripts/idl/*.py") + env.Glob(
-        "#buildscripts/idl/idl/*.py"
-    )
+    IDL_GLOBAL_DEPS = env.Glob("#buildscripts/idl/*.py") + env.Glob("#buildscripts/idl/idl/*.py")
     env["IDL_HAS_INLINE_DEPENDENCIES"] = True
 
 

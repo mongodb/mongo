@@ -71,15 +71,15 @@ def _add_scanner(builder):
         return new_results
 
     builder.target_scanner = SCons.Scanner.Scanner(
-        function=new_scanner, path_function=path_function
+        function=new_scanner,
+        path_function=path_function,
     )
 
 
 def _add_action(builder):
     actions = builder.action
     builder.action = actions + SCons.Action.Action(
-        "$ABIDW --no-show-locs $TARGET | md5sum > ${TARGET}.abidw"
-    )
+        "$ABIDW --no-show-locs $TARGET | md5sum > ${TARGET}.abidw")
 
 
 def exists(env):

@@ -4,15 +4,19 @@ Import("env")
 
 env = env.Clone()
 
-env.Append( CPPDEFINES=[ "HAVE_CONFIG_H",  ] )
+env.Append(CPPDEFINES=[
+    "HAVE_CONFIG_H",
+])
 
 env['CCFLAGS_WERROR'] = []
+
 
 def removeIfPresent(lst, item):
     try:
         lst.remove(item)
     except ValueError:
         pass
+
 
 for to_remove in ['-Wall', '-W']:
     removeIfPresent(env['CCFLAGS'], to_remove)
@@ -38,7 +42,9 @@ elif env.TargetOSIs('solaris'):
 else:
     env.Append(CPPPATH=["build_posix"])
 
-env.Library( "pcrecpp", [
+env.Library(
+    "pcrecpp",
+    [
         # pcre
         "pcre_byte_order.c",
         "pcre_compile.c",
@@ -65,4 +71,5 @@ env.Library( "pcrecpp", [
         "pcrecpp.cc",
         "pcre_scanner.cc",
         "pcre_stringpiece.cc",
-        ] )
+    ],
+)

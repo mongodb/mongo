@@ -75,7 +75,9 @@ def exists(env):
     if validated:
         env['CCACHE_VERSION'] = ccache_version
     else:
-        print(f"Error: failed to verify ccache version >= {_ccache_version_min}, found {ccache_version}")
+        print(
+            f"Error: failed to verify ccache version >= {_ccache_version_min}, found {ccache_version}"
+        )
 
     return validated
 
@@ -147,10 +149,8 @@ def generate(env):
     # compiler parameter and differences in the file need to be accounted for in the
     # hash result to prevent erroneous cache hits.
     if "CCACHE_EXTRAFILES" in env and env["CCACHE_EXTRAFILES"]:
-        env["ENV"]["CCACHE_EXTRAFILES"] = ":".join([
-            denyfile.path
-            for denyfile in env["CCACHE_EXTRAFILES"]
-        ])
+        env["ENV"]["CCACHE_EXTRAFILES"] = ":".join(
+            [denyfile.path for denyfile in env["CCACHE_EXTRAFILES"]])
 
     # Make a generator to expand to CCACHE in the case where we are
     # not a conftest. We don't want to use ccache for configure tests
@@ -165,6 +165,7 @@ def generate(env):
         if "conftest" not in str(target[0]):
             return '$CCACHE'
         return ''
+
     env['CCACHE_GENERATOR'] = ccache_generator
 
     # Add ccache to the relevant command lines. Wrap the reference to

@@ -66,7 +66,10 @@ def generate(env):
             if not suffix in suffixes:
                 continue
             base = emitterdict[suffix]
-            emitterdict[suffix] = SCons.Builder.ListEmitter([base, _dwo_emitter,])
+            emitterdict[suffix] = SCons.Builder.ListEmitter([
+                base,
+                _dwo_emitter,
+            ])
 
 
 def exists(env):

@@ -21,14 +21,14 @@ ftdcEnv.Library(
         'file_reader.cpp',
         'file_writer.cpp',
         'util.cpp',
-        'varint.cpp'
+        'varint.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/third_party/s2/s2', # For VarInt
+        '$BUILD_DIR/third_party/s2/s2',  # For VarInt
         '$BUILD_DIR/third_party/shim_zlib',
     ],
 )
@@ -51,7 +51,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/util/processinfo',
-        'ftdc'
+        'ftdc',
     ] + platform_libs,
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
@@ -77,7 +77,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/idl/server_parameter',
-        'ftdc_server'
+        'ftdc_server',
     ],
 )
 

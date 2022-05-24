@@ -87,7 +87,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'transport_layer',
-    ]
+    ],
 )
 
 tlEnv.Library(
@@ -157,7 +157,7 @@ zlibEnv.Library(
         '$BUILD_DIR/third_party/shim_snappy',
         '$BUILD_DIR/third_party/shim_zlib',
         '$BUILD_DIR/third_party/shim_zstd',
-    ]
+    ],
 )
 
 env.Library(
@@ -225,8 +225,7 @@ tlEnvTest.Append(
     # upgrade per SERVER-54569.
     CCFLAGS=[] if env.TargetOSIs('windows') else [
         '-Wno-nonnull',
-    ],
-)
+    ], )
 
 tlEnvTest.CppIntegrationTest(
     target='transport_integration_test',

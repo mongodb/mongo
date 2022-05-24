@@ -3,12 +3,13 @@
 Import([
     "get_option",
     "env",
-    ])
+])
 
 env = env.Clone()
 env.InjectThirdParty(libraries=['zlib'])
 
 env['CCFLAGS_WERROR'] = []
+
 
 def removeIfPresent(lst, item):
     try:
@@ -16,39 +17,35 @@ def removeIfPresent(lst, item):
     except ValueError:
         pass
 
+
 for to_remove in ['-Wall', '-W', '/W3', '-Wsign-compare', '/permissive-']:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
 # See what -D's show up in make.  The AB_CD one might change, but we're little
 # endian only for now so I think it's sane
 env.Prepend(CPPDEFINES=[
-        ('IMPL_MFBT', 1),
-        ('JS_USE_CUSTOM_ALLOCATOR', 1),
-        ('STATIC_JS_API', 1),
-        ('U_NO_DEFAULT_INCLUDE_UTF_HEADERS', 1),
-        ('UCONFIG_NO_BREAK_ITERATION', 1),
-        ('UCONFIG_NO_FORMATTING', 1),
-        ('UCONFIG_NO_TRANSLITERATION', 1),
-        ('UCONFIG_NO_REGULAR_EXPRESSIONS', 1),
-        ('U_CHARSET_IS_UTF8', 1),
-        ('U_DISABLE_RENAMING', 1),
-        ('U_STATIC_IMPLEMENTATION', 1),
-        ('U_USING_ICU_NAMESPACE', 0),
-        ])
+    ('IMPL_MFBT', 1),
+    ('JS_USE_CUSTOM_ALLOCATOR', 1),
+    ('STATIC_JS_API', 1),
+    ('U_NO_DEFAULT_INCLUDE_UTF_HEADERS', 1),
+    ('UCONFIG_NO_BREAK_ITERATION', 1),
+    ('UCONFIG_NO_FORMATTING', 1),
+    ('UCONFIG_NO_TRANSLITERATION', 1),
+    ('UCONFIG_NO_REGULAR_EXPRESSIONS', 1),
+    ('U_CHARSET_IS_UTF8', 1),
+    ('U_DISABLE_RENAMING', 1),
+    ('U_STATIC_IMPLEMENTATION', 1),
+    ('U_USING_ICU_NAMESPACE', 0),
+])
 
 if get_option('spider-monkey-dbg') == "on":
     env.Prepend(CPPDEFINES=[
-            'DEBUG',
-            'JS_DEBUG',
-            'JS_GC_ZEAL',
-            ])
+        'DEBUG',
+        'JS_DEBUG',
+        'JS_GC_ZEAL',
+    ])
 
-
-env.Append(
-    FORCEINCLUDES=[
-        'js-confdefs.h'
-    ],
-)
+env.Append(FORCEINCLUDES=['js-confdefs.h'], )
 
 if env.TargetOSIs('windows'):
     env.Append(
@@ -79,16 +76,13 @@ if env.TargetOSIs('windows'):
 
             # not enough arguments for function-like macro invocation
             '/wd4003',
-        ],
-    )
+        ], )
 else:
-    env.Append(
-        CXXFLAGS=[
-            '-Wno-non-virtual-dtor',
-            '-Wno-invalid-offsetof',
-            '-Wno-sign-compare'
-        ],
-    )
+    env.Append(CXXFLAGS=[
+        '-Wno-non-virtual-dtor',
+        '-Wno-invalid-offsetof',
+        '-Wno-sign-compare',
+    ], )
 
 # js/src, js/public and mfbt are the only required sources right now, that
 # could change in the future
@@ -138,20 +132,19 @@ sources = [
 
 if env.TargetOSIs('windows'):
     sources.extend([
-    "extract/mozglue/misc/ConditionVariable_windows.cpp",
-    "extract/mozglue/misc/Mutex_windows.cpp",
-    "extract/mozglue/misc/TimeStamp_windows.cpp",
+        "extract/mozglue/misc/ConditionVariable_windows.cpp",
+        "extract/mozglue/misc/Mutex_windows.cpp",
+        "extract/mozglue/misc/TimeStamp_windows.cpp",
     ])
 else:
     sources.extend([
-    "extract/mozglue/misc/ConditionVariable_posix.cpp",
-    "extract/mozglue/misc/Mutex_posix.cpp",
-    "extract/mozglue/misc/TimeStamp_posix.cpp",
+        "extract/mozglue/misc/ConditionVariable_posix.cpp",
+        "extract/mozglue/misc/Mutex_posix.cpp",
+        "extract/mozglue/misc/TimeStamp_posix.cpp",
     ])
 
-
-
-sources.append( [ "extract/modules/fdlibm/{}".format(f) for f in [
+sources.append([
+    "extract/modules/fdlibm/{}".format(f) for f in [
         'e_acos.cpp',
         'e_acosh.cpp',
         'e_asin.cpp',
@@ -192,7 +185,8 @@ sources.append( [ "extract/modules/fdlibm/{}".format(f) for f in [
         's_tanh.cpp',
         's_trunc.cpp',
         's_truncf.cpp',
-]])
+    ]
+])
 
 if env.TargetOSIs('windows'):
     env.Prepend(CPPDEFINES=[
@@ -201,11 +195,9 @@ if env.TargetOSIs('windows'):
     ])
 
 if env['TARGET_ARCH'] == 'x86_64':
-    env.Prepend(CPPDEFINES=[
-        ("WASM_HUGE_MEMORY", "1")
-    ])
+    env.Prepend(CPPDEFINES=[("WASM_HUGE_MEMORY", "1")])
 
-sourceFilePatterns=[
+sourceFilePatterns = [
     "/build/*.cpp",
     "/build/jit/*.cpp",
     "/build/gc/*.cpp",
@@ -249,8 +241,7 @@ env.Append(
         ('U_DISABLE_RENAMING', 1),
         ('U_STATIC_IMPLEMENTATION', 1),
         ('U_USING_ICU_NAMESPACE', 0),
-    ],
-)
+    ], )
 
 if env.TargetOSIs('solaris'):
     # On Solaris, compile of certain files fails if the below define is not enabled.  Specifically,
@@ -260,17 +251,17 @@ if env.TargetOSIs('solaris'):
     # error because XPG4v2 programs are incompatible with C99. If we keep _XOPEN_SOURCE=600 but
     # force _XOPEN_SOURCE_EXTENDED=0, then <sys/feature_tests.h> chooses XPG6, which resolves the
     # error (since XPG6 is compatible with C99).
-    env.Append(
-        CPPDEFINES=[
-            ('_XOPEN_SOURCE_EXTENDED', 0),
-        ],
-    )
+    env.Append(CPPDEFINES=[
+        ('_XOPEN_SOURCE_EXTENDED', 0),
+    ], )
+
 
 def removeIfPresent(lst, item):
     try:
         lst.remove(item)
     except ValueError:
         pass
+
 
 env['CCFLAGS_WERROR'] = []
 for to_remove in ['-Wall', '-W']:
@@ -283,7 +274,6 @@ if env.ToolchainIs('clang', 'GCC'):
 if env.TargetOSIs('windows'):
     # C4996: '...': was declared deprecated
     env.Append(CCFLAGS=['/wd4996'])
-
 
 # Suppress `register` keyword warnings in FreeBSD builds
 

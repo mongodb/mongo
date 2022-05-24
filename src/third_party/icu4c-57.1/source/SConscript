@@ -17,8 +17,7 @@ env.Append(
         ('U_DISABLE_RENAMING', 1),
         ('U_STATIC_IMPLEMENTATION', 1),
         ('U_USING_ICU_NAMESPACE', 0),
-    ],
-)
+    ], )
 
 if env.TargetOSIs('solaris'):
     # On Solaris, compile of certain files fails if the below define is not enabled.  Specifically,
@@ -28,17 +27,17 @@ if env.TargetOSIs('solaris'):
     # error because XPG4v2 programs are incompatible with C99. If we keep _XOPEN_SOURCE=600 but
     # force _XOPEN_SOURCE_EXTENDED=0, then <sys/feature_tests.h> chooses XPG6, which resolves the
     # error (since XPG6 is compatible with C99).
-    env.Append(
-        CPPDEFINES=[
-            ('_XOPEN_SOURCE_EXTENDED', 0),
-        ],
-    )
+    env.Append(CPPDEFINES=[
+        ('_XOPEN_SOURCE_EXTENDED', 0),
+    ], )
+
 
 def removeIfPresent(lst, item):
     try:
         lst.remove(item)
     except ValueError:
         pass
+
 
 env['CCFLAGS_WERROR'] = []
 for to_remove in ['-Wall', '-W']:
@@ -52,7 +51,6 @@ if env.TargetOSIs('windows'):
     # C4996: '...': was declared deprecated
     env.Append(CCFLAGS=['/wd4996'])
 
-
 # Suppress `register` keyword warnings in FreeBSD builds
 
 if env.TargetOSIs('freebsd'):
@@ -60,11 +58,9 @@ if env.TargetOSIs('freebsd'):
     env.Append(CCFLAGS=['-Wno-register'])
 
 i18nEnv = env.Clone()
-i18nEnv.Append(
-    CPPDEFINES=[
-        ('U_I18N_IMPLEMENTATION', 1),
-    ],
-)
+i18nEnv.Append(CPPDEFINES=[
+    ('U_I18N_IMPLEMENTATION', 1),
+], )
 i18nEnv.Library(
     target='icu_i18n',
     source=[
@@ -273,11 +269,9 @@ i18nEnv.Library(
 )
 
 commonEnv = env.Clone()
-commonEnv.Append(
-    CPPDEFINES=[
-        ('U_COMMON_IMPLEMENTATION', 1),
-    ],
-)
+commonEnv.Append(CPPDEFINES=[
+    ('U_COMMON_IMPLEMENTATION', 1),
+], )
 commonEnv.Library(
     target='icu_common',
     source=[

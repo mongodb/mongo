@@ -9,9 +9,9 @@ install_dir = env.Dir('$DESTDIR/$PREFIX_BINDIR').path.replace("\\", r"\\")
 resmoke_py = env.Substfile(
     target="resmoke.py",
     source='resmoke.py.in',
-    SUBST_DICT = {
+    SUBST_DICT={
         '@install_dir@': install_dir,
-    }
+    },
 )
 resmoke_py_install = env.AutoInstall(
     '$PREFIX_BINDIR',

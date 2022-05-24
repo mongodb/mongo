@@ -34,10 +34,13 @@ def GZipAction(target, source, env, **kw):
 
 def generate(env, **kwargs):
     env["BUILDERS"]["__GZIPTOOL"] = SCons.Builder.Builder(
-        action=SCons.Action.Action(GZipAction, "$GZIPTOOL_COMSTR")
-    )
+        action=SCons.Action.Action(
+            GZipAction,
+            "$GZIPTOOL_COMSTR",
+        ))
     env["GZIPTOOL_COMSTR"] = kwargs.get(
-        "GZIPTOOL_COMSTR", "Compressing $TARGET with gzip"
+        "GZIPTOOL_COMSTR",
+        "Compressing $TARGET with gzip",
     )
 
     def GZipTool(env, target, source, **kwargs):

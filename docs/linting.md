@@ -73,6 +73,11 @@ Ex: `buildscripts/pylinters.py lint`
 | `pydocstyle` | `.pydocstyle` | `pydocstyle --help` | [https://readthedocs.org/projects/pydocstyle/](https://readthedocs.org/projects/pydocstyle/) |
 | `yapf` | `.style.yapf` | `yapf --help` | [https://github.com/google/yapf](https://github.com/google/yapf) |
 
+### SCons Linters
+`buildscripts/pylinters.py` has the `lint-scons` and `fix-scons` commands to lint 
+and fix SCons and build system related code. Currently `yapf` is the only 
+linter supported for SCons code.
+
 ## Using SCons for linting
 You can use SCons to run most of the linters listed above via their corresponding Python wrapper 
 script. SCons also provides the ability to run multiple linters in a single command. At this time, 
@@ -89,3 +94,4 @@ Here are some examples:
 | `lint-lint.py` | `quickcpplint.py` | `buildscripts/scons.py lint-lint.py` |
 | `lint-eslint` | `eslint` | `buildscripts/scons.py lint-eslint` |
 | `lint-pylinters` | `pylint` `mypy` `pydocstyle` `yapf` | `buildscripts/scons.py lint-pylinters` |
+| `lint-sconslinters` | `yapf` | `buildscripts/scons.py lint-sconslinters` |

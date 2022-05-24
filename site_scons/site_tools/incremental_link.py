@@ -32,9 +32,10 @@ def generate(env):
     builders = env["BUILDERS"]
     for builder in ("Program", "SharedLibrary", "LoadableModule"):
         emitter = builders[builder].emitter
-        builders[builder].emitter = SCons.Builder.ListEmitter(
-            [emitter, _tag_as_precious,]
-        )
+        builders[builder].emitter = SCons.Builder.ListEmitter([
+            emitter,
+            _tag_as_precious,
+        ])
 
 
 def exists(env):
@@ -46,12 +47,8 @@ def exists(env):
 
     # On posix platforms, excluding darwin, we may have enabled
     # incremental linking. Check for the relevant flags.
-    if (
-        env.TargetOSIs("posix")
-        and not env.TargetOSIs("darwin")
-        and "-fuse-ld=gold" in env["LINKFLAGS"]
-        and "-Wl,--incremental" in env["LINKFLAGS"]
-    ):
+    if (env.TargetOSIs("posix") and not env.TargetOSIs("darwin")
+            and "-fuse-ld=gold" in env["LINKFLAGS"] and "-Wl,--incremental" in env["LINKFLAGS"]):
         return True
 
     return False

@@ -34,15 +34,15 @@ def _update_builder(env, builder):
         if origin is not None:
             origin_results = old_scanner(origin, env, path)
             for origin_result in origin_results:
-                origin_result_debug_files = getattr(
-                    origin_result.attributes, "separate_debug_files", None
-                )
+                origin_result_debug_files = getattr(origin_result.attributes,
+                                                    "separate_debug_files", None)
                 if origin_result_debug_files is not None:
                     results.extend(origin_result_debug_files)
         return results
 
     builder.target_scanner = SCons.Scanner.Scanner(
-        function=new_scanner, path_function=old_path_function,
+        function=new_scanner,
+        path_function=old_path_function,
     )
 
     base_action = builder.action
@@ -57,31 +57,27 @@ def _update_builder(env, builder):
     # setup from the etc/scons/xcode_*.vars files, which would be a
     # win as well.
     if env.TargetOSIs("darwin"):
-        base_action.list.extend(
-            [
-                SCons.Action.Action(
-                    "$DSYMUTIL -num-threads 1 $TARGET -o ${TARGET}.dSYM",
-                    "$DSYMUTILCOMSTR"
-                ),
-                SCons.Action.Action(
-                    "$STRIP -S ${TARGET}",
-                    "$DEBUGSTRIPCOMSTR"
-                ),
-            ]
-        )
+        base_action.list.extend([
+            SCons.Action.Action(
+                "$DSYMUTIL -num-threads 1 $TARGET -o ${TARGET}.dSYM",
+                "$DSYMUTILCOMSTR",
+            ),
+            SCons.Action.Action(
+                "$STRIP -S ${TARGET}",
+                "$DEBUGSTRIPCOMSTR",
+            ),
+        ])
     elif env.TargetOSIs("posix"):
-        base_action.list.extend(
-            [
-                SCons.Action.Action(
-                    "$OBJCOPY --only-keep-debug $TARGET ${TARGET}.debug",
-                    "$OBJCOPY_ONLY_KEEP_DEBUG_COMSTR"
-                ),
-                SCons.Action.Action(
-                    "$OBJCOPY --strip-debug --add-gnu-debuglink ${TARGET}.debug ${TARGET}",
-                    "$DEBUGSTRIPCOMSTR"
-                ),
-            ]
-        )
+        base_action.list.extend([
+            SCons.Action.Action(
+                "$OBJCOPY --only-keep-debug $TARGET ${TARGET}.debug",
+                "$OBJCOPY_ONLY_KEEP_DEBUG_COMSTR",
+            ),
+            SCons.Action.Action(
+                "$OBJCOPY --strip-debug --add-gnu-debuglink ${TARGET}.debug ${TARGET}",
+                "$DEBUGSTRIPCOMSTR",
+            ),
+        ])
     else:
         pass
 
@@ -109,13 +105,15 @@ def _update_builder(env, builder):
 
             plist_file = env.File("Contents/Info.plist", directory=dsym_dir)
             setattr(plist_file.attributes, "aib_effective_suffix", ".dSYM")
-            setattr(plist_file.attributes, "aib_additional_directory", "{}/Contents".format(dsym_dir_name))
+            setattr(plist_file.attributes, "aib_additional_directory",
+                    "{}/Contents".format(dsym_dir_name))
 
             dwarf_dir = env.Dir("Contents/Resources/DWARF", directory=dsym_dir)
 
             dwarf_file = env.File(target0.name, directory=dwarf_dir)
             setattr(dwarf_file.attributes, "aib_effective_suffix", ".dSYM")
-            setattr(dwarf_file.attributes, "aib_additional_directory", "{}/Contents/Resources/DWARF".format(dsym_dir_name))
+            setattr(dwarf_file.attributes, "aib_additional_directory",
+                    "{}/Contents/Resources/DWARF".format(dsym_dir_name))
 
             debug_files.extend([plist_file, dwarf_file])
 
@@ -174,8 +172,10 @@ def generate(env):
 
         if not env.Verbose():
             env.Append(
-                OBJCOPY_ONLY_KEEP_DEBUG_COMSTR="Generating debug info for $TARGET into ${TARGET}.dSYM",
-                DEBUGSTRIPCOMSTR="Stripping debug info from ${TARGET} and adding .gnu.debuglink to ${TARGET}.debug",
+                OBJCOPY_ONLY_KEEP_DEBUG_COMSTR=
+                "Generating debug info for $TARGET into ${TARGET}.dSYM",
+                DEBUGSTRIPCOMSTR=
+                "Stripping debug info from ${TARGET} and adding .gnu.debuglink to ${TARGET}.debug",
             )
 
     for builder in ["Program", "SharedLibrary", "LoadableModule"]:

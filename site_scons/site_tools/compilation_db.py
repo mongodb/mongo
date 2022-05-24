@@ -142,7 +142,11 @@ def WriteCompilationDb(target, source, env):
 
     with open(str(target[0]), "w") as target_file:
         json.dump(
-            entries, target_file, sort_keys=True, indent=4, separators=(",", ": ")
+            entries,
+            target_file,
+            sort_keys=True,
+            indent=4,
+            separators=(",", ": "),
         )
 
 
@@ -155,7 +159,8 @@ def generate(env, **kwargs):
     static_obj, shared_obj = SCons.Tool.createObjBuilders(env)
 
     env["COMPILATIONDB_COMSTR"] = kwargs.get(
-        "COMPILATIONDB_COMSTR", "Building compilation database $TARGET"
+        "COMPILATIONDB_COMSTR",
+        "Building compilation database $TARGET",
     )
 
     components_by_suffix = itertools.chain(
@@ -181,18 +186,19 @@ def generate(env, **kwargs):
 
         # Assumes a dictionary emitter
         emitter = builder.emitter[suffix]
-        builder.emitter[suffix] = SCons.Builder.ListEmitter(
-            [emitter, makeEmitCompilationDbEntry(command),]
-        )
+        builder.emitter[suffix] = SCons.Builder.ListEmitter([
+            emitter,
+            makeEmitCompilationDbEntry(command),
+        ])
 
     env["BUILDERS"]["__COMPILATIONDB_Entry"] = SCons.Builder.Builder(
-        action=SCons.Action.Action(CompilationDbEntryAction, None),
-    )
+        action=SCons.Action.Action(CompilationDbEntryAction, None), )
 
     env["BUILDERS"]["__COMPILATIONDB_Database"] = SCons.Builder.Builder(
         action=SCons.Action.Action(WriteCompilationDb, "$COMPILATIONDB_COMSTR"),
         target_scanner=SCons.Scanner.Scanner(
-            function=ScanCompilationDb, node_class=None
+            function=ScanCompilationDb,
+            node_class=None,
         ),
     )
 

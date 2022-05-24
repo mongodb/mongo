@@ -15,7 +15,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/idl/server_parameter',
-        '$BUILD_DIR/mongo/util/processinfo'
+        '$BUILD_DIR/mongo/util/processinfo',
     ],
 )
 
@@ -49,7 +49,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/util/fail_point',
-    ]
+    ],
 )
 
 env.Library(

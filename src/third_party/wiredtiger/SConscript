@@ -14,14 +14,14 @@ if endian == "big":
     env.Append(CPPDEFINES=[('WORDS_BIGENDIAN', 1)])
 
 env.Append(CPPPATH=[
-        "src/include",
-    ])
+    "src/include",
+])
 
 # Enable asserts in debug builds
 if debugBuild:
     env.Append(CPPDEFINES=[
         "HAVE_DIAGNOSTIC",
-        ])
+    ])
 
 # Enable optional rich logging
 env.Append(CPPDEFINES=["HAVE_VERBOSE"])
@@ -29,28 +29,28 @@ env.Append(CPPDEFINES=["HAVE_VERBOSE"])
 conf = Configure(env)
 if conf.CheckFunc("fallocate"):
     conf.env.Append(CPPDEFINES=[
-        "HAVE_FALLOCATE"
+        "HAVE_FALLOCATE",
     ])
 if conf.CheckFunc("sync_file_range"):
     conf.env.Append(CPPDEFINES=[
-        "HAVE_SYNC_FILE_RANGE"
+        "HAVE_SYNC_FILE_RANGE",
     ])
 
 # GCC 8+ includes x86intrin.h in non-x64 versions of the compiler so limit the check to x64.
 if env['TARGET_ARCH'] == 'x86_64' and conf.CheckCHeader('x86intrin.h'):
     conf.env.Append(CPPDEFINES=[
-        "HAVE_X86INTRIN_H"
+        "HAVE_X86INTRIN_H",
     ])
 if conf.CheckCHeader('arm_neon.h'):
     conf.env.Append(CPPDEFINES=[
-        "HAVE_ARM_NEON_INTRIN_H"
+        "HAVE_ARM_NEON_INTRIN_H",
     ])
-env = conf.Finish();
+env = conf.Finish()
 
 if env.TargetOSIs('windows'):
     env.Append(CPPPATH=["build_win"])
     env.Append(CFLAGS=[
-        "/wd4090" # Ignore warning about mismatched const qualifiers
+        "/wd4090"  # Ignore warning about mismatched const qualifiers
     ])
     if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
         env.InjectThirdParty(libraries=['gperftools'])
@@ -75,7 +75,7 @@ elif env.TargetOSIs('linux'):
         env.Append(CPPDEFINES=["_GNU_SOURCE"])
 else:
     print("Wiredtiger is not supported on this platform. " +
-        "Please generate an approriate wiredtiger_config.h")
+          "Please generate an approriate wiredtiger_config.h")
     Exit(1)
 
 useZlib = True
@@ -95,10 +95,8 @@ for l in open(File(version_file).srcnode().abspath):
     if m and len(m.groups()) == 2:
         exec('%s=%s' % (m.group(1), m.group(2)))
 
-if (VERSION_MAJOR == None or
-    VERSION_MINOR == None or
-    VERSION_PATCH == None or
-    VERSION_STRING == None):
+if (VERSION_MAJOR == None or VERSION_MINOR == None or VERSION_PATCH == None
+        or VERSION_STRING == None):
     print("Failed to find version variables in " + version_file)
     Exit(1)
 
@@ -114,15 +112,22 @@ wiredtiger_includes = """
     """
 wiredtiger_includes = textwrap.dedent(wiredtiger_includes)
 replacements = {
-    '@VERSION_MAJOR@' : VERSION_MAJOR,
-    '@VERSION_MINOR@' : VERSION_MINOR,
-    '@VERSION_PATCH@' : VERSION_PATCH,
-    '@VERSION_STRING@' : '"' + VERSION_STRING + '"',
-    '@uintmax_t_decl@': "",
-    '@uintptr_t_decl@': "",
-    '@off_t_decl@' : 'typedef int64_t wt_off_t;' if env.TargetOSIs('windows')
-        else "typedef off_t wt_off_t;",
-    '@wiredtiger_includes_decl@': wiredtiger_includes
+    '@VERSION_MAJOR@':
+        VERSION_MAJOR,
+    '@VERSION_MINOR@':
+        VERSION_MINOR,
+    '@VERSION_PATCH@':
+        VERSION_PATCH,
+    '@VERSION_STRING@':
+        '"' + VERSION_STRING + '"',
+    '@uintmax_t_decl@':
+        "",
+    '@uintptr_t_decl@':
+        "",
+    '@off_t_decl@':
+        'typedef int64_t wt_off_t;' if env.TargetOSIs('windows') else "typedef off_t wt_off_t;",
+    '@wiredtiger_includes_decl@':
+        wiredtiger_includes,
 }
 
 wiredtiger_h = env.Substfile(
@@ -130,12 +135,13 @@ wiredtiger_h = env.Substfile(
     source=[
         'src/include/wiredtiger.in',
     ],
-    SUBST_DICT=replacements)
+    SUBST_DICT=replacements,
+)
 
 wiredtiger_ext_h = env.Install(
     target='.',
     source=[
-        'src/include/wiredtiger_ext.h'
+        'src/include/wiredtiger_ext.h',
     ],
 )
 
@@ -159,15 +165,15 @@ env.AutoInstall(
 # included.
 #
 condition_map = {
-    'POSIX_HOST'   : not env.TargetOSIs('windows'),
-    'WINDOWS_HOST' : env.TargetOSIs('windows'),
-
-    'ARM64_HOST'   : env['TARGET_ARCH'] == 'aarch64',
-    'POWERPC_HOST' : env['TARGET_ARCH'] == 'ppc64le',
-    'RISCV64_HOST' : env['TARGET_ARCH'] == 'riscv64',
-    'X86_HOST'     : env['TARGET_ARCH'] == 'x86_64',
-    'ZSERIES_HOST' : env['TARGET_ARCH'] == 's390x',
+    'POSIX_HOST': not env.TargetOSIs('windows'),
+    'WINDOWS_HOST': env.TargetOSIs('windows'),
+    'ARM64_HOST': env['TARGET_ARCH'] == 'aarch64',
+    'POWERPC_HOST': env['TARGET_ARCH'] == 'ppc64le',
+    'RISCV64_HOST': env['TARGET_ARCH'] == 'riscv64',
+    'X86_HOST': env['TARGET_ARCH'] == 'x86_64',
+    'ZSERIES_HOST': env['TARGET_ARCH'] == 's390x',
 }
+
 
 def filtered_filelist(f, checksum):
     for line in f:
@@ -177,6 +183,7 @@ def filtered_filelist(f, checksum):
         if len(file_cond) == 1 or condition_map.get(file_cond[1], False):
             if line.startswith('src/checksum/') == checksum:
                 yield file_cond[0]
+
 
 filelistfile = 'dist/filelist'
 with open(File(filelistfile).srcnode().abspath) as filelist:

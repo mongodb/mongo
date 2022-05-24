@@ -7,33 +7,23 @@ env = env.Clone()
 # Core geometry shape libraries
 env.Library(
     target="geometry",
-    source=[
-        "hash.cpp",
-        "shapes.cpp",
-        "big_polygon.cpp",
-        "r2_region_coverer.cpp"
-    ],
+    source=["hash.cpp", "shapes.cpp", "big_polygon.cpp", "r2_region_coverer.cpp"],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/common",
-        "$BUILD_DIR/mongo/db/storage/key_string",
-        "$BUILD_DIR/third_party/s2/s2"
-    ]
+        "$BUILD_DIR/mongo/base", "$BUILD_DIR/mongo/db/common",
+        "$BUILD_DIR/mongo/db/storage/key_string", "$BUILD_DIR/third_party/s2/s2"
+    ],
 )
 
 # Geometry / BSON parsing and wrapping
 env.Library(
     target="geoparser",
-    source=[
-        "geoparser.cpp",
-        "geometry_container.cpp"
-    ],
+    source=["geoparser.cpp", "geometry_container.cpp"],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/bson/dotted_path_support",
         "$BUILD_DIR/third_party/s2/s2",
         "geometry",
-    ]
+    ],
 )
 
 env.CppUnitTest(
@@ -48,5 +38,5 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/common",
         "geometry",
         "geoparser",
-    ]
+    ],
 )

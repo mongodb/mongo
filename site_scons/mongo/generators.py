@@ -4,6 +4,7 @@ import hashlib
 
 # Default and alternative generator definitions go here.
 
+
 # This is the key/value mapping that will be returned by the buildInfo command and
 # printed by the --version command-line option to mongod.
 # Each mapped value is in turn a dict consisting of:
@@ -77,7 +78,7 @@ def default_buildinfo_environment_data():
         ),
     )
     return {
-        k:{'key': k, 'value': v, 'inBuildInfo': ibi, 'inVersion': iv}
+        k: {'key': k, 'value': v, 'inBuildInfo': ibi, 'inVersion': iv}
         for k, v, ibi, iv in data
     }
 
@@ -109,11 +110,11 @@ def default_variant_dir_generator(target, source, env, for_signature):
 
     # If our option hash yields a well known hash, replace it with its name.
     known_variant_hashes = {
-        '343e6678' : 'debug',
-        '85fcf9b0' : 'opt',
-        '981ce870' : 'debug',
-        '9fface73' : 'optdebug',
-        'c52b1cc3' : 'opt',
+        '343e6678': 'debug',
+        '85fcf9b0': 'opt',
+        '981ce870': 'debug',
+        '9fface73': 'optdebug',
+        'c52b1cc3': 'opt',
     }
 
     return known_variant_hashes.get(variant_dir, variant_dir)
@@ -122,4 +123,5 @@ def default_variant_dir_generator(target, source, env, for_signature):
 def os_specific_variant_dir_generator(target, source, env, for_signature):
     return '-'.join([
         env['TARGET_OS'],
-        default_variant_dir_generator(target, source, env, for_signature)])
+        default_variant_dir_generator(target, source, env, for_signature),
+    ])

@@ -29,7 +29,7 @@ env.Library(
 env.CppUnitTest(
     target='stdx_test',
     source=[
-        'unordered_map_test.cpp'
+        'unordered_map_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/third_party/shim_abseil',

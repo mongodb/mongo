@@ -48,7 +48,7 @@ env.Library(
     ],
     LBDEPS_PRIVATE=[
         'bson_template_evaluator',
-    ]
+    ],
 )
 
 if jsEngine:
@@ -59,16 +59,13 @@ if jsEngine:
             # TODO(SERVER-59992): Remove -Wno-class-memacces where possible.
             '-Wno-unknown-warning-option',
             '-Wno-class-memaccess',
-        ],
-    )
+        ], )
 
     scriptingEnv.InjectMozJS()
 
     scriptingEnv.JSHeader(
         target='mozjs/mongohelpers_js.cpp',
-        source=[
-            'mozjs/mongohelpers.js'
-        ]
+        source=['mozjs/mongohelpers.js'],
     )
 
     env.Alias('generated-sources', 'mozjs/mongohelpers_js.cpp')
@@ -138,7 +135,7 @@ else:
     env.Library(
         target='scripting',
         source=[
-            'scripting_none.cpp'
+            'scripting_none.cpp',
         ],
         LIBDEPS=[
             'scripting_none',

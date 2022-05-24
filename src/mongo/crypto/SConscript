@@ -8,39 +8,35 @@ Import([
 
 env = env.Clone()
 
-env.Library('sha1_block',
-    source=[
-        'sha1_block.cpp'
-    ],
+env.Library(
+    'sha1_block',
+    source=['sha1_block.cpp'],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/secure_compare_memory',
-    ])
+    ],
+)
 
-env.Library('sha256_block',
-    source=[
-        'sha256_block.cpp'
-    ],
+env.Library(
+    'sha256_block',
+    source=['sha256_block.cpp'],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/secure_compare_memory',
-    ])
+    ],
+)
 
 cryptoEnv = env.Clone()
 
 if "tom" in env["MONGO_CRYPTO"]:
     cryptoEnv.InjectThirdParty(libraries=['tomcrypt'])
-    cryptoEnv.Append(
-        CPPDEFINES=[
-            'LTC_NO_PROTOTYPES',
-        ]
-    )
+    cryptoEnv.Append(CPPDEFINES=[
+        'LTC_NO_PROTOTYPES',
+    ])
 
 cryptoEnv.Library(
     target='sha_block_${MONGO_CRYPTO}',
-    source=[
-        'sha_block_${MONGO_CRYPTO}.cpp'
-    ],
+    source=['sha_block_${MONGO_CRYPTO}.cpp'],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         'sha1_block',
@@ -48,10 +44,11 @@ cryptoEnv.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/third_party/shim_tomcrypt' if "tom" in env["MONGO_CRYPTO"] else [],
-    ]
+    ],
 )
 
-cryptoEnv.Library(target='symmetric_crypto',
+cryptoEnv.Library(
+    target='symmetric_crypto',
     source=[
         'symmetric_crypto.cpp',
         'symmetric_crypto_${MONGO_CRYPTO}.cpp',
@@ -63,7 +60,7 @@ cryptoEnv.Library(target='symmetric_crypto',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/third_party/shim_tomcrypt' if "tom" in env["MONGO_CRYPTO"] else [],
-    ]
+    ],
 )
 
 env.Library(
@@ -84,9 +81,9 @@ env.Library(
         "encryption_fields.idl",
     ],
     LIBDEPS=[
-         '$BUILD_DIR/mongo/idl/feature_flag',
-         '$BUILD_DIR/mongo/idl/idl_parser',
-    ]
+        '$BUILD_DIR/mongo/idl/feature_flag',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
 )
 
 env.Library(
@@ -120,7 +117,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/idl/idl_parser',
-    ]
+    ],
 )
 
 env.CppUnitTest(

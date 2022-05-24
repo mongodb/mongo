@@ -25,7 +25,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/idl/basic_types',
         '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/idl/server_parameter'
+        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 
@@ -126,7 +126,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/storage/key_string',
         'validate_state',
-    ]
+    ],
 )
 
 env.Library(
@@ -144,7 +144,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         'index_repair',
         'multi_index_block',
-    ]
+    ],
 )
 
 env.Library(
@@ -218,7 +218,7 @@ env.Library(
         'collection',
         'collection_catalog',
         'collection_query_info',
-    ]
+    ],
 )
 
 env.Library(
@@ -271,7 +271,7 @@ env.Library(
         'collection_query_info',
         'index_build_block',
         'index_catalog',
-    ]
+    ],
 )
 
 env.Library(
@@ -294,7 +294,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/idl/server_parameter',
         'collection',
-    ]
+    ],
 )
 
 env.Benchmark(
@@ -327,9 +327,7 @@ env.Library(
 
 env.Library(
     target="validate_state",
-    source=[
-        "validate_state.cpp"
-    ],
+    source=["validate_state.cpp"],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/catalog_raii",
@@ -341,7 +339,7 @@ env.Library(
         "database_holder",
         "index_catalog",
         "throttle_cursor",
-    ]
+    ],
 )
 
 env.Library(
@@ -418,7 +416,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/views/views',
         'database_holder',
-    ]
+    ],
 )
 
 env.Library(
@@ -448,7 +446,7 @@ env.Library(
         'index_key_validate',
         'throttle_cursor',
         'validate_state',
-    ]
+    ],
 )
 
 env.Library(

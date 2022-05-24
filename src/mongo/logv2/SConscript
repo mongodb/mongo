@@ -15,7 +15,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/security_token',
         '$BUILD_DIR/mongo/db/multitenancy_params',
-    ]
+    ],
 )
 
 env.Benchmark(

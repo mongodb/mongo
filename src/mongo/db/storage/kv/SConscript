@@ -35,4 +35,3 @@ env.Library(
         '$BUILD_DIR/mongo/util/clock_source_mock',
     ],
 )
-

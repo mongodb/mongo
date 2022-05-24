@@ -4,10 +4,12 @@
 
 import bisect
 
+
 def print_build_failures():
     from SCons.Script import GetBuildFailures
     for bf in GetBuildFailures():
         print("%s failed: %s" % (bf.node, bf.errstr))
+
 
 def insort_wrapper(target_list, target_string):
     """

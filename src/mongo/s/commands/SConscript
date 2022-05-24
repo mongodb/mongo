@@ -17,7 +17,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/s/grid',
         '$BUILD_DIR/mongo/s/startup_initialization',
-    ]
+    ],
 )
 
 # These commands are linked in mongos and mongoqd
@@ -154,7 +154,7 @@ env.Library(
         '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         'cluster_commands_common',
-    ]
+    ],
 )
 
 env.Library(
@@ -185,7 +185,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/sharding_router_api',
         '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
-     ]
+    ],
 )
 
 # These commands are linked in MongoS only
@@ -229,7 +229,7 @@ env.Library(
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         'cluster_commands',
         'cluster_commands_common',
-    ]
+    ],
 )
 
 env.CppUnitTest(

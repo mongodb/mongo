@@ -36,8 +36,8 @@ env.Library(
         '$BUILD_DIR/mongo/s/sharding_routing_table',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/write_block_bypass'
-    ]
+        '$BUILD_DIR/mongo/db/write_block_bypass',
+    ],
 )
 
 env.Library(
@@ -187,7 +187,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         'sharding_api_d',
-    ]
+    ],
 )
 
 env.Library(
@@ -222,14 +222,14 @@ env.Library(
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/s/grid',
         'sharding_api_d',
-    ]
+    ],
 )
 
 env.Library(
     target='forwardable_operation_metadata',
     source=[
         'forwardable_operation_metadata.cpp',
-        'forwardable_operation_metadata.idl'
+        'forwardable_operation_metadata.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -237,7 +237,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/write_block_bypass',
-    ]
+    ],
 )
 
 env.Library(
@@ -485,7 +485,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
         '$BUILD_DIR/mongo/s/sessions_collection_sharded',
         '$BUILD_DIR/mongo/s/sharding_api',
-    ]
+    ],
 )
 
 env.Library(
@@ -676,7 +676,7 @@ env.CppUnitTest(
         'topology_time_ticker_test.cpp',
         'type_lockpings_test.cpp',
         'type_locks_test.cpp',
-        'vector_clock_config_server_test.cpp'
+        'vector_clock_config_server_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
@@ -701,7 +701,7 @@ env.Benchmark(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
-        'sharding_runtime_d'
+        'sharding_runtime_d',
     ],
 )
 

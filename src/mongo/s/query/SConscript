@@ -44,7 +44,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
-    ]
+    ],
 )
 
 env.Library(
@@ -92,13 +92,13 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
-    ]
+    ],
 )
 
 env.Library(
     target="store_possible_cursor",
     source=[
-        "store_possible_cursor.cpp"
+        "store_possible_cursor.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

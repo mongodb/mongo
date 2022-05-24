@@ -17,9 +17,9 @@ env.SConscript(
 env.Library(
     target='change_stream_pre_and_post_images_options',
     source=[
-        'change_stream_pre_and_post_images_options.idl'
+        'change_stream_pre_and_post_images_options.idl',
     ],
-     LIBDEPS=[
+    LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
@@ -46,21 +46,21 @@ env.Library(
         'aggregation_request_helper',
         'expression_context',
         'pipeline',
-    ]
+    ],
 )
 
 env.Library(
     target='field_path',
     source=[
         'field_path.cpp',
-        ],
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/query/query_knobs',
         '$BUILD_DIR/mongo/db/server_options',
         '$BUILD_DIR/mongo/idl/feature_flag',
-        ]
-    )
+    ],
+)
 
 env.Library(
     target='aggregation_request_helper',
@@ -80,7 +80,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/write_concern_options',
         '$BUILD_DIR/mongo/idl/idl_parser',
         'document_sources_idl',
-    ]
+    ],
 )
 
 env.Library(
@@ -90,7 +90,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-    ]
+    ],
 )
 env.Library(
     target='expression_context',
@@ -135,11 +135,11 @@ env.Library(
     target='dependencies',
     source=[
         'dependencies.cpp',
-        ],
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         'field_path',
-    ]
+    ],
 )
 
 env.Library(
@@ -169,7 +169,7 @@ env.Library(
         'window_function/window_function_integral.cpp',
         'window_function/window_function_shift.cpp',
         'window_function/window_function_sum.cpp',
-        ],
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/query/query_knobs',
@@ -179,9 +179,8 @@ env.Library(
         'field_path',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/exec/sort_executor',
-        '$BUILD_DIR/mongo/db/index/key_generator'
-    ]
+        '$BUILD_DIR/mongo/db/exec/sort_executor', '$BUILD_DIR/mongo/db/index/key_generator'
+    ],
 )
 
 env.Library(
@@ -190,12 +189,12 @@ env.Library(
         'granularity_rounder.cpp',
         'granularity_rounder_powers_of_two.cpp',
         'granularity_rounder_preferred_numbers.cpp',
-        ],
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         'expression_context',
         'field_path',
-    ]
+    ],
 )
 
 env.Library(
@@ -203,11 +202,11 @@ env.Library(
     source=[
         'document_source_mock.cpp',
         'process_interface/stub_lookup_single_document_process_interface.cpp',
-        ],
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'pipeline',
-    ]
+    ],
 )
 
 env.Library(
@@ -227,12 +226,12 @@ env.Library(
     source=[
         'lite_parsed_document_source.cpp',
         'lite_parsed_pipeline.cpp',
-        ],
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/common_query_enums_and_helpers',
         '$BUILD_DIR/mongo/db/stats/counters',
         'aggregation_request_helper',
-    ]
+    ],
 )
 
 env.Library(
@@ -391,7 +390,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/rpc/command_status',
-    ]
+    ],
 )
 
 env.Library(
@@ -441,7 +440,6 @@ env.Library(
     ],
 )
 
-
 env.Library(
     target='runtime_constants_idl',
     source=[
@@ -487,7 +485,7 @@ env.Library(
 env.Library(
     target='change_stream_expired_pre_image_remover',
     source=[
-        'change_stream_expired_pre_image_remover.cpp'
+        'change_stream_expired_pre_image_remover.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/change_stream_options_manager',
@@ -499,13 +497,13 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/storage_interface',
         '$BUILD_DIR/mongo/util/periodic_runner',
         'change_stream_preimage',
-    ]
+    ],
 )
 
 env.Library(
     target='change_stream_pre_image_helpers',
     source=[
-        'change_stream_pre_image_helpers.cpp'
+        'change_stream_pre_image_helpers.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
@@ -516,7 +514,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/lock_manager_defs',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/namespace_string',
-    ]
+    ],
 )
 
 env.Library(
@@ -527,8 +525,7 @@ env.Library(
     LIBDEPS=[
         "change_stream_pipeline",
     ],
-    LIBDEPS_PRIVATE=[
-    ],
+    LIBDEPS_PRIVATE=[],
 )
 
 env.CppUnitTest(
@@ -686,7 +683,7 @@ env.CppUnitTest(
         'process_interface/mongos_process_interface',
         'process_interface/shardsvr_process_interface',
         'sharded_agg_helpers',
-    ]
+    ],
 )
 
 env.Benchmark(

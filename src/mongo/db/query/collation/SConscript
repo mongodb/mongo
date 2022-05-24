@@ -78,8 +78,7 @@ if not use_system_version_of_library("icu"):
             ("U_DISABLE_RENAMING", 1),
             ("U_STATIC_IMPLEMENTATION", 1),
             ("U_USING_ICU_NAMESPACE", 0),
-        ],
-    )
+        ], )
 
 icuEnv.Library(
     target="collator_icu",

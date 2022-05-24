@@ -16,22 +16,21 @@ env.Library(
 
 env.Library(
     target='thread_pool_test_fixture',
-    source=[
-        'thread_pool_test_common.cpp',
-        'thread_pool_test_fixture.cpp'
-    ],
+    source=['thread_pool_test_common.cpp', 'thread_pool_test_fixture.cpp'],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/unittest/unittest',
-    ]
+    ],
 )
 
-env.Library('ticketholder',
-            ['ticketholder.cpp'],
-            LIBDEPS=[
-                '$BUILD_DIR/mongo/base',
-                '$BUILD_DIR/mongo/db/service_context',
-                '$BUILD_DIR/third_party/shim_boost',
-            ])
+env.Library(
+    'ticketholder',
+    ['ticketholder.cpp'],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/third_party/shim_boost',
+    ],
+)
 
 env.Library(
     target='spin_lock',
@@ -40,7 +39,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-    ]
+    ],
 )
 
 env.CppUnitTest(
@@ -57,7 +56,7 @@ env.CppUnitTest(
         'thread_pool',
         'thread_pool_test_fixture',
         'ticketholder',
-    ]
+    ],
 )
 
 env.Benchmark(
@@ -69,4 +68,3 @@ env.Benchmark(
         'ticketholder',
     ],
 )
-

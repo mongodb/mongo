@@ -19,7 +19,6 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-
 """Pseudo-builders for building test lists for Resmoke"""
 
 import SCons
@@ -63,9 +62,9 @@ def test_list_builder_action(env, target, source):
 
 TEST_LIST_BUILDER = SCons.Builder.Builder(
     action=SCons.Action.FunctionAction(
-        test_list_builder_action, {"cmdstr": "Generating $TARGETS"},
-    )
-)
+        test_list_builder_action,
+        {"cmdstr": "Generating $TARGETS"},
+    ))
 
 
 def exists(env):

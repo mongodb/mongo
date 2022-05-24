@@ -37,13 +37,13 @@ stemming_packages = [
     "UTF_8_french",
     "UTF_8_norwegian",
     "UTF_8_russian",
-    ]
+]
 
 stemmer_files = [
     'runtime/api.c',
     'libstemmer/libstemmer_utf8.c',
     ['src_c/stem_%s.c' % p for p in stemming_packages],
-    ]
+]
 
 myEnv = env.Clone()
 if myEnv.ToolchainIs('GCC', 'clang'):

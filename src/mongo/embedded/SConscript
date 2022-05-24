@@ -8,14 +8,13 @@ Import("wiredtiger")
 
 env = env.Clone()
 
-env.AppendUnique(
-    CPPPATH=["$BUILD_DIR/mongo/embedded"],
-)
+env.AppendUnique(CPPPATH=["$BUILD_DIR/mongo/embedded"], )
 
 # Inject this before we call the SDK directory SConscripts so that
 # they can both use it.
 
 sdkEnv = env.Clone()
+
 
 def mongo_export_file_generator(target, source, env, for_signature):
     if env.ToolchainIs('msvc'):
@@ -29,6 +28,7 @@ def mongo_export_file_generator(target, source, env, for_signature):
         return script.get_csig() if for_signature else "-Wl,--version-script," + str(script)
     else:
         pass
+
 
 # We really only want to use the mapfile if we are doing an SDK build. In an ordinary
 # dynamic build, we would end up building the normal library with an export map
@@ -44,7 +44,7 @@ env.SConscript(
         'stitch_support',
     ],
     exports={
-        'env' : sdkEnv,
+        'env': sdkEnv,
     },
 )
 
@@ -116,8 +116,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/vector_clock_trivial',
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/rpc/client_metadata',
-        '$BUILD_DIR/mongo/util/latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
+        '$BUILD_DIR/mongo/util/latch_analyzer'
+        if get_option('use-diagnostic-latches') == 'on' else [],
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         '$BUILD_DIR/mongo/util/version_impl',
-    ]
+    ],
 )

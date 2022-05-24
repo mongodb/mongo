@@ -15,11 +15,9 @@ env = env.Clone()
 
 env.InjectMongoIncludePaths()
 
-env.AppendUnique(
-    FORCEINCLUDES=[
-        'mongo/platform/basic.h',
-    ],
-)
+env.AppendUnique(FORCEINCLUDES=[
+    'mongo/platform/basic.h',
+], )
 
 env.SConscript(
     dirs=[
@@ -53,7 +51,8 @@ env.SConscript(
 )
 
 config_header_substs = (
-    ('@mongo_config_altivec_vec_vbpermq_output_index@', 'MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX'),
+    ('@mongo_config_altivec_vec_vbpermq_output_index@',
+     'MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX'),
     ('@mongo_config_debug_build@', 'MONGO_CONFIG_DEBUG_BUILD'),
     ('@mongo_config_have_execinfo_backtrace@', 'MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE'),
     ('@mongo_config_have_explicit_bzero@', 'MONGO_CONFIG_HAVE_EXPLICIT_BZERO'),
@@ -78,19 +77,20 @@ config_header_substs = (
     ('@mongo_config_wiredtiger_enabled@', 'MONGO_CONFIG_WIREDTIGER_ENABLED'),
 )
 
+
 def makeConfigHeaderDefine(self, key):
     val = "// #undef {0}".format(key)
     if key in self['CONFIG_HEADER_DEFINES']:
         val = "#define {0} {1}".format(key, self['CONFIG_HEADER_DEFINES'][key])
     return val
+
+
 env.AddMethod(makeConfigHeaderDefine)
 
 generateConfigHeaderFile = env.Substfile(
     'config.h.in',
-    SUBST_DICT=[(k, env.makeConfigHeaderDefine(v)) for (k, v) in config_header_substs]
-)
+    SUBST_DICT=[(k, env.makeConfigHeaderDefine(v)) for (k, v) in config_header_substs])
 env.Alias('generated-sources', generateConfigHeaderFile)
-
 
 # NOTE: The 'base' library does not really belong here. Its presence
 # here is temporary. Do not add to this library, do not remove from
@@ -102,11 +102,9 @@ if use_libunwind == True:
 
 quick_exit_env = baseEnv.Clone()
 if has_option('gcov'):
-    quick_exit_env.Append(
-        CPPDEFINES=[
-            'MONGO_GCOV',
-        ],
-    )
+    quick_exit_env.Append(CPPDEFINES=[
+        'MONGO_GCOV',
+    ], )
 quick_exit_obj = quick_exit_env.LibraryObject(
     target='quick_exit',
     source=[
@@ -261,9 +259,11 @@ env.AutoInstall(
 
 # If no module has introduced a file named LICENSE-Enterprise.txt then this
 # is a Community build, so inject the AGPL and the Community license
-enterprise_license = [banner for banner in env["MODULE_BANNERS"] if banner.name ==  "LICENSE-Enterprise.txt"]
+enterprise_license = [
+    banner for banner in env["MODULE_BANNERS"] if banner.name == "LICENSE-Enterprise.txt"
+]
 if not enterprise_license:
-    env.Append(MODULE_BANNERS = [distsrc.File('LICENSE-Community.txt')])
+    env.Append(MODULE_BANNERS=[distsrc.File('LICENSE-Community.txt')])
 
 # All module banners get staged to the top level of the tarfile, so we
 # need to fail if we are going to have a name collision.

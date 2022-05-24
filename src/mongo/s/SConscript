@@ -140,11 +140,11 @@ env.Library(
 env.Library(
     target="load_balancer_feature_flag",
     source=[
-        'load_balancer_feature_flag.idl'
+        'load_balancer_feature_flag.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/feature_flag',
-    ]
+    ],
 )
 
 env.Library(
@@ -254,7 +254,7 @@ env.Library(
     source=[
         'sharding_test_fixture_common.cpp',
         'catalog_cache_loader_mock.cpp',
-        'catalog_cache_mock.cpp'
+        'catalog_cache_mock.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
@@ -351,12 +351,12 @@ env.Benchmark(
 env.Library(
     target='committed_optime_metadata_hook',
     source=[
-        'committed_optime_metadata_hook.cpp'
+        'committed_optime_metadata_hook.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/rpc/metadata',
         'coreshard',
-    ]
+    ],
 )
 
 env.Library(
@@ -378,7 +378,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/rpc/metadata',
-    ]
+    ],
 )
 
 env.Library(
@@ -403,7 +403,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
-    ]
+    ],
 )
 
 env.Library(
@@ -483,7 +483,8 @@ env.Library(
         '$BUILD_DIR/mongo/transport/transport_layer_manager',
         '$BUILD_DIR/mongo/util/clock_sources',
         '$BUILD_DIR/mongo/util/fail_point',
-        '$BUILD_DIR/mongo/util/latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
+        '$BUILD_DIR/mongo/util/latch_analyzer'
+        if get_option('use-diagnostic-latches') == 'on' else [],
         '$BUILD_DIR/mongo/util/net/http_client_impl',
         '$BUILD_DIR/mongo/util/net/ssl_options_server' if get_option('ssl') == 'on' else '',
         '$BUILD_DIR/mongo/util/ntservice',
@@ -540,7 +541,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/startup_warnings_common',
         '$BUILD_DIR/mongo/transport/service_entry_point',
         '$BUILD_DIR/mongo/transport/transport_layer_manager',
-        '$BUILD_DIR/mongo/util/latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
+        '$BUILD_DIR/mongo/util/latch_analyzer'
+        if get_option('use-diagnostic-latches') == 'on' else [],
         '$BUILD_DIR/mongo/util/signal_handlers',
         'client/sharding_client',
         'commands/cluster_commands',
@@ -569,7 +571,8 @@ if env.TargetOSIs('windows'):
             ('@mongo_version_patch@', version_parts[2]),
             ('@mongo_version_extra@', version_parts[3]),
             ('@mongo_version_extra_str@', version_extra),
-        ])
+        ],
+    )
 
     env.Alias('generated-sources', generatedServerManifest)
     env.Depends("mongos.res", generatedServerManifest)

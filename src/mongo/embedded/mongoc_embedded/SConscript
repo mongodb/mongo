@@ -18,33 +18,29 @@ env.AutoInstall(
     AIB_ROLE='base',
 )
 
+
 def create_mongoc_env(env):
     mongocEnv = env.Clone()
     mongocEnv.AppendUnique(LIBS=['bson-1.0', 'mongoc-1.0'])
     return mongocEnv
 
+
 mongocEmbeddedEnv = create_mongoc_env(env)
 
-mongocEmbeddedEnv.AppendUnique(
-    CPPDEFINES=[
-        'MONGOC_EMBEDDED_COMPILING',
-     ],
-)
+mongocEmbeddedEnv.AppendUnique(CPPDEFINES=[
+    'MONGOC_EMBEDDED_COMPILING',
+], )
 
 if get_option('link-model') == 'static':
-    mongocEmbeddedEnv.AppendUnique(
-        CPPDEFINES=[
-            'MONGOC_EMBEDDED_STATIC',
-        ],
-    )
+    mongocEmbeddedEnv.AppendUnique(CPPDEFINES=[
+        'MONGOC_EMBEDDED_STATIC',
+    ], )
 
 # Please see the note in ../mongo_embedded/SConscript about how to
 # interpret and adjust the current and compatibility versinos.
-mongocEmbeddedEnv.AppendUnique(
-    SHLINKFLAGS=[
-        '$MONGO_EXPORT_FILE_SHLINKFLAGS',
-    ],
-)
+mongocEmbeddedEnv.AppendUnique(SHLINKFLAGS=[
+    '$MONGO_EXPORT_FILE_SHLINKFLAGS',
+], )
 
 if mongocEmbeddedEnv.TargetOSIs('darwin'):
     # Please see the note in ../mongo_embedded/SConscript about how to
@@ -53,8 +49,7 @@ if mongocEmbeddedEnv.TargetOSIs('darwin'):
         SHLINKFLAGS=[
             '-Wl,-current_version,1',
             '-Wl,-compatibility_version,1',
-        ],
-    )
+        ], )
 
 mongocEmbeddedTargets = mongocEmbeddedEnv.Library(
     target='mongoc_embedded',
@@ -72,7 +67,7 @@ env.AutoInstall(
     '$PREFIX_INCLUDEDIR/mongoc_embedded/v1/mongoc_embedded',
     source=['mongoc_embedded.h'],
     AIB_COMPONENT='embedded',
-    AIB_ROLE='dev'
+    AIB_ROLE='dev',
 )
 
 yamlEnv = env.Clone()

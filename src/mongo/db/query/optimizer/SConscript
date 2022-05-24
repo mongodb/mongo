@@ -9,7 +9,7 @@ env.SConscript(
         "algebra",
     ],
     exports=[
-        'env'
+        'env',
     ],
 )
 
@@ -41,7 +41,7 @@ env.Library(
         "utils/abt_hash.cpp",
         "utils/interval_utils.cpp",
         "utils/memo_utils.cpp",
-        "utils/utils.cpp"
+        "utils/utils.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/exec/sbe/query_sbe_values",
@@ -73,5 +73,5 @@ env.CppUnitTest(
     LIBDEPS=[
         "optimizer",
         "unit_test_utils",
-    ]
+    ],
 )

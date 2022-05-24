@@ -8,10 +8,10 @@ env.Append(CCFLAGS=['-Isrc/third_party/s2'])
 
 env.Library(
     "strings",
-    [ 
-	"split.cc",
-	"stringprintf.cc",
-	"strutil.cc",
+    [
+        "split.cc",
+        "stringprintf.cc",
+        "strutil.cc",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
