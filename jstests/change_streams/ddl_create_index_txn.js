@@ -3,6 +3,7 @@
  * createIndexes is done in a transaction.
  *
  * @tags: [
+ *     __TEMPORARILY_DISABLED__,
  *     uses_transactions,
  *     requires_majority_read_concern,
  *     featureFlagChangeStreamsVisibility,
