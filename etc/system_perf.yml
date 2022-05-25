@@ -21,11 +21,6 @@ variables:
         variant: compile-rhel70
       - name: schedule_global_auto_tasks
         variant: task_generation
-  _real_compile_amazon_linux2_arm64: &_real_compile_amazon_linux2_arm64
-      - name: compile
-        variant: compile-amazon-linux2-arm64
-      - name: schedule_global_auto_tasks
-        variant: task_generation
   _real_expansions: &_expansion_updates
     # TODO: Disable in SERVER-57226.
     - key: enable_detect_changes
@@ -33,17 +28,14 @@ variables:
   ###
 
 ###
-# # **Or**: Leave this section uncommented to bypass/skip compile.
-# _skip_compile_amazon2: &_compile_amazon2
-#     - name: schedule_global_auto_tasks
-#       variant: task_generation
-# _skip_compile_rhel70: &_compile_rhel70
-#     - name: schedule_global_auto_tasks
-#       variant: task_generation
-# _skip_compile_amazon_linux2_arm64: &_real_compile_amazon_linux2_arm64
-#     - name: schedule_global_auto_tasks
-#       variant: task_generation
-# _skip_expansions: &_expansion_updates
+# **Or**: Leave this section uncommented to bypass/skip compile.
+#  _skip_compile_amazon2: &_compile_amazon2
+#      - name: schedule_global_auto_tasks
+#        variant: task_generation
+#  _skip_compile_rhel70: &_compile_rhel70
+#      - name: schedule_global_auto_tasks
+#        variant: task_generation
+#  _skip_expansions: &_expansion_updates
 #      # This is the normal (amazon2) "compile" artifact from https://evergreen.mongodb.com/version/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9
 #      - key: mdb_binary_for_client
 #        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9/97c6a9e443ff7e171b7310a1fa5c05d0768faff9/linux/mongodb-sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9.tar.gz
@@ -1086,19 +1078,6 @@ buildvariants:
         install-mongocryptd
     run_on:
       - "amazon2-xlarge"
-    tasks:
-      - name: compile
-
-  - &compile-amazon-linux2-arm64
-    name: compile-amazon-linux2-arm64
-    display_name: Compile for Amazon Linux 2 arm64
-    modules: *modules
-    cron: "0 0 * * *" # Everyday at 00:00
-    disable: true
-    expansions:
-      <<: *compile-expansions
-    run_on:
-      - "amazon2-arm64"
     tasks:
       - name: compile
 
