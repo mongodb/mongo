@@ -424,8 +424,8 @@ public:
     //
 
     /**
-     * Creates index in collection.
-     * Assumes callers has necessary locks.
+     * Creates the specified index without yielding locks.
+     * Assumes the caller has collection MODE_X lock.
      * Throws exception on error.
      */
     void createIndex(OperationContext* opCtx,
@@ -435,12 +435,11 @@ public:
                      bool fromMigrate);
 
     /**
-     * Creates indexes on an empty collection.
-     * Assumes we are enclosed in a WriteUnitOfWork and caller has necessary locks.
-     * For two phase index builds, writes both startIndexBuild and commitIndexBuild oplog entries
-     * on success. No two phase index build oplog entries, including abortIndexBuild, will be
-     * written on failure.
-     * Throws exception on error.
+     * Creates the specified indexes on an empty collection without yielding locks.
+     * Assumes we are enclosed in a WriteUnitOfWork and the caller has exclusive access to the
+     * collection. For two phase index builds, writes both startIndexBuild and commitIndexBuild
+     * oplog entries on success. No two phase index build oplog entries, including abortIndexBuild,
+     * will be written on failure. Throws exception on error.
      */
     static void createIndexesOnEmptyCollection(OperationContext* opCtx,
                                                CollectionWriter& collection,

@@ -2705,6 +2705,7 @@ if wiredtiger:
             'hasher_test.cpp',
             'index_build_entry_helpers_test.cpp',
             'index_builds_coordinator_mongod_test.cpp',
+            'index_builds_coordinator_test.cpp',
             'internal_session_pool_test.cpp',
             'keypattern_test.cpp',
             'keys_collection_document_test.cpp',
