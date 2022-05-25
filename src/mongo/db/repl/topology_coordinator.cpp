@@ -786,11 +786,12 @@ void TopologyCoordinator::prepareSyncFromResponse(const HostAndPort& target,
     *result = Status::OK();
 }
 
-// produce a reply to a heartbeat
-Status TopologyCoordinator::prepareHeartbeatResponseV1(Date_t now,
-                                                       const ReplSetHeartbeatArgsV1& args,
-                                                       StringData ourSetName,
-                                                       ReplSetHeartbeatResponse* response) {
+// produce a reply to a heartbeat, and return whether the remote node's config has changed.
+StatusWith<bool> TopologyCoordinator::prepareHeartbeatResponseV1(
+    Date_t now,
+    const ReplSetHeartbeatArgsV1& args,
+    StringData ourSetName,
+    ReplSetHeartbeatResponse* response) {
     // Verify that replica set names match
     const std::string rshb = args.getSetName();
     if (ourSetName != rshb) {
@@ -853,7 +854,7 @@ Status TopologyCoordinator::prepareHeartbeatResponseV1(Date_t now,
 
     if (!_rsConfig.isInitialized()) {
         response->setConfigVersion(-2);
-        return Status::OK();
+        return false;
     }
 
     response->setElectable(
@@ -874,7 +875,7 @@ Status TopologyCoordinator::prepareHeartbeatResponseV1(Date_t now,
         from = _getMemberIndex(args.getSenderId());
     }
     if (from == -1) {
-        return Status::OK();
+        return false;
     }
     invariant(from != _selfIndex);
 
@@ -883,7 +884,7 @@ Status TopologyCoordinator::prepareHeartbeatResponseV1(Date_t now,
     fromNodeData.setLastHeartbeatRecv(now);
     // Update liveness for sending node.
     fromNodeData.updateLiveness(now);
-    return Status::OK();
+    return fromNodeData.getConfigVersionAndTerm() < args.getConfigVersionAndTerm();
 }
 
 int TopologyCoordinator::_getMemberIndex(int id) const {

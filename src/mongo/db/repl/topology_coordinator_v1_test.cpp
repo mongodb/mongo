@@ -2320,7 +2320,8 @@ public:
     void prepareHeartbeatResponseV1(const ReplSetHeartbeatArgsV1& args,
                                     ReplSetHeartbeatResponse* response,
                                     Status* result) {
-        *result = getTopoCoord().prepareHeartbeatResponseV1(now()++, args, "rs0", response);
+        *result =
+            getTopoCoord().prepareHeartbeatResponseV1(now()++, args, "rs0", response).getStatus();
     }
 
     int initConfigVersion = 1;
@@ -2402,7 +2403,8 @@ TEST_F(TopoCoordTest, SetConfigVersionToNegativeTwoInHeartbeatResponseWhenNoConf
     args.setSenderId(20);
     ReplSetHeartbeatResponse response;
     // prepare response and check the results
-    Status result = getTopoCoord().prepareHeartbeatResponseV1(now()++, args, "rs0", &response);
+    Status result =
+        getTopoCoord().prepareHeartbeatResponseV1(now()++, args, "rs0", &response).getStatus();
     ASSERT_OK(result);
     // this change to true because we can now see a majority, unlike in the previous cases
     ASSERT_EQUALS("rs0", response.getReplicaSetName());

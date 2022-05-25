@@ -214,6 +214,7 @@ rst.nodes[2].disconnect(rst.nodes);
 assert.commandWorked(primaryColl.insert({a: 8}, {writeConcern: {w: "majority"}}));
 
 // Only three nodes are needed for an election (0, 1, and 3).
+rst.waitForConfigReplication(rst.nodes[0], [rst.nodes[1]]);
 assert.commandWorked(rst.nodes[1].adminCommand({replSetStepUp: 1}));
 assert.eq(rst.getPrimary(), rst.nodes[1]);
 rst.waitForConfigReplication(rst.nodes[1], [rst.nodes[0], rst.nodes[1], rst.nodes[3]]);

@@ -366,11 +366,11 @@ public:
                                  BSONObjBuilder* response,
                                  Status* result);
 
-    // produce a reply to a V1 heartbeat
-    Status prepareHeartbeatResponseV1(Date_t now,
-                                      const ReplSetHeartbeatArgsV1& args,
-                                      StringData ourSetName,
-                                      ReplSetHeartbeatResponse* response);
+    // produce a reply to a V1 heartbeat, and return whether the remote node's config has changed.
+    StatusWith<bool> prepareHeartbeatResponseV1(Date_t now,
+                                                const ReplSetHeartbeatArgsV1& args,
+                                                StringData ourSetName,
+                                                ReplSetHeartbeatResponse* response);
 
     struct ReplSetStatusArgs {
         const Date_t now;

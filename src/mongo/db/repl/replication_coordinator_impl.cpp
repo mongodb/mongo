@@ -5785,7 +5785,14 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
 
     auto senderHost(args.getSenderHost());
     const Date_t now = _replExecutor->now();
-    result = _topCoord->prepareHeartbeatResponseV1(now, args, replSetName, response);
+    auto configChanged = _topCoord->prepareHeartbeatResponseV1(now, args, replSetName, response);
+    result = configChanged.getStatus();
+    if (configChanged.isOK() && configChanged.getValue()) {
+        // If the latest heartbeat indicates that the remote node's config has changed, we want to
+        // update it's member data as soon as possible. Send an immediate hearbeat, and update the
+        // member data on processing its response.
+        _scheduleHeartbeatToTarget_inlock(senderHost, now, replSetName);
+    }
 
     if ((result.isOK() || result == ErrorCodes::InvalidReplicaSetConfig) && _selfIndex < 0) {
         // If this node does not belong to the configuration it knows about, send heartbeats
