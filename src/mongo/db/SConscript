@@ -1098,6 +1098,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/pipeline/change_stream_pre_image_helpers',
+        '$BUILD_DIR/mongo/db/server_feature_flags',
         'dbhelpers',
         'internal_transactions_feature_flag',
         'multitenancy',
@@ -2258,6 +2259,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/idl/idl_parser',
+        'namespace_string',
         'service_context',
     ],
 )

@@ -224,7 +224,7 @@ types:
         description: "A MongoDB NamespaceString"
         cpp_type: "mongo::NamespaceString"
         serializer: mongo::NamespaceString::toString
-        deserializer: mongo::NamespaceString
+        deserializer: mongo::NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode
 
     connection_string:
         bson_serialization_type: string

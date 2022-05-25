@@ -67,6 +67,7 @@
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_write_router.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
@@ -599,6 +600,9 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             };
 
         MutableOplogEntry oplogEntryTemplate;
+        // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
+        if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
+            oplogEntryTemplate.setTid(nss.tenantId());
         oplogEntryTemplate.setNss(nss);
         oplogEntryTemplate.setUuid(uuid);
         oplogEntryTemplate.setFromMigrateIfTrue(fromMigrate);

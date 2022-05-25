@@ -183,6 +183,10 @@ ReplOperation MutableOplogEntry::makeInsertOperation(const NamespaceString& nss,
                                                      const BSONObj& docKey) {
     ReplOperation op;
     op.setOpType(OpTypeEnum::kInsert);
+
+    // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
+    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
+        op.setTid(nss.tenantId());
     op.setNss(nss);
     op.setUuid(uuid);
     op.setObject(docToInsert.getOwned());
