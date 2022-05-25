@@ -3,6 +3,7 @@
 (function() {
 
 load("jstests/sharding/libs/find_chunks_util.js");
+load("jstests/libs/feature_flag_util.js");
 
 var s = new ShardingTest({
     name: "slow_sharding_balance3",
@@ -15,6 +16,13 @@ var s = new ShardingTest({
             {setParameter: {internalQueryMaxBlockingSortMemoryUsageBytes: 32 * 1024 * 1024}}
     }
 });
+
+// TODO SERVER-66754 review tests disabled because expecting initial chunks split
+if (FeatureFlagUtil.isEnabled(s.configRS.getPrimary().getDB('admin'), 'NoMoreAutoSplitter')) {
+    jsTestLog("Skipping as featureFlagNoMoreAutoSplitter is enabled");
+    s.stop();
+    return;
+}
 
 s.adminCommand({enablesharding: "test"});
 s.ensurePrimaryShard('test', s.shard1.shardName);

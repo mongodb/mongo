@@ -5,6 +5,7 @@
 'use strict';
 
 load("jstests/sharding/libs/find_chunks_util.js");
+load("jstests/libs/feature_flag_util.js");
 
 var MaxSizeMB = 1;
 
@@ -17,6 +18,14 @@ var s = new ShardingTest({
             {setParameter: {internalQueryMaxBlockingSortMemoryUsageBytes: 32 * 1024 * 1024}}
     }
 });
+
+// TODO SERVER-66754 review tests disabled because expecting initial chunks split
+if (FeatureFlagUtil.isEnabled(s.configRS.getPrimary().getDB('admin'), 'NoMoreAutoSplitter')) {
+    jsTestLog("Skipping as featureFlagNoMoreAutoSplitter is enabled");
+    s.stop();
+    return;
+}
+
 var db = s.getDB("test");
 
 var names = s.getConnNames();
