@@ -269,7 +269,8 @@ std::unique_ptr<InitialSplitPolicy> InitialSplitPolicy::calculateOptimizationStr
     const boost::optional<std::vector<BSONObj>>& initialSplitPoints,
     const std::vector<TagsType>& tags,
     size_t numShards,
-    bool collectionIsEmpty) {
+    bool collectionIsEmpty,
+    bool useAutoSplitter) {
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "numInitialChunks is only supported when the collection is empty "
                              "and has a hashed field in the shard key pattern",
@@ -313,7 +314,11 @@ std::unique_ptr<InitialSplitPolicy> InitialSplitPolicy::calculateOptimizationStr
         return std::make_unique<SingleChunkOnPrimarySplitPolicy>();
     }
 
-    return std::make_unique<UnoptimizedSplitPolicy>();
+    if (useAutoSplitter) {
+        return std::make_unique<AutoSplitInChunksOnPrimaryPolicy>();
+    }
+
+    return std::make_unique<SingleChunkOnPrimarySplitPolicy>();
 }
 
 InitialSplitPolicy::ShardCollectionConfig SingleChunkOnPrimarySplitPolicy::createFirstChunks(
@@ -337,7 +342,7 @@ InitialSplitPolicy::ShardCollectionConfig SingleChunkOnPrimarySplitPolicy::creat
     return {std::move(chunks)};
 }
 
-InitialSplitPolicy::ShardCollectionConfig UnoptimizedSplitPolicy::createFirstChunks(
+InitialSplitPolicy::ShardCollectionConfig AutoSplitInChunksOnPrimaryPolicy::createFirstChunks(
     OperationContext* opCtx,
     const ShardKeyPattern& shardKeyPattern,
     const SplitPolicyParams& params) {

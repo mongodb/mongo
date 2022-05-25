@@ -7,10 +7,18 @@
  */
 (function() {
 
+load("jstests/libs/feature_flag_util.js");
+
 var chunkSize = 25;
 
 var s = new ShardingTest(
     {name: "migrate_cursor1", shards: 2, mongos: 1, other: {chunkSize: chunkSize}});
+// TODO SERVER-66754 review tests disabled because expecting initial chunks split
+if (FeatureFlagUtil.isEnabled(s.configRS.getPrimary().getDB('admin'), 'NoMoreAutoSplitter')) {
+    jsTestLog("Skipping as featureFlagNoMoreAutoSplitter is enabled");
+    s.stop();
+    return;
+}
 
 s.adminCommand({enablesharding: "test"});
 db = s.getDB("test");

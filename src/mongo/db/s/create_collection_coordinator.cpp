@@ -792,7 +792,8 @@ void CreateCollectionCoordinator::_createPolicy(OperationContext* opCtx) {
         _request.getInitialSplitPoints(),
         getTagsAndValidate(opCtx, nss(), _shardKeyPattern->toBSON()),
         getNumShards(opCtx),
-        *_collectionEmpty);
+        *_collectionEmpty,
+        !feature_flags::gNoMoreAutoSplitter.isEnabled(serverGlobalParams.featureCompatibility));
 }
 
 void CreateCollectionCoordinator::_createChunks(OperationContext* opCtx) {
