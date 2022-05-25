@@ -151,13 +151,11 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
             }
         });
 
-        if (_opCtx->lockState()->shouldConflictWithSetFeatureCompatibilityVersion() &&
-            !isSharedLockMode(lockMode)) {
-            _fcvLock.lock(_opCtx, MODE_IX, deadline);
+        if (_opCtx->lockState()->shouldConflictWithSetFeatureCompatibilityVersion()) {
+            _fcvLock.lock(_opCtx, isSharedLockMode(lockMode) ? MODE_IS : MODE_IX, deadline);
         }
-        ScopeGuard unlockFCVLock([this, lockMode] {
-            if (_opCtx->lockState()->shouldConflictWithSetFeatureCompatibilityVersion() &&
-                !isSharedLockMode(lockMode)) {
+        ScopeGuard unlockFCVLock([this] {
+            if (_opCtx->lockState()->shouldConflictWithSetFeatureCompatibilityVersion()) {
                 _fcvLock.unlock();
             }
         });

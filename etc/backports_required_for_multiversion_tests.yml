@@ -218,7 +218,7 @@ last-continuous:
       test_file: jstests/core/sbe_plan_cache_autoparameterize_collscan.js
     - ticket: SERVER-64315
       test_file: jstests/core/wildcard_index_cached_plans.js
-    - ticket: SERVER-65821
+    - ticket: SERVER-66719
       test_file: jstests/replsets/dbhash_lock_acquisition.js
     - ticket: SERVER-65188
       test_file: jstests/sharding/sessions_collection_auto_healing.js
@@ -601,7 +601,7 @@ last-lts:
       test_file: jstests/core/sbe_plan_cache_autoparameterize_collscan.js
     - ticket: SERVER-64315
       test_file: jstests/core/wildcard_index_cached_plans.js
-    - ticket: SERVER-65821
+    - ticket: SERVER-66719
       test_file: jstests/replsets/dbhash_lock_acquisition.js
     - ticket: SERVER-65188
       test_file: jstests/sharding/sessions_collection_auto_healing.js
