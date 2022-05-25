@@ -130,12 +130,8 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
     // Check if we need to refresh from the configsvrs.  If so, then do that and get the results,
     // otherwise (this is a lookup only to incorporate updated connection strings from the RSM),
     // then get the equivalent values from the previously cached data.
-    auto [returnData,
-          returnTopologyTime,
-          returnForceReloadIncrement,
-          removedShards,
-          fetchedFromConfigServers] = [&]()
-        -> std::tuple<ShardRegistryData, Timestamp, Increment, ShardRegistryData::ShardMap, bool> {
+    auto [returnData, returnTopologyTime, returnForceReloadIncrement, removedShards] =
+        [&]() -> std::tuple<ShardRegistryData, Timestamp, Increment, ShardRegistryData::ShardMap> {
         if (timeInStore.topologyTime > cachedData.getTime().topologyTime ||
             timeInStore.forceReloadIncrement > cachedData.getTime().forceReloadIncrement) {
             auto [reloadedData, maxTopologyTime] =
@@ -144,14 +140,12 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
             auto [mergedData, removedShards] =
                 ShardRegistryData::mergeExisting(*cachedData, reloadedData);
 
-            return {
-                mergedData, maxTopologyTime, timeInStore.forceReloadIncrement, removedShards, true};
+            return {mergedData, maxTopologyTime, timeInStore.forceReloadIncrement, removedShards};
         } else {
             return {*cachedData,
                     cachedData.getTime().topologyTime,
                     cachedData.getTime().forceReloadIncrement,
-                    {},
-                    false};
+                    {}};
         }
     }();
 
@@ -184,11 +178,6 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
             ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
                 .getAsync([=](const Status&) { callback(shardId); });
         }
-    }
-
-    // The registry is "up" once there has been a successful lookup from the config servers.
-    if (fetchedFromConfigServers) {
-        _isUp.store(true);
     }
 
     Time returnTime{returnTopologyTime, rsmIncrementForConnStrings, returnForceReloadIncrement};
@@ -380,8 +369,18 @@ std::unique_ptr<Shard> ShardRegistry::createConnection(const ConnectionString& c
     return _shardFactory->createUniqueShard(ShardId("<unnamed>"), connStr);
 }
 
-bool ShardRegistry::isUp() const {
-    return _isUp.load();
+bool ShardRegistry::isUp() {
+    if (_isUp.load())
+        return true;
+
+    // Before the first lookup is completed, the latest cached value is either empty or it is
+    // associated to the default constructed time
+    const auto latestCached = _cache->peekLatestCached(_kSingleton);
+    if (latestCached && latestCached.getTime() != Time()) {
+        _isUp.store(true);
+        return true;
+    }
+    return false;
 }
 
 void ShardRegistry::toBSON(BSONObjBuilder* result) const {
