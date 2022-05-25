@@ -31,11 +31,12 @@
 
 #include "mongo/util/uuid.h"
 
+#include <algorithm>
 #include <fmt/format.h>
-#include <pcrecpp.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/synchronized_value.h"
@@ -85,15 +86,14 @@ UUID UUID::parse(const BSONObj& obj) {
     return res.getValue();
 }
 
-bool UUID::isUUIDString(const std::string& s) {
-    // Regex to match valid version 4 UUIDs with variant bits set
-    static StaticImmortal<pcrecpp::RE> uuidRegex(
-        "[[:xdigit:]]{8}-"
-        "[[:xdigit:]]{4}-"
-        "[[:xdigit:]]{4}-"
-        "[[:xdigit:]]{4}-"
-        "[[:xdigit:]]{12}");
-    return uuidRegex->FullMatch(s);
+bool UUID::isUUIDString(StringData s) {
+    static constexpr auto pat = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"_sd;
+    return s.size() == pat.size() &&
+        std::mismatch(s.begin(),
+                      s.end(),
+                      pat.begin(),
+                      [](char a, char b) { return b == 'x' ? ctype::isXdigit(a) : a == b; })
+            .first == s.end();
 }
 
 bool UUID::isRFC4122v4() const {

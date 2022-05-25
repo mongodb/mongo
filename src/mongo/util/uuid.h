@@ -93,7 +93,7 @@ public:
     /**
      * Returns whether this string represents a valid UUID.
      */
-    static bool isUUIDString(const std::string& s);
+    static bool isUUIDString(StringData s);
 
     /*
      * Return the underlying 128-bit array.

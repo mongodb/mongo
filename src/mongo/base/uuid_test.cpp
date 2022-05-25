@@ -51,6 +51,8 @@ TEST(UUIDTest, UUIDCollisionTest) {
 }
 
 TEST(UUIDTest, isUUIDStringTest) {
+    ASSERT(!UUID::isUUIDString(""));
+
     // Several valid strings
     ASSERT(UUID::isUUIDString("00000000-0000-4000-8000-000000000000"));
     ASSERT(UUID::isUUIDString("01234567-9abc-4def-9012-3456789abcde"));
