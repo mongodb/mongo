@@ -7241,6 +7241,16 @@ tasks:
       resmoke_args: --tagFile=generated_resmoke_config/multiversion_exclude_tags.yml
       fallback_num_sub_suites: 24
 
+- name: sharding_opportunistic_secondary_targeting_gen
+  # The following line is commented out because Evergreen file size limit requires new suites to be added explicitly to variants
+  # tags: ["sharding", "common"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 32
+
 - <<: *task_template
   name: snmp
   commands:
@@ -8867,6 +8877,7 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot
   - name: sharding_gen
+  - name: sharding_opportunistic_secondary_targeting_gen
   - name: .stitch
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
@@ -9776,6 +9787,7 @@ buildvariants:
     - windows-vsCurrent-large
   - name: session_jscore_passthrough
   - name: sharding_gen
+  - name: sharding_opportunistic_secondary_targeting_gen
   - name: .stitch
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
@@ -9883,6 +9895,7 @@ buildvariants:
     - name: sharding_auth_gen
     - name: sharding_auth_audit_gen
     - name: sharding_ese_gen
+    - name: sharding_opportunistic_secondary_targeting_gen
     - name: snmp
     - name: unittest_shell_hang_analyzer_gen
     - name: push
@@ -10305,6 +10318,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
   - name: .sharding .common
+  - name: sharding_opportunistic_secondary_targeting_gen
   - name: snmp
   - name: .stitch
   - name: .updatefuzzer
