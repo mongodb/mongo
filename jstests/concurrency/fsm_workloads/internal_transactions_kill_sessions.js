@@ -1,9 +1,8 @@
 'use strict';
 
 /**
- * Runs insert, update, delete and findAndModify commands against a sharded collection inside
- * single-shard and cross-shard internal transactions using all the available client session
- * settings, and occasionally kills a random session.
+ * Runs insert, update, delete and findAndModify commands in internal transactions using all the
+ * available client session settings, and occasionally kills a random session.
  *
  * @tags: [
  *  requires_fcv_60,
