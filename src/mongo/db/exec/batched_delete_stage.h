@@ -129,6 +129,16 @@ private:
     // some, or all, of the documents staged in the _stagedDeletesBuffer are successfully deleted.
     PlanStage::StageState _deleteBatch(WorkingSetID* out);
 
+    // Attempts to delete the documents staged for deletion in a WriteUnitOfWork. Updates
+    // recordsToSkip, docsDeleted, and buffferOffset to reflect which document deletes are skipped,
+    // executed, or remaining when the WriteUnitOfWork is committed.
+    //
+    // Returns the time spent (milliseconds) committing the batch.
+    long long _commitBatch(WorkingSetID* out,
+                           std::set<WorkingSetID>* recordsToSkip,
+                           unsigned int* docsDeleted,
+                           unsigned int* bufferOffset);
+
     // Attempts to stage a new delete in the _stagedDeletesBuffer. Returns the PlanStage::StageState
     // fetched directly from the child except when there is a document to stage. Converts
     // PlanStage::ADVANCED to PlanStage::NEED_TIME before returning when a document is staged for
