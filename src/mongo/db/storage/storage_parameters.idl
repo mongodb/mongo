@@ -164,3 +164,7 @@ feature_flags:
         description: "When enabled, support storing derived collection and index metadata"
         cpp_varname: feature_flags::gDerivedMetadata
         default: false
+    featureFlagTimeseriesScalabilityImprovements:
+        description: "Enable scalability and usability improvements for time-series collections"
+        cpp_varname: feature_flags::gTimeseriesScalabilityImprovements
+        default: false
