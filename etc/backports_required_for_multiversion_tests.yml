@@ -205,6 +205,8 @@ last-continuous:
   - test_file: jstests/core/where_multiple_plans.js
     ticket: SERVER-66389
   - test_file: jstests/replsets/dbhash_lock_acquisition.js
+    ticket: SERVER-60829
+  - test_file: jstests/replsets/tenant_migration_donor_resume_on_stepup_and_restart.js
     ticket: SERVER-66719
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     ticket: SERVER-67492
@@ -504,6 +506,8 @@ last-lts:
   - test_file: jstests/core/where_multiple_plans.js
     ticket: SERVER-66389
   - test_file: jstests/replsets/dbhash_lock_acquisition.js
+    ticket: SERVER-60829
+  - test_file: jstests/replsets/tenant_migration_donor_resume_on_stepup_and_restart.js
     ticket: SERVER-66719
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     ticket: SERVER-67492
