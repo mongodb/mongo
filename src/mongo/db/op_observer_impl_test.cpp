@@ -178,6 +178,7 @@ public:
         // Ensure that we are primary.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+        MongoDSessionCatalog::onStepUp(opCtx.get());
 
         ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
     }
@@ -725,7 +726,6 @@ public:
         OpObserverTest::setUp();
 
         auto opCtx = cc().makeOperationContext();
-        MongoDSessionCatalog::onStepUp(opCtx.get());
     }
 
     /**
@@ -846,7 +846,6 @@ public:
         OpObserverTest::setUp();
         _opCtx = cc().makeOperationContext();
         _opObserver.emplace();
-        MongoDSessionCatalog::onStepUp(opCtx());
         _times.emplace(opCtx());
     }
 

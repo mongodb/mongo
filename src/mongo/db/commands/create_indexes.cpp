@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
@@ -62,6 +63,7 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
@@ -446,16 +448,28 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
     return reply;
 }
 
+bool isCreatingInternalConfigTxnsPartialIndex(const CreateIndexesCommand& cmd) {
+    if (cmd.getIndexes().size() > 1) {
+        return false;
+    }
+    const auto& index = cmd.getIndexes()[0];
+
+    UnorderedFieldsBSONObjComparator comparator;
+    return comparator.compare(index, MongoDSessionCatalog::getConfigTxnPartialIndexSpec()) == 0;
+}
+
 CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                                                    const CreateIndexesCommand& cmd) {
     const auto ns = cmd.getNamespace();
     uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
     // Disallow users from creating new indexes on config.transactions since the sessions code
-    // was optimized to not update indexes
+    // was optimized to not update indexes. The only exception is the partial index used to support
+    // retryable transactions that the sessions code knows how to handle.
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "not allowed to create index on " << ns.ns(),
-            ns != NamespaceString::kSessionTransactionsTableNamespace);
+            ns != NamespaceString::kSessionTransactionsTableNamespace ||
+                isCreatingInternalConfigTxnsPartialIndex(cmd));
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot write to system collection " << ns.toString()

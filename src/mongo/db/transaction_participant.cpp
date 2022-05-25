@@ -65,6 +65,7 @@
 #include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/server_transactions_metrics.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/storage/flow_control.h"
 #include "mongo/db/transaction_history_iterator.h"
@@ -180,6 +181,20 @@ auto performReadWithNoTimestampDBDirectClient(OperationContext* opCtx, Callable&
     // ticket to be obtained.
     FlowControl::Bypass flowControlBypass(opCtx);
     return callable(&client);
+}
+
+void rethrowPartialIndexQueryBadValueWithContext(const DBException& ex) {
+    if (ex.reason().find("hint provided does not correspond to an existing index")) {
+        uassertStatusOKWithContext(
+            ex.toStatus(),
+            str::stream()
+                << "Failed to find partial index for "
+                << NamespaceString::kSessionTransactionsTableNamespace.ns()
+                << ". Please create an index directly on this replica set with the specification: "
+                << MongoDSessionCatalog::getConfigTxnPartialIndexSpec() << " or drop the "
+                << NamespaceString::kSessionTransactionsTableNamespace.ns()
+                << " collection and step up a new primary.");
+    }
 }
 
 struct ActiveTransactionHistory {
@@ -328,29 +343,35 @@ TxnNumber fetchHighestTxnNumberWithInternalSessions(OperationContext* opCtx,
         highestTxnNumber = osession.getHighestTxnNumberWithChildSessions();
     });
 
-    performReadWithNoTimestampDBDirectClient(opCtx, [&](DBDirectClient* client) {
-        FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
-        findRequest.setFilter(BSON(
-            SessionTxnRecord::kParentSessionIdFieldName
-            << parentLsid.toBSON()
-            << (SessionTxnRecord::kSessionIdFieldName + "." + LogicalSessionId::kTxnNumberFieldName)
-            << BSON("$gte" << highestTxnNumber)));
-        findRequest.setSort(BSON(
-            (SessionTxnRecord::kSessionIdFieldName + "." + LogicalSessionId::kTxnNumberFieldName)
-            << -1));
-        findRequest.setProjection(BSON(SessionTxnRecord::kSessionIdFieldName << 1));
-        findRequest.setLimit(1);
+    try {
+        performReadWithNoTimestampDBDirectClient(opCtx, [&](DBDirectClient* client) {
+            FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+            findRequest.setFilter(BSON(SessionTxnRecord::kParentSessionIdFieldName
+                                       << parentLsid.toBSON()
+                                       << (SessionTxnRecord::kSessionIdFieldName + "." +
+                                           LogicalSessionId::kTxnNumberFieldName)
+                                       << BSON("$gte" << highestTxnNumber)));
+            findRequest.setSort(BSON((SessionTxnRecord::kSessionIdFieldName + "." +
+                                      LogicalSessionId::kTxnNumberFieldName)
+                                     << -1));
+            findRequest.setProjection(BSON(SessionTxnRecord::kSessionIdFieldName << 1));
+            findRequest.setLimit(1);
+            findRequest.setHint(BSON("$hint" << MongoDSessionCatalog::kConfigTxnsPartialIndexName));
 
-        auto cursor = client->find(findRequest);
+            auto cursor = client->find(findRequest);
 
-        while (cursor->more()) {
-            const auto doc = cursor->next();
-            const auto childLsid = LogicalSessionId::parse(
-                IDLParserErrorContext("LogicalSessionId"), doc.getObjectField("_id"));
-            highestTxnNumber = std::max(highestTxnNumber, *childLsid.getTxnNumber());
-            invariant(!cursor->more());
-        }
-    });
+            while (cursor->more()) {
+                const auto doc = cursor->next();
+                const auto childLsid = LogicalSessionId::parse(
+                    IDLParserErrorContext("LogicalSessionId"), doc.getObjectField("_id"));
+                highestTxnNumber = std::max(highestTxnNumber, *childLsid.getTxnNumber());
+                invariant(!cursor->more());
+            }
+        });
+    } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
+        rethrowPartialIndexQueryBadValueWithContext(ex);
+        throw;
+    }
 
     return highestTxnNumber;
 }
@@ -2875,22 +2896,27 @@ void TransactionParticipant::Participant::_refreshActiveTransactionParticipantsF
 
             // Make sure that every child session has a corresponding
             // Session/TransactionParticipant.
-            performReadWithNoTimestampDBDirectClient(opCtx, [&](DBDirectClient* client) {
-                FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
-                findRequest.setFilter(BSON(SessionTxnRecord::kParentSessionIdFieldName
-                                           << parentTxnParticipant._sessionId().toBSON()
-                                           << (SessionTxnRecord::kSessionIdFieldName + "." +
-                                               LogicalSessionId::kTxnNumberFieldName)
-                                           << BSON("$gte" << *activeRetryableWriteTxnNumber)));
-                findRequest.setProjection(BSON("_id" << 1));
+            try {
+                performReadWithNoTimestampDBDirectClient(opCtx, [&](DBDirectClient* client) {
+                    FindCommandRequest findRequest{
+                        NamespaceString::kSessionTransactionsTableNamespace};
+                    findRequest.setFilter(BSON(SessionTxnRecord::kParentSessionIdFieldName
+                                               << parentTxnParticipant._sessionId().toBSON()
+                                               << (SessionTxnRecord::kSessionIdFieldName + "." +
+                                                   LogicalSessionId::kTxnNumberFieldName)
+                                               << BSON("$gte" << *activeRetryableWriteTxnNumber)));
+                    findRequest.setProjection(BSON(SessionTxnRecord::kSessionIdFieldName << 1));
+                    findRequest.setHint(
+                        BSON("$hint" << MongoDSessionCatalog::kConfigTxnsPartialIndexName));
 
-                auto cursor = client->find(findRequest);
+                    auto cursor = client->find(findRequest);
 
-                while (cursor->more()) {
-                    const auto doc = cursor->next();
-                    const auto childLsid = LogicalSessionId::parse(
-                        IDLParserErrorContext("LogicalSessionId"), doc.getObjectField("_id"));
-                    uassert(6202001,
+                    while (cursor->more()) {
+                        const auto doc = cursor->next();
+                        const auto childLsid = LogicalSessionId::parse(
+                            IDLParserErrorContext("LogicalSessionId"), doc.getObjectField("_id"));
+                        uassert(
+                            6202001,
                             str::stream()
                                 << "Refresh expected the highest transaction number in the session "
                                 << parentTxnParticipant._sessionId() << " to be "
@@ -2899,15 +2925,20 @@ void TransactionParticipant::Participant::_refreshActiveTransactionParticipantsF
                                 << " entry for an internal transaction for retryable writes with "
                                 << "transaction number " << *childLsid.getTxnNumber(),
                             *childLsid.getTxnNumber() == *activeRetryableWriteTxnNumber);
-                    auto sessionCatalog = SessionCatalog::get(opCtx);
-                    sessionCatalog->createSessionIfDoesNotExist(childLsid);
-                    sessionCatalog->scanSession(childLsid, [&](const ObservableSession& osession) {
-                        auto childTxnParticipant =
-                            TransactionParticipant::get(opCtx, osession.get());
-                        childTxnParticipants.push_back(childTxnParticipant);
-                    });
-                }
-            });
+                        auto sessionCatalog = SessionCatalog::get(opCtx);
+                        sessionCatalog->createSessionIfDoesNotExist(childLsid);
+                        sessionCatalog->scanSession(
+                            childLsid, [&](const ObservableSession& osession) {
+                                auto childTxnParticipant =
+                                    TransactionParticipant::get(opCtx, osession.get());
+                                childTxnParticipants.push_back(childTxnParticipant);
+                            });
+                    }
+                });
+            } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
+                rethrowPartialIndexQueryBadValueWithContext(ex);
+                throw;
+            }
 
             for (auto& childTxnParticipant : childTxnParticipants) {
                 childTxnParticipant._refreshSelfFromStorageIfNeeded(opCtx, fetchOplogEntries);

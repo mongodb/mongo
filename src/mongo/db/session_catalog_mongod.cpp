@@ -347,19 +347,11 @@ void createTransactionTable(OperationContext* opCtx) {
         str::stream() << "Failed to create the "
                       << NamespaceString::kSessionTransactionsTableNamespace.ns() << " collection");
 
-    NewIndexSpec index;
-    index.setV(int(IndexDescriptor::kLatestIndexVersion));
-    index.setKey(BSON(
-        SessionTxnRecord::kParentSessionIdFieldName
-        << 1
-        << (SessionTxnRecord::kSessionIdFieldName + "." + LogicalSessionId::kTxnNumberFieldName)
-        << 1 << SessionTxnRecord::kSessionIdFieldName << 1));
-    index.setName("parent_lsid");
-    index.setPartialFilterExpression(BSON("parentLsid" << BSON("$exists" << true)));
+    auto indexSpec = MongoDSessionCatalog::getConfigTxnPartialIndexSpec();
 
     const auto createIndexStatus =
         repl::StorageInterface::get(opCtx)->createIndexesOnEmptyCollection(
-            opCtx, NamespaceString::kSessionTransactionsTableNamespace, {index.toBSON()});
+            opCtx, NamespaceString::kSessionTransactionsTableNamespace, {indexSpec});
     uassertStatusOKWithContext(
         createIndexStatus,
         str::stream() << "Failed to create partial index for the "
@@ -411,6 +403,21 @@ void abortInProgressTransactions(OperationContext* opCtx) {
     }
 }
 }  // namespace
+
+const std::string MongoDSessionCatalog::kConfigTxnsPartialIndexName = "parent_lsid";
+
+BSONObj MongoDSessionCatalog::getConfigTxnPartialIndexSpec() {
+    NewIndexSpec index;
+    index.setV(int(IndexDescriptor::kLatestIndexVersion));
+    index.setKey(BSON(
+        SessionTxnRecord::kParentSessionIdFieldName
+        << 1
+        << (SessionTxnRecord::kSessionIdFieldName + "." + LogicalSessionId::kTxnNumberFieldName)
+        << 1 << SessionTxnRecord::kSessionIdFieldName << 1));
+    index.setName(MongoDSessionCatalog::kConfigTxnsPartialIndexName);
+    index.setPartialFilterExpression(BSON("parentLsid" << BSON("$exists" << true)));
+    return index.toBSON();
+}
 
 void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     // Invalidate sessions that could have a retryable write on it, so that we can refresh from disk

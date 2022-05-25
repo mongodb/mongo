@@ -45,6 +45,7 @@
 #include "mongo/db/s/session_catalog_migration.h"
 #include "mongo/db/s/session_catalog_migration_source.h"
 #include "mongo/db/session.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/executor/remote_command_request.h"
@@ -2553,6 +2554,8 @@ TEST_F(SessionCatalogMigrationSourceTest, UntransferredDataSizeWithCommittedWrit
 
     DBDirectClient client(opCtx());
     client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
+    client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                         {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
     // Enter an oplog entry before creating SessionCatalogMigrationSource to set config.transactions
     // average object size to the size of this entry.
     auto entry = makeOplogEntry(
