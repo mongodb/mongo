@@ -272,7 +272,7 @@ public:
      * The ShardRegistry is "up" once a successful lookup from the config servers has been
      * completed.
      */
-    bool isUp() const;
+    bool isUp();
 
     void toBSON(BSONObjBuilder* result) const;
 
