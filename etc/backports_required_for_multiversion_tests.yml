@@ -220,6 +220,8 @@ last-continuous:
       test_file: jstests/core/wildcard_index_cached_plans.js
     - ticket: SERVER-66719
       test_file: jstests/replsets/dbhash_lock_acquisition.js
+    - ticket: SERVER-60829
+      test_file: jstests/replsets/tenant_migration_donor_resume_on_stepup_and_restart.js
     - ticket: SERVER-65188
       test_file: jstests/sharding/sessions_collection_auto_healing.js
     - ticket: SERVER-65188
@@ -603,6 +605,8 @@ last-lts:
       test_file: jstests/core/wildcard_index_cached_plans.js
     - ticket: SERVER-66719
       test_file: jstests/replsets/dbhash_lock_acquisition.js
+    - ticket: SERVER-60829
+      test_file: jstests/replsets/tenant_migration_donor_resume_on_stepup_and_restart.js
     - ticket: SERVER-65188
       test_file: jstests/sharding/sessions_collection_auto_healing.js
     - ticket: SERVER-65188
