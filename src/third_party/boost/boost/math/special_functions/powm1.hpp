@@ -16,7 +16,7 @@
 #include <boost/math/special_functions/log1p.hpp>
 #include <boost/math/special_functions/expm1.hpp>
 #include <boost/math/special_functions/trunc.hpp>
-#include <boost/assert.hpp>
+#include <boost/math/tools/assert.hpp>
 
 namespace boost{ namespace math{ namespace detail{
 
@@ -40,7 +40,7 @@ inline T powm1_imp(const T x, const T y, const Policy& pol)
          // fall through....
       }
    }
-   else
+   else if (x < 0)
    {
       // y had better be an integer:
       if (boost::math::trunc(y) != y)

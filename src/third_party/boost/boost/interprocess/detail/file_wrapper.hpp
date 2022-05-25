@@ -210,7 +210,7 @@ inline bool file_wrapper::remove(const char *filename)
 
 inline void file_wrapper::truncate(offset_t length)
 {
-   if(!truncate_file(m_handle, length)){
+   if(!truncate_file(m_handle, (std::size_t)length)){
       error_info err(system_error_code());
       throw interprocess_exception(err);
    }

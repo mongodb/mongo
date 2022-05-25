@@ -12,7 +12,6 @@
 #include <boost/math/special_functions/expm1.hpp>
 #include <boost/math/distributions/complement.hpp>
 #include <boost/math/distributions/detail/common_error_handling.hpp>
-#include <boost/config/no_tr1/cmath.hpp>
 
 //
 // This is the maximum extreme value distribution, see
@@ -22,8 +21,9 @@
 // distribution or a Gumbel distribution.
 
 #include <utility>
+#include <cmath>
 
-#ifdef BOOST_MSVC
+#ifdef _MSC_VER
 # pragma warning(push)
 # pragma warning(disable: 4702) // unreachable code (return after domain_error throw).
 #endif
@@ -72,6 +72,13 @@ private:
 };
 
 typedef extreme_value_distribution<double> extreme_value;
+
+#ifdef __cpp_deduction_guides
+template <class RealType>
+extreme_value_distribution(RealType)->extreme_value_distribution<typename boost::math::tools::promote_args<RealType>::type>;
+template <class RealType>
+extreme_value_distribution(RealType,RealType)->extreme_value_distribution<typename boost::math::tools::promote_args<RealType>::type>;
+#endif
 
 template <class RealType, class Policy>
 inline const std::pair<RealType, RealType> range(const extreme_value_distribution<RealType, Policy>& /*dist*/)
@@ -288,7 +295,7 @@ inline RealType kurtosis_excess(const extreme_value_distribution<RealType, Polic
 } // namespace math
 } // namespace boost
 
-#ifdef BOOST_MSVC
+#ifdef _MSC_VER
 # pragma warning(pop)
 #endif
 

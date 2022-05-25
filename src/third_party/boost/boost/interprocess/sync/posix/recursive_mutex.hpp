@@ -41,8 +41,8 @@
 #include <pthread.h>
 #include <errno.h>
 #include <boost/interprocess/sync/posix/pthread_helpers.hpp>
-#include <boost/interprocess/sync/posix/ptime_to_timespec.hpp>
-#include <boost/interprocess/detail/posix_time_types_wrk.hpp>
+#include <boost/interprocess/sync/posix/timepoint_to_timespec.hpp>
+#include <boost/interprocess/detail/timed_utils.hpp>
 #include <boost/interprocess/exceptions.hpp>
 #ifndef BOOST_INTERPROCESS_POSIX_TIMEOUTS
 #  include <boost/interprocess/detail/os_thread_functions.hpp>
@@ -65,7 +65,7 @@ class posix_recursive_mutex
 
    void lock();
    bool try_lock();
-   bool timed_lock(const boost::posix_time::ptime &abs_time);
+   template<class TimePoint> bool timed_lock(const TimePoint &abs_time);
    void unlock();
 
    private:
@@ -87,29 +87,67 @@ inline posix_recursive_mutex::~posix_recursive_mutex()
 
 inline void posix_recursive_mutex::lock()
 {
-   if (pthread_mutex_lock(&m_mut) != 0)
+   int res = pthread_mutex_lock(&m_mut);
+   #ifdef BOOST_INTERPROCESS_POSIX_ROBUST_MUTEXES
+   if (res == EOWNERDEAD)
+   {
+      //We can't inform the application and data might
+      //corrupted, so be safe and mark the mutex as not recoverable
+      //so applications can act accordingly.
+      pthread_mutex_unlock(&m_mut);
+      throw lock_exception(not_recoverable);
+   }
+   else if (res == ENOTRECOVERABLE)
+      throw lock_exception(not_recoverable);
+   #endif
+   if (res != 0)
       throw lock_exception();
 }
 
 inline bool posix_recursive_mutex::try_lock()
 {
    int res = pthread_mutex_trylock(&m_mut);
+   #ifdef BOOST_INTERPROCESS_POSIX_ROBUST_MUTEXES
+   if (res == EOWNERDEAD)
+   {
+      //We can't inform the application and data might
+      //corrupted, so be safe and mark the mutex as not recoverable
+      //so applications can act accordingly.
+      pthread_mutex_unlock(&m_mut);
+      throw lock_exception(not_recoverable);
+   }
+   else if (res == ENOTRECOVERABLE)
+      throw lock_exception(not_recoverable);
+   #endif
    if (!(res == 0 || res == EBUSY))
       throw lock_exception();
-   return res == 0;
+   return (res == 0);
 }
 
-inline bool posix_recursive_mutex::timed_lock(const boost::posix_time::ptime &abs_time)
+template<class TimePoint>
+inline bool posix_recursive_mutex::timed_lock(const TimePoint &abs_time)
 {
    #ifdef BOOST_INTERPROCESS_POSIX_TIMEOUTS
    //Posix does not support infinity absolute time so handle it here
-   if(abs_time.is_pos_infinity()){
+   if(ipcdetail::is_pos_infinity(abs_time)){
       this->lock();
       return true;
    }
 
-   timespec ts = ptime_to_timespec(abs_time);
+   timespec ts = timepoint_to_timespec(abs_time);
    int res = pthread_mutex_timedlock(&m_mut, &ts);
+   #ifdef BOOST_INTERPROCESS_POSIX_ROBUST_MUTEXES
+   if (res == EOWNERDEAD)
+   {
+      //We can't inform the application and data might
+      //corrupted, so be safe and mark the mutex as not recoverable
+      //so applications can act accordingly.
+      pthread_mutex_unlock(&m_mut);
+      throw lock_exception(not_recoverable);
+   }
+   else if (res == ENOTRECOVERABLE)
+      throw lock_exception(not_recoverable);
+   #endif
    if (res != 0 && res != ETIMEDOUT)
       throw lock_exception();
    return res == 0;

@@ -13,8 +13,14 @@
 #define BOOST_MOVE_ADAPTIVE_SORT_HPP
 
 #include <boost/move/detail/config_begin.hpp>
+
 #include <boost/move/algo/detail/adaptive_sort_merge.hpp>
 #include <boost/core/ignore_unused.hpp>
+
+#if defined(BOOST_CLANG) || (defined(BOOST_GCC) && (BOOST_GCC >= 40600))
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#endif
 
 namespace boost {
 namespace movelib {
@@ -24,7 +30,7 @@ namespace detail_adaptive {
 
 template<class RandIt>
 void move_data_backward( RandIt cur_pos
-              , typename iterator_traits<RandIt>::size_type const l_data
+              , typename iter_size<RandIt>::type const l_data
               , RandIt new_pos
               , bool const xbuf_used)
 {
@@ -41,7 +47,7 @@ void move_data_backward( RandIt cur_pos
 
 template<class RandIt>
 void move_data_forward( RandIt cur_pos
-              , typename iterator_traits<RandIt>::size_type const l_data
+              , typename iter_size<RandIt>::type const l_data
               , RandIt new_pos
               , bool const xbuf_used)
 {
@@ -77,22 +83,22 @@ void move_data_forward( RandIt cur_pos
 // As a last step, if auxiliary memory is available in-place merge is performed.
 // until all is merged or auxiliary memory is not large enough.
 template<class RandIt, class Compare, class XBuf>
-typename iterator_traits<RandIt>::size_type  
+typename iter_size<RandIt>::type  
    adaptive_sort_build_blocks
       ( RandIt const first
-      , typename iterator_traits<RandIt>::size_type const len
-      , typename iterator_traits<RandIt>::size_type const l_base
-      , typename iterator_traits<RandIt>::size_type const l_build_buf
+      , typename iter_size<RandIt>::type const len
+      , typename iter_size<RandIt>::type const l_base
+      , typename iter_size<RandIt>::type const l_build_buf
       , XBuf & xbuf
       , Compare comp)
 {
-   typedef typename iterator_traits<RandIt>::size_type  size_type;
+   typedef typename iter_size<RandIt>::type       size_type;
    BOOST_ASSERT(l_build_buf <= len);
    BOOST_ASSERT(0 == ((l_build_buf / l_base)&(l_build_buf/l_base-1)));
 
    //Place the start pointer after the buffer
    RandIt first_block = first + l_build_buf;
-   size_type const elements_in_blocks = len - l_build_buf;
+   size_type const elements_in_blocks = size_type(len - l_build_buf);
 
    //////////////////////////////////
    // Start of merge to left step
@@ -112,7 +118,7 @@ typename iterator_traits<RandIt>::size_type
       //Now combine them using the buffer. Elements from buffer can be
       //overwritten since they've been saved to xbuf
       l_merged = op_merge_left_step_multiple
-         ( first_block - l_merged, elements_in_blocks, l_merged, l_build_buf, kbuf - l_merged, comp, move_op());
+         ( first_block - l_merged, elements_in_blocks, l_merged, l_build_buf, size_type(kbuf - l_merged), comp, move_op());
 
       //Restore internal buffer from external buffer unless kbuf was l_build_buf,
       //in that case restoration will happen later
@@ -122,13 +128,13 @@ typename iterator_traits<RandIt>::size_type
    }
    else{
       l_merged = insertion_sort_step(first_block, elements_in_blocks, l_base, comp);
-      rotate_gcd(first_block - l_merged, first_block, first_block+elements_in_blocks);
+      rotate_gcd(first_block-l_merged, first_block, first_block+elements_in_blocks);
    }
 
    //Now combine elements using the buffer. Elements from buffer can't be
    //overwritten since xbuf was not big enough, so merge swapping elements.
    l_merged = op_merge_left_step_multiple
-      (first_block - l_merged, elements_in_blocks, l_merged, l_build_buf, l_build_buf - l_merged, comp, swap_op());
+      (first_block-l_merged, elements_in_blocks, l_merged, l_build_buf, size_type(l_build_buf - l_merged), comp, swap_op());
 
    BOOST_ASSERT(l_merged == l_build_buf);
 
@@ -149,7 +155,7 @@ typename iterator_traits<RandIt>::size_type
    }
    xbuf.clear();
    //2*l_build_buf or total already merged
-   return min_value<size_type>(elements_in_blocks, 2*l_build_buf);
+   return min_value<size_type>(elements_in_blocks, size_type(2u*l_build_buf));
 }
 
 template<class RandItKeys, class KeyCompare, class RandIt, class Compare, class XBuf>
@@ -157,9 +163,9 @@ void adaptive_sort_combine_blocks
    ( RandItKeys const keys
    , KeyCompare key_comp
    , RandIt const first
-   , typename iterator_traits<RandIt>::size_type const len
-   , typename iterator_traits<RandIt>::size_type const l_prev_merged
-   , typename iterator_traits<RandIt>::size_type const l_block
+   , typename iter_size<RandIt>::type const len
+   , typename iter_size<RandIt>::type const l_prev_merged
+   , typename iter_size<RandIt>::type const l_block
    , bool const use_buf
    , bool const xbuf_used
    , XBuf & xbuf
@@ -167,9 +173,9 @@ void adaptive_sort_combine_blocks
    , bool merge_left)
 {
    boost::ignore_unused(xbuf);
-   typedef typename iterator_traits<RandIt>::size_type   size_type;
+   typedef typename iter_size<RandIt>::type         size_type;
 
-   size_type const l_reg_combined   = 2*l_prev_merged;
+   size_type const l_reg_combined   = size_type(2u*l_prev_merged);
    size_type l_irreg_combined = 0;
    size_type const l_total_combined = calculate_total_combined(len, l_prev_merged, &l_irreg_combined);
    size_type const n_reg_combined = len/l_reg_combined;
@@ -178,7 +184,7 @@ void adaptive_sort_combine_blocks
    boost::ignore_unused(l_total_combined);
    BOOST_ASSERT(l_total_combined <= len);
 
-   size_type const max_i = n_reg_combined + (l_irreg_combined != 0);
+   size_type const max_i = size_type(n_reg_combined + (l_irreg_combined != 0));
 
    if(merge_left || !use_buf) {
       for( size_type combined_i = 0; combined_i != max_i; ) {
@@ -209,7 +215,7 @@ void adaptive_sort_combine_blocks
       }
    }
    else{
-      combined_first += l_reg_combined*(max_i-1);
+      combined_first += size_type(l_reg_combined*(max_i-1u));
       for( size_type combined_i = max_i; combined_i; ) {
          --combined_i;
          bool const is_last = combined_i==n_reg_combined;
@@ -239,18 +245,19 @@ void adaptive_sort_combine_blocks
 template<class RandIt, class Compare, class XBuf>
 bool adaptive_sort_combine_all_blocks
    ( RandIt keys
-   , typename iterator_traits<RandIt>::size_type &n_keys
+   , typename iter_size<RandIt>::type &n_keys
    , RandIt const buffer
-   , typename iterator_traits<RandIt>::size_type const l_buf_plus_data
-   , typename iterator_traits<RandIt>::size_type l_merged
-   , typename iterator_traits<RandIt>::size_type &l_intbuf
+   , typename iter_size<RandIt>::type const l_buf_plus_data
+   , typename iter_size<RandIt>::type l_merged
+   , typename iter_size<RandIt>::type &l_intbuf
    , XBuf & xbuf
    , Compare comp)
 {
-   typedef typename iterator_traits<RandIt>::size_type  size_type;
+   typedef typename iter_size<RandIt>::type       size_type;
+
    RandIt const first = buffer + l_intbuf;
-   size_type const l_data = l_buf_plus_data - l_intbuf;
-   size_type const l_unique = l_intbuf+n_keys;
+   size_type const l_data = size_type(l_buf_plus_data - l_intbuf);
+   size_type const l_unique = size_type(l_intbuf + n_keys);
    //Backup data to external buffer once if possible
    bool const common_xbuf = l_data > l_merged && l_intbuf && l_intbuf <= xbuf.capacity();
    if(common_xbuf){
@@ -262,7 +269,7 @@ bool adaptive_sort_combine_all_blocks
    bool prev_use_internal_buf = true;
 
    for( size_type n = 0; l_data > l_merged
-      ; l_merged*=2
+      ; l_merged = size_type(2u*l_merged)
       , ++n){
       //If l_intbuf is non-zero, use that internal buffer.
       //    Implies l_block == l_intbuf && use_internal_buf == true
@@ -286,11 +293,11 @@ bool adaptive_sort_combine_all_blocks
             RandIt const buf_end = first+l_prev_total_combined;
             RandIt const buf_beg = buf_end-l_block;
             if(l_prev_total_combined > l_total_combined){
-               size_type const l_diff = l_prev_total_combined - l_total_combined;
+               size_type const l_diff = size_type(l_prev_total_combined - l_total_combined);
                move_data_backward(buf_beg-l_diff, l_diff, buf_end-l_diff, common_xbuf);
             }
             else if(l_prev_total_combined < l_total_combined){
-               size_type const l_diff = l_total_combined - l_prev_total_combined;
+               size_type const l_diff = size_type(l_total_combined - l_prev_total_combined);
                move_data_forward(buf_end, l_diff, buf_beg, common_xbuf);
             }
          }
@@ -299,7 +306,7 @@ bool adaptive_sort_combine_all_blocks
 
       //Combine to form l_merged*2 segments
       if(n_keys){
-         size_type upper_n_keys_this_iter = 2*l_merged/l_block;
+         size_type upper_n_keys_this_iter = size_type(2u*l_merged/l_block);
          if(upper_n_keys_this_iter > 256){
             adaptive_sort_combine_blocks
                ( keys, comp, !use_internal_buf || is_merge_left ? first : first-l_block
@@ -329,7 +336,7 @@ bool adaptive_sort_combine_all_blocks
    bool const buffer_right = prev_use_internal_buf && prev_merge_left;
 
    l_intbuf = prev_use_internal_buf ? l_prev_block : 0u;
-   n_keys = l_unique - l_intbuf;
+   n_keys = size_type(l_unique - l_intbuf);
    //Restore data from to external common buffer if used
    if(common_xbuf){
       if(buffer_right){
@@ -346,21 +353,22 @@ bool adaptive_sort_combine_all_blocks
 template<class RandIt, class Compare, class XBuf>
 void adaptive_sort_final_merge( bool buffer_right
                               , RandIt const first
-                              , typename iterator_traits<RandIt>::size_type const l_intbuf
-                              , typename iterator_traits<RandIt>::size_type const n_keys
-                              , typename iterator_traits<RandIt>::size_type const len
+                              , typename iter_size<RandIt>::type const l_intbuf
+                              , typename iter_size<RandIt>::type const n_keys
+                              , typename iter_size<RandIt>::type const len
                               , XBuf & xbuf
                               , Compare comp)
 {
    //BOOST_ASSERT(n_keys || xbuf.size() == l_intbuf);
    xbuf.clear();
 
-   typedef typename iterator_traits<RandIt>::size_type  size_type;
-   size_type const n_key_plus_buf = l_intbuf+n_keys;
+   typedef typename iter_size<RandIt>::type         size_type;
+
+   size_type const n_key_plus_buf = size_type(l_intbuf+n_keys);
    if(buffer_right){
       //Use stable sort as some buffer elements might not be unique (see non_unique_buf)
       stable_sort(first+len-l_intbuf, first+len, comp, xbuf);
-      stable_merge(first+n_keys, first+len-l_intbuf, first+len, antistable<Compare>(comp), xbuf);
+      stable_merge( first+n_keys, first+len-l_intbuf, first+len,    antistable<Compare>(comp), xbuf);
       unstable_sort(first, first+n_keys, comp, xbuf);
       stable_merge(first, first+n_keys, first+len, comp, xbuf);
    }
@@ -371,7 +379,8 @@ void adaptive_sort_final_merge( bool buffer_right
          buffered_merge(first, first+n_key_plus_buf, first+len, comp, xbuf);
       }
       else if(xbuf.capacity() >= min_value<size_type>(l_intbuf, n_keys)){
-         stable_merge(first+n_keys, first+n_key_plus_buf, first+len, comp, xbuf);
+         stable_merge( first+n_keys, first+n_key_plus_buf
+                     , first+len, comp, xbuf);
          stable_merge(first, first+n_keys, first+len, comp, xbuf);
       }
       else{
@@ -388,7 +397,7 @@ bool adaptive_sort_build_params
    , XBuf & xbuf
    )
 {
-   typedef Unsigned size_type;
+   typedef typename iter_size<RandIt>::type         size_type;
 
    //Calculate ideal parameters and try to collect needed unique keys
    l_base = 0u;
@@ -403,20 +412,21 @@ bool adaptive_sort_build_params
 
    //The internal buffer can be expanded if there is enough external memory
    while(xbuf.capacity() >= l_intbuf*2){
-      l_intbuf *= 2;
+      l_intbuf = size_type(2u*l_intbuf);
    }
 
    //This is the minimum number of keys to implement the ideal algorithm
    //
    //l_intbuf is used as buffer plus the key count
-   size_type n_min_ideal_keys = l_intbuf-1;
+   size_type n_min_ideal_keys = size_type(l_intbuf-1u);
    while(n_min_ideal_keys >= (len-l_intbuf-n_min_ideal_keys)/l_intbuf){
       --n_min_ideal_keys;
    }
-   n_min_ideal_keys += 1;
+   ++n_min_ideal_keys;
    BOOST_ASSERT(n_min_ideal_keys <= l_intbuf);
 
-   if(xbuf.template supports_aligned_trailing<size_type>(l_intbuf, (len-l_intbuf-1)/l_intbuf+1)){
+   if(xbuf.template supports_aligned_trailing<size_type>
+         (l_intbuf, size_type((size_type(len-l_intbuf)-1u)/l_intbuf+1u))){
       n_keys = 0u;
       l_build_buf = l_intbuf;
    }
@@ -429,7 +439,7 @@ bool adaptive_sort_build_params
       //(to be used for keys in combine_all_blocks) as the whole l_build_buf
       //will be backuped in the buffer during build_blocks.
       bool const non_unique_buf = xbuf.capacity() >= l_intbuf;
-      size_type const to_collect = non_unique_buf ? n_min_ideal_keys : l_intbuf*2;
+      size_type const to_collect = non_unique_buf ? n_min_ideal_keys : size_type(l_intbuf*2u);
       size_type collected = collect_unique(first, first+len, to_collect, comp, xbuf);
 
       //If available memory is 2*sqrt(l), then for "build_params" 
@@ -440,12 +450,12 @@ bool adaptive_sort_build_params
       }
       else if(collected == 2*l_intbuf){
          //l_intbuf*2 elements found. Use all of them in the build phase 
-         l_build_buf = l_intbuf*2;
+         l_build_buf = size_type(l_intbuf*2);
          n_keys = l_intbuf;
       }
-      else if(collected == (n_min_ideal_keys+l_intbuf)){ 
+      else if(collected >= (n_min_ideal_keys+l_intbuf)){ 
          l_build_buf = l_intbuf;
-         n_keys = n_min_ideal_keys;
+         n_keys = size_type(collected - l_intbuf);
       }
       //If collected keys are not enough, try to fix n_keys and l_intbuf. If no fix
       //is possible (due to very low unique keys), then go to a slow sort based on rotations.
@@ -455,8 +465,8 @@ bool adaptive_sort_build_params
             return false;
          }
          n_keys = l_intbuf;
-         while(n_keys&(n_keys-1)){
-            n_keys &= n_keys-1;  // make it power or 2
+         while(n_keys & (n_keys-1u)){
+            n_keys &= size_type(n_keys-1u);  // make it power or 2
          }
          while(n_keys > collected){
             n_keys/=2;
@@ -531,12 +541,12 @@ bool adaptive_sort_build_params
 template<class RandIt, class Compare, class XBuf>
 void adaptive_sort_impl
    ( RandIt first
-   , typename iterator_traits<RandIt>::size_type const len
+   , typename iter_size<RandIt>::type const len
    , Compare comp
    , XBuf & xbuf
    )
 {
-   typedef typename iterator_traits<RandIt>::size_type  size_type;
+   typedef typename iter_size<RandIt>::type         size_type;
 
    //Small sorts go directly to insertion sort
    if(len <= size_type(AdaptiveSortInsertionSortThreshold)){
@@ -563,18 +573,20 @@ void adaptive_sort_impl
          BOOST_ASSERT(l_build_buf);
          //Otherwise, continue the adaptive_sort
          BOOST_MOVE_ADAPTIVE_SORT_PRINT_L1("\n   After collect_unique: ", len);
-         size_type const n_key_plus_buf = l_intbuf+n_keys;
+         size_type const n_key_plus_buf = size_type(l_intbuf+n_keys);
          //l_build_buf is always power of two if l_intbuf is zero
          BOOST_ASSERT(l_intbuf || (0 == (l_build_buf & (l_build_buf-1))));
 
          //Classic merge sort until internal buffer and xbuf are exhausted
          size_type const l_merged = adaptive_sort_build_blocks
-            (first+n_key_plus_buf-l_build_buf, len-n_key_plus_buf+l_build_buf, l_base, l_build_buf, xbuf, comp);
+            ( first + n_key_plus_buf-l_build_buf
+            , size_type(len-n_key_plus_buf+l_build_buf)
+            , l_base, l_build_buf, xbuf, comp);
          BOOST_MOVE_ADAPTIVE_SORT_PRINT_L1("   After build_blocks:   ", len);
 
          //Non-trivial merge
          bool const buffer_right = adaptive_sort_combine_all_blocks
-            (first, n_keys, first+n_keys, len-n_keys, l_merged, l_intbuf, xbuf, comp);
+            (first, n_keys, first+n_keys, size_type(len-n_keys), l_merged, l_intbuf, xbuf, comp);
 
          //Sort keys and buffer and merge the whole sequence
          adaptive_sort_final_merge(buffer_right, first, l_intbuf, n_keys, len, xbuf, comp);
@@ -614,9 +626,9 @@ void adaptive_sort_impl
 template<class RandIt, class RandRawIt, class Compare>
 void adaptive_sort( RandIt first, RandIt last, Compare comp
                , RandRawIt uninitialized
-               , typename iterator_traits<RandIt>::size_type uninitialized_len)
+               , typename iter_size<RandIt>::type uninitialized_len)
 {
-   typedef typename iterator_traits<RandIt>::size_type  size_type;
+   typedef typename iter_size<RandIt>::type  size_type;
    typedef typename iterator_traits<RandIt>::value_type value_type;
 
    ::boost::movelib::adaptive_xbuf<value_type, RandRawIt, size_type> xbuf(uninitialized, uninitialized_len);
@@ -634,5 +646,9 @@ void adaptive_sort( RandIt first, RandIt last, Compare comp)
 }  //namespace boost {
 
 #include <boost/move/detail/config_end.hpp>
+
+#if defined(BOOST_CLANG) || (defined(BOOST_GCC) && (BOOST_GCC >= 40600))
+#pragma GCC diagnostic pop
+#endif
 
 #endif   //#define BOOST_MOVE_ADAPTIVE_SORT_HPP

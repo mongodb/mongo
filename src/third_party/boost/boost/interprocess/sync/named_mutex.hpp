@@ -24,7 +24,6 @@
 #include <boost/interprocess/creation_tags.hpp>
 #include <boost/interprocess/exceptions.hpp>
 #include <boost/interprocess/detail/interprocess_tester.hpp>
-#include <boost/interprocess/detail/posix_time_types_wrk.hpp>
 #include <boost/interprocess/permissions.hpp>
 
 #if defined(BOOST_INTERPROCESS_NAMED_MUTEX_USES_POSIX_SEMAPHORES)
@@ -62,7 +61,7 @@ class named_mutex
    public:
    //!Creates a global mutex with a name.
    //!Throws interprocess_exception on error.
-   named_mutex(create_only_t create_only, const char *name, const permissions &perm = permissions());
+   named_mutex(create_only_t, const char *name, const permissions &perm = permissions());
 
    //!Opens or creates a global mutex with a name.
    //!If the mutex is created, this call is equivalent to
@@ -70,12 +69,12 @@ class named_mutex
    //!If the mutex is already created, this call is equivalent
    //!named_mutex(open_only_t, ... )
    //!Does not throw
-   named_mutex(open_or_create_t open_or_create, const char *name, const permissions &perm = permissions());
+   named_mutex(open_or_create_t, const char *name, const permissions &perm = permissions());
 
    //!Opens a global mutex with a name if that mutex is previously
    //!created. If it is not previously created this function throws
    //!interprocess_exception.
-   named_mutex(open_only_t open_only, const char *name);
+   named_mutex(open_only_t, const char *name);
 
    #if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
 
@@ -84,7 +83,7 @@ class named_mutex
    //! 
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
-   named_mutex(create_only_t create_only, const wchar_t *name, const permissions &perm = permissions());
+   named_mutex(create_only_t, const wchar_t *name, const permissions &perm = permissions());
 
    //!Opens or creates a global mutex with a name.
    //!If the mutex is created, this call is equivalent to
@@ -95,7 +94,7 @@ class named_mutex
    //! 
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
-   named_mutex(open_or_create_t open_or_create, const wchar_t *name, const permissions &perm = permissions());
+   named_mutex(open_or_create_t, const wchar_t *name, const permissions &perm = permissions());
 
    //!Opens a global mutex with a name if that mutex is previously
    //!created. If it is not previously created this function throws
@@ -103,7 +102,7 @@ class named_mutex
    //! 
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
-   named_mutex(open_only_t open_only, const wchar_t *name);
+   named_mutex(open_only_t, const wchar_t *name);
 
    #endif   //defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
 
@@ -149,7 +148,18 @@ class named_mutex
    //!Note: A program may deadlock if the thread that has ownership calls 
    //!   this function. If the implementation can detect the deadlock,
    //!   an exception could be thrown.
-   bool timed_lock(const boost::posix_time::ptime &abs_time);
+   template<class TimePoint>
+   bool timed_lock(const TimePoint &abs_time);
+
+   //!Same as `timed_lock`, but this function is modeled after the
+   //!standard library interface.
+   template<class TimePoint> bool try_lock_until(const TimePoint &abs_time)
+   {  return this->timed_lock(abs_time);  }
+
+   //!Same as `timed_lock`, but this function is modeled after the
+   //!standard library interface.
+   template<class Duration>  bool try_lock_for(const Duration &dur)
+   {  return this->timed_lock(ipcdetail::duration_to_ustime(dur)); }
 
    //!Erases a named mutex from the system.
    //!Returns false on error. Never throws.
@@ -232,7 +242,8 @@ inline void named_mutex::unlock()
 inline bool named_mutex::try_lock()
 {  return m_mut.try_lock();  }
 
-inline bool named_mutex::timed_lock(const boost::posix_time::ptime &abs_time)
+template<class TimePoint>
+inline bool named_mutex::timed_lock(const TimePoint &abs_time)
 {  return m_mut.timed_lock(abs_time);  }
 
 inline bool named_mutex::remove(const char *name)

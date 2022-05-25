@@ -82,10 +82,9 @@ inline windows_named_sync::windows_named_sync()
 inline void windows_named_sync::close(windows_named_sync_interface &sync_interface)
 {
    const std::size_t buflen = sync_interface.get_data_size();
-   const std::size_t sizeof_file_info = sizeof(sync_id::internal_type) + buflen;
    winapi::interprocess_overlapped overlapped;
    if(winapi::lock_file_ex
-      (m_file_hnd, winapi::lockfile_exclusive_lock, 0, sizeof_file_info, 0, &overlapped)){
+      (m_file_hnd, winapi::lockfile_exclusive_lock, 0, 1, 0, &overlapped)){
       if(winapi::set_file_pointer(m_file_hnd, sizeof(sync_id::internal_type), 0, winapi::file_begin)){
          const void *buf = sync_interface.buffer_with_final_data_to_file();
 
@@ -96,6 +95,7 @@ inline void windows_named_sync::close(windows_named_sync_interface &sync_interfa
       }
    }
    sync_interface.close();
+   //close_handle unlocks the lock
    if(m_file_hnd != winapi::invalid_handle_value){
       winapi::close_handle(m_file_hnd);
       m_file_hnd = winapi::invalid_handle_value;
@@ -134,7 +134,7 @@ inline void windows_named_sync::open_or_create
          const std::size_t sizeof_file_info = sizeof(unique_id_type) + buflen;
          winapi::interprocess_overlapped overlapped;
          if(winapi::lock_file_ex
-            (m_file_hnd, winapi::lockfile_exclusive_lock, 0, sizeof_file_info, 0, &overlapped)){
+            (m_file_hnd, winapi::lockfile_exclusive_lock, 0, 1, 0, &overlapped)){
             __int64 filesize = 0;
             //Obtain the unique id to open the native semaphore.
             //If file size was created
@@ -174,10 +174,11 @@ inline void windows_named_sync::open_or_create
             }
 
             //Obtain OS error in case something has failed
-            err = system_error_code();
+            if(!success)
+               err = system_error_code();
 
             //If this fails we have no possible rollback so don't check the return
-            if(!winapi::unlock_file_ex(m_file_hnd, 0, sizeof_file_info, 0, &overlapped)){
+            if(!winapi::unlock_file_ex(m_file_hnd, 0, 1, 0, &overlapped)){
                err = system_error_code();
             }
          }
@@ -203,28 +204,28 @@ inline void windows_named_sync::open_or_create
 
 inline bool windows_named_sync::remove(const char *name)
 {
-   try{
+   BOOST_TRY{
       //Make sure a temporary path is created for shared memory
       std::string semfile;
       ipcdetail::shared_filepath(name, semfile);
       return winapi::unlink_file(semfile.c_str());
    }
-   catch(...){
+   BOOST_CATCH(...){
       return false;
-   }
+   } BOOST_CATCH_END
 }
 
 inline bool windows_named_sync::remove(const wchar_t *name)
 {
-   try{
+   BOOST_TRY{
       //Make sure a temporary path is created for shared memory
       std::wstring semfile;
       ipcdetail::shared_filepath(name, semfile);
       return winapi::unlink_file(semfile.c_str());
    }
-   catch(...){
+   BOOST_CATCH(...){
       return false;
-   }
+   } BOOST_CATCH_END
 }
 
 }  //namespace ipcdetail {

@@ -2,7 +2,7 @@
 // detail/timer_queue_ptime.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -77,6 +77,10 @@ public:
   BOOST_ASIO_DECL std::size_t cancel_timer(
       per_timer_data& timer, op_queue<operation>& ops,
       std::size_t max_cancelled = (std::numeric_limits<std::size_t>::max)());
+
+  // Cancel and dequeue operations for the given timer and key.
+  BOOST_ASIO_DECL void cancel_timer_by_key(per_timer_data* timer,
+      op_queue<operation>& ops, void* cancellation_key);
 
   // Move operations from one timer to another, empty timer.
   BOOST_ASIO_DECL void move_timer(per_timer_data& target,

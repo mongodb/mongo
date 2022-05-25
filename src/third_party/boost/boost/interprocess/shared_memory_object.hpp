@@ -269,35 +269,35 @@ inline bool shared_memory_object::priv_open_or_create
 
 inline bool shared_memory_object::remove(const wchar_t *filename)
 {
-   try{
+   BOOST_TRY{
       //Make sure a temporary path is created for shared memory
       std::wstring shmfile;
       ipcdetail::shared_filepath(filename, shmfile);
       return ipcdetail::delete_file(shmfile.c_str());
    }
-   catch(...){
+   BOOST_CATCH(...){
       return false;
-   }
+   } BOOST_CATCH_END
 }
 
 #endif
 
 inline bool shared_memory_object::remove(const char *filename)
 {
-   try{
+   BOOST_TRY{
       //Make sure a temporary path is created for shared memory
       std::string shmfile;
       ipcdetail::shared_filepath(filename, shmfile);
       return ipcdetail::delete_file(shmfile.c_str());
    }
-   catch(...){
+   BOOST_CATCH(...){
       return false;
-   }
+   } BOOST_CATCH_END
 }
 
 inline void shared_memory_object::truncate(offset_t length)
 {
-   if(!ipcdetail::truncate_file(m_handle, length)){
+   if(!ipcdetail::truncate_file(m_handle, (std::size_t)length)){
       error_info err = system_error_code();
       throw interprocess_exception(err);
    }
@@ -368,7 +368,7 @@ inline bool shared_memory_object::priv_open_or_create
       error_info err(mode_error);
       throw interprocess_exception(err);
    }
-   int unix_perm = perm.get_permissions();
+   ::mode_t unix_perm = perm.get_permissions();
 
    switch(type){
       case ipcdetail::DoOpen:
@@ -432,7 +432,7 @@ inline bool shared_memory_object::priv_open_or_create
 
 inline bool shared_memory_object::remove(const char *filename)
 {
-   try{
+   BOOST_TRY{
       std::string filepath;
       #if defined(BOOST_INTERPROCESS_FILESYSTEM_BASED_POSIX_SHARED_MEMORY)
       const bool add_leading_slash = false;
@@ -449,23 +449,30 @@ inline bool shared_memory_object::remove(const char *filename)
       }
       return 0 == shm_unlink(filepath.c_str());
    }
-   catch(...){
+   BOOST_CATCH(...){
       return false;
-   }
+   } BOOST_CATCH_END
 }
 
 inline void shared_memory_object::truncate(offset_t length)
 {
    #ifdef BOOST_INTERPROCESS_POSIX_FALLOCATE
-   int ret = posix_fallocate(m_handle, 0, length);
+   int ret = EINTR;
+   while (EINTR == ret) {
+      ret = posix_fallocate(m_handle, 0, length);
+   }
 
-   if (ret && ret != EOPNOTSUPP){
-      error_info err(system_error_code());
+   if (ret && ret != EOPNOTSUPP && ret != ENODEV){
+      error_info err(ret);
       throw interprocess_exception(err);
    }
    //ftruncate fallback
    #endif //BOOST_INTERPROCESS_POSIX_FALLOCATE
-   if(0 != ftruncate(m_handle, length)){
+
+   handle_eintr:
+   if (0 != ftruncate(m_handle, length)){
+      if (errno == EINTR)
+         goto handle_eintr;
       error_info err(system_error_code());
       throw interprocess_exception(err);
    }

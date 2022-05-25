@@ -15,4 +15,9 @@
 #if defined(__GNUC__) && ((__GNUC__*100 + __GNUC_MINOR__) >= 406)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wshadow"
+#  pragma GCC diagnostic ignored "-Wsign-conversion"
+#  pragma GCC diagnostic ignored "-Wconversion"
+#  if (BOOST_GCC >= 100000)
+#     pragma GCC diagnostic ignored "-Warith-conversion"
+#  endif
 #endif

@@ -8,6 +8,7 @@
 #define BOOST_MP_ADD_UNSIGNED_ADDC_32_HPP
 
 #include <boost/multiprecision/cpp_int/intel_intrinsics.hpp>
+#include <boost/multiprecision/detail/assert.hpp>
 
 namespace boost { namespace multiprecision { namespace backends {
 
@@ -21,9 +22,9 @@ inline BOOST_MP_CXX14_CONSTEXPR void add_unsigned_constexpr(CppInt1& result, con
    // Nothing fancy, just let uintmax_t take the strain:
    //
    double_limb_type carry = 0;
-   unsigned         m(0), x(0);
-   unsigned         as = a.size();
-   unsigned         bs = b.size();
+   std::size_t         m(0), x(0);
+   std::size_t         as = a.size();
+   std::size_t         bs = b.size();
    minmax(as, bs, m, x);
    if (x == 1)
    {
@@ -95,7 +96,7 @@ inline BOOST_MP_CXX14_CONSTEXPR void subtract_unsigned_constexpr(CppInt1& result
    // Nothing fancy, just let uintmax_t take the strain:
    //
    double_limb_type borrow = 0;
-   unsigned         m(0), x(0);
+   std::size_t         m(0), x(0);
    minmax(a.size(), b.size(), m, x);
    //
    // special cases for small limb counts:
@@ -135,7 +136,7 @@ inline BOOST_MP_CXX14_CONSTEXPR void subtract_unsigned_constexpr(CppInt1& result
       return;
    }
 
-   unsigned i = 0;
+   std::size_t i = 0;
    // First where a and b overlap:
    while (i < m)
    {
@@ -155,7 +156,7 @@ inline BOOST_MP_CXX14_CONSTEXPR void subtract_unsigned_constexpr(CppInt1& result
    // Any remaining digits are the same as those in pa:
    if ((x != i) && (pa != pr))
       std_constexpr::copy(pa + i, pa + x, pr + i);
-   BOOST_ASSERT(0 == borrow);
+   BOOST_MP_ASSERT(0 == borrow);
 
    //
    // We may have lost digits, if so update limb usage count:
@@ -198,9 +199,9 @@ inline BOOST_MP_CXX14_CONSTEXPR void add_unsigned(CppInt1& result, const CppInt2
       using std::swap;
 
       // Nothing fancy, just let uintmax_t take the strain:
-      unsigned m(0), x(0);
-      unsigned as = a.size();
-      unsigned bs = b.size();
+      std::size_t m(0), x(0);
+      std::size_t as = a.size();
+      std::size_t bs = b.size();
       minmax(as, bs, m, x);
       if (x == 1)
       {
@@ -217,7 +218,7 @@ inline BOOST_MP_CXX14_CONSTEXPR void add_unsigned(CppInt1& result, const CppInt2
       if (as < bs)
          swap(pa, pb);
       // First where a and b overlap:
-      unsigned      i = 0;
+      std::size_t      i = 0;
       unsigned char carry = 0;
 #if defined(BOOST_MSVC) && !defined(BOOST_HAS_INT128) && defined(_M_X64)
       //
@@ -243,7 +244,8 @@ inline BOOST_MP_CXX14_CONSTEXPR void add_unsigned(CppInt1& result, const CppInt2
       for (; i < m; ++i)
          carry = ::boost::multiprecision::detail::addcarry_limb(carry, pa[i], pb[i], pr + i);
       for (; i < x && carry; ++i)
-         carry = ::boost::multiprecision::detail::addcarry_limb(carry, pa[i], 0, pr + i);
+         // We know carry is 1, so we just need to increment pa[i] (ie add a literal 1) and capture the carry:
+         carry = ::boost::multiprecision::detail::addcarry_limb(0, pa[i], 1, pr + i);
       if (i == x && carry)
       {
          // We overflowed, need to add one more limb:
@@ -251,8 +253,9 @@ inline BOOST_MP_CXX14_CONSTEXPR void add_unsigned(CppInt1& result, const CppInt2
          if (result.size() > x)
             result.limbs()[x] = static_cast<limb_type>(1u);
       }
-      else
-         std::copy(pa + i, pa + x, pr + i);
+      else if ((x != i) && (pa != pr))
+         // Copy remaining digits only if we need to:
+         std_constexpr::copy(pa + i, pa + x, pr + i);
       result.normalize();
       result.sign(a.sign());
    }
@@ -272,7 +275,7 @@ inline BOOST_MP_CXX14_CONSTEXPR void subtract_unsigned(CppInt1& result, const Cp
       using std::swap;
 
       // Nothing fancy, just let uintmax_t take the strain:
-      unsigned         m(0), x(0);
+      std::size_t         m(0), x(0);
       minmax(a.size(), b.size(), m, x);
       //
       // special cases for small limb counts:
@@ -312,7 +315,7 @@ inline BOOST_MP_CXX14_CONSTEXPR void subtract_unsigned(CppInt1& result, const Cp
          return;
       }
 
-      unsigned i = 0;
+      std::size_t i = 0;
       unsigned char borrow = 0;
       // First where a and b overlap:
 #if defined(BOOST_MSVC) && !defined(BOOST_HAS_INT128) && defined(_M_X64)
@@ -348,7 +351,7 @@ inline BOOST_MP_CXX14_CONSTEXPR void subtract_unsigned(CppInt1& result, const Cp
       // Any remaining digits are the same as those in pa:
       if ((x != i) && (pa != pr))
          std_constexpr::copy(pa + i, pa + x, pr + i);
-      BOOST_ASSERT(0 == borrow);
+      BOOST_MP_ASSERT(0 == borrow);
 
       //
       // We may have lost digits, if so update limb usage count:

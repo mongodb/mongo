@@ -41,7 +41,7 @@ class init_disposer
    typedef typename NodeAlgorithms::node_ptr node_ptr;
 
    public:
-   BOOST_INTRUSIVE_FORCEINLINE void operator()(const node_ptr & p)
+   BOOST_INTRUSIVE_FORCEINLINE void operator()(node_ptr p)
    {  NodeAlgorithms::init(p);   }
 };
 

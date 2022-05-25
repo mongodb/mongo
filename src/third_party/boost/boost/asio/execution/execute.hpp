@@ -2,7 +2,7 @@
 // execution/execute.hpp
 // ~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -88,7 +88,7 @@ void submit_helper(BOOST_ASIO_MOVE_ARG(S) s, BOOST_ASIO_MOVE_ARG(R) r);
 } // namespace execution
 } // namespace asio
 } // namespace boost
-namespace asio_execution_execute_fn {
+namespace boost_asio_execution_execute_fn {
 
 using boost::asio::conditional;
 using boost::asio::decay;
@@ -249,25 +249,25 @@ struct static_instance
 template <typename T>
 const T static_instance<T>::instance = {};
 
-} // namespace asio_execution_execute_fn
+} // namespace boost_asio_execution_execute_fn
 namespace boost {
 namespace asio {
 namespace execution {
 namespace {
 
-static BOOST_ASIO_CONSTEXPR const asio_execution_execute_fn::impl&
-  execute = asio_execution_execute_fn::static_instance<>::instance;
+static BOOST_ASIO_CONSTEXPR const boost_asio_execution_execute_fn::impl&
+  execute = boost_asio_execution_execute_fn::static_instance<>::instance;
 
 } // namespace
 
-typedef asio_execution_execute_fn::impl execute_t;
+typedef boost_asio_execution_execute_fn::impl execute_t;
 
 template <typename T, typename F>
 struct can_execute :
   integral_constant<bool,
-    asio_execution_execute_fn::call_traits<
+    boost_asio_execution_execute_fn::call_traits<
       execute_t, T, void(F)>::overload !=
-        asio_execution_execute_fn::ill_formed>
+        boost_asio_execution_execute_fn::ill_formed>
 {
 };
 

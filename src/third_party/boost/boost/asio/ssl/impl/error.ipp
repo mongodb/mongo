@@ -2,7 +2,7 @@
 // ssl/impl/error.ipp
 // ~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -36,8 +36,30 @@ public:
 
   std::string message(int value) const
   {
-    const char* s = ::ERR_reason_error_string(value);
-    return s ? s : "asio.ssl error";
+    const char* reason = ::ERR_reason_error_string(value);
+    if (reason)
+    {
+      const char* lib = ::ERR_lib_error_string(value);
+#if (OPENSSL_VERSION_NUMBER < 0x30000000L)
+      const char* func = ::ERR_func_error_string(value);
+#else // (OPENSSL_VERSION_NUMBER < 0x30000000L)
+      const char* func = 0;
+#endif // (OPENSSL_VERSION_NUMBER < 0x30000000L)
+      std::string result(reason);
+      if (lib || func)
+      {
+        result += " (";
+        if (lib)
+          result += lib;
+        if (lib && func)
+          result += ", ";
+        if (func)
+          result += func;
+        result += ")";
+      }
+      return result;
+    }
+    return "asio.ssl error";
   }
 };
 

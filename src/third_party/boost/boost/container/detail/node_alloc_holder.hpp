@@ -36,6 +36,7 @@
 #include <boost/move/detail/to_raw_pointer.hpp>
 #include <boost/container/detail/type_traits.hpp>
 #include <boost/container/detail/version_type.hpp>
+#include <boost/container/detail/is_pair.hpp>
 // intrusive
 #include <boost/intrusive/detail/mpl.hpp>
 #include <boost/intrusive/options.hpp>
@@ -50,6 +51,140 @@
 
 namespace boost {
 namespace container {
+
+//This trait is used to type-pun std::pair because in C++03
+//compilers std::pair is useless for C++11 features
+template<class T, bool = dtl::is_pair<T>::value >
+struct node_internal_data_type
+{
+   typedef T type;
+};
+
+template<class T>
+struct node_internal_data_type< T, true>
+{
+   typedef dtl::pair< typename dtl::remove_const<typename T::first_type>::type
+                     , typename T::second_type>
+                     type;
+};
+
+template <class T, class HookDefiner>
+struct base_node
+   :  public HookDefiner::type
+{
+   public:
+   typedef T value_type;
+   typedef typename node_internal_data_type<T>::type internal_type;
+   typedef typename HookDefiner::type hook_type;
+
+   typedef typename dtl::aligned_storage<sizeof(T), dtl::alignment_of<T>::value>::type storage_t;
+   storage_t m_storage;
+
+   #if defined(BOOST_GCC) && (BOOST_GCC >= 40600) && (BOOST_GCC < 80000)
+      #pragma GCC diagnostic push
+      #pragma GCC diagnostic ignored "-Wstrict-aliasing"
+      #define BOOST_CONTAINER_DISABLE_ALIASING_WARNING
+   #  endif
+   public:
+
+   #if !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
+
+   template<class Alloc, class ...Args>
+   explicit base_node(Alloc &a, Args &&...args)
+      : hook_type()
+   {
+      ::boost::container::allocator_traits<Alloc>::construct
+         (a, &this->get_real_data(), ::boost::forward<Args>(args)...);
+   }
+
+   #else //defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
+
+   #define BOOST_CONTAINER_BASE_NODE_CONSTRUCT_IMPL(N) \
+   template< class Alloc BOOST_MOVE_I##N BOOST_MOVE_CLASS##N > \
+   explicit base_node(Alloc &a BOOST_MOVE_I##N BOOST_MOVE_UREF##N)\
+      : hook_type()\
+   {\
+      ::boost::container::allocator_traits<Alloc>::construct\
+         (a, &this->get_real_data() BOOST_MOVE_I##N BOOST_MOVE_FWD##N);\
+   }\
+   //
+   BOOST_MOVE_ITERATE_0TO9(BOOST_CONTAINER_BASE_NODE_CONSTRUCT_IMPL)
+   #undef BOOST_CONTAINER_BASE_NODE_CONSTRUCT_IMPL
+
+   #endif   // !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
+
+   template<class Alloc, class It>
+   explicit base_node(iterator_arg_t, Alloc &a, It it)
+      : hook_type()
+   {
+      ::boost::container::construct_in_place(a, &this->get_real_data(), it);
+   }
+
+   BOOST_CONTAINER_FORCEINLINE T &get_data()
+   {  return *move_detail::force_ptr<T*>(this->m_storage.data);   }
+
+   BOOST_CONTAINER_FORCEINLINE const T &get_data() const
+   {  return *move_detail::force_ptr<const T*>(this->m_storage.data);  }
+
+   BOOST_CONTAINER_FORCEINLINE internal_type &get_real_data()
+   {  return *move_detail::force_ptr<internal_type*>(this->m_storage.data);   }
+
+   BOOST_CONTAINER_FORCEINLINE const internal_type &get_real_data() const
+   {  return *move_detail::force_ptr<const internal_type*>(this->m_storage.data);  }
+
+   #if defined(BOOST_CONTAINER_DISABLE_ALIASING_WARNING)
+      #pragma GCC diagnostic pop
+      #undef BOOST_CONTAINER_DISABLE_ALIASING_WARNING
+   #  endif
+
+   template<class Alloc>
+   void destructor(Alloc &a) BOOST_NOEXCEPT
+   {
+      allocator_traits<Alloc>::destroy
+         (a, &this->get_real_data());
+      this->~base_node();
+   }
+
+   template<class Pair>
+   BOOST_CONTAINER_FORCEINLINE
+   typename dtl::enable_if< dtl::is_pair<Pair>, void >::type
+      do_assign(const Pair &p)
+   {
+      typedef typename Pair::first_type first_type;
+      const_cast<typename dtl::remove_const<first_type>::type &>(this->get_real_data().first) = p.first;
+      this->get_real_data().second  = p.second;
+   }
+
+   template<class V>
+   BOOST_CONTAINER_FORCEINLINE 
+   typename dtl::disable_if< dtl::is_pair<V>, void >::type
+      do_assign(const V &v)
+   {  this->get_real_data() = v; }
+
+   template<class Pair>
+   BOOST_CONTAINER_FORCEINLINE 
+   typename dtl::enable_if< dtl::is_pair<Pair>, void >::type
+      do_move_assign(Pair &p)
+   {
+      typedef typename Pair::first_type first_type;
+      const_cast<first_type&>(this->get_real_data().first) = ::boost::move(p.first);
+      this->get_real_data().second = ::boost::move(p.second);
+   }
+
+   template<class V>
+   BOOST_CONTAINER_FORCEINLINE 
+   typename dtl::disable_if< dtl::is_pair<V>, void >::type
+      do_move_assign(V &v)
+   {  this->get_real_data() = ::boost::move(v); }
+
+   private:
+   base_node();
+
+   BOOST_CONTAINER_FORCEINLINE ~base_node()
+   { }
+};
+
+
 namespace dtl {
 
 BOOST_INTRUSIVE_INSTANTIATE_DEFAULT_TYPE_TMPLT(key_compare)
@@ -111,7 +246,7 @@ struct node_alloc_holder
          version<NodeAlloc>::value>                               alloc_version;
    typedef typename ICont::iterator                               icont_iterator;
    typedef typename ICont::const_iterator                         icont_citerator;
-   typedef allocator_destroyer<NodeAlloc>                         Destroyer;
+   typedef allocator_node_destroyer<NodeAlloc>                         Destroyer;
    typedef allocator_traits<NodeAlloc>                            NodeAllocTraits;
    typedef allocator_version_traits<NodeAlloc>                    AllocVersionTraits;
 
@@ -176,7 +311,7 @@ struct node_alloc_holder
    {}
 
    explicit node_alloc_holder(BOOST_RV_REF(node_alloc_holder) x)
-      : NodeAlloc(boost::move(x.node_alloc()))
+      : NodeAlloc(boost::move(BOOST_MOVE_TO_LV(x).node_alloc()))
    {  this->icont().swap(x.icont());  }
 
    explicit node_alloc_holder(const val_compare &c)
@@ -185,15 +320,15 @@ struct node_alloc_holder
 
    //helpers for move assignments
    explicit node_alloc_holder(BOOST_RV_REF(node_alloc_holder) x, const val_compare &c)
-      : NodeAlloc(boost::move(x.node_alloc())), m_icont(typename ICont::key_compare(c))
+      : NodeAlloc(boost::move(BOOST_MOVE_TO_LV(x).node_alloc())), m_icont(typename ICont::key_compare(c))
    {  this->icont().swap(x.icont());  }
 
    explicit node_alloc_holder(BOOST_RV_REF(node_alloc_holder) x, const val_hasher &hf, const val_equal &eql)
-      : NodeAlloc(boost::move(x.node_alloc()))
+      : NodeAlloc(boost::move(BOOST_MOVE_TO_LV(x).node_alloc()))
       , m_icont( typename ICont::bucket_traits()
                , typename ICont::hasher(hf)
                , typename ICont::key_equal(eql))
-   {  this->icont().swap(x.icont());   }
+   {  this->icont().swap(BOOST_MOVE_TO_LV(x).icont());   }
 
    void copy_assign_alloc(const node_alloc_holder &x)
    {
@@ -227,18 +362,11 @@ struct node_alloc_holder
    NodePtr create_node(Args &&...args)
    {
       NodePtr p = this->allocate_one();
-      BOOST_TRY{
-         ::new(boost::movelib::iterator_to_raw_pointer(p), boost_container_new_t()) Node;
-         allocator_traits<NodeAlloc>::construct
-            (this->node_alloc()
-            , p->get_real_data_ptr(), boost::forward<Args>(args)...);
-      }
-      BOOST_CATCH(...) {
-         p->destroy_header();
-         this->node_alloc().deallocate(p, 1);
-         BOOST_RETHROW
-      }
-      BOOST_CATCH_END
+      NodeAlloc &nalloc = this->node_alloc();
+      Deallocator node_deallocator(p, nalloc);
+      ::new(boost::movelib::iterator_to_raw_pointer(p), boost_container_new_t())
+         Node(nalloc, boost::forward<Args>(args)...);
+      node_deallocator.release();
       return (p);
    }
 
@@ -249,19 +377,11 @@ struct node_alloc_holder
    NodePtr create_node(BOOST_MOVE_UREF##N)\
    {\
       NodePtr p = this->allocate_one();\
-      BOOST_TRY{\
-         ::new(boost::movelib::iterator_to_raw_pointer(p), boost_container_new_t()) Node;\
-         allocator_traits<NodeAlloc>::construct\
-            ( this->node_alloc()\
-            , p->get_real_data_ptr()\
-             BOOST_MOVE_I##N BOOST_MOVE_FWD##N);\
-      }\
-      BOOST_CATCH(...) {\
-         p->destroy_header();\
-         this->node_alloc().deallocate(p, 1);\
-         BOOST_RETHROW\
-      }\
-      BOOST_CATCH_END\
+      NodeAlloc &nalloc = this->node_alloc();\
+      Deallocator node_deallocator(p, nalloc);\
+      ::new(boost::movelib::iterator_to_raw_pointer(p), boost_container_new_t())\
+         Node(nalloc BOOST_MOVE_I##N BOOST_MOVE_FWD##N);\
+      node_deallocator.release();\
       return (p);\
    }\
    //
@@ -274,16 +394,11 @@ struct node_alloc_holder
    NodePtr create_node_from_it(const It &it)
    {
       NodePtr p = this->allocate_one();
-      BOOST_TRY{
-         ::new(boost::movelib::iterator_to_raw_pointer(p), boost_container_new_t()) Node;
-         ::boost::container::construct_in_place(this->node_alloc(), p->get_real_data_ptr(), it);
-      }
-      BOOST_CATCH(...) {
-         p->destroy_header();
-         this->node_alloc().deallocate(p, 1);
-         BOOST_RETHROW
-      }
-      BOOST_CATCH_END
+      NodeAlloc &nalloc = this->node_alloc();
+      Deallocator node_deallocator(p, nalloc);
+      ::new(boost::movelib::iterator_to_raw_pointer(p), boost_container_new_t())
+         Node(iterator_arg_t(), nalloc, it);
+      node_deallocator.release();
       return (p);
    }
 
@@ -316,7 +431,7 @@ struct node_alloc_holder
 
    void destroy_node(const NodePtr &nodep)
    {
-      allocator_traits<NodeAlloc>::destroy(this->node_alloc(), boost::movelib::to_raw_pointer(nodep));
+      boost::movelib::to_raw_pointer(nodep)->destructor(this->node_alloc());
       this->deallocate_one(nodep);
    }
 
@@ -329,7 +444,7 @@ struct node_alloc_holder
 
    template<class FwdIterator, class Inserter>
    void allocate_many_and_construct
-      (FwdIterator beg, difference_type n, Inserter inserter)
+      (FwdIterator beg, size_type n, Inserter inserter)
    {
       if(n){
          typedef typename node_allocator_version_traits_type::multiallocation_chain multiallocation_chain_t;
@@ -346,28 +461,25 @@ struct node_alloc_holder
          Node *p = 0;
             BOOST_TRY{
             Deallocator node_deallocator(NodePtr(), nalloc);
-            dtl::scoped_destructor<NodeAlloc> sdestructor(nalloc, 0);
+            dtl::scoped_node_destructor<NodeAlloc> sdestructor(nalloc, 0);
             while(n){
                --n;
                p = boost::movelib::iterator_to_raw_pointer(itbeg);
                ++itbeg; //Increment iterator before overwriting pointed memory
                //This does not throw
-               p = ::new(p, boost_container_new_t()) Node;
-               node_deallocator.set(p);
-               //This can throw
-               boost::container::construct_in_place(nalloc, p->get_real_data_ptr(), beg);
+               ::new(boost::movelib::iterator_to_raw_pointer(p), boost_container_new_t())
+                  Node(iterator_arg_t(), nalloc, beg);
                sdestructor.set(p);
                ++beg;
                //This can throw in some containers (predicate might throw).
                //(sdestructor will destruct the node and node_deallocator will deallocate it in case of exception)
                inserter(*p);
-               sdestructor.set(0);
+               sdestructor.release();
             }
             sdestructor.release();
             node_deallocator.release();
          }
          BOOST_CATCH(...){
-            p->destroy_header();
             chain.incorporate_after(chain.last(), &*itbeg, &*itlast, n);
             node_allocator_version_traits_type::deallocate_individual(this->node_alloc(), chain);
             BOOST_RETHROW
@@ -382,7 +494,7 @@ struct node_alloc_holder
    void clear(version_2)
    {
       typename NodeAlloc::multiallocation_chain chain;
-      allocator_destroyer_and_chain_builder<NodeAlloc> builder(this->node_alloc(), chain);
+      allocator_node_destroyer_and_chain_builder<NodeAlloc> builder(this->node_alloc(), chain);
       this->icont().clear_and_dispose(builder);
       //BOOST_STATIC_ASSERT((::boost::has_move_emulation_enabled<typename NodeAlloc::multiallocation_chain>::value == true));
       if(!chain.empty())
@@ -394,10 +506,9 @@ struct node_alloc_holder
 
    icont_iterator erase_range(const icont_iterator &first, const icont_iterator &last, version_2)
    {
-      typedef typename NodeAlloc::multiallocation_chain multiallocation_chain;
       NodeAlloc & nalloc = this->node_alloc();
-      multiallocation_chain chain;
-      allocator_destroyer_and_chain_builder<NodeAlloc> chain_builder(nalloc, chain);
+      typename NodeAlloc::multiallocation_chain chain;
+      allocator_node_destroyer_and_chain_builder<NodeAlloc> chain_builder(nalloc, chain);
       icont_iterator ret_it = this->icont().erase_and_dispose(first, last, chain_builder);
       nalloc.deallocate_individual(chain);
       return ret_it;

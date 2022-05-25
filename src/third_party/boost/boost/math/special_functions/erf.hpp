@@ -130,7 +130,7 @@ T erf_series_near_zero_sum(const T& x, const Policy& pol)
    // This method is *much* faster than the alternatives even so.
    //
    erf_series_near_zero<T> sum(x);
-   boost::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
+   std::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
    T result = constants::two_div_root_pi<T>() * tools::kahan_sum_series(sum, tools::digits<T>(), max_iter);
    policies::check_series_iterations<T>("boost::math::erf<%1%>(%1%, %1%)", max_iter, pol);
    return result;
@@ -156,7 +156,7 @@ T erf_imp(T z, bool invert, const Policy& pol, const Tag& t)
    if(!invert && (z > detail::erf_asymptotic_limit<T, Policy>()))
    {
       detail::erf_asympt_series_t<T> s(z);
-      boost::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
+      std::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
       result = boost::math::tools::sum_series(s, policies::get_epsilon<T, Policy>(), max_iter, 1);
       policies::check_series_iterations<T>("boost::math::erf<%1%>(%1%, %1%)", max_iter, pol);
    }
@@ -260,7 +260,7 @@ T erf_imp(T z, bool invert, const Policy& pol, const std::integral_constant<int,
          result = z * (Y + tools::evaluate_polynomial(P, zz) / tools::evaluate_polynomial(Q, zz));
       }
    }
-   else if(invert ? (z < 28) : (z < 5.8f))
+   else if(invert ? (z < 28) : (z < 5.93f))
    {
       //
       // We'll be calculating erfc:
@@ -483,7 +483,7 @@ T erf_imp(T z, bool invert, const Policy& pol, const std::integral_constant<int,
          result = z * (Y + tools::evaluate_polynomial(P, T(z * z)) / tools::evaluate_polynomial(Q, T(z * z)));
       }
    }
-   else if(invert ? (z < 110) : (z < 6.4f))
+   else if(invert ? (z < 110) : (z < 6.6f))
    {
       //
       // We'll be calculating erfc:

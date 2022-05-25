@@ -7,12 +7,21 @@
 
 //  Library home page: http://www.boost.org/libs/filesystem
 
-#ifndef BOOST_FILESYSTEM3_WIN_FILE_CODECVT_HPP
-#define BOOST_FILESYSTEM3_WIN_FILE_CODECVT_HPP
+#ifndef BOOST_FILESYSTEM_WINDOWS_FILE_CODECVT_HPP
+#define BOOST_FILESYSTEM_WINDOWS_FILE_CODECVT_HPP
 
 #include <boost/filesystem/config.hpp>
+
+#ifdef BOOST_WINDOWS_API
+
+#include <boost/config/workaround.hpp>
 #include <cstddef>
+#include <cwchar> // std::mbstate_t
 #include <locale>
+
+namespace boost {
+namespace filesystem {
+namespace detail {
 
 //------------------------------------------------------------------------------------//
 //                                                                                    //
@@ -23,35 +32,37 @@
 //                                                                                    //
 //------------------------------------------------------------------------------------//
 
-class BOOST_SYMBOL_VISIBLE windows_file_codecvt
-  : public std::codecvt< wchar_t, char, std::mbstate_t >
+class BOOST_SYMBOL_VISIBLE windows_file_codecvt BOOST_FINAL :
+    public std::codecvt< wchar_t, char, std::mbstate_t >
 {
 public:
-  explicit windows_file_codecvt(std::size_t refs = 0)
-      : std::codecvt<wchar_t, char, std::mbstate_t>(refs) {}
+    explicit windows_file_codecvt(std::size_t refs = 0) :
+        std::codecvt< wchar_t, char, std::mbstate_t >(refs)
+    {
+    }
+
 protected:
+    bool do_always_noconv() const BOOST_NOEXCEPT_OR_NOTHROW BOOST_OVERRIDE { return false; }
 
-  virtual bool do_always_noconv() const throw() { return false; }
-
-  //  seems safest to assume variable number of characters since we don't
-  //  actually know what codepage is active
-  virtual int do_encoding() const throw() { return 0; }
-
-  virtual std::codecvt_base::result do_in(std::mbstate_t& state,
-    const char* from, const char* from_end, const char*& from_next,
-    wchar_t* to, wchar_t* to_end, wchar_t*& to_next) const;
-
-  virtual std::codecvt_base::result do_out(std::mbstate_t & state,
-    const wchar_t* from, const wchar_t* from_end, const wchar_t*& from_next,
-    char* to, char* to_end, char*& to_next) const;
-
-  virtual std::codecvt_base::result do_unshift(std::mbstate_t&,
-      char* /*from*/, char* /*to*/, char* & /*next*/) const  { return ok; }
-
-  virtual int do_length(std::mbstate_t&,
-    const char* /*from*/, const char* /*from_end*/, std::size_t /*max*/) const  { return 0; }
-
-  virtual int do_max_length() const throw () { return 0; }
+    //  seems safest to assume variable number of characters since we don't
+    //  actually know what codepage is active
+    int do_encoding() const BOOST_NOEXCEPT_OR_NOTHROW BOOST_OVERRIDE { return 0; }
+    std::codecvt_base::result do_in(std::mbstate_t& state, const char* from, const char* from_end, const char*& from_next, wchar_t* to, wchar_t* to_end, wchar_t*& to_next) const BOOST_OVERRIDE;
+    std::codecvt_base::result do_out(std::mbstate_t& state, const wchar_t* from, const wchar_t* from_end, const wchar_t*& from_next, char* to, char* to_end, char*& to_next) const BOOST_OVERRIDE;
+    std::codecvt_base::result do_unshift(std::mbstate_t&, char* /*from*/, char* /*to*/, char*& /*next*/) const BOOST_OVERRIDE { return ok; }
+    int do_length(std::mbstate_t&, const char* /*from*/, const char* /*from_end*/, std::size_t /*max*/) const
+#if BOOST_WORKAROUND(__IBMCPP__, BOOST_TESTED_AT(600))
+        throw()
+#endif
+        BOOST_OVERRIDE
+    { return 0; }
+    int do_max_length() const BOOST_NOEXCEPT_OR_NOTHROW BOOST_OVERRIDE { return 0; }
 };
 
-#endif  // BOOST_FILESYSTEM3_WIN_FILE_CODECVT_HPP
+} // namespace detail
+} // namespace filesystem
+} // namespace boost
+
+#endif // BOOST_WINDOWS_API
+
+#endif // BOOST_FILESYSTEM_WINDOWS_FILE_CODECVT_HPP

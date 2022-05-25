@@ -167,6 +167,11 @@ namespace boost
 
     typedef poisson_distribution<double> poisson; // Reserved name of type double.
 
+    #ifdef __cpp_deduction_guides
+    template <class RealType>
+    poisson_distribution(RealType)->poisson_distribution<typename boost::math::tools::promote_args<RealType>::type>;
+    #endif
+
     // Non-member functions to give properties of the distribution.
 
     template <class RealType, class Policy>
@@ -410,7 +415,7 @@ namespace boost
          return policies::raise_overflow_error<RealType>(function, 0, Policy());
       }
       typedef typename Policy::discrete_quantile_type discrete_type;
-      boost::uintmax_t max_iter = policies::get_max_root_iterations<Policy>();
+      std::uintmax_t max_iter = policies::get_max_root_iterations<Policy>();
       RealType guess, factor = 8;
       RealType z = dist.mean();
       if(z < 1)
@@ -480,7 +485,7 @@ namespace boost
          return 0;  // Exact result regardless of discrete-quantile Policy
       }
       typedef typename Policy::discrete_quantile_type discrete_type;
-      boost::uintmax_t max_iter = policies::get_max_root_iterations<Policy>();
+      std::uintmax_t max_iter = policies::get_max_root_iterations<Policy>();
       RealType guess, factor = 8;
       RealType z = dist.mean();
       if(z < 1)

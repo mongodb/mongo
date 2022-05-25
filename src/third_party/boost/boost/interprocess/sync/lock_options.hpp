@@ -26,14 +26,6 @@
 //!Describes the lock options with associated with interprocess_mutex lock constructors.
 
 namespace boost {
-
-#if !defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
-
-namespace posix_time
-{  class ptime;   }
-
-#endif   //#if !defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
-
 namespace interprocess {
 
 //!Type to indicate to a mutex lock constructor that must not lock the mutex.

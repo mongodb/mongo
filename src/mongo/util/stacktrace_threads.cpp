@@ -35,6 +35,7 @@
 #include <array>
 #include <atomic>
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
 #include <cstdint>
 #include <cstdlib>
 #include <dirent.h>

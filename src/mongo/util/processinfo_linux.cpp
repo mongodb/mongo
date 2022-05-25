@@ -32,6 +32,7 @@
 
 #include "processinfo.h"
 
+#include <fstream>
 #include <iostream>
 #include <malloc.h>
 #include <pcrecpp.h>

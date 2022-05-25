@@ -1055,6 +1055,7 @@ bool basic_regex_parser<charT, traits>::parse_repeat(std::size_t low, std::size_
       case syntax_element_jump:
       case syntax_element_startmark:
       case syntax_element_backstep:
+      case syntax_element_toggle_case:
          // can't legally repeat any of the above:
          fail(regex_constants::error_badrepeat, m_position - m_base);
          return false;
@@ -1124,6 +1125,9 @@ bool basic_regex_parser<charT, traits>::parse_repeat(std::size_t low, std::size_
                   }
                   else
                      contin = false;
+                  break;
+               default:
+                  contin = false;
                }
             }
             else
@@ -3137,7 +3141,13 @@ bool basic_regex_parser<charT, traits>::unwind_alts(std::ptrdiff_t last_paren_st
       m_alt_jumps.pop_back();
       this->m_pdata->m_data.align();
       re_jump* jmp = static_cast<re_jump*>(this->getaddress(jump_offset));
-      BOOST_REGEX_ASSERT(jmp->type == syntax_element_jump);
+      if (jmp->type != syntax_element_jump)
+      {
+         // Something really bad happened, this used to be an assert, 
+         // but we'll make it an error just in case we should ever get here.
+         fail(regex_constants::error_unknown, this->m_position - this->m_base, "Internal logic failed while compiling the expression, probably you added a repeat to something non-repeatable!");
+         return false;
+      }
       jmp->alt.i = this->m_pdata->m_data.size() - jump_offset;
    }
    return true;

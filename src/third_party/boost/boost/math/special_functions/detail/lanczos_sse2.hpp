@@ -210,7 +210,7 @@ inline double lanczos13m53::lanczos_sum_expG_scaled<double>(const double& x)
 
 #ifdef _MSC_VER
 
-BOOST_STATIC_ASSERT(sizeof(double) == sizeof(long double));
+static_assert(sizeof(double) == sizeof(long double), "sizeof(long double) != sizeof(double) is not supported");
 
 template <>
 inline long double lanczos13m53::lanczos_sum<long double>(const long double& x)

@@ -100,12 +100,12 @@
     ((defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 407)) ||\
         (defined(BOOST_CLANG) && ((__clang_major__ * 100 + __clang_minor__) >= 302))) &&\
     (\
-        (__GCC_ATOMIC_BOOL_LOCK_FREE + 0) == 2 ||\
-        (__GCC_ATOMIC_CHAR_LOCK_FREE + 0) == 2 ||\
-        (__GCC_ATOMIC_SHORT_LOCK_FREE + 0) == 2 ||\
-        (__GCC_ATOMIC_INT_LOCK_FREE + 0) == 2 ||\
-        (__GCC_ATOMIC_LONG_LOCK_FREE + 0) == 2 ||\
-        (__GCC_ATOMIC_LLONG_LOCK_FREE + 0) == 2\
+        (__GCC_ATOMIC_BOOL_LOCK_FREE == 2) ||\
+        (__GCC_ATOMIC_CHAR_LOCK_FREE == 2) ||\
+        (__GCC_ATOMIC_SHORT_LOCK_FREE == 2) ||\
+        (__GCC_ATOMIC_INT_LOCK_FREE == 2) ||\
+        (__GCC_ATOMIC_LONG_LOCK_FREE == 2) ||\
+        (__GCC_ATOMIC_LLONG_LOCK_FREE == 2)\
     )
 
 #define BOOST_ATOMIC_DETAIL_CORE_BACKEND gcc_atomic
@@ -152,6 +152,15 @@
 
 #if defined(BOOST_ATOMIC_DETAIL_HAS_FUTEX)
 #define BOOST_ATOMIC_DETAIL_WAIT_BACKEND futex
+#elif defined(__APPLE__)
+#if !defined(BOOST_ATOMIC_NO_DARWIN_ULOCK) && (\
+    (defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ >= 101200) || \
+    (defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__ >= 100000) || \
+    (defined(__ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__ >= 100000) || \
+    (defined(__ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__ >= 30000))
+// Darwin 16+ supports ulock API
+#define BOOST_ATOMIC_DETAIL_WAIT_BACKEND darwin_ulock
+#endif // __ENVIRONMENT_*_VERSION_MIN_REQUIRED__
 #elif defined(__FreeBSD__)
 #include <sys/param.h>
 // FreeBSD prior to 7.0 had _umtx_op with a different signature

@@ -20,7 +20,7 @@ namespace boost { namespace multiprecision { namespace backends {
 //
 // Start with non-trivial cpp_int's:
 //
-template <unsigned MinBits, unsigned MaxBits, cpp_integer_type SignType, cpp_int_check_type Checked, class Allocator>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_integer_type SignType, cpp_int_check_type Checked, class Allocator>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, SignType, Checked, Allocator> >::value,
     bool>::type
@@ -28,7 +28,7 @@ eval_eq(const cpp_int_backend<MinBits, MaxBits, SignType, Checked, Allocator>& a
 {
    return (a.sign() == b.sign()) && (a.size() == b.size()) && std_constexpr::equal(a.limbs(), a.limbs() + a.size(), b.limbs());
 }
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, unsigned MinBits2, unsigned MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, std::size_t MinBits2, std::size_t MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value && !is_trivial_cpp_int<cpp_int_backend<MinBits2, MaxBits2, SignType2, Checked2, Allocator2> >::value,
     bool>::type
@@ -36,7 +36,7 @@ eval_eq(const cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator
 {
    return (a.sign() == b.sign()) && (a.size() == b.size()) && std_constexpr::equal(a.limbs(), a.limbs() + a.size(), b.limbs());
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class Allocator>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class Allocator>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, Allocator> >::value,
     bool>::type
@@ -44,7 +44,7 @@ eval_eq(const cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, Alloc
 {
    return (a.sign() == false) && (a.size() == 1) && (*a.limbs() == b);
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class Allocator>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class Allocator>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, Allocator> >::value,
     bool>::type
@@ -52,7 +52,7 @@ eval_eq(const cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, Alloc
 {
    return (a.sign() == (b < 0)) && (a.size() == 1) && (*a.limbs() == boost::multiprecision::detail::unsigned_abs(b));
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class Allocator>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class Allocator>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, Allocator> >::value,
     bool>::type
@@ -60,7 +60,7 @@ eval_eq(const cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, All
 {
    return (a.size() == 1) && (*a.limbs() == b);
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class Allocator>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class Allocator>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, Allocator> >::value,
     bool>::type
@@ -69,7 +69,7 @@ eval_eq(const cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, All
    return (b < 0) ? eval_eq(a, cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, Allocator>(b)) : eval_eq(a, static_cast<limb_type>(b)); // Use bit pattern of b for comparison
 }
 
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class Allocator>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class Allocator>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, Allocator> >::value,
     bool>::type
@@ -81,7 +81,7 @@ eval_lt(const cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, Alloc
       return false;
    return *a.limbs() < b;
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class Allocator>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class Allocator>
 inline BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, Allocator> >::value,
     bool>::type
@@ -103,7 +103,7 @@ eval_lt(const cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, Alloc
    }
 }
 
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class Allocator>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class Allocator>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, Allocator> >::value,
     bool>::type
@@ -113,7 +113,7 @@ eval_lt(const cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, All
       return false;
    return *a.limbs() < b;
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class Allocator>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class Allocator>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, Allocator> >::value,
     bool>::type
@@ -122,7 +122,7 @@ eval_lt(const cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, All
    return (b < 0) ? a.compare(b) < 0 : eval_lt(a, static_cast<limb_type>(b)); // Use bit pattern of b for comparison
 }
 
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class Allocator>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class Allocator>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, Allocator> >::value,
     bool>::type
@@ -134,7 +134,7 @@ eval_gt(const cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, Alloc
       return true;
    return *a.limbs() > b;
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class Allocator>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class Allocator>
 inline BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, Allocator> >::value,
     bool>::type
@@ -158,7 +158,7 @@ eval_gt(const cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, Alloc
    }
 }
 
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class Allocator>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class Allocator>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, Allocator> >::value,
     bool>::type
@@ -168,7 +168,7 @@ eval_gt(const cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, All
       return true;
    return *a.limbs() > b;
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class Allocator>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class Allocator>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, Allocator> >::value,
     bool>::type
@@ -179,7 +179,7 @@ eval_gt(const cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, All
 //
 // And again for trivial cpp_ints:
 //
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void> >::value,
     bool>::value
@@ -187,7 +187,7 @@ eval_eq(const cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void>
 {
    return (a.sign() == b.sign()) && (*a.limbs() == *b.limbs());
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, void> >::value,
     bool>::value
@@ -195,7 +195,7 @@ eval_eq(const cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, voi
 {
    return *a.limbs() == *b.limbs();
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class U>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class U>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     boost::multiprecision::detail::is_unsigned<U>::value && is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void> >::value,
     bool>::type
@@ -203,7 +203,7 @@ eval_eq(const cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void>
 {
    return !a.sign() && (*a.limbs() == b);
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class S>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class S>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     boost::multiprecision::detail::is_signed<S>::value && boost::multiprecision::detail::is_integral<S>::value && is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void> >::value,
     bool>::type
@@ -211,7 +211,7 @@ eval_eq(const cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void>
 {
    return (a.sign() == (b < 0)) && (*a.limbs() == boost::multiprecision::detail::unsigned_abs(b));
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class U>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class U>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     boost::multiprecision::detail::is_unsigned<U>::value && is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, void> >::value,
     bool>::type
@@ -219,7 +219,7 @@ eval_eq(const cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, voi
 {
    return *a.limbs() == b;
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class S>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class S>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     boost::multiprecision::detail::is_signed<S>::value && boost::multiprecision::detail::is_integral<S>::value && is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, void> >::value,
     bool>::type
@@ -237,7 +237,7 @@ eval_eq(const cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, voi
    }
 }
 
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void> >::value,
     bool>::type
@@ -247,7 +247,7 @@ eval_lt(const cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void>
       return a.sign();
    return a.sign() ? *a.limbs() > *b.limbs() : *a.limbs() < *b.limbs();
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, void> >::value,
     bool>::type
@@ -255,7 +255,7 @@ eval_lt(const cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, voi
 {
    return *a.limbs() < *b.limbs();
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class U>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class U>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     boost::multiprecision::detail::is_unsigned<U>::value && is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void> >::value,
     bool>::type
@@ -265,7 +265,7 @@ eval_lt(const cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void>
       return true;
    return *a.limbs() < b;
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class S>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class S>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     boost::multiprecision::detail::is_signed<S>::value && boost::multiprecision::detail::is_integral<S>::value && is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void> >::value,
     bool>::type
@@ -275,7 +275,7 @@ eval_lt(const cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void>
       return a.sign();
    return a.sign() ? (*a.limbs() > boost::multiprecision::detail::unsigned_abs(b)) : (*a.limbs() < boost::multiprecision::detail::unsigned_abs(b));
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class U>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class U>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     boost::multiprecision::detail::is_unsigned<U>::value && is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, void> >::value,
     bool>::type
@@ -283,7 +283,7 @@ eval_lt(const cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, voi
 {
    return *a.limbs() < b;
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class S>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class S>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     boost::multiprecision::detail::is_signed<S>::value && boost::multiprecision::detail::is_integral<S>::value && is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, void> >::value,
     bool>::type
@@ -301,7 +301,7 @@ eval_lt(const cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, voi
    }
 }
 
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void> >::value,
     bool>::type
@@ -311,7 +311,7 @@ eval_gt(const cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void>
       return !a.sign();
    return a.sign() ? *a.limbs() < *b.limbs() : *a.limbs() > *b.limbs();
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, void> >::value,
     bool>::type
@@ -319,7 +319,7 @@ eval_gt(const cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, voi
 {
    return *a.limbs() > *b.limbs();
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class U>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class U>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     boost::multiprecision::detail::is_unsigned<U>::value && is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void> >::value,
     bool>::type
@@ -329,7 +329,7 @@ eval_gt(const cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void>
       return false;
    return *a.limbs() > b;
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class S>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class S>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     boost::multiprecision::detail::is_signed<S>::value && boost::multiprecision::detail::is_integral<S>::value && is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void> >::value,
     bool>::type
@@ -339,7 +339,7 @@ eval_gt(const cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, void>
       return !a.sign();
    return a.sign() ? (*a.limbs() < boost::multiprecision::detail::unsigned_abs(b)) : (*a.limbs() > boost::multiprecision::detail::unsigned_abs(b));
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class U>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class U>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     boost::multiprecision::detail::is_unsigned<U>::value && is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, void> >::value,
     bool>::type
@@ -347,7 +347,7 @@ eval_gt(const cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, voi
 {
    return *a.limbs() > b;
 }
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class S>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class S>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     boost::multiprecision::detail::is_signed<S>::value && boost::multiprecision::detail::is_integral<S>::value && is_trivial_cpp_int<cpp_int_backend<MinBits, MaxBits, unsigned_magnitude, Checked, void> >::value,
     bool>::type

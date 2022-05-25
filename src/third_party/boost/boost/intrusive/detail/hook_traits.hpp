@@ -55,7 +55,7 @@ struct bhtraits_base
    typedef node&                                                     node_reference;
    typedef const node &                                              const_node_reference;
 
-   BOOST_INTRUSIVE_FORCEINLINE static pointer to_value_ptr(const node_ptr & n)
+   BOOST_INTRUSIVE_FORCEINLINE static pointer to_value_ptr(node_ptr n)
    {
       pointer p = pointer_traits<pointer>::pointer_to
          (static_cast<reference>(static_cast<node_holder_reference>(*n)));
@@ -63,7 +63,7 @@ struct bhtraits_base
       return p;
    }
 
-   BOOST_INTRUSIVE_FORCEINLINE static const_pointer to_value_ptr(const const_node_ptr & n)
+   BOOST_INTRUSIVE_FORCEINLINE static const_pointer to_value_ptr(const_node_ptr n)
    {
       const_pointer p = pointer_traits<const_pointer>::pointer_to
          (static_cast<const_reference>(static_cast<const_node_holder_reference>(*n)));
@@ -132,14 +132,14 @@ struct mhtraits
          (static_cast<const_node_reference>(static_cast<const_hook_reference>(value.*P)));
    }
 
-   BOOST_INTRUSIVE_FORCEINLINE static pointer to_value_ptr(const node_ptr & n)
+   BOOST_INTRUSIVE_FORCEINLINE static pointer to_value_ptr(node_ptr n)
    {
       return pointer_traits<pointer>::pointer_to
          (*detail::parent_from_member<T, Hook>
             (static_cast<Hook*>(boost::movelib::to_raw_pointer(n)), P));
    }
 
-   BOOST_INTRUSIVE_FORCEINLINE static const_pointer to_value_ptr(const const_node_ptr & n)
+   BOOST_INTRUSIVE_FORCEINLINE static const_pointer to_value_ptr(const_node_ptr n)
    {
       return pointer_traits<const_pointer>::pointer_to
          (*detail::parent_from_member<T, Hook>
@@ -174,17 +174,17 @@ struct fhtraits
    static const_node_ptr to_node_ptr(const_reference value)
    {  return static_cast<const node*>(boost::movelib::to_raw_pointer(Functor::to_hook_ptr(value)));  }
 
-   static pointer to_value_ptr(const node_ptr & n)
+   static pointer to_value_ptr(node_ptr n)
    {  return Functor::to_value_ptr(to_hook_ptr(n));  }
 
-   static const_pointer to_value_ptr(const const_node_ptr & n)
+   static const_pointer to_value_ptr(const_node_ptr n)
    {  return Functor::to_value_ptr(to_hook_ptr(n));  }
 
    private:
-   static hook_ptr to_hook_ptr(const node_ptr & n)
+   static hook_ptr to_hook_ptr(node_ptr n)
    {  return hook_ptr(&*static_cast<hook_type*>(&*n));  }
 
-   static const_hook_ptr to_hook_ptr(const const_node_ptr & n)
+   static const_hook_ptr to_hook_ptr(const_node_ptr n)
    {  return const_hook_ptr(&*static_cast<const hook_type*>(&*n));  }
 };
 

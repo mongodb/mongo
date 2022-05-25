@@ -2,7 +2,7 @@
 // detail/null_reactor.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -17,9 +17,12 @@
 
 #include <boost/asio/detail/config.hpp>
 
-#if defined(BOOST_ASIO_HAS_IOCP) || defined(BOOST_ASIO_WINDOWS_RUNTIME)
+#if defined(BOOST_ASIO_HAS_IOCP) \
+  || defined(BOOST_ASIO_WINDOWS_RUNTIME) \
+  || defined(BOOST_ASIO_HAS_IO_URING_AS_DEFAULT)
 
 #include <boost/asio/detail/scheduler_operation.hpp>
+#include <boost/asio/detail/scheduler_task.hpp>
 #include <boost/asio/execution_context.hpp>
 
 #include <boost/asio/detail/push_options.hpp>
@@ -29,9 +32,14 @@ namespace asio {
 namespace detail {
 
 class null_reactor
-  : public execution_context_service_base<null_reactor>
+  : public execution_context_service_base<null_reactor>,
+    public scheduler_task
 {
 public:
+  struct per_descriptor_data
+  {
+  };
+
   // Constructor.
   null_reactor(boost::asio::execution_context& ctx)
     : execution_context_service_base<null_reactor>(ctx)
@@ -40,6 +48,11 @@ public:
 
   // Destructor.
   ~null_reactor()
+  {
+  }
+
+  // Initialise the task.
+  void init_task()
   {
   }
 
@@ -65,6 +78,8 @@ public:
 
 #include <boost/asio/detail/pop_options.hpp>
 
-#endif // defined(BOOST_ASIO_HAS_IOCP) || defined(BOOST_ASIO_WINDOWS_RUNTIME)
+#endif // defined(BOOST_ASIO_HAS_IOCP)
+       //   || defined(BOOST_ASIO_WINDOWS_RUNTIME)
+       //   || defined(BOOST_ASIO_HAS_IO_URING_AS_DEFAULT)
 
 #endif // BOOST_ASIO_DETAIL_NULL_REACTOR_HPP

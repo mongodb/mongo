@@ -71,7 +71,7 @@ class tree_iterator
    BOOST_INTRUSIVE_FORCEINLINE tree_iterator()
    {}
 
-   BOOST_INTRUSIVE_FORCEINLINE explicit tree_iterator(const node_ptr & nodeptr, const const_value_traits_ptr &traits_ptr)
+   BOOST_INTRUSIVE_FORCEINLINE explicit tree_iterator(node_ptr nodeptr, const_value_traits_ptr traits_ptr)
       : members_(nodeptr, traits_ptr)
    {}
 
@@ -86,7 +86,7 @@ class tree_iterator
    BOOST_INTRUSIVE_FORCEINLINE tree_iterator &operator=(const tree_iterator &other)
    {  members_.nodeptr_ = other.members_.nodeptr_;  return *this;  }
 
-   BOOST_INTRUSIVE_FORCEINLINE tree_iterator &operator=(const node_ptr &nodeptr)
+   BOOST_INTRUSIVE_FORCEINLINE tree_iterator &operator=(node_ptr nodeptr)
    {  members_.nodeptr_ = nodeptr;  return *this;  }
 
    BOOST_INTRUSIVE_FORCEINLINE node_ptr pointed_node() const

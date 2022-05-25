@@ -31,6 +31,8 @@
 #include <boost/container/detail/singleton.hpp>
 #include <boost/container/detail/placement_new.hpp>
 
+#include <boost/move/detail/force_ptr.hpp>
+
 #include <boost/assert.hpp>
 #include <boost/static_assert.hpp>
 #include <boost/move/utility_core.hpp>
@@ -153,7 +155,7 @@ class adaptive_pool
    {  return size_type(-1)/(2u*sizeof(T));   }
 
    //!Allocate memory for an array of count elements.
-   //!Throws std::bad_alloc if there is no enough memory
+   //!Throws bad_alloc if there is no enough memory
    pointer allocate(size_type count, const void * = 0)
    {
       if(BOOST_UNLIKELY(count > size_type(-1)/(2u*sizeof(T))))
@@ -263,7 +265,8 @@ class adaptive_pool
                              ,(T*)BOOST_CONTAINER_MEMCHAIN_LASTMEM(&ch)
                              ,BOOST_CONTAINER_MEMCHAIN_SIZE(&ch) );*/
       if(BOOST_UNLIKELY(!dlmalloc_multialloc_nodes
-            (n_elements, elem_size*sizeof(T), BOOST_CONTAINER_DL_MULTIALLOC_DEFAULT_CONTIGUOUS, reinterpret_cast<dlmalloc_memchain *>(&chain)))){
+            ( n_elements, elem_size*sizeof(T), BOOST_CONTAINER_DL_MULTIALLOC_DEFAULT_CONTIGUOUS
+            , move_detail::force_ptr<dlmalloc_memchain *>(&chain)))){
          boost::container::throw_bad_alloc();
       }
    }
@@ -283,7 +286,8 @@ class adaptive_pool
                              ,(T*)BOOST_CONTAINER_MEMCHAIN_LASTMEM(&ch)
                              ,BOOST_CONTAINER_MEMCHAIN_SIZE(&ch) );*/
       if(BOOST_UNLIKELY(!dlmalloc_multialloc_arrays
-         (n_elements, elem_sizes, sizeof(T), BOOST_CONTAINER_DL_MULTIALLOC_DEFAULT_CONTIGUOUS, reinterpret_cast<dlmalloc_memchain *>(&chain)))){
+         ( n_elements, elem_sizes, sizeof(T), BOOST_CONTAINER_DL_MULTIALLOC_DEFAULT_CONTIGUOUS
+         , move_detail::force_ptr<dlmalloc_memchain *>(&chain)))){
          boost::container::throw_bad_alloc();
       }
    }
@@ -295,7 +299,7 @@ class adaptive_pool
       size_t size(chain.size());
       BOOST_CONTAINER_MEMCHAIN_INIT_FROM(&ch, beg, last, size);
       dlmalloc_multidealloc(&ch);*/
-      dlmalloc_multidealloc(reinterpret_cast<dlmalloc_memchain *>(&chain));
+      dlmalloc_multidealloc(move_detail::force_ptr<dlmalloc_memchain *>(&chain));
    }
 
    //!Deallocates all free blocks of the pool
@@ -467,7 +471,7 @@ class private_adaptive_pool
    {  return size_type(-1)/(2u*sizeof(T));   }
 
    //!Allocate memory for an array of count elements.
-   //!Throws std::bad_alloc if there is no enough memory
+   //!Throws bad_alloc if there is no enough memory
    pointer allocate(size_type count, const void * = 0)
    {
       if(BOOST_UNLIKELY(count > size_type(-1)/(2u*sizeof(T))))
@@ -544,7 +548,8 @@ class private_adaptive_pool
    {
       BOOST_STATIC_ASSERT(( Version > 1 ));
       if(BOOST_UNLIKELY(!dlmalloc_multialloc_nodes
-            (n_elements, elem_size*sizeof(T), BOOST_CONTAINER_DL_MULTIALLOC_DEFAULT_CONTIGUOUS, reinterpret_cast<dlmalloc_memchain *>(&chain)))){
+            ( n_elements, elem_size*sizeof(T), BOOST_CONTAINER_DL_MULTIALLOC_DEFAULT_CONTIGUOUS
+            , move_detail::force_ptr<dlmalloc_memchain *>(&chain)))){
          boost::container::throw_bad_alloc();
       }
    }
@@ -555,14 +560,15 @@ class private_adaptive_pool
    {
       BOOST_STATIC_ASSERT(( Version > 1 ));
       if(BOOST_UNLIKELY(!dlmalloc_multialloc_arrays
-         (n_elements, elem_sizes, sizeof(T), BOOST_CONTAINER_DL_MULTIALLOC_DEFAULT_CONTIGUOUS, reinterpret_cast<dlmalloc_memchain *>(&chain)))){
+         (n_elements, elem_sizes, sizeof(T), BOOST_CONTAINER_DL_MULTIALLOC_DEFAULT_CONTIGUOUS
+         , move_detail::force_ptr<dlmalloc_memchain *>(&chain)))){
          boost::container::throw_bad_alloc();
       }
    }
 
    void deallocate_many(multiallocation_chain &chain) BOOST_NOEXCEPT_OR_NOTHROW
    {
-      dlmalloc_multidealloc(reinterpret_cast<dlmalloc_memchain *>(&chain));
+      dlmalloc_multidealloc(move_detail::force_ptr<dlmalloc_memchain *>(&chain));
    }
 
    //!Deallocates all free blocks of the pool

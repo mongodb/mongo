@@ -14,12 +14,8 @@
 #include <boost/math/tools/precision.hpp>
 #include <boost/math/policies/error_handling.hpp>
 #include <boost/math/special_functions/math_fwd.hpp>
-#include <boost/config/no_tr1/cmath.hpp>
 #include <algorithm> // for swap
-
-#ifdef BOOST_NO_STDC_NAMESPACE
-namespace std{ using ::sqrt; using ::fabs; }
-#endif
+#include <cmath>
 
 namespace boost{ namespace math{ namespace detail{
 
@@ -34,7 +30,7 @@ T hypot_imp(T x, T y, const Policy& pol)
    x = fabs(x);
    y = fabs(y);
 
-#ifdef BOOST_MSVC
+#ifdef _MSC_VER
 #pragma warning(push) 
 #pragma warning(disable: 4127)
 #endif
@@ -43,7 +39,7 @@ T hypot_imp(T x, T y, const Policy& pol)
       && ((x == std::numeric_limits<T>::infinity())
       || (y == std::numeric_limits<T>::infinity())))
       return policies::raise_overflow_error<T>("boost::math::hypot<%1%>(%1%,%1%)", 0, pol);
-#ifdef BOOST_MSVC
+#ifdef _MSC_VER
 #pragma warning(pop)
 #endif
 

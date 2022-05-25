@@ -35,6 +35,7 @@
 #include <limits>
 
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
 
 #include "mongo/base/simple_string_data_comparator.h"

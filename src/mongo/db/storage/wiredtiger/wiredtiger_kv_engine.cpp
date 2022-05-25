@@ -47,6 +47,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/system/error_code.hpp>

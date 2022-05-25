@@ -890,9 +890,9 @@ class segment_manager
        size_type &length, ipcdetail::false_ is_intrusive, bool use_lock)
    {
       (void)is_intrusive;
-      typedef IndexType<ipcdetail::index_config<CharT, MemoryAlgorithm> >      index_type;
-      typedef typename index_type::key_type        key_type;
-      typedef typename index_type::iterator        index_it;
+      typedef IndexType<ipcdetail::index_config<CharT, MemoryAlgorithm> >      char_aware_index_type;
+      typedef typename char_aware_index_type::key_type        key_type;
+      typedef typename char_aware_index_type::iterator        index_it;
 
       //-------------------------------
       scoped_lock<rmutex> guard(priv_get_lock(use_lock));
@@ -1000,9 +1000,9 @@ class segment_manager
                                    ipcdetail::false_ is_intrusive_index)
    {
       (void)is_intrusive_index;
-      typedef IndexType<ipcdetail::index_config<CharT, MemoryAlgorithm> >            index_type;
-      typedef typename index_type::iterator              index_it;
-      typedef typename index_type::key_type              key_type;
+      typedef IndexType<ipcdetail::index_config<CharT, MemoryAlgorithm> >            char_aware_index_type;
+      typedef typename char_aware_index_type::iterator              index_it;
+      typedef typename char_aware_index_type::key_type              key_type;
 
       //-------------------------------
       scoped_lock<rmutex> guard(m_header);
@@ -1026,8 +1026,8 @@ class segment_manager
       IndexType<ipcdetail::index_config<CharT, MemoryAlgorithm> > &index,
       ipcdetail::in_place_interface &table)
    {
-      typedef IndexType<ipcdetail::index_config<CharT, MemoryAlgorithm> >      index_type;
-      typedef typename index_type::iterator        index_it;
+      typedef IndexType<ipcdetail::index_config<CharT, MemoryAlgorithm> >      char_aware_index_type;
+      typedef typename char_aware_index_type::iterator        index_it;
 
       //Get allocation parameters
       block_header_t *ctrl_data = reinterpret_cast<block_header_t*>

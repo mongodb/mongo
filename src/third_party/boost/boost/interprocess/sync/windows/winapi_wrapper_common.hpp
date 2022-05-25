@@ -22,9 +22,9 @@
 #include <boost/interprocess/detail/config_begin.hpp>
 #include <boost/interprocess/detail/workaround.hpp>
 #include <boost/interprocess/detail/win32_api.hpp>
-#include <boost/interprocess/detail/posix_time_types_wrk.hpp>
 #include <boost/interprocess/errors.hpp>
 #include <boost/interprocess/exceptions.hpp>
+#include <boost/interprocess/detail/timed_utils.hpp>
 #include <limits>
 
 namespace boost {
@@ -50,21 +50,22 @@ inline bool do_winapi_wait(void *handle, unsigned long dwMilliseconds)
    }
 }
 
-inline bool winapi_wrapper_timed_wait_for_single_object(void *handle, const boost::posix_time::ptime &abs_time)
+template<class TimePoint>
+inline bool winapi_wrapper_timed_wait_for_single_object(void *handle, const TimePoint &abs_time)
 {
    //Windows uses relative wait times so check for negative waits
    //and implement as 0 wait to allow try-semantics as POSIX mandates.
-   unsigned long time = 0u;
-   if (abs_time.is_pos_infinity()){
-      time = winapi::infinite_time;
+   unsigned long time_ms = 0u;
+   if (ipcdetail::is_pos_infinity(abs_time)){
+      time_ms = winapi::infinite_time;
    }
    else {
-      const boost::posix_time::ptime cur_time = microsec_clock::universal_time();
+      const TimePoint cur_time = microsec_clock<TimePoint>::universal_time();
       if(abs_time > cur_time){
-         time = (abs_time - cur_time).total_milliseconds();
+         time_ms = static_cast<unsigned long>(duration_to_milliseconds(abs_time - cur_time));
       }
    }
-   return do_winapi_wait(handle, time);
+   return do_winapi_wait(handle, time_ms);
 }
 
 inline void winapi_wrapper_wait_for_single_object(void *handle)

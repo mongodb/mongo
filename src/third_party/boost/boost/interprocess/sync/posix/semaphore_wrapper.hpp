@@ -19,11 +19,11 @@
 #  pragma once
 #endif
 
-#include <boost/interprocess/detail/posix_time_types_wrk.hpp>
 #include <boost/interprocess/exceptions.hpp>
 #include <boost/interprocess/creation_tags.hpp>
 #include <boost/interprocess/detail/os_file_functions.hpp>
 #include <boost/interprocess/detail/shared_dir_helpers.hpp>
+#include <boost/interprocess/detail/timed_utils.hpp>
 #include <boost/interprocess/permissions.hpp>
 
 #include <fcntl.h>      //O_CREAT, O_*...
@@ -40,7 +40,7 @@
 #endif
 
 #ifdef BOOST_INTERPROCESS_POSIX_TIMEOUTS
-#include <boost/interprocess/sync/posix/ptime_to_timespec.hpp>
+#include <boost/interprocess/sync/posix/timepoint_to_timespec.hpp>
 #else
 #include <boost/interprocess/detail/os_thread_functions.hpp>
 #include <boost/interprocess/sync/detail/locks.hpp>
@@ -122,7 +122,7 @@ inline void semaphore_close(sem_t *handle)
 
 inline bool semaphore_unlink(const char *semname)
 {
-   try{
+   BOOST_TRY{
       std::string sem_str;
       #ifndef BOOST_INTERPROCESS_FILESYSTEM_BASED_POSIX_SEMAPHORES
       add_leading_slash(semname, sem_str);
@@ -131,9 +131,9 @@ inline bool semaphore_unlink(const char *semname)
       #endif
       return 0 == sem_unlink(sem_str.c_str());
    }
-   catch(...){
+   BOOST_CATCH(...){
       return false;
-   }
+   } BOOST_CATCH_END
 }
 
 #endif   //BOOST_INTERPROCESS_POSIX_NAMED_SEMAPHORES
@@ -212,16 +212,17 @@ struct semaphore_wrapper_try_wrapper
 
 #endif
 
-inline bool semaphore_timed_wait(sem_t *handle, const boost::posix_time::ptime &abs_time)
+template<class TimePoint>
+inline bool semaphore_timed_wait(sem_t *handle, const TimePoint &abs_time)
 {
    #ifdef BOOST_INTERPROCESS_POSIX_TIMEOUTS
    //Posix does not support infinity absolute time so handle it here
-   if(abs_time.is_pos_infinity()){
+   if(ipcdetail::is_pos_infinity(abs_time)){
       semaphore_wait(handle);
       return true;
    }
 
-   timespec tspec = ptime_to_timespec(abs_time);
+   timespec tspec = timepoint_to_timespec(abs_time);
    for (;;){
       int res = sem_timedwait(handle, &tspec);
       if(res == 0)

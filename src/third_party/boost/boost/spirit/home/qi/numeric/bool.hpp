@@ -128,7 +128,7 @@ namespace boost { namespace spirit { namespace qi
                     return false;
 
 #if BOOST_WORKAROUND(BOOST_MSVC, BOOST_TESTED_AT(1600))
-                p; // suppresses warning: C4100: 'p' : unreferenced formal parameter
+                (void)p; // suppresses warning: C4100: 'p' : unreferenced formal parameter
 #endif
                 return (allow_true && p.parse_true(first, last, attr)) ||
                        (!disallow_false && p.parse_false(first, last, attr));

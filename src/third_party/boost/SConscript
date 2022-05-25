@@ -175,4 +175,5 @@ loglib_env.Library(
         'boost_filesystem',
         'boost_thread',
     ],
+    SYSLIBDEPS=['synchronization'] if env.TargetOSIs('windows') else [],
 )

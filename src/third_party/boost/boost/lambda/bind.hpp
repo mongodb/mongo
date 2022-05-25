@@ -14,6 +14,11 @@
 
 #include "boost/lambda/core.hpp"
 
+// Required for std::is_assignable to work on the result of bind()
+#include "boost/lambda/detail/operator_actions.hpp"
+#include "boost/lambda/detail/operator_lambda_func_base.hpp"
+#include "boost/lambda/detail/operator_return_type_traits.hpp"
+
 #include "boost/lambda/detail/bind_functions.hpp"
-    
+
 #endif

@@ -401,17 +401,22 @@ template<typename CharT>
 inline basic_cstring<CharT>&
 basic_cstring<CharT>::trim_right( basic_cstring exclusions )
 {
+    if(!size()) {
+        return *this;
+    }
+
     if( exclusions.is_empty() )
         exclusions = default_trim_ex();
 
-    iterator it;
+    iterator it = end();
 
-    for( it = end()-1; it != begin()-1; --it ) {
+    do {
+        --it;
         if( self_type::traits_type::find( exclusions.begin(),  exclusions.size(), *it ) == reinterpret_cast<pointer>(0) )
             break;
-    }
+    } while(it != begin());
 
-    return trim_right( it+1 );
+    return trim_right( it + 1 );
 }
 
 //____________________________________________________________________________//

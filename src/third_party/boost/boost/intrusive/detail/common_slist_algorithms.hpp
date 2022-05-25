@@ -40,7 +40,7 @@ class common_slist_algorithms
    typedef typename NodeTraits::const_node_ptr  const_node_ptr;
    typedef NodeTraits                           node_traits;
 
-   static node_ptr get_previous_node(node_ptr p, const node_ptr & this_node)
+   static node_ptr get_previous_node(node_ptr p, node_ptr this_node)
    {
       for( node_ptr p_next
          ; this_node != (p_next = NodeTraits::get_next(p))
@@ -52,41 +52,41 @@ class common_slist_algorithms
       return p;
    }
 
-   BOOST_INTRUSIVE_FORCEINLINE static void init(node_ptr this_node)
+   BOOST_INTRUSIVE_FORCEINLINE static void init(node_ptr this_node) BOOST_NOEXCEPT
    {  NodeTraits::set_next(this_node, node_ptr());  }
 
-   BOOST_INTRUSIVE_FORCEINLINE static bool unique(const const_node_ptr & this_node)
+   static bool unique(const_node_ptr this_node) BOOST_NOEXCEPT
    {
       node_ptr next = NodeTraits::get_next(this_node);
       return !next || next == this_node;
    }
 
-   BOOST_INTRUSIVE_FORCEINLINE static bool inited(const const_node_ptr & this_node)
+   BOOST_INTRUSIVE_FORCEINLINE static bool inited(const_node_ptr this_node) BOOST_NOEXCEPT
    {  return !NodeTraits::get_next(this_node); }
 
-   BOOST_INTRUSIVE_FORCEINLINE static void unlink_after(node_ptr prev_node)
+   static void unlink_after(node_ptr prev_node) BOOST_NOEXCEPT
    {
       const_node_ptr this_node(NodeTraits::get_next(prev_node));
       NodeTraits::set_next(prev_node, NodeTraits::get_next(this_node));
    }
 
-   BOOST_INTRUSIVE_FORCEINLINE static void unlink_after(node_ptr prev_node, node_ptr last_node)
+   BOOST_INTRUSIVE_FORCEINLINE static void unlink_after(node_ptr prev_node, node_ptr last_node) BOOST_NOEXCEPT
    {  NodeTraits::set_next(prev_node, last_node);  }
 
-   BOOST_INTRUSIVE_FORCEINLINE static void link_after(node_ptr prev_node, node_ptr this_node)
+   static void link_after(node_ptr prev_node, node_ptr this_node) BOOST_NOEXCEPT
    {
       NodeTraits::set_next(this_node, NodeTraits::get_next(prev_node));
       NodeTraits::set_next(prev_node, this_node);
    }
 
-   BOOST_INTRUSIVE_FORCEINLINE static void incorporate_after(node_ptr bp, node_ptr b, node_ptr be)
+   static void incorporate_after(node_ptr bp, node_ptr b, node_ptr be) BOOST_NOEXCEPT
    {
       node_ptr p(NodeTraits::get_next(bp));
       NodeTraits::set_next(bp, b);
       NodeTraits::set_next(be, p);
    }
 
-   static void transfer_after(node_ptr bp, node_ptr bb, node_ptr be)
+   static void transfer_after(node_ptr bp, node_ptr bb, node_ptr be) BOOST_NOEXCEPT
    {
       if (bp != bb && bp != be && bb != be) {
          node_ptr next_b = NodeTraits::get_next(bb);
@@ -167,7 +167,7 @@ class common_slist_algorithms
    //! <b>Complexity</b>: Linear
    //!
    //! <b>Throws</b>: Nothing.
-   static std::size_t distance(const const_node_ptr &f, const const_node_ptr &l)
+   static std::size_t distance(const_node_ptr f, const_node_ptr l) BOOST_NOEXCEPT
    {
       const_node_ptr i(f);
       std::size_t result = 0;

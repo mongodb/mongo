@@ -374,17 +374,36 @@ public:
     }
 
     //
-    // Requirements: D's copy constructor must not throw
+    // Requirements: D's copy/move constructors must not throw
     //
     // shared_ptr will release p by calling d(p)
     //
+
+#if !defined( BOOST_NO_CXX11_RVALUE_REFERENCES )
+
+    template<class Y, class D> shared_ptr( Y * p, D d ): px( p ), pn( p, static_cast< D&& >( d ) )
+    {
+        boost::detail::sp_deleter_construct( this, p );
+    }
+
+#else
 
     template<class Y, class D> shared_ptr( Y * p, D d ): px( p ), pn( p, d )
     {
         boost::detail::sp_deleter_construct( this, p );
     }
 
+#endif
+
 #if !defined( BOOST_NO_CXX11_NULLPTR )
+
+#if !defined( BOOST_NO_CXX11_RVALUE_REFERENCES )
+
+    template<class D> shared_ptr( boost::detail::sp_nullptr_t p, D d ): px( p ), pn( p, static_cast< D&& >( d ) )
+    {
+    }
+
+#else
 
     template<class D> shared_ptr( boost::detail::sp_nullptr_t p, D d ): px( p ), pn( p, d )
     {
@@ -392,18 +411,41 @@ public:
 
 #endif
 
+#endif
+
     // As above, but with allocator. A's copy constructor shall not throw.
+
+#if !defined( BOOST_NO_CXX11_RVALUE_REFERENCES )
+
+    template<class Y, class D, class A> shared_ptr( Y * p, D d, A a ): px( p ), pn( p, static_cast< D&& >( d ), a )
+    {
+        boost::detail::sp_deleter_construct( this, p );
+    }
+
+#else
 
     template<class Y, class D, class A> shared_ptr( Y * p, D d, A a ): px( p ), pn( p, d, a )
     {
         boost::detail::sp_deleter_construct( this, p );
     }
 
+#endif
+
 #if !defined( BOOST_NO_CXX11_NULLPTR )
+
+#if !defined( BOOST_NO_CXX11_RVALUE_REFERENCES )
+
+    template<class D, class A> shared_ptr( boost::detail::sp_nullptr_t p, D d, A a ): px( p ), pn( p, static_cast< D&& >( d ), a )
+    {
+    }
+
+#else
 
     template<class D, class A> shared_ptr( boost::detail::sp_nullptr_t p, D d, A a ): px( p ), pn( p, d, a )
     {
     }
+
+#endif
 
 #endif
 
@@ -693,6 +735,20 @@ public:
         this_type( p ).swap( *this );
     }
 
+#if !defined( BOOST_NO_CXX11_RVALUE_REFERENCES )
+
+    template<class Y, class D> void reset( Y * p, D d )
+    {
+        this_type( p, static_cast< D&& >( d ) ).swap( *this );
+    }
+
+    template<class Y, class D, class A> void reset( Y * p, D d, A a )
+    {
+        this_type( p, static_cast< D&& >( d ), a ).swap( *this );
+    }
+
+#else
+
     template<class Y, class D> void reset( Y * p, D d )
     {
         this_type( p, d ).swap( *this );
@@ -702,6 +758,8 @@ public:
     {
         this_type( p, d, a ).swap( *this );
     }
+
+#endif
 
     template<class Y> void reset( shared_ptr<Y> const & r, element_type * p ) BOOST_SP_NOEXCEPT
     {

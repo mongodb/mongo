@@ -10,17 +10,31 @@
 #ifndef BOOST_MATH_TOOLS_COMPLEX_HPP
 #define BOOST_MATH_TOOLS_COMPLEX_HPP
 
-#include <boost/type_traits/is_complex.hpp>
+#include <utility>
+#include <boost/math/tools/is_detected.hpp>
 
 namespace boost {
    namespace math {
       namespace tools {
 
-         //
-         // Specialize this trait for user-defined complex types (ie Boost.Multiprecision):
-         //
-         template <class T>
-         struct is_complex_type : public boost::is_complex<T> {};
+         namespace detail {
+         template <typename T, typename = void>
+         struct is_complex_type_impl
+         {
+            static constexpr bool value = false;
+         };
+
+         template <typename T>
+         struct is_complex_type_impl<T, void_t<decltype(std::declval<T>().real()), 
+                                               decltype(std::declval<T>().imag())>>
+         {
+            static constexpr bool value = true;
+         };
+         } // Namespace detail
+
+         template <typename T>
+         struct is_complex_type : public detail::is_complex_type_impl<T> {};
+         
          //
          // Use this trait to typecast integer literals to something
          // that will interoperate with T:

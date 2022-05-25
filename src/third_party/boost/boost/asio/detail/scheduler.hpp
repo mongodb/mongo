@@ -2,7 +2,7 @@
 // detail/scheduler.hpp
 // ~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -23,8 +23,8 @@
 #include <boost/asio/detail/conditionally_enabled_event.hpp>
 #include <boost/asio/detail/conditionally_enabled_mutex.hpp>
 #include <boost/asio/detail/op_queue.hpp>
-#include <boost/asio/detail/reactor_fwd.hpp>
 #include <boost/asio/detail/scheduler_operation.hpp>
+#include <boost/asio/detail/scheduler_task.hpp>
 #include <boost/asio/detail/thread.hpp>
 #include <boost/asio/detail/thread_context.hpp>
 
@@ -43,10 +43,15 @@ class scheduler
 public:
   typedef scheduler_operation operation;
 
+  // The type of a function used to obtain a task instance.
+  typedef scheduler_task* (*get_task_func_type)(
+      boost::asio::execution_context&);
+
   // Constructor. Specifies the number of concurrent threads that are likely to
   // run the scheduler. If set to 1 certain optimisation are performed.
   BOOST_ASIO_DECL scheduler(boost::asio::execution_context& ctx,
-      int concurrency_hint = 0, bool own_thread = true);
+      int concurrency_hint = 0, bool own_thread = true,
+      get_task_func_type get_task = &scheduler::get_default_task);
 
   // Destructor.
   BOOST_ASIO_DECL ~scheduler();
@@ -166,6 +171,10 @@ private:
   BOOST_ASIO_DECL void wake_one_thread_and_unlock(
       mutex::scoped_lock& lock);
 
+  // Get the default task.
+  BOOST_ASIO_DECL static scheduler_task* get_default_task(
+      boost::asio::execution_context& ctx);
+
   // Helper class to run the scheduler in its own thread.
   class thread_function;
   friend class thread_function;
@@ -188,7 +197,10 @@ private:
   event wakeup_event_;
 
   // The task to be run by this service.
-  reactor* task_;
+  scheduler_task* task_;
+
+  // The function used to get the task.
+  get_task_func_type get_task_;
 
   // Operation object to represent the position of the task in the queue.
   struct task_operation : operation

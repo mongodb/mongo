@@ -20,8 +20,8 @@
 #include <boost/math/special_functions/expm1.hpp>
 #include <boost/math/special_functions/trunc.hpp>
 #include <boost/math/tools/roots.hpp>
-#include <boost/static_assert.hpp>
-#include <boost/config/no_tr1/cmath.hpp>
+#include <boost/math/tools/assert.hpp>
+#include <cmath>
 
 namespace boost{ namespace math{
 
@@ -549,7 +549,7 @@ T ibeta_series(T a, T b, T x, T s0, const Lanczos&, bool normalised, T* p_deriva
 
    T result;
 
-   BOOST_ASSERT((p_derivative == 0) || normalised);
+   BOOST_MATH_ASSERT((p_derivative == 0) || normalised);
 
    if(normalised)
    {
@@ -581,7 +581,7 @@ T ibeta_series(T a, T b, T x, T s0, const Lanczos&, bool normalised, T* p_deriva
          if(p_derivative)
          {
             *p_derivative = result * pow(y, b);
-            BOOST_ASSERT(*p_derivative >= 0);
+            BOOST_MATH_ASSERT(*p_derivative >= 0);
          }
       }
       else
@@ -603,7 +603,7 @@ T ibeta_series(T a, T b, T x, T s0, const Lanczos&, bool normalised, T* p_deriva
    if(result < tools::min_value<T>())
       return s0; // Safeguard: series can't cope with denorms.
    ibeta_series_t<T> s(a, b, x, result);
-   boost::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
+   std::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
    result = boost::math::tools::sum_series(s, boost::math::policies::get_epsilon<T, Policy>(), max_iter, s0);
    policies::check_series_iterations<T>("boost::math::ibeta<%1%>(%1%, %1%, %1%) in ibeta_series (with lanczos)", max_iter, pol);
    return result;
@@ -617,7 +617,7 @@ T ibeta_series(T a, T b, T x, T s0, const boost::math::lanczos::undefined_lanczo
    BOOST_MATH_STD_USING
 
    T result;
-   BOOST_ASSERT((p_derivative == 0) || normalised);
+   BOOST_MATH_ASSERT((p_derivative == 0) || normalised);
 
    if(normalised)
    {
@@ -653,7 +653,7 @@ T ibeta_series(T a, T b, T x, T s0, const boost::math::lanczos::undefined_lanczo
       if(p_derivative)
       {
          *p_derivative = result * pow(y, b);
-         BOOST_ASSERT(*p_derivative >= 0);
+         BOOST_MATH_ASSERT(*p_derivative >= 0);
       }
    }
    else
@@ -664,7 +664,7 @@ T ibeta_series(T a, T b, T x, T s0, const boost::math::lanczos::undefined_lanczo
    if(result < tools::min_value<T>())
       return s0; // Safeguard: series can't cope with denorms.
    ibeta_series_t<T> s(a, b, x, result);
-   boost::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
+   std::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
    result = boost::math::tools::sum_series(s, boost::math::policies::get_epsilon<T, Policy>(), max_iter, s0);
    policies::check_series_iterations<T>("boost::math::ibeta<%1%>(%1%, %1%, %1%) in ibeta_series (without lanczos)", max_iter, pol);
    return result;
@@ -711,7 +711,7 @@ inline T ibeta_fraction2(T a, T b, T x, T y, const Policy& pol, bool normalised,
    if(p_derivative)
    {
       *p_derivative = result;
-      BOOST_ASSERT(*p_derivative >= 0);
+      BOOST_MATH_ASSERT(*p_derivative >= 0);
    }
    if(result == 0)
       return result;
@@ -736,7 +736,7 @@ T ibeta_a_step(T a, T b, T x, T y, int k, const Policy& pol, bool normalised, T*
    if(p_derivative)
    {
       *p_derivative = prefix;
-      BOOST_ASSERT(*p_derivative >= 0);
+      BOOST_MATH_ASSERT(*p_derivative >= 0);
    }
    prefix /= a;
    if(prefix == 0)
@@ -791,29 +791,29 @@ struct Pn_size
 {
    // This is likely to be enough for ~35-50 digit accuracy
    // but it's hard to quantify exactly:
-   BOOST_STATIC_CONSTANT(unsigned, value =
+   static constexpr unsigned value =
       ::boost::math::max_factorial<T>::value >= 100 ? 50
    : ::boost::math::max_factorial<T>::value >= ::boost::math::max_factorial<double>::value ? 30
-   : ::boost::math::max_factorial<T>::value >= ::boost::math::max_factorial<float>::value ? 15 : 1);
-   BOOST_STATIC_ASSERT(::boost::math::max_factorial<T>::value >= ::boost::math::max_factorial<float>::value);
+   : ::boost::math::max_factorial<T>::value >= ::boost::math::max_factorial<float>::value ? 15 : 1;
+   static_assert(::boost::math::max_factorial<T>::value >= ::boost::math::max_factorial<float>::value, "Type does not provide for 35-50 digits of accuracy.");
 };
 template <>
 struct Pn_size<float>
 {
-   BOOST_STATIC_CONSTANT(unsigned, value = 15); // ~8-15 digit accuracy
-   BOOST_STATIC_ASSERT(::boost::math::max_factorial<float>::value >= 30);
+   static constexpr unsigned value = 15; // ~8-15 digit accuracy
+   static_assert(::boost::math::max_factorial<float>::value >= 30, "Type does not provide for 8-15 digits of accuracy.");
 };
 template <>
 struct Pn_size<double>
 {
-   BOOST_STATIC_CONSTANT(unsigned, value = 30); // 16-20 digit accuracy
-   BOOST_STATIC_ASSERT(::boost::math::max_factorial<double>::value >= 60);
+   static constexpr unsigned value = 30; // 16-20 digit accuracy
+   static_assert(::boost::math::max_factorial<double>::value >= 60, "Type does not provide for 16-20 digits of accuracy.");
 };
 template <>
 struct Pn_size<long double>
 {
-   BOOST_STATIC_CONSTANT(unsigned, value = 50); // ~35-50 digit accuracy
-   BOOST_STATIC_ASSERT(::boost::math::max_factorial<long double>::value >= 100);
+   static constexpr unsigned value = 50; // ~35-50 digit accuracy
+   static_assert(::boost::math::max_factorial<long double>::value >= 100, "Type does not provide for ~35-50 digits of accuracy");
 };
 
 template <class T, class Policy>
@@ -1006,7 +1006,7 @@ T ibeta_imp(T a, T b, T x, const Policy& pol, bool inv, bool normalised, T* p_de
    T fract;
    T y = 1 - x;
 
-   BOOST_ASSERT((p_derivative == 0) || normalised);
+   BOOST_MATH_ASSERT((p_derivative == 0) || normalised);
 
    if(p_derivative)
       *p_derivative = -1; // value not set.

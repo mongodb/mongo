@@ -2,7 +2,7 @@
 // detail/impl/dev_poll_reactor.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -21,6 +21,7 @@
 
 #include <boost/asio/detail/dev_poll_reactor.hpp>
 #include <boost/asio/detail/assert.hpp>
+#include <boost/asio/detail/scheduler.hpp>
 #include <boost/asio/detail/throw_error.hpp>
 #include <boost/asio/error.hpp>
 
@@ -200,6 +201,19 @@ void dev_poll_reactor::cancel_ops(socket_type descriptor,
 {
   boost::asio::detail::mutex::scoped_lock lock(mutex_);
   cancel_ops_unlocked(descriptor, boost::asio::error::operation_aborted);
+}
+
+void dev_poll_reactor::cancel_ops_by_key(socket_type descriptor,
+    dev_poll_reactor::per_descriptor_data&,
+    int op_type, void* cancellation_key)
+{
+  boost::asio::detail::mutex::scoped_lock lock(mutex_);
+  op_queue<operation> ops;
+  bool need_interrupt = op_queue_[op_type].cancel_operations_by_key(
+      descriptor, ops, cancellation_key, boost::asio::error::operation_aborted);
+  scheduler_.post_deferred_completions(ops);
+  if (need_interrupt)
+    interrupter_.interrupt();
 }
 
 void dev_poll_reactor::deregister_descriptor(socket_type descriptor,

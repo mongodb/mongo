@@ -7,10 +7,11 @@
 #ifndef BOOST_ENABLE_IF_23022003THW_HPP
 #define BOOST_ENABLE_IF_23022003THW_HPP
 
-#include <boost/detail/workaround.hpp>
-#include <boost/mpl/identity.hpp>
-
+#include <boost/config.hpp>
 #include <boost/iterator/detail/config_def.hpp>
+#if defined(BOOST_NO_SFINAE) || defined(BOOST_NO_IS_CONVERTIBLE)
+#include <boost/type_traits/type_identity.hpp>
+#endif
 
 //
 // Boost iterators uses its own enable_if cause we need
@@ -48,7 +49,6 @@ namespace boost
       struct base
       {
 #ifdef BOOST_NO_SFINAE
-
         typedef T type;
 
         // This way to do it would give a nice error message containing
@@ -69,7 +69,7 @@ namespace boost
 # if !defined(BOOST_NO_SFINAE) && !defined(BOOST_NO_IS_CONVERTIBLE)
       : enabled<(Cond::value)>::template base<Return>
 # else
-      : mpl::identity<Return>
+      : boost::type_identity<Return>
 # endif
     {
     };

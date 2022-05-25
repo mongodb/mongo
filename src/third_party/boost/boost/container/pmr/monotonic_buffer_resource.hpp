@@ -160,18 +160,18 @@ class BOOST_CONTAINER_DECL monotonic_buffer_resource
    //!   then allocate the return block from the newly-allocated internal `current_buffer`.
    //!
    //! <b>Throws</b>: Nothing unless `upstream_resource()->allocate()` throws.
-   void* do_allocate(std::size_t bytes, std::size_t alignment) BOOST_OVERRIDE;
+   virtual void* do_allocate(std::size_t bytes, std::size_t alignment) BOOST_OVERRIDE;
 
    //! <b>Effects</b>: None
    //!
    //! <b>Throws</b>: Nothing
    //!
    //! <b>Remarks</b>: Memory used by this resource increases monotonically until its destruction.
-   void do_deallocate(void* p, std::size_t bytes, std::size_t alignment) BOOST_NOEXCEPT BOOST_OVERRIDE;
+   virtual void do_deallocate(void* p, std::size_t bytes, std::size_t alignment) BOOST_NOEXCEPT BOOST_OVERRIDE;
 
    //! <b>Returns</b>:
    //!   `this == dynamic_cast<const monotonic_buffer_resource*>(&other)`.
-   bool do_is_equal(const memory_resource& other) const BOOST_NOEXCEPT BOOST_OVERRIDE;
+   virtual bool do_is_equal(const memory_resource& other) const BOOST_NOEXCEPT BOOST_OVERRIDE;
 };
 
 }  //namespace pmr {

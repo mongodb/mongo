@@ -50,11 +50,11 @@ namespace boost { namespace spirit { namespace support { namespace detail
         typedef std::numeric_limits<value_type> limits;
 
         value_type decr_first =
-            range.first == limits::min()
+            range.first == (limits::min)()
             ? range.first : range.first-1;
 
         value_type incr_last =
-            range.last == limits::max()
+            range.last == (limits::max)()
             ? range.last : range.last+1;
 
         return (decr_first <= other.last) && (incr_last >= other.first);

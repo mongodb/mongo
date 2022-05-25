@@ -33,6 +33,7 @@
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
 #include <memory>
 

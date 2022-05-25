@@ -20,6 +20,7 @@
 #include <ostream>
 #include <boost/limits.hpp>
 #include <boost/cstdint.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <boost/date_time/date_defs.hpp>
 #include <boost/date_time/special_defs.hpp>
@@ -66,6 +67,20 @@ enum scan_method
     scan_all        //!< Scan for all files in the directory
 };
 
+//! The structure contains filesystem scanning results
+struct scan_result
+{
+    //! The number of found files
+    uintmax_t found_count;
+    //! If populated, the largest file counter that was used in the found file names
+    boost::optional< unsigned int > last_file_counter;
+
+    scan_result() BOOST_NOEXCEPT :
+        found_count(0u)
+    {
+    }
+};
+
 /*!
  * \brief Base class for file collectors
  *
@@ -81,7 +96,11 @@ struct BOOST_LOG_NO_VTABLE collector
     /*!
      * Virtual destructor
      */
+#if !defined(BOOST_LOG_NO_CXX11_DEFAULTED_VIRTUAL_FUNCTIONS)
+    BOOST_DEFAULTED_FUNCTION(virtual ~collector(), {})
+#else
     virtual ~collector() {}
+#endif
 
     /*!
      * The function stores the specified file in the storage. May lead to an older file
@@ -90,6 +109,13 @@ struct BOOST_LOG_NO_VTABLE collector
      * \param src_path The name of the file to be stored
      */
     virtual void store_file(filesystem::path const& src_path) = 0;
+
+    /*!
+     * The function checks if the specified path refers to an existing file in the storage.
+     *
+     * \param src_path The path to be checked
+     */
+    virtual bool is_in_storage(filesystem::path const& src_path) const = 0;
 
     /*!
      * Scans the target directory for the files that have already been stored. The found
@@ -110,19 +136,17 @@ struct BOOST_LOG_NO_VTABLE collector
      * \param method The method of scanning. If \c no_scan is specified, the call has no effect.
      * \param pattern The file name pattern if \a method is \c scan_matching. Otherwise the parameter
      *                is not used.
-     * \param counter If not \c NULL and \a method is \c scan_matching, the method suggests initial value
-     *                of a file counter that may be used in the file name pattern. The parameter
-     *                is not used otherwise.
-     * \return The number of found files.
+     * \return The result of filesystem scanning. The last file counter is only populated if
+     *         \a method is \c scan_matching, the \a pattern contains %N placeholder, and at least
+     *         one file matching the pattern is found.
      *
      * \note In case if \a method is \c scan_matching the effect of this function is highly dependent
      *       on the \a pattern definition. It is recommended to choose patterns with easily
      *       distinguished placeholders (i.e. having delimiters between them). Otherwise
      *       either some files can be mistakenly found or not found, which in turn may lead
-     *       to an incorrect file deletion.
+     *       to deletion of an unintended file.
      */
-    virtual uintmax_t scan_for_files(
-        scan_method method, filesystem::path const& pattern = filesystem::path(), unsigned int* counter = 0) = 0;
+    virtual scan_result scan_for_files(scan_method method, filesystem::path const& pattern = filesystem::path()) = 0;
 
     BOOST_DELETED_FUNCTION(collector(collector const&))
     BOOST_DELETED_FUNCTION(collector& operator= (collector const&))

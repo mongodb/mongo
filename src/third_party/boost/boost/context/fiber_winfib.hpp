@@ -185,19 +185,10 @@ struct BOOST_CONTEXT_DECL fiber_activation_record_initializer {
 
 struct forced_unwind {
     fiber_activation_record  *  from{ nullptr };
-#ifndef BOOST_ASSERT_IS_VOID
-    bool                        caught{ false };
-#endif
 
     explicit forced_unwind( fiber_activation_record * from_) :
         from{ from_ } {
     }
-
-#ifndef BOOST_ASSERT_IS_VOID
-    ~forced_unwind() {
-        BOOST_ASSERT( caught);
-    }
-#endif
 };
 
 template< typename Ctx, typename StackAlloc, typename Fn >
@@ -238,9 +229,6 @@ public:
 #endif  
         } catch ( forced_unwind const& ex) {
             c = Ctx{ ex.from };
-#ifndef BOOST_ASSERT_IS_VOID
-            const_cast< forced_unwind & >( ex).caught = true;
-#endif
         }
         // this context has finished its task
         from = nullptr;

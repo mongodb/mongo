@@ -137,15 +137,16 @@ struct get_static_vector_allocator
 //!possible.
 //!
 //!@par Error Handling
-//! Insertion beyond the capacity result in throwing std::bad_alloc() if exceptions are enabled or
+//! Insertion beyond the capacity result in throwing bad_alloc() if exceptions are enabled or
 //! calling throw_bad_alloc() if not enabled.
 //!
-//! std::out_of_range is thrown if out of bounds access is performed in <code>at()</code> if exceptions are
+//! out_of_range is thrown if out of bounds access is performed in <code>at()</code> if exceptions are
 //! enabled, throw_out_of_range() if not enabled.
 //!
 //!@tparam T    The type of element that will be stored.
 //!@tparam Capacity The maximum number of elements static_vector can store, fixed at compile time.
-//!@tparam Options A type produced from \c boost::container::static_vector_options.
+//!@tparam Options A type produced from \c boost::container::static_vector_options. If no option
+//! is specified, by default throw_on_overflow<true> option is set.
 template <typename T, std::size_t Capacity, class Options BOOST_CONTAINER_DOCONLY(= void) >
 class static_vector
     : public vector<T, typename dtl::get_static_vector_allocator< T, Capacity, Options>::type>
@@ -208,7 +209,8 @@ public:
     //! @param count    The number of values which will be contained in the container.
     //!
     //! @par Throws
-    //!   If T's value initialization throws.
+    //!   @li If T's value initialization throws
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -223,7 +225,8 @@ public:
     //! @param count    The number of values which will be contained in the container.
     //!
     //! @par Throws
-    //!   If T's default initialization throws.
+    //!   @li If T's default initialization throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -242,7 +245,8 @@ public:
     //! @param value    The value which will be used to copy construct values.
     //!
     //! @par Throws
-    //!   If T's copy constructor throws.
+    //!   @li If T's copy constructor throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -260,7 +264,8 @@ public:
     //! @param last     The iterator to the one after the last element in range.
     //!
     //! @par Throws
-    //!   If T's constructor taking a dereferenced Iterator throws.
+    //!   @li If T's constructor taking a dereferenced Iterator throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -278,7 +283,8 @@ public:
     //! @param il       std::initializer_list with values to initialize vector.
     //!
     //! @par Throws
-    //!   If T's constructor taking a dereferenced std::initializer_list throws.
+    //!   @li If T's constructor taking a dereferenced std::initializer_list throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -320,7 +326,8 @@ public:
     //! @param other    The static_vector which content will be copied to this one.
     //!
     //! @par Throws
-    //!   If T's copy constructor throws.
+    //!   @li If T's copy constructor throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -353,6 +360,7 @@ public:
     //! @par Throws
     //!   @li If \c has_nothrow_move<T>::value is \c true and T's move constructor throws.
     //!   @li If \c has_nothrow_move<T>::value is \c false and T's copy constructor throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -381,7 +389,8 @@ public:
     //! @param il    The std::initializer_list which content will be copied to this one.
     //!
     //! @par Throws
-    //!   If T's copy constructor or copy assignment throws.
+    //!   @li If T's copy constructor or copy assignment throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //! Linear O(N).
@@ -396,7 +405,8 @@ public:
     //! @param other    The static_vector which content will be copied to this one.
     //!
     //! @par Throws
-    //!   If T's copy constructor or copy assignment throws.
+    //!   @li If T's copy constructor or copy assignment throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -432,6 +442,7 @@ public:
     //! @par Throws
     //!   @li If \c has_nothrow_move<T>::value is \c true and T's move constructor or move assignment throws.
     //!   @li If \c has_nothrow_move<T>::value is \c false and T's copy constructor or copy assignment throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -474,6 +485,7 @@ public:
     //! @par Throws
     //!   @li If \c has_nothrow_move<T>::value is \c true and T's move constructor or move assignment throws,
     //!   @li If \c has_nothrow_move<T>::value is \c false and T's copy constructor or copy assignment throws,
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -488,7 +500,8 @@ public:
     //! @param count    The number of elements which will be stored in the container.
     //!
     //! @par Throws
-    //!   If T's value initialization throws.
+    //!   @li If T's value initialization throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -502,7 +515,8 @@ public:
     //! @param count    The number of elements which will be stored in the container.
     //!
     //! @par Throws
-    //!   If T's default initialization throws.
+    //!   @li If T's default initialization throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -520,7 +534,8 @@ public:
     //! @param value    The value used to copy construct the new element.
     //!
     //! @par Throws
-    //!   If T's copy constructor throws.
+    //!   @li If T's copy constructor throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -533,11 +548,11 @@ public:
     //! @param count    The number of elements which the container should be able to contain.
     //!
     //! @par Throws
-    //!   Nothing.
+    //!   If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
-    //!   Linear O(N).
-    void reserve(size_type count)  BOOST_NOEXCEPT_OR_NOTHROW;
+    //!   Constant O(1).
+    void reserve(size_type count);
 
     //! @pre <tt>size() < capacity()</tt>
     //!
@@ -546,7 +561,8 @@ public:
     //! @param value    The value used to copy construct the new element.
     //!
     //! @par Throws
-    //!   If T's copy constructor throws.
+    //!   @li If T's copy constructor throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Constant O(1).
@@ -559,7 +575,8 @@ public:
     //! @param value    The value to move construct the new element.
     //!
     //! @par Throws
-    //!   If T's move constructor throws.
+    //!   @li If T's move constructor throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Constant O(1).
@@ -570,11 +587,11 @@ public:
     //! @brief Destroys last value and decreases the size.
     //!
     //! @par Throws
-    //!   Nothing by default.
+    //!   Nothing.
     //!
     //! @par Complexity
     //!   Constant O(1).
-    void pop_back();
+    void pop_back() BOOST_NOEXCEPT_OR_NOTHROW;
 
     //! @pre
     //!  @li \c p must be a valid iterator of \c *this in range <tt>[begin(), end()]</tt>.
@@ -588,6 +605,7 @@ public:
     //! @par Throws
     //!   @li If T's copy constructor or copy assignment throws
     //!   @li If T's move constructor or move assignment throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Constant or linear.
@@ -603,7 +621,8 @@ public:
     //! @param value The value used to move construct the new element.
     //!
     //! @par Throws
-    //!   If T's move constructor or move assignment throws.
+    //!   @li If T's move constructor or move assignment throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Constant or linear.
@@ -622,6 +641,7 @@ public:
     //! @par Throws
     //!   @li If T's copy constructor or copy assignment throws.
     //!   @li If T's move constructor or move assignment throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -641,6 +661,7 @@ public:
     //! @par Throws
     //!   @li If T's constructor and assignment taking a dereferenced \c Iterator.
     //!   @li If T's move constructor or move assignment throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -658,6 +679,7 @@ public:
     //!
     //! @par Throws
     //!   @li If T's constructor and assignment taking a dereferenced std::initializer_list iterator.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -700,7 +722,8 @@ public:
     //! @param last        The iterator to the one after the last element of a range used to construct new content of this container.
     //!
     //! @par Throws
-    //!   If T's copy constructor or copy assignment throws,
+    //!   @li If T's copy constructor or copy assignment throws,
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -714,7 +737,8 @@ public:
     //! @param il       std::initializer_list with values used to construct new content of this container.
     //!
     //! @par Throws
-    //!   If T's copy constructor or copy assignment throws,
+    //!   @li If T's copy constructor or copy assignment throws,
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -728,7 +752,8 @@ public:
     //! @param value       The value which will be used to copy construct the new content.
     //!
     //! @par Throws
-    //!   If T's copy constructor or copy assignment throws.
+    //!   @li If T's copy constructor or copy assignment throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Linear O(N).
@@ -744,7 +769,8 @@ public:
     //! @param args     The arguments of the constructor of the new element which will be created at the end of the container.
     //!
     //! @par Throws
-    //!   If in-place constructor throws or T's move constructor throws.
+    //!   @li If in-place constructor throws or T's move constructor throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Constant O(1).
@@ -762,7 +788,8 @@ public:
     //! @param args  The arguments of the constructor of the new element.
     //!
     //! @par Throws
-    //!   If in-place constructor throws or if T's move constructor or move assignment throws.
+    //!   @li If in-place constructor throws or if T's move constructor or move assignment throws.
+    //!   @li If \c throw_on_overflow<true> option is set and the container runs out of capacity.
     //!
     //! @par Complexity
     //!   Constant or linear.
@@ -788,7 +815,7 @@ public:
     //!   from the beginning of the container.
     //!
     //! @par Throws
-    //!   \c std::out_of_range exception by default.
+    //!   \c out_of_range exception by default.
     //!
     //! @par Complexity
     //!   Constant O(1).
@@ -804,7 +831,7 @@ public:
     //!   from the beginning of the container.
     //!
     //! @par Throws
-    //!   \c std::out_of_range exception by default.
+    //!   \c out_of_range exception by default.
     //!
     //! @par Complexity
     //!   Constant O(1).
@@ -820,11 +847,11 @@ public:
     //!   from the beginning of the container.
     //!
     //! @par Throws
-    //!   Nothing by default.
+    //!   Nothing.
     //!
     //! @par Complexity
     //!   Constant O(1).
-    reference operator[](size_type i);
+    reference operator[](size_type i) BOOST_NOEXCEPT_OR_NOTHROW;
 
     //! @pre <tt>i < size()</tt>
     //!
@@ -836,11 +863,11 @@ public:
     //!   from the beginning of the container.
     //!
     //! @par Throws
-    //!   Nothing by default.
+    //!   Nothing.
     //!
     //! @par Complexity
     //!   Constant O(1).
-    const_reference operator[](size_type i) const;
+    const_reference operator[](size_type i) const BOOST_NOEXCEPT_OR_NOTHROW;
 
     //! @pre <tt>i =< size()</tt>
     //!
@@ -851,11 +878,11 @@ public:
     //! @return a iterator to the i-th element.
     //!
     //! @par Throws
-    //!   Nothing by default.
+    //!   Nothing.
     //!
     //! @par Complexity
     //!   Constant O(1).
-    iterator nth(size_type i);
+    iterator nth(size_type i) BOOST_NOEXCEPT_OR_NOTHROW;
 
     //! @pre <tt>i =< size()</tt>
     //!
@@ -870,7 +897,7 @@ public:
     //!
     //! @par Complexity
     //!   Constant O(1).
-    const_iterator nth(size_type i) const;
+    const_iterator nth(size_type i) const BOOST_NOEXCEPT_OR_NOTHROW;
 
     //! @pre <tt>begin() <= p <= end()</tt>
     //!
@@ -881,11 +908,11 @@ public:
     //! @return The index of the element pointed by p.
     //!
     //! @par Throws
-    //!   Nothing by default.
+    //!   Nothing.
     //!
     //! @par Complexity
     //!   Constant O(1).
-    size_type index_of(iterator p);
+    size_type index_of(iterator p) BOOST_NOEXCEPT_OR_NOTHROW;
 
     //! @pre <tt>begin() <= p <= end()</tt>
     //!
@@ -896,11 +923,11 @@ public:
     //! @return a const_iterator to the i-th element.
     //!
     //! @par Throws
-    //!   Nothing by default.
+    //!   Nothing.
     //!
     //! @par Complexity
     //!   Constant O(1).
-    size_type index_of(const_iterator p) const;
+    size_type index_of(const_iterator p) const BOOST_NOEXCEPT_OR_NOTHROW;
 
     //! @pre \c !empty()
     //!
@@ -910,11 +937,11 @@ public:
     //!   from the beginning of the container.
     //!
     //! @par Throws
-    //!   Nothing by default.
+    //!   Nothing.
     //!
     //! @par Complexity
     //!   Constant O(1).
-    reference front();
+    reference front() BOOST_NOEXCEPT_OR_NOTHROW;
 
     //! @pre \c !empty()
     //!
@@ -924,11 +951,11 @@ public:
     //!   from the beginning of the container.
     //!
     //! @par Throws
-    //!   Nothing by default.
+    //!   Nothing.
     //!
     //! @par Complexity
     //!   Constant O(1).
-    const_reference front() const;
+    const_reference front() const BOOST_NOEXCEPT_OR_NOTHROW;
 
     //! @pre \c !empty()
     //!
@@ -938,11 +965,11 @@ public:
     //!   from the beginning of the container.
     //!
     //! @par Throws
-    //!   Nothing by default.
+    //!   Nothing.
     //!
     //! @par Complexity
     //!   Constant O(1).
-    reference back();
+    reference back() BOOST_NOEXCEPT_OR_NOTHROW;
 
     //! @pre \c !empty()
     //!
@@ -952,11 +979,11 @@ public:
     //!   from the beginning of the container.
     //!
     //! @par Throws
-    //!   Nothing by default.
+    //!   Nothing.
     //!
     //! @par Complexity
     //!   Constant O(1).
-    const_reference back() const;
+    const_reference back() const BOOST_NOEXCEPT_OR_NOTHROW;
 
     //! @brief Pointer such that <tt>[data(), data() + size())</tt> is a valid range.
     //!   For a non-empty vector <tt>data() == &front()</tt>.

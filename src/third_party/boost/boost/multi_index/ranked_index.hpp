@@ -1,4 +1,4 @@
-/* Copyright 2003-2020 Joaquin M Lopez Munoz.
+/* Copyright 2003-2022 Joaquin M Lopez Munoz.
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
@@ -48,6 +48,21 @@ public:
   typedef typename super::allocator_type allocator_type;
   typedef typename super::iterator       iterator;
   typedef typename super::size_type      size_type;
+
+  /* set operations */
+
+  template<typename CompatibleKey>
+  size_type count(const CompatibleKey& x)const
+  {
+    return count(x,this->comp_);
+  }
+
+  template<typename CompatibleKey,typename CompatibleCompare>
+  size_type count(const CompatibleKey& x,const CompatibleCompare& comp)const
+  {
+    std::pair<size_type,size_type> p=this->equal_range_rank(x,comp);
+    return p.second-p.first;
+  }
 
   /* rank operations */
 

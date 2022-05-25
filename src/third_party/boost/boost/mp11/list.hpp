@@ -12,6 +12,8 @@
 #include <boost/mp11/detail/mp_list.hpp>
 #include <boost/mp11/detail/mp_is_list.hpp>
 #include <boost/mp11/detail/mp_append.hpp>
+#include <boost/mp11/detail/mp_front.hpp>
+#include <boost/mp11/detail/mp_rename.hpp>
 #include <boost/mp11/detail/config.hpp>
 #include <type_traits>
 
@@ -66,23 +68,7 @@ template<class L1, class L2> using mp_assign = typename detail::mp_assign_impl<L
 template<class L> using mp_clear = mp_assign<L, mp_list<>>;
 
 // mp_front<L>
-namespace detail
-{
-
-template<class L> struct mp_front_impl
-{
-// An error "no type named 'type'" here means that the argument to mp_front
-// is either not a list, or is an empty list
-};
-
-template<template<class...> class L, class T1, class... T> struct mp_front_impl<L<T1, T...>>
-{
-    using type = T1;
-};
-
-} // namespace detail
-
-template<class L> using mp_front = typename detail::mp_front_impl<L>::type;
+//   in detail/mp_front.hpp
 
 // mp_pop_front<L>
 namespace detail
@@ -184,26 +170,9 @@ template<template<class...> class L, class... U, class... T> struct mp_push_back
 template<class L, class... T> using mp_push_back = typename detail::mp_push_back_impl<L, T...>::type;
 
 // mp_rename<L, B>
-namespace detail
-{
-
-template<class A, template<class...> class B> struct mp_rename_impl
-{
-// An error "no type named 'type'" here means that the first argument to mp_rename is not a list
-};
-
-template<template<class...> class A, class... T, template<class...> class B> struct mp_rename_impl<A<T...>, B>
-{
-    using type = B<T...>;
-};
-
-} // namespace detail
-
-template<class A, template<class...> class B> using mp_rename = typename detail::mp_rename_impl<A, B>::type;
-
-template<template<class...> class F, class L> using mp_apply = typename detail::mp_rename_impl<L, F>::type;
-
-template<class Q, class L> using mp_apply_q = typename detail::mp_rename_impl<L, Q::template fn>::type;
+// mp_apply<F, L>
+// mp_apply_q<Q, L>
+//   in detail/mp_rename.hpp
 
 // mp_replace_front<L, T>
 namespace detail

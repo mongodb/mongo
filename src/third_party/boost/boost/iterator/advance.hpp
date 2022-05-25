@@ -8,6 +8,7 @@
 #define BOOST_ITERATOR_ADVANCE_HPP
 
 #include <boost/config.hpp>
+#include <boost/detail/workaround.hpp>
 #include <boost/iterator/iterator_categories.hpp>
 
 namespace boost {
@@ -27,6 +28,12 @@ namespace iterators {
                 --n;
             }
         }
+
+#if BOOST_WORKAROUND(BOOST_GCC_VERSION, >= 40600)
+// type-limits warning issued below when n is an unsigned integral
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wtype-limits"
+#endif
 
         template <typename BidirectionalIterator, typename Distance>
         inline BOOST_CXX14_CONSTEXPR void
@@ -49,6 +56,10 @@ namespace iterators {
                 }
             }
         }
+
+#if BOOST_WORKAROUND(BOOST_GCC_VERSION, >= 40600)
+#pragma GCC diagnostic pop
+#endif
 
         template <typename RandomAccessIterator, typename Distance>
         inline BOOST_CXX14_CONSTEXPR void

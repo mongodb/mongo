@@ -66,7 +66,7 @@ struct CtorArgN : public placement_destroy<T>
 
    virtual void construct_n(void *mem
                      , std::size_t num
-                     , std::size_t &constructed)
+                     , std::size_t &constructed) BOOST_OVERRIDE
    {
       T* memory      = static_cast<T*>(mem);
       for(constructed = 0; constructed < num; ++constructed){
@@ -200,7 +200,7 @@ struct CtorArg##N : placement_destroy<T>\
    CtorArg##N ( BOOST_MOVE_UREF##N  )\
       BOOST_MOVE_COLON##N BOOST_MOVE_FWD_INIT##N{}\
    \
-   virtual void construct_n(void *mem, std::size_t num, std::size_t &constructed)\
+   virtual void construct_n(void *mem, std::size_t num, std::size_t &constructed) BOOST_OVERRIDE\
    {\
       T* memory      = static_cast<T*>(mem);\
       for(constructed = 0; constructed < num; ++constructed){\
@@ -230,7 +230,7 @@ struct CtorIt##N : public placement_destroy<T>\
    CtorIt##N ( BOOST_MOVE_VAL##N  )\
       BOOST_MOVE_COLON##N BOOST_MOVE_VAL_INIT##N{}\
    \
-   virtual void construct_n(void *mem, std::size_t num, std::size_t &constructed)\
+   virtual void construct_n(void *mem, std::size_t num, std::size_t &constructed) BOOST_OVERRIDE\
    {\
       T* memory      = static_cast<T*>(mem);\
       for(constructed = 0; constructed < num; ++constructed){\

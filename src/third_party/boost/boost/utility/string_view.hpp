@@ -23,7 +23,6 @@
 #include <boost/io/ostream_put.hpp>
 #include <boost/utility/string_view_fwd.hpp>
 #include <boost/throw_exception.hpp>
-#include <boost/container_hash/hash_fwd.hpp>
 
 #include <cstddef>
 #include <stdexcept>
@@ -651,6 +650,9 @@ namespace boost {
         return std::stold ( std::wstring(str), idx );
         }
 #endif
+
+    // Forward declaration of Boost.ContainerHash function
+    template <class It> std::size_t hash_range(It, It);
 
     template <class charT, class traits>
     std::size_t hash_value(basic_string_view<charT, traits> s) {

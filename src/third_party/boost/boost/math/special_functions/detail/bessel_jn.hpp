@@ -66,7 +66,7 @@ T bessel_jn(int n, T x, const Policy& pol)
         return static_cast<T>(0);
     }
 
-    BOOST_ASSERT(n > 1);
+    BOOST_MATH_ASSERT(n > 1);
     T scale = 1;
     if (n < abs(x))                         // forward recurrence
     {

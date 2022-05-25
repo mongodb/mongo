@@ -2,7 +2,7 @@
 // posix/basic_stream_descriptor.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -16,7 +16,7 @@
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include <boost/asio/detail/config.hpp>
-#include <boost/asio/posix/descriptor.hpp>
+#include <boost/asio/posix/basic_descriptor.hpp>
 
 #if defined(BOOST_ASIO_HAS_POSIX_STREAM_DESCRIPTOR) \
   || defined(GENERATING_DOCUMENTATION)
@@ -155,7 +155,7 @@ public:
    * constructor.
    */
   basic_stream_descriptor(basic_stream_descriptor&& other) BOOST_ASIO_NOEXCEPT
-    : descriptor(std::move(other))
+    : basic_descriptor<Executor>(std::move(other))
   {
   }
 
@@ -173,7 +173,7 @@ public:
    */
   basic_stream_descriptor& operator=(basic_stream_descriptor&& other)
   {
-    descriptor::operator=(std::move(other));
+    basic_descriptor<Executor>::operator=(std::move(other));
     return *this;
   }
 #endif // defined(BOOST_ASIO_HAS_MOVE) || defined(GENERATING_DOCUMENTATION)
@@ -242,24 +242,30 @@ public:
   /// Start an asynchronous write.
   /**
    * This function is used to asynchronously write data to the stream
-   * descriptor. The function call always returns immediately.
+   * descriptor. It is an initiating function for an @ref
+   * asynchronous_operation, and always returns immediately.
    *
    * @param buffers One or more data buffers to be written to the descriptor.
    * Although the buffers object may be copied as necessary, ownership of the
    * underlying memory blocks is retained by the caller, which must guarantee
-   * that they remain valid until the handler is called.
+   * that they remain valid until the completion handler is called.
    *
-   * @param handler The handler to be called when the write operation completes.
-   * Copies will be made of the handler as required. The function signature of
-   * the handler must be:
+   * @param token The @ref completion_token that will be used to produce a
+   * completion handler, which will be called when the write completes.
+   * Potential completion tokens include @ref use_future, @ref use_awaitable,
+   * @ref yield_context, or a function object with the correct completion
+   * signature. The function signature of the completion handler must be:
    * @code void handler(
    *   const boost::system::error_code& error, // Result of operation.
-   *   std::size_t bytes_transferred           // Number of bytes written.
+   *   std::size_t bytes_transferred // Number of bytes written.
    * ); @endcode
    * Regardless of whether the asynchronous operation completes immediately or
-   * not, the handler will not be invoked from within this function. On
-   * immediate completion, invocation of the handler will be performed in a
+   * not, the completion handler will not be invoked from within this function.
+   * On immediate completion, invocation of the handler will be performed in a
    * manner equivalent to using boost::asio::post().
+   *
+   * @par Completion Signature
+   * @code void(boost::system::error_code, std::size_t) @endcode
    *
    * @note The write operation may not transmit all of the data to the peer.
    * Consider using the @ref async_write function if you need to ensure that all
@@ -273,20 +279,30 @@ public:
    * See the @ref buffer documentation for information on writing multiple
    * buffers in one go, and how to use it with arrays, boost::array or
    * std::vector.
+   *
+   * @par Per-Operation Cancellation
+   * This asynchronous operation supports cancellation for the following
+   * boost::asio::cancellation_type values:
+   *
+   * @li @c cancellation_type::terminal
+   *
+   * @li @c cancellation_type::partial
+   *
+   * @li @c cancellation_type::total
    */
   template <typename ConstBufferSequence,
       BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
-        std::size_t)) WriteHandler
+        std::size_t)) WriteToken
           BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
-  BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(WriteHandler,
+  BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(WriteToken,
       void (boost::system::error_code, std::size_t))
   async_write_some(const ConstBufferSequence& buffers,
-      BOOST_ASIO_MOVE_ARG(WriteHandler) handler
+      BOOST_ASIO_MOVE_ARG(WriteToken) token
         BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
   {
-    return async_initiate<WriteHandler,
+    return async_initiate<WriteToken,
       void (boost::system::error_code, std::size_t)>(
-        initiate_async_write_some(this), handler, buffers);
+        initiate_async_write_some(this), token, buffers);
   }
 
   /// Read some data from the descriptor.
@@ -355,24 +371,30 @@ public:
   /// Start an asynchronous read.
   /**
    * This function is used to asynchronously read data from the stream
-   * descriptor. The function call always returns immediately.
+   * descriptor. It is an initiating function for an @ref
+   * asynchronous_operation, and always returns immediately.
    *
    * @param buffers One or more buffers into which the data will be read.
    * Although the buffers object may be copied as necessary, ownership of the
    * underlying memory blocks is retained by the caller, which must guarantee
-   * that they remain valid until the handler is called.
+   * that they remain valid until the completion handler is called.
    *
-   * @param handler The handler to be called when the read operation completes.
-   * Copies will be made of the handler as required. The function signature of
-   * the handler must be:
+   * @param token The @ref completion_token that will be used to produce a
+   * completion handler, which will be called when the read completes.
+   * Potential completion tokens include @ref use_future, @ref use_awaitable,
+   * @ref yield_context, or a function object with the correct completion
+   * signature. The function signature of the completion handler must be:
    * @code void handler(
    *   const boost::system::error_code& error, // Result of operation.
-   *   std::size_t bytes_transferred           // Number of bytes read.
+   *   std::size_t bytes_transferred // Number of bytes read.
    * ); @endcode
    * Regardless of whether the asynchronous operation completes immediately or
-   * not, the handler will not be invoked from within this function. On
-   * immediate completion, invocation of the handler will be performed in a
+   * not, the completion handler will not be invoked from within this function.
+   * On immediate completion, invocation of the handler will be performed in a
    * manner equivalent to using boost::asio::post().
+   *
+   * @par Completion Signature
+   * @code void(boost::system::error_code, std::size_t) @endcode
    *
    * @note The read operation may not read all of the requested number of bytes.
    * Consider using the @ref async_read function if you need to ensure that the
@@ -387,20 +409,30 @@ public:
    * See the @ref buffer documentation for information on reading into multiple
    * buffers in one go, and how to use it with arrays, boost::array or
    * std::vector.
+   *
+   * @par Per-Operation Cancellation
+   * This asynchronous operation supports cancellation for the following
+   * boost::asio::cancellation_type values:
+   *
+   * @li @c cancellation_type::terminal
+   *
+   * @li @c cancellation_type::partial
+   *
+   * @li @c cancellation_type::total
    */
   template <typename MutableBufferSequence,
       BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
-        std::size_t)) ReadHandler
+        std::size_t)) ReadToken
           BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
-  BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(ReadHandler,
+  BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(ReadToken,
       void (boost::system::error_code, std::size_t))
   async_read_some(const MutableBufferSequence& buffers,
-      BOOST_ASIO_MOVE_ARG(ReadHandler) handler
+      BOOST_ASIO_MOVE_ARG(ReadToken) token
         BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
   {
-    return async_initiate<ReadHandler,
+    return async_initiate<ReadToken,
       void (boost::system::error_code, std::size_t)>(
-        initiate_async_read_some(this), handler, buffers);
+        initiate_async_read_some(this), token, buffers);
   }
 
 private:

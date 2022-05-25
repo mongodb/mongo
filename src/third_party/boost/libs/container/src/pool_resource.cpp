@@ -176,7 +176,7 @@ pool_resource::pool_resource(const pool_options& opts) BOOST_NOEXCEPT
    : m_options(opts), m_upstream(*get_default_resource()), m_oversized_list(), m_pool_data(), m_pool_count()
 {  this->priv_constructor_body();  }
 
-pool_resource::~pool_resource() //virtual
+pool_resource::~pool_resource()
 {
    this->release();
 
@@ -203,7 +203,7 @@ memory_resource* pool_resource::upstream_resource() const
 pool_options pool_resource::options() const
 {  return m_options; }
 
-void* pool_resource::do_allocate(std::size_t bytes, std::size_t alignment) //virtual
+void* pool_resource::do_allocate(std::size_t bytes, std::size_t alignment)
 {
    if(!m_pool_data){
       this->priv_init_pools();
@@ -224,7 +224,7 @@ void* pool_resource::do_allocate(std::size_t bytes, std::size_t alignment) //vir
    }
 }
 
-void pool_resource::do_deallocate(void* p, std::size_t bytes, std::size_t alignment) //virtual
+void pool_resource::do_deallocate(void* p, std::size_t bytes, std::size_t alignment)
 {
    (void)alignment;  //alignment ignored here, max_align is used by pools
    if(bytes > m_options.largest_required_pool_block){
@@ -236,10 +236,6 @@ void pool_resource::do_deallocate(void* p, std::size_t bytes, std::size_t alignm
       return m_pool_data[pool_idx].deallocate_block(p);
    }
 }
-
-bool pool_resource::do_is_equal(const memory_resource& other) const BOOST_NOEXCEPT //virtual
-{  return this == dynamic_cast<const pool_resource*>(&other);  }
-
 
 std::size_t pool_resource::pool_count() const
 {

@@ -23,11 +23,13 @@
 
 #include <boost/container/detail/addressof.hpp>
 #include <boost/container/detail/mpl.hpp>
-#include <boost/container/detail/pair.hpp>
+#include <boost/container/detail/is_pair.hpp>
 #include <boost/container/detail/type_traits.hpp>
 
 #if defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
 #include <boost/move/detail/fwd_macros.hpp>
+#else
+#include <boost/container/detail/variadic_templates_tools.hpp>
 #endif
 #include <boost/move/utility_core.hpp>
 

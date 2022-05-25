@@ -2,7 +2,7 @@
 // impl/handler_alloc_hook.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -16,6 +16,7 @@
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include <boost/asio/detail/config.hpp>
+#include <boost/asio/detail/memory.hpp>
 #include <boost/asio/detail/thread_context.hpp>
 #include <boost/asio/detail/thread_info_base.hpp>
 #include <boost/asio/handler_alloc_hook.hpp>
@@ -35,7 +36,7 @@ asio_handler_allocate(std::size_t size, ...)
   return detail::thread_info_base::allocate(
       detail::thread_context::top_of_thread_call_stack(), size);
 #else // !defined(BOOST_ASIO_DISABLE_SMALL_BLOCK_RECYCLING)
-  return ::operator new(size);
+  return aligned_new(BOOST_ASIO_DEFAULT_ALIGN, size);
 #endif // !defined(BOOST_ASIO_DISABLE_SMALL_BLOCK_RECYCLING)
 }
 
@@ -51,7 +52,7 @@ asio_handler_deallocate(void* pointer, std::size_t size, ...)
       detail::thread_context::top_of_thread_call_stack(), pointer, size);
 #else // !defined(BOOST_ASIO_DISABLE_SMALL_BLOCK_RECYCLING)
   (void)size;
-  ::operator delete(pointer);
+  aligned_delete(pointer)
 #endif // !defined(BOOST_ASIO_DISABLE_SMALL_BLOCK_RECYCLING)
 }
 

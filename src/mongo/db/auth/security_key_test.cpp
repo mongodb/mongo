@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_manager.h"

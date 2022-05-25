@@ -15,7 +15,7 @@ http://www.boost.org/LICENSE_1_0.txt)
 = `BOOST_LANG_STDC`
 
 http://en.wikipedia.org/wiki/C_(programming_language)[Standard C] language.
-If available, the year of the standard is detected as YYYY.MM.1 from the Epoc date.
+If available, the year of the standard is detected as YYYY.MM.1 from the Epoch date.
 
 [options="header"]
 |===

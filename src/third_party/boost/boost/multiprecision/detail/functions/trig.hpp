@@ -12,6 +12,10 @@
 // This file has no include guards or namespaces - it's expanded inline inside default_ops.hpp
 //
 
+#include <boost/multiprecision/detail/standalone_config.hpp>
+#include <boost/multiprecision/detail/no_exceptions_support.hpp>
+#include <boost/multiprecision/detail/assert.hpp>
+
 #ifdef BOOST_MSVC
 #pragma warning(push)
 #pragma warning(disable : 6326) // comparison of two constants
@@ -68,7 +72,7 @@ void hyp0F1(T& result, const T& b, const T& x)
    }
 
    if (n >= series_limit)
-      BOOST_THROW_EXCEPTION(std::runtime_error("H0F1 Failed to Converge"));
+      BOOST_MP_THROW_EXCEPTION(std::runtime_error("H0F1 Failed to Converge"));
 }
 
 template <class T, unsigned N, bool b = boost::multiprecision::detail::is_variable_precision<boost::multiprecision::number<T> >::value>
@@ -86,14 +90,14 @@ struct scoped_N_precision<T, N, true>
    unsigned old_precision, old_arg_precision;
    scoped_N_precision(T& arg)
    {
-      old_precision = T::default_precision();
+      old_precision     = T::thread_default_precision();
       old_arg_precision = arg.precision();
-      T::default_precision(old_arg_precision * N);
+      T::thread_default_precision(old_arg_precision * N);
       arg.precision(old_arg_precision * N);
    }
    ~scoped_N_precision()
    {
-      T::default_precision(old_precision);
+      T::thread_default_precision(old_precision);
    }
    void reduce(T& arg) 
    {
@@ -133,6 +137,7 @@ void reduce_n_half_pi(T& arg, const T& n, bool go_down)
    reduction_type reduction = get_constant_pi<reduction_type>();
    eval_ldexp(reduction, reduction, -1); // divide by 2
    eval_multiply(reduction, n);
+
    BOOST_MATH_INSTRUMENT_CODE(big_arg.str(10, std::ios_base::scientific));
    BOOST_MATH_INSTRUMENT_CODE(reduction.str(10, std::ios_base::scientific));
 
@@ -177,7 +182,7 @@ void eval_sin(T& result, const T& x)
          errno  = EDOM;
       }
       else
-         BOOST_THROW_EXCEPTION(std::domain_error("Result is undefined or complex and there is no NaN for this number type."));
+         BOOST_MP_THROW_EXCEPTION(std::domain_error("Result is undefined or complex and there is no NaN for this number type."));
       return;
    case FP_ZERO:
       result = x;
@@ -262,8 +267,8 @@ void eval_sin(T& result, const T& x)
 
       BOOST_MATH_INSTRUMENT_CODE(xx.str(0, std::ios_base::scientific));
       BOOST_MATH_INSTRUMENT_CODE(n_pi.str(0, std::ios_base::scientific));
-      BOOST_ASSERT(xx.compare(half_pi) <= 0);
-      BOOST_ASSERT(xx.compare(ui_type(0)) >= 0);
+      BOOST_MP_ASSERT(xx.compare(half_pi) <= 0);
+      BOOST_MP_ASSERT(xx.compare(ui_type(0)) >= 0);
    }
 
    t = half_pi;
@@ -369,7 +374,7 @@ void eval_cos(T& result, const T& x)
          errno  = EDOM;
       }
       else
-         BOOST_THROW_EXCEPTION(std::domain_error("Result is undefined or complex and there is no NaN for this number type."));
+         BOOST_MP_THROW_EXCEPTION(std::domain_error("Result is undefined or complex and there is no NaN for this number type."));
       return;
    case FP_ZERO:
       result = ui_type(1);
@@ -399,6 +404,20 @@ void eval_cos(T& result, const T& x)
    {
       eval_divide(t, xx, half_pi);
       eval_trunc(n_pi, t);
+      //
+      // If n_pi is > 1/epsilon, then it is no longer an exact integer value
+      // but an approximation.  As a result we can no longer reliably reduce
+      // xx to 0 <= xx < pi/2, nor can we tell the sign of the result as we need
+      // n_pi % 4 for that, but that will always be zero in this situation.
+      // We could use a higher precision type for n_pi, along with division at
+      // higher precision, but that's rather expensive.  So for now we do not support
+      // this, and will see if anyone complains and has a legitimate use case.
+      //
+      if (n_pi.compare(get_constant_one_over_epsilon<T>()) > 0)
+      {
+         result = ui_type(1);
+         return;
+      }
       BOOST_MATH_INSTRUMENT_CODE(n_pi.str(0, std::ios_base::scientific));
       t = ui_type(4);
       eval_fmod(t, n_pi, t);
@@ -419,25 +438,11 @@ void eval_cos(T& result, const T& x)
       }
       else
       {
-         BOOST_ASSERT(t.compare(ui_type(3)) == 0);
+         BOOST_MP_ASSERT(t.compare(ui_type(3)) == 0);
       }
 
       if (b_go_down)
          eval_increment(n_pi);
-      //
-      // If n_pi is > 1/epsilon, then it is no longer an exact integer value
-      // but an approximation.  As a result we can no longer reliably reduce
-      // xx to 0 <= xx < pi/2, nor can we tell the sign of the result as we need
-      // n_pi % 4 for that, but that will always be zero in this situation.
-      // We could use a higher precision type for n_pi, along with division at
-      // higher precision, but that's rather expensive.  So for now we do not support
-      // this, and will see if anyone complains and has a legitimate use case.
-      //
-      if (n_pi.compare(get_constant_one_over_epsilon<T>()) > 0)
-      {
-         result = ui_type(1);
-         return;
-      }
 
       reduce_n_half_pi(xx, n_pi, b_go_down);
       //
@@ -456,8 +461,8 @@ void eval_cos(T& result, const T& x)
          eval_subtract(xx, half_pi, xx);
          eval_ldexp(half_pi, half_pi, -1);
       }
-      BOOST_ASSERT(xx.compare(half_pi) <= 0);
-      BOOST_ASSERT(xx.compare(ui_type(0)) >= 0);
+      BOOST_MP_ASSERT(xx.compare(half_pi) <= 0);
+      BOOST_MP_ASSERT(xx.compare(ui_type(0)) >= 0);
    }
    else
    {
@@ -556,7 +561,7 @@ void hyp2F1(T& result, const T& a, const T& b, const T& c, const T& x)
          break;
    }
    if (n > series_limit)
-      BOOST_THROW_EXCEPTION(std::runtime_error("H2F1 failed to converge."));
+      BOOST_MP_THROW_EXCEPTION(std::runtime_error("H2F1 failed to converge."));
 }
 
 template <class T>
@@ -583,7 +588,7 @@ void eval_asin(T& result, const T& x)
          errno  = EDOM;
       }
       else
-         BOOST_THROW_EXCEPTION(std::domain_error("Result is undefined or complex and there is no NaN for this number type."));
+         BOOST_MP_THROW_EXCEPTION(std::domain_error("Result is undefined or complex and there is no NaN for this number type."));
       return;
    case FP_ZERO:
       result = x;
@@ -606,7 +611,7 @@ void eval_asin(T& result, const T& x)
          errno  = EDOM;
       }
       else
-         BOOST_THROW_EXCEPTION(std::domain_error("Result is undefined or complex and there is no NaN for this number type."));
+         BOOST_MP_THROW_EXCEPTION(std::domain_error("Result is undefined or complex and there is no NaN for this number type."));
       return;
    }
    else if (c == 0)
@@ -705,7 +710,7 @@ inline void eval_acos(T& result, const T& x)
          errno  = EDOM;
       }
       else
-         BOOST_THROW_EXCEPTION(std::domain_error("Result is undefined or complex and there is no NaN for this number type."));
+         BOOST_MP_THROW_EXCEPTION(std::domain_error("Result is undefined or complex and there is no NaN for this number type."));
       return;
    case FP_ZERO:
       result = get_constant_pi<T>();
@@ -725,7 +730,7 @@ inline void eval_acos(T& result, const T& x)
          errno  = EDOM;
       }
       else
-         BOOST_THROW_EXCEPTION(std::domain_error("Result is undefined or complex and there is no NaN for this number type."));
+         BOOST_MP_THROW_EXCEPTION(std::domain_error("Result is undefined or complex and there is no NaN for this number type."));
       return;
    }
    else if (c == 0)

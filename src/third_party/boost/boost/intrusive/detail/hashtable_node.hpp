@@ -98,10 +98,10 @@ struct bucket_traits_impl
       buckets_ = x.buckets_;  buckets_len_ = x.buckets_len_; return *this;
    }
 
-   BOOST_INTRUSIVE_FORCEINLINE const bucket_ptr &bucket_begin() const
+   BOOST_INTRUSIVE_FORCEINLINE bucket_ptr bucket_begin() const
    {  return buckets_;  }
 
-   BOOST_INTRUSIVE_FORCEINLINE size_type  bucket_count() const
+   BOOST_INTRUSIVE_FORCEINLINE size_type  bucket_count() const BOOST_NOEXCEPT
    {  return buckets_len_;  }
 
    private:
@@ -242,7 +242,7 @@ class hashtable_iterator
          (downcast_bucket(slist_it_.pointed_node()));
    }
 
-   BOOST_INTRUSIVE_FORCEINLINE const const_bucketvaltraits_ptr &get_bucket_value_traits() const
+   BOOST_INTRUSIVE_FORCEINLINE const_bucketvaltraits_ptr get_bucket_value_traits() const
    {  return traitsptr_;  }
 
    BOOST_INTRUSIVE_FORCEINLINE const value_traits &priv_value_traits() const

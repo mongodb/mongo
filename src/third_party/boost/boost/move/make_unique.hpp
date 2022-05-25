@@ -38,11 +38,21 @@
  
 #if !defined(BOOST_MOVE_DOXYGEN_INVOKED)
 
+#if defined(_MSC_VER) && (_MSC_VER >= 1915)
+   #pragma warning (push)
+   #pragma warning (disable : 4643) // Forward declaring 'X' in namespace std is not permitted by the C++ Standard
+#endif
+
 namespace std {   //no namespace versioning in clang+libc++
 
 struct nothrow_t;
 
 }  //namespace std {
+
+#if defined(_MSC_VER) && (_MSC_VER >= 1915)
+   #pragma warning (pop)
+#endif
+
 
 namespace boost{
 namespace move_upmu {

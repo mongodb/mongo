@@ -1,4 +1,4 @@
-/* Copyright 2003-2020 Joaquin M Lopez Munoz.
+/* Copyright 2003-2021 Joaquin M Lopez Munoz.
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
@@ -34,6 +34,7 @@
 #include <boost/multi_index/detail/do_not_copy_elements_tag.hpp>
 #include <boost/multi_index/detail/hash_index_iterator.hpp>
 #include <boost/multi_index/detail/index_node_base.hpp>
+#include <boost/multi_index/detail/invalidate_iterators.hpp>
 #include <boost/multi_index/detail/modify_key_adaptor.hpp>
 #include <boost/multi_index/detail/node_handle.hpp>
 #include <boost/multi_index/detail/promotes_arg.hpp>
@@ -82,18 +83,17 @@ namespace detail{
  * Category tags defined in hash_index_node.hpp.
  */
 
+#if defined(BOOST_MSVC)
+#pragma warning(push)
+#pragma warning(disable:4355) /* this used in base member initializer list */
+#endif
+
 template<
   typename KeyFromValue,typename Hash,typename Pred,
   typename SuperMeta,typename TagList,typename Category
 >
 class hashed_index:
   BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS SuperMeta::type
-
-#if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-  ,public safe_mode::safe_container<
-    hashed_index<KeyFromValue,Hash,Pred,SuperMeta,TagList,Category> >
-#endif
-
 { 
 #if defined(BOOST_MULTI_INDEX_ENABLE_INVARIANT_CHECKING)&&\
     BOOST_WORKAROUND(__MWERKS__,<=0x3003)
@@ -103,6 +103,12 @@ class hashed_index:
  */
 
 #pragma parse_mfunc_templ off
+#endif
+
+#if !defined(BOOST_NO_MEMBER_TEMPLATE_FRIENDS)
+  /* cross-index access */
+
+  template <typename,typename,typename> friend class index_base;
 #endif
 
   typedef typename SuperMeta::type               super;
@@ -148,8 +154,7 @@ public:
     hashed_index_iterator<
       index_node_type,bucket_array_type,
       Category,
-      hashed_index_global_iterator_tag>,
-    hashed_index>                                iterator;
+      hashed_index_global_iterator_tag> >        iterator;
 #else
   typedef hashed_index_iterator<
     index_node_type,bucket_array_type,
@@ -191,19 +196,16 @@ protected:
 
 private:
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-  typedef safe_mode::safe_container<
-    hashed_index>                             safe_super;
+  typedef safe_mode::safe_container<iterator> safe_container;
 #endif
 
   typedef typename call_traits<value_type>::param_type value_param_type;
   typedef typename call_traits<
     key_type>::param_type                              key_param_type;
 
-  /* Needed to avoid commas in BOOST_MULTI_INDEX_OVERLOADS_TO_VARTEMPL
-   * expansion.
-   */
+  /* needed to avoid commas in some macros */
 
-  typedef std::pair<iterator,bool>                     emplace_return_type;
+  typedef std::pair<iterator,bool>                     pair_return_type;
 
 public:
 
@@ -273,7 +275,7 @@ public:
   /* modifiers */
 
   BOOST_MULTI_INDEX_OVERLOADS_TO_VARTEMPL(
-    emplace_return_type,emplace,emplace_impl)
+    pair_return_type,emplace,emplace_impl)
 
   BOOST_MULTI_INDEX_OVERLOADS_TO_VARTEMPL_EXTRA_ARG(
     iterator,emplace_hint,emplace_hint_impl,iterator,position)
@@ -508,6 +510,73 @@ public:
     this->final_swap_(x.final());
   }
 
+  template<typename Index>
+  BOOST_MULTI_INDEX_ENABLE_IF_MERGEABLE(hashed_index,Index,void)
+  merge(Index& x)
+  {
+    merge(x,x.begin(),x.end());
+  }
+
+  template<typename Index>
+  BOOST_MULTI_INDEX_ENABLE_IF_MERGEABLE(hashed_index,Index,void)
+  merge(BOOST_RV_REF(Index) x){merge(static_cast<Index&>(x));}
+
+  template<typename Index>
+  BOOST_MULTI_INDEX_ENABLE_IF_MERGEABLE(hashed_index,Index,pair_return_type)
+  merge(Index& x,BOOST_DEDUCED_TYPENAME Index::iterator i)
+  {
+    BOOST_MULTI_INDEX_CHECK_VALID_ITERATOR(i);
+    BOOST_MULTI_INDEX_CHECK_DEREFERENCEABLE_ITERATOR(i);
+    BOOST_MULTI_INDEX_CHECK_IS_OWNER(i,x);
+    BOOST_MULTI_INDEX_CHECK_EQUAL_ALLOCATORS(*this,x);
+    BOOST_MULTI_INDEX_HASHED_INDEX_CHECK_INVARIANT;
+    if(x.end().get_node()==this->header()){ /* same container */
+      return std::pair<iterator,bool>(
+        make_iterator(static_cast<final_node_type*>(i.get_node())),true);
+    }
+    else{
+      std::pair<final_node_type*,bool> p=this->final_transfer_(
+        x,static_cast<final_node_type*>(i.get_node()));
+      return std::pair<iterator,bool>(make_iterator(p.first),p.second);
+    }
+  }
+
+  template<typename Index>
+  BOOST_MULTI_INDEX_ENABLE_IF_MERGEABLE(hashed_index,Index,pair_return_type)
+  merge(BOOST_RV_REF(Index) x,BOOST_DEDUCED_TYPENAME Index::iterator i)
+  {
+    return merge(static_cast<Index&>(x),i);
+  }
+
+  template<typename Index>
+  BOOST_MULTI_INDEX_ENABLE_IF_MERGEABLE(hashed_index,Index,void)
+  merge(
+    Index& x,
+    BOOST_DEDUCED_TYPENAME Index::iterator first,
+    BOOST_DEDUCED_TYPENAME Index::iterator last)
+  {
+    BOOST_MULTI_INDEX_CHECK_VALID_ITERATOR(first);
+    BOOST_MULTI_INDEX_CHECK_VALID_ITERATOR(last);
+    BOOST_MULTI_INDEX_CHECK_IS_OWNER(first,x);
+    BOOST_MULTI_INDEX_CHECK_IS_OWNER(last,x);
+    BOOST_MULTI_INDEX_CHECK_VALID_RANGE(first,last);
+    BOOST_MULTI_INDEX_CHECK_EQUAL_ALLOCATORS(*this,x);
+    BOOST_MULTI_INDEX_HASHED_INDEX_CHECK_INVARIANT;
+    if(x.end().get_node()!=this->header()){ /* different containers */
+      this->final_transfer_range_(x,first,last);
+    }
+  }
+
+  template<typename Index>
+  BOOST_MULTI_INDEX_ENABLE_IF_MERGEABLE(hashed_index,Index,void)
+  merge(
+    BOOST_RV_REF(Index) x,
+    BOOST_DEDUCED_TYPENAME Index::iterator first,
+    BOOST_DEDUCED_TYPENAME Index::iterator last)
+  {
+    merge(static_cast<Index&>(x),first,last);
+  }
+
   /* observers */
 
   key_from_value key_extractor()const{return key;}
@@ -557,6 +626,22 @@ public:
   {
     return count(
       k,hash,eq,promotes_1st_arg<CompatiblePred,CompatibleKey,key_type>());
+  }
+
+  template<typename CompatibleKey>
+  bool contains(const CompatibleKey& k)const
+  {
+    return contains(k,hash_,eq_);
+  }
+
+  template<
+    typename CompatibleKey,typename CompatibleHash,typename CompatiblePred
+  >
+  bool contains(
+    const CompatibleKey& k,
+    const CompatibleHash& hash,const CompatiblePred& eq)const
+  {
+    return find(k,hash,eq)!=end();
   }
 
   template<typename CompatibleKey>
@@ -671,6 +756,11 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
     eq_(tuples::get<3>(args_list.get_head())),
     buckets(al,header()->impl(),tuples::get<0>(args_list.get_head())),
     mlf(1.0f)
+
+#if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
+    ,safe(*this)
+#endif
+
   {
     calculate_max_load();
   }
@@ -678,17 +768,17 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
   hashed_index(
     const hashed_index<KeyFromValue,Hash,Pred,SuperMeta,TagList,Category>& x):
     super(x),
-
-#if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-    safe_super(),
-#endif
-
     key(x.key),
     hash_(x.hash_),
     eq_(x.eq_),
     buckets(x.get_allocator(),header()->impl(),x.buckets.size()),
     mlf(x.mlf),
     max_load(x.max_load)
+
+#if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
+    ,safe(*this)
+#endif
+
   {
     /* Copy ctor just takes the internal configuration objects from x. The rest
      * is done in subsequent call to copy_().
@@ -699,16 +789,16 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
     const hashed_index<KeyFromValue,Hash,Pred,SuperMeta,TagList,Category>& x,
     do_not_copy_elements_tag):
     super(x,do_not_copy_elements_tag()),
-
-#if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-    safe_super(),
-#endif
-
     key(x.key),
     hash_(x.hash_),
     eq_(x.eq_),
     buckets(x.get_allocator(),header()->impl(),0),
     mlf(1.0f)
+
+#if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
+    ,safe(*this)
+#endif
+
   {
      calculate_max_load();
   }
@@ -721,12 +811,12 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
   iterator make_iterator(index_node_type* node)
   {
-    return iterator(node,this);
+    return iterator(node,&safe);
   }
 
   const_iterator make_iterator(index_node_type* node)const
   {
-    return const_iterator(node,const_cast<hashed_index*>(this));
+    return const_iterator(node,const_cast<safe_container*>(&safe));
   }
 #else
   iterator make_iterator(index_node_type* node)
@@ -878,13 +968,14 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
     return res;
   }
 
-  void extract_(index_node_type* x)
+  template<typename Dst>
+  void extract_(index_node_type* x,Dst dst)
   {
     unlink(x);
-    super::extract_(x);
+    super::extract_(x,dst.next());
 
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-    detach_iterators(x);
+    transfer_iterators(dst.get(),x);
 #endif
   }
 
@@ -928,7 +1019,7 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
     buckets.clear(header()->impl());
 
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-    safe_super::detach_dereferenceable_iterators();
+    safe.detach_dereferenceable_iterators();
 #endif
   }
 
@@ -945,7 +1036,7 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
     std::swap(max_load,x.max_load);
 
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-    safe_super::swap(x);
+    safe.swap(x.safe);
 #endif
 
     super::swap_(x,swap_allocators);
@@ -959,7 +1050,7 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
     std::swap(max_load,x.max_load);
 
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-    safe_super::swap(x);
+    safe.swap(x.safe);
 #endif
 
     super::swap_elements_(x);
@@ -1001,7 +1092,7 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
       b=in_place(x->impl(),key(x->value()),buc);
     }
     BOOST_CATCH(...){
-      extract_(x);
+      extract_(x,invalidate_iterators());
       BOOST_RETHROW;
     }
     BOOST_CATCH_END
@@ -1010,7 +1101,7 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
       BOOST_TRY{
         link_info pos(buckets.at(buc));
         if(!link_point(x->value(),pos)){
-          super::extract_(x);
+          super::extract_(x,invalidate_iterators());
 
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
           detach_iterators(x);
@@ -1020,7 +1111,7 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
         link(x,pos);
       }
       BOOST_CATCH(...){
-        super::extract_(x);
+        super::extract_(x,invalidate_iterators());
 
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
       detach_iterators(x);
@@ -1560,6 +1651,13 @@ private:
     iterator it=make_iterator(x);
     safe_mode::detach_equivalent_iterators(it);
   }
+
+  template<typename Dst>
+  void transfer_iterators(Dst& dst,index_node_type* x)
+  {
+    iterator it=make_iterator(x);
+    safe_mode::transfer_equivalent_iterators(dst,it);
+  }
 #endif
 
   template<BOOST_MULTI_INDEX_TEMPLATE_PARAM_PACK>
@@ -1680,12 +1778,20 @@ private:
   bucket_array_type            buckets;
   float                        mlf;
   size_type                    max_load;
-      
+
+#if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
+  safe_container               safe;
+#endif
+
 #if defined(BOOST_MULTI_INDEX_ENABLE_INVARIANT_CHECKING)&&\
     BOOST_WORKAROUND(__MWERKS__,<=0x3003)
 #pragma parse_mfunc_templ reset
 #endif
 };
+
+#if defined(BOOST_MSVC)
+#pragma warning(pop) /* C4355 */
+#endif
 
 /* comparison */
 

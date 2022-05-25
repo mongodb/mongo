@@ -154,61 +154,61 @@ class avltree_impl
    ~avltree_impl();
 
    //! @copydoc ::boost::intrusive::bstree::begin()
-   iterator begin();
+   iterator begin() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::begin()const
-   const_iterator begin() const;
+   const_iterator begin() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::cbegin()const
-   const_iterator cbegin() const;
+   const_iterator cbegin() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::end()
-   iterator end();
+   iterator end() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::end()const
-   const_iterator end() const;
+   const_iterator end() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::cend()const
-   const_iterator cend() const;
+   const_iterator cend() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::rbegin()
-   reverse_iterator rbegin();
+   reverse_iterator rbegin() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::rbegin()const
-   const_reverse_iterator rbegin() const;
+   const_reverse_iterator rbegin() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::crbegin()const
-   const_reverse_iterator crbegin() const;
+   const_reverse_iterator crbegin() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::rend()
-   reverse_iterator rend();
+   reverse_iterator rend() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::rend()const
-   const_reverse_iterator rend() const;
+   const_reverse_iterator rend() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::crend()const
-   const_reverse_iterator crend() const;
+   const_reverse_iterator crend() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::root()
-   iterator root();
+   iterator root() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::root()const
-   const_iterator root() const;
+   const_iterator root() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::croot()const
-   const_iterator croot() const;
+   const_iterator croot() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::container_from_end_iterator(iterator)
-   static avltree_impl &container_from_end_iterator(iterator end_iterator);
+   static avltree_impl &container_from_end_iterator(iterator end_iterator) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::container_from_end_iterator(const_iterator)
-   static const avltree_impl &container_from_end_iterator(const_iterator end_iterator);
+   static const avltree_impl &container_from_end_iterator(const_iterator end_iterator) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::container_from_iterator(iterator)
-   static avltree_impl &container_from_iterator(iterator it);
+   static avltree_impl &container_from_iterator(iterator it) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::container_from_iterator(const_iterator)
-   static const avltree_impl &container_from_iterator(const_iterator it);
+   static const avltree_impl &container_from_iterator(const_iterator it) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::key_comp()const
    key_compare key_comp() const;
@@ -217,10 +217,10 @@ class avltree_impl
    value_compare value_comp() const;
 
    //! @copydoc ::boost::intrusive::bstree::empty()const
-   bool empty() const;
+   bool empty() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::size()const
-   size_type size() const;
+   size_type size() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::swap
    void swap(avltree_impl& other);
@@ -278,26 +278,26 @@ class avltree_impl
       (const_iterator hint, const key_type &key, insert_commit_data &commit_data);
 
    //! @copydoc ::boost::intrusive::bstree::insert_unique_commit
-   iterator insert_unique_commit(reference value, const insert_commit_data &commit_data);
+   iterator insert_unique_commit(reference value, const insert_commit_data &commit_data) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::insert_unique(Iterator,Iterator)
    template<class Iterator>
    void insert_unique(Iterator b, Iterator e);
 
    //! @copydoc ::boost::intrusive::bstree::insert_before
-   iterator insert_before(const_iterator pos, reference value);
+   iterator insert_before(const_iterator pos, reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::push_back
-   void push_back(reference value);
+   void push_back(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::push_front
-   void push_front(reference value);
+   void push_front(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::erase(const_iterator)
-   iterator erase(const_iterator i);
+   iterator erase(const_iterator i) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::erase(const_iterator,const_iterator)
-   iterator erase(const_iterator b, const_iterator e);
+   iterator erase(const_iterator b, const_iterator e) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::erase(const key_type &)
    size_type erase(const key_type &key);
@@ -308,11 +308,11 @@ class avltree_impl
 
    //! @copydoc ::boost::intrusive::bstree::erase_and_dispose(const_iterator,Disposer)
    template<class Disposer>
-   iterator erase_and_dispose(const_iterator i, Disposer disposer);
+   iterator erase_and_dispose(const_iterator i, Disposer disposer) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::erase_and_dispose(const_iterator,const_iterator,Disposer)
    template<class Disposer>
-   iterator erase_and_dispose(const_iterator b, const_iterator e, Disposer disposer);
+   iterator erase_and_dispose(const_iterator b, const_iterator e, Disposer disposer) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::erase_and_dispose(const key_type &, Disposer)
    template<class Disposer>
@@ -323,11 +323,11 @@ class avltree_impl
    size_type erase_and_dispose(const KeyType& key, KeyTypeKeyCompare comp, Disposer disposer);
 
    //! @copydoc ::boost::intrusive::bstree::clear
-   void clear();
+   void clear() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::clear_and_dispose
    template<class Disposer>
-   void clear_and_dispose(Disposer disposer);
+   void clear_and_dispose(Disposer disposer) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::count(const key_type &ke)const
    size_type count(const key_type &key) const;
@@ -413,28 +413,28 @@ class avltree_impl
          (const KeyType& lower_key, const KeyType& upper_key, KeyTypeKeyCompare comp, bool left_closed, bool right_closed) const;
 
    //! @copydoc ::boost::intrusive::bstree::s_iterator_to(reference)
-   static iterator s_iterator_to(reference value);
+   static iterator s_iterator_to(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::s_iterator_to(const_reference)
-   static const_iterator s_iterator_to(const_reference value);
+   static const_iterator s_iterator_to(const_reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::iterator_to(reference)
-   iterator iterator_to(reference value);
+   iterator iterator_to(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::iterator_to(const_reference)const
-   const_iterator iterator_to(const_reference value) const;
+   const_iterator iterator_to(const_reference value) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::init_node(reference)
-   static void init_node(reference value);
+   static void init_node(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::unlink_leftmost_without_rebalance
-   pointer unlink_leftmost_without_rebalance();
+   pointer unlink_leftmost_without_rebalance() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::replace_node
-   void replace_node(iterator replace_this, reference with_this);
+   void replace_node(iterator replace_this, reference with_this) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::remove_node
-   void remove_node(reference value);
+   void remove_node(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree::merge_unique(bstree<T, Options2...>&)
    template<class T, class ...Options2>
@@ -565,16 +565,16 @@ class avltree
    BOOST_INTRUSIVE_FORCEINLINE void clone_from(BOOST_RV_REF(avltree) src, Cloner cloner, Disposer disposer)
    {  Base::clone_from(BOOST_MOVE_BASE(Base, src), cloner, disposer);  }
 
-   BOOST_INTRUSIVE_FORCEINLINE static avltree &container_from_end_iterator(iterator end_iterator)
+   BOOST_INTRUSIVE_FORCEINLINE static avltree &container_from_end_iterator(iterator end_iterator) BOOST_NOEXCEPT
    {  return static_cast<avltree &>(Base::container_from_end_iterator(end_iterator));   }
 
-   BOOST_INTRUSIVE_FORCEINLINE static const avltree &container_from_end_iterator(const_iterator end_iterator)
+   BOOST_INTRUSIVE_FORCEINLINE static const avltree &container_from_end_iterator(const_iterator end_iterator) BOOST_NOEXCEPT
    {  return static_cast<const avltree &>(Base::container_from_end_iterator(end_iterator));   }
 
-   BOOST_INTRUSIVE_FORCEINLINE static avltree &container_from_iterator(iterator it)
+   BOOST_INTRUSIVE_FORCEINLINE static avltree &container_from_iterator(iterator it) BOOST_NOEXCEPT
    {  return static_cast<avltree &>(Base::container_from_iterator(it));   }
 
-   BOOST_INTRUSIVE_FORCEINLINE static const avltree &container_from_iterator(const_iterator it)
+   BOOST_INTRUSIVE_FORCEINLINE static const avltree &container_from_iterator(const_iterator it) BOOST_NOEXCEPT
    {  return static_cast<const avltree &>(Base::container_from_iterator(it));   }
 };
 

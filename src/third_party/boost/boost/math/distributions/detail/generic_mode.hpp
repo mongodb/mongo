@@ -72,7 +72,7 @@ typename Dist::value_type generic_find_mode(const Dist& dist, typename Dist::val
       v = pdf(dist, lower_bound);
    }while(maxval < v);
 
-   boost::uintmax_t max_iter = policies::get_max_root_iterations<policy_type>();
+   std::uintmax_t max_iter = policies::get_max_root_iterations<policy_type>();
 
    value_type result = tools::brent_find_minima(
       pdf_minimizer<Dist>(dist), 
@@ -125,7 +125,7 @@ typename Dist::value_type generic_find_mode_01(const Dist& dist, typename Dist::
       v = pdf(dist, lower_bound);
    }while(maxval < v);
 
-   boost::uintmax_t max_iter = policies::get_max_root_iterations<policy_type>();
+   std::uintmax_t max_iter = policies::get_max_root_iterations<policy_type>();
 
    value_type result = tools::brent_find_minima(
       pdf_minimizer<Dist>(dist), 

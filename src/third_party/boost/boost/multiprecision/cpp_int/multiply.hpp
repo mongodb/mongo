@@ -10,18 +10,22 @@
 #ifndef BOOST_MP_CPP_INT_MUL_HPP
 #define BOOST_MP_CPP_INT_MUL_HPP
 
+#include <limits>
+#include <boost/multiprecision/detail/standalone_config.hpp>
+#include <boost/multiprecision/detail/endian.hpp>
+#include <boost/multiprecision/detail/assert.hpp>
 #include <boost/multiprecision/integer.hpp>
 
 namespace boost { namespace multiprecision { namespace backends {
 
-#ifdef _MSC_VER
+#ifdef BOOST_MSVC
 #pragma warning(push)
 #pragma warning(disable : 4127) // conditional expression is constant
 #endif
 //
 // Multiplication by a single limb:
 //
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, unsigned MinBits2, unsigned MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, std::size_t MinBits2, std::size_t MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2>
 inline BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<!is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value && !is_trivial_cpp_int<cpp_int_backend<MinBits2, MaxBits2, SignType2, Checked2, Allocator2> >::value>::type
 eval_multiply(
     cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>&       result,
@@ -52,7 +56,7 @@ eval_multiply(
    }
    if (carry)
    {
-      unsigned i = result.size();
+      std::size_t i = result.size();
       result.resize(i + 1, i + 1);
       if (result.size() > i)
          result.limbs()[i] = static_cast<limb_type>(carry);
@@ -67,11 +71,11 @@ eval_multiply(
 // for "required" elements could possibly have failed, *and* we have checking enabled.
 // This will cause an overflow error inside resize():
 //
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
-inline BOOST_MP_CXX14_CONSTEXPR void resize_for_carry(cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>& /*result*/, unsigned /*required*/) {}
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
+inline BOOST_MP_CXX14_CONSTEXPR void resize_for_carry(cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>& /*result*/, std::size_t /*required*/) {}
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, class Allocator1>
-inline BOOST_MP_CXX14_CONSTEXPR void resize_for_carry(cpp_int_backend<MinBits1, MaxBits1, SignType1, checked, Allocator1>& result, unsigned required)
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, class Allocator1>
+inline BOOST_MP_CXX14_CONSTEXPR void resize_for_carry(cpp_int_backend<MinBits1, MaxBits1, SignType1, checked, Allocator1>& result, std::size_t required)
 {
    if (result.size() < required)
       result.resize(required, required);
@@ -90,7 +94,7 @@ const size_t karatsuba_cutoff = 40;
 // and full variable precision.  Karatsuba really doesn't play nice with fixed-size integers.  If necessary
 // fixed precision integers will get aliased as variable-precision types before this is called.
 //
-template <unsigned MinBits, unsigned MaxBits, cpp_int_check_type Checked, class Allocator>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_int_check_type Checked, class Allocator>
 inline void multiply_karatsuba(
     cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, Allocator>&       result,
     const cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, Allocator>& a,
@@ -99,8 +103,8 @@ inline void multiply_karatsuba(
 {
    using cpp_int_type = cpp_int_backend<MinBits, MaxBits, signed_magnitude, Checked, Allocator>;
 
-   unsigned as = a.size();
-   unsigned bs = b.size();
+   std::size_t as = a.size();
+   std::size_t bs = b.size();
    //
    // Termination condition: if either argument is smaller than karatsuba_cutoff
    // then schoolboy multiplication will be faster:
@@ -113,7 +117,7 @@ inline void multiply_karatsuba(
    //
    // Partitioning size: split the larger of a and b into 2 halves
    //
-   unsigned n  = (as > bs ? as : bs) / 2 + 1;
+   std::size_t n  = (as > bs ? as : bs) / 2 + 1;
    //
    // Partition a and b into high and low parts.
    // ie write a, b as a = a_h * 2^n + a_l, b = b_h * 2^n + b_l
@@ -128,7 +132,7 @@ inline void multiply_karatsuba(
    // * Since we have one high part zero, the arithmetic simplifies considerably, 
    //   so should we have a special routine for this?
    // 
-   unsigned          sz = (std::min)(as, n);
+   std::size_t          sz = (std::min)(as, n);
    const cpp_int_type a_l(a.limbs(), 0, sz);
 
    sz = (std::min)(bs, n);
@@ -171,13 +175,13 @@ inline void multiply_karatsuba(
    // that it's worth the extra logic though (and is darn hard to measure
    // what the "average" case is).
    //
-   for (unsigned i = result_low.size(); i < 2 * n; ++i)
+   for (std::size_t i = result_low.size(); i < 2 * n; ++i)
       result.limbs()[i] = 0;
    //
    // Set the high part of result to a_h * b_h:
    //
    multiply_karatsuba(result_high, a_h, b_h, storage);
-   for (unsigned i = result_high.size() + 2 * n; i < result.size(); ++i)
+   for (std::size_t i = result_high.size() + 2 * n; i < result.size(); ++i)
       result.limbs()[i] = 0;
    //
    // Now calculate (a_h+a_l)*(b_h+b_l):
@@ -210,7 +214,7 @@ inline void multiply_karatsuba(
    result.normalize();
 }
 
-inline unsigned karatsuba_storage_size(unsigned s)
+inline std::size_t karatsuba_storage_size(std::size_t s)
 {
    // 
    // This estimates how much memory we will need based on
@@ -232,17 +236,17 @@ inline unsigned karatsuba_storage_size(unsigned s)
 //
 // Normal variable precision case comes first:
 //
-template <unsigned MinBits, unsigned MaxBits, cpp_integer_type SignType, cpp_int_check_type Checked, class Allocator>
+template <std::size_t MinBits, std::size_t MaxBits, cpp_integer_type SignType, cpp_int_check_type Checked, class Allocator>
 inline typename std::enable_if<!is_fixed_precision<cpp_int_backend<MinBits, MaxBits, SignType, Checked, Allocator> >::value>::type
 setup_karatsuba(
    cpp_int_backend<MinBits, MaxBits, SignType, Checked, Allocator>& result,
    const cpp_int_backend<MinBits, MaxBits, SignType, Checked, Allocator>& a,
    const cpp_int_backend<MinBits, MaxBits, SignType, Checked, Allocator>& b)
 {
-   unsigned as = a.size();
-   unsigned bs = b.size();
-   unsigned s = as > bs ? as : bs;
-   unsigned storage_size = karatsuba_storage_size(s);
+   std::size_t as = a.size();
+   std::size_t bs = b.size();
+   std::size_t s = as > bs ? as : bs;
+   std::size_t storage_size = karatsuba_storage_size(s);
    if (storage_size < 300)
    {
       //
@@ -261,7 +265,7 @@ setup_karatsuba(
    }
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, unsigned MinBits2, unsigned MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2, unsigned MinBits3, unsigned MaxBits3, cpp_integer_type SignType3, cpp_int_check_type Checked3, class Allocator3>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, std::size_t MinBits2, std::size_t MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2, std::size_t MinBits3, std::size_t MaxBits3, cpp_integer_type SignType3, cpp_int_check_type Checked3, class Allocator3>
 inline typename std::enable_if<is_fixed_precision<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value || is_fixed_precision<cpp_int_backend<MinBits2, MaxBits2, SignType2, Checked2, Allocator2> >::value || is_fixed_precision<cpp_int_backend<MinBits3, MaxBits3, SignType3, Checked3, Allocator3> >::value>::type
 setup_karatsuba(
     cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>&       result,
@@ -278,11 +282,11 @@ setup_karatsuba(
    //
    using variable_precision_type = cpp_int_backend<0, 0, signed_magnitude, unchecked, std::allocator<limb_type> >;
    variable_precision_type a_t(a.limbs(), 0, a.size()), b_t(b.limbs(), 0, b.size());
-   unsigned as = a.size();
-   unsigned bs = b.size();
-   unsigned s = as > bs ? as : bs;
-   unsigned sz = as + bs;
-   unsigned storage_size = karatsuba_storage_size(s);
+   std::size_t as = a.size();
+   std::size_t bs = b.size();
+   std::size_t s = as > bs ? as : bs;
+   std::size_t sz = as + bs;
+   std::size_t storage_size = karatsuba_storage_size(s);
 
    if (!is_fixed_precision<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value || (sz * sizeof(limb_type) * CHAR_BIT <= MaxBits1))
    {
@@ -291,6 +295,7 @@ setup_karatsuba(
       variable_precision_type t(result.limbs(), 0, result.size());
       typename variable_precision_type::scoped_shared_storage storage(t.allocator(), storage_size);
       multiply_karatsuba(t, a_t, b_t, storage);
+      result.resize(t.size(), t.size());
    }
    else
    {
@@ -307,7 +312,7 @@ setup_karatsuba(
       result = t;
    }
 }
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, unsigned MinBits2, unsigned MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2, unsigned MinBits3, unsigned MaxBits3, cpp_integer_type SignType3, cpp_int_check_type Checked3, class Allocator3>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, std::size_t MinBits2, std::size_t MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2, std::size_t MinBits3, std::size_t MaxBits3, cpp_integer_type SignType3, cpp_int_check_type Checked3, class Allocator3>
 inline typename std::enable_if<!is_fixed_precision<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value && !is_fixed_precision<cpp_int_backend<MinBits2, MaxBits2, SignType2, Checked2, Allocator2> >::value && !is_fixed_precision<cpp_int_backend<MinBits3, MaxBits3, SignType3, Checked3, Allocator3> >::value>::type
 setup_karatsuba(
    cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>& result,
@@ -319,11 +324,11 @@ setup_karatsuba(
    //
    using variable_precision_type = cpp_int_backend<0, 0, signed_magnitude, unchecked, std::allocator<limb_type> >;
    variable_precision_type a_t(a.limbs(), 0, a.size()), b_t(b.limbs(), 0, b.size());
-   unsigned as = a.size();
-   unsigned bs = b.size();
-   unsigned s = as > bs ? as : bs;
-   unsigned sz = as + bs;
-   unsigned storage_size = karatsuba_storage_size(s);
+   std::size_t as = a.size();
+   std::size_t bs = b.size();
+   std::size_t s = as > bs ? as : bs;
+   std::size_t sz = as + bs;
+   std::size_t storage_size = karatsuba_storage_size(s);
 
    result.resize(sz, sz);
    variable_precision_type t(result.limbs(), 0, result.size());
@@ -331,7 +336,7 @@ setup_karatsuba(
    multiply_karatsuba(t, a_t, b_t, storage);
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, unsigned MinBits2, unsigned MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2, unsigned MinBits3, unsigned MaxBits3, cpp_integer_type SignType3, cpp_int_check_type Checked3, class Allocator3>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, std::size_t MinBits2, std::size_t MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2, std::size_t MinBits3, std::size_t MaxBits3, cpp_integer_type SignType3, cpp_int_check_type Checked3, class Allocator3>
 inline BOOST_MP_CXX14_CONSTEXPR void
 eval_multiply_comba(
     cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>&       result,
@@ -343,7 +348,7 @@ eval_multiply_comba(
    // Comba Multiplier - based on Paul Comba's
    // Exponentiation cryptosystems on the IBM PC, 1990
    //
-   int as                                                                                         = a.size(),
+   std::ptrdiff_t as                                                                                         = a.size(),
        bs                                                                                         = b.size(),
        rs                                                                                         = result.size();
    typename cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>::limb_pointer pr = result.limbs();
@@ -351,11 +356,11 @@ eval_multiply_comba(
    double_limb_type carry    = 0,
                     temp     = 0;
    limb_type      overflow   = 0;
-   const unsigned limb_bits  = sizeof(limb_type) * CHAR_BIT;
+   const std::size_t limb_bits  = sizeof(limb_type) * CHAR_BIT;
    const bool     must_throw = rs < as + bs - 1;
-   for (int r = 0, lim = (std::min)(rs, as + bs - 1); r < lim; ++r, overflow = 0)
+   for (std::ptrdiff_t r = 0, lim = (std::min)(rs, as + bs - 1); r < lim; ++r, overflow = 0)
    {
-      int i = r >= as ? as - 1 : r,
+      std::ptrdiff_t i = r >= as ? as - 1 : r,
           j = r - i,
           k = i < bs - j ? i + 1 : bs - j; // min(i+1, bs-j);
 
@@ -377,11 +382,11 @@ eval_multiply_comba(
    if (carry || must_throw)
    {
       resize_for_carry(result, as + bs);
-      if ((int)result.size() >= as + bs)
+      if (static_cast<int>(result.size()) >= as + bs)
          *pr = static_cast<limb_type>(carry);
    }
 }
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, unsigned MinBits2, unsigned MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2, unsigned MinBits3, unsigned MaxBits3, cpp_integer_type SignType3, cpp_int_check_type Checked3, class Allocator3>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, std::size_t MinBits2, std::size_t MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2, std::size_t MinBits3, std::size_t MaxBits3, cpp_integer_type SignType3, cpp_int_check_type Checked3, class Allocator3>
 inline BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<!is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value && !is_trivial_cpp_int<cpp_int_backend<MinBits2, MaxBits2, SignType2, Checked2, Allocator2> >::value && !is_trivial_cpp_int<cpp_int_backend<MinBits3, MaxBits3, SignType3, Checked3, Allocator3> >::value>::type
 eval_multiply(
     cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>&       result,
@@ -397,8 +402,8 @@ eval_multiply(
    //
    // Trivial cases first:
    //
-   unsigned                                                                                          as = a.size();
-   unsigned                                                                                          bs = b.size();
+   std::size_t                                                                                          as = a.size();
+   std::size_t                                                                                          bs = b.size();
    typename cpp_int_backend<MinBits2, MaxBits2, SignType2, Checked2, Allocator2>::const_limb_pointer pa = a.limbs();
    typename cpp_int_backend<MinBits3, MaxBits3, SignType3, Checked3, Allocator3>::const_limb_pointer pb = b.limbs();
    if (as == 1)
@@ -461,7 +466,7 @@ eval_multiply(
 #ifndef BOOST_MP_NO_CONSTEXPR_DETECTION
    if (BOOST_MP_IS_CONST_EVALUATED(as))
    {
-      for (unsigned i = 0; i < result.size(); ++i)
+      for (std::size_t i = 0; i < result.size(); ++i)
          pr[i] = 0;
    }
    else
@@ -478,20 +483,20 @@ eval_multiply(
 #else
 
    double_limb_type carry = 0;
-   for (unsigned i = 0; i < as; ++i)
+   for (std::size_t i = 0; i < as; ++i)
    {
-      BOOST_ASSERT(result.size() > i);
-      unsigned inner_limit = !is_fixed_precision<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value ? bs : (std::min)(result.size() - i, bs);
-      unsigned j           = 0;
+      BOOST_MP_ASSERT(result.size() > i);
+      std::size_t inner_limit = !is_fixed_precision<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value ? bs : (std::min)(result.size() - i, bs);
+      std::size_t j           = 0;
       for (; j < inner_limit; ++j)
       {
-         BOOST_ASSERT(i + j < result.size());
+         BOOST_MP_ASSERT(i + j < result.size());
 #if (!defined(__GLIBCXX__) && !defined(__GLIBCPP__)) || !BOOST_WORKAROUND(BOOST_GCC_VERSION, <= 50100)
-         BOOST_ASSERT(!std::numeric_limits<double_limb_type>::is_specialized || ((std::numeric_limits<double_limb_type>::max)() - carry >
+         BOOST_MP_ASSERT(!std::numeric_limits<double_limb_type>::is_specialized || ((std::numeric_limits<double_limb_type>::max)() - carry >
                                                                                  static_cast<double_limb_type>(cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>::max_limb_value) * static_cast<double_limb_type>(cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>::max_limb_value)));
 #endif
          carry += static_cast<double_limb_type>(pa[i]) * static_cast<double_limb_type>(pb[j]);
-         BOOST_ASSERT(!std::numeric_limits<double_limb_type>::is_specialized || ((std::numeric_limits<double_limb_type>::max)() - carry >= pr[i + j]));
+         BOOST_MP_ASSERT(!std::numeric_limits<double_limb_type>::is_specialized || ((std::numeric_limits<double_limb_type>::max)() - carry >= pr[i + j]));
          carry += pr[i + j];
 #ifdef __MSVC_RUNTIME_CHECKS
          pr[i + j] = static_cast<limb_type>(carry & ~static_cast<limb_type>(0));
@@ -499,7 +504,7 @@ eval_multiply(
          pr[i + j] = static_cast<limb_type>(carry);
 #endif
          carry >>= cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>::limb_bits;
-         BOOST_ASSERT(carry <= (cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>::max_limb_value));
+         BOOST_MP_ASSERT(carry <= (cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>::max_limb_value));
       }
       if (carry)
       {
@@ -522,7 +527,7 @@ eval_multiply(
    result.sign(a.sign() != b.sign());
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, unsigned MinBits2, unsigned MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, std::size_t MinBits2, std::size_t MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<!is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value && !is_trivial_cpp_int<cpp_int_backend<MinBits2, MaxBits2, SignType2, Checked2, Allocator2> >::value>::type
 eval_multiply(
     cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>&       result,
@@ -532,7 +537,7 @@ eval_multiply(
    eval_multiply(result, result, a);
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<!is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value>::type
 eval_multiply(cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>& result, const limb_type& val) 
    noexcept((noexcept(eval_multiply(std::declval<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>&>(), std::declval<const cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>&>(), std::declval<const limb_type&>()))))
@@ -540,7 +545,7 @@ eval_multiply(cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator
    eval_multiply(result, result, val);
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, unsigned MinBits2, unsigned MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, std::size_t MinBits2, std::size_t MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<!is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value && !is_trivial_cpp_int<cpp_int_backend<MinBits2, MaxBits2, SignType2, Checked2, Allocator2> >::value>::type
 eval_multiply(
     cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>&       result,
@@ -557,7 +562,7 @@ eval_multiply(
    }
    else
    {
-#if BOOST_ENDIAN_LITTLE_BYTE && !defined(BOOST_MP_TEST_NO_LE)
+#if BOOST_MP_ENDIAN_LITTLE_BYTE && !defined(BOOST_MP_TEST_NO_LE)
       cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> t(val);
 #else
       cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> t;
@@ -567,7 +572,7 @@ eval_multiply(
    }
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<!is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value>::type
 eval_multiply(cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>& result, const double_limb_type& val)
    noexcept((noexcept(eval_multiply(std::declval<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>&>(), std::declval<const cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>&>(), std::declval<const double_limb_type&>()))))
@@ -575,7 +580,7 @@ eval_multiply(cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator
    eval_multiply(result, result, val);
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, unsigned MinBits2, unsigned MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, std::size_t MinBits2, std::size_t MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<!is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value && !is_trivial_cpp_int<cpp_int_backend<MinBits2, MaxBits2, SignType2, Checked2, Allocator2> >::value>::type
 eval_multiply(
     cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>&       result,
@@ -592,7 +597,7 @@ eval_multiply(
    }
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<!is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value>::type
 eval_multiply(cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>& result, const signed_limb_type& val)
    noexcept((noexcept(eval_multiply(std::declval<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>&>(), std::declval<const cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>&>(), std::declval<const limb_type&>()))))
@@ -600,7 +605,7 @@ eval_multiply(cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator
    eval_multiply(result, result, val);
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, unsigned MinBits2, unsigned MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, std::size_t MinBits2, std::size_t MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2>
 inline BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<!is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value && !is_trivial_cpp_int<cpp_int_backend<MinBits2, MaxBits2, SignType2, Checked2, Allocator2> >::value>::type
 eval_multiply(
     cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>&       result,
@@ -625,7 +630,7 @@ eval_multiply(
       result.negate();
       return;
    }
-#if BOOST_ENDIAN_LITTLE_BYTE && !defined(BOOST_MP_TEST_NO_LE)
+#if BOOST_MP_ENDIAN_LITTLE_BYTE && !defined(BOOST_MP_TEST_NO_LE)
    cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> t(val);
 #else
    cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> t;
@@ -634,7 +639,7 @@ eval_multiply(
    eval_multiply(result, a, t);
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<!is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value>::type
 eval_multiply(cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>& result, const signed_double_limb_type& val)
    noexcept(
@@ -648,7 +653,7 @@ eval_multiply(cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator
 //
 // Now over again for trivial cpp_int's:
 //
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value && is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value && (is_signed_number<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value || is_signed_number<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value)>::type
 eval_multiply(
@@ -660,7 +665,7 @@ eval_multiply(
    result.normalize();
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value && is_unsigned_number<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value>::type
 eval_multiply(
@@ -671,7 +676,7 @@ eval_multiply(
    result.normalize();
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value && is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value && (is_signed_number<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value || is_signed_number<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value)>::type
 eval_multiply(
@@ -684,7 +689,7 @@ eval_multiply(
    result.normalize();
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value && is_unsigned_number<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value>::type
 eval_multiply(
@@ -699,7 +704,7 @@ eval_multiply(
 //
 // Special routines for multiplying two integers to obtain a multiprecision result:
 //
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value>::type
 eval_multiply(
@@ -707,7 +712,7 @@ eval_multiply(
     signed_double_limb_type a, signed_double_limb_type b)
 {
    constexpr const signed_double_limb_type mask = ~static_cast<limb_type>(0);
-   constexpr const unsigned limb_bits = sizeof(limb_type) * CHAR_BIT;
+   constexpr const std::size_t limb_bits = sizeof(limb_type) * CHAR_BIT;
 
    bool s = false;
    if (a < 0)
@@ -752,7 +757,7 @@ eval_multiply(
    result.normalize();
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value>::type
 eval_multiply(
@@ -760,7 +765,7 @@ eval_multiply(
     double_limb_type a, double_limb_type b)
 {
    constexpr const signed_double_limb_type mask = ~static_cast<limb_type>(0);
-   constexpr const unsigned limb_bits = sizeof(limb_type) * CHAR_BIT;
+   constexpr const std::size_t limb_bits = sizeof(limb_type) * CHAR_BIT;
 
    double_limb_type w = a & mask;
    double_limb_type x = a >> limb_bits;
@@ -802,8 +807,8 @@ eval_multiply(
    result.normalize();
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1,
-          unsigned MinBits2, unsigned MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1,
+          std::size_t MinBits2, std::size_t MaxBits2, cpp_integer_type SignType2, cpp_int_check_type Checked2, class Allocator2>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<
     !is_trivial_cpp_int<cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1> >::value && is_trivial_cpp_int<cpp_int_backend<MinBits2, MaxBits2, SignType2, Checked2, Allocator2> >::value && is_trivial_cpp_int<cpp_int_backend<MinBits2, MaxBits2, SignType2, Checked2, Allocator2> >::value>::type
 eval_multiply(
@@ -816,7 +821,7 @@ eval_multiply(
    result.sign(a.sign() != b.sign());
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, class SI>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, class SI>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<boost::multiprecision::detail::is_signed<SI>::value && boost::multiprecision::detail::is_integral<SI>::value && (sizeof(SI) <= sizeof(signed_double_limb_type) / 2)>::type
 eval_multiply(
     cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>& result,
@@ -825,7 +830,7 @@ eval_multiply(
    result = static_cast<signed_double_limb_type>(a) * static_cast<signed_double_limb_type>(b);
 }
 
-template <unsigned MinBits1, unsigned MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, class UI>
+template <std::size_t MinBits1, std::size_t MaxBits1, cpp_integer_type SignType1, cpp_int_check_type Checked1, class Allocator1, class UI>
 BOOST_MP_FORCEINLINE BOOST_MP_CXX14_CONSTEXPR typename std::enable_if<boost::multiprecision::detail::is_unsigned<UI>::value && (sizeof(UI) <= sizeof(signed_double_limb_type) / 2)>::type
 eval_multiply(
     cpp_int_backend<MinBits1, MaxBits1, SignType1, Checked1, Allocator1>& result,
@@ -834,7 +839,7 @@ eval_multiply(
    result = static_cast<double_limb_type>(a) * static_cast<double_limb_type>(b);
 }
 
-#ifdef _MSC_VER
+#ifdef BOOST_MSVC
 #pragma warning(pop)
 #endif
 

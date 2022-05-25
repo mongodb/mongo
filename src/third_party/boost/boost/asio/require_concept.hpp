@@ -2,7 +2,7 @@
 // require_concept.hpp
 // ~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -107,7 +107,7 @@ struct require_concept_result
 
 #else // defined(GENERATING_DOCUMENTATION)
 
-namespace asio_require_concept_fn {
+namespace boost_asio_require_concept_fn {
 
 using boost::asio::conditional;
 using boost::asio::decay;
@@ -294,24 +294,24 @@ struct static_instance
 template <typename T>
 const T static_instance<T>::instance = {};
 
-} // namespace asio_require_concept_fn
+} // namespace boost_asio_require_concept_fn
 namespace boost {
 namespace asio {
 namespace {
 
-static BOOST_ASIO_CONSTEXPR const asio_require_concept_fn::impl&
-  require_concept = asio_require_concept_fn::static_instance<>::instance;
+static BOOST_ASIO_CONSTEXPR const boost_asio_require_concept_fn::impl&
+  require_concept = boost_asio_require_concept_fn::static_instance<>::instance;
 
 } // namespace
 
-typedef asio_require_concept_fn::impl require_concept_t;
+typedef boost_asio_require_concept_fn::impl require_concept_t;
 
 template <typename T, typename Property>
 struct can_require_concept :
   integral_constant<bool,
-    asio_require_concept_fn::call_traits<
+    boost_asio_require_concept_fn::call_traits<
       require_concept_t, T, void(Property)>::overload !=
-        asio_require_concept_fn::ill_formed>
+        boost_asio_require_concept_fn::ill_formed>
 {
 };
 
@@ -326,7 +326,7 @@ constexpr bool can_require_concept_v
 template <typename T, typename Property>
 struct is_nothrow_require_concept :
   integral_constant<bool,
-    asio_require_concept_fn::call_traits<
+    boost_asio_require_concept_fn::call_traits<
       require_concept_t, T, void(Property)>::is_noexcept>
 {
 };
@@ -342,7 +342,7 @@ constexpr bool is_nothrow_require_concept_v
 template <typename T, typename Property>
 struct require_concept_result
 {
-  typedef typename asio_require_concept_fn::call_traits<
+  typedef typename boost_asio_require_concept_fn::call_traits<
       require_concept_t, T, void(Property)>::result_type type;
 };
 

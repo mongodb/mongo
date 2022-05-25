@@ -5,7 +5,7 @@
 //
 //  Copyright (c) 2002-2003 Eric Friedman
 //  Copyright (c) 2002 by Andrei Alexandrescu
-//  Copyright (c) 2013-2021 Antony Polukhin
+//  Copyright (c) 2013-2022 Antony Polukhin
 //
 //  Use, modification and distribution are subject to the
 //  Boost Software License, Version 1.0. (See accompanying file

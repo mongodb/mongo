@@ -17,6 +17,7 @@
 #define BOOST_FORMAT_EXCEPTIONS_HPP
 
 
+#include <boost/config.hpp>
 #include <stdexcept>
 
 
@@ -30,7 +31,7 @@ namespace boost {
         {
         public:
             format_error()  {}
-            virtual const char *what() const throw() {
+            virtual const char *what() const BOOST_NOEXCEPT_OR_NOTHROW BOOST_OVERRIDE {
                 return "boost::format_error: "
                     "format generic failure";
             }
@@ -44,7 +45,7 @@ namespace boost {
                 : pos_(pos), next_(size) {}
             std::size_t get_pos() const { return pos_; }
             std::size_t get_next() const { return next_; }
-            virtual const char *what() const throw() {
+            virtual const char *what() const BOOST_NOEXCEPT_OR_NOTHROW BOOST_OVERRIDE {
                 return "boost::bad_format_string: format-string is ill-formed";
             }
         };
@@ -57,7 +58,7 @@ namespace boost {
                 : cur_(cur), expected_(expected) {}
             std::size_t get_cur() const { return cur_; }
             std::size_t get_expected() const { return expected_; }
-            virtual const char *what() const throw() {
+            virtual const char *what() const BOOST_NOEXCEPT_OR_NOTHROW BOOST_OVERRIDE {
                 return "boost::too_few_args: "
                     "format-string referred to more arguments than were passed";
             }
@@ -71,7 +72,7 @@ namespace boost {
                 : cur_(cur), expected_(expected) {}
             std::size_t get_cur() const { return cur_; }
             std::size_t get_expected() const { return expected_; }
-            virtual const char *what() const throw() {
+            virtual const char *what() const BOOST_NOEXCEPT_OR_NOTHROW BOOST_OVERRIDE {
                 return "boost::too_many_args: "
                     "format-string referred to fewer arguments than were passed";
             }
@@ -87,7 +88,7 @@ namespace boost {
             int get_index() const { return index_; }
             int get_beg() const { return beg_; }
             int get_end() const { return end_; }
-            virtual const char *what() const throw() {
+            virtual const char *what() const BOOST_NOEXCEPT_OR_NOTHROW BOOST_OVERRIDE {
                 return "boost::out_of_range: "
                     "tried to refer to an argument (or item) number which"
                     " is out of range, according to the format string";

@@ -7,6 +7,7 @@
 #define BOOST_MP_COMPARE_HPP
 
 #include <boost/multiprecision/traits/is_backend.hpp>
+#include <boost/multiprecision/detail/fpclassify.hpp>
 
 //
 // Comparison operators for number.
@@ -125,12 +126,7 @@ inline constexpr typename std::enable_if<number_category<Backend>::value != numb
    return false;
 }
 template <class Backend, expression_template_option ExpressionTemplates>
-inline
-#if !BOOST_WORKAROUND(BOOST_GCC_VERSION, < 40700)
-    constexpr
-#endif
-    typename std::enable_if<number_category<Backend>::value == number_kind_floating_point, bool>::type
-    is_unordered_value(const number<Backend, ExpressionTemplates>& a)
+inline constexpr typename std::enable_if<number_category<Backend>::value == number_kind_floating_point, bool>::type is_unordered_value(const number<Backend, ExpressionTemplates>& a)
 {
    using default_ops::eval_fpclassify;
    return eval_fpclassify(a.backend()) == FP_NAN;
@@ -157,7 +153,7 @@ inline
    else
 #endif
    {
-      return (boost::math::isnan)(a);
+      return BOOST_MP_ISNAN(a);
    }
 }
 

@@ -2,7 +2,7 @@
 // detail/impl/select_reactor.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -23,11 +23,23 @@
       && !defined(BOOST_ASIO_HAS_KQUEUE) \
       && !defined(BOOST_ASIO_WINDOWS_RUNTIME))
 
+#if defined(BOOST_ASIO_HAS_IOCP)
+# include <boost/asio/detail/win_iocp_io_context.hpp>
+#else // defined(BOOST_ASIO_HAS_IOCP)
+# include <boost/asio/detail/scheduler.hpp>
+#endif // defined(BOOST_ASIO_HAS_IOCP)
+
 #include <boost/asio/detail/push_options.hpp>
 
 namespace boost {
 namespace asio {
 namespace detail {
+
+inline void select_reactor::post_immediate_completion(
+    reactor_op* op, bool is_continuation)
+{
+  scheduler_.post_immediate_completion(op, is_continuation);
+}
 
 template <typename Time_Traits>
 void select_reactor::add_timer_queue(timer_queue<Time_Traits>& queue)
@@ -72,6 +84,18 @@ std::size_t select_reactor::cancel_timer(timer_queue<Time_Traits>& queue,
   lock.unlock();
   scheduler_.post_deferred_completions(ops);
   return n;
+}
+
+template <typename Time_Traits>
+void select_reactor::cancel_timer_by_key(timer_queue<Time_Traits>& queue,
+    typename timer_queue<Time_Traits>::per_timer_data* timer,
+    void* cancellation_key)
+{
+  mutex::scoped_lock lock(mutex_);
+  op_queue<operation> ops;
+  queue.cancel_timer_by_key(timer, ops, cancellation_key);
+  lock.unlock();
+  scheduler_.post_deferred_completions(ops);
 }
 
 template <typename Time_Traits>

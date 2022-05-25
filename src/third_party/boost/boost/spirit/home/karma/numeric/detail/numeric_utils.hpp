@@ -574,12 +574,12 @@ namespace boost { namespace spirit { namespace karma
     ///////////////////////////////////////////////////////////////////////////
 #define BOOST_KARMA_NUMERICS_INNER_LOOP_PREFIX(z, x, data)                    \
         if (!traits::test_zero(n)) {                                          \
-            int ch = radix_type::call(remainder_type::call(n));               \
+            int ch_##x = radix_type::call(remainder_type::call(n));           \
             n = divide_type::call(n, num, ++exp);                             \
     /**/
 
-#define BOOST_KARMA_NUMERICS_INNER_LOOP_SUFFIX(z, x, data)                    \
-            *sink = char(ch);                                                 \
+#define BOOST_KARMA_NUMERICS_INNER_LOOP_SUFFIX(z, x, n_rolls_sub1)            \
+            *sink = char(BOOST_PP_CAT(ch_, BOOST_PP_SUB(n_rolls_sub1, x)));   \
             ++sink;                                                           \
         }                                                                     \
     /**/
@@ -610,7 +610,8 @@ namespace boost { namespace spirit { namespace karma
 
             BOOST_PP_REPEAT(
                 BOOST_KARMA_NUMERICS_LOOP_UNROLL,
-                BOOST_KARMA_NUMERICS_INNER_LOOP_SUFFIX, _);
+                BOOST_KARMA_NUMERICS_INNER_LOOP_SUFFIX,
+                BOOST_PP_DEC(BOOST_KARMA_NUMERICS_LOOP_UNROLL));
 
             *sink = char(ch);
             ++sink;

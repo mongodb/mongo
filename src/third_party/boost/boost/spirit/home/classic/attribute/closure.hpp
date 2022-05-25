@@ -81,7 +81,7 @@ BOOST_SPIRIT_CLASSIC_NAMESPACE_BEGIN
 
         template <typename ResultT, typename ParserT, typename ScannerT>
         ResultT& post_parse(ResultT& hit, ParserT const&, ScannerT const&)
-        { hit.value(frame[::phoenix::tuple_index<0>()]); return hit; }
+        { hit.value(frame[::phoenix::tuple_index_names::_1]); return hit; }
 
     private:
 
@@ -121,7 +121,7 @@ BOOST_SPIRIT_CLASSIC_NAMESPACE_BEGIN
 
         template <typename ResultT, typename ParserT, typename ScannerT>
         ResultT& post_parse(ResultT& hit, ParserT const&, ScannerT const&)
-        { hit.value(frame[::phoenix::tuple_index<0>()]); return hit; }
+        { hit.value(frame[::phoenix::tuple_index_names::_1]); return hit; }
 
     private:
 

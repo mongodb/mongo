@@ -34,10 +34,10 @@ http://en.wikipedia.org/wiki/SPARC[SPARC] architecture.
 
 #if defined(__sparc__) || defined(__sparc)
 #   undef BOOST_ARCH_SPARC
-#   if !defined(BOOST_ARCH_SPARC) && (defined(__sparcv9) || defined(__sparc_v9__)
+#   if !defined(BOOST_ARCH_SPARC) && (defined(__sparcv9) || defined(__sparc_v9__))
 #       define BOOST_ARCH_SPARC BOOST_VERSION_NUMBER(9,0,0)
 #   endif
-#   if !defined(BOOST_ARCH_SPARC) && (defined(__sparcv8) || defined(__sparc_v8__)
+#   if !defined(BOOST_ARCH_SPARC) && (defined(__sparcv8) || defined(__sparc_v8__))
 #       define BOOST_ARCH_SPARC BOOST_VERSION_NUMBER(8,0,0)
 #   endif
 #   if !defined(BOOST_ARCH_SPARC)

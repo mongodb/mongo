@@ -60,7 +60,7 @@
 #include <boost/type_traits/has_multiplies.hpp>
 #include <boost/type_traits/has_multiplies_assign.hpp>
 #include <boost/type_traits/has_negate.hpp>
-#if !defined(BOOST_BORLANDC) && !defined(__CUDACC__)
+#if !defined(BOOST_BORLANDC) && (!(defined(__CUDACC__) && (__CUDACC_VER_MAJOR__ < 11)) || defined(__CUDA__))
 #include <boost/type_traits/has_new_operator.hpp>
 #endif
 #include <boost/type_traits/has_not_equal_to.hpp>

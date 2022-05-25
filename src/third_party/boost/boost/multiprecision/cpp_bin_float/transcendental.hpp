@@ -6,12 +6,14 @@
 #ifndef BOOST_MULTIPRECISION_CPP_BIN_FLOAT_TRANSCENDENTAL_HPP
 #define BOOST_MULTIPRECISION_CPP_BIN_FLOAT_TRANSCENDENTAL_HPP
 
+#include <boost/multiprecision/detail/assert.hpp>
+
 namespace boost { namespace multiprecision { namespace backends {
 
 template <unsigned Digits, digit_base_type DigitBase, class Allocator, class Exponent, Exponent MinE, Exponent MaxE>
 void eval_exp_taylor(cpp_bin_float<Digits, DigitBase, Allocator, Exponent, MinE, MaxE>& res, const cpp_bin_float<Digits, DigitBase, Allocator, Exponent, MinE, MaxE>& arg)
 {
-   constexpr const int bits = cpp_bin_float<Digits, DigitBase, Allocator, Exponent, MinE, MaxE>::bit_count;
+   constexpr const std::ptrdiff_t bits = cpp_bin_float<Digits, DigitBase, Allocator, Exponent, MinE, MaxE>::bit_count;
    //
    // Taylor series for small argument, note returns exp(x) - 1:
    //
@@ -20,7 +22,7 @@ void eval_exp_taylor(cpp_bin_float<Digits, DigitBase, Allocator, Exponent, MinE,
    denom = limb_type(1);
    eval_add(res, num);
 
-   for (unsigned k = 2;; ++k)
+   for (std::size_t k = 2;; ++k)
    {
       eval_multiply(denom, k);
       eval_multiply(num, arg);
@@ -68,13 +70,13 @@ void eval_exp(cpp_bin_float<Digits, DigitBase, Allocator, Exponent, MinE, MaxE>&
 
    int  type  = eval_fpclassify(arg);
    bool isneg = eval_get_sign(arg) < 0;
-   if (type == (int)FP_NAN)
+   if (type == static_cast<int>(FP_NAN))
    {
       res   = arg;
       errno = EDOM;
       return;
    }
-   else if (type == (int)FP_INFINITE)
+   else if (type == static_cast<int>(FP_INFINITE))
    {
       res = arg;
       if (isneg)
@@ -83,7 +85,7 @@ void eval_exp(cpp_bin_float<Digits, DigitBase, Allocator, Exponent, MinE, MaxE>&
          res = arg;
       return;
    }
-   else if (type == (int)FP_ZERO)
+   else if (type == static_cast<int>(FP_ZERO))
    {
       res = limb_type(1);
       return;
@@ -129,7 +131,7 @@ void eval_exp(cpp_bin_float<Digits, DigitBase, Allocator, Exponent, MinE, MaxE>&
       return;
    }
 
-   BOOST_ASSERT(t.compare(default_ops::get_constant_ln2<cpp_bin_float<Digits, DigitBase, Allocator, Exponent, MinE, MaxE> >()) < 0);
+   BOOST_MP_ASSERT(t.compare(default_ops::get_constant_ln2<cpp_bin_float<Digits, DigitBase, Allocator, Exponent, MinE, MaxE> >()) < 0);
 
    k = nn ? Exponent(1) << (msb(nn) / 2) : 0;
    k = (std::min)(k, (Exponent)(cpp_bin_float<Digits, DigitBase, Allocator, Exponent, MinE, MaxE>::bit_count / 4));

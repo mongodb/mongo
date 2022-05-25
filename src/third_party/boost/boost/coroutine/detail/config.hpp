@@ -38,4 +38,9 @@
 #define BOOST_COROUTINES_UNIDIRECT
 #define BOOST_COROUTINES_SYMMETRIC
 
+#if defined(__OpenBSD__)
+// stacks need mmap(2) with MAP_STACK
+# define BOOST_COROUTINES_USE_MAP_STACK
+#endif
+
 #endif // BOOST_COROUTINES_DETAIL_CONFIG_H

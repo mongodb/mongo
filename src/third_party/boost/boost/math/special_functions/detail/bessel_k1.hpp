@@ -16,7 +16,7 @@
 #include <boost/math/tools/rational.hpp>
 #include <boost/math/tools/big_constant.hpp>
 #include <boost/math/policies/error_handling.hpp>
-#include <boost/assert.hpp>
+#include <boost/math/tools/assert.hpp>
 
 #if defined(__GNUC__) && defined(BOOST_MATH_USE_FLOAT128)
 //
@@ -44,7 +44,7 @@
 namespace boost { namespace math { namespace detail{
 
    template <typename T>
-   T bessel_k1(const T& x);
+   T bessel_k1(const T&);
 
    template <class T, class tag>
    struct bessel_k1_initializer
@@ -82,9 +82,9 @@ namespace boost { namespace math { namespace detail{
 
 
    template <typename T, int N>
-   inline T bessel_k1_imp(const T& x, const std::integral_constant<int, N>&)
+   inline T bessel_k1_imp(const T&, const std::integral_constant<int, N>&)
    {
-      BOOST_ASSERT(0);
+      BOOST_MATH_ASSERT(0);
       return 0;
    }
 
@@ -527,7 +527,7 @@ namespace boost { namespace math { namespace detail{
           return bessel_k1_imp(x, std::integral_constant<int, 64>());
        else if(boost::math::tools::digits<T>() <= 113)
           return bessel_k1_imp(x, std::integral_constant<int, 113>());
-       BOOST_ASSERT(0);
+       BOOST_MATH_ASSERT(0);
        return 0;
     }
 

@@ -53,6 +53,10 @@ template< typename R >
 struct enable_if_byte< signed char, R > { typedef R type; };
 template< typename R >
 struct enable_if_byte< unsigned char, R > { typedef R type; };
+#if defined(__cpp_lib_byte) && __cpp_lib_byte >= 201603
+template< typename R >
+struct enable_if_byte< std::byte, R > { typedef R type; };
+#endif
 
 } // namespace aux
 

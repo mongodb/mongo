@@ -862,7 +862,8 @@ public:
     struct priority_order {
         bool operator()( test_observer* lhs, test_observer* rhs ) const
         {
-            return (lhs->priority() < rhs->priority()) || ((lhs->priority() == rhs->priority()) && (lhs < rhs));
+            return (lhs->priority() < rhs->priority()) ||
+                ((lhs->priority() == rhs->priority()) && std::less<test_observer*>()(lhs, rhs));
         }
     };
 

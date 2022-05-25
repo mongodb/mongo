@@ -4710,15 +4710,19 @@ def doConfigure(myenv):
         conf.FindSysLibDep("wiredtiger", ["wiredtiger"])
 
     conf.env.Append(CPPDEFINES=[
-        ("BOOST_THREAD_VERSION", "5"),
-        "BOOST_THREAD_USES_DATETIME",
-        "BOOST_SYSTEM_NO_DEPRECATED",
-        "BOOST_MATH_NO_LONG_DOUBLE_MATH_FUNCTIONS",
+        "ABSL_FORCE_ALIGNED_ACCESS",
         "BOOST_ENABLE_ASSERT_DEBUG_HANDLER",
+        # TODO: Ideally, we could not set this define in C++20
+        # builds, but at least our current Xcode 12 doesn't offer
+        # std::atomic_ref, so we cannot.
+        "BOOST_FILESYSTEM_NO_CXX20_ATOMIC_REF",
         "BOOST_LOG_NO_SHORTHAND_NAMES",
         "BOOST_LOG_USE_NATIVE_SYSLOG",
         "BOOST_LOG_WITHOUT_THREAD_ATTR",
-        "ABSL_FORCE_ALIGNED_ACCESS",
+        "BOOST_MATH_NO_LONG_DOUBLE_MATH_FUNCTIONS",
+        "BOOST_SYSTEM_NO_DEPRECATED",
+        "BOOST_THREAD_USES_DATETIME",
+        ("BOOST_THREAD_VERSION", "5"),
     ])
 
     if link_model.startswith("dynamic") and not link_model == 'dynamic-sdk':

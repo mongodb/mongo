@@ -34,7 +34,7 @@ struct empty_node_checker
 
    struct return_type {};
 
-   void operator () (const const_node_ptr&, const return_type&, const return_type&, return_type&) {}
+   void operator () (const_node_ptr, const return_type&, const return_type&, return_type&) {}
 };
 
 }  //namespace detail{

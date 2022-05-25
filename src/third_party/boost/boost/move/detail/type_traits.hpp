@@ -1102,7 +1102,7 @@ struct alignment_of
 class alignment_dummy;
 typedef void (*function_ptr)();
 typedef int (alignment_dummy::*member_ptr);
-typedef int (alignment_dummy::*member_function_ptr)();
+
 struct alignment_struct
 {  long double dummy[4];  };
 
@@ -1125,7 +1125,6 @@ union max_align
    long double long_double_[4];
    alignment_dummy *unknown_class_ptr_;
    function_ptr function_ptr_;
-   member_function_ptr member_function_ptr_;
    alignment_struct alignment_struct_;
 };
 

@@ -17,6 +17,7 @@
 #ifdef BOOST_MSVC
 
    #pragma warning (push)
+   #pragma warning (disable : 4619) // there is no warning number 'XXXX'
    #pragma warning (disable : 4275) // non DLL-interface classkey "identifier" used as base for DLL-interface classkey "identifier"
    #pragma warning (disable : 4251) // "identifier" : class "type" needs to have dll-interface to be used by clients of class "type2"
    #pragma warning (disable : 4675) // "method" should be declared "static" and have exactly one parameter

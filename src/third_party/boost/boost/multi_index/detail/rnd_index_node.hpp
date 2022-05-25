@@ -1,4 +1,4 @@
-/* Copyright 2003-2018 Joaquin M Lopez Munoz.
+/* Copyright 2003-2021 Joaquin M Lopez Munoz.
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
@@ -167,6 +167,25 @@ struct random_access_index_node_impl
       (*pend)->up()=pend;
       ++pbegin;
     }
+  }
+
+  static ptr_pointer gather_nulls(
+    ptr_pointer pbegin,ptr_pointer pend,ptr_pointer x)
+  {
+    for(ptr_pointer p=pbegin;p!=x;++p){
+      if(*p){
+        *pbegin=*p;
+        (*pbegin)->up()=pbegin;
+        ++pbegin;
+      }
+    }
+    for(ptr_pointer p=pend;p!=x;){
+      if(*--p){
+        *--pend=*p;
+        (*pend)->up()=pend;
+      }
+    }
+    return pbegin;
   }
 
 private:

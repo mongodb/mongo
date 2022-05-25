@@ -6,7 +6,7 @@
 #ifndef BOOST_MATH_TOOLS_CXX03_WARN_HPP
 #define BOOST_MATH_TOOLS_CXX03_WARN_HPP
 
-#include <boost/config/pragma_message.hpp>
+#include <boost/math/tools/config.hpp>
 
 #if defined(BOOST_NO_CXX11_NOEXCEPT)
 #  define BOOST_MATH_SHOW_CXX03_WARNING
@@ -52,10 +52,6 @@
 #  define BOOST_MATH_SHOW_CXX03_WARNING
 #  define BOOST_MATH_CXX03_WARN_REASON "BOOST_NO_CXX11_HDR_CHRONO"
 #endif
-#if defined(BOOST_NO_CXX11_THREAD_LOCAL) && !defined(BOOST_MATH_SHOW_CXX03_WARNING)
-#  define BOOST_MATH_SHOW_CXX03_WARNING
-#  define BOOST_MATH_CXX03_WARN_REASON "BOOST_NO_CXX11_THREAD_LOCAL"
-#endif
 #if defined(BOOST_NO_CXX11_CONSTEXPR) && !defined(BOOST_MATH_SHOW_CXX03_WARNING)
 #  define BOOST_MATH_SHOW_CXX03_WARNING
 #  define BOOST_MATH_CXX03_WARN_REASON "BOOST_NO_CXX11_CONSTEXPR"
@@ -76,10 +72,6 @@
 #  define BOOST_MATH_SHOW_CXX03_WARNING
 #  define BOOST_MATH_CXX03_WARN_REASON "BOOST_NO_CXX11_HDR_ARRAY"
 #endif
-#if defined(BOOST_NO_CXX11_HDR_ATOMIC) && !defined(BOOST_MATH_SHOW_CXX03_WARNING)
-#  define BOOST_MATH_SHOW_CXX03_WARNING
-#  define BOOST_MATH_CXX03_WARN_REASON "BOOST_NO_CXX11_HDR_ATOMIC"
-#endif
 #if defined(BOOST_NO_CXX11_ALLOCATOR) && !defined(BOOST_MATH_SHOW_CXX03_WARNING)
 #  define BOOST_MATH_SHOW_CXX03_WARNING
 #  define BOOST_MATH_CXX03_WARN_REASON "BOOST_NO_CXX11_ALLOCATOR"
@@ -95,12 +87,9 @@
 // As from March 2020, C++03 support is deprecated, and as from March 2021 will be removed,
 // so mark up as such:
 //
-#if (defined(_MSC_VER) || defined(__GNUC__)) && !defined(BOOST_MATH_DISABLE_DEPRECATED_03_WARNING)
-BOOST_PRAGMA_MESSAGE("CAUTION: One or more C++11 features were found to be unavailable")
-BOOST_PRAGMA_MESSAGE("CAUTION: Compiling Boost.Math in pre-C++11 conformance modes is now deprecated and will be removed from March 2021.")
-BOOST_PRAGMA_MESSAGE("CAUTION: Define BOOST_MATH_DISABLE_DEPRECATED_03_WARNING to suppress this message.")
-BOOST_PRAGMA_MESSAGE("CAUTION: This message was generated due to the define: " BOOST_MATH_CXX03_WARN_REASON)
-#endif
+// March 2021(mborland): C++03 support has been removed. Replace warning with hard error.
+//
+#error Support for C++03 has been removed. The minimum requirement for this library is fully compliant C++11.
 #endif
 
 #endif

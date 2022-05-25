@@ -98,7 +98,7 @@
 
         private:
           const Policy& my_pol;
-          const function_object_ai_and_ai_prime& operator=(const function_object_ai_and_ai_prime&);
+          const function_object_ai_and_ai_prime& operator=(const function_object_ai_and_ai_prime&) = delete;
         };
       } // namespace airy_ai_zero_detail
 
@@ -149,7 +149,7 @@
 
         private:
           const Policy& my_pol;
-          const function_object_bi_and_bi_prime& operator=(const function_object_bi_and_bi_prime&);
+          const function_object_bi_and_bi_prime& operator=(const function_object_bi_and_bi_prime&) = delete;
         };
       } // namespace airy_bi_zero_detail
     } // namespace airy_zero

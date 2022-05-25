@@ -22,8 +22,8 @@
 #include <string>
 #include <streambuf>
 #include <boost/assert.hpp>
+#include <boost/cstdint.hpp>
 #include <boost/type_traits/integral_constant.hpp>
-#include <boost/locale/utf.hpp>
 #include <boost/log/detail/config.hpp>
 #include <boost/log/detail/header.hpp>
 
@@ -278,12 +278,12 @@ protected:
     size_type length_until_boundary(const char_type* s, size_type n, size_type max_size) const
     {
         BOOST_ASSERT(max_size <= n);
-        return length_until_boundary(s, n, max_size, boost::integral_constant< bool, sizeof(char_type) == 1u >());
+        return length_until_boundary(s, n, max_size, boost::integral_constant< std::size_t, sizeof(char_type) >());
     }
 
 private:
     //! Finds the string length so that it includes only complete characters, and does not exceed \a max_size
-    size_type length_until_boundary(const char_type* s, size_type, size_type max_size, boost::true_type) const
+    size_type length_until_boundary(const char_type* s, size_type, size_type max_size, boost::integral_constant< std::size_t, 1u >) const
     {
         std::locale loc = this->getloc();
         std::codecvt< wchar_t, char, std::mbstate_t > const& fac = std::use_facet< std::codecvt< wchar_t, char, std::mbstate_t > >(loc);
@@ -292,27 +292,29 @@ private:
     }
 
     //! Finds the string length so that it includes only complete characters, and does not exceed \a max_size
-    static size_type length_until_boundary(const char_type* s, size_type n, size_type max_size, boost::false_type)
+    static size_type length_until_boundary(const char_type* s, size_type n, size_type max_size, boost::integral_constant< std::size_t, 2u >)
     {
-        // Note: Although it's not required to be true for wchar_t, here we assume that the string has Unicode encoding.
+        // Note: Although it's not required to be true for wchar_t, here we assume that the string has Unicode encoding (UTF-16 or UCS-2).
         // Compilers use some version of Unicode for wchar_t on all tested platforms, and std::locale doesn't offer a way
         // to find the character boundary for character types other than char anyway.
-        typedef boost::locale::utf::utf_traits< char_type > utf_traits;
-
         size_type pos = max_size;
         while (pos > 0u)
         {
             --pos;
-            if (utf_traits::is_lead(s[pos]))
-            {
-                const char_type* p = s + pos;
-                boost::locale::utf::code_point cp = utf_traits::decode(p, s + n);
-                if (boost::locale::utf::is_valid_codepoint(cp) && p <= (s + max_size))
-                    return static_cast< size_type >(p - s);
-            }
+            uint_fast16_t c = static_cast< uint_fast16_t >(s[pos]);
+            // Check if this is a leading surrogate
+            if ((c & 0xFC00u) != 0xD800u)
+                return pos + 1u;
         }
 
         return 0u;
+    }
+
+    //! Finds the string length so that it includes only complete characters, and does not exceed \a max_size
+    static size_type length_until_boundary(const char_type* s, size_type n, size_type max_size, boost::integral_constant< std::size_t, 4u >)
+    {
+        // In UTF-32 and UCS-4 one code point is encoded as one code unit
+        return max_size;
     }
 
     //! Copy constructor (closed)

@@ -3,7 +3,7 @@
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
  *
- * Copyright (c) 2020 Andrey Semashev
+ * Copyright (c) 2020-2021 Andrey Semashev
  */
 /*!
  * \file   atomic/atomic_ref.hpp
@@ -74,9 +74,22 @@ public:
     BOOST_DELETED_FUNCTION(atomic_ref& operator= (atomic_ref const&))
 };
 
+#if !defined(BOOST_ATOMIC_DETAIL_NO_CXX17_DEDUCTION_GUIDES)
+template< typename T >
+atomic_ref(T&) -> atomic_ref< T >;
+#endif // !defined(BOOST_ATOMIC_DETAIL_NO_CXX17_DEDUCTION_GUIDES)
+
+//! Atomic reference factory function
+template< typename T >
+BOOST_FORCEINLINE atomic_ref< T > make_atomic_ref(T& value) BOOST_NOEXCEPT
+{
+    return atomic_ref< T >(value);
+}
+
 } // namespace atomics
 
 using atomics::atomic_ref;
+using atomics::make_atomic_ref;
 
 } // namespace boost
 

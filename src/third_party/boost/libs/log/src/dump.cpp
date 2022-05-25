@@ -1,5 +1,5 @@
 /*
- *          Copyright Andrey Semashev 2007 - 2015.
+ *          Copyright Andrey Semashev 2007 - 2021.
  * Distributed under the Boost Software License, Version 1.0.
  *    (See accompanying file LICENSE_1_0.txt or copy at
  *          http://www.boost.org/LICENSE_1_0.txt)
@@ -38,6 +38,14 @@ extern dump_data_char16_t dump_data_char16_ssse3;
 #if !defined(BOOST_NO_CXX11_CHAR32_T)
 extern dump_data_char32_t dump_data_char32_ssse3;
 #endif
+extern dump_data_char_t dump_data_char_ssse3_slow_pshufb;
+extern dump_data_wchar_t dump_data_wchar_ssse3_slow_pshufb;
+#if !defined(BOOST_NO_CXX11_CHAR16_T)
+extern dump_data_char16_t dump_data_char16_ssse3_slow_pshufb;
+#endif
+#if !defined(BOOST_NO_CXX11_CHAR32_T)
+extern dump_data_char32_t dump_data_char32_ssse3_slow_pshufb;
+#endif
 #endif
 #if defined(BOOST_LOG_USE_AVX2)
 extern dump_data_char_t dump_data_char_avx2;
@@ -52,7 +60,7 @@ extern dump_data_char32_t dump_data_char32_avx2;
 
 enum { stride = 256 };
 
-extern const char g_hex_char_table[2][16] =
+BOOST_ALIGNMENT(16) extern const char g_hex_char_table[2][16] =
 {
     { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' },
     { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' }
@@ -129,6 +137,7 @@ struct function_pointer_initializer
         cpuid(eax, ebx, ecx, edx);
 
         const uint32_t max_cpuid_function = eax;
+        const uint32_t cpu_vendor[3u] = { ebx, edx, ecx };
         if (max_cpuid_function >= 1)
         {
             eax = 1;
@@ -137,7 +146,21 @@ struct function_pointer_initializer
 
             // Check for SSSE3 support
             if (ecx & (1u << 9))
-                enable_ssse3();
+            {
+                const uint32_t family = ((eax >> 8) & 0x0000000F) + ((eax >> 20) & 0x000000FF);
+                const uint32_t model = ((eax >> 4) & 0x0000000F) | ((eax >> 12) & 0x000000F0);
+
+                // Check if the CPU has slow pshufb. Some old Intel Atoms prior to Silvermont.
+                if (cpu_vendor[0] == 0x756e6547 && cpu_vendor[1] == 0x49656e69 && cpu_vendor[2] == 0x6c65746e &&
+                    family == 6 && (model == 28 || model == 38 || model == 39 || model == 53 || model == 54))
+                {
+                    enable_ssse3_slow_pshufb();
+                }
+                else
+                {
+                    enable_ssse3();
+                }
+            }
 
 #if defined(BOOST_LOG_USE_AVX2)
             if (max_cpuid_function >= 7)
@@ -156,7 +179,7 @@ struct function_pointer_initializer
                             : "=a" (eax), "=d" (edx)
                             : "c" (0)
                     );
-                    mmstate = (eax & 6U) == 6U;
+                    mmstate = (eax & 6u) == 6u;
 #elif defined(BOOST_WINDOWS)
                     // MSVC does not have an intrinsic for xgetbv, we have to query OS
                     boost::winapi::HMODULE_ hKernel32 = boost::winapi::GetModuleHandleW(L"kernel32.dll");
@@ -179,7 +202,7 @@ struct function_pointer_initializer
                         ebx = ecx = edx = 0;
                         cpuid(eax, ebx, ecx, edx);
 
-                        if (ebx & (1U << 5))
+                        if (ebx & (1u << 5))
                             enable_avx2();
                     }
                 }
@@ -230,6 +253,18 @@ private:
         edx = regs[3];
 #else
 #error Boost.Log: Unexpected compiler
+#endif
+    }
+
+    static void enable_ssse3_slow_pshufb()
+    {
+        dump_data_char = &dump_data_char_ssse3_slow_pshufb;
+        dump_data_wchar = &dump_data_wchar_ssse3_slow_pshufb;
+#if !defined(BOOST_NO_CXX11_CHAR16_T)
+        dump_data_char16 = &dump_data_char16_ssse3_slow_pshufb;
+#endif
+#if !defined(BOOST_NO_CXX11_CHAR32_T)
+        dump_data_char32 = &dump_data_char32_ssse3_slow_pshufb;
 #endif
     }
 

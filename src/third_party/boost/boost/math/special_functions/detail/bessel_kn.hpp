@@ -56,7 +56,7 @@ T bessel_kn(int n, T x, const Policy& pol)
        prev = bessel_k0(x);
        current = bessel_k1(x);
        int k = 1;
-       BOOST_ASSERT(k < n);
+       BOOST_MATH_ASSERT(k < n);
        T scale = 1;
        do
        {

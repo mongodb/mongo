@@ -133,7 +133,7 @@ inline bool asymptotic_bessel_large_x_limit(int v, const T& x)
       // error rates either side of the divide for v < 10000.
       // At double precision eps^1/8 ~= 0.01.
       //
-      BOOST_ASSERT(v >= 0);
+      BOOST_MATH_ASSERT(v >= 0);
       return (v ? v : 1) < x * 0.004f;
 }
 

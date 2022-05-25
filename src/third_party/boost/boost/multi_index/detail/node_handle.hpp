@@ -1,4 +1,4 @@
-/* Copyright 2003-2020 Joaquin M Lopez Munoz.
+/* Copyright 2003-2021 Joaquin M Lopez Munoz.
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
@@ -24,6 +24,12 @@
 #include <boost/type_traits/aligned_storage.hpp>
 #include <boost/type_traits/alignment_of.hpp> 
 #include <new>
+
+#if !defined(BOOST_NO_SFINAE)
+#include <boost/type_traits/is_const.hpp>
+#include <boost/type_traits/is_same.hpp>
+#include <boost/utility/enable_if.hpp>
+#endif
 
 namespace boost{
 
@@ -234,6 +240,23 @@ struct insert_return_type
 private:
   BOOST_MOVABLE_BUT_NOT_COPYABLE(insert_return_type)
 };
+
+/* utility for SFINAEing merge and related operations */
+
+#if !defined(BOOST_NO_SFINAE)
+
+#define BOOST_MULTI_INDEX_ENABLE_IF_MERGEABLE(Dst,Src,T)           \
+typename enable_if_c<                                              \
+  !is_const< Dst >::value&&!is_const< Src >::value&&               \
+  is_same<typename Dst::node_type,typename Src::node_type>::value, \
+  T                                                                \
+>::type
+
+#else
+
+#define BOOST_MULTI_INDEX_ENABLE_IF_MERGEABLE(Dst,Src,T) T
+
+#endif
 
 } /* namespace multi_index::detail */
 

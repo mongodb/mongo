@@ -88,7 +88,7 @@ class basic_bufferbuf
       :  basic_streambuf_t(), m_mode(mode), m_buffer(buf), m_length(length)
       {  this->set_pointers();   }
 
-   virtual ~basic_bufferbuf(){}
+   virtual ~basic_bufferbuf() BOOST_OVERRIDE {}
 
    public:
    //!Returns the pointer and size of the internal buffer.
@@ -115,14 +115,14 @@ class basic_bufferbuf
    }
 
    protected:
-   virtual int_type underflow()
+   virtual int_type underflow() BOOST_OVERRIDE
    {
       // Precondition: gptr() >= egptr(). Returns a character, if available.
       return this->gptr() != this->egptr() ?
          CharTraits::to_int_type(*this->gptr()) : CharTraits::eof();
    }
 
-   virtual int_type pbackfail(int_type c = CharTraits::eof())
+   virtual int_type pbackfail(int_type c = CharTraits::eof()) BOOST_OVERRIDE
    {
       if(this->gptr() != this->eback()) {
          if(!CharTraits::eq_int_type(c, CharTraits::eof())) {
@@ -147,7 +147,7 @@ class basic_bufferbuf
          return CharTraits::eof();
    }
 
-   virtual int_type overflow(int_type c = CharTraits::eof())
+   virtual int_type overflow(int_type c = CharTraits::eof()) BOOST_OVERRIDE
    {
       if(m_mode & std::ios_base::out) {
          if(!CharTraits::eq_int_type(c, CharTraits::eof())) {
@@ -181,7 +181,7 @@ class basic_bufferbuf
 
    virtual pos_type seekoff(off_type off, std::ios_base::seekdir dir,
                               std::ios_base::openmode mode
-                                 = std::ios_base::in | std::ios_base::out)
+                                 = std::ios_base::in | std::ios_base::out) BOOST_OVERRIDE
    {
       bool in  = false;
       bool out = false;
@@ -246,7 +246,7 @@ class basic_bufferbuf
    }
 
    virtual pos_type seekpos(pos_type pos, std::ios_base::openmode mode
-                                 = std::ios_base::in | std::ios_base::out)
+                                 = std::ios_base::in | std::ios_base::out) BOOST_OVERRIDE
    {  return seekoff(pos - pos_type(off_type(0)), std::ios_base::beg, mode);  }
 
    private:

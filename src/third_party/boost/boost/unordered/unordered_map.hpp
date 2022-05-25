@@ -210,7 +210,10 @@ namespace boost {
 
       // size and capacity
 
-      bool empty() const BOOST_NOEXCEPT { return table_.size_ == 0; }
+      BOOST_ATTRIBUTE_NODISCARD bool empty() const BOOST_NOEXCEPT
+      {
+        return table_.size_ == 0;
+      }
 
       size_type size() const BOOST_NOEXCEPT { return table_.size_; }
 
@@ -385,10 +388,9 @@ namespace boost {
       }
 
       template <class P2>
-      std::pair<iterator, bool> insert(BOOST_RV_REF(P2) obj,
-        typename boost::enable_if_c<
-          boost::is_constructible<value_type, BOOST_RV_REF(P2)>::value,
-          void*>::type = 0)
+      typename boost::enable_if<
+        boost::is_constructible<value_type, BOOST_RV_REF(P2)>,
+        std::pair<iterator, bool> >::type insert(BOOST_RV_REF(P2) obj)
       {
         return this->emplace(boost::forward<P2>(obj));
       }
@@ -404,10 +406,9 @@ namespace boost {
       }
 
       template <class P2>
-      iterator insert(const_iterator hint, BOOST_RV_REF(P2) obj,
-        typename boost::enable_if_c<
-          boost::is_constructible<value_type, BOOST_RV_REF(P2)>::value,
-          void*>::type = 0)
+      typename boost::enable_if<
+        boost::is_constructible<value_type, BOOST_RV_REF(P2)>, iterator>::type
+      insert(const_iterator hint, BOOST_RV_REF(P2) obj)
       {
         return this->emplace_hint(hint, boost::forward<P2>(obj));
       }
@@ -428,7 +429,17 @@ namespace boost {
 
       node_type extract(const key_type& k)
       {
-        return node_type(table_.extract_by_key(k), table_.node_alloc());
+        return node_type(table_.extract_by_key_impl(k), table_.node_alloc());
+      }
+
+      template <class Key>
+      typename boost::enable_if_c<
+        detail::transparent_non_iterable<Key, unordered_map>::value,
+        node_type>::type
+      extract(BOOST_FWD_REF(Key) k)
+      {
+        return node_type(table_.extract_by_key_impl(boost::forward<Key>(k)),
+          table_.node_alloc());
       }
 
       insert_return_type insert(BOOST_RV_REF(node_type) np)
@@ -710,6 +721,17 @@ namespace boost {
       iterator erase(const_iterator);
       size_type erase(const key_type&);
       iterator erase(const_iterator, const_iterator);
+
+      template <class Key>
+      typename boost::enable_if_c<
+        detail::transparent_non_iterable<Key, unordered_map>::value,
+        size_type>::type
+      erase(BOOST_FWD_REF(Key) k)
+      {
+        return table_.erase_key_unique_impl(
+          this->key_eq(), boost::forward<Key>(k));
+      }
+
       BOOST_UNORDERED_DEPRECATED("Use erase instead")
       void quick_erase(const_iterator it) { erase(it); }
       BOOST_UNORDERED_DEPRECATED("Use erase instead")
@@ -747,6 +769,26 @@ namespace boost {
       iterator find(const key_type&);
       const_iterator find(const key_type&) const;
 
+      template <class Key>
+      typename boost::enable_if_c<detail::are_transparent<Key, H, P>::value,
+        iterator>::type
+      find(const Key& key)
+      {
+        return iterator(table_.find_node_impl(
+          table::policy::apply_hash(this->hash_function(), key), key,
+          this->key_eq()));
+      }
+
+      template <class Key>
+      typename boost::enable_if_c<detail::are_transparent<Key, H, P>::value,
+        const_iterator>::type
+      find(const Key& key) const
+      {
+        return const_iterator(table_.find_node_impl(
+          table::policy::apply_hash(this->hash_function(), key), key,
+          this->key_eq()));
+      }
+
       template <class CompatibleKey, class CompatibleHash,
         class CompatiblePredicate>
       iterator find(CompatibleKey const&, CompatibleHash const&,
@@ -757,11 +799,69 @@ namespace boost {
       const_iterator find(CompatibleKey const&, CompatibleHash const&,
         CompatiblePredicate const&) const;
 
+      bool contains(const key_type& k) const
+      {
+        return 0 != table_.find_node_impl(
+                      table::policy::apply_hash(this->hash_function(), k), k,
+                      this->key_eq());
+      }
+
+      template <class Key>
+      typename boost::enable_if_c<detail::are_transparent<Key, H, P>::value,
+        bool>::type
+      contains(const Key& k) const
+      {
+        return 0 != table_.find_node_impl(
+                      table::policy::apply_hash(this->hash_function(), k), k,
+                      this->key_eq());
+      }
+
       size_type count(const key_type&) const;
+
+      template <class Key>
+      typename boost::enable_if_c<detail::are_transparent<Key, H, P>::value,
+        size_type>::type
+      count(const Key& k) const
+      {
+        std::size_t const key_hash =
+          table::policy::apply_hash(this->hash_function(), k);
+
+        P const& eq = this->key_eq();
+
+        node_pointer p = table_.find_node_impl(key_hash, k, eq);
+
+        return (p ? 1 : 0);
+      }
 
       std::pair<iterator, iterator> equal_range(const key_type&);
       std::pair<const_iterator, const_iterator> equal_range(
         const key_type&) const;
+
+      template <class Key>
+      typename boost::enable_if_c<detail::are_transparent<Key, H, P>::value,
+        std::pair<iterator, iterator> >::type
+      equal_range(const Key& key)
+      {
+        node_pointer p = table_.find_node_impl(
+          table::policy::apply_hash(this->hash_function(), key), key,
+          this->key_eq());
+
+        return std::make_pair(
+          iterator(p), iterator(p ? table::next_node(p) : p));
+      }
+
+      template <class Key>
+      typename boost::enable_if_c<detail::are_transparent<Key, H, P>::value,
+        std::pair<const_iterator, const_iterator> >::type
+      equal_range(const Key& key) const
+      {
+        node_pointer p = table_.find_node_impl(
+          table::policy::apply_hash(this->hash_function(), key), key,
+          this->key_eq());
+
+        return std::make_pair(
+          const_iterator(p), const_iterator(p ? table::next_node(p) : p));
+      }
 
       mapped_type& operator[](const key_type&);
       mapped_type& operator[](BOOST_RV_REF(key_type));
@@ -1080,7 +1180,10 @@ namespace boost {
 
       // size and capacity
 
-      bool empty() const BOOST_NOEXCEPT { return table_.size_ == 0; }
+      BOOST_ATTRIBUTE_NODISCARD bool empty() const BOOST_NOEXCEPT
+      {
+        return table_.size_ == 0;
+      }
 
       size_type size() const BOOST_NOEXCEPT { return table_.size_; }
 
@@ -1249,10 +1352,9 @@ namespace boost {
       }
 
       template <class P2>
-      iterator insert(BOOST_RV_REF(P2) obj,
-        typename boost::enable_if_c<
-          boost::is_constructible<value_type, BOOST_RV_REF(P2)>::value,
-          void*>::type = 0)
+      typename boost::enable_if<
+        boost::is_constructible<value_type, BOOST_RV_REF(P2)>,
+        iterator>::type insert(BOOST_RV_REF(P2) obj)
       {
         return this->emplace(boost::forward<P2>(obj));
       }
@@ -1268,10 +1370,10 @@ namespace boost {
       }
 
       template <class P2>
-      iterator insert(const_iterator hint, BOOST_RV_REF(P2) obj,
-        typename boost::enable_if_c<
-          boost::is_constructible<value_type, BOOST_RV_REF(P2)>::value,
-          void*>::type = 0)
+      typename boost::enable_if<
+        boost::is_constructible<value_type, BOOST_RV_REF(P2)>,
+        iterator>::type
+      insert(const_iterator hint, BOOST_RV_REF(P2) obj)
       {
         return this->emplace_hint(hint, boost::forward<P2>(obj));
       }
@@ -1293,6 +1395,15 @@ namespace boost {
       node_type extract(const key_type& k)
       {
         return node_type(table_.extract_by_key(k), table_.node_alloc());
+      }
+
+      template <class Key>
+      typename boost::enable_if_c<
+        detail::transparent_non_iterable<Key, unordered_multimap>::value,
+        node_type>::type
+      extract(const Key& k)
+      {
+        return node_type(table_.extract_by_key_impl(k), table_.node_alloc());
       }
 
       iterator insert(BOOST_RV_REF(node_type) np)
@@ -1319,6 +1430,17 @@ namespace boost {
       iterator erase(const_iterator);
       size_type erase(const key_type&);
       iterator erase(const_iterator, const_iterator);
+
+      template <class Key>
+      typename boost::enable_if_c<
+        detail::transparent_non_iterable<Key, unordered_multimap>::value,
+        size_type>::type
+      erase(BOOST_FWD_REF(Key) k)
+      {
+        return table_.erase_key_equiv_impl(
+          this->key_eq(), boost::forward<Key>(k));
+      }
+
       BOOST_UNORDERED_DEPRECATED("Use erase instead")
       void quick_erase(const_iterator it) { erase(it); }
       BOOST_UNORDERED_DEPRECATED("Use erase instead")
@@ -1356,6 +1478,26 @@ namespace boost {
       iterator find(const key_type&);
       const_iterator find(const key_type&) const;
 
+      template <class Key>
+      typename boost::enable_if_c<detail::are_transparent<Key, H, P>::value,
+        iterator>::type
+      find(const Key& key)
+      {
+        return iterator(table_.find_node_impl(
+          table::policy::apply_hash(this->hash_function(), key), key,
+          this->key_eq()));
+      }
+
+      template <class Key>
+      typename boost::enable_if_c<detail::are_transparent<Key, H, P>::value,
+        const_iterator>::type
+      find(const Key& key) const
+      {
+        return const_iterator(table_.find_node_impl(
+          table::policy::apply_hash(this->hash_function(), key), key,
+          this->key_eq()));
+      }
+
       template <class CompatibleKey, class CompatibleHash,
         class CompatiblePredicate>
       iterator find(CompatibleKey const&, CompatibleHash const&,
@@ -1366,11 +1508,66 @@ namespace boost {
       const_iterator find(CompatibleKey const&, CompatibleHash const&,
         CompatiblePredicate const&) const;
 
+      bool contains(key_type const& k) const
+      {
+        return 0 != table_.find_node_impl(
+                      table::policy::apply_hash(this->hash_function(), k), k,
+                      this->key_eq());
+      }
+
+      template <class Key>
+      typename boost::enable_if_c<detail::are_transparent<Key, H, P>::value,
+        bool>::type
+      contains(const Key& k) const
+      {
+        return 0 != table_.find_node_impl(
+                      table::policy::apply_hash(this->hash_function(), k), k,
+                      this->key_eq());
+      }
+
       size_type count(const key_type&) const;
+
+      template <class Key>
+      typename boost::enable_if_c<detail::are_transparent<Key, H, P>::value,
+        size_type>::type
+      count(const Key& k) const
+      {
+        node_pointer n = table_.find_node_impl(
+          table::policy::apply_hash(this->hash_function(), k), k,
+          this->key_eq());
+
+        return n ? table_.group_count(n) : 0;
+      }
 
       std::pair<iterator, iterator> equal_range(const key_type&);
       std::pair<const_iterator, const_iterator> equal_range(
         const key_type&) const;
+
+      template <class Key>
+      typename boost::enable_if_c<detail::are_transparent<Key, H, P>::value,
+        std::pair<iterator, iterator> >::type
+      equal_range(const Key& key)
+      {
+        node_pointer p = table_.find_node_impl(
+          table::policy::apply_hash(this->hash_function(), key), key,
+          this->key_eq());
+
+        return std::make_pair(
+          iterator(p), iterator(p ? table_.next_group(p) : p));
+      }
+
+      template <class Key>
+      typename boost::enable_if_c<detail::are_transparent<Key, H, P>::value,
+        std::pair<const_iterator, const_iterator> >::type
+      equal_range(const Key& key) const
+      {
+        node_pointer p = table_.find_node_impl(
+          table::policy::apply_hash(this->hash_function(), key), key,
+          this->key_eq());
+
+        return std::make_pair(
+          const_iterator(p), const_iterator(p ? table_.next_group(p) : p));
+      }
 
       // bucket interface
 
@@ -1719,7 +1916,7 @@ namespace boost {
     typename unordered_map<K, T, H, P, A>::size_type
     unordered_map<K, T, H, P, A>::erase(const key_type& k)
     {
-      return table_.erase_key_unique(k);
+      return table_.erase_key_unique_impl(this->key_eq(), k);
     }
 
     template <class K, class T, class H, class P, class A>
@@ -1975,6 +2172,13 @@ namespace boost {
       };
 #endif
       m1.swap(m2);
+    }
+
+    template <class K, class T, class H, class P, class A, class Predicate>
+    typename unordered_map<K, T, H, P, A>::size_type erase_if(
+      unordered_map<K, T, H, P, A>& c, Predicate pred)
+    {
+      return detail::erase_if(c, pred);
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -2422,6 +2626,13 @@ namespace boost {
       m1.swap(m2);
     }
 
+    template <class K, class T, class H, class P, class A, class Predicate>
+    typename unordered_multimap<K, T, H, P, A>::size_type erase_if(
+      unordered_multimap<K, T, H, P, A>& c, Predicate pred)
+    {
+      return detail::erase_if(c, pred);
+    }
+
     template <typename N, class K, class T, class A> class node_handle_map
     {
       BOOST_MOVABLE_BUT_NOT_COPYABLE(node_handle_map)
@@ -2514,7 +2725,10 @@ namespace boost {
 
       bool operator!() const BOOST_NOEXCEPT { return ptr_ ? 0 : 1; }
 
-      bool empty() const BOOST_NOEXCEPT { return ptr_ ? 0 : 1; }
+      BOOST_ATTRIBUTE_NODISCARD bool empty() const BOOST_NOEXCEPT
+      {
+        return ptr_ ? 0 : 1;
+      }
 
       void swap(node_handle_map& n) BOOST_NOEXCEPT_IF(
         value_allocator_traits::propagate_on_container_swap::value ||

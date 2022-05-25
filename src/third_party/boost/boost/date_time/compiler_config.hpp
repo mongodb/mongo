@@ -28,10 +28,6 @@
 
 // Include extensions to date_duration - comment out to remove this feature
 #define BOOST_DATE_TIME_OPTIONAL_GREGORIAN_TYPES
-// these extensions are known to cause problems with gcc295
-#if defined(__GNUC__) && (__GNUC__ < 3)
-#undef BOOST_DATE_TIME_OPTIONAL_GREGORIAN_TYPES
-#endif
 
 #if (defined(BOOST_NO_INCLASS_MEMBER_INITIALIZATION) || BOOST_WORKAROUND( BOOST_BORLANDC,  BOOST_TESTED_AT(0x581) ) )
 #define BOOST_DATE_TIME_NO_MEMBER_INIT
@@ -123,26 +119,6 @@ namespace std {
 #  define BOOST_DATE_TIME_DECL
 #endif
 
-//
-// Automatically link to the correct build variant where possible. 
-// 
-#if !defined(BOOST_ALL_NO_LIB) && !defined(BOOST_DATE_TIME_NO_LIB) && !defined(BOOST_DATE_TIME_SOURCE)
-//
-// Set the name of our library, this will get undef'ed by auto_link.hpp
-// once it's done with it:
-//
-#define BOOST_LIB_NAME boost_date_time
-//
-// If we're importing code from a dll, then tell auto_link.hpp about it:
-//
-#if defined(BOOST_ALL_DYN_LINK) || defined(BOOST_DATE_TIME_DYN_LINK)
-#  define BOOST_DYN_LINK
-#endif
-//
-// And include the header that does the work:
-//
-#include <boost/config/auto_link.hpp>
-#endif  // auto-linking disabled
 
 #if defined(BOOST_HAS_THREADS) 
 #  if defined(_MSC_VER) || defined(__MWERKS__) || defined(__MINGW32__) ||  defined(__BORLANDC__)

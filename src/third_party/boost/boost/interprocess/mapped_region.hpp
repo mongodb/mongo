@@ -47,7 +47,6 @@
 
 #if defined (BOOST_INTERPROCESS_WINDOWS)
 #  include <boost/interprocess/detail/win32_api.hpp>
-#  include <boost/interprocess/sync/windows/sync_utils.hpp>
 #else
 #  ifdef BOOST_HAS_UNISTD_H
 #    include <fcntl.h>
@@ -365,12 +364,12 @@ inline offset_t mapped_region::priv_page_offset_addr_fixup(offset_t offset, cons
    //We calculate the difference between demanded and valid offset
    //(always less than a page in std::size_t, thus, representable by std::size_t)
    const std::size_t page_offset =
-      static_cast<std::size_t>(offset - (offset / page_size) * page_size);
+      static_cast<std::size_t>(offset - (offset / offset_t(page_size)) * offset_t(page_size));
    //Update the mapping address
    if(address){
       address = static_cast<const char*>(address) - page_offset;
    }
-   return page_offset;
+   return offset_t(page_offset);
 }
 
 #if defined (BOOST_INTERPROCESS_WINDOWS)
@@ -446,7 +445,7 @@ inline mapped_region::mapped_region
 
          //Check if all is correct
          if(!native_mapping_handle){
-            error_info err = winapi::get_last_error();
+            error_info err ((int)winapi::get_last_error());
             throw interprocess_exception(err);
          }
          handle_to_close = native_mapping_handle;
@@ -466,7 +465,7 @@ inline mapped_region::mapped_region
       if(size == 0){
          offset_t mapping_size;
          if(!winapi::get_file_mapping_size(native_mapping_handle, mapping_size)){
-            error_info err = winapi::get_last_error();
+            error_info err((int)winapi::get_last_error());
             throw interprocess_exception(err);
          }
          //This can throw
@@ -477,18 +476,18 @@ inline mapped_region::mapped_region
       void *base = winapi::map_view_of_file_ex
                                  (native_mapping_handle,
                                  map_access,
-                                 offset - page_offset,
+                                 ::boost::ulong_long_type(offset - page_offset),
                                  static_cast<std::size_t>(page_offset + size),
                                  const_cast<void*>(address));
       //Check error
       if(!base){
-         error_info err = winapi::get_last_error();
+         error_info err((int)winapi::get_last_error());
          throw interprocess_exception(err);
       }
 
       //Calculate new base for the user
       m_base = static_cast<char*>(base) + page_offset;
-      m_page_offset = page_offset;
+      m_page_offset = static_cast<std::size_t>(page_offset);
       m_size = size;
    }
    //Windows shared memory needs the duplication of the handle if we want to
@@ -496,7 +495,7 @@ inline mapped_region::mapped_region
    //
    //For mapped files, we duplicate the file handle to be able to FlushFileBuffers
    if(!winapi::duplicate_current_process_handle(mhandle.handle, &m_file_or_mapping_hnd)){
-      error_info err = winapi::get_last_error();
+      error_info err((int)winapi::get_last_error());
       this->priv_close();
       throw interprocess_exception(err);
    }
@@ -696,7 +695,7 @@ inline mapped_region::mapped_region
 
    //Map it to the address space
    void* base = mmap ( const_cast<void*>(address)
-                     , static_cast<std::size_t>(page_offset + size)
+                     , static_cast<std::size_t>(page_offset) + size
                      , prot
                      , flags
                      , mapping.get_mapping_handle().handle
@@ -710,7 +709,7 @@ inline mapped_region::mapped_region
 
    //Calculate new base for the user
    m_base = static_cast<char*>(base) + page_offset;
-   m_page_offset = page_offset;
+   m_page_offset = static_cast<std::size_t>(page_offset);
    m_size   = size;
 
    //Check for fixed mapping error

@@ -2,7 +2,7 @@
 // impl/dispatch.hpp
 // ~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -54,7 +54,8 @@ public:
         boost::asio::prefer(ex,
           execution::blocking.possibly,
           execution::allocator(alloc)),
-        BOOST_ASIO_MOVE_CAST(CompletionHandler)(handler));
+        boost::asio::detail::bind_handler(
+          BOOST_ASIO_MOVE_CAST(CompletionHandler)(handler)));
   }
 
   template <typename CompletionHandler>
@@ -75,7 +76,8 @@ public:
     typename associated_allocator<handler_t>::type alloc(
         (get_associated_allocator)(handler));
 
-    ex.dispatch(BOOST_ASIO_MOVE_CAST(CompletionHandler)(handler), alloc);
+    ex.dispatch(boost::asio::detail::bind_handler(
+          BOOST_ASIO_MOVE_CAST(CompletionHandler)(handler)), alloc);
   }
 };
 
@@ -118,7 +120,8 @@ public:
         boost::asio::prefer(ex_,
           execution::blocking.possibly,
           execution::allocator(alloc)),
-        BOOST_ASIO_MOVE_CAST(CompletionHandler)(handler));
+        boost::asio::detail::bind_handler(
+          BOOST_ASIO_MOVE_CAST(CompletionHandler)(handler)));
   }
 
   template <typename CompletionHandler>
@@ -171,7 +174,8 @@ public:
     typename associated_allocator<handler_t>::type alloc(
         (get_associated_allocator)(handler));
 
-    ex_.dispatch(BOOST_ASIO_MOVE_CAST(CompletionHandler)(handler), alloc);
+    ex_.dispatch(boost::asio::detail::bind_handler(
+          BOOST_ASIO_MOVE_CAST(CompletionHandler)(handler)), alloc);
   }
 
   template <typename CompletionHandler>
@@ -208,34 +212,34 @@ private:
 
 } // namespace detail
 
-template <BOOST_ASIO_COMPLETION_TOKEN_FOR(void()) CompletionToken>
-BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(CompletionToken, void()) dispatch(
-    BOOST_ASIO_MOVE_ARG(CompletionToken) token)
+template <BOOST_ASIO_COMPLETION_TOKEN_FOR(void()) NullaryToken>
+BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(NullaryToken, void()) dispatch(
+    BOOST_ASIO_MOVE_ARG(NullaryToken) token)
 {
-  return async_initiate<CompletionToken, void()>(
+  return async_initiate<NullaryToken, void()>(
       detail::initiate_dispatch(), token);
 }
 
 template <typename Executor,
-    BOOST_ASIO_COMPLETION_TOKEN_FOR(void()) CompletionToken>
-BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(CompletionToken, void()) dispatch(
-    const Executor& ex, BOOST_ASIO_MOVE_ARG(CompletionToken) token,
+    BOOST_ASIO_COMPLETION_TOKEN_FOR(void()) NullaryToken>
+BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(NullaryToken, void()) dispatch(
+    const Executor& ex, BOOST_ASIO_MOVE_ARG(NullaryToken) token,
     typename constraint<
       execution::is_executor<Executor>::value || is_executor<Executor>::value
     >::type)
 {
-  return async_initiate<CompletionToken, void()>(
+  return async_initiate<NullaryToken, void()>(
       detail::initiate_dispatch_with_executor<Executor>(ex), token);
 }
 
 template <typename ExecutionContext,
-    BOOST_ASIO_COMPLETION_TOKEN_FOR(void()) CompletionToken>
-inline BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(CompletionToken, void()) dispatch(
-    ExecutionContext& ctx, BOOST_ASIO_MOVE_ARG(CompletionToken) token,
+    BOOST_ASIO_COMPLETION_TOKEN_FOR(void()) NullaryToken>
+inline BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(NullaryToken, void()) dispatch(
+    ExecutionContext& ctx, BOOST_ASIO_MOVE_ARG(NullaryToken) token,
     typename constraint<is_convertible<
       ExecutionContext&, execution_context&>::value>::type)
 {
-  return async_initiate<CompletionToken, void()>(
+  return async_initiate<NullaryToken, void()>(
       detail::initiate_dispatch_with_executor<
         typename ExecutionContext::executor_type>(
           ctx.get_executor()), token);

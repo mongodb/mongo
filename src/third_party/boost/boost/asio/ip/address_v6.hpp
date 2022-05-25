@@ -2,7 +2,7 @@
 // ip/address_v6.hpp
 // ~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -68,9 +68,23 @@ public:
 #endif
 
   /// Default constructor.
+  /**
+   * Initialises the @c address_v6 object such that:
+   * @li <tt>to_bytes()</tt> yields <tt>{0, 0, ..., 0}</tt>; and
+   * @li <tt>scope_id() == 0</tt>.
+   */
   BOOST_ASIO_DECL address_v6() BOOST_ASIO_NOEXCEPT;
 
   /// Construct an address from raw bytes and scope ID.
+  /**
+   * Initialises the @c address_v6 object such that:
+   * @li <tt>to_bytes() == bytes</tt>; and
+   * @li <tt>this->scope_id() == scope_id</tt>.
+   *
+   * @throws out_of_range Thrown if any element in @c bytes is not in the range
+   * <tt>0 - 0xFF</tt>. Note that no range checking is required for platforms
+   * where <tt>std::numeric_limits<unsigned char>::max()</tt> is <tt>0xFF</tt>.
+   */
   BOOST_ASIO_DECL explicit address_v6(const bytes_type& bytes,
       scope_id_type scope_id = 0);
 
@@ -103,6 +117,8 @@ public:
   /// The scope ID of the address.
   /**
    * Modifies the scope ID associated with the IPv6 address.
+   *
+   * @param id The new scope ID.
    */
   void scope_id(scope_id_type id) BOOST_ASIO_NOEXCEPT
   {
@@ -143,9 +159,17 @@ public:
 #endif // !defined(BOOST_ASIO_NO_DEPRECATED)
 
   /// Determine whether the address is a loopback address.
+  /**
+   * This function tests whether the address is the loopback address
+   * <tt>::1</tt>.
+   */
   BOOST_ASIO_DECL bool is_loopback() const BOOST_ASIO_NOEXCEPT;
 
   /// Determine whether the address is unspecified.
+  /**
+   * This function tests whether the address is the loopback address
+   * <tt>::</tt>.
+   */
   BOOST_ASIO_DECL bool is_unspecified() const BOOST_ASIO_NOEXCEPT;
 
   /// Determine whether the address is link local.
@@ -218,12 +242,22 @@ public:
   }
 
   /// Obtain an address object that represents any address.
+  /**
+   * This functions returns an address that represents the "any" address
+   * <tt>::</tt>.
+   *
+   * @returns A default-constructed @c address_v6 object.
+   */
   static address_v6 any() BOOST_ASIO_NOEXCEPT
   {
     return address_v6();
   }
 
   /// Obtain an address object that represents the loopback address.
+  /**
+   * This function returns an address that represents the well-known loopback
+   * address <tt>::1</tt>.
+   */
   BOOST_ASIO_DECL static address_v6 loopback() BOOST_ASIO_NOEXCEPT;
 
 #if !defined(BOOST_ASIO_NO_DEPRECATED)

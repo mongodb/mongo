@@ -14,7 +14,7 @@
 #include <boost/type_traits/detail/config.hpp>
 #include <boost/config/workaround.hpp>
 
-#ifdef BOOST_TT_HAS_ASCCURATE_IS_FUNCTION
+#ifdef BOOST_TT_HAS_ACCURATE_IS_FUNCTION
 
 #include <boost/type_traits/detail/is_function_cxx_11.hpp>
 

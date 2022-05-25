@@ -24,7 +24,6 @@
 #include <boost/interprocess/creation_tags.hpp>
 #include <boost/interprocess/permissions.hpp>
 #include <boost/interprocess/detail/win32_api.hpp>
-#include <boost/interprocess/detail/posix_time_types_wrk.hpp>
 #include <boost/interprocess/sync/windows/winapi_wrapper_common.hpp>
 #include <boost/interprocess/errors.hpp>
 #include <boost/interprocess/exceptions.hpp>
@@ -57,7 +56,8 @@ class winapi_mutex_functions
    bool try_lock()
    {  return winapi_wrapper_try_wait_for_single_object(m_mtx_hnd);  }
 
-   bool timed_lock(const boost::posix_time::ptime &abs_time)
+   template<class TimePoint>
+   bool timed_lock(const TimePoint &abs_time)
    {  return winapi_wrapper_timed_wait_for_single_object(m_mtx_hnd, abs_time);  }
 
    #if !defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)

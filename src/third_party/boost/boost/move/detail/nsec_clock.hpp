@@ -82,7 +82,7 @@ inline boost::uint64_t nsec_clock() BOOST_NOEXCEPT
       }
    }
 
-   return static_cast<boost::uint64_t>((nanosecs_per_tic) * pcount.QuadPart);
+   return static_cast<boost::uint64_t>(nanosecs_per_tic * double(pcount.QuadPart));
 }
 
 }}  //namespace boost { namespace move_detail {
@@ -98,7 +98,7 @@ inline boost::uint64_t nsec_clock() BOOST_NOEXCEPT
    mach_timebase_info_data_t info;
    mach_timebase_info(&info);
    return static_cast<boost::uint64_t>
-      (  static_cast<double>(count)*(static_cast<double>(info.numer) / info.denom);
+      ( static_cast<double>(count)*(static_cast<double>(info.numer) / info.denom) );
 }
 
 #elif defined(BOOST_MOVE_DETAIL_POSIX_API)
@@ -121,9 +121,9 @@ inline boost::uint64_t nsec_clock() BOOST_NOEXCEPT
 {
    struct timespec count;
    ::clock_gettime(BOOST_MOVE_DETAIL_CLOCK_MONOTONIC, &count);
-   boost::uint64_t r = count.tv_sec;
+   boost::uint64_t r = static_cast<boost::uint64_t>(count.tv_sec);
    r *= 1000000000U;
-   r += count.tv_nsec;
+   r += static_cast<boost::uint64_t>(count.tv_nsec);
    return r;
 }
 
@@ -140,6 +140,9 @@ struct cpu_times
    nanosecond_type system;
 
    void clear() { wall = user = system = 0; }
+
+   cpu_times()
+   {  this->clear(); }
 };
 
 

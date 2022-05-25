@@ -1,5 +1,5 @@
 // Copyright (C) 2003, 2008 Fernando Luis Cacciola Carballal.
-// Copyright (C) 2014 - 2018 Andrzej Krzemienski.
+// Copyright (C) 2014 - 2021 Andrzej Krzemienski.
 //
 // Use, modification, and distribution is subject to the Boost Software
 // License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
@@ -18,7 +18,9 @@
 #define BOOST_OPTIONAL_OPTIONAL_FLC_19NOV2002_HPP
 
 #include <new>
+#ifndef BOOST_NO_IOSTREAM
 #include <iosfwd>
+#endif // BOOST_NO_IOSTREAM
 
 #ifdef BOOST_OPTIONAL_DETAIL_USE_STD_TYPE_TRAITS
 #  include <type_traits>
@@ -35,14 +37,18 @@
 #include <boost/type.hpp>
 #include <boost/type_traits/alignment_of.hpp>
 #include <boost/type_traits/conditional.hpp>
+#include <boost/type_traits/conjunction.hpp>
+#include <boost/type_traits/disjunction.hpp>
 #include <boost/type_traits/has_nothrow_constructor.hpp>
 #include <boost/type_traits/type_with_alignment.hpp>
 #include <boost/type_traits/remove_const.hpp>
 #include <boost/type_traits/remove_reference.hpp>
 #include <boost/type_traits/decay.hpp>
+#include <boost/type_traits/is_assignable.hpp>
 #include <boost/type_traits/is_base_of.hpp>
 #include <boost/type_traits/is_const.hpp>
 #include <boost/type_traits/is_constructible.hpp>
+#include <boost/type_traits/is_convertible.hpp>
 #include <boost/type_traits/is_lvalue_reference.hpp>
 #include <boost/type_traits/is_nothrow_move_assignable.hpp>
 #include <boost/type_traits/is_nothrow_move_constructible.hpp>
@@ -123,6 +129,7 @@ class optional_base : public optional_tag
   protected :
 
     typedef T value_type ;
+    typedef typename boost::remove_const<T>::type unqualified_value_type;
 
   protected:
     typedef T &       reference_type ;
@@ -399,14 +406,14 @@ class optional_base : public optional_tag
 
     void construct ( argument_type val )
      {
-       ::new (m_storage.address()) value_type(val) ;
+       ::new (m_storage.address()) unqualified_value_type(val) ;
        m_initialized = true ;
      }
 
 #ifndef  BOOST_OPTIONAL_DETAIL_NO_RVALUE_REFERENCES
     void construct ( rval_reference_type val )
      {
-       ::new (m_storage.address()) value_type( boost::move(val) ) ;
+       ::new (m_storage.address()) unqualified_value_type( boost::move(val) ) ;
        m_initialized = true ;
      }
 #endif
@@ -418,7 +425,7 @@ class optional_base : public optional_tag
     template<class... Args>
     void construct ( in_place_init_t, Args&&... args )
     {
-      ::new (m_storage.address()) value_type( boost::forward<Args>(args)... ) ;
+      ::new (m_storage.address()) unqualified_value_type( boost::forward<Args>(args)... ) ;
       m_initialized = true ;
     }
 
@@ -449,13 +456,13 @@ class optional_base : public optional_tag
     template<class Arg>
     void construct ( in_place_init_t, Arg&& arg )
      {
-       ::new (m_storage.address()) value_type( boost::forward<Arg>(arg) );
+       ::new (m_storage.address()) unqualified_value_type( boost::forward<Arg>(arg) );
        m_initialized = true ;
      }
 
     void construct ( in_place_init_t )
      {
-       ::new (m_storage.address()) value_type();
+       ::new (m_storage.address()) unqualified_value_type();
        m_initialized = true ;
      }
 
@@ -509,20 +516,20 @@ class optional_base : public optional_tag
     template<class Arg>
     void construct ( in_place_init_t, const Arg& arg )
      {
-       ::new (m_storage.address()) value_type( arg );
+       ::new (m_storage.address()) unqualified_value_type( arg );
        m_initialized = true ;
      }
 
     template<class Arg>
     void construct ( in_place_init_t, Arg& arg )
      {
-       ::new (m_storage.address()) value_type( arg );
+       ::new (m_storage.address()) unqualified_value_type( arg );
        m_initialized = true ;
      }
 
     void construct ( in_place_init_t )
      {
-       ::new (m_storage.address()) value_type();
+       ::new (m_storage.address()) unqualified_value_type();
        m_initialized = true ;
      }
 
@@ -667,7 +674,7 @@ class optional_base : public optional_tag
     template<class Expr>
     void construct ( Expr&& expr, void const* )
     {
-      new (m_storage.address()) value_type(boost::forward<Expr>(expr)) ;
+      new (m_storage.address()) unqualified_value_type(boost::forward<Expr>(expr)) ;
       m_initialized = true ;
     }
 
@@ -688,7 +695,7 @@ class optional_base : public optional_tag
     template<class Expr>
     void construct ( Expr const& expr, void const* )
      {
-       new (m_storage.address()) value_type(expr) ;
+       new (m_storage.address()) unqualified_value_type(expr) ;
        m_initialized = true ;
      }
 
@@ -726,7 +733,7 @@ class optional_base : public optional_tag
        {
          // An exception can be thrown here.
          // It it happens, THIS will be left uninitialized.
-         new (m_storage.address()) value_type(boost::move(expr.get())) ;
+         new (m_storage.address()) unqualified_value_type(boost::move(expr.get())) ;
          m_initialized = true ;
        }
      }
@@ -739,7 +746,7 @@ class optional_base : public optional_tag
        {
          // An exception can be thrown here.
          // It it happens, THIS will be left uninitialized.
-         new (m_storage.address()) value_type(expr.get()) ;
+         new (m_storage.address()) unqualified_value_type(expr.get()) ;
          m_initialized = true ;
        }
      }
@@ -779,7 +786,7 @@ class optional_base : public optional_tag
 
 // definition of metafunction is_optional_val_init_candidate
 template <typename U>
-struct is_optional_related
+struct is_optional_or_tag
   : boost::conditional< boost::is_base_of<optional_detail::optional_tag, BOOST_DEDUCED_TYPENAME boost::decay<U>::type>::value
                      || boost::is_same<BOOST_DEDUCED_TYPENAME boost::decay<U>::type, none_t>::value
                      || boost::is_same<BOOST_DEDUCED_TYPENAME boost::decay<U>::type, in_place_init_t>::value
@@ -787,14 +794,22 @@ struct is_optional_related
     boost::true_type, boost::false_type>::type
 {};
 
+template <typename T, typename U>
+struct has_dedicated_constructor
+  : boost::disjunction<is_optional_or_tag<U>, boost::is_same<T, BOOST_DEDUCED_TYPENAME boost::decay<U>::type> >
+{};
+
+template <typename U>
+struct is_in_place_factory
+  : boost::disjunction< boost::is_base_of<boost::in_place_factory_base, BOOST_DEDUCED_TYPENAME boost::decay<U>::type>,
+                        boost::is_base_of<boost::typed_in_place_factory_base, BOOST_DEDUCED_TYPENAME boost::decay<U>::type> >
+{};
+
 #if !defined(BOOST_OPTIONAL_DETAIL_NO_IS_CONSTRUCTIBLE_TRAIT)
 
 template <typename T, typename U>
-struct is_convertible_to_T_or_factory
-  : boost::conditional< boost::is_base_of<boost::in_place_factory_base, BOOST_DEDUCED_TYPENAME boost::decay<U>::type>::value
-                     || boost::is_base_of<boost::typed_in_place_factory_base, BOOST_DEDUCED_TYPENAME boost::decay<U>::type>::value
-                     || (boost::is_constructible<T, U&&>::value && !boost::is_same<T, BOOST_DEDUCED_TYPENAME boost::decay<U>::type>::value)
-                      , boost::true_type, boost::false_type>::type
+struct is_factory_or_constructible_to_T
+  : boost::disjunction< is_in_place_factory<U>, boost::is_constructible<T, U&&> >
 {};
 
 template <typename T, typename U>
@@ -804,7 +819,7 @@ struct is_optional_constructible : boost::is_constructible<T, U>
 #else
 
 template <typename, typename>
-struct is_convertible_to_T_or_factory : boost::true_type
+struct is_factory_or_constructible_to_T : boost::true_type
 {};
 
 template <typename T, typename U>
@@ -813,15 +828,58 @@ struct is_optional_constructible : boost::true_type
 
 #endif // is_convertible condition
 
-template <typename T, typename U, bool = is_optional_related<U>::value>
+#if !defined(BOOST_NO_CXX11_DECLTYPE) && !BOOST_WORKAROUND(BOOST_MSVC, < 1800)
+// for is_assignable
+
+#if (!defined BOOST_NO_CXX11_RVALUE_REFERENCES)
+// On some initial rvalue reference implementations GCC does it in a strange way,
+// preferring perfect-forwarding constructor to implicit copy constructor.
+
+template <typename T, typename U>
+struct is_opt_assignable
+  : boost::conjunction<boost::is_convertible<U&&, T>, boost::is_assignable<T&, U&&> >
+{};
+
+#else
+
+template <typename T, typename U>
+struct is_opt_assignable
+  : boost::conjunction<boost::is_convertible<U, T>, boost::is_assignable<T&, U> >
+{};
+
+#endif
+
+#else
+
+template <typename T, typename U>
+struct is_opt_assignable : boost::is_convertible<U, T>
+{};
+
+#endif
+
+template <typename T, typename U>
+struct is_factory_or_opt_assignable_to_T
+  : boost::disjunction< is_in_place_factory<U>, is_opt_assignable<T, U> >
+{};
+
+template <typename T, typename U, bool = has_dedicated_constructor<T, U>::value>
 struct is_optional_val_init_candidate
   : boost::false_type
 {};
 
 template <typename T, typename U>
 struct is_optional_val_init_candidate<T, U, false>
-  : boost::conditional< is_convertible_to_T_or_factory<T, U>::value
-                      , boost::true_type, boost::false_type>::type
+  : is_factory_or_constructible_to_T<T, U>
+{};
+
+template <typename T, typename U, bool = has_dedicated_constructor<T, U>::value>
+struct is_optional_val_assign_candidate
+  : boost::false_type
+{};
+
+template <typename T, typename U>
+struct is_optional_val_assign_candidate<T, U, false>
+  : is_factory_or_opt_assignable_to_T<T, U>
 {};
 
 } // namespace optional_detail
@@ -994,7 +1052,7 @@ class optional
 #ifndef  BOOST_OPTIONAL_DETAIL_NO_RVALUE_REFERENCES
 
     template<class Expr>
-    BOOST_DEDUCED_TYPENAME boost::enable_if<optional_detail::is_optional_val_init_candidate<T, Expr>, optional&>::type
+    BOOST_DEDUCED_TYPENAME boost::enable_if<optional_detail::is_optional_val_assign_candidate<T, Expr>, optional&>::type
     operator= ( Expr&& expr )
       {
         this->assign_expr(boost::forward<Expr>(expr),boost::addressof(expr));
@@ -1586,6 +1644,7 @@ get_pointer ( optional<T>& opt )
 
 } // namespace boost
 
+#ifndef BOOST_NO_IOSTREAM
 namespace boost {
 
 // The following declaration prevents a bug where operator safe-bool is used upon streaming optional object if you forget the IO header.
@@ -1598,6 +1657,7 @@ operator<<(std::basic_ostream<CharType, CharTrait>& os, optional_detail::optiona
 }
 
 } // namespace boost
+#endif // BOOST_NO_IOSTREAM
 
 #include <boost/optional/detail/optional_relops.hpp>
 #include <boost/optional/detail/optional_swap.hpp>

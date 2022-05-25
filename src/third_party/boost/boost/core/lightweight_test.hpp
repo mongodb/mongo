@@ -181,7 +181,13 @@ inline const void* test_output_impl(std::nullptr_t) { return nullptr; }
 inline int test_output_impl( signed char const& v ) { return v; }
 inline unsigned test_output_impl( unsigned char const& v ) { return v; }
 
-inline unsigned long test_output_impl( wchar_t const& v ) { return v; }
+// Whether wchar_t is signed is implementation-defined
+
+template<bool Signed> struct lwt_long_type {};
+template<> struct lwt_long_type<true> { typedef long type; };
+template<> struct lwt_long_type<false> { typedef unsigned long type; };
+
+inline lwt_long_type<(static_cast<wchar_t>(-1) < static_cast<wchar_t>(0))>::type test_output_impl( wchar_t const& v ) { return v; }
 
 #if !defined( BOOST_NO_CXX11_CHAR16_T )
 inline unsigned long test_output_impl( char16_t const& v ) { return v; }

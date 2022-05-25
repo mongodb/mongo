@@ -16,6 +16,10 @@
 // the header defines the macro unconditionally and if the user includes both Boost.WinAPI and Cygwin WinAPI headers there will be conflict.
 #include <_cygwin.h>
 #endif
+#if defined(__MINGW32__)
+// MinGW and MinGW-w64 define __MINGW32_VERSION_MAJOR/MINOR and __MINGW64_VERSION_MAJOR/MINOR macros in a private header.
+#include <_mingw.h>
+#endif
 
 // BOOST_WINAPI_IS_MINGW indicates that the target Windows SDK is provided by MinGW (http://mingw.org/).
 // BOOST_WINAPI_IS_MINGW_W64 indicates that the target Windows SDK is provided by MinGW-w64 (http://mingw-w64.org).

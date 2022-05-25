@@ -4,7 +4,7 @@
 //-----------------------------------------------------------------------------
 //
 // Copyright (c) 2003 Eric Friedman, Itay Maman
-// Copyright (c) 2014-2021 Antony Polukhin
+// Copyright (c) 2014-2022 Antony Polukhin
 //
 // Distributed under the Boost Software License, Version 1.0. (See
 // accompanying file LICENSE_1_0.txt or copy at
@@ -102,7 +102,7 @@ public: // visitor interfaces
 #   if !BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x0551))
 #       define BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(t)
 #   else
-#       if defined(BOOST_NO_NULLPTR)
+#       if defined(BOOST_NO_CXX11_NULLPTR)
 #           define BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(t)  \
             , t* = 0
 #       else

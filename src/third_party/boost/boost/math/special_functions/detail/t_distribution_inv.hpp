@@ -27,7 +27,7 @@ template <class T, class Policy>
 T inverse_students_t_hill(T ndf, T u, const Policy& pol)
 {
    BOOST_MATH_STD_USING
-   BOOST_ASSERT(u <= 0.5);
+   BOOST_MATH_ASSERT(u <= 0.5);
 
    T a, b, c, d, q, x, y;
 

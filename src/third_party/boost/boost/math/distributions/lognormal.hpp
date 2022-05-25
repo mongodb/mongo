@@ -75,6 +75,13 @@ private:
 
 typedef lognormal_distribution<double> lognormal;
 
+#ifdef __cpp_deduction_guides
+template <class RealType>
+lognormal_distribution(RealType)->lognormal_distribution<typename boost::math::tools::promote_args<RealType>::type>;
+template <class RealType>
+lognormal_distribution(RealType,RealType)->lognormal_distribution<typename boost::math::tools::promote_args<RealType>::type>;
+#endif
+
 template <class RealType, class Policy>
 inline const std::pair<RealType, RealType> range(const lognormal_distribution<RealType, Policy>& /*dist*/)
 { // Range of permissible values for random variable x is >0 to +infinity.

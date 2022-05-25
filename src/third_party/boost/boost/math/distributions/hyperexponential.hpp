@@ -15,8 +15,6 @@
 #ifndef BOOST_MATH_DISTRIBUTIONS_HYPEREXPONENTIAL_HPP
 #define BOOST_MATH_DISTRIBUTIONS_HYPEREXPONENTIAL_HPP
 
-
-#include <boost/config.hpp>
 #include <boost/math/tools/cxx03_warn.hpp>
 #include <boost/math/distributions/complement.hpp>
 #include <boost/math/distributions/detail/common_error_handling.hpp>
@@ -25,20 +23,16 @@
 #include <boost/math/special_functions/fpclassify.hpp>
 #include <boost/math/tools/precision.hpp>
 #include <boost/math/tools/roots.hpp>
-#include <boost/range/begin.hpp>
-#include <boost/range/end.hpp>
-#include <boost/range/size.hpp>
-#include <boost/type_traits/has_pre_increment.hpp>
+#include <boost/math/tools/is_detected.hpp>
 #include <cstddef>
 #include <iterator>
 #include <limits>
 #include <numeric>
 #include <utility>
 #include <vector>
+#include <type_traits>
+#include <initializer_list>
 
-#if !defined(BOOST_NO_CXX11_HDR_INITIALIZER_LIST)
-# include <initializer_list>
-#endif
 
 #ifdef _MSC_VER
 # pragma warning (push)
@@ -278,16 +272,29 @@ class hyperexponential_distribution
                                     &err,
                                     PolicyT());
     }
+    private: template <typename T, typename = void>
+             struct is_iterator
+             {
+                 static constexpr bool value = false;
+             };
+
+             template <typename T>
+             struct is_iterator<T, boost::math::tools::void_t<typename std::iterator_traits<T>::difference_type>>
+             {
+                 // std::iterator_traits<T>::difference_type returns void for invalid types
+                 static constexpr bool value = !std::is_same<typename std::iterator_traits<T>::difference_type, void>::value;
+             };
 
     // Two arg constructor from 2 ranges, we SFINAE this out of existence if
     // either argument type is incrementable as in that case the type is
     // probably an iterator:
-    public: template <typename ProbRangeT, typename RateRangeT>
+    public: template <typename ProbRangeT, typename RateRangeT, 
+                      typename std::enable_if<!is_iterator<ProbRangeT>::value && 
+                                              !is_iterator<RateRangeT>::value, bool>::type = true>
             hyperexponential_distribution(ProbRangeT const& prob_range,
-                                          RateRangeT const& rate_range,
-                                          typename boost::disable_if_c<boost::has_pre_increment<ProbRangeT>::value || boost::has_pre_increment<RateRangeT>::value>::type* = 0)
-    : probs_(boost::begin(prob_range), boost::end(prob_range)),
-      rates_(boost::begin(rate_range), boost::end(rate_range))
+                                          RateRangeT const& rate_range)
+    : probs_(std::begin(prob_range), std::end(prob_range)),
+      rates_(std::begin(rate_range), std::end(rate_range))
     {
         hyperexp_detail::normalize(probs_);
 
@@ -303,10 +310,11 @@ class hyperexponential_distribution
     // existence if neither argument types are incrementable.
     // Note that we allow different argument types here to allow for
     // construction from an array plus a pointer into that array.
-    public: template <typename RateIterT, typename RateIterT2>
+    public: template <typename RateIterT, typename RateIterT2, 
+                      typename std::enable_if<is_iterator<RateIterT>::value || 
+                                              is_iterator<RateIterT2>::value, bool>::type = true>
             hyperexponential_distribution(RateIterT const& rate_first, 
-                                          RateIterT2 const& rate_last, 
-                                          typename std::enable_if<boost::has_pre_increment<RateIterT>::value || boost::has_pre_increment<RateIterT2>::value>::type* = 0)
+                                          RateIterT2 const& rate_last)
     : probs_(std::distance(rate_first, rate_last), 1), // will be normalized below
       rates_(rate_first, rate_last)
     {
@@ -320,7 +328,6 @@ class hyperexponential_distribution
                                     PolicyT());
     }
 
-#if !defined(BOOST_NO_CXX11_HDR_INITIALIZER_LIST)
       // Initializer list constructor: allows for construction from array literals:
 public: hyperexponential_distribution(std::initializer_list<RealT> l1, std::initializer_list<RealT> l2)
       : probs_(l1.begin(), l1.end()),
@@ -349,13 +356,12 @@ public: hyperexponential_distribution(std::initializer_list<RealT> l1)
             &err,
             PolicyT());
       }
-#endif // !defined(BOOST_NO_CXX11_HDR_INITIALIZER_LIST)
 
     // Single argument constructor: argument must be a range.
     public: template <typename RateRangeT>
     hyperexponential_distribution(RateRangeT const& rate_range)
-    : probs_(boost::size(rate_range), 1), // will be normalized below
-      rates_(boost::begin(rate_range), boost::end(rate_range))
+    : probs_(std::distance(std::begin(rate_range), std::end(rate_range)), 1), // will be normalized below
+      rates_(std::begin(rate_range), std::end(rate_range))
     {
         hyperexp_detail::normalize(probs_);
 
@@ -623,7 +629,7 @@ RealT mode(hyperexponential_distribution<RealT,PolicyT> const& /*dist*/)
 
 }} // namespace boost::math
 
-#ifdef BOOST_MSVC
+#ifdef _MSC_VER
 #pragma warning (pop)
 #endif
 // This include must be at the end, *after* the accessors

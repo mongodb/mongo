@@ -844,7 +844,7 @@ public:
 
 // bind_t
 
-#if !defined( BOOST_NO_CXX11_RVALUE_REFERENCES )
+#if !defined(BOOST_NO_CXX11_RVALUE_REFERENCES) && !(defined(BOOST_GCC) && BOOST_GCC < 40600)
 
 template< class A1 > class rrlist1
 {

@@ -54,6 +54,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/move/iterator.hpp>
 #include <boost/move/adl_move_swap.hpp>
+#include <boost/move/detail/force_ptr.hpp>
 // move/detail
 #include <boost/move/detail/move_helpers.hpp>
 // other
@@ -165,19 +166,19 @@ struct node
    #  endif
 
    BOOST_CONTAINER_FORCEINLINE T &get_data()
-   {  return *reinterpret_cast<T*>(this->m_storage.data);   }
+   {  return *boost::move_detail::force_ptr<T*>(this->m_storage.data);   }
 
    BOOST_CONTAINER_FORCEINLINE const T &get_data() const
-   {  return *reinterpret_cast<const T*>(this->m_storage.data);  }
+   {  return *boost::move_detail::force_ptr<const T*>(this->m_storage.data);  }
 
    BOOST_CONTAINER_FORCEINLINE T *get_data_ptr()
-   {  return reinterpret_cast<T*>(this->m_storage.data);  }
+   {  return boost::move_detail::force_ptr<T*>(this->m_storage.data);  }
 
    BOOST_CONTAINER_FORCEINLINE const T *get_data_ptr() const
-   {  return reinterpret_cast<T*>(this->m_storage.data);  }
+   {  return boost::move_detail::force_ptr<const T*>(this->m_storage.data);  }
 
    BOOST_CONTAINER_FORCEINLINE ~node()
-   {  reinterpret_cast<T*>(this->m_storage.data)->~T();  }
+   {  boost::move_detail::force_ptr<T*>(this->m_storage.data)->~T();   }
 
    #if defined(BOOST_CONTAINER_DISABLE_ALIASING_WARNING)
       #pragma GCC diagnostic pop
@@ -289,6 +290,7 @@ class stable_vector_iterator
    typedef std::random_access_iterator_tag                                          iterator_category;
    typedef typename non_const_ptr_traits::element_type                              value_type;
    typedef typename non_const_ptr_traits::difference_type                           difference_type;
+   typedef typename non_const_ptr_traits::size_type                                 size_type;
    typedef typename ::boost::container::dtl::if_c
       < IsConst
       , typename non_const_ptr_traits::template
@@ -383,6 +385,7 @@ class stable_vector_iterator
       reference operator[](difference_type off) const BOOST_NOEXCEPT_OR_NOTHROW
    {  return node_ptr_traits::static_cast_from(this->m_pn->up[off])->get_data();  }
 
+   //Arithmetic
    BOOST_CONTAINER_FORCEINLINE stable_vector_iterator& operator+=(difference_type off) BOOST_NOEXCEPT_OR_NOTHROW
    {
       if(off) this->m_pn = this->m_pn->up[off];
@@ -416,6 +419,7 @@ class stable_vector_iterator
       return tmp;
    }
 
+   //Difference
    BOOST_CONTAINER_ATTRIBUTE_NODISCARD BOOST_CONTAINER_FORCEINLINE
       friend difference_type operator-(const stable_vector_iterator &left, const stable_vector_iterator &right) BOOST_NOEXCEPT_OR_NOTHROW
    {  return left.m_pn->up - right.m_pn->up;  }
@@ -916,7 +920,7 @@ class stable_vector
    //! <b>Complexity</b>: Linear to n.
    BOOST_CONTAINER_FORCEINLINE void assign(size_type n, const T& t)
    {
-      typedef constant_iterator<value_type, difference_type> cvalue_iterator;
+      typedef constant_iterator<value_type> cvalue_iterator;
       this->assign(cvalue_iterator(t, n), cvalue_iterator());
    }
 
@@ -1155,12 +1159,13 @@ class stable_vector
    //! <b>Complexity</b>: Linear to the difference between size() and new_size.
    void resize(size_type n)
    {
-      typedef value_init_construct_iterator<value_type, difference_type> value_init_iterator;
+      typedef value_init_construct_iterator<value_type> value_init_iterator;
       BOOST_CONTAINER_STABLE_VECTOR_CHECK_INVARIANT;
       if(n > this->size())
-         this->insert(this->cend(), value_init_iterator(n - this->size()), value_init_iterator());
+         this->insert( this->cend()
+                     , value_init_iterator(n - this->size()), value_init_iterator());
       else if(n < this->size())
-         this->erase(this->cbegin() + n, this->cend());
+         this->erase(this->cbegin() + difference_type(n), this->cend());
    }
 
    //! <b>Effects</b>: Inserts or erases elements at the end such that
@@ -1173,12 +1178,12 @@ class stable_vector
    //! <b>Note</b>: Non-standard extension
    void resize(size_type n, default_init_t)
    {
-      typedef default_init_construct_iterator<value_type, difference_type> default_init_iterator;
+      typedef default_init_construct_iterator<value_type> default_init_iterator;
       BOOST_CONTAINER_STABLE_VECTOR_CHECK_INVARIANT;
       if(n > this->size())
          this->insert(this->cend(), default_init_iterator(n - this->size()), default_init_iterator());
       else if(n < this->size())
-         this->erase(this->cbegin() + n, this->cend());
+         this->erase(this->cbegin() + difference_type(n), this->cend());
    }
 
    //! <b>Effects</b>: Inserts or erases elements at the end such that
@@ -1193,7 +1198,7 @@ class stable_vector
       if(n > this->size())
          this->insert(this->cend(), n - this->size(), t);
       else if(n < this->size())
-         this->erase(this->cbegin() + n, this->cend());
+         this->erase(this->cbegin() + difference_type(n), this->cend());
    }
 
    //! <b>Effects</b>: Number of elements for which memory has been allocated.
@@ -1490,7 +1495,7 @@ class stable_vector
    reference emplace_back(Args &&...args)
    {
       typedef emplace_functor<Args...>         EmplaceFunctor;
-      typedef emplace_iterator<value_type, EmplaceFunctor, difference_type> EmplaceIterator;
+      typedef emplace_iterator<value_type, EmplaceFunctor> EmplaceIterator;
       EmplaceFunctor &&ef = EmplaceFunctor(boost::forward<Args>(args)...);
       return *this->insert(this->cend(), EmplaceIterator(ef), EmplaceIterator());
    }
@@ -1508,9 +1513,9 @@ class stable_vector
    iterator emplace(const_iterator p, Args && ...args)
    {
       BOOST_ASSERT(this->priv_in_range_or_end(p));
-      size_type pos_n = p - cbegin();
+      difference_type pos_n = p - cbegin();
       typedef emplace_functor<Args...>         EmplaceFunctor;
-      typedef emplace_iterator<value_type, EmplaceFunctor, difference_type> EmplaceIterator;
+      typedef emplace_iterator<value_type, EmplaceFunctor> EmplaceIterator;
       EmplaceFunctor &&ef = EmplaceFunctor(boost::forward<Args>(args)...);
       this->insert(p, EmplaceIterator(ef), EmplaceIterator());
       return iterator(this->begin() + pos_n);
@@ -1524,7 +1529,7 @@ class stable_vector
    {\
       typedef emplace_functor##N\
          BOOST_MOVE_LT##N BOOST_MOVE_TARG##N BOOST_MOVE_GT##N EmplaceFunctor;\
-      typedef emplace_iterator<value_type, EmplaceFunctor, difference_type>  EmplaceIterator;\
+      typedef emplace_iterator<value_type, EmplaceFunctor>  EmplaceIterator;\
       EmplaceFunctor ef BOOST_MOVE_LP##N BOOST_MOVE_FWD##N BOOST_MOVE_RP##N;\
       return *this->insert(this->cend() , EmplaceIterator(ef), EmplaceIterator());\
    }\
@@ -1535,11 +1540,11 @@ class stable_vector
       BOOST_ASSERT(this->priv_in_range_or_end(p));\
       typedef emplace_functor##N\
          BOOST_MOVE_LT##N BOOST_MOVE_TARG##N BOOST_MOVE_GT##N EmplaceFunctor;\
-      typedef emplace_iterator<value_type, EmplaceFunctor, difference_type>  EmplaceIterator;\
+      typedef emplace_iterator<value_type, EmplaceFunctor>  EmplaceIterator;\
       EmplaceFunctor ef BOOST_MOVE_LP##N BOOST_MOVE_FWD##N BOOST_MOVE_RP##N;\
-      const size_type pos_n = p - this->cbegin();\
+      const size_type pos_n = size_type(p - this->cbegin());\
       this->insert(p, EmplaceIterator(ef), EmplaceIterator());\
-      return this->begin() += pos_n;\
+      return this->begin() += difference_type(pos_n);\
    }\
    //
    BOOST_MOVE_ITERATE_0TO9(BOOST_CONTAINER_STABLE_VECTOR_EMPLACE_CODE)
@@ -1608,7 +1613,7 @@ class stable_vector
    {
       BOOST_ASSERT(this->priv_in_range_or_end(p));
       BOOST_CONTAINER_STABLE_VECTOR_CHECK_INVARIANT;
-      typedef constant_iterator<value_type, difference_type> cvalue_iterator;
+      typedef constant_iterator<value_type> cvalue_iterator;
       return this->insert(p, cvalue_iterator(t, n), cvalue_iterator());
    }
 
@@ -1654,11 +1659,11 @@ class stable_vector
    {
       BOOST_ASSERT(this->priv_in_range_or_end(p));
       BOOST_CONTAINER_STABLE_VECTOR_CHECK_INVARIANT;
-      const size_type pos_n = p - this->cbegin();
+      const difference_type pos_n = p - this->cbegin();
       for(; first != last; ++first){
          this->emplace(p, *first);
       }
-      return this->begin() + pos_n;
+      return this->begin() + difference_type(pos_n);
    }
 
    #if !defined(BOOST_CONTAINER_DOXYGEN_INVOKED)
@@ -1671,7 +1676,7 @@ class stable_vector
       insert(const_iterator p, FwdIt first, FwdIt last)
    {
       BOOST_ASSERT(this->priv_in_range_or_end(p));
-      const size_type num_new = static_cast<size_type>(boost::container::iterator_distance(first, last));
+      const size_type num_new = boost::container::iterator_udistance(first, last);
       const size_type idx     = static_cast<size_type>(p - this->cbegin());
       if(num_new){
          //Fills the node pool and inserts num_new null pointers in idx.
@@ -1679,7 +1684,7 @@ class stable_vector
          //past-new nodes are not aligned until the end of this function
          //or in a rollback in case of exception
          index_iterator it_past_newly_constructed(this->priv_insert_forward_non_templated(idx, num_new));
-         const index_iterator it_past_new(it_past_newly_constructed + num_new);
+         const index_iterator it_past_new(it_past_newly_constructed + difference_type(num_new));
          {
             //Prepare rollback
             insert_rollback rollback(*this, it_past_newly_constructed, it_past_new);
@@ -1699,7 +1704,7 @@ class stable_vector
          //nodes before insertion p in priv_insert_forward_non_templated(...)
          index_traits_type::fix_up_pointers_from(this->index, it_past_newly_constructed);
       }
-      return this->begin() + idx;
+      return this->begin() + static_cast<difference_type>(idx);
    }
    #endif
 
@@ -1724,7 +1729,7 @@ class stable_vector
    {
       BOOST_ASSERT(this->priv_in_range(p));
       BOOST_CONTAINER_STABLE_VECTOR_CHECK_INVARIANT;
-      const size_type d = p - this->cbegin();
+      const difference_type d = p - this->cbegin();
       index_iterator it = this->index.begin() + d;
       this->priv_delete_node(p.node_pointer());
       it = this->index.erase(it);
@@ -1749,10 +1754,11 @@ class stable_vector
       size_type d_dif = d2 - d1;
       if(d_dif){
          multiallocation_chain holder;
-         const index_iterator it1(this->index.begin() + d1);
-         const index_iterator it2(it1 + d_dif);
+         const index_iterator it1(this->index.begin() + difference_type(d1));
+         const index_iterator it2(it1 + difference_type(d_dif));
          index_iterator it(it1);
-         while(d_dif--){
+         while(d_dif){
+            --d_dif;
             node_base_ptr &nb = *it;
             ++it;
             node_type &n = *node_ptr_traits::static_cast_from(nb);
@@ -1861,7 +1867,7 @@ class stable_vector
       //Check range
       BOOST_ASSERT(this->index.empty() || (this->index.data() <= p->up));
       BOOST_ASSERT(this->index.empty() || p->up <= (this->index.data() + this->index.size()));
-      return this->index.empty() ? 0 : p->up - this->index.data();
+      return this->index.empty() ? 0u : size_type(p->up - this->index.data());
    }
 
    class insert_rollback
@@ -1920,15 +1926,15 @@ class stable_vector
 
       //Now try to make room in the vector
       const node_base_ptr_ptr old_buffer = this->index.data();
-      this->index.insert(this->index.begin() + idx, num_new, node_ptr());
+      this->index.insert(this->index.begin() + (difference_type)idx, num_new, node_ptr());
       bool new_buffer = this->index.data() != old_buffer;
 
       //Fix the pointers for the newly allocated buffer
       const index_iterator index_beg = this->index.begin();
       if(new_buffer){
-         index_traits_type::fix_up_pointers(index_beg, index_beg + idx);
+         index_traits_type::fix_up_pointers(index_beg, index_beg + (difference_type)idx);
       }
-      return index_beg + idx;
+      return index_beg + (difference_type)idx;
    }
 
    BOOST_CONTAINER_FORCEINLINE bool priv_capacity_bigger_than_size() const
@@ -1962,14 +1968,14 @@ class stable_vector
    iterator priv_insert(const_iterator p, const value_type &t)
    {
       BOOST_ASSERT(this->priv_in_range_or_end(p));
-      typedef constant_iterator<value_type, difference_type> cvalue_iterator;
+      typedef constant_iterator<value_type> cvalue_iterator;
       return this->insert(p, cvalue_iterator(t, 1), cvalue_iterator());
    }
 
    iterator priv_insert(const_iterator p, BOOST_RV_REF(T) x)
    {
       BOOST_ASSERT(this->priv_in_range_or_end(p));
-      typedef repeat_iterator<T, difference_type>  repeat_it;
+      typedef repeat_iterator<T>  repeat_it;
       typedef boost::move_iterator<repeat_it>      repeat_move_it;
       //Just call more general insert(p, size, value) and return iterator
       return this->insert(p, repeat_move_it(repeat_it(x, 1)), repeat_move_it(repeat_it()));

@@ -2,7 +2,7 @@
 // detail/impl/win_iocp_io_context.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -80,6 +80,22 @@ std::size_t win_iocp_io_context::cancel_timer(timer_queue<Time_Traits>& queue,
   lock.unlock();
   post_deferred_completions(ops);
   return n;
+}
+
+template <typename Time_Traits>
+void win_iocp_io_context::cancel_timer_by_key(timer_queue<Time_Traits>& queue,
+    typename timer_queue<Time_Traits>::per_timer_data* timer,
+    void* cancellation_key)
+{
+  // If the service has been shut down we silently ignore the cancellation.
+  if (::InterlockedExchangeAdd(&shutdown_, 0) != 0)
+    return;
+
+  mutex::scoped_lock lock(dispatch_mutex_);
+  op_queue<win_iocp_operation> ops;
+  queue.cancel_timer_by_key(timer, ops, cancellation_key);
+  lock.unlock();
+  post_deferred_completions(ops);
 }
 
 template <typename Time_Traits>

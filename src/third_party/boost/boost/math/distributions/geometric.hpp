@@ -44,10 +44,6 @@
 #include <boost/math/tools/roots.hpp> // for root finding.
 #include <boost/math/distributions/detail/inv_discrete_quantile.hpp>
 
-#include <boost/type_traits/is_floating_point.hpp>
-#include <boost/type_traits/is_integral.hpp>
-#include <boost/type_traits/is_same.hpp>
-
 #include <limits> // using std::numeric_limits;
 #include <utility>
 
@@ -239,6 +235,11 @@ namespace boost
     }; // template <class RealType, class Policy> class geometric_distribution
 
     typedef geometric_distribution<double> geometric; // Reserved name of type double.
+
+    #ifdef __cpp_deduction_guides
+    template <class RealType>
+    geometric_distribution(RealType)->geometric_distribution<typename boost::math::tools::promote_args<RealType>::type>;
+    #endif
 
     template <class RealType, class Policy>
     inline const std::pair<RealType, RealType> range(const geometric_distribution<RealType, Policy>& /* dist */)

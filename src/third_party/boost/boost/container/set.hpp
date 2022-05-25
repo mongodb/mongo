@@ -680,6 +680,14 @@ class set
    BOOST_CONTAINER_FORCEINLINE void merge(BOOST_RV_REF_BEG multiset<Key, C2, Allocator, Options> BOOST_RV_REF_END source)
    {  return this->merge(static_cast<multiset<Key, C2, Allocator, Options>&>(source));   }
 
+   //! <b>Effects</b>: If present, erases the element in the container with key equivalent to x.
+   //!
+   //! <b>Returns</b>: Returns the number of erased elements (0/1).
+   //!
+   //! <b>Complexity</b>: log(size()) + count(k)
+   BOOST_CONTAINER_FORCEINLINE size_type erase(const key_type& x)
+   {  return this->base_t::erase_unique(x);   }
+
    #if defined(BOOST_CONTAINER_DOXYGEN_INVOKED)
 
    //! <b>Effects</b>: Erases the element pointed to by p.
@@ -690,13 +698,6 @@ class set
    //!
    //! <b>Complexity</b>: Amortized constant time
    iterator erase(const_iterator p);
-
-   //! <b>Effects</b>: Erases all elements in the container with key equivalent to x.
-   //!
-   //! <b>Returns</b>: Returns the number of erased elements.
-   //!
-   //! <b>Complexity</b>: log(size()) + count(k)
-   size_type erase(const key_type& x);
 
    //! <b>Effects</b>: Erases all the elements in the range [first, last).
    //!
@@ -771,7 +772,9 @@ class set
    template<typename K>
    const_iterator find(const K& x) const;
 
-   #endif   //#if defined(BOOST_CONTAINER_DOXYGEN_INVOKED)
+   #else
+   using base_t::erase;
+   #endif   //   #if defined(BOOST_CONTAINER_DOXYGEN_INVOKED)
 
    //! <b>Returns</b>: The number of elements with key equivalent to x.
    //!

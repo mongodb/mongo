@@ -59,7 +59,7 @@
 #endif
 
 #ifndef _POSIX_PTHREAD_SEMANTICS
-#define _POSIX_PTHREAD_SEMANTICS  // Sun readdir_r() needs this
+#define _POSIX_PTHREAD_SEMANTICS // Sun readdir_r() needs this
 #endif
 
 #if !defined(_INCLUDE_STDCSOURCE_199901) && (defined(hpux) || defined(_hpux) || defined(__hpux))
@@ -68,7 +68,7 @@
 #define _INCLUDE_STDCSOURCE_199901
 #endif
 
-#if defined(_WIN32) || defined(_WIN64) || defined(__WIN32__) || defined(__TOS_WIN__) || defined(__WINDOWS__) ||\
+#if defined(_WIN32) || defined(_WIN64) || defined(__WIN32__) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
     defined(__CYGWIN__)
 // Define target Windows version macros before including any other headers
 #include <boost/winapi/config.hpp>

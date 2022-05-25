@@ -87,7 +87,7 @@ void synchronized_pool_resource::do_deallocate(void* p, std::size_t bytes, std::
 }
 
 bool synchronized_pool_resource::do_is_equal(const memory_resource& other) const BOOST_NOEXCEPT //virtual
-{  return this == dynamic_cast<const synchronized_pool_resource*>(&other);  }
+{  return this == &other;  }
 
 std::size_t synchronized_pool_resource::pool_count() const
 {  return m_pool_resource.pool_count();  }

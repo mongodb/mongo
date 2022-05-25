@@ -2,7 +2,7 @@
 // execution/bulk_execute.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -100,7 +100,7 @@ struct can_bulk_execute :
 
 #else // defined(GENERATING_DOCUMENTATION)
 
-namespace asio_execution_bulk_execute_fn {
+namespace boost_asio_execution_bulk_execute_fn {
 
 using boost::asio::declval;
 using boost::asio::enable_if;
@@ -339,23 +339,24 @@ struct static_instance
 template <typename T>
 const T static_instance<T>::instance = {};
 
-} // namespace asio_execution_bulk_execute_fn
+} // namespace boost_asio_execution_bulk_execute_fn
 namespace boost {
 namespace asio {
 namespace execution {
 namespace {
 
 static BOOST_ASIO_CONSTEXPR
-  const asio_execution_bulk_execute_fn::impl& bulk_execute =
-    asio_execution_bulk_execute_fn::static_instance<>::instance;
+  const boost_asio_execution_bulk_execute_fn::impl& bulk_execute =
+    boost_asio_execution_bulk_execute_fn::static_instance<>::instance;
 
 } // namespace
 
 template <typename S, typename F, typename N>
 struct can_bulk_execute :
   integral_constant<bool,
-    asio_execution_bulk_execute_fn::call_traits<S, void(F, N)>::overload !=
-      asio_execution_bulk_execute_fn::ill_formed>
+    boost_asio_execution_bulk_execute_fn::call_traits<
+      S, void(F, N)>::overload !=
+        boost_asio_execution_bulk_execute_fn::ill_formed>
 {
 };
 
@@ -369,7 +370,8 @@ constexpr bool can_bulk_execute_v = can_bulk_execute<S, F, N>::value;
 template <typename S, typename F, typename N>
 struct is_nothrow_bulk_execute :
   integral_constant<bool,
-    asio_execution_bulk_execute_fn::call_traits<S, void(F, N)>::is_noexcept>
+    boost_asio_execution_bulk_execute_fn::call_traits<
+      S, void(F, N)>::is_noexcept>
 {
 };
 
@@ -384,7 +386,7 @@ constexpr bool is_nothrow_bulk_execute_v
 template <typename S, typename F, typename N>
 struct bulk_execute_result
 {
-  typedef typename asio_execution_bulk_execute_fn::call_traits<
+  typedef typename boost_asio_execution_bulk_execute_fn::call_traits<
       S, void(F, N)>::result_type type;
 };
 

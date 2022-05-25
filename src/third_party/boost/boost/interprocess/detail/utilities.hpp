@@ -87,7 +87,7 @@ struct ct_rounded_size
 };
 
 // Gennaro Prota wrote this. Thanks!
-template <int p, int n = 4>
+template <std::size_t p, std::size_t n = 4>
 struct ct_max_pow2_less
 {
    static const std::size_t c = 2*n < p;
@@ -163,8 +163,8 @@ template<class T, class OffsetType>
 class pointer_offset_caster<T*, OffsetType>
 {
    public:
-   BOOST_INTERPROCESS_FORCEINLINE explicit pointer_offset_caster(OffsetType offset)
-      : m_offset(offset)
+   BOOST_INTERPROCESS_FORCEINLINE explicit pointer_offset_caster(OffsetType off)
+      : m_offset(off)
    {}
 
    BOOST_INTERPROCESS_FORCEINLINE explicit pointer_offset_caster(const volatile T *p)

@@ -12,18 +12,13 @@
 #define BOOST_MATH_UNCHECKED_BERNOULLI_HPP
 
 #include <limits>
+#include <type_traits>
+#include <array>
 #include <cmath>
+#include <cstdint>
 #include <boost/math/policies/error_handling.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <boost/math/special_functions/math_fwd.hpp>
-#include <boost/type_traits/is_convertible.hpp>
-
-#ifdef BOOST_MATH_HAVE_CONSTEXPR_TABLES
-#include <array>
-#else
-#include <boost/array.hpp>
-#endif
-
 
 namespace boost { namespace math { 
    
@@ -32,37 +27,37 @@ namespace detail {
 template <unsigned N>
 struct max_bernoulli_index
 {
-   BOOST_STATIC_CONSTANT(unsigned, value = 17);
+   static constexpr unsigned value = 17;
 };
 
 template <>
 struct max_bernoulli_index<1>
 {
-   BOOST_STATIC_CONSTANT(unsigned, value = 32);
+   static constexpr unsigned value = 32;
 };
 
 template <>
 struct max_bernoulli_index<2>
 {
-   BOOST_STATIC_CONSTANT(unsigned, value = 129);
+   static constexpr unsigned value = 129;
 };
 
 template <>
 struct max_bernoulli_index<3>
 {
-   BOOST_STATIC_CONSTANT(unsigned, value = 1156);
+   static constexpr unsigned value = 1156;
 };
 
 template <>
 struct max_bernoulli_index<4>
 {
-   BOOST_STATIC_CONSTANT(unsigned, value = 11);
+   static constexpr unsigned value = 11;
 };
 
 template <class T>
 struct bernoulli_imp_variant
 {
-   static const unsigned value = 
+   static constexpr unsigned value = 
       (std::numeric_limits<T>::max_exponent == 128)
       && (std::numeric_limits<T>::radix == 2)
       && (std::numeric_limits<T>::digits <= std::numeric_limits<float>::digits)
@@ -76,7 +71,7 @@ struct bernoulli_imp_variant
             (std::numeric_limits<T>::max_exponent == 16384)
             && (std::numeric_limits<T>::radix == 2)
             && (std::numeric_limits<T>::digits <= std::numeric_limits<long double>::digits)
-            && (std::is_convertible<long double, T>::value) ? 3 : (!is_convertible<boost::int64_t, T>::value ? 4 : 0)
+            && (std::is_convertible<long double, T>::value) ? 3 : (!std::is_convertible<std::int64_t, T>::value ? 4 : 0)
          )
       );
 };
@@ -92,55 +87,55 @@ template <class T>
 inline BOOST_MATH_CONSTEXPR_TABLE_FUNCTION T unchecked_bernoulli_imp(std::size_t n, const std::integral_constant<int, 0>& )
 {
 #ifdef BOOST_MATH_HAVE_CONSTEXPR_TABLES
-   constexpr std::array<boost::int64_t, 1 + max_bernoulli_b2n<T>::value> numerators =
+   constexpr std::array<std::int64_t, 1 + max_bernoulli_b2n<T>::value> numerators =
 #else
-   static const boost::array<boost::int64_t, 1 + max_bernoulli_b2n<T>::value> numerators =
+   static const std::array<std::int64_t, 1 + max_bernoulli_b2n<T>::value> numerators =
 #endif
    {{
-      boost::int64_t(            +1LL),
-      boost::int64_t(            +1LL),
-      boost::int64_t(            -1LL),
-      boost::int64_t(            +1LL),
-      boost::int64_t(            -1LL),
-      boost::int64_t(            +5LL),
-      boost::int64_t(          -691LL),
-      boost::int64_t(            +7LL),
-      boost::int64_t(         -3617LL),
-      boost::int64_t(        +43867LL),
-      boost::int64_t(       -174611LL),
-      boost::int64_t(       +854513LL),
-      boost::int64_t(    -236364091LL),
-      boost::int64_t(      +8553103LL),
-      boost::int64_t(  -23749461029LL),
-      boost::int64_t(+8615841276005LL),
-      boost::int64_t(-7709321041217LL),
-      boost::int64_t(+2577687858367LL)
+      std::int64_t(            +1LL),
+      std::int64_t(            +1LL),
+      std::int64_t(            -1LL),
+      std::int64_t(            +1LL),
+      std::int64_t(            -1LL),
+      std::int64_t(            +5LL),
+      std::int64_t(          -691LL),
+      std::int64_t(            +7LL),
+      std::int64_t(         -3617LL),
+      std::int64_t(        +43867LL),
+      std::int64_t(       -174611LL),
+      std::int64_t(       +854513LL),
+      std::int64_t(    -236364091LL),
+      std::int64_t(      +8553103LL),
+      std::int64_t(  -23749461029LL),
+      std::int64_t(+8615841276005LL),
+      std::int64_t(-7709321041217LL),
+      std::int64_t(+2577687858367LL)
    }};
 
 #ifdef BOOST_MATH_HAVE_CONSTEXPR_TABLES
-   constexpr std::array<boost::int64_t, 1 + max_bernoulli_b2n<T>::value> denominators =
+   constexpr std::array<std::int64_t, 1 + max_bernoulli_b2n<T>::value> denominators =
 #else
-   static const boost::array<boost::int64_t, 1 + max_bernoulli_b2n<T>::value> denominators =
+   static const std::array<std::int64_t, 1 + max_bernoulli_b2n<T>::value> denominators =
 #endif
    {{
-      boost::int64_t(      1LL),
-      boost::int64_t(      6LL),
-      boost::int64_t(     30LL),
-      boost::int64_t(     42LL),
-      boost::int64_t(     30LL),
-      boost::int64_t(     66LL),
-      boost::int64_t(   2730LL),
-      boost::int64_t(      6LL),
-      boost::int64_t(    510LL),
-      boost::int64_t(    798LL),
-      boost::int64_t(    330LL),
-      boost::int64_t(    138LL),
-      boost::int64_t(   2730LL),
-      boost::int64_t(      6LL),
-      boost::int64_t(    870LL),
-      boost::int64_t(  14322LL),
-      boost::int64_t(    510LL),
-      boost::int64_t(      6LL)
+      std::int64_t(      1LL),
+      std::int64_t(      6LL),
+      std::int64_t(     30LL),
+      std::int64_t(     42LL),
+      std::int64_t(     30LL),
+      std::int64_t(     66LL),
+      std::int64_t(   2730LL),
+      std::int64_t(      6LL),
+      std::int64_t(    510LL),
+      std::int64_t(    798LL),
+      std::int64_t(    330LL),
+      std::int64_t(    138LL),
+      std::int64_t(   2730LL),
+      std::int64_t(      6LL),
+      std::int64_t(    870LL),
+      std::int64_t(  14322LL),
+      std::int64_t(    510LL),
+      std::int64_t(      6LL)
    }};
    return T(numerators[n]) / denominators[n];
 }
@@ -151,7 +146,7 @@ inline BOOST_MATH_CONSTEXPR_TABLE_FUNCTION T unchecked_bernoulli_imp(std::size_t
 #ifdef BOOST_MATH_HAVE_CONSTEXPR_TABLES
    constexpr std::array<float, 1 + max_bernoulli_b2n<T>::value> bernoulli_data =
 #else
-   static const boost::array<float, 1 + max_bernoulli_b2n<T>::value> bernoulli_data =
+   static const std::array<float, 1 + max_bernoulli_b2n<T>::value> bernoulli_data =
 #endif
    {{
       +1.00000000000000000000000000000000000000000F,
@@ -199,7 +194,7 @@ inline BOOST_MATH_CONSTEXPR_TABLE_FUNCTION T unchecked_bernoulli_imp(std::size_t
 #ifdef BOOST_MATH_HAVE_CONSTEXPR_TABLES
    constexpr std::array<double, 1 + max_bernoulli_b2n<T>::value> bernoulli_data =
 #else
-   static const boost::array<double, 1 + max_bernoulli_b2n<T>::value> bernoulli_data =
+   static const std::array<double, 1 + max_bernoulli_b2n<T>::value> bernoulli_data =
 #endif
    {{
       +1.00000000000000000000000000000000000000000,
@@ -343,7 +338,7 @@ inline BOOST_MATH_CONSTEXPR_TABLE_FUNCTION T unchecked_bernoulli_imp(std::size_t
 #ifdef BOOST_MATH_HAVE_CONSTEXPR_TABLES
    constexpr std::array<long double, 1 + max_bernoulli_b2n<T>::value> bernoulli_data =
 #else
-   static const boost::array<long double, 1 + max_bernoulli_b2n<T>::value> bernoulli_data =
+   static const std::array<long double, 1 + max_bernoulli_b2n<T>::value> bernoulli_data =
 #endif
    {{
       +1.00000000000000000000000000000000000000000L,
@@ -677,36 +672,36 @@ inline T unchecked_bernoulli_imp(std::size_t n, const std::integral_constant<int
    // Special case added for multiprecision types that have no conversion from long long,
    // there are very few such types, but mpfr_class is one.
    //
-   static const boost::array<boost::int32_t, 1 + max_bernoulli_b2n<T>::value> numerators =
+   static const std::array<std::int32_t, 1 + max_bernoulli_b2n<T>::value> numerators =
    {{
-      boost::int32_t(            +1LL),
-      boost::int32_t(            +1LL),
-      boost::int32_t(            -1LL),
-      boost::int32_t(            +1LL),
-      boost::int32_t(            -1LL),
-      boost::int32_t(            +5LL),
-      boost::int32_t(          -691LL),
-      boost::int32_t(            +7LL),
-      boost::int32_t(         -3617LL),
-      boost::int32_t(        +43867LL),
-      boost::int32_t(       -174611LL),
-      boost::int32_t(       +854513LL),
+      std::int32_t(            +1LL),
+      std::int32_t(            +1LL),
+      std::int32_t(            -1LL),
+      std::int32_t(            +1LL),
+      std::int32_t(            -1LL),
+      std::int32_t(            +5LL),
+      std::int32_t(          -691LL),
+      std::int32_t(            +7LL),
+      std::int32_t(         -3617LL),
+      std::int32_t(        +43867LL),
+      std::int32_t(       -174611LL),
+      std::int32_t(       +854513LL),
    }};
 
-   static const boost::array<boost::int32_t, 1 + max_bernoulli_b2n<T>::value> denominators =
+   static const std::array<std::int32_t, 1 + max_bernoulli_b2n<T>::value> denominators =
    {{
-      boost::int32_t(      1LL),
-      boost::int32_t(      6LL),
-      boost::int32_t(     30LL),
-      boost::int32_t(     42LL),
-      boost::int32_t(     30LL),
-      boost::int32_t(     66LL),
-      boost::int32_t(   2730LL),
-      boost::int32_t(      6LL),
-      boost::int32_t(    510LL),
-      boost::int32_t(    798LL),
-      boost::int32_t(    330LL),
-      boost::int32_t(    138LL),
+      std::int32_t(      1LL),
+      std::int32_t(      6LL),
+      std::int32_t(     30LL),
+      std::int32_t(     42LL),
+      std::int32_t(     30LL),
+      std::int32_t(     66LL),
+      std::int32_t(   2730LL),
+      std::int32_t(      6LL),
+      std::int32_t(    510LL),
+      std::int32_t(    798LL),
+      std::int32_t(    330LL),
+      std::int32_t(    138LL),
    }};
    return T(numerators[n]) / T(denominators[n]);
 }

@@ -25,6 +25,11 @@ Distributed under the Boost Software License, Version 1.0.
 #endif
 #endif
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable:4510)
+#endif
+
 namespace boost {
 
 template<class T>
@@ -142,5 +147,9 @@ using empty_::empty_value;
 BOOST_INLINE_CONSTEXPR empty_init_t empty_init = empty_init_t();
 
 } /* boost */
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 #endif

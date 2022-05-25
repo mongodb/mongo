@@ -154,6 +154,13 @@ struct BOOST_TEST_DECL print_log_value<unsigned char> {
 //____________________________________________________________________________//
 
 template<>
+struct BOOST_TEST_DECL print_log_value<wchar_t> {
+    void    operator()( std::ostream& ostr, wchar_t t );
+};
+
+//____________________________________________________________________________//
+
+template<>
 struct BOOST_TEST_DECL print_log_value<char const*> {
     void    operator()( std::ostream& ostr, char const* t );
 };

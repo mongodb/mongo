@@ -26,6 +26,7 @@
 #pragma once
 #endif
 
+#if (defined(__cpp_lib_uncaught_exceptions) && __cpp_lib_uncaught_exceptions >= 201411)
 #if defined(__APPLE__)
 #include <Availability.h>
 // Apple systems only support std::uncaught_exceptions starting with specific versions:
@@ -34,16 +35,15 @@
 // - tvOS >= 10.0
 // - watchOS >= 3.0
 // https://github.com/boostorg/core/issues/80
-#if (defined(__cpp_lib_uncaught_exceptions) && __cpp_lib_uncaught_exceptions >= 201411) && \
-    ( \
-        (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200) || \
-        (defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 100000) \
-    )
+#if (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200) || \
+    (defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 100000)
 #define BOOST_CORE_HAS_UNCAUGHT_EXCEPTIONS
 #endif
+#else
+#define BOOST_CORE_HAS_UNCAUGHT_EXCEPTIONS
+#endif // defined(__APPLE__)
 // Visual Studio 14.0 supports N4152 std::uncaught_exceptions() but doesn't define __cpp_lib_uncaught_exceptions
-#elif (defined(__cpp_lib_uncaught_exceptions) && __cpp_lib_uncaught_exceptions >= 201411) || \
-    (defined(_MSC_VER) && _MSC_VER >= 1900)
+#elif (defined(_MSC_VER) && _MSC_VER >= 1900)
 #define BOOST_CORE_HAS_UNCAUGHT_EXCEPTIONS
 #endif
 

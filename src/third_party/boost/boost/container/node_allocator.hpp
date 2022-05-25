@@ -81,7 +81,7 @@ class node_allocator
    typedef std::ptrdiff_t                       difference_type;
 
    typedef boost::container::dtl::
-      version_type<self_t, Version>             version;
+      version_type<self_t, (unsigned int) Version>             version;
 
    #ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
    typedef boost::container::dtl::
@@ -141,7 +141,7 @@ class node_allocator
    {  return size_type(-1)/sizeof(T);   }
 
    //!Allocate memory for an array of count elements.
-   //!Throws std::bad_alloc if there is no enough memory
+   //!Throws bad_alloc if there is no enough memory
    pointer allocate(size_type count, const void * = 0)
    {
       if(BOOST_UNLIKELY(count > this->max_size()))

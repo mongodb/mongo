@@ -19,15 +19,21 @@ namespace boost {
 
 class in_place_factory_base {} ;
 
+#ifndef BOOST_UTILITY_DOCS
 #define  BOOST_PP_ITERATION_LIMITS (0, BOOST_MAX_INPLACE_FACTORY_ARITY)
 #define  BOOST_PP_FILENAME_1 <boost/utility/in_place_factory.hpp>
+#endif // BOOST_UTILITY_DOCS
+
 #include BOOST_PP_ITERATE()
 
 } // namespace boost
 
 #include <boost/utility/detail/in_place_factory_suffix.hpp>
 
+#ifndef BOOST_UTILITY_DOCS
 #define BOOST_UTILITY_INPLACE_FACTORY_04APR2007_HPP
+#endif
+
 #else
 #define N BOOST_PP_ITERATION()
 

@@ -104,7 +104,22 @@ template<class CharT>
 inline bool create_directory(const CharT *path)
 {  return winapi::create_directory(path); }
 
-inline bool remove_directory(const char *path)
+template<class CharT>
+inline bool open_or_create_directory(const CharT *path)
+{
+   //If fails, check that it's because it already exists
+   return create_directory(path)
+      ||  error_info(system_error_code()).get_error_code() == already_exists_error;
+}
+
+template<class CharT>
+inline bool open_or_create_shared_directory(const CharT *path)
+{
+   return open_or_create_directory(path);
+}
+
+template <class CharT>
+inline bool remove_directory(const CharT *path)
 {  return winapi::remove_directory(path); }
 
 inline bool get_temporary_path(char *buffer, std::size_t buf_len, std::size_t &required_len)
@@ -117,7 +132,7 @@ inline bool get_temporary_path(char *buffer, std::size_t buf_len, std::size_t &r
       return false;
    }
    required_len = winapi::get_temp_path(buf_len, buffer);
-   const bool ret = !(buf_len < required_len);
+   const bool ret = required_len && (buf_len > required_len);
    if(ret && buffer[required_len-1] == '\\'){
       buffer[required_len-1] = '\0';
    }
@@ -197,7 +212,7 @@ inline bool truncate_file (file_handle_t hnd, std::size_t size)
       }
       //We will write zeros in the end of the file
       //since set_end_of_file does not guarantee this
-      for(std::size_t remaining = size - filesize, write_size = 0
+      for(std::size_t remaining = size - std::size_t(filesize), write_size = 0
          ;remaining > 0
          ;remaining -= write_size){
          const std::size_t DataSize = 512;
@@ -493,7 +508,23 @@ inline file_handle_t file_handle_from_mapping_handle(mapping_handle_t hnd)
 {  return hnd.handle; }
 
 inline bool create_directory(const char *path)
-{  return ::mkdir(path, 0777) == 0 && ::chmod(path, 0777) == 0; }
+{
+   ::mode_t m = ::mode_t(0777);
+   return ::mkdir(path, m) == 0;
+}
+
+inline bool open_or_create_directory(const char *path)
+{
+   ::mode_t m = ::mode_t(0777);
+   return ::mkdir(path, m) == 0 || (errno == EEXIST);
+}
+
+inline bool open_or_create_shared_directory(const char *path)
+{
+   ::mode_t m = ::mode_t(01777);
+   const bool created_or_exists = (::mkdir(path, m) == 0) || (errno == EEXIST);
+   return created_or_exists && (::chmod(path, m) == 0);
+}
 
 inline bool remove_directory(const char *path)
 {  return ::rmdir(path) == 0; }
@@ -780,18 +811,6 @@ inline bool delete_subdirectories(const std::string &refcstrRootDirectory, const
 }
 
 #endif   //#if defined (BOOST_INTERPROCESS_WINDOWS)
-
-inline bool open_or_create_directory(const char *dir_name)
-{
-   //If fails, check that it's because it already exists
-   if(!create_directory(dir_name)){
-      error_info info(system_error_code());
-      if(info.get_error_code() != already_exists_error){
-         return false;
-      }
-   }
-   return true;
-}
 
 inline std::string get_temporary_path()
 {

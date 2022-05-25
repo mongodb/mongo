@@ -97,7 +97,7 @@ class slist_base_hook
    //!   initializes the node to an unlinked state.
    //!
    //! <b>Throws</b>: Nothing.
-   slist_base_hook();
+   slist_base_hook() BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: If link_mode is \c auto_unlink or \c safe_link
    //!   initializes the node to an unlinked state. The argument is ignored.
@@ -108,7 +108,7 @@ class slist_base_hook
    //!   makes classes using the hook STL-compliant without forcing the
    //!   user to do some additional work. \c swap can be used to emulate
    //!   move-semantics.
-   slist_base_hook(const slist_base_hook& );
+   slist_base_hook(const slist_base_hook& ) BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: Empty function. The argument is ignored.
    //!
@@ -118,7 +118,7 @@ class slist_base_hook
    //!   makes classes using the hook STL-compliant without forcing the
    //!   user to do some additional work. \c swap can be used to emulate
    //!   move-semantics.
-   slist_base_hook& operator=(const slist_base_hook& );
+   slist_base_hook& operator=(const slist_base_hook& ) BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: If link_mode is \c normal_link, the destructor does
    //!   nothing (ie. no code is generated). If link_mode is \c safe_link and the
@@ -140,7 +140,7 @@ class slist_base_hook
    //! <b>Complexity</b>: Constant
    //!
    //! <b>Throws</b>: Nothing.
-   void swap_nodes(slist_base_hook &other);
+   void swap_nodes(slist_base_hook &other) BOOST_NOEXCEPT;
 
    //! <b>Precondition</b>: link_mode must be \c safe_link or \c auto_unlink.
    //!
@@ -148,14 +148,16 @@ class slist_base_hook
    //!   otherwise. This function can be used to test whether \c slist::iterator_to
    //!   will return a valid iterator.
    //!
+   //! <b>Throws</b>: Nothing.
+   //!
    //! <b>Complexity</b>: Constant
-   bool is_linked() const;
+   bool is_linked() const BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: Removes the node if it's inserted in a container.
    //!   This function is only allowed if link_mode is \c auto_unlink.
    //!
    //! <b>Throws</b>: Nothing.
-   void unlink();
+   void unlink() BOOST_NOEXCEPT;
    #endif
 };
 

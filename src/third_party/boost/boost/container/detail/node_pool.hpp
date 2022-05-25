@@ -82,7 +82,7 @@ class shared_node_pool
    ~shared_node_pool()
    {}
 
-   //!Allocates array of count elements. Can throw std::bad_alloc
+   //!Allocates array of count elements. Can throw bad_alloc
    void *allocate_node()
    {
       //-----------------------
@@ -101,7 +101,7 @@ class shared_node_pool
    }
 
    //!Allocates a singly linked list of n nodes ending in null pointer.
-   //!can throw std::bad_alloc
+   //!can throw bad_alloc
    void allocate_nodes(const std::size_t n, multiallocation_chain &chain)
    {
       //-----------------------

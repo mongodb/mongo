@@ -77,7 +77,7 @@ T bessel_yn(int n, T x, const Policy& pol)
        prev = bessel_y0(x, pol);
        current = bessel_y1(x, pol);
        int k = 1;
-       BOOST_ASSERT(k < n);
+       BOOST_MATH_ASSERT(k < n);
        policies::check_series_iterations<T>("boost::math::bessel_y_n<%1%>(%1%,%1%)", n, pol);
        T mult = 2 * k / x;
        value = mult * current - prev;

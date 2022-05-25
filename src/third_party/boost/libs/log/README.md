@@ -22,10 +22,10 @@ Boost.Log, part of collection of the [Boost C++ Libraries](https://github.com/bo
 
 ### Build status
 
-Branch          | Travis CI | AppVeyor | Test Matrix | Dependencies |
-:-------------: | --------- | -------- | ----------- | ------------ |
-[`master`](https://github.com/boostorg/log/tree/master) | [![Travis CI](https://travis-ci.org/boostorg/log.svg?branch=master)](https://travis-ci.org/boostorg/log) | [![AppVeyor](https://ci.appveyor.com/api/projects/status/w7x67cnm82xihei5/branch/master?svg=true)](https://ci.appveyor.com/project/Lastique/log/branch/master) | [![Tests](https://img.shields.io/badge/matrix-master-brightgreen.svg)](http://www.boost.org/development/tests/master/developer/log.html) | [![Dependencies](https://img.shields.io/badge/deps-master-brightgreen.svg)](https://pdimov.github.io/boostdep-report/master/log.html)
-[`develop`](https://github.com/boostorg/log/tree/develop) | [![Travis CI](https://travis-ci.org/boostorg/log.svg?branch=develop)](https://travis-ci.org/boostorg/log) | [![AppVeyor](https://ci.appveyor.com/api/projects/status/w7x67cnm82xihei5/branch/develop?svg=true)](https://ci.appveyor.com/project/Lastique/log/branch/develop) | [![Tests](https://img.shields.io/badge/matrix-develop-brightgreen.svg)](http://www.boost.org/development/tests/develop/developer/log.html) | [![Dependencies](https://img.shields.io/badge/deps-develop-brightgreen.svg)](https://pdimov.github.io/boostdep-report/develop/log.html)
+Branch          | GitHub Actions | AppVeyor | Test Matrix | Dependencies |
+:-------------: | -------------- | -------- | ----------- | ------------ |
+[`master`](https://github.com/boostorg/log/tree/master) | [![GitHub Actions](https://github.com/boostorg/log/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/boostorg/log/actions?query=branch%3Amaster) | [![AppVeyor](https://ci.appveyor.com/api/projects/status/w7x67cnm82xihei5/branch/master?svg=true)](https://ci.appveyor.com/project/Lastique/log/branch/master) | [![Tests](https://img.shields.io/badge/matrix-master-brightgreen.svg)](http://www.boost.org/development/tests/master/developer/log.html) | [![Dependencies](https://img.shields.io/badge/deps-master-brightgreen.svg)](https://pdimov.github.io/boostdep-report/master/log.html)
+[`develop`](https://github.com/boostorg/log/tree/develop) | [![GitHub Actions](https://github.com/boostorg/log/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/boostorg/log/actions?query=branch%3Adevelop) | [![AppVeyor](https://ci.appveyor.com/api/projects/status/w7x67cnm82xihei5/branch/develop?svg=true)](https://ci.appveyor.com/project/Lastique/log/branch/develop) | [![Tests](https://img.shields.io/badge/matrix-develop-brightgreen.svg)](http://www.boost.org/development/tests/develop/developer/log.html) | [![Dependencies](https://img.shields.io/badge/deps-develop-brightgreen.svg)](https://pdimov.github.io/boostdep-report/develop/log.html)
 
 ### License
 

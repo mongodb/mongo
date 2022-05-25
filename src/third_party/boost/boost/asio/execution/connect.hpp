@@ -2,7 +2,7 @@
 // execution/connect.hpp
 // ~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -132,7 +132,7 @@ using connect_result_t = typename connect_result<S, R>::type;
 
 #else // defined(GENERATING_DOCUMENTATION)
 
-namespace asio_execution_connect_fn {
+namespace boost_asio_execution_connect_fn {
 
 using boost::asio::conditional;
 using boost::asio::declval;
@@ -427,22 +427,22 @@ struct static_instance
 template <typename T>
 const T static_instance<T>::instance = {};
 
-} // namespace asio_execution_connect_fn
+} // namespace boost_asio_execution_connect_fn
 namespace boost {
 namespace asio {
 namespace execution {
 namespace {
 
-static BOOST_ASIO_CONSTEXPR const asio_execution_connect_fn::impl&
-  connect = asio_execution_connect_fn::static_instance<>::instance;
+static BOOST_ASIO_CONSTEXPR const boost_asio_execution_connect_fn::impl&
+  connect = boost_asio_execution_connect_fn::static_instance<>::instance;
 
 } // namespace
 
 template <typename S, typename R>
 struct can_connect :
   integral_constant<bool,
-    asio_execution_connect_fn::call_traits<S, void(R)>::overload !=
-      asio_execution_connect_fn::ill_formed>
+    boost_asio_execution_connect_fn::call_traits<S, void(R)>::overload !=
+      boost_asio_execution_connect_fn::ill_formed>
 {
 };
 
@@ -456,7 +456,7 @@ constexpr bool can_connect_v = can_connect<S, R>::value;
 template <typename S, typename R>
 struct is_nothrow_connect :
   integral_constant<bool,
-    asio_execution_connect_fn::call_traits<S, void(R)>::is_noexcept>
+    boost_asio_execution_connect_fn::call_traits<S, void(R)>::is_noexcept>
 {
 };
 
@@ -471,7 +471,7 @@ constexpr bool is_nothrow_connect_v
 template <typename S, typename R>
 struct connect_result
 {
-  typedef typename asio_execution_connect_fn::call_traits<
+  typedef typename boost_asio_execution_connect_fn::call_traits<
       S, void(R)>::result_type type;
 };
 

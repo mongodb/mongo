@@ -15,9 +15,9 @@
 #include <cstdint>
 #include <cstddef>
 
-namespace mp = boost::math::tools::meta_programming;
-
 namespace boost{ namespace math{ 
+
+namespace mp = tools::meta_programming;
 
 namespace tools{
 

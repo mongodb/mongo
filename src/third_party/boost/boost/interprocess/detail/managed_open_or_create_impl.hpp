@@ -33,6 +33,7 @@
 #include <boost/interprocess/permissions.hpp>
 #include <boost/container/detail/type_traits.hpp>  //alignment_of, aligned_storage
 #include <boost/interprocess/sync/spin/wait.hpp>
+#include <boost/interprocess/detail/timed_utils.hpp>
 #include <boost/move/move.hpp>
 #include <boost/cstdint.hpp>
 
@@ -71,6 +72,10 @@ class managed_open_or_create_impl
 {
    //Non-copyable
    BOOST_MOVABLE_BUT_NOT_COPYABLE(managed_open_or_create_impl)
+   typedef bool_<FileBased> file_like_t;
+
+   static const unsigned MaxCreateOrOpenTries = BOOST_INTERPROCESS_MANAGED_OPEN_OR_CREATE_INITIALIZE_MAX_TRIES;
+   static const unsigned MaxInitializeTimeSec = BOOST_INTERPROCESS_MANAGED_OPEN_OR_CREATE_INITIALIZE_TIMEOUT_SEC;
 
    typedef managed_open_or_create_impl_device_holder<StoreDevice, DeviceAbstraction> DevHolder;
    enum
@@ -236,7 +241,6 @@ class managed_open_or_create_impl
    const mapped_region &get_mapped_region() const
    {  return m_mapped_region;  }
 
-
    DeviceAbstraction &get_device()
    {  return this->DevHolder::get_device(); }
 
@@ -265,19 +269,191 @@ class managed_open_or_create_impl
 
    //These are templatized to allow explicit instantiations
    template<bool dummy, class DeviceId>
-   static void create_device(DeviceAbstraction &dev, const DeviceId & id, std::size_t size, const permissions &perm, false_ file_like)
+   static void create_device(DeviceAbstraction &dev, const DeviceId & id, std::size_t size, const permissions &perm, false_ /*file_like*/)
    {
-      (void)file_like;
       DeviceAbstraction tmp(create_only, id, read_write, size, perm);
       tmp.swap(dev);
    }
 
    template<bool dummy, class DeviceId>
-   static void create_device(DeviceAbstraction &dev, const DeviceId & id, std::size_t, const permissions &perm, true_ file_like)
+   static void create_device(DeviceAbstraction &dev, const DeviceId & id, std::size_t, const permissions &perm, true_ /*file_like*/)
    {
-      (void)file_like;
       DeviceAbstraction tmp(create_only, id, read_write, perm);
       tmp.swap(dev);
+   }
+
+   template <class DeviceId>
+   static bool do_create_else_open(DeviceAbstraction &dev, const DeviceId & id, std::size_t size, const permissions &perm)
+   {
+      //This loop is very ugly, but brute force is sometimes better
+      //than diplomacy. In POSIX file-based resources we can' know if we
+      //effectively created the file or not (there is no ERROR_ALREADY_EXISTS equivalent),
+      //so we try to create exclusively and fallback to open if already exists, with
+      //some retries if opening also fails because the file does not exist
+      //(there is a race, the creator just removed the file after creating it).
+      //
+      //We'll put a maximum retry limit just to avoid possible deadlocks, we don't
+      //want to support pathological use cases.
+      spin_wait swait;
+      unsigned tries = 0;
+      while(1){
+         BOOST_TRY{
+            create_device<FileBased>(dev, id, size, perm, file_like_t());
+            return true;
+         }
+         BOOST_CATCH(interprocess_exception &ex){
+            #ifndef BOOST_NO_EXCEPTIONS
+            if(ex.get_error_code() != already_exists_error){
+               BOOST_RETHROW
+            }
+            else if (++tries == MaxCreateOrOpenTries) {
+               //File existing when trying to create, but non-existing when
+               //trying to open, and tried MaxCreateOrOpenTries times. Something fishy
+               //is happening here and we can't solve it
+               throw interprocess_exception(error_info(corrupted_error));
+            }
+            else{
+               BOOST_TRY{
+                  DeviceAbstraction tmp(open_only, id, read_write);
+                  dev.swap(tmp);
+                  return false;
+               }
+               BOOST_CATCH(interprocess_exception &e){
+                  if(e.get_error_code() != not_found_error){
+                     BOOST_RETHROW
+                  }
+               }
+               BOOST_CATCH(...){
+                  BOOST_RETHROW
+               } BOOST_CATCH_END
+            }
+            #endif   //#ifndef BOOST_NO_EXCEPTIONS
+         }
+         BOOST_CATCH(...){
+            BOOST_RETHROW
+         } BOOST_CATCH_END
+         swait.yield();
+      }
+      return false;
+   }
+
+   template <class ConstructFunc>
+   static void do_map_after_create
+      (DeviceAbstraction &dev, mapped_region &final_region,
+       std::size_t size, const void *addr, ConstructFunc construct_func)
+   {
+      BOOST_TRY{
+         //If this throws, we are lost
+         truncate_device<FileBased>(dev, static_cast<offset_t>(size), file_like_t());
+
+         //If the following throws, we will truncate the file to 1
+         mapped_region region(dev, read_write, 0, 0, addr);
+         boost::uint32_t *patomic_word = 0;  //avoid gcc warning
+         patomic_word = static_cast<boost::uint32_t*>(region.get_address());
+         boost::uint32_t previous = atomic_cas32(patomic_word, InitializingSegment, UninitializedSegment);
+
+         if(previous == UninitializedSegment){
+            BOOST_TRY{
+               construct_func( static_cast<char*>(region.get_address()) + ManagedOpenOrCreateUserOffset
+                              , size - ManagedOpenOrCreateUserOffset, true);
+               //All ok, just move resources to the external mapped region
+               final_region.swap(region);
+            }
+            BOOST_CATCH(...){
+               atomic_write32(patomic_word, CorruptedSegment);
+               BOOST_RETHROW
+            } BOOST_CATCH_END
+            atomic_write32(patomic_word, InitializedSegment);
+         }
+         else{
+            atomic_write32(patomic_word, CorruptedSegment);
+            throw interprocess_exception(error_info(corrupted_error));
+         }
+      }
+      BOOST_CATCH(...){
+         BOOST_TRY{
+            truncate_device<FileBased>(dev, 1u, file_like_t());
+         }
+         BOOST_CATCH(...){
+         }
+         BOOST_CATCH_END
+         BOOST_RETHROW
+      }
+      BOOST_CATCH_END
+   }
+
+   template <class ConstructFunc>
+   static void do_map_after_open
+      ( DeviceAbstraction &dev, mapped_region &final_region
+      , const void *addr, ConstructFunc construct_func
+      , bool ronly, bool cow)
+   {
+      const usduration TimeoutSec(usduration_seconds(MaxInitializeTimeSec));
+
+      if(FileBased){
+         offset_t filesize = 0;
+         spin_wait swait;
+
+         //If a file device was used, the creator might be truncating the device, so wait
+         //until the file size is enough to map the initial word
+         ustime ustime_start = microsec_clock<ustime>::universal_time();
+
+         while(1){
+            if(!get_file_size(file_handle_from_mapping_handle(dev.get_mapping_handle()), filesize)){
+               error_info err = system_error_code();
+               throw interprocess_exception(err);
+            }
+            if (filesize != 0)
+               break;
+            else {
+               //More than MaxZeroTruncateTimeSec seconds waiting to the creator
+               //to minimally increase the size of the file: something bad has happened
+               const usduration elapsed(microsec_clock<ustime>::universal_time() - ustime_start);
+               if (elapsed > TimeoutSec){
+                  throw interprocess_exception(error_info(corrupted_error));
+               }
+               swait.yield();
+            }
+         }
+         //The creator detected an error creating the file and signalled it with size 1
+         if(filesize == 1){
+            throw interprocess_exception(error_info(corrupted_error));
+         }
+      }
+
+      mapped_region  region(dev, ronly ? read_only : (cow ? copy_on_write : read_write), 0, 0, addr);
+
+      boost::uint32_t *patomic_word = static_cast<boost::uint32_t*>(region.get_address());
+      boost::uint32_t value = atomic_read32(patomic_word);
+
+      if (value != InitializedSegment){
+         ustime ustime_start = microsec_clock<ustime>::universal_time();
+         spin_wait swait;
+         while ((value = atomic_read32(patomic_word)) != InitializedSegment){
+            if(value == CorruptedSegment){
+               throw interprocess_exception(error_info(corrupted_error));
+            }
+            //More than MaxZeroTruncateTimeSec seconds waiting to the creator
+            //to minimally increase the size of the file: something bad has happened
+            const usduration elapsed(microsec_clock<ustime>::universal_time() - ustime_start);
+            if (elapsed > TimeoutSec){
+               throw interprocess_exception(error_info(corrupted_error));
+            }
+            swait.yield();
+         }
+         //The size of the file might have grown while Uninitialized -> Initializing, so remap
+         {
+            mapped_region null_map;
+            region.swap(null_map);
+         }
+         mapped_region  final_size_map(dev, ronly ? read_only : (cow ? copy_on_write : read_write), 0, 0, addr);
+         final_size_map.swap(region);
+      }
+      construct_func( static_cast<char*>(region.get_address()) + ManagedOpenOrCreateUserOffset
+                     , region.get_size() - ManagedOpenOrCreateUserOffset
+                     , false);
+      //All ok, just move resources to the external mapped region
+      final_region.swap(region);
    }
 
    template <class DeviceId, class ConstructFunc> inline
@@ -289,13 +465,6 @@ class managed_open_or_create_impl
        const permissions &perm,
        ConstructFunc construct_func)
    {
-      typedef bool_<FileBased> file_like_t;
-      (void)mode;
-      bool created = false;
-      bool ronly   = false;
-      bool cow     = false;
-      DeviceAbstraction dev;
-
       if(type != DoOpen){
          //Check if the requested size is enough to build the managed metadata
          const std::size_t func_min_size = construct_func.get_min_size();
@@ -303,149 +472,39 @@ class managed_open_or_create_impl
              size < (func_min_size + ManagedOpenOrCreateUserOffset) ){
             throw interprocess_exception(error_info(size_error));
          }
+         //Check size can be represented by offset_t (used by truncate)
+         if (!check_offset_t_size<FileBased>(size, file_like_t())){
+           throw interprocess_exception(error_info(size_error));
+         }
       }
-      //Check size can be represented by offset_t (used by truncate)
-      if(type != DoOpen && !check_offset_t_size<FileBased>(size, file_like_t())){
-         throw interprocess_exception(error_info(size_error));
-      }
-      if(type == DoOpen && mode == read_write){
-         DeviceAbstraction tmp(open_only, id, read_write);
+
+      //Now create the device (file, shm file, etc.)
+      DeviceAbstraction dev;
+      (void)mode;
+      bool created = false;
+      bool ronly   = false;
+      bool cow     = false;
+      if(type == DoOpen){
+         DeviceAbstraction tmp(open_only, id, mode == read_write ? read_write : read_only);
          tmp.swap(dev);
-         created = false;
-      }
-      else if(type == DoOpen && mode == read_only){
-         DeviceAbstraction tmp(open_only, id, read_only);
-         tmp.swap(dev);
-         created = false;
-         ronly   = true;
-      }
-      else if(type == DoOpen && mode == copy_on_write){
-         DeviceAbstraction tmp(open_only, id, read_only);
-         tmp.swap(dev);
-         created = false;
-         cow     = true;
+         ronly = mode == read_only;
+         cow = mode == copy_on_write;
       }
       else if(type == DoCreate){
          create_device<FileBased>(dev, id, size, perm, file_like_t());
          created = true;
       }
-      else if(type == DoOpenOrCreate){
-         //This loop is very ugly, but brute force is sometimes better
-         //than diplomacy. If someone knows how to open or create a
-         //file and know if we have really created it or just open it
-         //drop me a e-mail!
-         bool completed = false;
-         spin_wait swait;
-         while(!completed){
-            try{
-               create_device<FileBased>(dev, id, size, perm, file_like_t());
-               created     = true;
-               completed   = true;
-            }
-            catch(interprocess_exception &ex){
-               if(ex.get_error_code() != already_exists_error){
-                  throw;
-               }
-               else{
-                  try{
-                     DeviceAbstraction tmp(open_only, id, read_write);
-                     dev.swap(tmp);
-                     created     = false;
-                     completed   = true;
-                  }
-                  catch(interprocess_exception &e){
-                     if(e.get_error_code() != not_found_error){
-                        throw;
-                     }
-                  }
-                  catch(...){
-                     throw;
-                  }
-               }
-            }
-            catch(...){
-               throw;
-            }
-            swait.yield();
-         }
+      else { //DoOpenOrCreate
+         created = this->do_create_else_open(dev, id, size, perm);
       }
 
       if(created){
-         try{
-            //If this throws, we are lost
-            truncate_device<FileBased>(dev, size, file_like_t());
-
-            //If the following throws, we will truncate the file to 1
-            mapped_region        region(dev, read_write, 0, 0, addr);
-            boost::uint32_t *patomic_word = 0;  //avoid gcc warning
-            patomic_word = static_cast<boost::uint32_t*>(region.get_address());
-            boost::uint32_t previous = atomic_cas32(patomic_word, InitializingSegment, UninitializedSegment);
-
-            if(previous == UninitializedSegment){
-               try{
-                  construct_func( static_cast<char*>(region.get_address()) + ManagedOpenOrCreateUserOffset
-                                , size - ManagedOpenOrCreateUserOffset, true);
-                  //All ok, just move resources to the external mapped region
-                  m_mapped_region.swap(region);
-               }
-               catch(...){
-                  atomic_write32(patomic_word, CorruptedSegment);
-                  throw;
-               }
-               atomic_write32(patomic_word, InitializedSegment);
-            }
-            else if(previous == InitializingSegment || previous == InitializedSegment){
-               throw interprocess_exception(error_info(already_exists_error));
-            }
-            else{
-               throw interprocess_exception(error_info(corrupted_error));
-            }
-         }
-         catch(...){
-            try{
-               truncate_device<FileBased>(dev, 1u, file_like_t());
-            }
-            catch(...){
-            }
-            throw;
-         }
+         this->do_map_after_create(dev, m_mapped_region, size, addr, construct_func);
       }
       else{
-         if(FileBased){
-            offset_t filesize = 0;
-            spin_wait swait;
-            while(filesize == 0){
-               if(!get_file_size(file_handle_from_mapping_handle(dev.get_mapping_handle()), filesize)){
-                  error_info err = system_error_code();
-                  throw interprocess_exception(err);
-               }
-               swait.yield();
-            }
-            if(filesize == 1){
-               throw interprocess_exception(error_info(corrupted_error));
-            }
-         }
-
-         mapped_region  region(dev, ronly ? read_only : (cow ? copy_on_write : read_write), 0, 0, addr);
-
-         boost::uint32_t *patomic_word = static_cast<boost::uint32_t*>(region.get_address());
-         boost::uint32_t value = atomic_read32(patomic_word);
-
-         spin_wait swait;
-         while(value == InitializingSegment || value == UninitializedSegment){
-            swait.yield();
-            value = atomic_read32(patomic_word);
-         }
-
-         if(value != InitializedSegment)
-            throw interprocess_exception(error_info(corrupted_error));
-
-         construct_func( static_cast<char*>(region.get_address()) + ManagedOpenOrCreateUserOffset
-                        , region.get_size() - ManagedOpenOrCreateUserOffset
-                        , false);
-         //All ok, just move resources to the external mapped region
-         m_mapped_region.swap(region);
+         this->do_map_after_open(dev, m_mapped_region, addr, construct_func, ronly, cow);
       }
+
       if(StoreDevice){
          this->DevHolder::get_device() = boost::move(dev);
       }

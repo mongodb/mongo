@@ -12,11 +12,108 @@
 // Floating point classification and sign manipulation functions
 // Extracted from https://github.com/boostorg/lexical_cast/pull/37
 //
-// Copyright 2020 Peter Dimov
+// Copyright 2020, 2021 Peter Dimov
 // Distributed under the Boost Software License, Version 1.0.
 // https://www.boost.org/LICENSE_1_0.txt
 
 #include <cmath>
+
+#if defined(BOOST_CORE_USE_GENERIC_CMATH) || (!defined(_MSC_VER) && !defined(FP_SUBNORMAL))
+
+#include <boost/cstdint.hpp>
+#include <boost/static_assert.hpp>
+#include <limits>
+#include <cstring>
+
+namespace boost
+{
+namespace core
+{
+
+// fpclassify return values
+
+int const fp_zero = 0;
+int const fp_subnormal = 1;
+int const fp_normal = 2;
+int const fp_infinite = 3;
+int const fp_nan = 4;
+
+// Classification functions
+
+template<class T> bool isfinite( T x )
+{
+    return x <= (std::numeric_limits<T>::max)() && x >= -(std::numeric_limits<T>::max)();
+}
+
+template<class T> bool isinf( T x )
+{
+    return x > (std::numeric_limits<T>::max)() || x < -(std::numeric_limits<T>::max)();
+}
+
+template<class T> bool isnan( T x )
+{
+    return !isfinite( x ) && !isinf( x );
+}
+
+template<class T> bool isnormal( T x )
+{
+    return isfinite( x ) && ( x >= (std::numeric_limits<T>::min)() || x <= -(std::numeric_limits<T>::min)() );
+}
+
+template<class T> int fpclassify( T x )
+{
+    if( x == 0 ) return fp_zero;
+
+    if( x < 0 ) x = -x;
+
+    if( x > (std::numeric_limits<T>::max)() ) return fp_infinite;
+
+    if( x >= (std::numeric_limits<T>::min)() ) return fp_normal;
+
+    if( x < (std::numeric_limits<T>::min)() ) return fp_subnormal;
+
+    return fp_nan;
+}
+
+// Sign manipulation functions
+
+inline bool signbit( float x )
+{
+    boost::int32_t y;
+
+    BOOST_STATIC_ASSERT( sizeof( x ) == sizeof( y ) );
+
+    std::memcpy( &y, &x, sizeof( y ) );
+
+    return y < 0;
+}
+
+inline bool signbit( double x )
+{
+    boost::int64_t y;
+
+    BOOST_STATIC_ASSERT( sizeof( x ) == sizeof( y ) );
+
+    std::memcpy( &y, &x, sizeof( y ) );
+
+    return y < 0;
+}
+
+inline bool signbit( long double x )
+{
+    return signbit( static_cast<double>( x ) );
+}
+
+template<class T> T copysign( T x, T y )
+{
+    return signbit( x ) == signbit( y )? x: -x;
+}
+
+} // namespace core
+} // namespace boost
+
+#else // defined(BOOST_CORE_USE_GENERIC_CMATH)
+
 #if defined(_MSC_VER) && _MSC_VER < 1800
 # include <float.h>
 #endif
@@ -195,5 +292,7 @@ template<class T> T copysign( T x, T y )
 
 } // namespace core
 } // namespace boost
+
+#endif // defined(BOOST_CORE_USE_GENERIC_CMATH)
 
 #endif  // #ifndef BOOST_CORE_CMATH_HPP_INCLUDED

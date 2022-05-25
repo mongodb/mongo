@@ -2,7 +2,7 @@
 // detail/push_options.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -57,6 +57,15 @@
 #  pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 # endif // (__clang_major__ >= 6)
 
+# pragma push_macro ("emit")
+# undef emit
+
+# pragma push_macro ("signal")
+# undef signal
+
+# pragma push_macro ("slot")
+# undef slot
+
 #elif defined(__GNUC__)
 
 // GNU C++
@@ -91,6 +100,15 @@
 # if (__GNUC__ >= 7)
 #  pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 # endif // (__GNUC__ >= 7)
+
+# pragma push_macro ("emit")
+# undef emit
+
+# pragma push_macro ("signal")
+# undef signal
+
+# pragma push_macro ("slot")
+# undef slot
 
 #elif defined(__KCC)
 
@@ -151,6 +169,7 @@
 # pragma warning (disable:4127)
 # pragma warning (disable:4180)
 # pragma warning (disable:4244)
+# pragma warning (disable:4265)
 # pragma warning (disable:4355)
 # pragma warning (disable:4510)
 # pragma warning (disable:4512)
@@ -187,5 +206,14 @@
 #   endif
 #  endif
 # endif
+
+# pragma push_macro ("emit")
+# undef emit
+
+# pragma push_macro ("signal")
+# undef signal
+
+# pragma push_macro ("slot")
+# undef slot
 
 #endif

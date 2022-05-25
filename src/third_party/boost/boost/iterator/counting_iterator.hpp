@@ -5,12 +5,21 @@
 #ifndef COUNTING_ITERATOR_DWA200348_HPP
 # define COUNTING_ITERATOR_DWA200348_HPP
 
-# include <boost/iterator/iterator_adaptor.hpp>
+# include <boost/config.hpp>
+# include <boost/static_assert.hpp>
+# ifndef BOOST_NO_LIMITS_COMPILE_TIME_CONSTANTS
+# include <limits>
+# elif !BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x551))
+# include <boost/type_traits/is_convertible.hpp>
+# else
+# include <boost/type_traits/is_arithmetic.hpp>
+# endif
+# include <boost/type_traits/is_integral.hpp>
+# include <boost/type_traits/type_identity.hpp>
+# include <boost/type_traits/conditional.hpp>
+# include <boost/type_traits/integral_constant.hpp>
 # include <boost/detail/numeric_traits.hpp>
-# include <boost/mpl/bool.hpp>
-# include <boost/mpl/if.hpp>
-# include <boost/mpl/identity.hpp>
-# include <boost/mpl/eval_if.hpp>
+# include <boost/iterator/iterator_adaptor.hpp>
 
 namespace boost {
 namespace iterators {
@@ -45,7 +54,7 @@ namespace detail
            && boost::is_convertible<T,int>::value
       ));
 #  else
-    BOOST_STATIC_CONSTANT(bool, value = ::boost::is_arithmetic<T>::value);
+      BOOST_STATIC_CONSTANT(bool, value = ::boost::is_arithmetic<T>::value);
 #  endif
 
 # endif
@@ -53,23 +62,33 @@ namespace detail
 
   template <class T>
   struct is_numeric
-    : mpl::bool_<(::boost::iterators::detail::is_numeric_impl<T>::value)>
+    : boost::integral_constant<bool, ::boost::iterators::detail::is_numeric_impl<T>::value>
   {};
 
 #  if defined(BOOST_HAS_LONG_LONG)
   template <>
-  struct is_numeric< ::boost::long_long_type>
-    : mpl::true_ {};
+  struct is_numeric<boost::long_long_type>
+    : boost::true_type {};
 
   template <>
-  struct is_numeric< ::boost::ulong_long_type>
-    : mpl::true_ {};
+  struct is_numeric<boost::ulong_long_type>
+    : boost::true_type {};
+#  endif
+
+#  if defined(BOOST_HAS_INT128)
+  template <>
+  struct is_numeric<boost::int128_type>
+    : boost::true_type {};
+
+  template <>
+  struct is_numeric<boost::uint128_type>
+    : boost::true_type {};
 #  endif
 
   // Some compilers fail to have a numeric_limits specialization
   template <>
   struct is_numeric<wchar_t>
-    : mpl::true_ {};
+    : true_type {};
 
   template <class T>
   struct numeric_difference
@@ -77,27 +96,40 @@ namespace detail
       typedef typename boost::detail::numeric_traits<T>::difference_type type;
   };
 
-  BOOST_STATIC_ASSERT(is_numeric<int>::value);
+#  if defined(BOOST_HAS_INT128)
+  // std::numeric_limits, which is used by numeric_traits, is not specialized for __int128 in some standard libraries
+  template <>
+  struct numeric_difference<boost::int128_type>
+  {
+      typedef boost::int128_type type;
+  };
+
+  template <>
+  struct numeric_difference<boost::uint128_type>
+  {
+      typedef boost::int128_type type;
+  };
+#  endif
 
   template <class Incrementable, class CategoryOrTraversal, class Difference>
   struct counting_iterator_base
   {
       typedef typename detail::ia_dflt_help<
           CategoryOrTraversal
-        , mpl::eval_if<
-              is_numeric<Incrementable>
-            , mpl::identity<random_access_traversal_tag>
+        , typename boost::conditional<
+              is_numeric<Incrementable>::value
+            , boost::type_identity<random_access_traversal_tag>
             , iterator_traversal<Incrementable>
-          >
+          >::type
       >::type traversal;
 
       typedef typename detail::ia_dflt_help<
           Difference
-        , mpl::eval_if<
-              is_numeric<Incrementable>
+        , typename boost::conditional<
+              is_numeric<Incrementable>::value
             , numeric_difference<Incrementable>
             , iterator_difference<Incrementable>
-          >
+          >::type
       >::type difference;
 
       typedef iterator_adaptor<
@@ -161,9 +193,9 @@ class counting_iterator
  public:
     typedef typename super_t::difference_type difference_type;
 
-    counting_iterator() { }
+    BOOST_DEFAULTED_FUNCTION(counting_iterator(), {})
 
-    counting_iterator(counting_iterator const& rhs) : super_t(rhs.base()) {}
+    BOOST_DEFAULTED_FUNCTION(counting_iterator(counting_iterator const& rhs), : super_t(rhs.base()) {})
 
     counting_iterator(Incrementable x)
       : super_t(x)
@@ -180,6 +212,8 @@ class counting_iterator
     {}
 # endif
 
+    BOOST_DEFAULTED_FUNCTION(counting_iterator& operator=(counting_iterator const& rhs), { *static_cast< super_t* >(this) = static_cast< super_t const& >(rhs); return *this; })
+
  private:
 
     typename super_t::reference dereference() const
@@ -191,13 +225,13 @@ class counting_iterator
     difference_type
     distance_to(counting_iterator<OtherIncrementable, CategoryOrTraversal, Difference> const& y) const
     {
-      typedef typename mpl::if_<
-          detail::is_numeric<Incrementable>
-        , detail::number_distance<difference_type, Incrementable, OtherIncrementable>
-        , detail::iterator_distance<difference_type, Incrementable, OtherIncrementable>
-      >::type d;
+        typedef typename boost::conditional<
+            detail::is_numeric<Incrementable>::value
+          , detail::number_distance<difference_type, Incrementable, OtherIncrementable>
+          , detail::iterator_distance<difference_type, Incrementable, OtherIncrementable>
+        >::type d;
 
-      return d::distance(this->base(), y.base());
+        return d::distance(this->base(), y.base());
     }
 };
 
@@ -206,8 +240,8 @@ template <class Incrementable>
 inline counting_iterator<Incrementable>
 make_counting_iterator(Incrementable x)
 {
-  typedef counting_iterator<Incrementable> result_t;
-  return result_t(x);
+    typedef counting_iterator<Incrementable> result_t;
+    return result_t(x);
 }
 
 } // namespace iterators

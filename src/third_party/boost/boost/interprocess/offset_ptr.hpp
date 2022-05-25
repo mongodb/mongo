@@ -35,6 +35,12 @@
 #include <boost/assert.hpp>
 #include <iosfwd>
 
+#if defined(BOOST_GCC) && (BOOST_GCC >= 40600)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
+
 //!\file
 //!Describes a smart pointer that stores the offset between this pointer and
 //!target pointee, called offset_ptr.
@@ -400,17 +406,17 @@ class offset_ptr
    //!offset_ptr += difference_type.
    //!Never throws.
    BOOST_INTERPROCESS_FORCEINLINE offset_ptr &operator+= (difference_type offset) BOOST_NOEXCEPT
-   {  this->inc_offset(offset * sizeof (PointedType));   return *this;  }
+   {  this->inc_offset(offset * difference_type(sizeof(PointedType)));   return *this;  }
 
    //!offset_ptr -= difference_type.
    //!Never throws.
    BOOST_INTERPROCESS_FORCEINLINE offset_ptr &operator-= (difference_type offset) BOOST_NOEXCEPT
-   {  this->dec_offset(offset * sizeof (PointedType));   return *this;  }
+   {  this->dec_offset(offset * difference_type(sizeof(PointedType)));   return *this;  }
 
    //!++offset_ptr.
    //!Never throws.
    BOOST_INTERPROCESS_FORCEINLINE offset_ptr& operator++ (void) BOOST_NOEXCEPT
-   {  this->inc_offset(sizeof (PointedType));   return *this;  }
+   {  this->inc_offset(difference_type(sizeof(PointedType)));   return *this;  }
 
    //!offset_ptr++.
    //!Never throws.
@@ -573,10 +579,10 @@ class offset_ptr
 
    #if !defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
    BOOST_INTERPROCESS_FORCEINLINE void inc_offset(DifferenceType bytes) BOOST_NOEXCEPT
-   {  internal.m_offset += bytes;   }
+   {  internal.m_offset += OffsetType(bytes);   }
 
    BOOST_INTERPROCESS_FORCEINLINE void dec_offset(DifferenceType bytes) BOOST_NOEXCEPT
-   {  internal.m_offset -= bytes;   }
+   {  internal.m_offset -= OffsetType(bytes);   }
 
    ipcdetail::offset_ptr_internal<OffsetType, OffsetAlignment> internal;
 
@@ -761,5 +767,9 @@ struct pointer_to_other
 #endif   //#ifndef BOOST_INTERPROCESS_DOXYGEN_INVOKED
 
 #include <boost/interprocess/detail/config_end.hpp>
+
+#if defined(BOOST_GCC) && (BOOST_GCC >= 40600)
+#pragma GCC diagnostic pop
+#endif
 
 #endif //#ifndef BOOST_INTERPROCESS_OFFSET_PTR_HPP

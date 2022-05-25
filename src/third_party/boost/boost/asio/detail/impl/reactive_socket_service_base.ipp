@@ -2,7 +2,7 @@
 // detail/reactive_socket_service_base.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -18,7 +18,8 @@
 #include <boost/asio/detail/config.hpp>
 
 #if !defined(BOOST_ASIO_HAS_IOCP) \
-  && !defined(BOOST_ASIO_WINDOWS_RUNTIME)
+  && !defined(BOOST_ASIO_WINDOWS_RUNTIME) \
+  && !defined(BOOST_ASIO_HAS_IO_URING_AS_DEFAULT)
 
 #include <boost/asio/detail/reactive_socket_service_base.hpp>
 
@@ -298,5 +299,6 @@ void reactive_socket_service_base::start_connect_op(
 
 #endif // !defined(BOOST_ASIO_HAS_IOCP)
        //   && !defined(BOOST_ASIO_WINDOWS_RUNTIME)
+       //   && !defined(BOOST_ASIO_HAS_IO_URING_AS_DEFAULT)
 
 #endif // BOOST_ASIO_DETAIL_IMPL_REACTIVE_SOCKET_SERVICE_BASE_IPP

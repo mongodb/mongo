@@ -21,6 +21,7 @@
 #include <boost/move/detail/workaround.hpp>  //forceinline
 #include <boost/move/detail/meta_utils_core.hpp>
 #include <cstddef>   //for std::size_t
+#include <boost/move/detail/addressof.hpp>
 
 //Small meta-typetraits to support move
 
@@ -241,36 +242,7 @@ struct is_class_or_union
 //////////////////////////////////////
 //             addressof
 //////////////////////////////////////
-template<class T>
-struct addr_impl_ref
-{
-   T & v_;
-   BOOST_MOVE_FORCEINLINE addr_impl_ref( T & v ): v_( v ) {}
-   BOOST_MOVE_FORCEINLINE operator T& () const { return v_; }
 
-   private:
-   addr_impl_ref & operator=(const addr_impl_ref &);
-};
-
-template<class T>
-struct addressof_impl
-{
-   BOOST_MOVE_FORCEINLINE static T * f( T & v, long )
-   {
-      return reinterpret_cast<T*>(
-         &const_cast<char&>(reinterpret_cast<const volatile char &>(v)));
-   }
-
-   BOOST_MOVE_FORCEINLINE static T * f( T * v, int )
-   {  return v;  }
-};
-
-template<class T>
-BOOST_MOVE_FORCEINLINE T * addressof( T & v )
-{
-   return ::boost::move_detail::addressof_impl<T>::f
-      ( ::boost::move_detail::addr_impl_ref<T>( v ), 0 );
-}
 
 //////////////////////////////////////
 //          has_pointer_type

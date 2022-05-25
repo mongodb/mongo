@@ -67,9 +67,9 @@ namespace detail {
     template<class T>
     inline int signbit_impl(T x, ieee_copy_all_bits_tag const&)
     {
-        typedef BOOST_DEDUCED_TYPENAME fp_traits<T>::type traits;
+        typedef typename fp_traits<T>::type traits;
 
-        BOOST_DEDUCED_TYPENAME traits::bits a;
+        typename traits::bits a;
         traits::get_bits(x,a);
         return a & traits::sign ? 1 : 0;
     }
@@ -77,9 +77,9 @@ namespace detail {
     template<class T> 
     inline int signbit_impl(T x, ieee_copy_leading_bits_tag const&)
     {
-        typedef BOOST_DEDUCED_TYPENAME fp_traits<T>::type traits;
+        typedef typename fp_traits<T>::type traits;
 
-        BOOST_DEDUCED_TYPENAME traits::bits a;
+        typename traits::bits a;
         traits::get_bits(x,a);
 
         return a & traits::sign ? 1 : 0;
@@ -126,9 +126,9 @@ namespace detail {
     template<class T>
     inline T changesign_impl(T x, ieee_copy_all_bits_tag const&)
     {
-        typedef BOOST_DEDUCED_TYPENAME fp_traits<T>::sign_change_type traits;
+        typedef typename fp_traits<T>::sign_change_type traits;
 
-        BOOST_DEDUCED_TYPENAME traits::bits a;
+        typename traits::bits a;
         traits::get_bits(x,a);
         a ^= traits::sign;
         traits::set_bits(x,a);
@@ -138,9 +138,9 @@ namespace detail {
     template<class T>
     inline T (changesign_impl)(T x, ieee_copy_leading_bits_tag const&)
     {
-        typedef BOOST_DEDUCED_TYPENAME fp_traits<T>::sign_change_type traits;
+        typedef typename fp_traits<T>::sign_change_type traits;
 
-        BOOST_DEDUCED_TYPENAME traits::bits a;
+        typename traits::bits a;
         traits::get_bits(x,a);
         a ^= traits::sign;
         traits::set_bits(x,a);

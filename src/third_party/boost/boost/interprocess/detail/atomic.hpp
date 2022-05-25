@@ -27,6 +27,14 @@
 #include <boost/interprocess/detail/workaround.hpp>
 #include <boost/cstdint.hpp>
 
+#if !defined(_AIX)
+#define BOOST_INTERPROCESS_DETAIL_PPC_ASM_LABEL(label) label ":\n\t"
+#define BOOST_INTERPROCESS_DETAIL_PPC_ASM_JUMP(insn, label, offset) insn " " label "\n\t"
+#else
+#define BOOST_INTERPROCESS_DETAIL_PPC_ASM_LABEL(label)
+#define BOOST_INTERPROCESS_DETAIL_PPC_ASM_JUMP(insn, label, offset) insn " $" offset "\n\t"
+#endif
+
 namespace boost{
 namespace interprocess{
 namespace ipcdetail{
@@ -86,13 +94,13 @@ namespace ipcdetail{
 //! "mem": pointer to the atomic value
 //! Returns the old value pointed to by mem
 inline boost::uint32_t atomic_dec32(volatile boost::uint32_t *mem)
-{  return winapi::interlocked_decrement(reinterpret_cast<volatile long*>(mem)) + 1;  }
+{  return (boost::uint32_t)winapi::interlocked_decrement(reinterpret_cast<volatile long*>(mem)) + 1;  }
 
 //! Atomically increment an apr_uint32_t by 1
 //! "mem": pointer to the object
 //! Returns the old value pointed to by mem
 inline boost::uint32_t atomic_inc32(volatile boost::uint32_t *mem)
-{  return winapi::interlocked_increment(reinterpret_cast<volatile long*>(mem))-1;  }
+{  return (boost::uint32_t)winapi::interlocked_increment(reinterpret_cast<volatile long*>(mem))-1;  }
 
 //! Atomically read an boost::uint32_t from memory
 inline boost::uint32_t atomic_read32(volatile boost::uint32_t *mem)
@@ -106,7 +114,7 @@ inline boost::uint32_t atomic_read32(volatile boost::uint32_t *mem)
 //! "mem": pointer to the object
 //! "param": val value that the object will assume
 inline void atomic_write32(volatile boost::uint32_t *mem, boost::uint32_t val)
-{  winapi::interlocked_exchange(reinterpret_cast<volatile long*>(mem), val);  }
+{  winapi::interlocked_exchange(reinterpret_cast<volatile long*>(mem), (long)val);  }
 
 //! Compare an boost::uint32_t's value with "cmp".
 //! If they are the same swap the value with "with"
@@ -116,7 +124,7 @@ inline void atomic_write32(volatile boost::uint32_t *mem, boost::uint32_t val)
 //! Returns the old value of *mem
 inline boost::uint32_t atomic_cas32
    (volatile boost::uint32_t *mem, boost::uint32_t with, boost::uint32_t cmp)
-{  return winapi::interlocked_compare_exchange(reinterpret_cast<volatile long*>(mem), with, cmp);  }
+{  return (boost::uint32_t)winapi::interlocked_compare_exchange(reinterpret_cast<volatile long*>(mem), (long)with, (long)cmp);  }
 
 }  //namespace ipcdetail{
 }  //namespace interprocess{
@@ -158,7 +166,7 @@ inline boost::uint32_t atomic_add32
    // int r = *pw;
    // *mem += val;
    // return r;
-   int r;
+   boost::uint32_t r;
 
    asm volatile
    (
@@ -223,14 +231,17 @@ inline boost::uint32_t atomic_add32(volatile boost::uint32_t *mem, boost::uint32
 {
    boost::uint32_t prev, temp;
 
-   asm volatile ("1:\n\t"
-                 "lwarx  %0,0,%2\n\t"
-                 "add    %1,%0,%3\n\t"
-                 "stwcx. %1,0,%2\n\t"
-                 "bne-   1b"
-                 : "=&r" (prev), "=&r" (temp)
-                 : "b" (mem), "r" (val)
-                 : "cc", "memory");
+   asm volatile
+     (
+         BOOST_INTERPROCESS_DETAIL_PPC_ASM_LABEL("1")
+         "lwarx  %0,0,%2\n\t"
+         "add    %1,%0,%3\n\t"
+         "stwcx. %1,0,%2\n\t"
+         BOOST_INTERPROCESS_DETAIL_PPC_ASM_JUMP("bne-", "1b", "-12")
+         : "=&r" (prev), "=&r" (temp)
+         : "b" (mem), "r" (val)
+         : "cc", "memory"
+      );
    return prev;
 }
 
@@ -245,16 +256,19 @@ inline boost::uint32_t atomic_cas32
 {
    boost::uint32_t prev;
 
-   asm volatile ("1:\n\t"
-                 "lwarx  %0,0,%1\n\t"
-                 "cmpw   %0,%3\n\t"
-                 "bne-   2f\n\t"
-                 "stwcx. %2,0,%1\n\t"
-                 "bne-   1b\n\t"
-                 "2:"
-                 : "=&r"(prev)
-                 : "b" (mem), "r" (with), "r" (cmp)
-                 : "cc", "memory");
+   asm volatile
+     (
+         BOOST_INTERPROCESS_DETAIL_PPC_ASM_LABEL("1")
+         "lwarx  %0,0,%1\n\t"
+         "cmpw   %0,%3\n\t"
+         BOOST_INTERPROCESS_DETAIL_PPC_ASM_JUMP("bne-", "2f", "+12")
+         "stwcx. %2,0,%1\n\t"
+         BOOST_INTERPROCESS_DETAIL_PPC_ASM_JUMP("bne-", "1b", "-16")
+         BOOST_INTERPROCESS_DETAIL_PPC_ASM_LABEL("2")
+         : "=&r"(prev)
+	 : "b" (mem), "r" (with), "r" (cmp)
+	 : "cc", "memory"
+      );
    return prev;
 }
 

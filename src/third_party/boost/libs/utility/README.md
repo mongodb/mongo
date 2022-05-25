@@ -16,8 +16,10 @@ Boost.Utility, part of collection of the [Boost C++ Libraries](https://github.co
 
 ### Build status
 
-Master: [![Travis CI](https://travis-ci.org/boostorg/utility.svg?branch=master)](https://travis-ci.org/boostorg/utility)
-Develop: [![Travis CI](https://travis-ci.org/boostorg/utility.svg?branch=develop)](https://travis-ci.org/boostorg/utility)
+Branch          | GitHub Actions | AppVeyor | Test Matrix | Dependencies |
+:-------------: | -------------- | -------- | ----------- | ------------ |
+[`master`](https://github.com/boostorg/utility/tree/master) | [![GitHub Actions](https://github.com/boostorg/utility/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/boostorg/utility/actions?query=branch%3Amaster) | [![AppVeyor](https://ci.appveyor.com/api/projects/status/g09ehuy2o6aq42th/branch/master?svg=true)](https://ci.appveyor.com/project/Lastique/utility/branch/master) | [![Tests](https://img.shields.io/badge/matrix-master-brightgreen.svg)](http://www.boost.org/development/tests/master/developer/utility.html) | [![Dependencies](https://img.shields.io/badge/deps-master-brightgreen.svg)](https://pdimov.github.io/boostdep-report/master/utility.html)
+[`develop`](https://github.com/boostorg/utility/tree/develop) | [![GitHub Actions](https://github.com/boostorg/utility/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/boostorg/utility/actions?query=branch%3Adevelop) | [![AppVeyor](https://ci.appveyor.com/api/projects/status/g09ehuy2o6aq42th/branch/develop?svg=true)](https://ci.appveyor.com/project/Lastique/utility/branch/develop) | [![Tests](https://img.shields.io/badge/matrix-develop-brightgreen.svg)](http://www.boost.org/development/tests/develop/developer/utility.html) | [![Dependencies](https://img.shields.io/badge/deps-develop-brightgreen.svg)](https://pdimov.github.io/boostdep-report/develop/utility.html)
 
 ### License
 

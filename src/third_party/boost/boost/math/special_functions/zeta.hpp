@@ -129,7 +129,7 @@ private:
 template <class T, class Policy>
 inline T zeta_series2_imp(T s, const Policy& pol)
 {
-   boost::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();;
+   std::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();;
    zeta_series2<T> f(s);
    T result = tools::sum_series(
       f, 

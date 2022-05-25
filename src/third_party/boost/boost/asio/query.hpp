@@ -2,7 +2,7 @@
 // query.hpp
 // ~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -100,7 +100,7 @@ struct query_result
 
 #else // defined(GENERATING_DOCUMENTATION)
 
-namespace asio_query_fn {
+namespace boost_asio_query_fn {
 
 using boost::asio::conditional;
 using boost::asio::decay;
@@ -268,23 +268,23 @@ struct static_instance
 template <typename T>
 const T static_instance<T>::instance = {};
 
-} // namespace asio_query_fn
+} // namespace boost_asio_query_fn
 namespace boost {
 namespace asio {
 namespace {
 
-static BOOST_ASIO_CONSTEXPR const asio_query_fn::impl&
-  query = asio_query_fn::static_instance<>::instance;
+static BOOST_ASIO_CONSTEXPR const boost_asio_query_fn::impl&
+  query = boost_asio_query_fn::static_instance<>::instance;
 
 } // namespace
 
-typedef asio_query_fn::impl query_t;
+typedef boost_asio_query_fn::impl query_t;
 
 template <typename T, typename Property>
 struct can_query :
   integral_constant<bool,
-    asio_query_fn::call_traits<query_t, T, void(Property)>::overload !=
-      asio_query_fn::ill_formed>
+    boost_asio_query_fn::call_traits<query_t, T, void(Property)>::overload !=
+      boost_asio_query_fn::ill_formed>
 {
 };
 
@@ -299,7 +299,7 @@ constexpr bool can_query_v
 template <typename T, typename Property>
 struct is_nothrow_query :
   integral_constant<bool,
-    asio_query_fn::call_traits<query_t, T, void(Property)>::is_noexcept>
+    boost_asio_query_fn::call_traits<query_t, T, void(Property)>::is_noexcept>
 {
 };
 
@@ -314,7 +314,7 @@ constexpr bool is_nothrow_query_v
 template <typename T, typename Property>
 struct query_result
 {
-  typedef typename asio_query_fn::call_traits<
+  typedef typename boost_asio_query_fn::call_traits<
       query_t, T, void(Property)>::result_type type;
 };
 

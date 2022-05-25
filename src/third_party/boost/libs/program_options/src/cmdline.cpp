@@ -15,7 +15,7 @@
 #include <boost/program_options/positional_options.hpp>
 #include <boost/throw_exception.hpp>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include <string>
 #include <utility>
@@ -28,6 +28,8 @@
 #include <cstdio>
 
 #include <iostream>
+
+using namespace boost::placeholders;
 
 namespace boost { namespace program_options {
 

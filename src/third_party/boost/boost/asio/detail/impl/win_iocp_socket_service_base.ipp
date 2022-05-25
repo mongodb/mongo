@@ -2,7 +2,7 @@
 // detail/impl/win_iocp_socket_service_base.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -467,23 +467,24 @@ void win_iocp_socket_service_base::start_receive_op(
   }
 }
 
-void win_iocp_socket_service_base::start_null_buffers_receive_op(
+int win_iocp_socket_service_base::start_null_buffers_receive_op(
     win_iocp_socket_service_base::base_implementation_type& impl,
-    socket_base::message_flags flags, reactor_op* op)
+    socket_base::message_flags flags, reactor_op* op, operation* iocp_op)
 {
   if ((impl.state_ & socket_ops::stream_oriented) != 0)
   {
     // For stream sockets on Windows, we may issue a 0-byte overlapped
     // WSARecv to wait until there is data available on the socket.
     ::WSABUF buf = { 0, 0 };
-    start_receive_op(impl, &buf, 1, flags, false, op);
+    start_receive_op(impl, &buf, 1, flags, false, iocp_op);
+    return -1;
   }
   else
   {
-    start_reactor_op(impl,
-        (flags & socket_base::message_out_of_band)
-          ? select_reactor::except_op : select_reactor::read_op,
-        op);
+    int op_type = (flags & socket_base::message_out_of_band)
+      ? select_reactor::except_op : select_reactor::read_op;
+    start_reactor_op(impl, op_type, op);
+    return op_type;
   }
 }
 
@@ -548,10 +549,16 @@ void win_iocp_socket_service_base::start_accept_op(
 
 void win_iocp_socket_service_base::restart_accept_op(
     socket_type s, socket_holder& new_socket, int family, int type,
-    int protocol, void* output_buffer, DWORD address_length, operation* op)
+    int protocol, void* output_buffer, DWORD address_length,
+    long* cancel_requested, operation* op)
 {
   new_socket.reset();
   iocp_service_.work_started();
+
+  // Check if we were cancelled after the first AcceptEx completed.
+  if (cancel_requested)
+    if (::InterlockedExchangeAdd(cancel_requested, 0) == 1)
+      iocp_service_.on_completion(op, boost::asio::error::operation_aborted);
 
   boost::system::error_code ec;
   new_socket.reset(socket_ops::socket(family, type, protocol, ec));
@@ -566,7 +573,19 @@ void win_iocp_socket_service_base::restart_accept_op(
     if (!result && last_error != WSA_IO_PENDING)
       iocp_service_.on_completion(op, last_error);
     else
+    {
+#if defined(_WIN32_WINNT) && (_WIN32_WINNT >= 0x0600)
+      if (cancel_requested)
+      {
+        if (::InterlockedExchangeAdd(cancel_requested, 0) == 1)
+        {
+          HANDLE sock_as_handle = reinterpret_cast<HANDLE>(s);
+          ::CancelIoEx(sock_as_handle, op);
+        }
+      }
+#endif // defined(_WIN32_WINNT) && (_WIN32_WINNT >= 0x0600)
       iocp_service_.on_pending(op);
+    }
   }
 }
 
@@ -588,10 +607,10 @@ void win_iocp_socket_service_base::start_reactor_op(
   iocp_service_.post_immediate_completion(op, false);
 }
 
-void win_iocp_socket_service_base::start_connect_op(
+int win_iocp_socket_service_base::start_connect_op(
     win_iocp_socket_service_base::base_implementation_type& impl,
-    int family, int type, const socket_addr_type* addr,
-    std::size_t addrlen, win_iocp_socket_connect_op_base* op)
+    int family, int type, const socket_addr_type* addr, std::size_t addrlen,
+    win_iocp_socket_connect_op_base* op, operation* iocp_op)
 {
   // If ConnectEx is available, use that.
   if (family == BOOST_ASIO_OS_DEF(AF_INET)
@@ -616,7 +635,7 @@ void win_iocp_socket_service_base::start_connect_op(
       if (op->ec_ && op->ec_ != boost::asio::error::invalid_argument)
       {
         iocp_service_.post_immediate_completion(op, false);
-        return;
+        return -1;
       }
 
       op->connect_ex_ = true;
@@ -624,13 +643,13 @@ void win_iocp_socket_service_base::start_connect_op(
       iocp_service_.work_started();
 
       BOOL result = connect_ex(impl.socket_,
-          addr, static_cast<int>(addrlen), 0, 0, 0, op);
+          addr, static_cast<int>(addrlen), 0, 0, 0, iocp_op);
       DWORD last_error = ::WSAGetLastError();
       if (!result && last_error != WSA_IO_PENDING)
-        iocp_service_.on_completion(op, last_error);
+        iocp_service_.on_completion(iocp_op, last_error);
       else
-        iocp_service_.on_pending(op);
-      return;
+        iocp_service_.on_pending(iocp_op);
+      return -1;
     }
   }
 
@@ -650,12 +669,13 @@ void win_iocp_socket_service_base::start_connect_op(
         op->ec_ = boost::system::error_code();
         r.start_op(select_reactor::connect_op, impl.socket_,
             impl.reactor_data_, op, false, false);
-        return;
+        return select_reactor::connect_op;
       }
     }
   }
 
   r.post_immediate_completion(op, false);
+  return -1;
 }
 
 void win_iocp_socket_service_base::close_for_destruction(

@@ -387,7 +387,7 @@ public:
     {
         typedef typename sp_convert_reference<D>::type D2;
 
-        D2 d2( r.get_deleter() );
+        D2 d2( static_cast<D&&>( r.get_deleter() ) );
         pi_ = new sp_counted_impl_pd< typename std::unique_ptr<Y, D>::pointer, D2 >( r.get(), d2 );
 
 #ifdef BOOST_NO_EXCEPTIONS

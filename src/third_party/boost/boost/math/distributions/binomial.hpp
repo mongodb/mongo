@@ -261,7 +261,7 @@ namespace boost
            factor = 2; // trials largish, but in far tails.
 
         typedef typename Policy::discrete_quantile_type discrete_quantile_type;
-        boost::uintmax_t max_iter = policies::get_max_root_iterations<Policy>();
+        std::uintmax_t max_iter = policies::get_max_root_iterations<Policy>();
         return detail::inverse_discrete_quantile(
             dist,
             comp ? q : p,
@@ -413,6 +413,13 @@ namespace boost
       // typedef binomial_distribution<double> binomial;
       // IS now included since no longer a name clash with function binomial.
       //typedef binomial_distribution<double> binomial; // Reserved name of type double.
+
+      #ifdef __cpp_deduction_guides
+      template <class RealType>
+      binomial_distribution(RealType)->binomial_distribution<typename boost::math::tools::promote_args<RealType>::type>;
+      template <class RealType>
+      binomial_distribution(RealType,RealType)->binomial_distribution<typename boost::math::tools::promote_args<RealType>::type>;
+      #endif
 
       template <class RealType, class Policy>
       const std::pair<RealType, RealType> range(const binomial_distribution<RealType, Policy>& dist)

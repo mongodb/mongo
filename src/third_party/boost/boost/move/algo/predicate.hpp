@@ -24,19 +24,19 @@ namespace movelib {
 template<class Comp>
 struct antistable
 {
-   explicit antistable(Comp &comp)
+   BOOST_MOVE_FORCEINLINE explicit antistable(Comp &comp)
       : m_comp(comp)
    {}
 
-   antistable(const antistable & other)
+   BOOST_MOVE_FORCEINLINE antistable(const antistable & other)
       : m_comp(other.m_comp)
    {}
 
    template<class U, class V>
-   bool operator()(const U &u, const V & v)
+   BOOST_MOVE_FORCEINLINE bool operator()(const U &u, const V & v)
    {  return !m_comp(v, u);  }
 
-   const Comp &get() const
+   BOOST_MOVE_FORCEINLINE const Comp &get() const
    {  return m_comp; }
 
    private:
@@ -56,15 +56,15 @@ template <class Comp>
 class negate
 {
    public:
-   negate()
+   BOOST_MOVE_FORCEINLINE negate()
    {}
 
-   explicit negate(Comp comp)
+   BOOST_MOVE_FORCEINLINE explicit negate(Comp comp)
       : m_comp(comp)
    {}
 
    template <class T1, class T2>
-   bool operator()(const T1& l, const T2& r)
+   BOOST_MOVE_FORCEINLINE bool operator()(const T1& l, const T2& r)
    {
       return !m_comp(l, r);
    }
@@ -78,15 +78,15 @@ template <class Comp>
 class inverse
 {
    public:
-   inverse()
+   BOOST_MOVE_FORCEINLINE inverse()
    {}
 
-   explicit inverse(Comp comp)
+   BOOST_MOVE_FORCEINLINE explicit inverse(Comp comp)
       : m_comp(comp)
    {}
 
    template <class T1, class T2>
-   bool operator()(const T1& l, const T2& r)
+   BOOST_MOVE_FORCEINLINE bool operator()(const T1& l, const T2& r)
    {
       return m_comp(r, l);
    }

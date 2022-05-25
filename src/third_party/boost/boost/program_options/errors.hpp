@@ -35,7 +35,7 @@ namespace boost { namespace program_options {
     }
 
     /** Base class for all errors in the library. */
-    class BOOST_PROGRAM_OPTIONS_DECL error : public std::logic_error {
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE error : public std::logic_error {
     public:
         error(const std::string& xwhat) : std::logic_error(xwhat) {}
     };
@@ -44,7 +44,7 @@ namespace boost { namespace program_options {
     /** Class thrown when there are too many positional options. 
         This is a programming error.
     */
-    class BOOST_PROGRAM_OPTIONS_DECL too_many_positional_options_error : public error {
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE too_many_positional_options_error : public error {
     public:
         too_many_positional_options_error() 
          : error("too many positional options have been specified on the command line") 
@@ -52,7 +52,7 @@ namespace boost { namespace program_options {
     };
 
     /** Class thrown when there are programming error related to style */
-    class BOOST_PROGRAM_OPTIONS_DECL invalid_command_line_style : public error {
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE invalid_command_line_style : public error {
     public:
         invalid_command_line_style(const std::string& msg)
         : error(msg)
@@ -60,7 +60,7 @@ namespace boost { namespace program_options {
     };
 
     /** Class thrown if config file can not be read */
-    class BOOST_PROGRAM_OPTIONS_DECL reading_file : public error {
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE reading_file : public error {
     public:
         reading_file(const char* filename)
          : error(std::string("can not read options configuration file '").append(filename).append("'"))
@@ -91,7 +91,7 @@ namespace boost { namespace program_options {
      *      or without a prefix (from a configuration file)
      *  
      *   */
-    class BOOST_PROGRAM_OPTIONS_DECL error_with_option_name : public error {
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE error_with_option_name : public error {
 
     protected:
         /** can be
@@ -204,7 +204,7 @@ namespace boost { namespace program_options {
 
     /** Class thrown when there are several option values, but
         user called a method which cannot return them all. */
-    class BOOST_PROGRAM_OPTIONS_DECL multiple_values : public error_with_option_name {
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE multiple_values : public error_with_option_name {
     public:
         multiple_values() 
          : error_with_option_name("option '%canonical_option%' only takes a single argument"){}
@@ -215,7 +215,7 @@ namespace boost { namespace program_options {
     /** Class thrown when there are several occurrences of an
         option, but user called a method which cannot return 
         them all. */
-    class BOOST_PROGRAM_OPTIONS_DECL multiple_occurrences : public error_with_option_name {
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE multiple_occurrences : public error_with_option_name {
     public:
         multiple_occurrences() 
          : error_with_option_name("option '%canonical_option%' cannot be specified more than once"){}
@@ -225,7 +225,7 @@ namespace boost { namespace program_options {
     };
 
     /** Class thrown when a required/mandatory option is missing */
-    class BOOST_PROGRAM_OPTIONS_DECL required_option : public error_with_option_name {
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE required_option : public error_with_option_name {
     public:
        // option name is constructed by the option_descriptor and never on the fly
        required_option(const std::string& option_name)
@@ -247,7 +247,7 @@ namespace boost { namespace program_options {
      *      a lot easier, even if the name indicates some sort of conceptual dissonance!
      *  
      *   */
-    class BOOST_PROGRAM_OPTIONS_DECL error_with_no_option_name : public error_with_option_name {
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE error_with_no_option_name : public error_with_option_name {
     public:
         error_with_no_option_name(const std::string& template_,
                               const std::string& original_token = "")
@@ -263,7 +263,7 @@ namespace boost { namespace program_options {
 
 
     /** Class thrown when option name is not recognized. */
-    class BOOST_PROGRAM_OPTIONS_DECL unknown_option : public error_with_no_option_name {
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE unknown_option : public error_with_no_option_name {
     public:
         unknown_option(const std::string& original_token = "")
         : error_with_no_option_name("unrecognised option '%canonical_option%'", original_token)
@@ -276,7 +276,7 @@ namespace boost { namespace program_options {
 
 
     /** Class thrown when there's ambiguity amoung several possible options. */
-    class BOOST_PROGRAM_OPTIONS_DECL ambiguous_option : public error_with_no_option_name {
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE ambiguous_option : public error_with_no_option_name {
     public:
         ambiguous_option(const std::vector<std::string>& xalternatives)
         : error_with_no_option_name("option '%canonical_option%' is ambiguous"),
@@ -299,7 +299,7 @@ namespace boost { namespace program_options {
     /** Class thrown when there's syntax error either for command
      *  line or config file options. See derived children for
      *  concrete classes. */
-    class BOOST_PROGRAM_OPTIONS_DECL invalid_syntax : public error_with_option_name {
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE invalid_syntax : public error_with_option_name {
     public:
         enum kind_t {
             long_not_allowed = 30,
@@ -332,7 +332,7 @@ namespace boost { namespace program_options {
         kind_t m_kind;
     };
 
-    class BOOST_PROGRAM_OPTIONS_DECL invalid_config_file_syntax : public invalid_syntax {
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE invalid_config_file_syntax : public invalid_syntax {
     public:
         invalid_config_file_syntax(const std::string& invalid_line, kind_t kind):
             invalid_syntax(kind)
@@ -348,7 +348,7 @@ namespace boost { namespace program_options {
 
 
     /** Class thrown when there are syntax errors in given command line */
-    class BOOST_PROGRAM_OPTIONS_DECL invalid_command_line_syntax : public invalid_syntax {
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE invalid_command_line_syntax : public invalid_syntax {
     public:
         invalid_command_line_syntax(kind_t kind,
                        const std::string& option_name = "",
@@ -360,7 +360,7 @@ namespace boost { namespace program_options {
 
 
     /** Class thrown when value of option is incorrect. */
-    class BOOST_PROGRAM_OPTIONS_DECL validation_error : public error_with_option_name {
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE validation_error : public error_with_option_name {
     public:
         enum kind_t {
             multiple_values_not_allowed = 30,
@@ -391,7 +391,7 @@ namespace boost { namespace program_options {
     };
 
     /** Class thrown if there is an invalid option value given */
-    class BOOST_PROGRAM_OPTIONS_DECL invalid_option_value 
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE invalid_option_value
         : public validation_error
     {
     public:
@@ -402,7 +402,7 @@ namespace boost { namespace program_options {
     };
 
     /** Class thrown if there is an invalid bool value given */
-    class BOOST_PROGRAM_OPTIONS_DECL invalid_bool_value 
+    class BOOST_PROGRAM_OPTIONS_DECL BOOST_SYMBOL_VISIBLE invalid_bool_value
         : public validation_error
     {
     public:

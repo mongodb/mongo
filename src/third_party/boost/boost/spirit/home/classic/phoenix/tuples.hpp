@@ -29,6 +29,8 @@
 #if BOOST_WORKAROUND(BOOST_MSVC, >= 1400)
 #pragma warning(push)
 #pragma warning(disable:4512) //assignment operator could not be generated
+// bogus https://developercommunity.visualstudio.com/t/buggy-warning-c4709/471956
+#pragma warning(disable:4709) //comma operator within array index expression
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////

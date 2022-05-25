@@ -2,7 +2,7 @@
 // execution/start.hpp
 // ~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -65,7 +65,7 @@ struct can_start :
 
 #else // defined(GENERATING_DOCUMENTATION)
 
-namespace asio_execution_start_fn {
+namespace boost_asio_execution_start_fn {
 
 using boost::asio::decay;
 using boost::asio::declval;
@@ -199,22 +199,22 @@ struct static_instance
 template <typename T>
 const T static_instance<T>::instance = {};
 
-} // namespace asio_execution_start_fn
+} // namespace boost_asio_execution_start_fn
 namespace boost {
 namespace asio {
 namespace execution {
 namespace {
 
-static BOOST_ASIO_CONSTEXPR const asio_execution_start_fn::impl&
-  start = asio_execution_start_fn::static_instance<>::instance;
+static BOOST_ASIO_CONSTEXPR const boost_asio_execution_start_fn::impl&
+  start = boost_asio_execution_start_fn::static_instance<>::instance;
 
 } // namespace
 
 template <typename R>
 struct can_start :
   integral_constant<bool,
-    asio_execution_start_fn::call_traits<R>::overload !=
-      asio_execution_start_fn::ill_formed>
+    boost_asio_execution_start_fn::call_traits<R>::overload !=
+      boost_asio_execution_start_fn::ill_formed>
 {
 };
 
@@ -228,7 +228,7 @@ constexpr bool can_start_v = can_start<R>::value;
 template <typename R>
 struct is_nothrow_start :
   integral_constant<bool,
-    asio_execution_start_fn::call_traits<R>::is_noexcept>
+    boost_asio_execution_start_fn::call_traits<R>::is_noexcept>
 {
 };
 

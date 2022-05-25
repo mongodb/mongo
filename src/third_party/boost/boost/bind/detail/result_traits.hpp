@@ -21,7 +21,9 @@
 //  See http://www.boost.org/libs/bind/bind.html for documentation.
 //
 
-#if defined(_MSVC_LANG) && _MSVC_LANG >= 17
+#include <boost/config.hpp>
+
+#if BOOST_CXX_VERSION >= 201700L
 #include <functional>
 #endif
 
@@ -48,7 +50,7 @@ template<class F> struct result_traits< unspecified, reference_wrapper<F> >
     typedef typename F::result_type type;
 };
 
-#if defined(_MSVC_LANG) && _MSVC_LANG >= 17
+#if BOOST_CXX_VERSION >= 201700L
 
 template<class T> struct result_traits< unspecified, std::plus<T> >
 {
@@ -140,10 +142,18 @@ template<class T> struct result_traits< unspecified, std::bit_xor<T> >
     typedef T type;
 };
 
+#if defined(BOOST_LIBSTDCXX_VERSION) && BOOST_LIBSTDCXX_VERSION < 40900
+
+// libstdc++ 4.8 and below don't have std::bit_not
+
+#else
+
 template<class T> struct result_traits< unspecified, std::bit_not<T> >
 {
     typedef T type;
 };
+
+#endif
 
 #endif
 

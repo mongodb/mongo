@@ -115,21 +115,21 @@ class basic_managed_memory_impl
    {
       typedef typename ManagedMemory::device_type device_type;
       //Increase file size
-      try{
+      BOOST_TRY{
          offset_t old_size;
          {
             device_type f(open_or_create, filename, read_write);
             if(!f.get_size(old_size))
                return false;
-            f.truncate(old_size + extra_bytes);
+            f.truncate(old_size + static_cast<offset_t>(extra_bytes));
          }
          ManagedMemory managed_memory(open_only, filename);
          //Grow always works
          managed_memory.self_t::grow(extra_bytes);
       }
-      catch(...){
+      BOOST_CATCH(...){
          return false;
-      }
+      } BOOST_CATCH_END
       return true;
    }
 
@@ -138,20 +138,20 @@ class basic_managed_memory_impl
    {
       typedef typename ManagedMemory::device_type device_type;
       size_type new_size;
-      try{
+      BOOST_TRY{
          ManagedMemory managed_memory(open_only, filename);
          managed_memory.get_size();
          managed_memory.self_t::shrink_to_fit();
          new_size = managed_memory.get_size();
       }
-      catch(...){
+      BOOST_CATCH(...){
          return false;
-      }
+      } BOOST_CATCH_END
 
       //Decrease file size
       {
          device_type f(open_or_create, filename, read_write);
-         f.truncate(new_size);
+         f.truncate(static_cast<offset_t>(new_size));
       }
       return true;
    }
@@ -182,8 +182,7 @@ class basic_managed_memory_impl
       }
       BOOST_CATCH(...){
          return false;
-      }
-      BOOST_CATCH_END
+      } BOOST_CATCH_END
       return true;
    }
 

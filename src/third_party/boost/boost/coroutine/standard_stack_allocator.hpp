@@ -22,6 +22,12 @@
 #include <boost/coroutine/stack_context.hpp>
 #include <boost/coroutine/stack_traits.hpp>
 
+#if defined(BOOST_COROUTINES_USE_MAP_STACK)
+extern "C" {
+#include <sys/mman.h>
+}
+#endif
+
 #ifdef BOOST_HAS_ABI_HEADERS
 #  include BOOST_ABI_PREFIX
 #endif
@@ -39,8 +45,13 @@ struct basic_standard_stack_allocator
         BOOST_ASSERT( traits_type::minimum_size() <= size);
         BOOST_ASSERT( traits_type::is_unbounded() || ( traits_type::maximum_size() >= size) );
 
+#if defined(BOOST_COROUTINES_USE_MAP_STACK)
+        void * limit = ::mmap(0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON | MAP_STACK, -1, 0);
+        if ( limit == MAP_FAILED ) throw std::bad_alloc();
+#else
         void * limit = std::malloc( size);
         if ( ! limit) throw std::bad_alloc();
+#endif
 
         ctx.size = size;
         ctx.sp = static_cast< char * >( limit) + ctx.size;
@@ -60,7 +71,11 @@ struct basic_standard_stack_allocator
 #endif
 
         void * limit = static_cast< char * >( ctx.sp) - ctx.size;
+#if defined(BOOST_COROUTINES_USE_MAP_STACK)
+        munmap(limit, ctx.size);
+#else
         std::free( limit);
+#endif
     }
 };
 

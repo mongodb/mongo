@@ -33,6 +33,10 @@ namespace boost {
       unordered_set<T, H, P, A>& m1, unordered_set<T, H, P, A>& m2)
       BOOST_NOEXCEPT_IF(BOOST_NOEXCEPT_EXPR(m1.swap(m2)));
 
+    template <class K, class H, class P, class A, class Predicate>
+    typename unordered_set<K, H, P, A>::size_type erase_if(
+      unordered_set<K, H, P, A>& c, Predicate pred);
+
     template <class T, class H = boost::hash<T>, class P = std::equal_to<T>,
       class A = std::allocator<T> >
     class unordered_multiset;
@@ -47,6 +51,10 @@ namespace boost {
     inline void swap(
       unordered_multiset<T, H, P, A>& m1, unordered_multiset<T, H, P, A>& m2)
       BOOST_NOEXCEPT_IF(BOOST_NOEXCEPT_EXPR(m1.swap(m2)));
+
+    template <class K, class H, class P, class A, class Predicate>
+    typename unordered_multiset<K, H, P, A>::size_type erase_if(
+      unordered_multiset<K, H, P, A>& c, Predicate pred);
 
     template <class N, class T, class A> class node_handle_set;
     template <class N, class T, class A> struct insert_return_type_set;

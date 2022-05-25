@@ -10,8 +10,8 @@
 #pragma once
 #endif
 
+#include <type_traits>
 #include <boost/math/special_functions/round.hpp>
-#include <boost/type_traits/is_convertible.hpp>
 
 namespace boost { namespace math { namespace detail{
 

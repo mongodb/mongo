@@ -3,12 +3,9 @@
 # Distributed under the Boost Software License, Version 1.0.
 # See accompanying file LICENSE_1_0.txt or copy at https://www.boost.org/LICENSE_1_0.txt
 
-# Partial (add_subdirectory only) and experimental CMake support
-# Subject to change; please do not rely on the contents of this file yet.
+cmake_minimum_required(VERSION 3.5...3.20)
 
-cmake_minimum_required(VERSION 3.5)
-
-project(BoostInteger LANGUAGES CXX)
+project(boost_integer VERSION "${BOOST_SUPERPROJECT_VERSION}" LANGUAGES CXX)
 
 add_library(boost_integer INTERFACE)
 add_library(Boost::integer ALIAS boost_integer)

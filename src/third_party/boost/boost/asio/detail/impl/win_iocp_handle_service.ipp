@@ -2,7 +2,7 @@
 // detail/impl/win_iocp_handle_service.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 // Copyright (c) 2008 Rep Invariant Systems, Inc. (info@repinvariant.com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
@@ -223,6 +223,38 @@ boost::system::error_code win_iocp_handle_service::close(
   }
 
   return ec;
+}
+
+win_iocp_handle_service::native_handle_type win_iocp_handle_service::release(
+    win_iocp_handle_service::implementation_type& impl,
+    boost::system::error_code& ec)
+{
+  if (!is_open(impl))
+    return INVALID_HANDLE_VALUE;
+
+  cancel(impl, ec);
+  if (ec)
+    return INVALID_HANDLE_VALUE;
+
+  nt_set_info_fn fn = get_nt_set_info();
+  if (fn == 0)
+  {
+    ec = boost::asio::error::operation_not_supported;
+    return INVALID_HANDLE_VALUE;
+  }
+
+  ULONG_PTR iosb[2] = { 0, 0 };
+  void* info[2] = { 0, 0 };
+  if (fn(impl.handle_, iosb, &info, sizeof(info),
+        61 /* FileReplaceCompletionInformation */))
+  {
+    ec = boost::asio::error::operation_not_supported;
+    return INVALID_HANDLE_VALUE;
+  }
+
+  native_handle_type tmp = impl.handle_;
+  impl.handle_ = INVALID_HANDLE_VALUE;
+  return tmp;
 }
 
 boost::system::error_code win_iocp_handle_service::cancel(
@@ -514,6 +546,47 @@ void win_iocp_handle_service::close_for_destruction(implementation_type& impl)
     impl.handle_ = INVALID_HANDLE_VALUE;
     impl.safe_cancellation_thread_id_ = 0;
   }
+}
+
+win_iocp_handle_service::nt_set_info_fn
+win_iocp_handle_service::get_nt_set_info()
+{
+  void* ptr = interlocked_compare_exchange_pointer(&nt_set_info_, 0, 0);
+  if (!ptr)
+  {
+    if (HMODULE h = ::GetModuleHandleA("NTDLL.DLL"))
+      ptr = reinterpret_cast<void*>(GetProcAddress(h, "NtSetInformationFile"));
+
+    // On failure, set nt_set_info_ to a special value to indicate that the
+    // NtSetInformationFile function is unavailable. That way we won't bother
+    // trying to look it up again.
+    interlocked_exchange_pointer(&nt_set_info_, ptr ? ptr : this);
+  }
+
+  return reinterpret_cast<nt_set_info_fn>(ptr == this ? 0 : ptr);
+}
+
+void* win_iocp_handle_service::interlocked_compare_exchange_pointer(
+    void** dest, void* exch, void* cmp)
+{
+#if defined(_M_IX86)
+  return reinterpret_cast<void*>(InterlockedCompareExchange(
+        reinterpret_cast<PLONG>(dest), reinterpret_cast<LONG>(exch),
+        reinterpret_cast<LONG>(cmp)));
+#else
+  return InterlockedCompareExchangePointer(dest, exch, cmp);
+#endif
+}
+
+void* win_iocp_handle_service::interlocked_exchange_pointer(
+    void** dest, void* val)
+{
+#if defined(_M_IX86)
+  return reinterpret_cast<void*>(InterlockedExchange(
+        reinterpret_cast<PLONG>(dest), reinterpret_cast<LONG>(val)));
+#else
+  return InterlockedExchangePointer(dest, val);
+#endif
 }
 
 } // namespace detail

@@ -39,14 +39,14 @@ class BOOST_SYMBOL_VISIBLE interprocess_exception : public std::exception
    interprocess_exception(const char *err) BOOST_NOEXCEPT
       :  m_err(other_error)
    {
-      try   {  m_str = err; }
-      catch (...) {}
+      BOOST_TRY   {  m_str = err; }
+      BOOST_CATCH(...) {} BOOST_CATCH_END
    }
 
    interprocess_exception(const error_info &err_info, const char *str = 0)
       :  m_err(err_info)
    {
-      try{
+      BOOST_TRY{
          if(m_err.get_native_error() != 0){
             fill_system_message(m_err.get_native_error(), m_str);
          }
@@ -57,7 +57,7 @@ class BOOST_SYMBOL_VISIBLE interprocess_exception : public std::exception
             m_str = "boost::interprocess_exception::library_error";
          }
       }
-      catch(...){}
+      BOOST_CATCH(...){} BOOST_CATCH_END
    }
 
    ~interprocess_exception() BOOST_NOEXCEPT_OR_NOTHROW BOOST_OVERRIDE {}
@@ -82,8 +82,8 @@ class BOOST_SYMBOL_VISIBLE interprocess_exception : public std::exception
 class BOOST_SYMBOL_VISIBLE lock_exception : public interprocess_exception
 {
    public:
-   lock_exception() BOOST_NOEXCEPT
-      :  interprocess_exception(lock_error)
+   lock_exception(error_code_t err = lock_error) BOOST_NOEXCEPT
+      :  interprocess_exception(err)
    {}
 
    const char* what() const BOOST_NOEXCEPT_OR_NOTHROW BOOST_OVERRIDE

@@ -7,27 +7,29 @@ Distributed under the [Boost Software License, Version 1.0](http://www.boost.org
 ### Properties
 
 * C++03
-* Requires Linking
+* Header only
 
 ### Build Status
 
-Branch          | Travis | Appveyor | Coverity Scan | codecov.io | Deps | Docs | Tests |
+Branch          | GHA CI | Appveyor | Coverity Scan | codecov.io | Deps | Docs | Tests |
 :-------------: | ------ | -------- | ------------- | ---------- | ---- | ---- | ----- |
-[`master`](https://github.com/boostorg/date_time/tree/master) | [![Build Status](https://travis-ci.org/boostorg/date_time.svg?branch=master)](https://travis-ci.org/boostorg/date_time) | [![Build status](https://ci.appveyor.com/api/projects/status/upf5c528fy09fudk?svg=true)](https://ci.appveyor.com/project/jeking3/date-time-1evbf) | [![Coverity Scan Build Status](https://scan.coverity.com/projects/14908/badge.svg)](https://scan.coverity.com/projects/boostorg-date_time) | [![codecov](https://codecov.io/gh/boostorg/date_time/branch/master/graph/badge.svg)](https://codecov.io/gh/boostorg/date_time/branch/master) | [![Deps](https://img.shields.io/badge/deps-master-brightgreen.svg)](https://pdimov.github.io/boostdep-report/master/date_time.html) | [![Documentation](https://img.shields.io/badge/docs-master-brightgreen.svg)](http://www.boost.org/doc/libs/master/doc/html/date_time.html) | [![Enter the Matrix](https://img.shields.io/badge/matrix-master-brightgreen.svg)](http://www.boost.org/development/tests/master/developer/date_time.html) 
-[`develop`](https://github.com/boostorg/date_time/tree/develop) | [![Build Status](https://travis-ci.org/boostorg/date_time.svg?branch=develop)](https://travis-ci.org/boostorg/date_time) | [![Build status](https://ci.appveyor.com/api/projects/status/upf5c528fy09fudk/branch/develop?svg=true)](https://ci.appveyor.com/project/boostorg/date_time/branch/develop) | [![Coverity Scan Build Status](https://scan.coverity.com/projects/14908/badge.svg)](https://scan.coverity.com/projects/boostorg-date_time) | [![codecov](https://codecov.io/gh/boostorg/date_time/branch/develop/graph/badge.svg)](https://codecov.io/gh/boostorg/date_time/branch/develop) | [![Deps](https://img.shields.io/badge/deps-develop-brightgreen.svg)](https://pdimov.github.io/boostdep-report/develop/date_time.html) | [![Documentation](https://img.shields.io/badge/docs-develop-brightgreen.svg)](http://www.boost.org/doc/libs/develop/doc/html/date_time.html) | [![Enter the Matrix](https://img.shields.io/badge/matrix-develop-brightgreen.svg)](http://www.boost.org/development/tests/develop/developer/date_time.html)
+[`master`](https://github.com/boostorg/date_time/tree/master) | [![Build Status](https://github.com/boostorg/date_time/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/boostorg/date_time/actions?query=branch:master) | [![Build status](https://ci.appveyor.com/api/projects/status/upf5c528fy09fudk?svg=true)](https://ci.appveyor.com/project/jeking3/date-time-1evbf) | [![Coverity Scan Build Status](https://scan.coverity.com/projects/14908/badge.svg)](https://scan.coverity.com/projects/boostorg-date_time) | [![codecov](https://codecov.io/gh/boostorg/date_time/branch/master/graph/badge.svg)](https://codecov.io/gh/boostorg/date_time/branch/master) | [![Deps](https://img.shields.io/badge/deps-master-brightgreen.svg)](https://pdimov.github.io/boostdep-report/master/date_time.html) | [![Documentation](https://img.shields.io/badge/docs-master-brightgreen.svg)](http://www.boost.org/doc/libs/master/doc/html/date_time.html) | [![Enter the Matrix](https://img.shields.io/badge/matrix-master-brightgreen.svg)](http://www.boost.org/development/tests/master/developer/date_time.html) 
+[`develop`](https://github.com/boostorg/date_time/tree/develop) | [![Build Status](https://github.com/boostorg/date_time/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/boostorg/date_time/actions?query=branch:develop) | [![Build status](https://ci.appveyor.com/api/projects/status/upf5c528fy09fudk/branch/develop?svg=true)](https://ci.appveyor.com/project/boostorg/date_time/branch/develop) | [![Coverity Scan Build Status](https://scan.coverity.com/projects/14908/badge.svg)](https://scan.coverity.com/projects/boostorg-date_time) | [![codecov](https://codecov.io/gh/boostorg/date_time/branch/develop/graph/badge.svg)](https://codecov.io/gh/boostorg/date_time/branch/develop) | [![Deps](https://img.shields.io/badge/deps-develop-brightgreen.svg)](https://pdimov.github.io/boostdep-report/develop/date_time.html) | [![Documentation](https://img.shields.io/badge/docs-develop-brightgreen.svg)](http://www.boost.org/doc/libs/develop/doc/html/date_time.html) | [![Enter the Matrix](https://img.shields.io/badge/matrix-develop-brightgreen.svg)](http://www.boost.org/development/tests/develop/developer/date_time.html)
 
 ### Directories
 
-| Name      | Purpose                        |
-| --------- | ------------------------------ |
-| `build`   | build script for link library  |
-| `data`    | timezone database              |
-| `doc`     | documentation                  |
-| `example` | use case examples              |
-| `include` | headers                        |
-| `src`     | source code for link library   |
-| `test`    | unit tests                     |
-| `xmldoc`  | additional documentation       |
+Note that the built library is only for build backward compatibility and contains no symbols.  date_time is now header only.
+
+| Name      | Purpose                                 |
+| --------- | --------------------------------------- |
+| `build`   | build script for optional lib build     |
+| `data`    | timezone database                       |
+| `doc`     | documentation                           |
+| `example` | use case examples                       |
+| `include` | headers                                 |
+| `src`     | source code for optional link library   |
+| `test`    | unit tests                              |
+| `xmldoc`  | documentation source                    |
 
 ### More information
 

@@ -86,11 +86,20 @@ namespace boost {
         typedef void (*func_ptr_t)();
         mutable func_ptr_t func_ptr;
 
+#if defined(BOOST_MSVC) && BOOST_MSVC >= 1929
+# pragma warning(push)
+# pragma warning(disable: 5243)
+#endif
+
         // For bound member pointers
         struct bound_memfunc_ptr_t {
           void (X::*memfunc_ptr)(int);
           void* obj_ptr;
         } bound_memfunc_ptr;
+
+#if defined(BOOST_MSVC) && BOOST_MSVC >= 1929
+# pragma warning(pop)
+#endif
 
         // For references to function objects. We explicitly keep
         // track of the cv-qualifiers on the object referenced.

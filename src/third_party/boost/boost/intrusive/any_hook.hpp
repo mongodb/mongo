@@ -194,7 +194,7 @@ class any_member_hook
    //!   initializes the node to an unlinked state.
    //!
    //! <b>Throws</b>: Nothing.
-   any_member_hook();
+   any_member_hook() BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: If link_mode is or \c safe_link
    //!   initializes the node to an unlinked state. The argument is ignored.
@@ -205,7 +205,7 @@ class any_member_hook
    //!   makes classes using the hook STL-compliant without forcing the
    //!   user to do some additional work. \c swap can be used to emulate
    //!   move-semantics.
-   any_member_hook(const any_member_hook& );
+   any_member_hook(const any_member_hook&) BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: Empty function. The argument is ignored.
    //!
@@ -215,7 +215,7 @@ class any_member_hook
    //!   makes classes using the hook STL-compliant without forcing the
    //!   user to do some additional work. \c swap can be used to emulate
    //!   move-semantics.
-   any_member_hook& operator=(const any_member_hook& );
+   any_member_hook& operator=(const any_member_hook&) BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: If link_mode is \c normal_link, the destructor does
    //!   nothing (ie. no code is generated). If link_mode is \c safe_link and the
@@ -231,7 +231,7 @@ class any_member_hook
    //!   will return a valid iterator.
    //!
    //! <b>Complexity</b>: Constant
-   bool is_linked() const;
+   bool is_linked() const BOOST_NOEXCEPT;
    #endif
 };
 

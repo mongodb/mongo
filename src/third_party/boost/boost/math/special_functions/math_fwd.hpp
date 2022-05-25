@@ -192,22 +192,21 @@ namespace boost
    template <class T>
    inline std::vector<T> legendre_p_zeros(int l);
 
-#if !BOOST_WORKAROUND(BOOST_MSVC, <= 1310)
    template <class T, class Policy>
    typename std::enable_if<policies::is_policy<Policy>::value, typename tools::promote_args<T>::type>::type
          legendre_p(int l, T x, const Policy& pol);
    template <class T, class Policy>
    inline typename std::enable_if<policies::is_policy<Policy>::value, typename tools::promote_args<T>::type>::type
       legendre_p_prime(int l, T x, const Policy& pol);
-#endif
+
    template <class T>
    typename tools::promote_args<T>::type
          legendre_q(unsigned l, T x);
-#if !BOOST_WORKAROUND(BOOST_MSVC, <= 1310)
+
    template <class T, class Policy>
    typename std::enable_if<policies::is_policy<Policy>::value, typename tools::promote_args<T>::type>::type
          legendre_q(unsigned l, T x, const Policy& pol);
-#endif
+
    template <class T1, class T2, class T3>
    typename tools::promote_args<T1, T2, T3>::type
          legendre_next(unsigned l, unsigned m, T1 x, T2 Pl, T3 Plm1);
@@ -1189,31 +1188,21 @@ namespace boost
     } // namespace math
 } // namespace boost
 
-#ifdef BOOST_HAS_LONG_LONG
 #define BOOST_MATH_DETAIL_LL_FUNC(Policy)\
    \
    template <class T>\
-   inline T modf(const T& v, boost::long_long_type* ipart){ using boost::math::modf; return modf(v, ipart, Policy()); }\
+   inline T modf(const T& v, long long* ipart){ using boost::math::modf; return modf(v, ipart, Policy()); }\
    \
    template <class T>\
-   inline boost::long_long_type lltrunc(const T& v){ using boost::math::lltrunc; return lltrunc(v, Policy()); }\
+   inline long long lltrunc(const T& v){ using boost::math::lltrunc; return lltrunc(v, Policy()); }\
    \
    template <class T>\
-   inline boost::long_long_type llround(const T& v){ using boost::math::llround; return llround(v, Policy()); }\
+   inline long long llround(const T& v){ using boost::math::llround; return llround(v, Policy()); }\
 
-#else
-#define BOOST_MATH_DETAIL_LL_FUNC(Policy)
-#endif
-
-#if !defined(BOOST_NO_CXX11_DECLTYPE) && !defined(BOOST_NO_CXX11_AUTO_DECLARATIONS) && !defined(BOOST_NO_CXX11_HDR_ARRAY)
 #  define BOOST_MATH_DETAIL_11_FUNC(Policy)\
    template <class T, class U, class V>\
    inline typename boost::math::tools::promote_args<T, U>::type hypergeometric_1F1(const T& a, const U& b, const V& z)\
    { return boost::math::hypergeometric_1F1(a, b, z, Policy()); }\
-
-#else
-#  define BOOST_MATH_DETAIL_11_FUNC(Policy)
-#endif
 
 #define BOOST_MATH_DECLARE_SPECIAL_FUNCTIONS(Policy)\
    \

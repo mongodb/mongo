@@ -7,11 +7,11 @@ into the C++11 standard as [`std::function`](https://en.cppreference.com/w/cpp/u
 
 ## Currently supported compilers
 
-* g++ 4.4 or later
-* clang++ 3.3 or later
-* Visual Studio 2005-2017
+* g++ 4.8 or later
+* clang++ 3.9 or later
+* Visual Studio 2005-2022
 
-Tested on [Travis](https://travis-ci.org/boostorg/function/) and [Appveyor](https://ci.appveyor.com/project/pdimov/function/).
+Tested on [Github Actions](https://github.com/boostorg/function/actions) and [Appveyor](https://ci.appveyor.com/project/pdimov/function/).
 
 ## License
 

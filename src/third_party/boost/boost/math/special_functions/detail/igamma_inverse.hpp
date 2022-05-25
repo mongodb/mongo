@@ -433,7 +433,7 @@ T gamma_p_inv_imp(T a, T p, const Policy& pol)
    //
    // Go ahead and iterate:
    //
-   boost::uintmax_t max_iter = policies::get_max_root_iterations<Policy>();
+   std::uintmax_t max_iter = policies::get_max_root_iterations<Policy>();
    guess = tools::halley_iterate(
       detail::gamma_p_inverse_func<T, Policy>(a, p, false),
       guess,
@@ -492,7 +492,7 @@ T gamma_q_inv_imp(T a, T q, const Policy& pol)
    //
    // Go ahead and iterate:
    //
-   boost::uintmax_t max_iter = policies::get_max_root_iterations<Policy>();
+   std::uintmax_t max_iter = policies::get_max_root_iterations<Policy>();
    guess = tools::halley_iterate(
       detail::gamma_p_inverse_func<T, Policy>(a, q, true),
       guess,

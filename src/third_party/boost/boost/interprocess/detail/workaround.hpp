@@ -72,6 +72,13 @@
    #endif
 
    //////////////////////////////////////////////////////
+   //    BOOST_INTERPROCESS_POSIX_ROBUST_MUTEXES
+   //////////////////////////////////////////////////////
+   #if (_XOPEN_SOURCE >= 700 || _POSIX_C_SOURCE >= 200809L)
+      #define BOOST_INTERPROCESS_POSIX_ROBUST_MUTEXES
+   #endif
+
+   //////////////////////////////////////////////////////
    // _POSIX_SHARED_MEMORY_OBJECTS (POSIX.1b/POSIX.4)
    //////////////////////////////////////////////////////
    #if ( defined(_POSIX_SHARED_MEMORY_OBJECTS) && ((_POSIX_SHARED_MEMORY_OBJECTS + 0) > 0) ) ||\
@@ -159,7 +166,7 @@
    //////////////////////////////////////////////////////
    //posix_fallocate
    //////////////////////////////////////////////////////
-   #if (_XOPEN_SOURCE >= 600 || __POSIX_C_SOURCE >= 200112L)
+   #if (_XOPEN_SOURCE >= 600 || _POSIX_C_SOURCE >= 200112L)
    #define BOOST_INTERPROCESS_POSIX_FALLOCATE
    #endif
 
@@ -184,6 +191,18 @@
    #define BOOST_INTERPROCESS_TIMEOUT_WHEN_LOCKING_DURATION_MS 10000
 #endif
 
+
+// Max open or create tries with managed memory segments
+#ifndef BOOST_INTERPROCESS_MANAGED_OPEN_OR_CREATE_INITIALIZE_MAX_TRIES
+   #define BOOST_INTERPROCESS_MANAGED_OPEN_OR_CREATE_INITIALIZE_MAX_TRIES 20u
+#endif
+
+// Maximum timeout in seconds with open or create tries with managed memory segments
+// waiting the creator to initialize the shared memory
+#ifndef BOOST_INTERPROCESS_MANAGED_OPEN_OR_CREATE_INITIALIZE_TIMEOUT_SEC
+   #define BOOST_INTERPROCESS_MANAGED_OPEN_OR_CREATE_INITIALIZE_TIMEOUT_SEC 300u
+#endif
+
 //Other switches
 //BOOST_INTERPROCESS_MSG_QUEUE_USES_CIRC_INDEX
 //message queue uses a circular queue as index instead of an array (better performance)
@@ -204,10 +223,10 @@
    #define BOOST_INTERPROCESS_FORCEINLINE inline
 #elif defined(BOOST_INTERPROCESS_FORCEINLINE_IS_BOOST_FORCELINE)
    #define BOOST_INTERPROCESS_FORCEINLINE BOOST_FORCEINLINE
-#elif defined(BOOST_MSVC) && defined(_DEBUG)
-   //"__forceinline" and MSVC seems to have some bugs in debug mode
+#elif defined(BOOST_MSVC) && (_MSC_VER < 1900 || defined(_DEBUG))
+   //"__forceinline" and MSVC seems to have some bugs in old versions and in debug mode
    #define BOOST_INTERPROCESS_FORCEINLINE inline
-#elif defined(__GNUC__) && ((__GNUC__ < 4) || (__GNUC__ == 4 && (__GNUC_MINOR__ < 5)))
+#elif defined(BOOST_GCC) && (__GNUC__ <= 5)
    //Older GCCs have problems with forceinline
    #define BOOST_INTERPROCESS_FORCEINLINE inline
 #else
@@ -230,5 +249,14 @@
 
 #endif
 
+#if defined(BOOST_HAS_THREADS) 
+#  if defined(_MSC_VER) || defined(__MWERKS__) || defined(__MINGW32__) ||  defined(__BORLANDC__)
+     //no reentrant posix functions (eg: localtime_r)
+#  elif (!defined(__hpux) || (defined(__hpux) && defined(_REENTRANT)))
+#   define BOOST_INTERPROCESS_HAS_REENTRANT_STD_FUNCTIONS
+#  endif
+#endif
+
+#include <boost/core/no_exceptions_support.hpp>
 
 #endif   //#ifndef BOOST_INTERPROCESS_DETAIL_WORKAROUND_HPP

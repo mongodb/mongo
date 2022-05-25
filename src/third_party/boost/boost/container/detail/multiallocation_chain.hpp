@@ -153,8 +153,8 @@ class basic_multiallocation_chain
       char_ptr elem = char_pointer_traits::static_cast_from(b);
       if(num_units){
          char_ptr prev_elem = elem;
-         elem += unit_bytes;
-         for(size_type i = 0; i != num_units-1; ++i, elem += unit_bytes){
+         elem += difference_type(unit_bytes);
+         for(size_type i = 0; i != num_units-1u; ++i, elem += difference_type(unit_bytes)){
             ::new (boost::movelib::to_raw_pointer(prev_elem), boost_container_new_t()) void_pointer(elem);
             prev_elem = elem;
          }

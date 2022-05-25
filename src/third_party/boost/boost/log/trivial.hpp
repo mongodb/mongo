@@ -91,7 +91,7 @@ typedef sources::severity_logger< severity_level > logger_type;
 /*!
  * \brief Trivial logger tag
  *
- * This tag can be used to acquire the logger that is used with lrivial logging macros.
+ * This tag can be used to acquire the logger that is used with trivial logging macros.
  * This may be useful when the logger is used with other macros which require a logger.
  */
 struct logger

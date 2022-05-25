@@ -1010,8 +1010,16 @@ namespace boost {
 #             pragma GCC diagnostic pop
 #           endif
           } else
+#if defined(BOOST_GCC) && (__GNUC__ == 11)
+# pragma GCC diagnostic push
+// False positive in GCC 11 for empty function objects (function_n_test.cpp:673)
+# pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
             get_vtable()->base.manager(f.functor, this->functor,
                                      boost::detail::function::move_functor_tag);
+#if defined(BOOST_GCC) && (__GNUC__ == 11)
+# pragma GCC diagnostic pop
+#endif
           f.vtable = 0;
         } else {
           clear();

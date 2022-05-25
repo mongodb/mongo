@@ -2,7 +2,7 @@
 // require.hpp
 // ~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -107,7 +107,7 @@ struct require_result
 
 #else // defined(GENERATING_DOCUMENTATION)
 
-namespace asio_require_fn {
+namespace boost_asio_require_fn {
 
 using boost::asio::conditional;
 using boost::asio::decay;
@@ -406,26 +406,26 @@ struct static_instance
 template <typename T>
 const T static_instance<T>::instance = {};
 
-} // namespace asio_require_fn
+} // namespace boost_asio_require_fn
 namespace boost {
 namespace asio {
 namespace {
 
-static BOOST_ASIO_CONSTEXPR const asio_require_fn::impl&
-  require = asio_require_fn::static_instance<>::instance;
+static BOOST_ASIO_CONSTEXPR const boost_asio_require_fn::impl&
+  require = boost_asio_require_fn::static_instance<>::instance;
 
 } // namespace
 
-typedef asio_require_fn::impl require_t;
+typedef boost_asio_require_fn::impl require_t;
 
 #if defined(BOOST_ASIO_HAS_VARIADIC_TEMPLATES)
 
 template <typename T, typename... Properties>
 struct can_require :
   integral_constant<bool,
-    asio_require_fn::call_traits<
+    boost_asio_require_fn::call_traits<
       require_t, T, void(Properties...)>::overload
-        != asio_require_fn::ill_formed>
+        != boost_asio_require_fn::ill_formed>
 {
 };
 
@@ -435,24 +435,24 @@ template <typename T, typename P0 = void,
     typename P1 = void, typename P2 = void>
 struct can_require :
   integral_constant<bool,
-    asio_require_fn::call_traits<require_t, T, void(P0, P1, P2)>::overload
-      != asio_require_fn::ill_formed>
+    boost_asio_require_fn::call_traits<require_t, T, void(P0, P1, P2)>::overload
+      != boost_asio_require_fn::ill_formed>
 {
 };
 
 template <typename T, typename P0, typename P1>
 struct can_require<T, P0, P1> :
   integral_constant<bool,
-    asio_require_fn::call_traits<require_t, T, void(P0, P1)>::overload
-      != asio_require_fn::ill_formed>
+    boost_asio_require_fn::call_traits<require_t, T, void(P0, P1)>::overload
+      != boost_asio_require_fn::ill_formed>
 {
 };
 
 template <typename T, typename P0>
 struct can_require<T, P0> :
   integral_constant<bool,
-    asio_require_fn::call_traits<require_t, T, void(P0)>::overload
-      != asio_require_fn::ill_formed>
+    boost_asio_require_fn::call_traits<require_t, T, void(P0)>::overload
+      != boost_asio_require_fn::ill_formed>
 {
 };
 
@@ -477,7 +477,7 @@ constexpr bool can_require_v
 template <typename T, typename... Properties>
 struct is_nothrow_require :
   integral_constant<bool,
-    asio_require_fn::call_traits<
+    boost_asio_require_fn::call_traits<
       require_t, T, void(Properties...)>::is_noexcept>
 {
 };
@@ -488,7 +488,7 @@ template <typename T, typename P0 = void,
     typename P1 = void, typename P2 = void>
 struct is_nothrow_require :
   integral_constant<bool,
-    asio_require_fn::call_traits<
+    boost_asio_require_fn::call_traits<
       require_t, T, void(P0, P1, P2)>::is_noexcept>
 {
 };
@@ -496,7 +496,7 @@ struct is_nothrow_require :
 template <typename T, typename P0, typename P1>
 struct is_nothrow_require<T, P0, P1> :
   integral_constant<bool,
-    asio_require_fn::call_traits<
+    boost_asio_require_fn::call_traits<
       require_t, T, void(P0, P1)>::is_noexcept>
 {
 };
@@ -504,7 +504,7 @@ struct is_nothrow_require<T, P0, P1> :
 template <typename T, typename P0>
 struct is_nothrow_require<T, P0> :
   integral_constant<bool,
-    asio_require_fn::call_traits<
+    boost_asio_require_fn::call_traits<
       require_t, T, void(P0)>::is_noexcept>
 {
 };
@@ -530,7 +530,7 @@ constexpr bool is_nothrow_require_v
 template <typename T, typename... Properties>
 struct require_result
 {
-  typedef typename asio_require_fn::call_traits<
+  typedef typename boost_asio_require_fn::call_traits<
       require_t, T, void(Properties...)>::result_type type;
 };
 
@@ -540,21 +540,21 @@ template <typename T, typename P0 = void,
     typename P1 = void, typename P2 = void>
 struct require_result
 {
-  typedef typename asio_require_fn::call_traits<
+  typedef typename boost_asio_require_fn::call_traits<
       require_t, T, void(P0, P1, P2)>::result_type type;
 };
 
 template <typename T, typename P0, typename P1>
 struct require_result<T, P0, P1>
 {
-  typedef typename asio_require_fn::call_traits<
+  typedef typename boost_asio_require_fn::call_traits<
       require_t, T, void(P0, P1)>::result_type type;
 };
 
 template <typename T, typename P0>
 struct require_result<T, P0>
 {
-  typedef typename asio_require_fn::call_traits<
+  typedef typename boost_asio_require_fn::call_traits<
       require_t, T, void(P0)>::result_type type;
 };
 

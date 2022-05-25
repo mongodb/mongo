@@ -38,7 +38,6 @@
 #include <boost/interprocess/detail/config_begin.hpp>
 #include <boost/interprocess/detail/workaround.hpp>
 
-#include <boost/interprocess/detail/posix_time_types_wrk.hpp>
 #include <boost/interprocess/detail/os_thread_functions.hpp>
 #include <boost/interprocess/exceptions.hpp>
 #include <boost/interprocess/detail/atomic.hpp>
@@ -62,7 +61,15 @@ class spin_recursive_mutex
 
    void lock();
    bool try_lock();
-   bool timed_lock(const boost::posix_time::ptime &abs_time);
+   template<class TimePoint>
+   bool timed_lock(const TimePoint &abs_time);
+
+   template<class TimePoint> bool try_lock_until(const TimePoint &abs_time)
+   {  return this->timed_lock(abs_time);  }
+
+   template<class Duration>  bool try_lock_for(const Duration &dur)
+   {  return this->timed_lock(duration_to_ustime(dur)); }
+
    void unlock();
    void take_ownership();
    private:
@@ -119,7 +126,8 @@ inline bool spin_recursive_mutex::try_lock()
    return false;
 }
 
-inline bool spin_recursive_mutex::timed_lock(const boost::posix_time::ptime &abs_time)
+template<class TimePoint>
+inline bool spin_recursive_mutex::timed_lock(const TimePoint &abs_time)
 {
    typedef ipcdetail::OS_systemwide_thread_id_t handle_t;
    const handle_t thr_id(ipcdetail::get_current_systemwide_thread_id());

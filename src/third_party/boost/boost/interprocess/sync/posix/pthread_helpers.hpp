@@ -41,8 +41,12 @@ namespace ipcdetail{
          if(pthread_mutexattr_init(&m_attr)!=0 ||
             pthread_mutexattr_setpshared(&m_attr, PTHREAD_PROCESS_SHARED)!= 0 ||
              (recursive &&
-              pthread_mutexattr_settype(&m_attr, PTHREAD_MUTEX_RECURSIVE)!= 0 ))
-            throw interprocess_exception("pthread_mutexattr_xxxx failed");
+              pthread_mutexattr_settype(&m_attr, PTHREAD_MUTEX_RECURSIVE) != 0 )
+              #ifdef BOOST_INTERPROCESS_POSIX_ROBUST_MUTEXES
+              || pthread_mutexattr_setrobust(&m_attr, PTHREAD_MUTEX_ROBUST) != 0
+              #endif
+              )
+          throw interprocess_exception("pthread_mutexattr_xxxx failed");
       }
 
       //!Destructor
@@ -144,7 +148,7 @@ namespace ipcdetail{
       //!Constructor. Takes barrier attributes to initialize the barrier
       barrier_initializer(pthread_barrier_t &mut,
                           pthread_barrierattr_t &mut_attr,
-                          int count)
+                          unsigned int count)
       : mp_barrier(&mut)
       {
          if(pthread_barrier_init(mp_barrier, &mut_attr, count) != 0)

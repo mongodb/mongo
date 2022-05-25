@@ -19,17 +19,36 @@
 // If this is GCC/clang, then check that the actual intrinsic exists:
 //
 #if defined(__has_builtin) && defined(__GNUC__)
-#if !__has_builtin(__builtin_ia32_addcarryx_u64) && defined(BOOST_MP_HAS_IMMINTRIN_H) && !(defined(BOOST_GCC) && (__GNUC__ >= 9))
+#if !__has_builtin(__builtin_ia32_addcarryx_u64) && defined(BOOST_MP_HAS_IMMINTRIN_H) \
+   && !(defined(BOOST_GCC) && (__GNUC__ >= 9) \
+      && (defined(__amd64__) || defined(__amd64) || defined(__x86_64__) || defined(__x86_64)\
+          || defined(i386) || defined(__i386) || defined(__i386__) || defined(_M_AMD64) \
+          || defined(_M_X64) || defined(__amd64__) || defined(_M_X64)))
 #undef BOOST_MP_HAS_IMMINTRIN_H
 #endif
 #elif defined(BOOST_MP_HAS_IMMINTRIN_H) && defined(__GNUC__) && !(defined(BOOST_GCC) && (__GNUC__ >= 9))
 #undef BOOST_MP_HAS_IMMINTRIN_H
 #endif
 
-#if defined(__clang__) && (__clang__ < 9)
+#if defined(__clang_major__) && (__clang_major__ < 9)
 // We appear to crash the compiler if we try to use these intrinsics?
 #undef BOOST_MP_HAS_IMMINTRIN_H
 #endif
+
+#if defined(BOOST_MSVC) && !defined(_M_IX86) && !defined(_M_X64) && !defined(_M_AMD64)
+//
+// When targeting platforms such as ARM, msvc still has the Intel headers in it's include path
+// even though they're not usable.  See https://github.com/boostorg/multiprecision/issues/321
+//
+#undef BOOST_MP_HAS_IMMINTRIN_H
+#endif
+
+#if defined(__APPLE_CC__) && defined(__clang_major__) && (__clang_major__ < 11) && defined(BOOST_MP_HAS_IMMINTRIN_H)
+// Apple clang has it's own version numbers.
+#undef BOOST_MP_HAS_IMMINTRIN_H
+#endif
+
+
 //
 // If the compiler supports the intrinsics used by GCC internally
 // inside <immintrin.h> then we'll use them directly.

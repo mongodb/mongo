@@ -22,7 +22,7 @@
 namespace boost {
 namespace math {
 
-#ifdef BOOST_MSVC
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:4702) // Unreachable code, only triggered in release mode and /W4
 #endif
@@ -130,7 +130,7 @@ template <int N, typename T>
 BOOST_CXX14_CONSTEXPR inline typename tools::promote_args<T>::type pow(T base)
 { return pow<N>(base, policies::policy<>()); }
 
-#ifdef BOOST_MSVC
+#ifdef _MSC_VER
 #pragma warning(pop)
 #endif
 

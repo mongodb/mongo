@@ -137,8 +137,8 @@ struct combine_value_to_pack<value_pack<first, ARGS...>, value>
 template <char NextChar, char... CHARS>
 struct pack_values
 {
-   static constexpr unsigned chars_per_limb = sizeof(limb_type) * CHAR_BIT / 4;
-   static constexpr unsigned shift          = ((sizeof...(CHARS)) % chars_per_limb) * 4;
+   static constexpr std::size_t chars_per_limb = sizeof(limb_type) * CHAR_BIT / 4;
+   static constexpr std::size_t shift          = ((sizeof...(CHARS)) % chars_per_limb) * 4;
    static constexpr limb_type value_to_add  = shift ? hex_value<NextChar>::value << shift : hex_value<NextChar>::value;
 
    using recursive_packed_type = typename pack_values<CHARS...>::type                         ;
@@ -275,13 +275,13 @@ BOOST_MP_DEFINE_SIZED_CPP_INT_LITERAL(1024)
 //
 // Overload unary minus operator for constexpr use:
 //
-template <unsigned MinBits, cpp_int_check_type Checked>
+template <std::size_t MinBits, cpp_int_check_type Checked>
 constexpr number<cpp_int_backend<MinBits, MinBits, signed_magnitude, Checked, void>, et_off>
 operator-(const number<cpp_int_backend<MinBits, MinBits, signed_magnitude, Checked, void>, et_off>& a)
 {
    return cpp_int_backend<MinBits, MinBits, signed_magnitude, Checked, void>(a.backend(), boost::multiprecision::literals::detail::make_negate_tag());
 }
-template <unsigned MinBits, cpp_int_check_type Checked>
+template <std::size_t MinBits, cpp_int_check_type Checked>
 constexpr number<cpp_int_backend<MinBits, MinBits, signed_magnitude, Checked, void>, et_off>
 operator-(number<cpp_int_backend<MinBits, MinBits, signed_magnitude, Checked, void>, et_off>&& a)
 {

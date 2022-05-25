@@ -17,8 +17,9 @@
 #pragma once
 #endif
 
+#include <cstdint>
+#include <utility>
 #include <boost/math/tools/toms748_solve.hpp>
-#include <boost/cstdint.hpp>
 
 namespace boost{ namespace math{ namespace detail{
 
@@ -150,7 +151,7 @@ T ibeta_inv_ab_imp(const T& b, const T& z, const T& p, const T& q, bool swap_ab,
    //
    // Max iterations permitted:
    //
-   boost::uintmax_t max_iter = policies::get_max_root_iterations<Policy>();
+   std::uintmax_t max_iter = policies::get_max_root_iterations<Policy>();
    std::pair<T, T> r = bracket_and_solve_root(f, guess, factor, swap_ab ? true : false, tol, max_iter, pol);
    if(max_iter >= policies::get_max_root_iterations<Policy>())
       return policies::raise_evaluation_error<T>("boost::math::ibeta_invab_imp<%1%>(%1%,%1%,%1%)", "Unable to locate the root within a reasonable number of iterations, closest approximation so far was %1%", r.first, pol);

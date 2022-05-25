@@ -46,6 +46,7 @@
 #include <boost/move/make_unique.hpp>
 #include <boost/move/iterator.hpp>
 #include <boost/move/adl_move_swap.hpp>
+#include <boost/move/detail/force_ptr.hpp>
 #include <boost/move/algo/adaptive_sort.hpp>
 #include <boost/move/algo/detail/pdqsort.hpp>
 
@@ -212,15 +213,16 @@ template<class SequenceContainer, class Iterator, class Compare>
 BOOST_CONTAINER_FORCEINLINE void flat_tree_merge_unique  //has_merge_unique == false
    (SequenceContainer& dest, Iterator first, Iterator last, Compare comp, dtl::false_)
 {
-   typedef typename SequenceContainer::iterator    iterator;
-   typedef typename SequenceContainer::size_type   size_type;
+   typedef typename SequenceContainer::iterator          iterator;
+   typedef typename SequenceContainer::size_type         size_type;
+   typedef typename SequenceContainer::difference_type   difference_type;
 
    size_type const old_sz = dest.size();
    iterator const first_new = dest.insert(dest.cend(), first, last );
    iterator e = boost::movelib::inplace_set_unique_difference(first_new, dest.end(), dest.begin(), first_new, comp);
    dest.erase(e, dest.end());
    dtl::bool_<is_contiguous_container<SequenceContainer>::value> contiguous_tag;
-   (flat_tree_container_inplace_merge)(dest, dest.begin()+old_sz, comp, contiguous_tag);
+   (flat_tree_container_inplace_merge)(dest, dest.begin() + difference_type(old_sz), comp, contiguous_tag);
 }
 
 ///////////////////////////////////////
@@ -263,7 +265,7 @@ BOOST_CONTAINER_FORCEINLINE Iterator
    flat_tree_nth  // has_nth == false
       (SequenceContainer& cont, typename SequenceContainer::size_type n, dtl::false_)
 {
-   return cont.begin()+ n;
+   return cont.begin()+ typename SequenceContainer::difference_type(n);
 }
 
 ///////////////////////////////////////
@@ -959,9 +961,9 @@ class flat_tree
    std::pair<iterator, bool> emplace_unique(BOOST_FWD_REF(Args)... args)
    {
       typename dtl::aligned_storage<sizeof(value_type), dtl::alignment_of<value_type>::value>::type v;
-      value_type *pval = reinterpret_cast<value_type *>(v.data);
       get_stored_allocator_noconst_return_t a = this->get_stored_allocator();
-      stored_allocator_traits::construct(a, pval, ::boost::forward<Args>(args)... );
+      stored_allocator_traits::construct(a, move_detail::force_ptr<value_type *>(&v), ::boost::forward<Args>(args)... );
+      value_type *pval = move_detail::force_ptr<value_type *>(&v);
       value_destructor<stored_allocator_type, value_type> d(a, *pval);
       return this->insert_unique(::boost::move(*pval));
    }
@@ -971,9 +973,9 @@ class flat_tree
    {
       //hint checked in insert_unique
       typename dtl::aligned_storage<sizeof(value_type), dtl::alignment_of<value_type>::value>::type v;
-      value_type *pval = reinterpret_cast<value_type *>(v.data);
       get_stored_allocator_noconst_return_t a = this->get_stored_allocator();
-      stored_allocator_traits::construct(a, pval, ::boost::forward<Args>(args)... );
+      stored_allocator_traits::construct(a, move_detail::force_ptr<value_type *>(&v), ::boost::forward<Args>(args)... );
+      value_type *pval = move_detail::force_ptr<value_type *>(&v);
       value_destructor<stored_allocator_type, value_type> d(a, *pval);
       return this->insert_unique(hint, ::boost::move(*pval));
    }
@@ -982,9 +984,9 @@ class flat_tree
    iterator emplace_equal(BOOST_FWD_REF(Args)... args)
    {
       typename dtl::aligned_storage<sizeof(value_type), dtl::alignment_of<value_type>::value>::type v;
-      value_type *pval = reinterpret_cast<value_type *>(v.data);
       get_stored_allocator_noconst_return_t a = this->get_stored_allocator();
-      stored_allocator_traits::construct(a, pval, ::boost::forward<Args>(args)... );
+      stored_allocator_traits::construct(a, move_detail::force_ptr<value_type *>(&v), ::boost::forward<Args>(args)... );
+      value_type *pval = move_detail::force_ptr<value_type *>(&v);
       value_destructor<stored_allocator_type, value_type> d(a, *pval);
       return this->insert_equal(::boost::move(*pval));
    }
@@ -994,9 +996,9 @@ class flat_tree
    {
       //hint checked in insert_equal
       typename dtl::aligned_storage<sizeof(value_type), dtl::alignment_of<value_type>::value>::type v;
-      value_type *pval = reinterpret_cast<value_type *>(v.data);
       get_stored_allocator_noconst_return_t a = this->get_stored_allocator();
-      stored_allocator_traits::construct(a, pval, ::boost::forward<Args>(args)... );
+      stored_allocator_traits::construct(a, move_detail::force_ptr<value_type *>(&v), ::boost::forward<Args>(args)... );
+      value_type *pval = move_detail::force_ptr<value_type *>(&v);
       value_destructor<stored_allocator_type, value_type> d(a, *pval);
       return this->insert_equal(hint, ::boost::move(*pval));
    }
@@ -1013,7 +1015,7 @@ class flat_tree
          : this->priv_insert_unique_prepare(hint, k, data);
 
       if(!ret.second){
-         ret.first  = this->nth(data.position - this->cbegin());
+         ret.first  = this->nth(size_type(data.position - this->cbegin()));
       }
       else{
          ret.first = this->m_data.m_seq.emplace(data.position, try_emplace_t(), ::boost::forward<KeyType>(key), ::boost::forward<Args>(args)...);
@@ -1028,9 +1030,9 @@ class flat_tree
    std::pair<iterator, bool> emplace_unique(BOOST_MOVE_UREF##N)\
    {\
       typename dtl::aligned_storage<sizeof(value_type), dtl::alignment_of<value_type>::value>::type v;\
-      value_type *pval = reinterpret_cast<value_type *>(v.data);\
       get_stored_allocator_noconst_return_t a = this->get_stored_allocator();\
-      stored_allocator_traits::construct(a, pval BOOST_MOVE_I##N BOOST_MOVE_FWD##N);\
+      stored_allocator_traits::construct(a, move_detail::force_ptr<value_type *>(&v) BOOST_MOVE_I##N BOOST_MOVE_FWD##N);\
+      value_type *pval = move_detail::force_ptr<value_type *>(&v);\
       value_destructor<stored_allocator_type, value_type> d(a, *pval);\
       return this->insert_unique(::boost::move(*pval));\
    }\
@@ -1039,9 +1041,9 @@ class flat_tree
    iterator emplace_hint_unique(const_iterator hint BOOST_MOVE_I##N BOOST_MOVE_UREF##N)\
    {\
       typename dtl::aligned_storage<sizeof(value_type), dtl::alignment_of<value_type>::value>::type v;\
-      value_type *pval = reinterpret_cast<value_type *>(v.data);\
       get_stored_allocator_noconst_return_t a = this->get_stored_allocator();\
-      stored_allocator_traits::construct(a, pval BOOST_MOVE_I##N BOOST_MOVE_FWD##N);\
+      stored_allocator_traits::construct(a, move_detail::force_ptr<value_type *>(&v) BOOST_MOVE_I##N BOOST_MOVE_FWD##N);\
+      value_type *pval = move_detail::force_ptr<value_type *>(&v);\
       value_destructor<stored_allocator_type, value_type> d(a, *pval);\
       return this->insert_unique(hint, ::boost::move(*pval));\
    }\
@@ -1050,9 +1052,9 @@ class flat_tree
    iterator emplace_equal(BOOST_MOVE_UREF##N)\
    {\
       typename dtl::aligned_storage<sizeof(value_type), dtl::alignment_of<value_type>::value>::type v;\
-      value_type *pval = reinterpret_cast<value_type *>(v.data);\
       get_stored_allocator_noconst_return_t a = this->get_stored_allocator();\
-      stored_allocator_traits::construct(a, pval BOOST_MOVE_I##N BOOST_MOVE_FWD##N);\
+      stored_allocator_traits::construct(a, move_detail::force_ptr<value_type *>(&v) BOOST_MOVE_I##N BOOST_MOVE_FWD##N);\
+      value_type *pval = move_detail::force_ptr<value_type *>(&v);\
       value_destructor<stored_allocator_type, value_type> d(a, *pval);\
       return this->insert_equal(::boost::move(*pval));\
    }\
@@ -1061,9 +1063,9 @@ class flat_tree
    iterator emplace_hint_equal(const_iterator hint BOOST_MOVE_I##N BOOST_MOVE_UREF##N)\
    {\
       typename dtl::aligned_storage <sizeof(value_type), dtl::alignment_of<value_type>::value>::type v;\
-      value_type *pval = reinterpret_cast<value_type *>(v.data);\
       get_stored_allocator_noconst_return_t a = this->get_stored_allocator();\
-      stored_allocator_traits::construct(a, pval BOOST_MOVE_I##N BOOST_MOVE_FWD##N);\
+      stored_allocator_traits::construct(a, move_detail::force_ptr<value_type *>(&v) BOOST_MOVE_I##N BOOST_MOVE_FWD##N);\
+      value_type *pval = move_detail::force_ptr<value_type *>(&v);\
       value_destructor<stored_allocator_type, value_type> d(a, *pval);\
       return this->insert_equal(hint, ::boost::move(*pval));\
    }\
@@ -1079,7 +1081,7 @@ class flat_tree
          : this->priv_insert_unique_prepare(hint, k, data);\
       \
       if(!ret.second){\
-         ret.first  = this->nth(data.position - this->cbegin());\
+         ret.first  = this->nth(size_type(data.position - this->cbegin()));\
       }\
       else{\
          ret.first = this->m_data.m_seq.emplace(data.position, try_emplace_t(), ::boost::forward<KeyType>(key) BOOST_MOVE_I##N BOOST_MOVE_FWD##N);\
@@ -1102,7 +1104,7 @@ class flat_tree
          ? this->priv_insert_unique_prepare(k, data)
          : this->priv_insert_unique_prepare(hint, k, data);
       if(!ret.second){
-         ret.first  = this->nth(data.position - this->cbegin());
+         ret.first  = this->nth(size_type(data.position - this->cbegin()));
          ret.first->second = boost::forward<M>(obj);
       }
       else{
@@ -1121,6 +1123,15 @@ class flat_tree
       if (ret){
          this->m_data.m_seq.erase(itp.first, itp.second);
       }
+      return ret;
+   }
+
+   size_type erase_unique(const key_type& k)
+   {
+      iterator i = this->find(k);
+      size_type ret = static_cast<size_type>(i != this->end());
+      if (ret)
+         this->erase(i);
       return ret;
    }
 
@@ -1225,7 +1236,7 @@ class flat_tree
       size_type count(const key_type& k) const
    {
       std::pair<const_iterator, const_iterator> p = this->equal_range(k);
-      size_type n = p.second - p.first;
+      size_type n = size_type(p.second - p.first);
       return n;
    }
 
@@ -1235,7 +1246,7 @@ class flat_tree
       count(const K& k) const
    {
       std::pair<const_iterator, const_iterator> p = this->equal_range(k);
-      size_type n = p.second - p.first;
+      size_type n = size_type(p.second - p.first);
       return n;
    }
 
@@ -1579,7 +1590,7 @@ class flat_tree
       while (len) {
          size_type step = len >> 1;
          middle = first;
-         middle += step;
+         middle += difference_type(step);
 
          if (key_cmp(key_extract(*middle), key)) {
             first = ++middle;
@@ -1604,7 +1615,7 @@ class flat_tree
       while (len) {
          size_type step = len >> 1;
          middle = first;
-         middle += step;
+         middle += difference_type(step);
 
          if (key_cmp(key, key_extract(*middle))) {
             len = step;
@@ -1629,7 +1640,7 @@ class flat_tree
       while (len) {
          size_type step = len >> 1;
          middle = first;
-         middle += step;
+         middle += difference_type(step);
 
          if (key_cmp(key_extract(*middle), key)){
             first = ++middle;
@@ -1641,7 +1652,7 @@ class flat_tree
          else {
             //Middle is equal to key
             last = first;
-            last += len;
+            last += difference_type(len);
             RanIt const first_ret = this->priv_lower_bound(first, middle, key);
             return std::pair<RanIt, RanIt>
                ( first_ret, this->priv_upper_bound(++middle, last, key));

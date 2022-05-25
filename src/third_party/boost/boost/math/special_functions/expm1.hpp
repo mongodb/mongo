@@ -11,7 +11,8 @@
 #endif
 
 #include <cmath>
-#include <boost/limits.hpp>
+#include <cstdint>
+#include <limits>
 #include <boost/math/tools/config.hpp>
 #include <boost/math/tools/series.hpp>
 #include <boost/math/tools/precision.hpp>
@@ -19,12 +20,7 @@
 #include <boost/math/policies/error_handling.hpp>
 #include <boost/math/tools/rational.hpp>
 #include <boost/math/special_functions/math_fwd.hpp>
-
-#ifndef BOOST_NO_LIMITS_COMPILE_TIME_CONSTANTS
-#  include <boost/static_assert.hpp>
-#else
-#  include <boost/assert.hpp>
-#endif
+#include <boost/math/tools/assert.hpp>
 
 #if defined(__GNUC__) && defined(BOOST_MATH_USE_FLOAT128)
 //
@@ -132,13 +128,10 @@ T expm1_imp(T x, const std::integral_constant<int, 0>&, const Policy& pol)
    if(a < tools::epsilon<T>())
       return x;
    detail::expm1_series<T> s(x);
-   boost::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
-#if !BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x582)) && !BOOST_WORKAROUND(__EDG_VERSION__, <= 245)
+   std::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
+
    T result = tools::sum_series(s, policies::get_epsilon<T, Policy>(), max_iter);
-#else
-   T zero = 0;
-   T result = tools::sum_series(s, policies::get_epsilon<T, Policy>(), max_iter, zero);
-#endif
+
    policies::check_series_iterations<T>("boost::math::expm1<%1%>(%1%)", max_iter, pol);
    return result;
 }
@@ -316,23 +309,6 @@ inline typename tools::promote_args<T>::type expm1(T x)
 {
    return expm1(x, policies::policy<>());
 }
-
-#if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x564))
-inline float expm1(float z)
-{
-   return expm1<float>(z);
-}
-inline double expm1(double z)
-{
-   return expm1<double>(z);
-}
-#ifndef BOOST_MATH_NO_LONG_DOUBLE_MATH_FUNCTIONS
-inline long double expm1(long double z)
-{
-   return expm1<long double>(z);
-}
-#endif
-#endif
 
 } // namespace math
 } // namespace boost

@@ -767,6 +767,15 @@ class flat_set
    BOOST_CONTAINER_FORCEINLINE void merge(BOOST_RV_REF_BEG flat_multiset<Key, C2, AllocatorOrContainer> BOOST_RV_REF_END source)
    {  return this->merge(static_cast<flat_multiset<Key, C2, AllocatorOrContainer>&>(source));   }
 
+   //! <b>Effects</b>: If present, erases the element in the container with key equivalent to x.
+   //!
+   //! <b>Returns</b>: Returns the number of erased elements (0/1).
+   //!
+   //! <b>Complexity</b>: Logarithmic search time plus erasure time
+   //!   linear to the elements with bigger keys.
+   BOOST_CONTAINER_FORCEINLINE size_type erase(const key_type& x)
+   {  return this->tree_t::erase_unique(x);   }
+
    #if defined(BOOST_CONTAINER_DOXYGEN_INVOKED)
 
    //! <b>Effects</b>: Erases the element pointed to by p.
@@ -780,14 +789,6 @@ class flat_set
    //! <b>Note</b>: Invalidates elements with keys
    //!   not less than the erased element.
    iterator erase(const_iterator p);
-
-   //! <b>Effects</b>: Erases all elements in the container with key equivalent to x.
-   //!
-   //! <b>Returns</b>: Returns the number of erased elements.
-   //!
-   //! <b>Complexity</b>: Logarithmic search time plus erasure time
-   //!   linear to the elements with bigger keys.
-   size_type erase(const key_type& x);
 
    //! <b>Effects</b>: Erases all the elements in the range [first, last).
    //!
@@ -909,6 +910,8 @@ class flat_set
    //! <b>Note</b>: Non-standard extension
    size_type index_of(const_iterator p) const BOOST_NOEXCEPT_OR_NOTHROW;
 
+   #else
+   using tree_t::erase;
    #endif   //   #if defined(BOOST_CONTAINER_DOXYGEN_INVOKED)
 
    //! <b>Returns</b>: The number of elements with key equivalent to x.

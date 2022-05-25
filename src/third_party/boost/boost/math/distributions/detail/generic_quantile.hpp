@@ -72,7 +72,7 @@ typename Dist::value_type generic_quantile(const Dist& dist, const typename Dist
 
    generic_quantile_finder<Dist> f(dist, p, comp);
    tools::eps_tolerance<value_type> tol(policies::digits<value_type, forwarding_policy>() - 3);
-   boost::uintmax_t max_iter = policies::get_max_root_iterations<forwarding_policy>();
+   std::uintmax_t max_iter = policies::get_max_root_iterations<forwarding_policy>();
    std::pair<value_type, value_type> ir = tools::bracket_and_solve_root(
       f, guess, value_type(2), true, tol, max_iter, forwarding_policy());
    value_type result = ir.first + (ir.second - ir.first) / 2;

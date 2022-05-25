@@ -35,6 +35,7 @@
 #include <boost/intrusive/pointer_traits.hpp>
 // move/detail
 #include <boost/move/detail/type_traits.hpp> //make_unsigned
+#include <boost/move/detail/force_ptr.hpp>
 // other boost
 #include <boost/assert.hpp>   //BOOST_ASSERT
 #include <boost/core/no_exceptions_support.hpp>
@@ -92,7 +93,7 @@ struct block_header
       :  m_value_bytes(val_bytes)
       ,  m_num_char((unsigned short)num_char)
       ,  m_value_alignment((unsigned char)val_alignment)
-      ,  m_alloc_type_sizeof_char( (al_type << 5u) | ((unsigned char)szof_char & 0x1F) )
+      ,  m_alloc_type_sizeof_char( (unsigned char)((al_type << 5u) | ((unsigned char)szof_char & 0x1F)) )
    {};
 
    template<class T>
@@ -102,7 +103,7 @@ struct block_header
    size_type total_size() const
    {
       if(alloc_type() != anonymous_type){
-         return name_offset() + (m_num_char+1)*sizeof_char();
+         return name_offset() + (m_num_char+1u)*sizeof_char();
       }
       else{
          return this->value_offset() + m_value_bytes;
@@ -130,7 +131,7 @@ struct block_header
    template<class CharType>
    CharType *name() const
    {
-      return const_cast<CharType*>(reinterpret_cast<const CharType*>
+      return const_cast<CharType*>(move_detail::force_ptr<const CharType*>
          (reinterpret_cast<const char*>(this) + name_offset()));
    }
 
@@ -175,7 +176,7 @@ struct block_header
    {
       block_header * hdr =
          const_cast<block_header*>
-            (reinterpret_cast<const block_header*>(reinterpret_cast<const char*>(value) -
+            (move_detail::force_ptr<const block_header*>(reinterpret_cast<const char*>(value) -
                get_rounded_size(sizeof(block_header), algn)));
       (void)sz;
       //Some sanity checks
@@ -188,7 +189,7 @@ struct block_header
    static block_header<size_type> *from_first_header(Header *header)
    {
       block_header<size_type> * hdr =
-         reinterpret_cast<block_header<size_type>*>(reinterpret_cast<char*>(header) +
+         move_detail::force_ptr<block_header<size_type>*>(reinterpret_cast<char*>(header) +
        get_rounded_size( size_type(sizeof(Header))
                        , size_type(::boost::container::dtl::alignment_of<block_header<size_type> >::value)));
       //Some sanity checks
@@ -199,7 +200,7 @@ struct block_header
    static Header *to_first_header(block_header<size_type> *bheader)
    {
       Header * hdr =
-         reinterpret_cast<Header*>(reinterpret_cast<char*>(bheader) -
+         move_detail::force_ptr<Header*>(reinterpret_cast<char*>(bheader) -
        get_rounded_size( size_type(sizeof(Header))
                        , size_type(::boost::container::dtl::alignment_of<block_header<size_type> >::value)));
       //Some sanity checks
@@ -219,8 +220,7 @@ inline void array_construct(void *mem, std::size_t num, in_place_interface &tabl
       std::size_t destroyed = 0;
       table.destroy_n(mem, constructed, destroyed);
       BOOST_RETHROW
-   }
-   BOOST_CATCH_END
+   } BOOST_CATCH_END
 }
 
 template<class CharT>
@@ -280,7 +280,7 @@ struct intrusive_value_type_impl
    block_header<size_type> *get_block_header() const
    {
       return const_cast<block_header<size_type>*>
-         (reinterpret_cast<const block_header<size_type> *>(reinterpret_cast<const char*>(this) +
+         (move_detail::force_ptr<const block_header<size_type> *>(reinterpret_cast<const char*>(this) +
             get_rounded_size(size_type(sizeof(*this)), size_type(BlockHdrAlignment))));
    }
 
@@ -292,7 +292,7 @@ struct intrusive_value_type_impl
 
    static intrusive_value_type_impl *get_intrusive_value_type(block_header<size_type> *hdr)
    {
-      return reinterpret_cast<intrusive_value_type_impl *>(reinterpret_cast<char*>(hdr) -
+      return move_detail::force_ptr<intrusive_value_type_impl*>(reinterpret_cast<char*>(hdr) -
          get_rounded_size(size_type(sizeof(intrusive_value_type_impl)), size_type(BlockHdrAlignment)));
    }
 
@@ -472,7 +472,7 @@ class segment_manager_iterator_value_adaptor<Iterator, false>
 
    const void *value() const
    {
-      return reinterpret_cast<block_header<size_type>*>
+      return move_detail::force_ptr<block_header<size_type>*>
          (to_raw_pointer(m_val->second.m_ptr))->value();
    }
 

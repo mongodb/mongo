@@ -27,10 +27,14 @@
 
 #include <sys/syscall.h>
 
-// Some Android NDKs (Google NDK and older Crystax.NET NDK versions) don't define SYS_futex.
 #if defined(SYS_futex)
 #define BOOST_ATOMIC_DETAIL_SYS_FUTEX SYS_futex
+#elif defined(SYS_futex_time64)
+// On some 32-bit targets (e.g. riscv32) SYS_futex is not defined and instead SYS_futex_time64 is implemented,
+// which is equivalent to SYS_futex but uses 64-bit time_t.
+#define BOOST_ATOMIC_DETAIL_SYS_FUTEX SYS_futex_time64
 #elif defined(__NR_futex)
+// Some Android NDKs (Google NDK and older Crystax.NET NDK versions) don't define SYS_futex.
 #define BOOST_ATOMIC_DETAIL_SYS_FUTEX __NR_futex
 #elif defined(SYS___futex)
 // NetBSD defines SYS___futex, which has slightly different parameters. Basically, it has decoupled timeout and val2 parameters:
@@ -56,6 +60,9 @@
 
 #if defined(FUTEX_PRIVATE_FLAG)
 #define BOOST_ATOMIC_DETAIL_FUTEX_PRIVATE_FLAG FUTEX_PRIVATE_FLAG
+#elif defined(__ANDROID__)
+// On Android, futex.h is lacking many definitions, but the actual Linux kernel supports the API in full.
+#define BOOST_ATOMIC_DETAIL_FUTEX_PRIVATE_FLAG 128
 #else
 #define BOOST_ATOMIC_DETAIL_FUTEX_PRIVATE_FLAG 0
 #endif

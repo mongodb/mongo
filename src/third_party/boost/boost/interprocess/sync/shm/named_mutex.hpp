@@ -25,7 +25,6 @@
 #include <boost/interprocess/exceptions.hpp>
 #include <boost/interprocess/detail/interprocess_tester.hpp>
 #include <boost/interprocess/permissions.hpp>
-#include <boost/interprocess/detail/posix_time_types_wrk.hpp>
 
 #include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/interprocess/sync/interprocess_mutex.hpp>
@@ -58,7 +57,7 @@ class shm_named_mutex
    public:
    //!Creates a global interprocess_mutex with a name.
    //!Throws interprocess_exception on error.
-   shm_named_mutex(create_only_t create_only, const char *name, const permissions &perm = permissions());
+   shm_named_mutex(create_only_t, const char *name, const permissions &perm = permissions());
 
    //!Opens or creates a global mutex with a name.
    //!If the mutex is created, this call is equivalent to
@@ -66,18 +65,18 @@ class shm_named_mutex
    //!If the mutex is already created, this call is equivalent
    //!shm_named_mutex(open_only_t, ... )
    //!Does not throw
-   shm_named_mutex(open_or_create_t open_or_create, const char *name, const permissions &perm = permissions());
+   shm_named_mutex(open_or_create_t, const char *name, const permissions &perm = permissions());
 
    //!Opens a global mutex with a name if that mutex is previously
    //!created. If it is not previously created this function throws
    //!interprocess_exception.
-   shm_named_mutex(open_only_t open_only, const char *name);
+   shm_named_mutex(open_only_t, const char *name);
 
    #if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
 
    //!Creates a global interprocess_mutex with a name.
    //!Throws interprocess_exception on error.
-   shm_named_mutex(create_only_t create_only, const wchar_t *name, const permissions &perm = permissions());
+   shm_named_mutex(create_only_t, const wchar_t *name, const permissions &perm = permissions());
 
    //!Opens or creates a global mutex with a name.
    //!If the mutex is created, this call is equivalent to
@@ -85,12 +84,12 @@ class shm_named_mutex
    //!If the mutex is already created, this call is equivalent
    //!shm_named_mutex(open_only_t, ... )
    //!Does not throw
-   shm_named_mutex(open_or_create_t open_or_create, const wchar_t *name, const permissions &perm = permissions());
+   shm_named_mutex(open_or_create_t, const wchar_t *name, const permissions &perm = permissions());
 
    //!Opens a global mutex with a name if that mutex is previously
    //!created. If it is not previously created this function throws
    //!interprocess_exception.
-   shm_named_mutex(open_only_t open_only, const wchar_t *name);
+   shm_named_mutex(open_only_t, const wchar_t *name);
 
    #endif   //defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
 
@@ -118,7 +117,14 @@ class shm_named_mutex
    //!Tries to lock the interprocess_mutex until time abs_time,
    //!Returns false when timeout expires, returns true when locks.
    //!Throws interprocess_exception if a severe error is found
-   bool timed_lock(const boost::posix_time::ptime &abs_time);
+   template<class TimePoint>
+   bool timed_lock(const TimePoint &abs_time);
+
+   template<class TimePoint> bool try_lock_until(const TimePoint &abs_time)
+   {  return this->timed_lock(abs_time);  }
+
+   template<class Duration>  bool try_lock_for(const Duration &dur)
+   {  return this->timed_lock(duration_to_ustime(dur)); }
 
    //!Erases a named mutex from the system.
    //!Returns false on error. Never throws.
@@ -155,7 +161,7 @@ inline shm_named_mutex::~shm_named_mutex()
 {}
 
 inline shm_named_mutex::shm_named_mutex(create_only_t, const char *name, const permissions &perm)
-   :  m_shmem  (create_only
+   :  m_shmem  (create_only_t()
                ,name
                ,sizeof(interprocess_mutex) +
                   open_create_impl_t::ManagedOpenOrCreateUserOffset
@@ -166,7 +172,7 @@ inline shm_named_mutex::shm_named_mutex(create_only_t, const char *name, const p
 {}
 
 inline shm_named_mutex::shm_named_mutex(open_or_create_t, const char *name, const permissions &perm)
-   :  m_shmem  (open_or_create
+   :  m_shmem  (open_or_create_t()
                ,name
                ,sizeof(interprocess_mutex) +
                   open_create_impl_t::ManagedOpenOrCreateUserOffset
@@ -177,7 +183,7 @@ inline shm_named_mutex::shm_named_mutex(open_or_create_t, const char *name, cons
 {}
 
 inline shm_named_mutex::shm_named_mutex(open_only_t, const char *name)
-   :  m_shmem  (open_only
+   :  m_shmem  (open_only_t()
                ,name
                ,read_write
                ,0
@@ -187,7 +193,7 @@ inline shm_named_mutex::shm_named_mutex(open_only_t, const char *name)
 #if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
 
 inline shm_named_mutex::shm_named_mutex(create_only_t, const wchar_t *name, const permissions &perm)
-   :  m_shmem  (create_only
+   :  m_shmem  (create_only_t()
                ,name
                ,sizeof(interprocess_mutex) +
                   open_create_impl_t::ManagedOpenOrCreateUserOffset
@@ -198,7 +204,7 @@ inline shm_named_mutex::shm_named_mutex(create_only_t, const wchar_t *name, cons
 {}
 
 inline shm_named_mutex::shm_named_mutex(open_or_create_t, const wchar_t *name, const permissions &perm)
-   :  m_shmem  (open_or_create
+   :  m_shmem  (open_or_create_t()
                ,name
                ,sizeof(interprocess_mutex) +
                   open_create_impl_t::ManagedOpenOrCreateUserOffset
@@ -209,7 +215,7 @@ inline shm_named_mutex::shm_named_mutex(open_or_create_t, const wchar_t *name, c
 {}
 
 inline shm_named_mutex::shm_named_mutex(open_only_t, const wchar_t *name)
-   :  m_shmem  (open_only
+   :  m_shmem  (open_only_t()
                ,name
                ,read_write
                ,0
@@ -227,7 +233,8 @@ inline void shm_named_mutex::unlock()
 inline bool shm_named_mutex::try_lock()
 {  return this->internal_mutex().try_lock();  }
 
-inline bool shm_named_mutex::timed_lock(const boost::posix_time::ptime &abs_time)
+template<class TimePoint>
+inline bool shm_named_mutex::timed_lock(const TimePoint &abs_time)
 {  return this->internal_mutex().timed_lock(abs_time);   }
 
 inline bool shm_named_mutex::remove(const char *name)

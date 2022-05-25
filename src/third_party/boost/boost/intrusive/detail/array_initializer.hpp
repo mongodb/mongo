@@ -24,6 +24,7 @@
 #include <boost/config.hpp>
 #include <boost/core/no_exceptions_support.hpp>
 #include <boost/move/detail/placement_new.hpp>
+#include <boost/move/detail/force_ptr.hpp>
 
 namespace boost {
 namespace intrusive {
@@ -63,7 +64,7 @@ class array_initializer
       BOOST_CATCH(...){
          while(i--){
             init_buf -= sizeof(T);
-            ((T*)init_buf)->~T();
+            move_detail::force_ptr<T*>(init_buf)->~T();
          }
          BOOST_RETHROW;
       }
@@ -81,7 +82,7 @@ class array_initializer
       char *init_buf = (char*)rawbuf + N*sizeof(T);
       for(std::size_t i = 0; i != N; ++i){
          init_buf -= sizeof(T);
-         ((T*)init_buf)->~T();
+         move_detail::force_ptr<T*>(init_buf)->~T();
       }
    }
 

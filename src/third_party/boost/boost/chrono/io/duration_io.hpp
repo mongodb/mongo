@@ -17,7 +17,7 @@
 #include <boost/chrono/io/duration_put.hpp>
 #include <boost/chrono/io/duration_get.hpp>
 #include <boost/chrono/io/utility/manip_base.hpp>
-#include <boost/detail/no_exceptions_support.hpp>
+#include <boost/core/no_exceptions_support.hpp>
 #include <boost/type_traits/is_integral.hpp>
 #include <boost/type_traits/is_floating_point.hpp>
 #include <locale>

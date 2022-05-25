@@ -34,6 +34,10 @@ namespace boost {
       unordered_map<K, T, H, P, A>& m1, unordered_map<K, T, H, P, A>& m2)
       BOOST_NOEXCEPT_IF(BOOST_NOEXCEPT_EXPR(m1.swap(m2)));
 
+    template <class K, class T, class H, class P, class A, class Predicate>
+    typename unordered_map<K, T, H, P, A>::size_type erase_if(
+      unordered_map<K, T, H, P, A>& c, Predicate pred);
+
     template <class K, class T, class H = boost::hash<K>,
       class P = std::equal_to<K>,
       class A = std::allocator<std::pair<const K, T> > >
@@ -49,6 +53,10 @@ namespace boost {
     inline void swap(unordered_multimap<K, T, H, P, A>& m1,
       unordered_multimap<K, T, H, P, A>& m2)
       BOOST_NOEXCEPT_IF(BOOST_NOEXCEPT_EXPR(m1.swap(m2)));
+
+    template <class K, class T, class H, class P, class A, class Predicate>
+    typename unordered_multimap<K, T, H, P, A>::size_type erase_if(
+      unordered_multimap<K, T, H, P, A>& c, Predicate pred);
 
     template <class N, class K, class T, class A> class node_handle_map;
     template <class N, class K, class T, class A> struct insert_return_type_map;

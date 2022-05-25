@@ -37,6 +37,8 @@
 #pragma warning(disable: 4512)
 #endif
 
+#ifndef BOOST_UTILITY_DOCS
+
 #ifdef BOOST_NO_COMPLETE_VALUE_INITIALIZATION
   // Implementation detail: The macro BOOST_DETAIL_VALUE_INIT_WORKAROUND_SUGGESTED 
   // suggests that a workaround should be applied, because of compiler issues 
@@ -53,6 +55,8 @@
   #define BOOST_DETAIL_VALUE_INIT_WORKAROUND 0
   #endif
 #endif
+
+#endif // BOOST_UTILITY_DOCS
 
 namespace boost {
 

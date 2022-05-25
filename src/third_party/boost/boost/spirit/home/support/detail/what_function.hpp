@@ -30,7 +30,7 @@ namespace boost { namespace spirit { namespace detail
         void operator()(Component const& component) const
         {
 #if BOOST_WORKAROUND(BOOST_MSVC, BOOST_TESTED_AT(1600))
-            component; // suppresses warning: C4100: 'component' : unreferenced formal parameter
+            (void)component; // suppresses warning: C4100: 'component' : unreferenced formal parameter
 #endif
             boost::get<std::list<info> >(what.value).
                 push_back(component.what(context));

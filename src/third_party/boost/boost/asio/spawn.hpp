@@ -2,7 +2,7 @@
 // spawn.hpp
 // ~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -31,11 +31,12 @@
 namespace boost {
 namespace asio {
 
-/// Context object the represents the currently executing coroutine.
+/// A @ref completion_token that represents the currently executing coroutine.
 /**
- * The basic_yield_context class is used to represent the currently executing
- * stackful coroutine. A basic_yield_context may be passed as a handler to an
- * asynchronous operation. For example:
+ * The basic_yield_context class is a completion token type that is used to
+ * represent the currently executing stackful coroutine. A basic_yield_context
+ * object may be passed as a completion token to an asynchronous operation. For
+ * example:
  *
  * @code template <typename Handler>
  * void my_coroutine(basic_yield_context<Handler> yield)
@@ -148,7 +149,8 @@ private:
 };
 
 #if defined(GENERATING_DOCUMENTATION)
-/// Context object that represents the currently executing coroutine.
+/// A @ref completion_token object that represents the currently executing
+/// coroutine.
 typedef basic_yield_context<unspecified> yield_context;
 #else // defined(GENERATING_DOCUMENTATION)
 typedef basic_yield_context<

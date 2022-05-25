@@ -2,7 +2,7 @@
 // co_spawn.hpp
 // ~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -55,10 +55,13 @@ struct awaitable_signature<awaitable<void, Executor>>
  * @param a The boost::asio::awaitable object that is the result of calling the
  * coroutine's entry point function.
  *
- * @param token The completion token that will handle the notification that
+ * @param token The @ref completion_token that will handle the notification that
  * the thread of execution has completed. The function signature of the
  * completion handler must be:
  * @code void handler(std::exception_ptr, T); @endcode
+ *
+ * @par Completion Signature
+ * @code void(std::exception_ptr, T) @endcode
  *
  * @par Example
  * @code
@@ -96,6 +99,11 @@ struct awaitable_signature<awaitable<void, Executor>>
  *     std::cout << "transferred " << n << "\n";
  *   });
  * @endcode
+ *
+ * @par Per-Operation Cancellation
+ * The new thread of execution is created with a cancellation state that
+ * supports @c cancellation_type::terminal values only. To change the
+ * cancellation state, call boost::asio::this_coro::reset_cancellation_state.
  */
 template <typename Executor, typename T, typename AwaitableExecutor,
     BOOST_ASIO_COMPLETION_TOKEN_FOR(
@@ -119,10 +127,13 @@ co_spawn(const Executor& ex, awaitable<T, AwaitableExecutor> a,
  * @param a The boost::asio::awaitable object that is the result of calling the
  * coroutine's entry point function.
  *
- * @param token The completion token that will handle the notification that
+ * @param token The @ref completion_token that will handle the notification that
  * the thread of execution has completed. The function signature of the
  * completion handler must be:
  * @code void handler(std::exception_ptr); @endcode
+ *
+ * @par Completion Signature
+ * @code void(std::exception_ptr) @endcode
  *
  * @par Example
  * @code
@@ -152,6 +163,11 @@ co_spawn(const Executor& ex, awaitable<T, AwaitableExecutor> a,
  *   echo(std::move(my_tcp_socket)),
  *   boost::asio::detached);
  * @endcode
+ *
+ * @par Per-Operation Cancellation
+ * The new thread of execution is created with a cancellation state that
+ * supports @c cancellation_type::terminal values only. To change the
+ * cancellation state, call boost::asio::this_coro::reset_cancellation_state.
  */
 template <typename Executor, typename AwaitableExecutor,
     BOOST_ASIO_COMPLETION_TOKEN_FOR(
@@ -175,10 +191,13 @@ co_spawn(const Executor& ex, awaitable<void, AwaitableExecutor> a,
  * @param a The boost::asio::awaitable object that is the result of calling the
  * coroutine's entry point function.
  *
- * @param token The completion token that will handle the notification that
+ * @param token The @ref completion_token that will handle the notification that
  * the thread of execution has completed. The function signature of the
  * completion handler must be:
  * @code void handler(std::exception_ptr); @endcode
+ *
+ * @par Completion Signature
+ * @code void(std::exception_ptr, T) @endcode
  *
  * @par Example
  * @code
@@ -216,6 +235,11 @@ co_spawn(const Executor& ex, awaitable<void, AwaitableExecutor> a,
  *     std::cout << "transferred " << n << "\n";
  *   });
  * @endcode
+ *
+ * @par Per-Operation Cancellation
+ * The new thread of execution is created with a cancellation state that
+ * supports @c cancellation_type::terminal values only. To change the
+ * cancellation state, call boost::asio::this_coro::reset_cancellation_state.
  */
 template <typename ExecutionContext, typename T, typename AwaitableExecutor,
     BOOST_ASIO_COMPLETION_TOKEN_FOR(
@@ -242,10 +266,13 @@ co_spawn(ExecutionContext& ctx, awaitable<T, AwaitableExecutor> a,
  * @param a The boost::asio::awaitable object that is the result of calling the
  * coroutine's entry point function.
  *
- * @param token The completion token that will handle the notification that
+ * @param token The @ref completion_token that will handle the notification that
  * the thread of execution has completed. The function signature of the
  * completion handler must be:
  * @code void handler(std::exception_ptr); @endcode
+ *
+ * @par Completion Signature
+ * @code void(std::exception_ptr) @endcode
  *
  * @par Example
  * @code
@@ -275,6 +302,11 @@ co_spawn(ExecutionContext& ctx, awaitable<T, AwaitableExecutor> a,
  *   echo(std::move(my_tcp_socket)),
  *   boost::asio::detached);
  * @endcode
+ *
+ * @par Per-Operation Cancellation
+ * The new thread of execution is created with a cancellation state that
+ * supports @c cancellation_type::terminal values only. To change the
+ * cancellation state, call boost::asio::this_coro::reset_cancellation_state.
  */
 template <typename ExecutionContext, typename AwaitableExecutor,
     BOOST_ASIO_COMPLETION_TOKEN_FOR(
@@ -302,14 +334,19 @@ co_spawn(ExecutionContext& ctx, awaitable<void, AwaitableExecutor> a,
  * @c boost::asio::awaitable<R,E> that will be used as the coroutine's entry
  * point.
  *
- * @param token The completion token that will handle the notification that the
- * thread of execution has completed. If @c R is @c void, the function
+ * @param token The @ref completion_token that will handle the notification
+ * that the thread of execution has completed. If @c R is @c void, the function
  * signature of the completion handler must be:
  *
  * @code void handler(std::exception_ptr); @endcode
  * Otherwise, the function signature of the completion handler must be:
  * @code void handler(std::exception_ptr, R); @endcode
  *
+ * @par Completion Signature
+ * @code void(std::exception_ptr, R) @endcode
+ * where @c R is the first template argument to the @c awaitable returned by the
+ * supplied function object @c F:
+ * @code boost::asio::awaitable<R, AwaitableExecutor> F() @endcode
  *
  * @par Example
  * @code
@@ -362,6 +399,11 @@ co_spawn(ExecutionContext& ctx, awaitable<void, AwaitableExecutor> a,
  *     }
  *   }, boost::asio::detached);
  * @endcode
+ *
+ * @par Per-Operation Cancellation
+ * The new thread of execution is created with a cancellation state that
+ * supports @c cancellation_type::terminal values only. To change the
+ * cancellation state, call boost::asio::this_coro::reset_cancellation_state.
  */
 template <typename Executor, typename F,
     BOOST_ASIO_COMPLETION_TOKEN_FOR(typename detail::awaitable_signature<
@@ -385,14 +427,19 @@ co_spawn(const Executor& ex, F&& f,
  * @c boost::asio::awaitable<R,E> that will be used as the coroutine's entry
  * point.
  *
- * @param token The completion token that will handle the notification that the
- * thread of execution has completed. If @c R is @c void, the function
+ * @param token The @ref completion_token that will handle the notification
+ * that the thread of execution has completed. If @c R is @c void, the function
  * signature of the completion handler must be:
  *
  * @code void handler(std::exception_ptr); @endcode
  * Otherwise, the function signature of the completion handler must be:
  * @code void handler(std::exception_ptr, R); @endcode
  *
+ * @par Completion Signature
+ * @code void(std::exception_ptr, R) @endcode
+ * where @c R is the first template argument to the @c awaitable returned by the
+ * supplied function object @c F:
+ * @code boost::asio::awaitable<R, AwaitableExecutor> F() @endcode
  *
  * @par Example
  * @code
@@ -445,6 +492,11 @@ co_spawn(const Executor& ex, F&& f,
  *     }
  *   }, boost::asio::detached);
  * @endcode
+ *
+ * @par Per-Operation Cancellation
+ * The new thread of execution is created with a cancellation state that
+ * supports @c cancellation_type::terminal values only. To change the
+ * cancellation state, call boost::asio::this_coro::reset_cancellation_state.
  */
 template <typename ExecutionContext, typename F,
     BOOST_ASIO_COMPLETION_TOKEN_FOR(typename detail::awaitable_signature<

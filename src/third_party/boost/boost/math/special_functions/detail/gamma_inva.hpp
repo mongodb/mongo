@@ -17,8 +17,8 @@
 #pragma once
 #endif
 
+#include <cstdint>
 #include <boost/math/tools/toms748_solve.hpp>
-#include <boost/cstdint.hpp>
 
 namespace boost{ namespace math{ namespace detail{
 
@@ -135,7 +135,7 @@ T gamma_inva_imp(const T& z, const T& p, const T& q, const Policy& pol)
    //
    // Max iterations permitted:
    //
-   boost::uintmax_t max_iter = policies::get_max_root_iterations<Policy>();
+   std::uintmax_t max_iter = policies::get_max_root_iterations<Policy>();
    //
    // Use our generic derivative-free root finding procedure.
    // We could use Newton steps here, taking the PDF of the

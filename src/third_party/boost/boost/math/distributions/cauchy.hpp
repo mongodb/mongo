@@ -17,9 +17,8 @@
 #include <boost/math/constants/constants.hpp>
 #include <boost/math/distributions/complement.hpp>
 #include <boost/math/distributions/detail/common_error_handling.hpp>
-#include <boost/config/no_tr1/cmath.hpp>
-
 #include <utility>
+#include <cmath>
 
 namespace boost{ namespace math
 {
@@ -177,6 +176,13 @@ private:
 
 typedef cauchy_distribution<double> cauchy;
 
+#ifdef __cpp_deduction_guides
+template <class RealType>
+cauchy_distribution(RealType)->cauchy_distribution<typename boost::math::tools::promote_args<RealType>::type>;
+template <class RealType>
+cauchy_distribution(RealType,RealType)->cauchy_distribution<typename boost::math::tools::promote_args<RealType>::type>;
+#endif
+
 template <class RealType, class Policy>
 inline const std::pair<RealType, RealType> range(const cauchy_distribution<RealType, Policy>&)
 { // Range of permissible values for random variable x.
@@ -271,7 +277,7 @@ template <class RealType, class Policy>
 inline RealType mean(const cauchy_distribution<RealType, Policy>&)
 {  // There is no mean:
    typedef typename Policy::assert_undefined_type assert_type;
-   BOOST_STATIC_ASSERT(assert_type::value == 0);
+   static_assert(assert_type::value == 0, "assert type is undefined");
 
    return policies::raise_domain_error<RealType>(
       "boost::math::mean(cauchy<%1%>&)",
@@ -285,7 +291,7 @@ inline RealType variance(const cauchy_distribution<RealType, Policy>& /*dist*/)
 {
    // There is no variance:
    typedef typename Policy::assert_undefined_type assert_type;
-   BOOST_STATIC_ASSERT(assert_type::value == 0);
+   static_assert(assert_type::value == 0, "assert type is undefined");
 
    return policies::raise_domain_error<RealType>(
       "boost::math::variance(cauchy<%1%>&)",
@@ -310,7 +316,7 @@ inline RealType skewness(const cauchy_distribution<RealType, Policy>& /*dist*/)
 {
    // There is no skewness:
    typedef typename Policy::assert_undefined_type assert_type;
-   BOOST_STATIC_ASSERT(assert_type::value == 0);
+   static_assert(assert_type::value == 0, "assert type is undefined");
 
    return policies::raise_domain_error<RealType>(
       "boost::math::skewness(cauchy<%1%>&)",
@@ -324,7 +330,7 @@ inline RealType kurtosis(const cauchy_distribution<RealType, Policy>& /*dist*/)
 {
    // There is no kurtosis:
    typedef typename Policy::assert_undefined_type assert_type;
-   BOOST_STATIC_ASSERT(assert_type::value == 0);
+   static_assert(assert_type::value == 0, "assert type is undefined");
 
    return policies::raise_domain_error<RealType>(
       "boost::math::kurtosis(cauchy<%1%>&)",
@@ -338,7 +344,7 @@ inline RealType kurtosis_excess(const cauchy_distribution<RealType, Policy>& /*d
 {
    // There is no kurtosis excess:
    typedef typename Policy::assert_undefined_type assert_type;
-   BOOST_STATIC_ASSERT(assert_type::value == 0);
+   static_assert(assert_type::value == 0, "assert type is undefined");
 
    return policies::raise_domain_error<RealType>(
       "boost::math::kurtosis_excess(cauchy<%1%>&)",

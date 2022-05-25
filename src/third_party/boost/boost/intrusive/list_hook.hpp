@@ -96,7 +96,7 @@ class list_base_hook
    //!   initializes the node to an unlinked state.
    //!
    //! <b>Throws</b>: Nothing.
-   list_base_hook();
+   list_base_hook() BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: If link_mode is \c auto_unlink or \c safe_link
    //!   initializes the node to an unlinked state. The argument is ignored.
@@ -107,7 +107,7 @@ class list_base_hook
    //!   makes classes using the hook STL-compliant without forcing the
    //!   user to do some additional work. \c swap can be used to emulate
    //!   move-semantics.
-   list_base_hook(const list_base_hook& );
+   list_base_hook(const list_base_hook& ) BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: Empty function. The argument is ignored.
    //!
@@ -117,7 +117,7 @@ class list_base_hook
    //!   makes classes using the hook STL-compliant without forcing the
    //!   user to do some additional work. \c swap can be used to emulate
    //!   move-semantics.
-   list_base_hook& operator=(const list_base_hook& );
+   list_base_hook& operator=(const list_base_hook& ) BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: If link_mode is \c normal_link, the destructor does
    //!   nothing (ie. no code is generated). If link_mode is \c safe_link and the
@@ -139,7 +139,7 @@ class list_base_hook
    //! <b>Complexity</b>: Constant
    //!
    //! <b>Throws</b>: Nothing.
-   void swap_nodes(list_base_hook &other);
+   void swap_nodes(list_base_hook &other) BOOST_NOEXCEPT;
 
    //! <b>Precondition</b>: link_mode must be \c safe_link or \c auto_unlink.
    //!
@@ -154,7 +154,7 @@ class list_base_hook
    //!   This function is only allowed if link_mode is \c auto_unlink.
    //!
    //! <b>Throws</b>: Nothing.
-   void unlink();
+   void unlink() BOOST_NOEXCEPT;
    #endif
 };
 
@@ -219,7 +219,7 @@ class list_member_hook
    //!   initializes the node to an unlinked state.
    //!
    //! <b>Throws</b>: Nothing.
-   list_member_hook();
+   list_member_hook() BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: If link_mode is \c auto_unlink or \c safe_link
    //!   initializes the node to an unlinked state. The argument is ignored.
@@ -230,7 +230,7 @@ class list_member_hook
    //!   makes classes using the hook STL-compliant without forcing the
    //!   user to do some additional work. \c swap can be used to emulate
    //!   move-semantics.
-   list_member_hook(const list_member_hook& );
+   list_member_hook(const list_member_hook& ) BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: Empty function. The argument is ignored.
    //!
@@ -240,7 +240,7 @@ class list_member_hook
    //!   makes classes using the hook STL-compliant without forcing the
    //!   user to do some additional work. \c swap can be used to emulate
    //!   move-semantics.
-   list_member_hook& operator=(const list_member_hook& );
+   list_member_hook& operator=(const list_member_hook& ) BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: If link_mode is \c normal_link, the destructor does
    //!   nothing (ie. no code is generated). If link_mode is \c safe_link and the
@@ -262,7 +262,7 @@ class list_member_hook
    //! <b>Complexity</b>: Constant
    //!
    //! <b>Throws</b>: Nothing.
-   void swap_nodes(list_member_hook &other);
+   void swap_nodes(list_member_hook &other) BOOST_NOEXCEPT;
 
    //! <b>Precondition</b>: link_mode must be \c safe_link or \c auto_unlink.
    //!
@@ -277,7 +277,7 @@ class list_member_hook
    //!   This function is only allowed if link_mode is \c auto_unlink.
    //!
    //! <b>Throws</b>: Nothing.
-   void unlink();
+   void unlink() BOOST_NOEXCEPT;
    #endif
 };
 

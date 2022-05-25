@@ -47,7 +47,7 @@ struct default_header_holder : public NodeTraits::node
    { return pointer_traits< node_ptr >::pointer_to(*static_cast< node* >(this)); }
 
    // (unsafe) downcast used to implement container-from-iterator
-   BOOST_INTRUSIVE_FORCEINLINE static default_header_holder* get_holder(const node_ptr &p)
+   BOOST_INTRUSIVE_FORCEINLINE static default_header_holder* get_holder(node_ptr p)
    { return static_cast< default_header_holder* >(boost::movelib::to_raw_pointer(p)); }
 };
 

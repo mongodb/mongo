@@ -151,7 +151,7 @@ class new_allocator
    {}
 
    //!Allocates memory for an array of count elements.
-   //!Throws std::bad_alloc if there is no enough memory
+   //!Throws bad_alloc if there is no enough memory
    pointer allocate(size_type count)
    {
       const std::size_t max_count = std::size_t(-1)/(2*sizeof(T));

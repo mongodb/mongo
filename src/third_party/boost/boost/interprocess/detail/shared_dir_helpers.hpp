@@ -161,18 +161,32 @@ inline void get_shared_dir_root(std::basic_string<CharT> &dir_path)
 
 #else
 
+#if defined(BOOST_INTERPROCESS_SHARED_DIR_PATH)
+
+inline void get_shared_dir(std::string &shared_dir)
+{
+   shared_dir = BOOST_INTERPROCESS_SHARED_DIR_PATH;
+}
+
+#endif
+
+#if defined(BOOST_INTERPROCESS_SHARED_DIR_WPATH)
+
+inline void get_shared_dir(std::wstring &shared_dir)
+{
+   shared_dir = BOOST_INTERPROCESS_SHARED_DIR_WPATH;
+}
+
+#endif
+
 template<class CharT>
 inline void get_shared_dir(std::basic_string<CharT> &shared_dir)
 {
-   #if defined(BOOST_INTERPROCESS_SHARED_DIR_PATH)
-      shared_dir = BOOST_INTERPROCESS_SHARED_DIR_PATH;
-   #else 
       get_shared_dir_root(shared_dir);
       #if defined(BOOST_INTERPROCESS_HAS_KERNEL_BOOTTIME)
          shared_dir += shared_dir_constants<CharT>::dir_separator();
          get_bootstamp(shared_dir, true);
       #endif
-   #endif
 }
 #endif
 
@@ -195,22 +209,18 @@ inline void create_shared_dir_and_clean_old(std::basic_string<CharT> &shared_dir
       get_shared_dir_root(root_shared_dir);
 
       //If fails, check that it's because already exists
-      if(!create_directory(root_shared_dir.c_str())){
+      if(!open_or_create_shared_directory(root_shared_dir.c_str())){
          error_info info(system_error_code());
-         if(info.get_error_code() != already_exists_error){
-            throw interprocess_exception(info);
-         }
+         throw interprocess_exception(info);
       }
 
       #if defined(BOOST_INTERPROCESS_HAS_KERNEL_BOOTTIME)
          get_shared_dir(shared_dir);
 
          //If fails, check that it's because already exists
-         if(!create_directory(shared_dir.c_str())){
+         if(!open_or_create_shared_directory(shared_dir.c_str())){
             error_info info(system_error_code());
-            if(info.get_error_code() != already_exists_error){
-               throw interprocess_exception(info);
-            }
+            throw interprocess_exception(info);
          }
          //Now erase all old directories created in the previous boot sessions
          std::basic_string<CharT> subdir = shared_dir;

@@ -182,7 +182,7 @@ inline T digamma_imp_large(T x, const Policy& pol, const std::integral_constant<
    BOOST_MATH_STD_USING
    digamma_series_func<T> s(x);
    T result = log(x) - 1 / (2 * x);
-   boost::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
+   std::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
    result = boost::math::tools::sum_series(s, boost::math::policies::get_epsilon<T, Policy>(), max_iter, -result);
    result = -result;
    policies::check_series_iterations<T>("boost::math::digamma<%1%>(%1%)", max_iter, pol);

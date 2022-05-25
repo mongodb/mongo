@@ -121,8 +121,8 @@ static const unsigned long MaxPath           = 260;
 
 struct interprocess_semaphore_basic_information
 {
-   unsigned int count;      // current semaphore count
-   unsigned int limit;      // max semaphore count
+   unsigned long count;      // current semaphore count
+   unsigned long limit;      // max semaphore count
 };
 
 struct interprocess_section_basic_information
@@ -676,7 +676,11 @@ inline void * local_free(void *hmem)
 {  return LocalFree(hmem); }
 
 inline unsigned long make_lang_id(unsigned long p, unsigned long s)
-{  return ((((unsigned short)(s)) << 10) | (unsigned short)(p));   }
+{  
+   const unsigned short s_us = (unsigned short)s;
+   const unsigned short p_us = (unsigned short)p;
+   return (unsigned long)((s_us << 10) | p_us);
+}
 
 inline void sched_yield()
 {
@@ -703,8 +707,8 @@ inline bool get_process_times
 inline unsigned long get_current_process_id()
 {  return GetCurrentProcessId();  }
 
-inline unsigned int close_handle(void* handle)
-{  return CloseHandle(handle);   }
+inline bool close_handle(void* handle)
+{  return CloseHandle(handle) != 0;   }
 
 inline void * find_first_file(const char *lpFileName, win32_find_data_a *lpFindFileData)
 {  return FindFirstFileA(lpFileName, lpFindFileData);   }
@@ -799,13 +803,15 @@ class interprocess_all_access_security
 
 inline void * create_file_mapping (void * handle, unsigned long access, ::boost::ulong_long_type file_offset, const char * name, interprocess_security_attributes *psec)
 {
-   const boost::winapi::DWORD_ high_size(file_offset >> 32), low_size((boost::winapi::DWORD_)file_offset);
+   const boost::winapi::DWORD_ high_size = boost::winapi::DWORD_(file_offset >> 32);
+   const boost::winapi::DWORD_ low_size  = boost::winapi::DWORD_(file_offset);
    return CreateFileMappingA (handle, psec, access, high_size, low_size, name);
 }
 
 inline void * create_file_mapping (void * handle, unsigned long access, ::boost::ulong_long_type file_offset, const wchar_t * name, interprocess_security_attributes *psec)
 {
-   const boost::winapi::DWORD_ high_size(file_offset >> 32), low_size((boost::winapi::DWORD_)file_offset);
+   const boost::winapi::DWORD_ high_size = boost::winapi::DWORD_(file_offset >> 32);
+   const boost::winapi::DWORD_ low_size  = boost::winapi::DWORD_(file_offset);
    return CreateFileMappingW (handle, psec, access, high_size, low_size, name);
 }
 
@@ -817,8 +823,8 @@ inline void * open_file_mapping (unsigned long access, const wchar_t *name)
 
 inline void *map_view_of_file_ex(void *handle, unsigned long file_access, ::boost::ulong_long_type offset, std::size_t numbytes, void *base_addr)
 {
-   const unsigned long offset_low  = (unsigned long)(offset & ((::boost::ulong_long_type)0xFFFFFFFF));
-   const unsigned long offset_high = offset >> 32;
+   const boost::winapi::DWORD_ offset_low  = boost::winapi::DWORD_(offset & ((::boost::ulong_long_type)0xFFFFFFFF));
+   const boost::winapi::DWORD_ offset_high = boost::winapi::DWORD_(offset >> 32);
    return MapViewOfFileEx(handle, file_access, offset_high, offset_low, numbytes, base_addr);
 }
 
@@ -879,11 +885,11 @@ inline int set_end_of_file(void *handle)
 
 inline bool set_file_pointer(void *handle, __int64 distance, __int64 *new_file_pointer, unsigned long move_method)
 {
-   long highPart = distance >> 32u;
-   boost::winapi::DWORD_ r = boost::winapi::SetFilePointer(handle, (unsigned long)distance, &highPart, move_method);
+   boost::winapi::LONG_ highPart = boost::winapi::LONG_(distance >> 32u);
+   boost::winapi::DWORD_ r = boost::winapi::SetFilePointer(handle, (long)distance, &highPart, move_method);
    bool br = r != boost::winapi::INVALID_SET_FILE_POINTER_ || boost::winapi::GetLastError() != 0;
    if (br && new_file_pointer){
-      *new_file_pointer = (unsigned __int64)r + ((__int64)highPart << 32);
+      *new_file_pointer = (__int64)r + ((__int64)highPart << 32);
    }
 
    return br;
@@ -1237,8 +1243,8 @@ class nt_query_mem_deleter
       (SystemTimeOfDayInfoLength + sizeof(unsigned long) + sizeof(boost::winapi::DWORD_))*2;
 
    public:
-   explicit nt_query_mem_deleter(std::size_t object_name_information_size)
-      : m_size(object_name_information_size + rename_offset + rename_suffix)
+   explicit nt_query_mem_deleter(std::size_t object_name_info_size)
+      : m_size(object_name_info_size + rename_offset + rename_suffix)
       , m_buf(new char [m_size])
    {}
 
@@ -1318,7 +1324,7 @@ inline bool unlink_file(const CharT *filename)
    //- Close the handle. If there are no file users, it will be deleted.
    //  Otherwise it will be used by already connected handles but the
    //  file name can't be used to open this file again
-   try{
+   BOOST_TRY{
       NtSetInformationFile_t pNtSetInformationFile =
          reinterpret_cast<NtSetInformationFile_t>(dll_func::get(dll_func::NtSetInformationFile));
 
@@ -1348,7 +1354,7 @@ inline bool unlink_file(const CharT *filename)
          ntquery_mem_t *pmem = nt_query_mem.query_mem();
          file_rename_information_t *pfri = &pmem->ren.info;
          const std::size_t RenMaxNumChars =
-            (((char*)(pmem) + nt_query_mem.file_rename_information_size()) - (char*)&pmem->ren.info.FileName[0])/sizeof(wchar_t);
+            std::size_t(((char*)(pmem) + nt_query_mem.file_rename_information_size()) - (char*)&pmem->ren.info.FileName[0])/sizeof(wchar_t);
 
          //Copy filename to the rename member
          std::memmove(pmem->ren.info.FileName, pmem->name.Name.Buffer, pmem->name.Name.Length);
@@ -1412,9 +1418,9 @@ inline bool unlink_file(const CharT *filename)
          return true;
       }
    }
-   catch(...){
+   BOOST_CATCH(...){
       return false;
-   }
+   } BOOST_CATCH_END
    return true;
 }
 
@@ -1540,7 +1546,7 @@ inline bool get_file_mapping_size(void *file_mapping_hnd, __int64 &size)
       reinterpret_cast<NtQuerySection_t>(dll_func::get(dll_func::NtQuerySection));
    //Obtain file name
    interprocess_section_basic_information info;
-   unsigned long ntstatus =
+   long ntstatus =
       pNtQuerySection(file_mapping_hnd, section_basic_information, &info, sizeof(info), 0);
    size = info.section_size;
    return !ntstatus;
@@ -1553,8 +1559,8 @@ inline bool get_semaphore_info(void *handle, long &count, long &limit)
          reinterpret_cast<winapi::NtQuerySemaphore_t>(dll_func::get(winapi::dll_func::NtQuerySemaphore));
    unsigned int ret_len;
    long status = pNtQuerySemaphore(handle, winapi::semaphore_basic_information, &info, sizeof(info), &ret_len);
-   count = info.count;
-   limit = info.limit;
+   count = (long)info.count;
+   limit = (long)info.limit;
    return !status;
 }
 
@@ -1717,10 +1723,10 @@ inline bool find_record_in_buffer( const void* pBuffer, unsigned long dwBytesRea
    const unsigned char * pEndOfRecords = pRecord + dwBytesRead;
 
    while (pRecord < pEndOfRecords){
-      interprocess_eventlogrecord *pTypedRecord = (interprocess_eventlogrecord*)pRecord;
+      interprocess_eventlogrecord *pTypedRecord = (interprocess_eventlogrecord*)(void*)pRecord;
       // Check provider, written at the end of the fixed-part of the record
 
-      if (0 == winapi_traits<CharT>::cmp(provider_name, (CharT*)(pRecord + sizeof(interprocess_eventlogrecord))))
+      if (0 == winapi_traits<CharT>::cmp(provider_name, (CharT*)(void*)(pRecord + sizeof(interprocess_eventlogrecord))))
       {
          // Check event id
          if(id_to_find == (pTypedRecord->EventID & 0xFFFF)){

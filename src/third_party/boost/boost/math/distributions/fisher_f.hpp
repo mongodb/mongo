@@ -54,6 +54,11 @@ private:
 
 typedef fisher_f_distribution<double> fisher_f;
 
+#ifdef __cpp_deduction_guides
+template <class RealType>
+fisher_f_distribution(RealType,RealType)->fisher_f_distribution<typename boost::math::tools::promote_args<RealType>::type>;
+#endif
+
 template <class RealType, class Policy>
 inline const std::pair<RealType, RealType> range(const fisher_f_distribution<RealType, Policy>& /*dist*/)
 { // Range of permissible values for random variable x.

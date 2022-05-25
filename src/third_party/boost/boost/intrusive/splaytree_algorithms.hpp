@@ -54,7 +54,7 @@ struct splaydown_assemble_and_fix_header
 {
    typedef typename NodeTraits::node_ptr node_ptr;
 
-   splaydown_assemble_and_fix_header(node_ptr t, node_ptr header, node_ptr leftmost, node_ptr rightmost)
+   splaydown_assemble_and_fix_header(node_ptr t, node_ptr header, node_ptr leftmost, node_ptr rightmost) BOOST_NOEXCEPT
       : t_(t)
       , null_node_(header)
       , l_(null_node_)
@@ -79,7 +79,7 @@ struct splaydown_assemble_and_fix_header
 
    private:
 
-   void assemble()
+   void assemble() BOOST_NOEXCEPT
    {
       //procedure assemble;
       //    left(r), right(l) := right(t), left(t);
@@ -175,59 +175,59 @@ class splaytree_algorithms
 
    public:
    #ifdef BOOST_INTRUSIVE_DOXYGEN_INVOKED
-   //! @copydoc ::boost::intrusive::bstree_algorithms::get_header(const const_node_ptr&)
-   static node_ptr get_header(const const_node_ptr & n);
+   //! @copydoc ::boost::intrusive::bstree_algorithms::get_header(const_node_ptr)
+   static node_ptr get_header(const_node_ptr n) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::begin_node
-   static node_ptr begin_node(const const_node_ptr & header);
+   static node_ptr begin_node(const_node_ptr header) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::end_node
-   static node_ptr end_node(const const_node_ptr & header);
+   static node_ptr end_node(const_node_ptr header) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::swap_tree
-   static void swap_tree(const node_ptr & header1, const node_ptr & header2);
+   static void swap_tree(node_ptr header1, node_ptr header2);
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::swap_nodes(node_ptr,node_ptr)
-   static void swap_nodes(node_ptr node1, node_ptr node2);
+   static void swap_nodes(node_ptr node1, node_ptr node2) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::swap_nodes(node_ptr,node_ptr,node_ptr,node_ptr)
-   static void swap_nodes(node_ptr node1, node_ptr header1, node_ptr node2, node_ptr header2);
+   static void swap_nodes(node_ptr node1, node_ptr header1, node_ptr node2, node_ptr header2) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::replace_node(node_ptr,node_ptr)
-   static void replace_node(node_ptr node_to_be_replaced, node_ptr new_node);
+   static void replace_node(node_ptr node_to_be_replaced, node_ptr new_node) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::replace_node(node_ptr,node_ptr,node_ptr)
-   static void replace_node(node_ptr node_to_be_replaced, node_ptr header, node_ptr new_node);
+   static void replace_node(node_ptr node_to_be_replaced, node_ptr header, node_ptr new_node) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::unlink(node_ptr)
-   static void unlink(node_ptr node);
+   static void unlink(node_ptr node) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::unlink_leftmost_without_rebalance
-   static node_ptr unlink_leftmost_without_rebalance(node_ptr header);
+   static node_ptr unlink_leftmost_without_rebalance(node_ptr header) BOOST_NOEXCEPT;
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::unique(const const_node_ptr&)
-   static bool unique(const_node_ptr node);
+   //! @copydoc ::boost::intrusive::bstree_algorithms::unique(const_node_ptr)
+   static bool unique(const_node_ptr node) BOOST_NOEXCEPT;
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::size(const const_node_ptr&)
-   static std::size_t size(const_node_ptr header);
+   //! @copydoc ::boost::intrusive::bstree_algorithms::size(const_node_ptr)
+   static std::size_t size(const_node_ptr header) BOOST_NOEXCEPT;
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::next_node(const node_ptr&)
-   static node_ptr next_node(node_ptr node);
+   //! @copydoc ::boost::intrusive::bstree_algorithms::next_node(node_ptr)
+   static node_ptr next_node(node_ptr node) BOOST_NOEXCEPT;
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::prev_node(const node_ptr&)
-   static node_ptr prev_node(node_ptr node);
+   //! @copydoc ::boost::intrusive::bstree_algorithms::prev_node(node_ptr)
+   static node_ptr prev_node(node_ptr node) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::init(node_ptr)
-   static void init(node_ptr node);
+   static void init(node_ptr node) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::init_header(node_ptr)
-   static void init_header(node_ptr header);
+   static void init_header(node_ptr header) BOOST_NOEXCEPT;
 
    #endif   //#ifdef BOOST_INTRUSIVE_DOXYGEN_INVOKED
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::erase(node_ptr,node_ptr)
    //! Additional notes: the previous node of z is splayed to speed up range deletions.
-   static void erase(node_ptr header, node_ptr z)
+   static void erase(node_ptr header, node_ptr z) BOOST_NOEXCEPT
    {
       //posibility 1
       if(NodeTraits::get_left(z)){
@@ -279,17 +279,17 @@ class splaytree_algorithms
    }
 
    #ifdef BOOST_INTRUSIVE_DOXYGEN_INVOKED
-   //! @copydoc ::boost::intrusive::bstree_algorithms::clone(const const_node_ptr&,node_ptr,Cloner,Disposer)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::clone(const_node_ptr,node_ptr,Cloner,Disposer)
    template <class Cloner, class Disposer>
    static void clone
       (const_node_ptr source_header, node_ptr target_header, Cloner cloner, Disposer disposer);
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::clear_and_dispose(const node_ptr&,Disposer)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::clear_and_dispose(node_ptr,Disposer)
    template<class Disposer>
-   static void clear_and_dispose(node_ptr header, Disposer disposer);
+   static void clear_and_dispose(node_ptr header, Disposer disposer) BOOST_NOEXCEPT;
 
    #endif   //#ifdef BOOST_INTRUSIVE_DOXYGEN_INVOKED
-   //! @copydoc ::boost::intrusive::bstree_algorithms::count(const const_node_ptr&,const KeyType&,KeyNodePtrCompare)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::count(const_node_ptr,const KeyType&,KeyNodePtrCompare)
    //! Additional notes: an element with key `key` is splayed.
    template<class KeyType, class KeyNodePtrCompare>
    static std::size_t count
@@ -304,14 +304,14 @@ class splaytree_algorithms
       return n;
    }
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::count(const const_node_ptr&,const KeyType&,KeyNodePtrCompare)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::count(const_node_ptr,const KeyType&,KeyNodePtrCompare)
    //! Additional note: no splaying is performed
    template<class KeyType, class KeyNodePtrCompare>
    static std::size_t count
       (const_node_ptr header, const KeyType &key, KeyNodePtrCompare comp)
    {  return bstree_algo::count(header, key, comp);  }
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::lower_bound(const const_node_ptr&,const KeyType&,KeyNodePtrCompare)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::lower_bound(const_node_ptr,const KeyType&,KeyNodePtrCompare)
    //! Additional notes: the first node of the range is splayed.
    template<class KeyType, class KeyNodePtrCompare>
    static node_ptr lower_bound
@@ -323,14 +323,14 @@ class splaytree_algorithms
       return y;
    }
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::lower_bound(const const_node_ptr&,const KeyType&,KeyNodePtrCompare)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::lower_bound(const_node_ptr,const KeyType&,KeyNodePtrCompare)
    //! Additional note: no splaying is performed
    template<class KeyType, class KeyNodePtrCompare>
    static node_ptr lower_bound
       (const_node_ptr header, const KeyType &key, KeyNodePtrCompare comp)
    {  return bstree_algo::lower_bound(header, key, comp);  }
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::upper_bound(const const_node_ptr&,const KeyType&,KeyNodePtrCompare)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::upper_bound(const_node_ptr,const KeyType&,KeyNodePtrCompare)
    //! Additional notes: the first node of the range is splayed.
    template<class KeyType, class KeyNodePtrCompare>
    static node_ptr upper_bound
@@ -342,14 +342,14 @@ class splaytree_algorithms
       return y;
    }
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::upper_bound(const const_node_ptr&,const KeyType&,KeyNodePtrCompare)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::upper_bound(const_node_ptr,const KeyType&,KeyNodePtrCompare)
    //! Additional note: no splaying is performed
    template<class KeyType, class KeyNodePtrCompare>
    static node_ptr upper_bound
       (const_node_ptr header, const KeyType &key, KeyNodePtrCompare comp)
    {  return bstree_algo::upper_bound(header, key, comp);  }
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::find(const const_node_ptr&, const KeyType&,KeyNodePtrCompare)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::find(const_node_ptr, const KeyType&,KeyNodePtrCompare)
    //! Additional notes: the found node of the lower bound is splayed.
    template<class KeyType, class KeyNodePtrCompare>
    static node_ptr find
@@ -359,14 +359,14 @@ class splaytree_algorithms
       return bstree_algo::find(header, key, comp);
    }
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::find(const const_node_ptr&, const KeyType&,KeyNodePtrCompare)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::find(const_node_ptr, const KeyType&,KeyNodePtrCompare)
    //! Additional note: no splaying is performed
    template<class KeyType, class KeyNodePtrCompare>
    static node_ptr find
       (const_node_ptr header, const KeyType &key, KeyNodePtrCompare comp)
    {  return bstree_algo::find(header, key, comp);  }
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::equal_range(const const_node_ptr&,const KeyType&,KeyNodePtrCompare)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::equal_range(const_node_ptr,const KeyType&,KeyNodePtrCompare)
    //! Additional notes: the first node of the range is splayed.
    template<class KeyType, class KeyNodePtrCompare>
    static std::pair<node_ptr, node_ptr> equal_range
@@ -378,14 +378,14 @@ class splaytree_algorithms
       return ret;
    }
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::equal_range(const const_node_ptr&,const KeyType&,KeyNodePtrCompare)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::equal_range(const_node_ptr,const KeyType&,KeyNodePtrCompare)
    //! Additional note: no splaying is performed
    template<class KeyType, class KeyNodePtrCompare>
    static std::pair<node_ptr, node_ptr> equal_range
       (const_node_ptr header, const KeyType &key, KeyNodePtrCompare comp)
    {  return bstree_algo::equal_range(header, key, comp);  }
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::lower_bound_range(const const_node_ptr&,const KeyType&,KeyNodePtrCompare)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::lower_bound_range(const_node_ptr,const KeyType&,KeyNodePtrCompare)
    //! Additional notes: the first node of the range is splayed.
    template<class KeyType, class KeyNodePtrCompare>
    static std::pair<node_ptr, node_ptr> lower_bound_range
@@ -397,14 +397,14 @@ class splaytree_algorithms
       return ret;
    }
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::lower_bound_range(const const_node_ptr&,const KeyType&,KeyNodePtrCompare)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::lower_bound_range(const_node_ptr,const KeyType&,KeyNodePtrCompare)
    //! Additional note: no splaying is performed
    template<class KeyType, class KeyNodePtrCompare>
    static std::pair<node_ptr, node_ptr> lower_bound_range
       (const_node_ptr header, const KeyType &key, KeyNodePtrCompare comp)
    {  return bstree_algo::lower_bound_range(header, key, comp);  }
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::bounded_range(const const_node_ptr&,const KeyType&,const KeyType&,KeyNodePtrCompare,bool,bool)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::bounded_range(const_node_ptr,const KeyType&,const KeyType&,KeyNodePtrCompare,bool,bool)
    //! Additional notes: the first node of the range is splayed.
    template<class KeyType, class KeyNodePtrCompare>
    static std::pair<node_ptr, node_ptr> bounded_range
@@ -418,7 +418,7 @@ class splaytree_algorithms
       return ret;
    }
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::bounded_range(const const_node_ptr&,const KeyType&,const KeyType&,KeyNodePtrCompare,bool,bool)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::bounded_range(const_node_ptr,const KeyType&,const KeyType&,KeyNodePtrCompare,bool,bool)
    //! Additional note: no splaying is performed
    template<class KeyType, class KeyNodePtrCompare>
    static std::pair<node_ptr, node_ptr> bounded_range
@@ -459,7 +459,7 @@ class splaytree_algorithms
    //! @copydoc ::boost::intrusive::bstree_algorithms::insert_before(node_ptr,node_ptr,node_ptr)
    //! Additional note: the inserted node is splayed
    static node_ptr insert_before
-      (node_ptr header, node_ptr pos, node_ptr new_node)
+      (node_ptr header, node_ptr pos, node_ptr new_node) BOOST_NOEXCEPT
    {
       bstree_algo::insert_before(header, pos, new_node);
       splay_up(new_node, header);
@@ -468,7 +468,7 @@ class splaytree_algorithms
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::push_back(node_ptr,node_ptr)
    //! Additional note: the inserted node is splayed
-   static void push_back(node_ptr header, node_ptr new_node)
+   static void push_back(node_ptr header, node_ptr new_node) BOOST_NOEXCEPT
    {
       bstree_algo::push_back(header, new_node);
       splay_up(new_node, header);
@@ -476,13 +476,13 @@ class splaytree_algorithms
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::push_front(node_ptr,node_ptr)
    //! Additional note: the inserted node is splayed
-   static void push_front(node_ptr header, node_ptr new_node)
+   static void push_front(node_ptr header, node_ptr new_node) BOOST_NOEXCEPT
    {
       bstree_algo::push_front(header, new_node);
       splay_up(new_node, header);
    }
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::insert_unique_check(const const_node_ptr&,const KeyType&,KeyNodePtrCompare,insert_commit_data&)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::insert_unique_check(const_node_ptr,const KeyType&,KeyNodePtrCompare,insert_commit_data&)
    //! Additional note: nodes with the given key are splayed
    template<class KeyType, class KeyNodePtrCompare>
    static std::pair<node_ptr, bool> insert_unique_check
@@ -493,7 +493,7 @@ class splaytree_algorithms
       return bstree_algo::insert_unique_check(header, key, comp, commit_data);
    }
 
-   //! @copydoc ::boost::intrusive::bstree_algorithms::insert_unique_check(const const_node_ptr&,const node_ptr&,const KeyType&,KeyNodePtrCompare,insert_commit_data&)
+   //! @copydoc ::boost::intrusive::bstree_algorithms::insert_unique_check(const_node_ptr,node_ptr,const KeyType&,KeyNodePtrCompare,insert_commit_data&)
    //! Additional note: nodes with the given key are splayed
    template<class KeyType, class KeyNodePtrCompare>
    static std::pair<node_ptr, bool> insert_unique_check
@@ -507,21 +507,21 @@ class splaytree_algorithms
    #ifdef BOOST_INTRUSIVE_DOXYGEN_INVOKED
    //! @copydoc ::boost::intrusive::bstree_algorithms::insert_unique_commit(node_ptr,node_ptr,const insert_commit_data&)
    static void insert_unique_commit
-      (node_ptr header, node_ptr new_value, const insert_commit_data &commit_data);
+      (node_ptr header, node_ptr new_value, const insert_commit_data &commit_data) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::is_header
-   static bool is_header(const_node_ptr p);
+   static bool is_header(const_node_ptr p) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::rebalance
-   static void rebalance(node_ptr header);
+   static void rebalance(node_ptr header) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::bstree_algorithms::rebalance_subtree
-   static node_ptr rebalance_subtree(node_ptr old_root);
+   static node_ptr rebalance_subtree(node_ptr old_root) BOOST_NOEXCEPT;
 
    #endif   //#ifdef BOOST_INTRUSIVE_DOXYGEN_INVOKED
 
    // bottom-up splay, use data_ as parent for n    | complexity : logarithmic    | exception : nothrow
-   static void splay_up(node_ptr node, node_ptr header)
+   static void splay_up(node_ptr node, node_ptr header) BOOST_NOEXCEPT
    {  priv_splay_up<true>(node, header); }
 
    // top-down splay | complexity : logarithmic    | exception : strong, note A
@@ -535,7 +535,7 @@ class splaytree_algorithms
 
    // bottom-up splay, use data_ as parent for n    | complexity : logarithmic    | exception : nothrow
    template<bool SimpleSplay>
-   static void priv_splay_up(node_ptr node, node_ptr header)
+   static void priv_splay_up(node_ptr node, node_ptr header) BOOST_NOEXCEPT
    {
       // If (node == header) do a splay for the right most node instead
       // this is to boost performance of equal_range/count on equivalent containers in the case
@@ -660,7 +660,7 @@ class splaytree_algorithms
    }
 
    // break link to left child node and attach it to left tree pointed to by l   | complexity : constant | exception : nothrow
-   static void link_left(node_ptr & t, node_ptr & l)
+   static void link_left(node_ptr & t, node_ptr & l) BOOST_NOEXCEPT
    {
       //procedure link_left;
       //    t, l, right(l) := right(t), t, t
@@ -672,7 +672,7 @@ class splaytree_algorithms
    }
 
    // break link to right child node and attach it to right tree pointed to by r | complexity : constant | exception : nothrow
-   static void link_right(node_ptr & t, node_ptr & r)
+   static void link_right(node_ptr & t, node_ptr & r) BOOST_NOEXCEPT
    {
       //procedure link_right;
       //    t, r, left(r) := left(t), t, t
@@ -684,7 +684,7 @@ class splaytree_algorithms
    }
 
    // rotate n with its parent                     | complexity : constant    | exception : nothrow
-   static void rotate(node_ptr n)
+   static void rotate(node_ptr n) BOOST_NOEXCEPT
    {
       //procedure rotate_left;
       //    t, right(t), left(right(t)) := right(t), left(right(t)), t

@@ -16,7 +16,7 @@
 #include <boost/program_options/environment_iterator.hpp>
 #include <boost/program_options/detail/convert.hpp>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/throw_exception.hpp>
 
 #include <cctype>
@@ -61,6 +61,7 @@ extern char** environ;
 #endif
 
 using namespace std;
+using namespace boost::placeholders;
 
 namespace boost { namespace program_options {
 

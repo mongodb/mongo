@@ -10,16 +10,17 @@
 #pragma once
 #endif
 
-#include <boost/type_traits/is_constructible.hpp>
-#include <boost/type_traits/conditional.hpp>
+#include <type_traits>
+#ifndef BOOST_MATH_STANDALONE
 #include <boost/lexical_cast.hpp>
+#endif
 
 namespace boost{ namespace math{ namespace tools{
 
    template <class T>
    struct convert_from_string_result
    {
-      typedef typename boost::conditional<std::is_constructible<T, const char*>::value, const char*, T>::type type;
+      typedef typename std::conditional<std::is_constructible<T, const char*>::value, const char*, T>::type type;
    };
 
    template <class Real>
@@ -27,18 +28,20 @@ namespace boost{ namespace math{ namespace tools{
    {
 #ifdef BOOST_MATH_NO_LEXICAL_CAST
       // This function should not compile, we don't have the necessary functionality to support it:
-      BOOST_STATIC_ASSERT(sizeof(Real) == 0);
+      static_assert(sizeof(Real) == 0, "boost.lexical_cast is not supported in standalone mode.");
+      (void)p; // Supresses -Wunused-parameter
+      return Real(0);
 #else
       return boost::lexical_cast<Real>(p);
 #endif
    }
    template <class Real>
-   BOOST_CONSTEXPR const char* convert_from_string(const char* p, const std::true_type&) BOOST_NOEXCEPT
+   constexpr const char* convert_from_string(const char* p, const std::true_type&) noexcept
    {
       return p;
    }
    template <class Real>
-   BOOST_CONSTEXPR typename convert_from_string_result<Real>::type convert_from_string(const char* p) BOOST_NOEXCEPT_IF((std::is_constructible<Real, const char*>::value))
+   constexpr typename convert_from_string_result<Real>::type convert_from_string(const char* p) noexcept((std::is_constructible<Real, const char*>::value))
    {
       return convert_from_string<Real>(p, std::is_constructible<Real, const char*>());
    }

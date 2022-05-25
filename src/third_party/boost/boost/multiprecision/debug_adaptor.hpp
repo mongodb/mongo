@@ -6,6 +6,7 @@
 #ifndef BOOST_MATH_DEBUG_ADAPTER_HPP
 #define BOOST_MATH_DEBUG_ADAPTER_HPP
 
+#include <boost/multiprecision/detail/standalone_config.hpp>
 #include <boost/multiprecision/traits/extract_exponent_type.hpp>
 #include <boost/multiprecision/detail/integer_ops.hpp>
 
@@ -63,13 +64,25 @@ struct debug_adaptor
       update_view();
    }
    template <class T>
-   debug_adaptor(const T& i, const T& j)
+   debug_adaptor(const debug_adaptor<T>& i, const typename std::enable_if<std::is_convertible<T, Backend>::value>::type* = 0)
+       : m_value(i.value())
+   {
+      update_view();
+   }
+   template <class T, class U>
+   debug_adaptor(const T& i, const U& j, typename std::enable_if<std::is_constructible<Backend, const T&, const U&>::value>::type* = nullptr)
        : m_value(i, j)
    {
       update_view();
    }
+   template <class B2>
+   debug_adaptor(const B2& i, unsigned digits10, typename std::enable_if<std::is_same<B2, Backend>::value && std::is_constructible<Backend, const Backend&, unsigned>::value>::type* = nullptr)
+       : m_value(i, digits10)
+   {
+      update_view();
+   }
    template <class T>
-   typename std::enable_if<boost::multiprecision::detail::is_arithmetic<T>::value || std::is_convertible<T, Backend>::value, debug_adaptor&>::type operator=(const T& i)
+   typename std::enable_if<boost::multiprecision::detail::is_arithmetic<T>::value || std::is_assignable<Backend, T>::value, debug_adaptor&>::type operator=(const T& i)
    {
       m_value = i;
       update_view();
@@ -112,6 +125,8 @@ struct debug_adaptor
    {
       return m_value;
    }
+
+   #ifndef BOOST_MP_STANDALONE
    template <class Archive>
    void serialize(Archive& ar, const unsigned int /*version*/)
    {
@@ -120,6 +135,8 @@ struct debug_adaptor
       if (tag::value)
          update_view();
    }
+   #endif 
+   
    static unsigned default_precision() noexcept
    {
       return Backend::default_precision();
@@ -128,6 +145,14 @@ struct debug_adaptor
    {
       Backend::default_precision(v);
    }
+   static unsigned thread_default_precision() noexcept
+   {
+      return Backend::thread_default_precision();
+   }
+   static void thread_default_precision(unsigned v) noexcept
+   {
+      Backend::thread_default_precision(v);
+   }
    unsigned precision() const noexcept
    {
       return value().precision();
@@ -135,6 +160,25 @@ struct debug_adaptor
    void precision(unsigned digits10) noexcept
    {
       value().precision(digits10);
+   }
+   //
+   // Variable precision options:
+   // 
+   static constexpr variable_precision_options default_variable_precision_options()noexcept
+   {
+      return Backend::default_variable_precision_options();
+   }
+   static constexpr variable_precision_options thread_default_variable_precision_options()noexcept
+   {
+      return Backend::thread_default_variable_precision_options();
+   }
+   static BOOST_MP_CXX14_CONSTEXPR void default_variable_precision_options(variable_precision_options opts)
+   {
+      Backend::default_variable_precision_options(opts);
+   }
+   static BOOST_MP_CXX14_CONSTEXPR void thread_default_variable_precision_options(variable_precision_options opts)
+   {
+      Backend::thread_default_variable_precision_options(opts);
    }
 };
 
@@ -147,6 +191,14 @@ template <class T>
 inline const T& unwrap_debug_type(const T& val)
 {
    return val;
+}
+
+template <class Backend, class V, class U>
+inline BOOST_MP_CXX14_CONSTEXPR void assign_components(debug_adaptor<Backend>& result, const V& v1, const U& v2)
+{
+   using default_ops::assign_components;
+   assign_components(result.value(), unwrap_debug_type(v1), unwrap_debug_type(v2));
+   result.update_view();
 }
 
 #define NON_MEMBER_OP1(name, str)                                       \
@@ -272,6 +324,39 @@ inline void eval_convert_to(R* result, const debug_adaptor<Backend>& val)
    using default_ops::eval_convert_to;
    eval_convert_to(result, val.value());
 }
+template <class Backend, class R>
+inline void eval_convert_to(debug_adaptor<R>* result, const debug_adaptor<Backend>& val)
+{
+   using default_ops::eval_convert_to;
+   eval_convert_to(&result->value(), val.value());
+}
+template <class Backend, class R>
+inline void eval_convert_to(debug_adaptor<R>* result, const Backend& val)
+{
+   using default_ops::eval_convert_to;
+   eval_convert_to(&result->value(), val);
+}
+
+template <class Backend>
+inline void eval_convert_to(std::complex<float>* result, const debug_adaptor<Backend>& val)
+{
+   using default_ops::eval_convert_to;
+   eval_convert_to(result, val.value());
+}
+template <class Backend>
+inline void eval_convert_to(std::complex<double>* result, const debug_adaptor<Backend>& val)
+{
+   using default_ops::eval_convert_to;
+   eval_convert_to(result, val.value());
+}
+template <class Backend>
+inline void eval_convert_to(std::complex<long double>* result, const debug_adaptor<Backend>& val)
+{
+   using default_ops::eval_convert_to;
+   eval_convert_to(result, val.value());
+}
+
+
 
 template <class Backend, class Exp>
 inline void eval_frexp(debug_adaptor<Backend>& result, const debug_adaptor<Backend>& arg, Exp* exp)
@@ -379,49 +464,49 @@ inline void eval_right_shift(debug_adaptor<Backend>& arg, const debug_adaptor<Ba
 }
 
 template <class Backend, class T>
-inline unsigned eval_integer_modulus(const debug_adaptor<Backend>& arg, const T& a)
+inline T eval_integer_modulus(const debug_adaptor<Backend>& arg, const T& a)
 {
    using default_ops::eval_integer_modulus;
    return eval_integer_modulus(arg.value(), a);
 }
 
 template <class Backend>
-inline unsigned eval_lsb(const debug_adaptor<Backend>& arg)
+inline std::size_t eval_lsb(const debug_adaptor<Backend>& arg)
 {
    using default_ops::eval_lsb;
    return eval_lsb(arg.value());
 }
 
 template <class Backend>
-inline unsigned eval_msb(const debug_adaptor<Backend>& arg)
+inline std::size_t eval_msb(const debug_adaptor<Backend>& arg)
 {
    using default_ops::eval_msb;
    return eval_msb(arg.value());
 }
 
 template <class Backend>
-inline bool eval_bit_test(const debug_adaptor<Backend>& arg, unsigned a)
+inline bool eval_bit_test(const debug_adaptor<Backend>& arg, std::size_t a)
 {
    using default_ops::eval_bit_test;
    return eval_bit_test(arg.value(), a);
 }
 
 template <class Backend>
-inline void eval_bit_set(const debug_adaptor<Backend>& arg, unsigned a)
+inline void eval_bit_set(const debug_adaptor<Backend>& arg, std::size_t a)
 {
    using default_ops::eval_bit_set;
    eval_bit_set(arg.value(), a);
    arg.update_view();
 }
 template <class Backend>
-inline void eval_bit_unset(const debug_adaptor<Backend>& arg, unsigned a)
+inline void eval_bit_unset(const debug_adaptor<Backend>& arg, std::size_t a)
 {
    using default_ops::eval_bit_unset;
    eval_bit_unset(arg.value(), a);
    arg.update_view();
 }
 template <class Backend>
-inline void eval_bit_flip(const debug_adaptor<Backend>& arg, unsigned a)
+inline void eval_bit_flip(const debug_adaptor<Backend>& arg, std::size_t a)
 {
    using default_ops::eval_bit_flip;
    eval_bit_flip(arg.value(), a);
@@ -461,13 +546,18 @@ NON_MEMBER_OP2(atan, "atan")
 NON_MEMBER_OP2(sinh, "sinh")
 NON_MEMBER_OP2(cosh, "cosh")
 NON_MEMBER_OP2(tanh, "tanh")
+NON_MEMBER_OP2(asinh, "asinh")
+NON_MEMBER_OP2(acosh, "acosh")
+NON_MEMBER_OP2(atanh, "atanh")
 NON_MEMBER_OP3(fmod, "fmod")
 NON_MEMBER_OP3(pow, "pow")
 NON_MEMBER_OP3(atan2, "atan2")
+NON_MEMBER_OP2(conj, "conj")
 
 template <class Backend>
 int eval_signbit(const debug_adaptor<Backend>& val)
 {
+   using default_ops::eval_signbit;
    return eval_signbit(val.value());
 }
 
@@ -477,13 +567,150 @@ std::size_t hash_value(const debug_adaptor<Backend>& val)
    return hash_value(val.value());
 }
 
+template <class Backend, expression_template_option ExpressionTemplates>
+inline typename std::enable_if<number_category<Backend>::value == number_kind_rational, typename number<debug_adaptor<Backend>, ExpressionTemplates>::value_type>::type
+   numerator(const number<debug_adaptor<Backend>, ExpressionTemplates>& arg)
+{
+   number<Backend, ExpressionTemplates> t(arg.backend().value());
+   return numerator(t).backend();
+}
+template <class Backend, expression_template_option ExpressionTemplates>
+inline typename std::enable_if<number_category<Backend>::value == number_kind_rational, typename number<debug_adaptor<Backend>, ExpressionTemplates>::value_type>::type
+   denominator(const number<debug_adaptor<Backend>, ExpressionTemplates>& arg)
+{
+   number<Backend, ExpressionTemplates> t(arg.backend().value());
+   return denominator(t).backend();
+}
+
+template <class To, class From>
+inline BOOST_MP_CXX14_CONSTEXPR void eval_real(To& to, const debug_adaptor<From>& from)
+{
+   using default_ops::eval_real;
+   eval_real(to, from.value());
+}
+template <class To, class From>
+inline BOOST_MP_CXX14_CONSTEXPR void eval_real(debug_adaptor<To>& to, const debug_adaptor<From>& from)
+{
+   using default_ops::eval_real;
+   eval_real(to.value(), from.value());
+   to.update_view();
+}
+template <class To, class From>
+inline BOOST_MP_CXX14_CONSTEXPR void eval_real(debug_adaptor<To>& to, const From& from)
+{
+   using default_ops::eval_real;
+   eval_real(to.value(), from);
+   to.update_view();
+}
+
+template <class To, class From>
+inline BOOST_MP_CXX14_CONSTEXPR void eval_imag(To& to, const debug_adaptor<From>& from)
+{
+   using default_ops::eval_imag;
+   eval_imag(to, from.value());
+}
+template <class To, class From>
+inline BOOST_MP_CXX14_CONSTEXPR void eval_imag(debug_adaptor<To>& to, const debug_adaptor<From>& from)
+{
+   using default_ops::eval_imag;
+   eval_imag(to.value(), from.value());
+   to.update_view();
+}
+template <class To, class From>
+inline BOOST_MP_CXX14_CONSTEXPR void eval_imag(debug_adaptor<To>& to, const From& from)
+{
+   using default_ops::eval_imag;
+   eval_imag(to.value(), from);
+   to.update_view();
+}
+
+template <class To, class From>
+inline BOOST_MP_CXX14_CONSTEXPR void eval_set_real(To& to, const debug_adaptor<From>& from)
+{
+   using default_ops::eval_set_real;
+   eval_set_real(to, from.value());
+}
+template <class To, class From>
+inline BOOST_MP_CXX14_CONSTEXPR void eval_set_real(debug_adaptor<To>& to, const debug_adaptor<From>& from)
+{
+   using default_ops::eval_set_real;
+   eval_set_real(to.value(), from.value());
+   to.update_view();
+}
+template <class To, class From>
+inline BOOST_MP_CXX14_CONSTEXPR void eval_set_real(debug_adaptor<To>& to, const From& from)
+{
+   using default_ops::eval_set_real;
+   eval_set_real(to.value(), from);
+   to.update_view();
+}
+
+template <class To, class From>
+inline BOOST_MP_CXX14_CONSTEXPR void eval_set_imag(To& to, const debug_adaptor<From>& from)
+{
+   using default_ops::eval_set_imag;
+   eval_set_imag(to, from.value());
+}
+template <class To, class From>
+inline BOOST_MP_CXX14_CONSTEXPR void eval_set_imag(debug_adaptor<To>& to, const debug_adaptor<From>& from)
+{
+   using default_ops::eval_set_imag;
+   eval_set_imag(to.value(), from.value());
+   to.update_view();
+}
+template <class To, class From>
+inline BOOST_MP_CXX14_CONSTEXPR void eval_set_imag(debug_adaptor<To>& to, const From& from)
+{
+   using default_ops::eval_set_imag;
+   eval_set_imag(to.value(), from);
+   to.update_view();
+}
+
+
 } // namespace backends
 
 using backends::debug_adaptor;
 
+namespace detail {
+   template <class Backend>
+   struct is_variable_precision<debug_adaptor<Backend> > : public is_variable_precision<Backend>
+   {};
+#ifdef BOOST_HAS_INT128
+   template <class Backend>
+   struct is_convertible_arithmetic<int128_type, debug_adaptor<Backend> > : public is_convertible_arithmetic<int128_type, Backend>
+   {};
+   template <class Backend>
+   struct is_convertible_arithmetic<uint128_type, debug_adaptor<Backend> > : public is_convertible_arithmetic<uint128_type, Backend>
+   {};
+#endif
+#ifdef BOOST_HAS_FLOAT128
+   template <class Backend>
+   struct is_convertible_arithmetic<float128_type, debug_adaptor<Backend> > : public is_convertible_arithmetic<float128_type, Backend>
+   {};
+#endif
+   } // namespace detail
+
 template <class Backend>
 struct number_category<backends::debug_adaptor<Backend> > : public number_category<Backend>
 {};
+
+template <class Number>
+using debug_adaptor_t = number<debug_adaptor<typename Number::backend_type>, Number::et>;
+
+
+template <class Backend, expression_template_option ExpressionTemplates>
+struct component_type<number<debug_adaptor<Backend>, ExpressionTemplates>>
+{
+   //
+   // We'll make the component_type also a debug_adaptor:
+   //
+   using base_component_type = typename component_type<number<Backend, ExpressionTemplates>>::type;
+   using base_component_backend = typename base_component_type::backend_type;
+   using type = number<debug_adaptor<base_component_backend>, ExpressionTemplates>;
+};
+
+template <class Backend>
+struct is_interval_number<backends::debug_adaptor<Backend> > : public is_interval_number<Backend> {};
 
 }} // namespace boost::multiprecision
 
@@ -510,6 +737,7 @@ class numeric_limits<boost::multiprecision::number<boost::multiprecision::backen
 
 } // namespace std
 
+#ifdef BOOST_MP_MATH_AVAILABLE
 namespace boost {
 namespace math {
 
@@ -528,5 +756,11 @@ struct precision<boost::multiprecision::number<boost::multiprecision::debug_adap
 }
 
 }} // namespace boost::math::policies
+#else
+#undef NON_MEMBER_OP1
+#undef NON_MEMBER_OP2
+#undef NON_MEMBER_OP3
+#undef NON_MEMBER_OP4
+#endif // BOOST_MP_MATH_AVAILABLE
 
 #endif

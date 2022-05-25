@@ -47,13 +47,14 @@
 //         {}
 // This macro should only persist within this file.
 
+#ifndef BOOST_UTILITY_DOCS
 #define BOOST_PRIVATE_CTR_DEF( z, n, data )                   \
     template < BOOST_PP_ENUM_PARAMS(n, typename T) >          \
     base_from_member( BOOST_PP_ENUM_BINARY_PARAMS(n, T, x) )  \
         : member( BOOST_PP_ENUM_PARAMS(n, x) )                \
         {}                                                    \
     /**/
-
+#endif // BOOST_UTILITY_DOCS
 
 namespace boost
 {

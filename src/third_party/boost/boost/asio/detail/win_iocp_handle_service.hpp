@@ -2,7 +2,7 @@
 // detail/win_iocp_handle_service.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 // Copyright (c) 2008 Rep Invariant Systems, Inc. (info@repinvariant.com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
@@ -20,6 +20,7 @@
 
 #if defined(BOOST_ASIO_HAS_IOCP)
 
+#include <boost/asio/associated_cancellation_slot.hpp>
 #include <boost/asio/error.hpp>
 #include <boost/asio/execution_context.hpp>
 #include <boost/asio/detail/buffer_sequence_adapter.hpp>
@@ -110,6 +111,10 @@ public:
   BOOST_ASIO_DECL boost::system::error_code close(implementation_type& impl,
       boost::system::error_code& ec);
 
+  // Release ownership of a handle.
+  BOOST_ASIO_DECL native_handle_type release(implementation_type& impl,
+      boost::system::error_code& ec);
+
   // Get the native handle representation.
   native_handle_type native_handle(const implementation_type& impl) const
   {
@@ -148,19 +153,26 @@ public:
       const ConstBufferSequence& buffers,
       Handler& handler, const IoExecutor& io_ex)
   {
+    typename associated_cancellation_slot<Handler>::type slot
+      = boost::asio::get_associated_cancellation_slot(handler);
+
     // Allocate and construct an operation to wrap the handler.
     typedef win_iocp_handle_write_op<
         ConstBufferSequence, Handler, IoExecutor> op;
     typename op::ptr p = { boost::asio::detail::addressof(handler),
       op::ptr::allocate(handler), 0 };
-    p.p = new (p.v) op(buffers, handler, io_ex);
+    operation* o = p.p = new (p.v) op(buffers, handler, io_ex);
 
     BOOST_ASIO_HANDLER_CREATION((iocp_service_.context(), *p.p, "handle", &impl,
           reinterpret_cast<uintmax_t>(impl.handle_), "async_write_some"));
 
+    // Optionally register for per-operation cancellation.
+    if (slot.is_connected())
+      o = &slot.template emplace<iocp_op_cancellation>(impl.handle_, o);
+
     start_write_op(impl, 0,
         buffer_sequence_adapter<boost::asio::const_buffer,
-          ConstBufferSequence>::first(buffers), p.p);
+          ConstBufferSequence>::first(buffers), o);
     p.v = p.p = 0;
   }
 
@@ -171,19 +183,26 @@ public:
       uint64_t offset, const ConstBufferSequence& buffers,
       Handler& handler, const IoExecutor& io_ex)
   {
+    typename associated_cancellation_slot<Handler>::type slot
+      = boost::asio::get_associated_cancellation_slot(handler);
+
     // Allocate and construct an operation to wrap the handler.
     typedef win_iocp_handle_write_op<
         ConstBufferSequence, Handler, IoExecutor> op;
     typename op::ptr p = { boost::asio::detail::addressof(handler),
       op::ptr::allocate(handler), 0 };
-    p.p = new (p.v) op(buffers, handler, io_ex);
+    operation* o = p.p = new (p.v) op(buffers, handler, io_ex);
 
     BOOST_ASIO_HANDLER_CREATION((iocp_service_.context(), *p.p, "handle", &impl,
           reinterpret_cast<uintmax_t>(impl.handle_), "async_write_some_at"));
 
+    // Optionally register for per-operation cancellation.
+    if (slot.is_connected())
+      o = &slot.template emplace<iocp_op_cancellation>(impl.handle_, o);
+
     start_write_op(impl, offset,
         buffer_sequence_adapter<boost::asio::const_buffer,
-          ConstBufferSequence>::first(buffers), p.p);
+          ConstBufferSequence>::first(buffers), o);
     p.v = p.p = 0;
   }
 
@@ -215,19 +234,26 @@ public:
       const MutableBufferSequence& buffers,
       Handler& handler, const IoExecutor& io_ex)
   {
+    typename associated_cancellation_slot<Handler>::type slot
+      = boost::asio::get_associated_cancellation_slot(handler);
+
     // Allocate and construct an operation to wrap the handler.
     typedef win_iocp_handle_read_op<
         MutableBufferSequence, Handler, IoExecutor> op;
     typename op::ptr p = { boost::asio::detail::addressof(handler),
       op::ptr::allocate(handler), 0 };
-    p.p = new (p.v) op(buffers, handler, io_ex);
+    operation* o = p.p = new (p.v) op(buffers, handler, io_ex);
 
     BOOST_ASIO_HANDLER_CREATION((iocp_service_.context(), *p.p, "handle", &impl,
           reinterpret_cast<uintmax_t>(impl.handle_), "async_read_some"));
 
+    // Optionally register for per-operation cancellation.
+    if (slot.is_connected())
+      o = &slot.template emplace<iocp_op_cancellation>(impl.handle_, o);
+
     start_read_op(impl, 0,
         buffer_sequence_adapter<boost::asio::mutable_buffer,
-          MutableBufferSequence>::first(buffers), p.p);
+          MutableBufferSequence>::first(buffers), o);
     p.v = p.p = 0;
   }
 
@@ -240,19 +266,26 @@ public:
       uint64_t offset, const MutableBufferSequence& buffers,
       Handler& handler, const IoExecutor& io_ex)
   {
+    typename associated_cancellation_slot<Handler>::type slot
+      = boost::asio::get_associated_cancellation_slot(handler);
+
     // Allocate and construct an operation to wrap the handler.
     typedef win_iocp_handle_read_op<
         MutableBufferSequence, Handler, IoExecutor> op;
     typename op::ptr p = { boost::asio::detail::addressof(handler),
       op::ptr::allocate(handler), 0 };
-    p.p = new (p.v) op(buffers, handler, io_ex);
+    operation* o = p.p = new (p.v) op(buffers, handler, io_ex);
 
     BOOST_ASIO_HANDLER_CREATION((iocp_service_.context(), *p.p, "handle", &impl,
           reinterpret_cast<uintmax_t>(impl.handle_), "async_read_some_at"));
 
+    // Optionally register for per-operation cancellation.
+    if (slot.is_connected())
+      o = &slot.template emplace<iocp_op_cancellation>(impl.handle_, o);
+
     start_read_op(impl, offset,
         buffer_sequence_adapter<boost::asio::mutable_buffer,
-          MutableBufferSequence>::first(buffers), p.p);
+          MutableBufferSequence>::first(buffers), o);
     p.v = p.p = 0;
   }
 
@@ -311,9 +344,72 @@ private:
   // destroyed.
   BOOST_ASIO_DECL void close_for_destruction(implementation_type& impl);
 
+  // The type of a NtSetInformationFile function pointer.
+  typedef LONG (NTAPI *nt_set_info_fn)(HANDLE, ULONG_PTR*, void*, ULONG, ULONG);
+
+  // Helper function to get the NtSetInformationFile function pointer. If no
+  // NtSetInformationFile pointer has been obtained yet, one is obtained using
+  // GetProcAddress and the pointer is cached. Returns a null pointer if
+  // NtSetInformationFile is not available.
+  BOOST_ASIO_DECL nt_set_info_fn get_nt_set_info();
+
+  // Helper function to emulate InterlockedCompareExchangePointer functionality
+  // for:
+  // - very old Platform SDKs; and
+  // - platform SDKs where MSVC's /Wp64 option causes spurious warnings.
+  BOOST_ASIO_DECL void* interlocked_compare_exchange_pointer(
+      void** dest, void* exch, void* cmp);
+
+  // Helper function to emulate InterlockedExchangePointer functionality for:
+  // - very old Platform SDKs; and
+  // - platform SDKs where MSVC's /Wp64 option causes spurious warnings.
+  BOOST_ASIO_DECL void* interlocked_exchange_pointer(void** dest, void* val);
+
+  // Helper class used to implement per operation cancellation.
+  class iocp_op_cancellation : public operation
+  {
+  public:
+    iocp_op_cancellation(HANDLE h, operation* target)
+      : operation(&iocp_op_cancellation::do_complete),
+        handle_(h),
+        target_(target)
+    {
+    }
+
+    static void do_complete(void* owner, operation* base,
+        const boost::system::error_code& result_ec,
+        std::size_t bytes_transferred)
+    {
+      iocp_op_cancellation* o = static_cast<iocp_op_cancellation*>(base);
+      o->target_->complete(owner, result_ec, bytes_transferred);
+    }
+
+    void operator()(cancellation_type_t type)
+    {
+#if defined(_WIN32_WINNT) && (_WIN32_WINNT >= 0x0600)
+      if (!!(type &
+            (cancellation_type::terminal
+              | cancellation_type::partial
+              | cancellation_type::total)))
+      {
+        ::CancelIoEx(handle_, this);
+      }
+#else // defined(_WIN32_WINNT) && (_WIN32_WINNT >= 0x0600)
+      (void)type;
+#endif // defined(_WIN32_WINNT) && (_WIN32_WINNT >= 0x0600)
+    }
+
+  private:
+    HANDLE handle_;
+    operation* target_;
+  };
+
   // The IOCP service used for running asynchronous operations and dispatching
   // handlers.
   win_iocp_io_context& iocp_service_;
+
+  // Pointer to NtSetInformationFile implementation.
+  void* nt_set_info_;
 
   // Mutex to protect access to the linked list of implementations.
   mutex mutex_;

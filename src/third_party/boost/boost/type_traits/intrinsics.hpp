@@ -160,7 +160,7 @@
 #   define BOOST_HAS_TYPE_TRAITS_INTRINSICS
 #endif
 
-#if defined(BOOST_CLANG) && defined(__has_feature) && !defined(__CUDACC__)
+#if defined(BOOST_CLANG) && defined(__has_feature) && (!(defined(__CUDACC__) && (__CUDACC_VER_MAJOR__ < 11)) || defined(__CUDA__))
 //
 // Note that these intrinsics are disabled for the CUDA meta-compiler as it appears
 // to not support them, even though the underlying clang compiler does so.

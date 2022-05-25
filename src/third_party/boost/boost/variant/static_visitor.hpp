@@ -82,7 +82,7 @@ struct is_static_visitor_impl
 } // namespace detail
 
 template< typename T > struct is_static_visitor
-	: public ::boost::integral_constant<bool,(::boost::detail::is_static_visitor_impl<T>::value)>
+  : public ::boost::integral_constant<bool,(::boost::detail::is_static_visitor_impl<T>::value)>
 {
 public:
     BOOST_MPL_AUX_LAMBDA_SUPPORT(1,is_static_visitor,(T))

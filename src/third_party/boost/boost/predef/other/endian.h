@@ -121,6 +121,7 @@ information and acquired knowledge:
         defined(__ARMEL__) || \
         defined(__THUMBEL__) || \
         defined(__AARCH64EL__) || \
+        defined(__loongarch__) || \
         defined(_MIPSEL) || \
         defined(__MIPSEL) || \
         defined(__MIPSEL__) || \

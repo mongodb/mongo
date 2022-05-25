@@ -2,7 +2,7 @@
 // ssl/detail/io.hpp
 // ~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -17,6 +17,7 @@
 
 #include <boost/asio/detail/config.hpp>
 
+#include <boost/asio/detail/base_from_cancellation_state.hpp>
 #include <boost/asio/detail/handler_tracking.hpp>
 #include <boost/asio/ssl/detail/engine.hpp>
 #include <boost/asio/ssl/detail/stream_core.hpp>
@@ -95,11 +96,13 @@ std::size_t io(Stream& next_layer, stream_core& core,
 
 template <typename Stream, typename Operation, typename Handler>
 class io_op
+  : public boost::asio::detail::base_from_cancellation_state<Handler>
 {
 public:
   io_op(Stream& next_layer, stream_core& core,
       const Operation& op, Handler& handler)
-    : next_layer_(next_layer),
+    : boost::asio::detail::base_from_cancellation_state<Handler>(handler),
+      next_layer_(next_layer),
       core_(core),
       op_(op),
       start_(0),
@@ -111,7 +114,8 @@ public:
 
 #if defined(BOOST_ASIO_HAS_MOVE)
   io_op(const io_op& other)
-    : next_layer_(other.next_layer_),
+    : boost::asio::detail::base_from_cancellation_state<Handler>(other),
+      next_layer_(other.next_layer_),
       core_(other.core_),
       op_(other.op_),
       start_(other.start_),
@@ -123,7 +127,11 @@ public:
   }
 
   io_op(io_op&& other)
-    : next_layer_(other.next_layer_),
+    : boost::asio::detail::base_from_cancellation_state<Handler>(
+        BOOST_ASIO_MOVE_CAST(
+          boost::asio::detail::base_from_cancellation_state<Handler>)(
+            other)),
+      next_layer_(other.next_layer_),
       core_(other.core_),
       op_(BOOST_ASIO_MOVE_CAST(Operation)(other.op_)),
       start_(other.start_),
@@ -263,6 +271,13 @@ public:
           // Release any waiting read operations.
           core_.pending_read_.expires_at(core_.neg_infin());
 
+          // Check for cancellation before continuing.
+          if (this->cancelled() != cancellation_type::none)
+          {
+            ec_ = boost::asio::error::operation_aborted;
+            break;
+          }
+
           // Try the operation again.
           continue;
 
@@ -270,6 +285,13 @@ public:
 
           // Release any waiting write operations.
           core_.pending_write_.expires_at(core_.neg_infin());
+
+          // Check for cancellation before continuing.
+          if (this->cancelled() != cancellation_type::none)
+          {
+            ec_ = boost::asio::error::operation_aborted;
+            break;
+          }
 
           // Try the operation again.
           continue;
@@ -381,32 +403,19 @@ inline void async_io(Stream& next_layer, stream_core& core,
 } // namespace detail
 } // namespace ssl
 
-template <typename Stream, typename Operation,
-    typename Handler, typename Allocator>
-struct associated_allocator<
-    ssl::detail::io_op<Stream, Operation, Handler>, Allocator>
+template <template <typename, typename> class Associator,
+    typename Stream, typename Operation,
+    typename Handler, typename DefaultCandidate>
+struct associator<Associator,
+    ssl::detail::io_op<Stream, Operation, Handler>,
+    DefaultCandidate>
+  : Associator<Handler, DefaultCandidate>
 {
-  typedef typename associated_allocator<Handler, Allocator>::type type;
-
-  static type get(const ssl::detail::io_op<Stream, Operation, Handler>& h,
-      const Allocator& a = Allocator()) BOOST_ASIO_NOEXCEPT
+  static typename Associator<Handler, DefaultCandidate>::type get(
+      const ssl::detail::io_op<Stream, Operation, Handler>& h,
+      const DefaultCandidate& c = DefaultCandidate()) BOOST_ASIO_NOEXCEPT
   {
-    return associated_allocator<Handler, Allocator>::get(h.handler_, a);
-  }
-};
-
-template <typename Stream, typename Operation,
-    typename Handler, typename Executor>
-struct associated_executor<
-    ssl::detail::io_op<Stream, Operation, Handler>, Executor>
-  : detail::associated_executor_forwarding_base<Handler, Executor>
-{
-  typedef typename associated_executor<Handler, Executor>::type type;
-
-  static type get(const ssl::detail::io_op<Stream, Operation, Handler>& h,
-      const Executor& ex = Executor()) BOOST_ASIO_NOEXCEPT
-  {
-    return associated_executor<Handler, Executor>::get(h.handler_, ex);
+    return Associator<Handler, DefaultCandidate>::get(h.handler_, c);
   }
 };
 

@@ -40,6 +40,7 @@
 #include <sys/types.h>
 #endif
 
+#include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
 
 #include "mongo/db/dbhelpers.h"

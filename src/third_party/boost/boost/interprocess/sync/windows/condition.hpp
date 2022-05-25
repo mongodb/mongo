@@ -21,8 +21,8 @@
 
 #include <boost/interprocess/detail/config_begin.hpp>
 #include <boost/interprocess/detail/workaround.hpp>
-#include <boost/interprocess/detail/posix_time_types_wrk.hpp>
 
+#include <boost/interprocess/sync/cv_status.hpp>
 #include <boost/interprocess/sync/interprocess_mutex.hpp>
 #include <boost/interprocess/sync/scoped_lock.hpp>
 #include <boost/interprocess/exceptions.hpp>
@@ -59,14 +59,6 @@ class winapi_condition
    {  m_condition_data.notify_all();   }
 
    template <typename L>
-   bool timed_wait(L& lock, const boost::posix_time::ptime &abs_time)
-   {  return m_condition_data.timed_wait(lock, abs_time);   }
-
-   template <typename L, typename Pr>
-   bool timed_wait(L& lock, const boost::posix_time::ptime &abs_time, Pr pred)
-   {  return m_condition_data.timed_wait(lock, abs_time, pred);   }
-
-   template <typename L>
    void wait(L& lock)
    {  m_condition_data.wait(lock);   }
 
@@ -74,11 +66,36 @@ class winapi_condition
    void wait(L& lock, Pr pred)
    {  m_condition_data.wait(lock, pred);   }
 
+
+   template <typename L, typename TimePoint>
+   bool timed_wait(L& lock, const TimePoint &abs_time)
+   {  return m_condition_data.timed_wait(lock, abs_time);   }
+
+   template <typename L, typename TimePoint, typename Pr>
+   bool timed_wait(L& lock, const TimePoint &abs_time, Pr pred)
+   {  return m_condition_data.timed_wait(lock, abs_time, pred);   }
+
+   template <typename L, class TimePoint>
+   cv_status wait_until(L& lock, const TimePoint &abs_time)
+   {  return this->timed_wait(lock, abs_time) ? cv_status::no_timeout : cv_status::timeout; }
+
+   template <typename L, class TimePoint, typename Pr>
+   bool wait_until(L& lock, const TimePoint &abs_time, Pr pred)
+   {  return this->timed_wait(lock, abs_time, pred); }
+
+   template <typename L, class Duration>
+   cv_status wait_for(L& lock, const Duration &dur)
+   {  return this->wait_until(lock, duration_to_ustime(dur)); }
+
+   template <typename L, class Duration, typename Pr>
+   bool wait_for(L& lock, const Duration &dur, Pr pred)
+   {  return this->wait_until(lock, duration_to_ustime(dur), pred); }
+
    private:
 
    struct condition_data
    {
-      typedef boost::int32_t     integer_type;
+      typedef unsigned int      integer_type;
       typedef winapi_semaphore  semaphore_type;
       typedef winapi_mutex      mutex_type;
 

@@ -2,7 +2,7 @@
 // detail/impl/select_reactor.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -27,6 +27,12 @@
 #include <boost/asio/detail/select_reactor.hpp>
 #include <boost/asio/detail/signal_blocker.hpp>
 #include <boost/asio/detail/socket_ops.hpp>
+
+#if defined(BOOST_ASIO_HAS_IOCP)
+# include <boost/asio/detail/win_iocp_io_context.hpp>
+#else // defined(BOOST_ASIO_HAS_IOCP)
+# include <boost/asio/detail/scheduler.hpp>
+#endif // defined(BOOST_ASIO_HAS_IOCP)
 
 #include <boost/asio/detail/push_options.hpp>
 
@@ -164,6 +170,19 @@ void select_reactor::cancel_ops(socket_type descriptor,
 {
   boost::asio::detail::mutex::scoped_lock lock(mutex_);
   cancel_ops_unlocked(descriptor, boost::asio::error::operation_aborted);
+}
+
+void select_reactor::cancel_ops_by_key(socket_type descriptor,
+    select_reactor::per_descriptor_data&,
+    int op_type, void* cancellation_key)
+{
+  boost::asio::detail::mutex::scoped_lock lock(mutex_);
+  op_queue<operation> ops;
+  bool need_interrupt = op_queue_[op_type].cancel_operations_by_key(
+      descriptor, ops, cancellation_key, boost::asio::error::operation_aborted);
+  scheduler_.post_deferred_completions(ops);
+  if (need_interrupt)
+    interrupter_.interrupt();
 }
 
 void select_reactor::deregister_descriptor(socket_type descriptor,

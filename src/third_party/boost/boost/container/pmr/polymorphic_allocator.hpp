@@ -53,13 +53,13 @@ class polymorphic_allocator
    //! <b>Throws</b>: Nothing
    //!
    //! <b>Notes</b>: This constructor provides an implicit conversion from memory_resource*.
-   polymorphic_allocator(memory_resource* r)
+   polymorphic_allocator(memory_resource* r) BOOST_NOEXCEPT
       : m_resource(r)
    {  BOOST_ASSERT(r != 0);  }
 
    //! <b>Effects</b>: Sets m_resource to
    //!   other.resource().
-   polymorphic_allocator(const polymorphic_allocator& other)
+   polymorphic_allocator(const polymorphic_allocator& other) BOOST_NOEXCEPT
       : m_resource(other.m_resource)
    {}
 
@@ -72,7 +72,7 @@ class polymorphic_allocator
 
    //! <b>Effects</b>: Sets m_resource to
    //!   other.resource().
-   polymorphic_allocator& operator=(const polymorphic_allocator& other)
+   polymorphic_allocator& operator=(const polymorphic_allocator& other) BOOST_NOEXCEPT
    {  m_resource = other.m_resource;   return *this;  }
 
    //! <b>Returns</b>: Equivalent to
@@ -86,7 +86,7 @@ class polymorphic_allocator
    //! <b>Effects</b>: Equivalent to m_resource->deallocate(p, n * sizeof(T), alignof(T)).
    //!
    //! <b>Throws</b>: Nothing.
-   void deallocate(T* p, size_t n)
+   void deallocate(T* p, size_t n) BOOST_NOEXCEPT
    {  m_resource->deallocate(p, n*sizeof(T), ::boost::move_detail::alignment_of<T>::value);  }
 
    #if !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES) || defined(BOOST_CONTAINER_DOXYGEN_INVOKED)
@@ -133,12 +133,12 @@ class polymorphic_allocator
 
    //! <b>Returns</b>: Equivalent to
    //!   `polymorphic_allocator()`.
-   polymorphic_allocator select_on_container_copy_construction() const
+   polymorphic_allocator select_on_container_copy_construction() const BOOST_NOEXCEPT
    {  return polymorphic_allocator();  }
 
    //! <b>Returns</b>:
    //!   m_resource.
-   memory_resource* resource() const
+   memory_resource* resource() const BOOST_NOEXCEPT
    {  return m_resource;  }
 
    private:

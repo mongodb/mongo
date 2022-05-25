@@ -184,6 +184,15 @@ namespace boost{ namespace math
 
   typedef triangular_distribution<double> triangular;
 
+  #ifdef __cpp_deduction_guides
+  template <class RealType>
+  triangular_distribution(RealType)->triangular_distribution<typename boost::math::tools::promote_args<RealType>::type>;
+  template <class RealType>
+  triangular_distribution(RealType,RealType)->triangular_distribution<typename boost::math::tools::promote_args<RealType>::type>;
+  template <class RealType>
+  triangular_distribution(RealType,RealType,RealType)->triangular_distribution<typename boost::math::tools::promote_args<RealType>::type>;
+  #endif
+
   template <class RealType, class Policy>
   inline const std::pair<RealType, RealType> range(const triangular_distribution<RealType, Policy>& /* dist */)
   { // Range of permissible values for random variable x.

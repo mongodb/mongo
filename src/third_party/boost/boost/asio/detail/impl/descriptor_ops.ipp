@@ -2,7 +2,7 @@
 // detail/impl/descriptor_ops.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -34,6 +34,14 @@ namespace descriptor_ops {
 int open(const char* path, int flags, boost::system::error_code& ec)
 {
   int result = ::open(path, flags);
+  get_last_error(ec, result < 0);
+  return result;
+}
+
+int open(const char* path, int flags,
+    unsigned mode, boost::system::error_code& ec)
+{
+  int result = ::open(path, flags, mode);
   get_last_error(ec, result < 0);
   return result;
 }
@@ -467,6 +475,323 @@ bool non_blocking_write1(int d, const void* data, std::size_t size,
     return true;
   }
 }
+
+#if defined(BOOST_ASIO_HAS_FILE)
+
+std::size_t sync_read_at(int d, state_type state, uint64_t offset,
+    buf* bufs, std::size_t count, bool all_empty, boost::system::error_code& ec)
+{
+  if (d == -1)
+  {
+    ec = boost::asio::error::bad_descriptor;
+    return 0;
+  }
+
+  // A request to read 0 bytes on a stream is a no-op.
+  if (all_empty)
+  {
+    ec.assign(0, ec.category());
+    return 0;
+  }
+
+  // Read some data.
+  for (;;)
+  {
+    // Try to complete the operation without blocking.
+    signed_size_type bytes = ::preadv(d, bufs, static_cast<int>(count), offset);
+    get_last_error(ec, bytes < 0);
+
+    // Check if operation succeeded.
+    if (bytes > 0)
+      return bytes;
+
+    // Check for EOF.
+    if (bytes == 0)
+    {
+      ec = boost::asio::error::eof;
+      return 0;
+    }
+
+    // Operation failed.
+    if ((state & user_set_non_blocking)
+        || (ec != boost::asio::error::would_block
+          && ec != boost::asio::error::try_again))
+      return 0;
+
+    // Wait for descriptor to become ready.
+    if (descriptor_ops::poll_read(d, 0, ec) < 0)
+      return 0;
+  }
+}
+
+std::size_t sync_read_at1(int d, state_type state, uint64_t offset,
+    void* data, std::size_t size, boost::system::error_code& ec)
+{
+  if (d == -1)
+  {
+    ec = boost::asio::error::bad_descriptor;
+    return 0;
+  }
+
+  // A request to read 0 bytes on a stream is a no-op.
+  if (size == 0)
+  {
+    ec.assign(0, ec.category());
+    return 0;
+  }
+
+  // Read some data.
+  for (;;)
+  {
+    // Try to complete the operation without blocking.
+    signed_size_type bytes = ::pread(d, data, size, offset);
+    get_last_error(ec, bytes < 0);
+
+    // Check if operation succeeded.
+    if (bytes > 0)
+      return bytes;
+
+    // Check for EOF.
+    if (bytes == 0)
+    {
+      ec = boost::asio::error::eof;
+      return 0;
+    }
+
+    // Operation failed.
+    if ((state & user_set_non_blocking)
+        || (ec != boost::asio::error::would_block
+          && ec != boost::asio::error::try_again))
+      return 0;
+
+    // Wait for descriptor to become ready.
+    if (descriptor_ops::poll_read(d, 0, ec) < 0)
+      return 0;
+  }
+}
+
+bool non_blocking_read_at(int d, uint64_t offset, buf* bufs, std::size_t count,
+    boost::system::error_code& ec, std::size_t& bytes_transferred)
+{
+  for (;;)
+  {
+    // Read some data.
+    signed_size_type bytes = ::preadv(d, bufs, static_cast<int>(count), offset);
+    get_last_error(ec, bytes < 0);
+
+    // Check for EOF.
+    if (bytes == 0)
+    {
+      ec = boost::asio::error::eof;
+      return true;
+    }
+
+    // Check if operation succeeded.
+    if (bytes > 0)
+    {
+      bytes_transferred = bytes;
+      return true;
+    }
+
+    // Retry operation if interrupted by signal.
+    if (ec == boost::asio::error::interrupted)
+      continue;
+
+    // Check if we need to run the operation again.
+    if (ec == boost::asio::error::would_block
+        || ec == boost::asio::error::try_again)
+      return false;
+
+    // Operation failed.
+    bytes_transferred = 0;
+    return true;
+  }
+}
+
+bool non_blocking_read_at1(int d, uint64_t offset, void* data, std::size_t size,
+    boost::system::error_code& ec, std::size_t& bytes_transferred)
+{
+  for (;;)
+  {
+    // Read some data.
+    signed_size_type bytes = ::pread(d, data, size, offset);
+    get_last_error(ec, bytes < 0);
+
+    // Check for EOF.
+    if (bytes == 0)
+    {
+      ec = boost::asio::error::eof;
+      return true;
+    }
+
+    // Check if operation succeeded.
+    if (bytes > 0)
+    {
+      bytes_transferred = bytes;
+      return true;
+    }
+
+    // Retry operation if interrupted by signal.
+    if (ec == boost::asio::error::interrupted)
+      continue;
+
+    // Check if we need to run the operation again.
+    if (ec == boost::asio::error::would_block
+        || ec == boost::asio::error::try_again)
+      return false;
+
+    // Operation failed.
+    bytes_transferred = 0;
+    return true;
+  }
+}
+
+std::size_t sync_write_at(int d, state_type state, uint64_t offset,
+    const buf* bufs, std::size_t count, bool all_empty,
+    boost::system::error_code& ec)
+{
+  if (d == -1)
+  {
+    ec = boost::asio::error::bad_descriptor;
+    return 0;
+  }
+
+  // A request to write 0 bytes on a stream is a no-op.
+  if (all_empty)
+  {
+    ec.assign(0, ec.category());
+    return 0;
+  }
+
+  // Write some data.
+  for (;;)
+  {
+    // Try to complete the operation without blocking.
+    signed_size_type bytes = ::pwritev(d,
+        bufs, static_cast<int>(count), offset);
+    get_last_error(ec, bytes < 0);
+
+    // Check if operation succeeded.
+    if (bytes > 0)
+      return bytes;
+
+    // Operation failed.
+    if ((state & user_set_non_blocking)
+        || (ec != boost::asio::error::would_block
+          && ec != boost::asio::error::try_again))
+      return 0;
+
+    // Wait for descriptor to become ready.
+    if (descriptor_ops::poll_write(d, 0, ec) < 0)
+      return 0;
+  }
+}
+
+std::size_t sync_write_at1(int d, state_type state, uint64_t offset,
+    const void* data, std::size_t size, boost::system::error_code& ec)
+{
+  if (d == -1)
+  {
+    ec = boost::asio::error::bad_descriptor;
+    return 0;
+  }
+
+  // A request to write 0 bytes on a stream is a no-op.
+  if (size == 0)
+  {
+    ec.assign(0, ec.category());
+    return 0;
+  }
+
+  // Write some data.
+  for (;;)
+  {
+    // Try to complete the operation without blocking.
+    signed_size_type bytes = ::pwrite(d, data, size, offset);
+    get_last_error(ec, bytes < 0);
+
+    // Check if operation succeeded.
+    if (bytes > 0)
+      return bytes;
+
+    // Operation failed.
+    if ((state & user_set_non_blocking)
+        || (ec != boost::asio::error::would_block
+          && ec != boost::asio::error::try_again))
+      return 0;
+
+    // Wait for descriptor to become ready.
+    if (descriptor_ops::poll_write(d, 0, ec) < 0)
+      return 0;
+  }
+}
+
+bool non_blocking_write_at(int d, uint64_t offset,
+    const buf* bufs, std::size_t count,
+    boost::system::error_code& ec, std::size_t& bytes_transferred)
+{
+  for (;;)
+  {
+    // Write some data.
+    signed_size_type bytes = ::pwritev(d,
+        bufs, static_cast<int>(count), offset);
+    get_last_error(ec, bytes < 0);
+
+    // Check if operation succeeded.
+    if (bytes >= 0)
+    {
+      bytes_transferred = bytes;
+      return true;
+    }
+
+    // Retry operation if interrupted by signal.
+    if (ec == boost::asio::error::interrupted)
+      continue;
+
+    // Check if we need to run the operation again.
+    if (ec == boost::asio::error::would_block
+        || ec == boost::asio::error::try_again)
+      return false;
+
+    // Operation failed.
+    bytes_transferred = 0;
+    return true;
+  }
+}
+
+bool non_blocking_write_at1(int d, uint64_t offset,
+    const void* data, std::size_t size,
+    boost::system::error_code& ec, std::size_t& bytes_transferred)
+{
+  for (;;)
+  {
+    // Write some data.
+    signed_size_type bytes = ::pwrite(d, data, size, offset);
+    get_last_error(ec, bytes < 0);
+
+    // Check if operation succeeded.
+    if (bytes >= 0)
+    {
+      bytes_transferred = bytes;
+      return true;
+    }
+
+    // Retry operation if interrupted by signal.
+    if (ec == boost::asio::error::interrupted)
+      continue;
+
+    // Check if we need to run the operation again.
+    if (ec == boost::asio::error::would_block
+        || ec == boost::asio::error::try_again)
+      return false;
+
+    // Operation failed.
+    bytes_transferred = 0;
+    return true;
+  }
+}
+
+#endif // defined(BOOST_ASIO_HAS_FILE)
 
 int ioctl(int d, state_type& state, long cmd,
     ioctl_arg_type* arg, boost::system::error_code& ec)

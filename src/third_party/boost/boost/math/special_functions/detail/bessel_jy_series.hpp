@@ -10,6 +10,9 @@
 #pragma once
 #endif
 
+#include <cmath>
+#include <cstdint>
+
 namespace boost { namespace math { namespace detail{
 
 template <class T, class Policy>
@@ -61,13 +64,10 @@ inline T bessel_j_small_z_series(T v, T x, const Policy& pol)
       return prefix;
 
    bessel_j_small_z_series_term<T, Policy> s(v, x);
-   boost::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
-#if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x582))
-   T zero = 0;
-   T result = boost::math::tools::sum_series(s, boost::math::policies::get_epsilon<T, Policy>(), max_iter, zero);
-#else
+   std::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
+
    T result = boost::math::tools::sum_series(s, boost::math::policies::get_epsilon<T, Policy>(), max_iter);
-#endif
+
    policies::check_series_iterations<T>("boost::math::bessel_j_small_z_series<%1%>(%1%,%1%)", max_iter, pol);
    return prefix * result;
 }
@@ -177,14 +177,11 @@ inline T bessel_y_small_z_series(T v, T x, T* pscale, const Policy& pol)
       prefix = -exp(prefix);
    }
    bessel_y_small_z_series_term_a<T, Policy> s(v, x);
-   boost::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
+   std::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
    *pscale = scale;
-#if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x582))
-   T zero = 0;
-   T result = boost::math::tools::sum_series(s, boost::math::policies::get_epsilon<T, Policy>(), max_iter, zero);
-#else
+
    T result = boost::math::tools::sum_series(s, boost::math::policies::get_epsilon<T, Policy>(), max_iter);
-#endif
+
    policies::check_series_iterations<T>("boost::math::bessel_y_small_z_series<%1%>(%1%,%1%)", max_iter, pol);
    result *= prefix;
 
@@ -200,11 +197,9 @@ inline T bessel_y_small_z_series(T v, T x, T* pscale, const Policy& pol)
    }
    bessel_y_small_z_series_term_b<T, Policy> s2(v, x);
    max_iter = policies::get_max_series_iterations<Policy>();
-#if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x582))
-   T b = boost::math::tools::sum_series(s2, boost::math::policies::get_epsilon<T, Policy>(), max_iter, zero);
-#else
+
    T b = boost::math::tools::sum_series(s2, boost::math::policies::get_epsilon<T, Policy>(), max_iter);
-#endif
+
    result -= scale * prefix * b;
    return result;
 }
@@ -218,8 +213,8 @@ T bessel_yn_small_z(int n, T z, T* scale, const Policy& pol)
    // Note that when called we assume that x < epsilon and n is a positive integer.
    //
    BOOST_MATH_STD_USING
-   BOOST_ASSERT(n >= 0);
-   BOOST_ASSERT((z < policies::get_epsilon<T, Policy>()));
+   BOOST_MATH_ASSERT(n >= 0);
+   BOOST_MATH_ASSERT((z < policies::get_epsilon<T, Policy>()));
 
    if(n == 0)
    {

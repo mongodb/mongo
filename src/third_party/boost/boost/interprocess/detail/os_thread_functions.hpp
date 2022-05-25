@@ -157,7 +157,7 @@ inline OS_highres_count_t get_current_system_highres_count()
    if(!winapi::query_performance_counter(&count)){
       count = winapi::get_tick_count();
    }
-   return count;
+   return (OS_highres_count_t)count;
 }
 
 inline void zero_highres_count(OS_highres_count_t &count)
@@ -421,7 +421,7 @@ inline void thread_sleep_tick()
    struct timespec rqt;
    //Sleep for the half of the tick time
    rqt.tv_sec  = 0;
-   rqt.tv_nsec = get_system_tick_ns()/2;
+   rqt.tv_nsec = (long)get_system_tick_ns()/2;
    ::nanosleep(&rqt, 0);
 }
 
@@ -601,7 +601,7 @@ class launch_thread_impl
       : f_( f )
    {}
 
-   void run()
+   virtual void run() BOOST_OVERRIDE
    {  f_();  }
 
    private:

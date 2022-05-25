@@ -2,7 +2,7 @@
 // use_awaitable.hpp
 // ~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -33,7 +33,7 @@
 namespace boost {
 namespace asio {
 
-/// A completion token that represents the currently executing coroutine.
+/// A @ref completion_token that represents the currently executing coroutine.
 /**
  * The @c use_awaitable_t class, with its value @c use_awaitable, is used to
  * represent the currently executing coroutine. This completion token may be
@@ -100,17 +100,14 @@ struct use_awaitable_t
     typedef use_awaitable_t default_completion_token_type;
 
     /// Construct the adapted executor from the inner executor type.
-    executor_with_default(const InnerExecutor& ex) BOOST_ASIO_NOEXCEPT
-      : InnerExecutor(ex)
-    {
-    }
-
-    /// Convert the specified executor to the inner executor type, then use
-    /// that to construct the adapted executor.
-    template <typename OtherExecutor>
-    executor_with_default(const OtherExecutor& ex,
+    template <typename InnerExecutor1>
+    executor_with_default(const InnerExecutor1& ex,
         typename constraint<
-          is_convertible<OtherExecutor, InnerExecutor>::value
+          conditional<
+            !is_same<InnerExecutor1, executor_with_default>::value,
+            is_convertible<InnerExecutor1, InnerExecutor>,
+            false_type
+          >::type::value
         >::type = 0) BOOST_ASIO_NOEXCEPT
       : InnerExecutor(ex)
     {
@@ -147,7 +144,8 @@ struct use_awaitable_t
 #endif // defined(BOOST_ASIO_ENABLE_HANDLER_TRACKING)
 };
 
-/// A completion token object that represents the currently executing coroutine.
+/// A @ref completion_token object that represents the currently executing
+/// coroutine.
 /**
  * See the documentation for boost::asio::use_awaitable_t for a usage example.
  */

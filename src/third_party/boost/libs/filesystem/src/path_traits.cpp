@@ -11,12 +11,16 @@
 
 #include "platform_config.hpp"
 
+#include <boost/filesystem/config.hpp>
 #include <boost/filesystem/path_traits.hpp>
 #include <boost/system/system_error.hpp>
-#include <boost/scoped_array.hpp>
-#include <locale>   // for codecvt_base::result
-#include <cstring>  // for strlen
-#include <cwchar>   // for wcslen
+#include <boost/smart_ptr/scoped_array.hpp>
+#include <boost/assert.hpp>
+#include <string>
+#include <locale>  // for codecvt_base::result
+#include <cstring> // for strlen
+#include <cwchar>  // for wcslen
+#include <cstddef>
 
 namespace pt = boost::filesystem::path_traits;
 namespace fs = boost::filesystem;
@@ -27,13 +31,12 @@ namespace bs = boost::system;
 //--------------------------------------------------------------------------------------//
 
 #ifndef BOOST_FILESYSTEM_CODECVT_BUF_SIZE
-# define BOOST_FILESYSTEM_CODECVT_BUF_SIZE 256
+#define BOOST_FILESYSTEM_CODECVT_BUF_SIZE 256
 #endif
 
 namespace {
 
-  const std::size_t default_codecvt_buf_size = BOOST_FILESYSTEM_CODECVT_BUF_SIZE;
-
+BOOST_CONSTEXPR_OR_CONST std::size_t default_codecvt_buf_size = BOOST_FILESYSTEM_CODECVT_BUF_SIZE;
 
 //--------------------------------------------------------------------------------------//
 //                                                                                      //
@@ -46,13 +49,13 @@ namespace {
 //                      convert_aux const char* to wstring                             //
 //--------------------------------------------------------------------------------------//
 
-  void convert_aux(
-                   const char* from,
-                   const char* from_end,
-                   wchar_t* to, wchar_t* to_end,
-                   std::wstring & target,
-                   const pt::codecvt_type & cvt)
-  {
+void convert_aux(
+    const char* from,
+    const char* from_end,
+    wchar_t* to, wchar_t* to_end,
+    std::wstring& target,
+    pt::codecvt_type const& cvt)
+{
     //std::cout << std::hex
     //          << " from=" << std::size_t(from)
     //          << " from_end=" << std::size_t(from_end)
@@ -60,33 +63,31 @@ namespace {
     //          << " to_end=" << std::size_t(to_end)
     //          << std::endl;
 
-    std::mbstate_t state  = std::mbstate_t();  // perhaps unneeded, but cuts bug reports
+    std::mbstate_t state = std::mbstate_t(); // perhaps unneeded, but cuts bug reports
     const char* from_next;
     wchar_t* to_next;
 
     std::codecvt_base::result res;
 
-    if ((res=cvt.in(state, from, from_end, from_next,
-           to, to_end, to_next)) != std::codecvt_base::ok)
+    if ((res = cvt.in(state, from, from_end, from_next, to, to_end, to_next)) != std::codecvt_base::ok)
     {
-      //std::cout << " result is " << static_cast<int>(res) << std::endl;
-      BOOST_FILESYSTEM_THROW(bs::system_error(res, fs::codecvt_error_category(),
-        "boost::filesystem::path codecvt to wstring"));
+        //std::cout << " result is " << static_cast<int>(res) << std::endl;
+        BOOST_FILESYSTEM_THROW(bs::system_error(res, fs::codecvt_error_category(), "boost::filesystem::path codecvt to wstring"));
     }
     target.append(to, to_next);
-  }
+}
 
 //--------------------------------------------------------------------------------------//
 //                      convert_aux const wchar_t* to string                           //
 //--------------------------------------------------------------------------------------//
 
-  void convert_aux(
-                   const wchar_t* from,
-                   const wchar_t* from_end,
-                   char* to, char* to_end,
-                   std::string & target,
-                   const pt::codecvt_type & cvt)
-  {
+void convert_aux(
+    const wchar_t* from,
+    const wchar_t* from_end,
+    char* to, char* to_end,
+    std::string& target,
+    pt::codecvt_type const& cvt)
+{
     //std::cout << std::hex
     //          << " from=" << std::size_t(from)
     //          << " from_end=" << std::size_t(from_end)
@@ -94,100 +95,103 @@ namespace {
     //          << " to_end=" << std::size_t(to_end)
     //          << std::endl;
 
-    std::mbstate_t state  = std::mbstate_t();  // perhaps unneeded, but cuts bug reports
+    std::mbstate_t state = std::mbstate_t(); // perhaps unneeded, but cuts bug reports
     const wchar_t* from_next;
     char* to_next;
 
     std::codecvt_base::result res;
 
-    if ((res=cvt.out(state, from, from_end, from_next,
-           to, to_end, to_next)) != std::codecvt_base::ok)
+    if ((res = cvt.out(state, from, from_end, from_next, to, to_end, to_next)) != std::codecvt_base::ok)
     {
-      //std::cout << " result is " << static_cast<int>(res) << std::endl;
-      BOOST_FILESYSTEM_THROW(bs::system_error(res, fs::codecvt_error_category(),
-        "boost::filesystem::path codecvt to string"));
+        //std::cout << " result is " << static_cast<int>(res) << std::endl;
+        BOOST_FILESYSTEM_THROW(bs::system_error(res, fs::codecvt_error_category(), "boost::filesystem::path codecvt to string"));
     }
     target.append(to, to_next);
-  }
+}
 
-}  // unnamed namespace
+} // unnamed namespace
 
 //--------------------------------------------------------------------------------------//
 //                                   path_traits                                        //
 //--------------------------------------------------------------------------------------//
 
-namespace boost { namespace filesystem { namespace path_traits {
+namespace boost {
+namespace filesystem {
+namespace path_traits {
 
 //--------------------------------------------------------------------------------------//
 //                          convert const char* to wstring                              //
 //--------------------------------------------------------------------------------------//
 
-  BOOST_FILESYSTEM_DECL
-  void convert(const char* from,
-                const char* from_end,    // 0 for null terminated MBCS
-                std::wstring & to,
-                const codecvt_type & cvt)
-  {
+BOOST_FILESYSTEM_DECL
+void convert(const char* from,
+             const char* from_end, // 0 for null terminated MBCS
+             std::wstring& to, codecvt_type const& cvt)
+{
     BOOST_ASSERT(from);
 
-    if (!from_end)  // null terminated
+    if (!from_end) // null terminated
     {
-      from_end = from + std::strlen(from);
+        from_end = from + std::strlen(from);
     }
 
-    if (from == from_end) return;
+    if (from == from_end)
+        return;
 
-    std::size_t buf_size = (from_end - from) * 3;  // perhaps too large, but that's OK
+    std::size_t buf_size = (from_end - from) * 3; // perhaps too large, but that's OK
 
     //  dynamically allocate a buffer only if source is unusually large
     if (buf_size > default_codecvt_buf_size)
     {
-      boost::scoped_array< wchar_t > buf(new wchar_t [buf_size]);
-      convert_aux(from, from_end, buf.get(), buf.get()+buf_size, to, cvt);
+        boost::scoped_array< wchar_t > buf(new wchar_t[buf_size]);
+        convert_aux(from, from_end, buf.get(), buf.get() + buf_size, to, cvt);
     }
     else
     {
-      wchar_t buf[default_codecvt_buf_size];
-      convert_aux(from, from_end, buf, buf+default_codecvt_buf_size, to, cvt);
+        wchar_t buf[default_codecvt_buf_size];
+        convert_aux(from, from_end, buf, buf + default_codecvt_buf_size, to, cvt);
     }
-  }
+}
 
 //--------------------------------------------------------------------------------------//
 //                         convert const wchar_t* to string                            //
 //--------------------------------------------------------------------------------------//
 
-  BOOST_FILESYSTEM_DECL
-  void convert(const wchar_t* from,
-                const wchar_t* from_end,  // 0 for null terminated MBCS
-                std::string & to,
-                const codecvt_type & cvt)
-  {
+BOOST_FILESYSTEM_DECL
+void convert(const wchar_t* from,
+             const wchar_t* from_end, // 0 for null terminated MBCS
+             std::string& to, codecvt_type const& cvt)
+{
     BOOST_ASSERT(from);
 
-    if (!from_end)  // null terminated
+    if (!from_end) // null terminated
     {
-      from_end = from + std::wcslen(from);
+        from_end = from + std::wcslen(from);
     }
 
-    if (from == from_end) return;
+    if (from == from_end)
+        return;
 
     //  The codecvt length functions may not be implemented, and I don't really
     //  understand them either. Thus this code is just a guess; if it turns
     //  out the buffer is too small then an error will be reported and the code
     //  will have to be fixed.
-    std::size_t buf_size = (from_end - from) * 4;  // perhaps too large, but that's OK
-    buf_size += 4;  // encodings like shift-JIS need some prefix space
+    std::size_t buf_size = (from_end - from) * 4; // perhaps too large, but that's OK
+    buf_size += 4;                                // encodings like shift-JIS need some prefix space
 
     //  dynamically allocate a buffer only if source is unusually large
     if (buf_size > default_codecvt_buf_size)
     {
-      boost::scoped_array< char > buf(new char [buf_size]);
-      convert_aux(from, from_end, buf.get(), buf.get()+buf_size, to, cvt);
+        boost::scoped_array< char > buf(new char[buf_size]);
+        convert_aux(from, from_end, buf.get(), buf.get() + buf_size, to, cvt);
     }
     else
     {
-      char buf[default_codecvt_buf_size];
-      convert_aux(from, from_end, buf, buf+default_codecvt_buf_size, to, cvt);
+        char buf[default_codecvt_buf_size];
+        convert_aux(from, from_end, buf, buf + default_codecvt_buf_size, to, cvt);
     }
-  }
-}}} // namespace boost::filesystem::path_traits
+}
+
+} // namespace path_traits
+} // namespace filesystem
+} // namespace boost

@@ -120,22 +120,22 @@ class avl_set_impl
    ~avl_set_impl();
 
    //! @copydoc ::boost::intrusive::avltree::begin()
-   iterator begin();
+   iterator begin() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::begin()const
-   const_iterator begin() const;
+   const_iterator begin() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::cbegin()const
-   const_iterator cbegin() const;
+   const_iterator cbegin() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::end()
-   iterator end();
+   iterator end() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::end()const
-   const_iterator end() const;
+   const_iterator end() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::cend()const
-   const_iterator cend() const;
+   const_iterator cend() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::begin()
    reverse_iterator avlegin();
@@ -144,37 +144,37 @@ class avl_set_impl
    const_reverse_iterator avlegin() const;
 
    //! @copydoc ::boost::intrusive::avltree::crbegin()const
-   const_reverse_iterator crbegin() const;
+   const_reverse_iterator crbegin() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::rend()
-   reverse_iterator rend();
+   reverse_iterator rend() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::rend()const
-   const_reverse_iterator rend() const;
+   const_reverse_iterator rend() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::crend()const
-   const_reverse_iterator crend() const;
+   const_reverse_iterator crend() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::root()
-   iterator root();
+   iterator root() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::root()const
-   const_iterator root() const;
+   const_iterator root() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::croot()const
-   const_iterator croot() const;
+   const_iterator croot() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::container_from_end_iterator(iterator)
-   static avl_set_impl &container_from_end_iterator(iterator end_iterator);
+   static avl_set_impl &container_from_end_iterator(iterator end_iterator) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::container_from_end_iterator(const_iterator)
-   static const avl_set_impl &container_from_end_iterator(const_iterator end_iterator);
+   static const avl_set_impl &container_from_end_iterator(const_iterator end_iterator) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::container_from_iterator(iterator)
-   static avl_set_impl &container_from_iterator(iterator it);
+   static avl_set_impl &container_from_iterator(iterator it) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::container_from_iterator(const_iterator)
-   static const avl_set_impl &container_from_iterator(const_iterator it);
+   static const avl_set_impl &container_from_iterator(const_iterator it) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::key_comp()const
    key_compare key_comp() const;
@@ -183,10 +183,10 @@ class avl_set_impl
    value_compare value_comp() const;
 
    //! @copydoc ::boost::intrusive::avltree::empty()const
-   bool empty() const;
+   bool empty() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::size()const
-   size_type size() const;
+   size_type size() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::swap
    void swap(avl_set_impl& other);
@@ -244,24 +244,24 @@ class avl_set_impl
    {  tree_type::insert_unique(b, e);  }
 
    //! @copydoc ::boost::intrusive::avltree::insert_unique_commit
-   iterator insert_commit(reference value, const insert_commit_data &commit_data)
+   iterator insert_commit(reference value, const insert_commit_data &commit_data) BOOST_NOEXCEPT
    {  return tree_type::insert_unique_commit(value, commit_data);  }
 
    #ifdef BOOST_INTRUSIVE_DOXYGEN_INVOKED
    //! @copydoc ::boost::intrusive::avltree::insert_before
-   iterator insert_before(const_iterator pos, reference value);
+   iterator insert_before(const_iterator pos, reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::push_back
-   void push_back(reference value);
+   void push_back(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::push_front
-   void push_front(reference value);
+   void push_front(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::erase(const_iterator)
-   iterator erase(const_iterator i);
+   iterator erase(const_iterator i) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::erase(const_iterator,const_iterator)
-   iterator erase(const_iterator b, const_iterator e);
+   iterator erase(const_iterator b, const_iterator e) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::erase(const key_type &key)
    size_type erase(const key_type &key);
@@ -272,11 +272,11 @@ class avl_set_impl
 
    //! @copydoc ::boost::intrusive::avltree::erase_and_dispose(const_iterator,Disposer)
    template<class Disposer>
-   iterator erase_and_dispose(const_iterator i, Disposer disposer);
+   iterator erase_and_dispose(const_iterator i, Disposer disposer) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::erase_and_dispose(const_iterator,const_iterator,Disposer)
    template<class Disposer>
-   iterator erase_and_dispose(const_iterator b, const_iterator e, Disposer disposer);
+   iterator erase_and_dispose(const_iterator b, const_iterator e, Disposer disposer) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::erase_and_dispose(const key_type &, Disposer)
    template<class Disposer>
@@ -287,11 +287,11 @@ class avl_set_impl
    size_type erase_and_dispose(const KeyType& key, KeyTypeKeyCompare comp, Disposer disposer);
 
    //! @copydoc ::boost::intrusive::avltree::clear
-   void clear();
+   void clear() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::clear_and_dispose
    template<class Disposer>
-   void clear_and_dispose(Disposer disposer);
+   void clear_and_dispose(Disposer disposer) BOOST_NOEXCEPT;
 
    #endif   //   #ifdef BOOST_INTRUSIVE_DOXYGEN_INVOKED
 
@@ -391,28 +391,28 @@ class avl_set_impl
          (const KeyType& lower_key, const KeyType& upper_key, KeyTypeKeyCompare comp, bool left_closed, bool right_closed) const;
 
    //! @copydoc ::boost::intrusive::avltree::s_iterator_to(reference)
-   static iterator s_iterator_to(reference value);
+   static iterator s_iterator_to(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::s_iterator_to(const_reference)
-   static const_iterator s_iterator_to(const_reference value);
+   static const_iterator s_iterator_to(const_reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::iterator_to(reference)
-   iterator iterator_to(reference value);
+   iterator iterator_to(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::iterator_to(const_reference)const
-   const_iterator iterator_to(const_reference value) const;
+   const_iterator iterator_to(const_reference value) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::init_node(reference)
-   static void init_node(reference value);
+   static void init_node(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::unlink_leftmost_without_rebalance
-   pointer unlink_leftmost_without_rebalance();
+   pointer unlink_leftmost_without_rebalance() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::replace_node
-   void replace_node(iterator replace_this, reference with_this);
+   void replace_node(iterator replace_this, reference with_this) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::remove_node
-   void remove_node(reference value);
+   void remove_node(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::merge_unique
    template<class ...Options2>
@@ -555,16 +555,16 @@ class avl_set
    BOOST_INTRUSIVE_FORCEINLINE void clone_from(BOOST_RV_REF(avl_set) src, Cloner cloner, Disposer disposer)
    {  Base::clone_from(BOOST_MOVE_BASE(Base, src), cloner, disposer);  }
 
-   BOOST_INTRUSIVE_FORCEINLINE static avl_set &container_from_end_iterator(iterator end_iterator)
+   BOOST_INTRUSIVE_FORCEINLINE static avl_set &container_from_end_iterator(iterator end_iterator) BOOST_NOEXCEPT
    {  return static_cast<avl_set &>(Base::container_from_end_iterator(end_iterator));   }
 
-   BOOST_INTRUSIVE_FORCEINLINE static const avl_set &container_from_end_iterator(const_iterator end_iterator)
+   BOOST_INTRUSIVE_FORCEINLINE static const avl_set &container_from_end_iterator(const_iterator end_iterator) BOOST_NOEXCEPT
    {  return static_cast<const avl_set &>(Base::container_from_end_iterator(end_iterator));   }
 
-   BOOST_INTRUSIVE_FORCEINLINE static avl_set &container_from_iterator(iterator it)
+   BOOST_INTRUSIVE_FORCEINLINE static avl_set &container_from_iterator(iterator it) BOOST_NOEXCEPT
    {  return static_cast<avl_set &>(Base::container_from_iterator(it));   }
 
-   BOOST_INTRUSIVE_FORCEINLINE static const avl_set &container_from_iterator(const_iterator it)
+   BOOST_INTRUSIVE_FORCEINLINE static const avl_set &container_from_iterator(const_iterator it) BOOST_NOEXCEPT
    {  return static_cast<const avl_set &>(Base::container_from_iterator(it));   }
 };
 
@@ -657,61 +657,61 @@ class avl_multiset_impl
    ~avl_multiset_impl();
 
    //! @copydoc ::boost::intrusive::avltree::begin()
-   iterator begin();
+   iterator begin() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::begin()const
-   const_iterator begin() const;
+   const_iterator begin() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::cbegin()const
-   const_iterator cbegin() const;
+   const_iterator cbegin() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::end()
-   iterator end();
+   iterator end() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::end()const
-   const_iterator end() const;
+   const_iterator end() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::cend()const
-   const_iterator cend() const;
+   const_iterator cend() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::rbegin()
-   reverse_iterator rbegin();
+   reverse_iterator rbegin() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::rbegin()const
-   const_reverse_iterator rbegin() const;
+   const_reverse_iterator rbegin() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::crbegin()const
-   const_reverse_iterator crbegin() const;
+   const_reverse_iterator crbegin() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::rend()
-   reverse_iterator rend();
+   reverse_iterator rend() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::rend()const
-   const_reverse_iterator rend() const;
+   const_reverse_iterator rend() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::crend()const
-   const_reverse_iterator crend() const;
+   const_reverse_iterator crend() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::root()
-   iterator root();
+   iterator root() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::root()const
-   const_iterator root() const;
+   const_iterator root() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::croot()const
-   const_iterator croot() const;
+   const_iterator croot() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::container_from_end_iterator(iterator)
-   static avl_multiset_impl &container_from_end_iterator(iterator end_iterator);
+   static avl_multiset_impl &container_from_end_iterator(iterator end_iterator) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::container_from_end_iterator(const_iterator)
-   static const avl_multiset_impl &container_from_end_iterator(const_iterator end_iterator);
+   static const avl_multiset_impl &container_from_end_iterator(const_iterator end_iterator) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::container_from_iterator(iterator)
-   static avl_multiset_impl &container_from_iterator(iterator it);
+   static avl_multiset_impl &container_from_iterator(iterator it) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::container_from_iterator(const_iterator)
-   static const avl_multiset_impl &container_from_iterator(const_iterator it);
+   static const avl_multiset_impl &container_from_iterator(const_iterator it) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::key_comp()const
    key_compare key_comp() const;
@@ -720,10 +720,10 @@ class avl_multiset_impl
    value_compare value_comp() const;
 
    //! @copydoc ::boost::intrusive::avltree::empty()const
-   bool empty() const;
+   bool empty() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::size()const
-   size_type size() const;
+   size_type size() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::swap
    void swap(avl_multiset_impl& other);
@@ -758,19 +758,19 @@ class avl_multiset_impl
 
    #ifdef BOOST_INTRUSIVE_DOXYGEN_INVOKED
    //! @copydoc ::boost::intrusive::avltree::insert_before
-   iterator insert_before(const_iterator pos, reference value);
+   iterator insert_before(const_iterator pos, reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::push_back
-   void push_back(reference value);
+   void push_back(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::push_front
-   void push_front(reference value);
+   void push_front(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::erase(const_iterator)
-   iterator erase(const_iterator i);
+   iterator erase(const_iterator i) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::erase(const_iterator,const_iterator)
-   iterator erase(const_iterator b, const_iterator e);
+   iterator erase(const_iterator b, const_iterator e) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::erase(const key_type &)
    size_type erase(const key_type &key);
@@ -781,11 +781,11 @@ class avl_multiset_impl
 
    //! @copydoc ::boost::intrusive::avltree::erase_and_dispose(const_iterator,Disposer)
    template<class Disposer>
-   iterator erase_and_dispose(const_iterator i, Disposer disposer);
+   iterator erase_and_dispose(const_iterator i, Disposer disposer) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::erase_and_dispose(const_iterator,const_iterator,Disposer)
    template<class Disposer>
-   iterator erase_and_dispose(const_iterator b, const_iterator e, Disposer disposer);
+   iterator erase_and_dispose(const_iterator b, const_iterator e, Disposer disposer) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::erase_and_dispose(const key_type &, Disposer)
    template<class Disposer>
@@ -796,11 +796,11 @@ class avl_multiset_impl
    size_type erase_and_dispose(const KeyType& key, KeyTypeKeyCompare comp, Disposer disposer);
 
    //! @copydoc ::boost::intrusive::avltree::clear
-   void clear();
+   void clear() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::clear_and_dispose
    template<class Disposer>
-   void clear_and_dispose(Disposer disposer);
+   void clear_and_dispose(Disposer disposer) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::count(const key_type &)const
    size_type count(const key_type &key) const;
@@ -886,28 +886,28 @@ class avl_multiset_impl
          (const KeyType& lower_key, const KeyType& upper_key, KeyTypeKeyCompare comp, bool left_closed, bool right_closed) const;
 
    //! @copydoc ::boost::intrusive::avltree::s_iterator_to(reference)
-   static iterator s_iterator_to(reference value);
+   static iterator s_iterator_to(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::s_iterator_to(const_reference)
-   static const_iterator s_iterator_to(const_reference value);
+   static const_iterator s_iterator_to(const_reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::iterator_to(reference)
-   iterator iterator_to(reference value);
+   iterator iterator_to(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::iterator_to(const_reference)const
-   const_iterator iterator_to(const_reference value) const;
+   const_iterator iterator_to(const_reference value) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::init_node(reference)
-   static void init_node(reference value);
+   static void init_node(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::unlink_leftmost_without_rebalance
-   pointer unlink_leftmost_without_rebalance();
+   pointer unlink_leftmost_without_rebalance() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::replace_node
-   void replace_node(iterator replace_this, reference with_this);
+   void replace_node(iterator replace_this, reference with_this) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::remove_node
-   void remove_node(reference value);
+   void remove_node(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::avltree::merge_equal
    template<class ...Options2>
@@ -1050,16 +1050,16 @@ class avl_multiset
    BOOST_INTRUSIVE_FORCEINLINE void clone_from(BOOST_RV_REF(avl_multiset) src, Cloner cloner, Disposer disposer)
    {  Base::clone_from(BOOST_MOVE_BASE(Base, src), cloner, disposer);  }
 
-   BOOST_INTRUSIVE_FORCEINLINE static avl_multiset &container_from_end_iterator(iterator end_iterator)
+   BOOST_INTRUSIVE_FORCEINLINE static avl_multiset &container_from_end_iterator(iterator end_iterator) BOOST_NOEXCEPT
    {  return static_cast<avl_multiset &>(Base::container_from_end_iterator(end_iterator));   }
 
-   BOOST_INTRUSIVE_FORCEINLINE static const avl_multiset &container_from_end_iterator(const_iterator end_iterator)
+   BOOST_INTRUSIVE_FORCEINLINE static const avl_multiset &container_from_end_iterator(const_iterator end_iterator) BOOST_NOEXCEPT
    {  return static_cast<const avl_multiset &>(Base::container_from_end_iterator(end_iterator));   }
 
-   BOOST_INTRUSIVE_FORCEINLINE static avl_multiset &container_from_iterator(iterator it)
+   BOOST_INTRUSIVE_FORCEINLINE static avl_multiset &container_from_iterator(iterator it) BOOST_NOEXCEPT
    {  return static_cast<avl_multiset &>(Base::container_from_iterator(it));   }
 
-   BOOST_INTRUSIVE_FORCEINLINE static const avl_multiset &container_from_iterator(const_iterator it)
+   BOOST_INTRUSIVE_FORCEINLINE static const avl_multiset &container_from_iterator(const_iterator it) BOOST_NOEXCEPT
    {  return static_cast<const avl_multiset &>(Base::container_from_iterator(it));   }
 };
 

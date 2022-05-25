@@ -14,16 +14,28 @@
 #ifndef BOOST_ATOMIC_DETAIL_WAIT_OPS_WINDOWS_HPP_INCLUDED_
 #define BOOST_ATOMIC_DETAIL_WAIT_OPS_WINDOWS_HPP_INCLUDED_
 
-#include <cstddef>
-#include <boost/static_assert.hpp>
-#include <boost/memory_order.hpp>
-#include <boost/winapi/basic_types.hpp>
-#include <boost/winapi/wait_constants.hpp>
 #include <boost/atomic/detail/config.hpp>
-#include <boost/atomic/detail/link.hpp>
-#include <boost/atomic/detail/once_flag.hpp>
+#include <boost/memory_order.hpp>
+#include <boost/winapi/wait_constants.hpp>
 #include <boost/atomic/detail/wait_operations_fwd.hpp>
+#include <boost/atomic/detail/wait_capabilities.hpp>
+#if defined(BOOST_ATOMIC_DETAIL_WINDOWS_HAS_WAIT_ON_ADDRESS)
+#include <boost/winapi/wait_on_address.hpp>
+#if (defined(BOOST_ATOMIC_FORCE_AUTO_LINK) || (!defined(BOOST_ALL_NO_LIB) && !defined(BOOST_ATOMIC_NO_LIB))) && !defined(BOOST_ATOMIC_NO_SYNCHRONIZATION_LIB)
+#define BOOST_LIB_NAME "synchronization"
+#if defined(BOOST_AUTO_LINK_NOMANGLE)
+#include <boost/config/auto_link.hpp>
+#else // defined(BOOST_AUTO_LINK_NOMANGLE)
+#define BOOST_AUTO_LINK_NOMANGLE
+#include <boost/config/auto_link.hpp>
+#undef BOOST_AUTO_LINK_NOMANGLE
+#endif // defined(BOOST_AUTO_LINK_NOMANGLE)
+#endif // (defined(BOOST_ATOMIC_FORCE_AUTO_LINK) || (!defined(BOOST_ALL_NO_LIB) && !defined(BOOST_ATOMIC_NO_LIB))) && !defined(BOOST_ATOMIC_NO_SYNCHRONIZATION_LIB)
+#else // defined(BOOST_ATOMIC_DETAIL_WINDOWS_HAS_WAIT_ON_ADDRESS)
+#include <cstddef>
+#include <boost/atomic/detail/wait_on_address.hpp>
 #include <boost/atomic/detail/wait_ops_generic.hpp>
+#endif // defined(BOOST_ATOMIC_DETAIL_WINDOWS_HAS_WAIT_ON_ADDRESS)
 #include <boost/atomic/detail/header.hpp>
 
 #ifdef BOOST_HAS_PRAGMA_ONCE
@@ -34,31 +46,46 @@ namespace boost {
 namespace atomics {
 namespace detail {
 
-typedef boost::winapi::BOOL_ BOOST_WINAPI_WINAPI_CC
-wait_on_address_t(
-    volatile boost::winapi::VOID_* addr,
-    boost::winapi::PVOID_ compare_addr,
-    boost::winapi::SIZE_T_ size,
-    boost::winapi::DWORD_ timeout_ms);
+#if defined(BOOST_ATOMIC_DETAIL_WINDOWS_HAS_WAIT_ON_ADDRESS)
 
-typedef boost::winapi::VOID_ BOOST_WINAPI_WINAPI_CC
-wake_by_address_t(boost::winapi::PVOID_ addr);
-
-extern BOOST_ATOMIC_DECL wait_on_address_t* wait_on_address;
-extern BOOST_ATOMIC_DECL wake_by_address_t* wake_by_address_single;
-extern BOOST_ATOMIC_DECL wake_by_address_t* wake_by_address_all;
-
-extern BOOST_ATOMIC_DECL once_flag wait_functions_once_flag;
-BOOST_ATOMIC_DECL void initialize_wait_functions() BOOST_NOEXCEPT;
-
-BOOST_FORCEINLINE void ensure_wait_functions_initialized() BOOST_NOEXCEPT
+template< typename Base, std::size_t Size >
+struct wait_operations_windows :
+    public Base
 {
-    BOOST_STATIC_ASSERT_MSG(once_flag_operations::is_always_lock_free, "Boost.Atomic unsupported target platform: native atomic operations not implemented for bytes");
-    if (BOOST_LIKELY(once_flag_operations::load(wait_functions_once_flag.m_flag, boost::memory_order_acquire) == 0u))
-        return;
+    typedef Base base_type;
+    typedef typename base_type::storage_type storage_type;
 
-    initialize_wait_functions();
-}
+    static BOOST_CONSTEXPR_OR_CONST bool always_has_native_wait_notify = true;
+
+    static BOOST_FORCEINLINE bool has_native_wait_notify(storage_type const volatile&) BOOST_NOEXCEPT
+    {
+        return true;
+    }
+
+    static BOOST_FORCEINLINE storage_type wait(storage_type const volatile& storage, storage_type old_val, memory_order order) BOOST_NOEXCEPT
+    {
+        storage_type new_val = base_type::load(storage, order);
+        while (new_val == old_val)
+        {
+            boost::winapi::WaitOnAddress(const_cast< storage_type* >(&storage), &old_val, Size, boost::winapi::infinite);
+            new_val = base_type::load(storage, order);
+        }
+
+        return new_val;
+    }
+
+    static BOOST_FORCEINLINE void notify_one(storage_type volatile& storage) BOOST_NOEXCEPT
+    {
+        boost::winapi::WakeByAddressSingle(const_cast< storage_type* >(&storage));
+    }
+
+    static BOOST_FORCEINLINE void notify_all(storage_type volatile& storage) BOOST_NOEXCEPT
+    {
+        boost::winapi::WakeByAddressAll(const_cast< storage_type* >(&storage));
+    }
+};
+
+#else // defined(BOOST_ATOMIC_DETAIL_WINDOWS_HAS_WAIT_ON_ADDRESS)
 
 template< typename Base, std::size_t Size >
 struct wait_operations_windows :
@@ -116,6 +143,8 @@ struct wait_operations_windows :
             base_type::notify_all(storage);
     }
 };
+
+#endif // defined(BOOST_ATOMIC_DETAIL_WINDOWS_HAS_WAIT_ON_ADDRESS)
 
 template< typename Base >
 struct wait_operations< Base, 1u, true, false > :

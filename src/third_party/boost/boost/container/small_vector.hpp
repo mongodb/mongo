@@ -39,6 +39,7 @@
 #if defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
 #include <boost/move/detail/fwd_macros.hpp>
 #endif
+#include <boost/move/detail/force_ptr.hpp>
 
 //std
 #if !defined(BOOST_NO_CXX11_HDR_INITIALIZER_LIST)
@@ -324,7 +325,7 @@ class small_vector_allocator
    const_pointer internal_storage() const
    {
       const vector_alloc_holder_t &v_holder = static_cast<const vector_alloc_holder_t &>(*this);
-      const vector_base &v_base = reinterpret_cast<const vector_base &>(v_holder);
+      const vector_base &v_base = *move_detail::force_ptr<const vector_base *>(&v_holder);
       const derived_type &d_base = static_cast<const derived_type &>(v_base);
       return d_base.internal_storage();
    }
@@ -333,7 +334,7 @@ class small_vector_allocator
    pointer internal_storage()
    {
       vector_alloc_holder_t &v_holder = static_cast<vector_alloc_holder_t &>(*this);
-      vector_base &v_base = reinterpret_cast<vector_base &>(v_holder);
+      vector_base &v_base = *move_detail::force_ptr<vector_base *>(&v_holder);
       derived_type &d_base = static_cast<derived_type &>(v_base);
       return d_base.internal_storage();
    }

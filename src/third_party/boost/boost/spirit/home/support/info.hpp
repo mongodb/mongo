@@ -14,7 +14,6 @@
 #include <boost/variant/variant.hpp>
 #include <boost/variant/recursive_variant.hpp>
 #include <boost/variant/apply_visitor.hpp>
-#include <boost/foreach.hpp>
 #include <boost/spirit/home/support/utf8.hpp>
 #include <list>
 #include <iterator>
@@ -106,10 +105,11 @@ namespace boost { namespace spirit
         void operator()(std::list<info> const& l) const
         {
             callback.element(tag, "", depth);
-            BOOST_FOREACH(info const& what, l)
+            for (std::list<info>::const_iterator it = l.begin(),
+                                                 end = l.end(); it != end; ++it)
             {
                 boost::apply_visitor(
-                    this_type(callback, what.tag, depth+1), what.value);
+                    this_type(callback, it->tag, depth+1), it->value);
             }
         }
 

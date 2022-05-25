@@ -4,9 +4,9 @@
 # Distributed under the Boost Software License, Version 1.0.
 # (http://www.boost.org/LICENSE_1_0.txt)
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.5...3.20)
 
-project(BoostAlign LANGUAGES CXX)
+project(boost_align VERSION "${BOOST_SUPERPROJECT_VERSION}" LANGUAGES CXX)
 
 add_library(boost_align INTERFACE)
 
@@ -18,4 +18,5 @@ target_link_libraries(boost_align INTERFACE
     Boost::assert
     Boost::config
     Boost::core
-    Boost::static_assert)
+    Boost::static_assert
+)

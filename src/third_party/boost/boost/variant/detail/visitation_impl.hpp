@@ -59,7 +59,7 @@
 #endif
 
 // Define a compiler generic null pointer value
-#if defined(BOOST_NO_NULLPTR)
+#if defined(BOOST_NO_CXX11_NULLPTR)
 #define BOOST_VARIANT_NULL 0
 #else
 #define BOOST_VARIANT_NULL nullptr

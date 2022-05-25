@@ -22,6 +22,7 @@
 #endif
 
 #include <boost/container/detail/config_begin.hpp>
+#include <boost/container/container_fwd.hpp>
 #include <boost/container/detail/workaround.hpp>
 
 #include <boost/static_assert.hpp>
@@ -29,6 +30,7 @@
 #include <boost/container/detail/type_traits.hpp>
 #include <boost/container/detail/mpl.hpp>
 #include <boost/container/detail/std_fwd.hpp>
+#include <boost/container/detail/is_pair.hpp>
 #if !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
 #  include <boost/container/detail/variadic_templates_tools.hpp>
 #endif
@@ -37,21 +39,6 @@
 #include <boost/intrusive/detail/minimal_pair_header.hpp>      //pair
 #include <boost/move/utility_core.hpp>
 #include <boost/move/detail/fwd_macros.hpp>
-
-namespace boost {
-namespace tuples {
-
-struct null_type;
-
-template <
-  class T0, class T1, class T2,
-  class T3, class T4, class T5,
-  class T6, class T7, class T8,
-  class T9>
-class tuple;
-
-}  //namespace tuples {
-}  //namespace boost {
 
 namespace boost {
 namespace container {
@@ -90,19 +77,7 @@ struct is_tuple_null<boost::tuples::null_type>
    static const bool value = true;
 };
 
-}}}
-
-#if defined(BOOST_MSVC) && (_CPPLIB_VER == 520)
-//MSVC 2010 tuple marker
-namespace std { namespace tr1 { struct _Nil; }}
-#elif defined(BOOST_MSVC) && (_CPPLIB_VER == 540)
-//MSVC 2012 tuple marker
-namespace std { struct _Nil; }
-#endif
-
-
-namespace boost {
-namespace container {
+}  //namespace detail {
 
 #ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
 
@@ -115,10 +90,6 @@ namespace container {
    template <int Dummy>
    ::std::piecewise_construct_t *std_piecewise_construct_holder<Dummy>::dummy =
       reinterpret_cast< ::std::piecewise_construct_t *>(0x01234);  //Avoid sanitizer errors on references to null pointers
-
-typedef const std::piecewise_construct_t & piecewise_construct_t;
-
-struct try_emplace_t{};
 
 #else
 
@@ -141,45 +112,6 @@ struct piecewise_construct_use
    //Avoid warnings of unused "piecewise_construct"
    piecewise_construct_use()
    {  (void)&::boost::container::piecewise_construct;   }
-};
-
-template <class T1, class T2>
-struct pair;
-
-template <class T>
-struct is_pair
-{
-   static const bool value = false;
-};
-
-template <class T1, class T2>
-struct is_pair< pair<T1, T2> >
-{
-   static const bool value = true;
-};
-
-template <class T1, class T2>
-struct is_pair< std::pair<T1, T2> >
-{
-   static const bool value = true;
-};
-
-template <class T>
-struct is_not_pair
-{
-   static const bool value = !is_pair<T>::value;
-};
-
-template <class T>
-struct is_std_pair
-{
-   static const bool value = false;
-};
-
-template <class T1, class T2>
-struct is_std_pair< std::pair<T1, T2> >
-{
-   static const bool value = true;
 };
 
 struct pair_nat;
@@ -246,7 +178,7 @@ struct pair
 
    //pair move constructor
    pair(BOOST_RV_REF(pair) p)
-      : first(::boost::move(p.first)), second(::boost::move(p.second))
+      : first(::boost::move(BOOST_MOVE_TO_LV(p).first)), second(::boost::move(BOOST_MOVE_TO_LV(p).second))
    {
       BOOST_STATIC_ASSERT((sizeof(std::pair<T1, T2>) == sizeof(pair<T1, T2>)));
    }
@@ -260,7 +192,7 @@ struct pair
 
    template <class D, class S>
    pair(BOOST_RV_REF_BEG pair<D, S> BOOST_RV_REF_END p)
-      : first(::boost::move(p.first)), second(::boost::move(p.second))
+      : first(::boost::move(BOOST_MOVE_TO_LV(p).first)), second(::boost::move(BOOST_MOVE_TO_LV(p).second))
    {
       BOOST_STATIC_ASSERT((sizeof(std::pair<T1, T2>) == sizeof(pair<T1, T2>)));
    }
@@ -296,14 +228,14 @@ struct pair
    }
 
    pair(BOOST_RV_REF_BEG std::pair<T1, T2> BOOST_RV_REF_END p)
-      : first(::boost::move(p.first)), second(::boost::move(p.second))
+      : first(::boost::move(BOOST_MOVE_TO_LV(p).first)), second(::boost::move(BOOST_MOVE_TO_LV(p).second))
    {
       BOOST_STATIC_ASSERT((sizeof(std::pair<T1, T2>) == sizeof(pair<T1, T2>)));
    }
 
    template <class D, class S>
    pair(BOOST_RV_REF_BEG std::pair<D, S> BOOST_RV_REF_END p)
-      : first(::boost::move(p.first)), second(::boost::move(p.second))
+      : first(::boost::move(BOOST_MOVE_TO_LV(p).first)), second(::boost::move(BOOST_MOVE_TO_LV(p).second))
    {
       BOOST_STATIC_ASSERT((sizeof(std::pair<T1, T2>) == sizeof(pair<T1, T2>)));
    }
@@ -440,8 +372,8 @@ struct pair
    //pair move assignment
    pair& operator=(BOOST_RV_REF(pair) p)
    {
-      first  = ::boost::move(p.first);
-      second = ::boost::move(p.second);
+      first  = ::boost::move(BOOST_MOVE_TO_LV(p).first);
+      second = ::boost::move(BOOST_MOVE_TO_LV(p).second);
       return *this;
    }
 
@@ -466,8 +398,8 @@ struct pair
       >::type
       operator=(BOOST_RV_REF_BEG pair<D, S> BOOST_RV_REF_END p)
    {
-      first  = ::boost::move(p.first);
-      second = ::boost::move(p.second);
+      first  = ::boost::move(BOOST_MOVE_TO_LV(p).first);
+      second = ::boost::move(BOOST_MOVE_TO_LV(p).second);
       return *this;
    }
 //std::pair copy assignment
@@ -489,16 +421,16 @@ struct pair
    //std::pair move assignment
    pair& operator=(BOOST_RV_REF_BEG std::pair<T1, T2> BOOST_RV_REF_END p)
    {
-      first  = ::boost::move(p.first);
-      second = ::boost::move(p.second);
+      first  = ::boost::move(BOOST_MOVE_TO_LV(p).first);
+      second = ::boost::move(BOOST_MOVE_TO_LV(p).second);
       return *this;
    }
 
    template <class D, class S>
    pair& operator=(BOOST_RV_REF_BEG std::pair<D, S> BOOST_RV_REF_END p)
    {
-      first  = ::boost::move(p.first);
-      second = ::boost::move(p.second);
+      first  = ::boost::move(BOOST_MOVE_TO_LV(p).first);
+      second = ::boost::move(BOOST_MOVE_TO_LV(p).second);
       return *this;
    }
 

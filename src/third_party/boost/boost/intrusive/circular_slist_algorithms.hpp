@@ -72,7 +72,7 @@ class circular_slist_algorithms
    //! <b>Complexity</b>: Constant
    //!
    //! <b>Throws</b>: Nothing.
-   static void init(node_ptr this_node);
+   static void init(node_ptr this_node) BOOST_NOEXCEPT;
 
    //! <b>Requires</b>: this_node must be in a circular list or be an empty circular list.
    //!
@@ -83,7 +83,7 @@ class circular_slist_algorithms
    //! <b>Complexity</b>: Constant
    //!
    //! <b>Throws</b>: Nothing.
-   static bool unique(const_node_ptr this_node);
+   static bool unique(const_node_ptr this_node) BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: Returns true is "this_node" has the same state as
    //!  if it was inited using "init(node_ptr)"
@@ -91,7 +91,7 @@ class circular_slist_algorithms
    //! <b>Complexity</b>: Constant
    //!
    //! <b>Throws</b>: Nothing.
-   static bool inited(const_node_ptr this_node);
+   static bool inited(const_node_ptr this_node) BOOST_NOEXCEPT;
 
    //! <b>Requires</b>: prev_node must be in a circular list or be an empty circular list.
    //!
@@ -100,7 +100,7 @@ class circular_slist_algorithms
    //! <b>Complexity</b>: Constant
    //!
    //! <b>Throws</b>: Nothing.
-   static void unlink_after(node_ptr prev_node);
+   static void unlink_after(node_ptr prev_node) BOOST_NOEXCEPT;
 
    //! <b>Requires</b>: prev_node and last_node must be in a circular list
    //!  or be an empty circular list.
@@ -110,7 +110,7 @@ class circular_slist_algorithms
    //! <b>Complexity</b>: Constant
    //!
    //! <b>Throws</b>: Nothing.
-   static void unlink_after(node_ptr prev_node, node_ptr last_node);
+   static void unlink_after(node_ptr prev_node, node_ptr last_node) BOOST_NOEXCEPT;
 
    //! <b>Requires</b>: prev_node must be a node of a circular list.
    //!
@@ -119,7 +119,7 @@ class circular_slist_algorithms
    //! <b>Complexity</b>: Constant
    //!
    //! <b>Throws</b>: Nothing.
-   static void link_after(node_ptr prev_node, node_ptr this_node);
+   static void link_after(node_ptr prev_node, node_ptr this_node) BOOST_NOEXCEPT;
 
    //! <b>Requires</b>: b and e must be nodes of the same circular list or an empty range.
    //!   and p must be a node of a different circular list.
@@ -130,7 +130,7 @@ class circular_slist_algorithms
    //! <b>Complexity</b>: Constant
    //!
    //! <b>Throws</b>: Nothing.
-   static void transfer_after(node_ptr p, node_ptr b, node_ptr e);
+   static void transfer_after(node_ptr p, node_ptr b, node_ptr e) BOOST_NOEXCEPT;
 
    #endif   //#if defined(BOOST_INTRUSIVE_DOXYGEN_INVOKED)
 
@@ -141,7 +141,7 @@ class circular_slist_algorithms
    //! <b>Complexity</b>: Constant
    //!
    //! <b>Throws</b>: Nothing.
-   BOOST_INTRUSIVE_FORCEINLINE static void init_header(node_ptr this_node)
+   BOOST_INTRUSIVE_FORCEINLINE static void init_header(node_ptr this_node) BOOST_NOEXCEPT
    {  NodeTraits::set_next(this_node, this_node);  }
 
    //! <b>Requires</b>: this_node and prev_init_node must be in the same circular list.
@@ -153,7 +153,7 @@ class circular_slist_algorithms
    //! <b>Complexity</b>: Linear to the number of elements between prev_init_node and this_node.
    //!
    //! <b>Throws</b>: Nothing.
-   BOOST_INTRUSIVE_FORCEINLINE static node_ptr get_previous_node(const node_ptr &prev_init_node, const node_ptr &this_node)
+   BOOST_INTRUSIVE_FORCEINLINE static node_ptr get_previous_node(node_ptr prev_init_node, node_ptr this_node) BOOST_NOEXCEPT
    {  return base_t::get_previous_node(prev_init_node, this_node);   }
 
    //! <b>Requires</b>: this_node must be in a circular list or be an empty circular list.
@@ -163,7 +163,7 @@ class circular_slist_algorithms
    //! <b>Complexity</b>: Linear to the number of elements in the circular list.
    //!
    //! <b>Throws</b>: Nothing.
-   BOOST_INTRUSIVE_FORCEINLINE static node_ptr get_previous_node(const node_ptr & this_node)
+   BOOST_INTRUSIVE_FORCEINLINE static node_ptr get_previous_node(node_ptr this_node) BOOST_NOEXCEPT
    {  return base_t::get_previous_node(this_node, this_node); }
 
    //! <b>Requires</b>: this_node must be in a circular list or be an empty circular list.
@@ -173,7 +173,7 @@ class circular_slist_algorithms
    //! <b>Complexity</b>: Linear to the number of elements in the circular list.
    //!
    //! <b>Throws</b>: Nothing.
-   BOOST_INTRUSIVE_FORCEINLINE static node_ptr get_previous_previous_node(const node_ptr & this_node)
+   BOOST_INTRUSIVE_FORCEINLINE static node_ptr get_previous_previous_node(node_ptr this_node) BOOST_NOEXCEPT
    {  return get_previous_previous_node(this_node, this_node); }
 
    //! <b>Requires</b>: this_node and p must be in the same circular list.
@@ -185,7 +185,7 @@ class circular_slist_algorithms
    //! <b>Complexity</b>: Linear to the number of elements in the circular list.
    //!
    //! <b>Throws</b>: Nothing.
-   static node_ptr get_previous_previous_node(node_ptr p, const node_ptr & this_node)
+   static node_ptr get_previous_previous_node(node_ptr p, node_ptr this_node) BOOST_NOEXCEPT
    {
       node_ptr p_next = NodeTraits::get_next(p);
       node_ptr p_next_next = NodeTraits::get_next(p_next);
@@ -205,7 +205,7 @@ class circular_slist_algorithms
    //! <b>Complexity</b>: Linear
    //!
    //! <b>Throws</b>: Nothing.
-   static std::size_t count(const const_node_ptr & this_node)
+   static std::size_t count(const_node_ptr this_node) BOOST_NOEXCEPT
    {
       std::size_t result = 0;
       const_node_ptr p = this_node;
@@ -223,7 +223,7 @@ class circular_slist_algorithms
    //! <b>Complexity</b>: Linear to the number of elements in the circular list
    //!
    //! <b>Throws</b>: Nothing.
-   BOOST_INTRUSIVE_FORCEINLINE static void unlink(node_ptr this_node)
+   static void unlink(node_ptr this_node) BOOST_NOEXCEPT
    {
       if(NodeTraits::get_next(this_node))
          base_t::unlink_after(get_previous_node(this_node));
@@ -236,7 +236,7 @@ class circular_slist_algorithms
    //! <b>Complexity</b>: Linear to the number of elements in the circular list.
    //!
    //! <b>Throws</b>: Nothing.
-   BOOST_INTRUSIVE_FORCEINLINE static void link_before (node_ptr nxt_node, node_ptr this_node)
+   BOOST_INTRUSIVE_FORCEINLINE static void link_before (node_ptr nxt_node, node_ptr this_node) BOOST_NOEXCEPT
    {  base_t::link_after(get_previous_node(nxt_node), this_node);   }
 
    //! <b>Requires</b>: this_node and other_node must be nodes inserted
@@ -249,7 +249,7 @@ class circular_slist_algorithms
    //! <b>Complexity</b>: Linear to number of elements of both lists
    //!
    //! <b>Throws</b>: Nothing.
-   static void swap_nodes(node_ptr this_node, node_ptr other_node)
+   static void swap_nodes(node_ptr this_node, node_ptr other_node) BOOST_NOEXCEPT
    {
       if (other_node == this_node)
          return;
@@ -275,7 +275,7 @@ class circular_slist_algorithms
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: This function is linear to the contained elements.
-   static void reverse(node_ptr p)
+   static void reverse(node_ptr p) BOOST_NOEXCEPT
    {
       node_ptr i = NodeTraits::get_next(p), e(p);
       for (;;) {
@@ -294,7 +294,7 @@ class circular_slist_algorithms
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Linear to the number of elements plus the number moved positions.
-   static node_ptr move_backwards(node_ptr p, std::size_t n)
+   static node_ptr move_backwards(node_ptr p, std::size_t n) BOOST_NOEXCEPT
    {
       //Null shift, nothing to do
       if(!n) return node_ptr();
@@ -346,7 +346,7 @@ class circular_slist_algorithms
    //! <b>Throws</b>: Nothing.
    //!
    //! <b>Complexity</b>: Linear to the number of elements plus the number moved positions.
-   static node_ptr move_forward(node_ptr p, std::size_t n)
+   static node_ptr move_forward(node_ptr p, std::size_t n) BOOST_NOEXCEPT
    {
       //Null shift, nothing to do
       if(!n) return node_ptr();

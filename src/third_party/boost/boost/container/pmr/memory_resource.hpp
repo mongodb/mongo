@@ -19,6 +19,7 @@
 #include <boost/container/detail/workaround.hpp>
 #include <boost/container/container_fwd.hpp>
 #include <boost/move/detail/type_traits.hpp>
+#include <boost/container/detail/placement_new.hpp>
 #include <cstddef>
 
 namespace boost {
@@ -41,7 +42,11 @@ class memory_resource
    //! <b>Effects</b>: Equivalent to
    //! `return do_allocate(bytes, alignment);`
    void* allocate(std::size_t bytes, std::size_t alignment = max_align)
-   {  return this->do_allocate(bytes, alignment);  }
+   {  
+      //Obtain a pointer to enough storage and initialize the lifetime 
+      //of an array object of the given size in the address
+      return ::operator new(bytes, this->do_allocate(bytes, alignment), boost_container_new_t());
+   }
 
    //! <b>Effects</b>: Equivalent to
    //! `return do_deallocate(bytes, alignment);`

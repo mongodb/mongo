@@ -220,8 +220,7 @@ class cache_impl
       BOOST_CATCH(...){
          this->cached_deallocation(chain);
          BOOST_RETHROW
-      }
-      BOOST_CATCH_END
+      } BOOST_CATCH_END
    }
 
    void cached_deallocation(void *ptr)

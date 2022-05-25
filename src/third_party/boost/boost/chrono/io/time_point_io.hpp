@@ -29,7 +29,7 @@
 #include <boost/chrono/round.hpp>
 #include <boost/chrono/detail/scan_keyword.hpp>
 #include <boost/static_assert.hpp>
-#include <boost/detail/no_exceptions_support.hpp>
+#include <boost/core/no_exceptions_support.hpp>
 #include <cstring>
 #include <locale>
 #include <ctime>

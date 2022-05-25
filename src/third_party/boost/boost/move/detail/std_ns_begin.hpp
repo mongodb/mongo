@@ -24,7 +24,11 @@
    #define BOOST_MOVE_STD_NS_BEG _GLIBCXX_BEGIN_NAMESPACE(std)
    #define BOOST_MOVE_STD_NS_END _GLIBCXX_END_NAMESPACE
 #else
+   #if defined(_MSC_VER) && (_MSC_VER >= 1915)
+      #pragma warning (push)
+      #pragma warning (disable : 4643) // Forward declaring 'X' in namespace std is not permitted by the C++ Standard
+   #endif
+
    #define BOOST_MOVE_STD_NS_BEG namespace std{
    #define BOOST_MOVE_STD_NS_END }
 #endif
-

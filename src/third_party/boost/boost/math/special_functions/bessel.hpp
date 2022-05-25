@@ -78,13 +78,10 @@ inline T sph_bessel_j_small_z_series(unsigned v, T x, const Policy& pol)
 {
    BOOST_MATH_STD_USING // ADL of std names
    sph_bessel_j_small_z_series_term<T, Policy> s(v, x);
-   boost::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
-#if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x582))
-   T zero = 0;
-   T result = boost::math::tools::sum_series(s, boost::math::policies::get_epsilon<T, Policy>(), max_iter, zero);
-#else
+   std::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
+
    T result = boost::math::tools::sum_series(s, boost::math::policies::get_epsilon<T, Policy>(), max_iter);
-#endif
+
    policies::check_series_iterations<T>("boost::math::sph_bessel_j_small_z_series<%1%>(%1%,%1%)", max_iter, pol);
    return result * sqrt(constants::pi<T>() / 4);
 }
@@ -399,7 +396,7 @@ inline T cyl_bessel_j_zero_imp(T v, int m, const Policy& pol)
    const T guess_root = boost::math::detail::bessel_zero::cyl_bessel_j_zero_detail::initial_guess<T, Policy>((order_is_integer ? vv : v), m, pol);
 
    // Select the maximum allowed iterations from the policy.
-   boost::uintmax_t number_of_iterations = policies::get_max_root_iterations<Policy>();
+   std::uintmax_t number_of_iterations = policies::get_max_root_iterations<Policy>();
 
    const T delta_lo = ((guess_root > 0.2F) ? T(0.2) : T(guess_root / 2U));
 
@@ -478,7 +475,7 @@ inline T cyl_neumann_zero_imp(T v, int m, const Policy& pol)
    const T guess_root = boost::math::detail::bessel_zero::cyl_neumann_zero_detail::initial_guess<T, Policy>(v, m, pol);
 
    // Select the maximum allowed iterations from the policy.
-   boost::uintmax_t number_of_iterations = policies::get_max_root_iterations<Policy>();
+   std::uintmax_t number_of_iterations = policies::get_max_root_iterations<Policy>();
 
    const T delta_lo = ((guess_root > 0.2F) ? T(0.2) : T(guess_root / 2U));
 
@@ -645,7 +642,7 @@ inline typename detail::bessel_traits<T, T, Policy>::result_type cyl_bessel_j_ze
       policies::discrete_quantile<>,
       policies::assert_undefined<> >::type forwarding_policy;
 
-   BOOST_STATIC_ASSERT_MSG(    false == std::numeric_limits<T>::is_specialized
+   static_assert(    false == std::numeric_limits<T>::is_specialized
                            || (   true  == std::numeric_limits<T>::is_specialized
                                && false == std::numeric_limits<T>::is_integer),
                            "Order must be a floating-point type.");
@@ -656,7 +653,7 @@ inline typename detail::bessel_traits<T, T, Policy>::result_type cyl_bessel_j_ze
 template <class T>
 inline typename detail::bessel_traits<T, T, policies::policy<> >::result_type cyl_bessel_j_zero(T v, int m)
 {
-   BOOST_STATIC_ASSERT_MSG(    false == std::numeric_limits<T>::is_specialized
+   static_assert(    false == std::numeric_limits<T>::is_specialized
                            || (   true  == std::numeric_limits<T>::is_specialized
                                && false == std::numeric_limits<T>::is_integer),
                            "Order must be a floating-point type.");
@@ -671,7 +668,7 @@ inline OutputIterator cyl_bessel_j_zero(T v,
                               OutputIterator out_it,
                               const Policy& pol)
 {
-   BOOST_STATIC_ASSERT_MSG(    false == std::numeric_limits<T>::is_specialized
+   static_assert(    false == std::numeric_limits<T>::is_specialized
                            || (   true  == std::numeric_limits<T>::is_specialized
                                && false == std::numeric_limits<T>::is_integer),
                            "Order must be a floating-point type.");
@@ -706,7 +703,7 @@ inline typename detail::bessel_traits<T, T, Policy>::result_type cyl_neumann_zer
       policies::discrete_quantile<>,
       policies::assert_undefined<> >::type forwarding_policy;
 
-   BOOST_STATIC_ASSERT_MSG(    false == std::numeric_limits<T>::is_specialized
+   static_assert(    false == std::numeric_limits<T>::is_specialized
                            || (   true  == std::numeric_limits<T>::is_specialized
                                && false == std::numeric_limits<T>::is_integer),
                            "Order must be a floating-point type.");
@@ -717,7 +714,7 @@ inline typename detail::bessel_traits<T, T, Policy>::result_type cyl_neumann_zer
 template <class T>
 inline typename detail::bessel_traits<T, T, policies::policy<> >::result_type cyl_neumann_zero(T v, int m)
 {
-   BOOST_STATIC_ASSERT_MSG(    false == std::numeric_limits<T>::is_specialized
+   static_assert(    false == std::numeric_limits<T>::is_specialized
                            || (   true  == std::numeric_limits<T>::is_specialized
                                && false == std::numeric_limits<T>::is_integer),
                            "Order must be a floating-point type.");
@@ -732,7 +729,7 @@ inline OutputIterator cyl_neumann_zero(T v,
                              OutputIterator out_it,
                              const Policy& pol)
 {
-   BOOST_STATIC_ASSERT_MSG(    false == std::numeric_limits<T>::is_specialized
+   static_assert(    false == std::numeric_limits<T>::is_specialized
                            || (   true  == std::numeric_limits<T>::is_specialized
                                && false == std::numeric_limits<T>::is_integer),
                            "Order must be a floating-point type.");

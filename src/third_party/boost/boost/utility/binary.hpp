@@ -68,6 +68,7 @@
   ( (0) BOOST_DETAIL_CREATE_BINARY_LITERAL_OCTAL_SEQUENCE( d, bit_groupings )  \
   ) 
 
+#ifndef BOOST_UTILITY_DOCS
 #define BOOST_DETAIL_CREATE_BINARY_LITERAL_OCTAL_SEQUENCE( d, bit_groupings )  \
   BOOST_PP_SEQ_TRANSFORM                                                       \
   ( BOOST_DETAIL_TRIPLE_TO_OCTAL_OPERATION                                     \
@@ -703,6 +704,6 @@
 #define BOOST_DETAIL_BINARY_LITERAL_ELEMENT_11111100 (1)(1)(1)(1)(1)(1)(0)(0), 
 #define BOOST_DETAIL_BINARY_LITERAL_ELEMENT_11111101 (1)(1)(1)(1)(1)(1)(0)(1), 
 #define BOOST_DETAIL_BINARY_LITERAL_ELEMENT_11111110 (1)(1)(1)(1)(1)(1)(1)(0), 
-#define BOOST_DETAIL_BINARY_LITERAL_ELEMENT_11111111 (1)(1)(1)(1)(1)(1)(1)(1), 
-
+#define BOOST_DETAIL_BINARY_LITERAL_ELEMENT_11111111 (1)(1)(1)(1)(1)(1)(1)(1),
+#endif // BOOST_UTILITY_DOCS
 #endif

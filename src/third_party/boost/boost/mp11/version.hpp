@@ -11,6 +11,6 @@
 // Same format as BOOST_VERSION:
 //   major * 100000 + minor * 100 + patch
 
-#define BOOST_MP11_VERSION 107600
+#define BOOST_MP11_VERSION 107900
 
 #endif // #ifndef BOOST_MP11_VERSION_HPP_INCLUDED

@@ -13,7 +13,7 @@
 
 #include <boost/type_traits/detail/config.hpp>
 
-#ifdef BOOST_TT_HAS_ASCCURATE_IS_FUNCTION
+#ifdef BOOST_TT_HAS_ACCURATE_IS_FUNCTION
 
 #include <boost/type_traits/detail/is_member_function_pointer_cxx_11.hpp>
 

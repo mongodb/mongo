@@ -65,7 +65,8 @@ class posix_named_semaphore
    bool try_wait()
    {  return semaphore_try_wait(mp_sem); }
 
-   bool timed_wait(const boost::posix_time::ptime &abs_time)
+   template<class TimePoint>
+   bool timed_wait(const TimePoint &abs_time)
    {  return semaphore_timed_wait(mp_sem, abs_time); }
 
    static bool remove(const char *name)

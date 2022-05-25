@@ -152,22 +152,22 @@ class unordered_set_impl
    ~unordered_set_impl();
 
    //! @copydoc ::boost::intrusive::hashtable::begin()
-   iterator begin();
+   iterator begin() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::begin()const
-   const_iterator begin() const;
+   const_iterator begin() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::cbegin()const
-   const_iterator cbegin() const;
+   const_iterator cbegin() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::end()
-   iterator end();
+   iterator end() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::end()const
-   const_iterator end() const;
+   const_iterator end() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::cend()const
-   const_iterator cend() const;
+   const_iterator cend() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::hash_function()const
    hasher hash_function() const;
@@ -176,10 +176,10 @@ class unordered_set_impl
    key_equal key_eq() const;
 
    //! @copydoc ::boost::intrusive::hashtable::empty()const
-   bool empty() const;
+   bool empty() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::size()const
-   size_type size() const;
+   size_type size() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::hashtable
    void swap(unordered_set_impl& other);
@@ -215,11 +215,11 @@ class unordered_set_impl
    //! @copydoc ::boost::intrusive::hashtable::insert_unique_check(const KeyType&,KeyHasher,KeyEqual,insert_commit_data&)
    template<class KeyType, class KeyHasher, class KeyEqual>
    BOOST_INTRUSIVE_FORCEINLINE std::pair<iterator, bool> insert_check
-      (const KeyType &key, KeyHasher hasher, KeyEqual key_value_equal, insert_commit_data &commit_data)
-   {  return table_type::insert_unique_check(key, hasher, key_value_equal, commit_data); }
+      (const KeyType &key, KeyHasher hash_func, KeyEqual key_value_equal, insert_commit_data &commit_data)
+   {  return table_type::insert_unique_check(key, hash_func, key_value_equal, commit_data); }
 
    //! @copydoc ::boost::intrusive::hashtable::insert_unique_commit
-   BOOST_INTRUSIVE_FORCEINLINE iterator insert_commit(reference value, const insert_commit_data &commit_data)
+   BOOST_INTRUSIVE_FORCEINLINE iterator insert_commit(reference value, const insert_commit_data &commit_data) BOOST_NOEXCEPT
    {  return table_type::insert_unique_commit(value, commit_data); }
 
    #ifdef BOOST_INTRUSIVE_DOXYGEN_INVOKED
@@ -228,7 +228,7 @@ class unordered_set_impl
    void erase(const_iterator i);
 
    //! @copydoc ::boost::intrusive::hashtable::erase(const_iterator,const_iterator)
-   void erase(const_iterator b, const_iterator e);
+   void erase(const_iterator b, const_iterator e) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::erase(const key_type &)
    size_type erase(const key_type &key);
@@ -241,11 +241,11 @@ class unordered_set_impl
    template<class Disposer>
    BOOST_INTRUSIVE_DOC1ST(void
       , typename detail::disable_if_convertible<Disposer BOOST_INTRUSIVE_I const_iterator>::type)
-      erase_and_dispose(const_iterator i, Disposer disposer);
+      erase_and_dispose(const_iterator i, Disposer disposer) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::erase_and_dispose(const_iterator,const_iterator,Disposer)
    template<class Disposer>
-   void erase_and_dispose(const_iterator b, const_iterator e, Disposer disposer);
+   void erase_and_dispose(const_iterator b, const_iterator e, Disposer disposer) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::erase_and_dispose(const key_type &,Disposer)
    template<class Disposer>
@@ -256,11 +256,11 @@ class unordered_set_impl
    size_type erase_and_dispose(const KeyType& key, KeyHasher hash_func, KeyEqual equal_func, Disposer disposer);
 
    //! @copydoc ::boost::intrusive::hashtable::clear
-   void clear();
+   void clear() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::clear_and_dispose
    template<class Disposer>
-   void clear_and_dispose(Disposer disposer);
+   void clear_and_dispose(Disposer disposer) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::count(const key_type &)const
    size_type count(const key_type &key) const;
@@ -306,28 +306,28 @@ class unordered_set_impl
 
    #if defined(BOOST_INTRUSIVE_DOXYGEN_INVOKED)
    //! @copydoc ::boost::intrusive::hashtable::iterator_to(reference)
-   iterator iterator_to(reference value);
+   iterator iterator_to(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::iterator_to(const_reference)const
-   const_iterator iterator_to(const_reference value) const;
+   const_iterator iterator_to(const_reference value) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::s_local_iterator_to(reference)
-   static local_iterator s_local_iterator_to(reference value);
+   static local_iterator s_local_iterator_to(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::s_local_iterator_to(const_reference)
-   static const_local_iterator s_local_iterator_to(const_reference value);
+   static const_local_iterator s_local_iterator_to(const_reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::local_iterator_to(reference)
-   local_iterator local_iterator_to(reference value);
+   local_iterator local_iterator_to(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::local_iterator_to(const_reference)
-   const_local_iterator local_iterator_to(const_reference value) const;
+   const_local_iterator local_iterator_to(const_reference value) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::bucket_count
-   size_type bucket_count() const;
+   size_type bucket_count() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::bucket_size
-   size_type bucket_size(size_type n) const;
+   size_type bucket_size(size_type n) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::bucket(const key_type&)const
    size_type bucket(const key_type& k) const;
@@ -337,25 +337,25 @@ class unordered_set_impl
    size_type bucket(const KeyType& k,  KeyHasher hash_func) const;
 
    //! @copydoc ::boost::intrusive::hashtable::bucket_pointer
-   bucket_ptr bucket_pointer() const;
+   bucket_ptr bucket_pointer() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::begin(size_type)
-   local_iterator begin(size_type n);
+   local_iterator begin(size_type n) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::begin(size_type)const
-   const_local_iterator begin(size_type n) const;
+   const_local_iterator begin(size_type n) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::cbegin(size_type)const
-   const_local_iterator cbegin(size_type n) const;
+   const_local_iterator cbegin(size_type n) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::end(size_type)
-   local_iterator end(size_type n);
+   local_iterator end(size_type n) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::end(size_type)const
-   const_local_iterator end(size_type n) const;
+   const_local_iterator end(size_type n) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::cend(size_type)const
-   const_local_iterator cend(size_type n) const;
+   const_local_iterator cend(size_type n) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::rehash(const bucket_traits &)
    void rehash(const bucket_traits &new_bucket_traits);
@@ -370,13 +370,13 @@ class unordered_set_impl
    bool incremental_rehash(const bucket_traits &new_bucket_traits);
 
    //! @copydoc ::boost::intrusive::hashtable::split_count
-   size_type split_count() const;
+   size_type split_count() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::suggested_upper_bucket_count
-   static size_type suggested_upper_bucket_count(size_type n);
+   static size_type suggested_upper_bucket_count(size_type n) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::suggested_lower_bucket_count
-   static size_type suggested_lower_bucket_count(size_type n);
+   static size_type suggested_lower_bucket_count(size_type n) BOOST_NOEXCEPT;
 
    #endif   //   #ifdef BOOST_INTRUSIVE_DOXYGEN_INVOKED
 
@@ -653,22 +653,22 @@ class unordered_multiset_impl
    ~unordered_multiset_impl();
 
    //! @copydoc ::boost::intrusive::hashtable::begin()
-   iterator begin();
+   iterator begin() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::begin()const
-   const_iterator begin() const;
+   const_iterator begin() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::cbegin()const
-   const_iterator cbegin() const;
+   const_iterator cbegin() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::end()
-   iterator end();
+   iterator end() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::end()const
-   const_iterator end() const;
+   const_iterator end() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::cend()const
-   const_iterator cend() const;
+   const_iterator cend() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::hash_function()const
    hasher hash_function() const;
@@ -677,10 +677,10 @@ class unordered_multiset_impl
    key_equal key_eq() const;
 
    //! @copydoc ::boost::intrusive::hashtable::empty()const
-   bool empty() const;
+   bool empty() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::size()const
-   size_type size() const;
+   size_type size() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::hashtable
    void swap(unordered_multiset_impl& other);
@@ -715,7 +715,7 @@ class unordered_multiset_impl
    void erase(const_iterator i);
 
    //! @copydoc ::boost::intrusive::hashtable::erase(const_iterator,const_iterator)
-   void erase(const_iterator b, const_iterator e);
+   void erase(const_iterator b, const_iterator e) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::erase(const key_type &)
    size_type erase(const key_type &key);
@@ -728,11 +728,11 @@ class unordered_multiset_impl
    template<class Disposer>
    BOOST_INTRUSIVE_DOC1ST(void
       , typename detail::disable_if_convertible<Disposer BOOST_INTRUSIVE_I const_iterator>::type)
-      erase_and_dispose(const_iterator i, Disposer disposer);
+      erase_and_dispose(const_iterator i, Disposer disposer) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::erase_and_dispose(const_iterator,const_iterator,Disposer)
    template<class Disposer>
-   void erase_and_dispose(const_iterator b, const_iterator e, Disposer disposer);
+   void erase_and_dispose(const_iterator b, const_iterator e, Disposer disposer) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::erase_and_dispose(const key_type &,Disposer)
    template<class Disposer>
@@ -743,11 +743,11 @@ class unordered_multiset_impl
    size_type erase_and_dispose(const KeyType& key, KeyHasher hash_func, KeyEqual equal_func, Disposer disposer);
 
    //! @copydoc ::boost::intrusive::hashtable::clear
-   void clear();
+   void clear() BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::clear_and_dispose
    template<class Disposer>
-   void clear_and_dispose(Disposer disposer);
+   void clear_and_dispose(Disposer disposer) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::count(const key_type &)const
    size_type count(const key_type &key) const;
@@ -787,28 +787,28 @@ class unordered_multiset_impl
       equal_range(const KeyType& key, KeyHasher hash_func, KeyEqual equal_func) const;
 
    //! @copydoc ::boost::intrusive::hashtable::iterator_to(reference)
-   iterator iterator_to(reference value);
+   iterator iterator_to(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::iterator_to(const_reference)const
-   const_iterator iterator_to(const_reference value) const;
+   const_iterator iterator_to(const_reference value) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::s_local_iterator_to(reference)
-   static local_iterator s_local_iterator_to(reference value);
+   static local_iterator s_local_iterator_to(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::s_local_iterator_to(const_reference)
-   static const_local_iterator s_local_iterator_to(const_reference value);
+   static const_local_iterator s_local_iterator_to(const_reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::local_iterator_to(reference)
-   local_iterator local_iterator_to(reference value);
+   local_iterator local_iterator_to(reference value) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::local_iterator_to(const_reference)
-   const_local_iterator local_iterator_to(const_reference value) const;
+   const_local_iterator local_iterator_to(const_reference value) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::bucket_count
-   size_type bucket_count() const;
+   size_type bucket_count() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::bucket_size
-   size_type bucket_size(size_type n) const;
+   size_type bucket_size(size_type n) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::bucket(const key_type&)const
    size_type bucket(const key_type& k) const;
@@ -818,25 +818,25 @@ class unordered_multiset_impl
    size_type bucket(const KeyType& k, KeyHasher hash_func) const;
 
    //! @copydoc ::boost::intrusive::hashtable::bucket_pointer
-   bucket_ptr bucket_pointer() const;
+   bucket_ptr bucket_pointer() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::begin(size_type)
-   local_iterator begin(size_type n);
+   local_iterator begin(size_type n) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::begin(size_type)const
-   const_local_iterator begin(size_type n) const;
+   const_local_iterator begin(size_type n) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::cbegin(size_type)const
-   const_local_iterator cbegin(size_type n) const;
+   const_local_iterator cbegin(size_type n) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::end(size_type)
-   local_iterator end(size_type n);
+   local_iterator end(size_type n) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::end(size_type)const
-   const_local_iterator end(size_type n) const;
+   const_local_iterator end(size_type n) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::cend(size_type)const
-   const_local_iterator cend(size_type n) const;
+   const_local_iterator cend(size_type n) const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::rehash(const bucket_traits &)
    void rehash(const bucket_traits &new_bucket_traits);
@@ -851,13 +851,13 @@ class unordered_multiset_impl
    bool incremental_rehash(const bucket_traits &new_bucket_traits);
 
    //! @copydoc ::boost::intrusive::hashtable::split_count
-   size_type split_count() const;
+   size_type split_count() const BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::suggested_upper_bucket_count
-   static size_type suggested_upper_bucket_count(size_type n);
+   static size_type suggested_upper_bucket_count(size_type n) BOOST_NOEXCEPT;
 
    //! @copydoc ::boost::intrusive::hashtable::suggested_lower_bucket_count
-   static size_type suggested_lower_bucket_count(size_type n);
+   static size_type suggested_lower_bucket_count(size_type n) BOOST_NOEXCEPT;
 
    #endif   //   #ifdef BOOST_INTRUSIVE_DOXYGEN_INVOKED
 };

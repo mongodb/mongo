@@ -62,7 +62,6 @@ Accepts UTF-32 code points and forwards them on as UTF-16 code points.
 #define BOOST_REGEX_V4_UNICODE_ITERATOR_HPP
 #include <boost/cstdint.hpp>
 #include <boost/regex/config.hpp>
-#include <boost/iterator/iterator_facade.hpp>
 #include <boost/static_assert.hpp>
 #include <boost/throw_exception.hpp>
 #include <stdexcept>
@@ -145,10 +144,7 @@ inline void invalid_utf32_code_point(::boost::uint32_t val)
 
 template <class BaseIterator, class U16Type = ::boost::uint16_t>
 class u32_to_u16_iterator
-   : public boost::iterator_facade<u32_to_u16_iterator<BaseIterator, U16Type>, U16Type, std::bidirectional_iterator_tag, const U16Type>
 {
-   typedef boost::iterator_facade<u32_to_u16_iterator<BaseIterator, U16Type>, U16Type, std::bidirectional_iterator_tag, const U16Type> base_type;
-
 #if !defined(BOOST_NO_STD_ITERATOR_TRAITS)
    typedef typename std::iterator_traits<BaseIterator>::value_type base_value_type;
 
@@ -157,14 +153,19 @@ class u32_to_u16_iterator
 #endif
 
 public:
-   typename base_type::reference
-      dereference()const
+   typedef std::ptrdiff_t     difference_type;
+   typedef U16Type            value_type;
+   typedef value_type const*  pointer;
+   typedef value_type const   reference;
+   typedef std::bidirectional_iterator_tag iterator_category;
+
+   reference operator*()const
    {
       if(m_current == 2)
          extract_current();
       return m_values[m_current];
    }
-   bool equal(const u32_to_u16_iterator& that)const
+   bool operator==(const u32_to_u16_iterator& that)const
    {
       if(m_position == that.m_position)
       {
@@ -174,7 +175,11 @@ public:
       }
       return false;
    }
-   void increment()
+   bool operator!=(const u32_to_u16_iterator& that)const
+   {
+      return !(*this == that);
+   }
+   u32_to_u16_iterator& operator++()
    {
       // if we have a pending read then read now, so that we know whether
       // to skip a position, or move to a low-surrogate:
@@ -191,8 +196,15 @@ public:
          m_current = 2;
          ++m_position;
       }
+      return *this;
    }
-   void decrement()
+   u32_to_u16_iterator operator++(int)
+   {
+      u32_to_u16_iterator r(*this);
+      ++(*this);
+      return r;
+   }
+   u32_to_u16_iterator& operator--()
    {
       if(m_current != 1)
       {
@@ -205,6 +217,13 @@ public:
       {
          m_current = 0;
       }
+      return *this;
+   }
+   u32_to_u16_iterator operator--(int)
+   {
+      u32_to_u16_iterator r(*this);
+      --(*this);
+      return r;
    }
    BaseIterator base()const
    {
@@ -258,9 +277,7 @@ private:
 
 template <class BaseIterator, class U32Type = ::boost::uint32_t>
 class u16_to_u32_iterator
-   : public boost::iterator_facade<u16_to_u32_iterator<BaseIterator, U32Type>, U32Type, std::bidirectional_iterator_tag, const U32Type>
 {
-   typedef boost::iterator_facade<u16_to_u32_iterator<BaseIterator, U32Type>, U32Type, std::bidirectional_iterator_tag, const U32Type> base_type;
    // special values for pending iterator reads:
    BOOST_STATIC_CONSTANT(U32Type, pending_read = 0xffffffffu);
 
@@ -272,31 +289,54 @@ class u16_to_u32_iterator
 #endif
 
 public:
-   typename base_type::reference
-      dereference()const
+   typedef std::ptrdiff_t     difference_type;
+   typedef U32Type            value_type;
+   typedef value_type const*  pointer;
+   typedef value_type const   reference;
+   typedef std::bidirectional_iterator_tag iterator_category;
+
+   reference operator*()const
    {
       if(m_value == pending_read)
          extract_current();
       return m_value;
    }
-   bool equal(const u16_to_u32_iterator& that)const
+   bool operator==(const u16_to_u32_iterator& that)const
    {
       return m_position == that.m_position;
    }
-   void increment()
+   bool operator!=(const u16_to_u32_iterator& that)const
+   {
+      return !(*this == that);
+   }
+   u16_to_u32_iterator& operator++()
    {
       // skip high surrogate first if there is one:
       if(detail::is_high_surrogate(*m_position)) ++m_position;
       ++m_position;
       m_value = pending_read;
+      return *this;
    }
-   void decrement()
+   u16_to_u32_iterator operator++(int)
+   {
+      u16_to_u32_iterator r(*this);
+      ++(*this);
+      return r;
+   }
+   u16_to_u32_iterator& operator--()
    {
       --m_position;
       // if we have a low surrogate then go back one more:
       if(detail::is_low_surrogate(*m_position)) 
          --m_position;
       m_value = pending_read;
+      return *this;
+   }
+   u16_to_u32_iterator operator--(int)
+   {
+      u16_to_u32_iterator r(*this);
+      --(*this);
+      return r;
    }
    BaseIterator base()const
    {
@@ -375,10 +415,7 @@ private:
 
 template <class BaseIterator, class U8Type = ::boost::uint8_t>
 class u32_to_u8_iterator
-   : public boost::iterator_facade<u32_to_u8_iterator<BaseIterator, U8Type>, U8Type, std::bidirectional_iterator_tag, const U8Type>
 {
-   typedef boost::iterator_facade<u32_to_u8_iterator<BaseIterator, U8Type>, U8Type, std::bidirectional_iterator_tag, const U8Type> base_type;
-   
 #if !defined(BOOST_NO_STD_ITERATOR_TRAITS)
    typedef typename std::iterator_traits<BaseIterator>::value_type base_value_type;
 
@@ -387,14 +424,19 @@ class u32_to_u8_iterator
 #endif
 
 public:
-   typename base_type::reference
-      dereference()const
+   typedef std::ptrdiff_t     difference_type;
+   typedef U8Type             value_type;
+   typedef value_type const*  pointer;
+   typedef value_type const   reference;
+   typedef std::bidirectional_iterator_tag iterator_category;
+
+   reference operator*()const
    {
       if(m_current == 4)
          extract_current();
       return m_values[m_current];
    }
-   bool equal(const u32_to_u8_iterator& that)const
+   bool operator==(const u32_to_u8_iterator& that)const
    {
       if(m_position == that.m_position)
       {
@@ -405,7 +447,11 @@ public:
       }
       return false;
    }
-   void increment()
+   bool operator!=(const u32_to_u8_iterator& that)const
+   {
+      return !(*this == that);
+   }
+   u32_to_u8_iterator& operator++()
    {
       // if we have a pending read then read now, so that we know whether
       // to skip a position, or move to a low-surrogate:
@@ -422,8 +468,15 @@ public:
          m_current = 4;
          ++m_position;
       }
+      return *this;
    }
-   void decrement()
+   u32_to_u8_iterator operator++(int)
+   {
+      u32_to_u8_iterator r(*this);
+      ++(*this);
+      return r;
+   }
+   u32_to_u8_iterator& operator--()
    {
       if((m_current & 3) == 0)
       {
@@ -435,6 +488,13 @@ public:
       }
       else
          --m_current;
+      return *this;
+   }
+   u32_to_u8_iterator operator--(int)
+   {
+      u32_to_u8_iterator r(*this);
+      --(*this);
+      return r;
    }
    BaseIterator base()const
    {
@@ -501,9 +561,7 @@ private:
 
 template <class BaseIterator, class U32Type = ::boost::uint32_t>
 class u8_to_u32_iterator
-   : public boost::iterator_facade<u8_to_u32_iterator<BaseIterator, U32Type>, U32Type, std::bidirectional_iterator_tag, const U32Type>
 {
-   typedef boost::iterator_facade<u8_to_u32_iterator<BaseIterator, U32Type>, U32Type, std::bidirectional_iterator_tag, const U32Type> base_type;
    // special values for pending iterator reads:
    BOOST_STATIC_CONSTANT(U32Type, pending_read = 0xffffffffu);
 
@@ -515,18 +573,27 @@ class u8_to_u32_iterator
 #endif
 
 public:
-   typename base_type::reference
-      dereference()const
+   typedef std::ptrdiff_t     difference_type;
+   typedef U32Type            value_type;
+   typedef value_type const*  pointer;
+   typedef value_type const   reference;
+   typedef std::bidirectional_iterator_tag iterator_category;
+
+   reference operator*()const
    {
       if(m_value == pending_read)
          extract_current();
       return m_value;
    }
-   bool equal(const u8_to_u32_iterator& that)const
+   bool operator==(const u8_to_u32_iterator& that)const
    {
       return m_position == that.m_position;
    }
-   void increment()
+   bool operator!=(const u8_to_u32_iterator& that)const
+   {
+      return !(*this == that);
+   }
+   u8_to_u32_iterator& operator++()
    {
       // We must not start with a continuation character:
       if((static_cast<boost::uint8_t>(*m_position) & 0xC0) == 0x80)
@@ -549,8 +616,15 @@ public:
          std::advance(m_position, c);
       }
       m_value = pending_read;
+      return *this;
    }
-   void decrement()
+   u8_to_u32_iterator operator++(int)
+   {
+      u8_to_u32_iterator r(*this);
+      ++(*this);
+      return r;
+   }
+   u8_to_u32_iterator& operator--()
    {
       // Keep backtracking until we don't have a trailing character:
       unsigned count = 0;
@@ -559,6 +633,13 @@ public:
       if(count != detail::utf8_trailing_byte_count(*m_position))
          invalid_sequence();
       m_value = pending_read;
+      return *this;
+   }
+   u8_to_u32_iterator operator--(int)
+   {
+      u8_to_u32_iterator r(*this);
+      --(*this);
+      return r;
    }
    BaseIterator base()const
    {

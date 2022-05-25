@@ -82,22 +82,22 @@ struct unordered_node_traits
    static const bool store_hash        = StoreHash;
    static const bool optimize_multikey = OptimizeMultiKey;
 
-   BOOST_INTRUSIVE_FORCEINLINE static node_ptr get_next(const const_node_ptr & n)
+   BOOST_INTRUSIVE_FORCEINLINE static node_ptr get_next(const_node_ptr n) BOOST_NOEXCEPT
    {  return pointer_traits<node_ptr>::static_cast_from(n->next_);  }
 
-   BOOST_INTRUSIVE_FORCEINLINE static void set_next(node_ptr n, node_ptr next)
+   BOOST_INTRUSIVE_FORCEINLINE static void set_next(node_ptr n, node_ptr next) BOOST_NOEXCEPT
    {  n->next_ = next;  }
 
-   BOOST_INTRUSIVE_FORCEINLINE static node_ptr get_prev_in_group(const const_node_ptr & n)
+   BOOST_INTRUSIVE_FORCEINLINE static node_ptr get_prev_in_group(const_node_ptr n) BOOST_NOEXCEPT
    {  return n->prev_in_group_;  }
 
-   BOOST_INTRUSIVE_FORCEINLINE static void set_prev_in_group(node_ptr n, node_ptr prev)
+   BOOST_INTRUSIVE_FORCEINLINE static void set_prev_in_group(node_ptr n, node_ptr prev) BOOST_NOEXCEPT
    {  n->prev_in_group_ = prev;  }
 
-   BOOST_INTRUSIVE_FORCEINLINE static std::size_t get_hash(const const_node_ptr & n)
+   BOOST_INTRUSIVE_FORCEINLINE static std::size_t get_hash(const_node_ptr n) BOOST_NOEXCEPT
    {  return n->hash_;  }
 
-   BOOST_INTRUSIVE_FORCEINLINE static void set_hash(const node_ptr & n, std::size_t h)
+   BOOST_INTRUSIVE_FORCEINLINE static void set_hash(node_ptr n, std::size_t h) BOOST_NOEXCEPT
    {  n->hash_ = h;  }
 };
 
@@ -108,7 +108,7 @@ struct unordered_group_adapter
    typedef typename NodeTraits::node_ptr        node_ptr;
    typedef typename NodeTraits::const_node_ptr  const_node_ptr;
 
-   static node_ptr get_next(const const_node_ptr & n)
+   static node_ptr get_next(const_node_ptr n)
    {  return NodeTraits::get_prev_in_group(n);  }
 
    static void set_next(node_ptr n, node_ptr next)
@@ -127,19 +127,19 @@ struct unordered_algorithms
    typedef typename NodeTraits::node_ptr           node_ptr;
    typedef typename NodeTraits::const_node_ptr     const_node_ptr;
 
-   BOOST_INTRUSIVE_FORCEINLINE static void init(typename base_type::node_ptr n)
+   BOOST_INTRUSIVE_FORCEINLINE static void init(typename base_type::node_ptr n) BOOST_NOEXCEPT
    {
       base_type::init(n);
       group_algorithms::init(n);
    }
 
-   BOOST_INTRUSIVE_FORCEINLINE static void init_header(typename base_type::node_ptr n)
+   BOOST_INTRUSIVE_FORCEINLINE static void init_header(typename base_type::node_ptr n) BOOST_NOEXCEPT
    {
       base_type::init_header(n);
       group_algorithms::init_header(n);
    }
 
-   BOOST_INTRUSIVE_FORCEINLINE static void unlink(typename base_type::node_ptr n)
+   BOOST_INTRUSIVE_FORCEINLINE static void unlink(typename base_type::node_ptr n) BOOST_NOEXCEPT
    {
       base_type::unlink(n);
       group_algorithms::unlink(n);
@@ -258,7 +258,7 @@ class unordered_set_base_hook
    //!   initializes the node to an unlinked state.
    //!
    //! <b>Throws</b>: Nothing.
-   unordered_set_base_hook();
+   unordered_set_base_hook() BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: If link_mode is \c auto_unlink or \c safe_link
    //!   initializes the node to an unlinked state. The argument is ignored.
@@ -269,7 +269,7 @@ class unordered_set_base_hook
    //!   makes classes using the hook STL-compliant without forcing the
    //!   user to do some additional work. \c swap can be used to emulate
    //!   move-semantics.
-   unordered_set_base_hook(const unordered_set_base_hook& );
+   unordered_set_base_hook(const unordered_set_base_hook& ) BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: Empty function. The argument is ignored.
    //!
@@ -279,7 +279,7 @@ class unordered_set_base_hook
    //!   makes classes using the hook STL-compliant without forcing the
    //!   user to do some additional work. \c swap can be used to emulate
    //!   move-semantics.
-   unordered_set_base_hook& operator=(const unordered_set_base_hook& );
+   unordered_set_base_hook& operator=(const unordered_set_base_hook& ) BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: If link_mode is \c normal_link, the destructor does
    //!   nothing (ie. no code is generated). If link_mode is \c safe_link and the
@@ -301,7 +301,7 @@ class unordered_set_base_hook
    //! <b>Complexity</b>: Constant
    //!
    //! <b>Throws</b>: Nothing.
-   void swap_nodes(unordered_set_base_hook &other);
+   void swap_nodes(unordered_set_base_hook &other) BOOST_NOEXCEPT;
 
    //! <b>Precondition</b>: link_mode must be \c safe_link or \c auto_unlink.
    //!
@@ -310,13 +310,13 @@ class unordered_set_base_hook
    //!   will return a valid iterator.
    //!
    //! <b>Complexity</b>: Constant
-   bool is_linked() const;
+   bool is_linked() const BOOST_NOEXCEPT;
 
    //! <b>Effects</b>: Removes the node if it's inserted in a container.
    //!   This function is only allowed if link_mode is \c auto_unlink.
    //!
    //! <b>Throws</b>: Nothing.
-   void unlink();
+   void unlink() BOOST_NOEXCEPT;
    #endif
 };
 

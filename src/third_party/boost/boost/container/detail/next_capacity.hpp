@@ -48,13 +48,13 @@ struct grow_factor_ratio
       SizeType new_cap = 0;
 
       if(cur_cap <= overflow_limit){
-         new_cap = cur_cap * Numerator / Denominator;
+         new_cap = SizeType(cur_cap * Numerator / Denominator);
       }
       else if(Denominator == 1 || (SizeType(new_cap = cur_cap) / Denominator) > overflow_limit){
          new_cap = (SizeType)-1;
       }
       else{
-         new_cap *= Numerator;
+         new_cap = SizeType(new_cap*Numerator);
       }
       return max_value<SizeType>
                ( SizeType(Minimum)

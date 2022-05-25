@@ -43,12 +43,14 @@ struct trivial_value_traits
    typedef node_ptr                                            pointer;
    typedef const_node_ptr                                      const_pointer;
    static const link_mode_type link_mode = LinkMode;
-   BOOST_INTRUSIVE_FORCEINLINE static node_ptr       to_node_ptr (value_type &value)
+   BOOST_INTRUSIVE_FORCEINLINE static node_ptr       to_node_ptr (value_type &value) BOOST_NOEXCEPT
       {  return pointer_traits<node_ptr>::pointer_to(value);  }
-   BOOST_INTRUSIVE_FORCEINLINE static const_node_ptr to_node_ptr (const value_type &value)
+   BOOST_INTRUSIVE_FORCEINLINE static const_node_ptr to_node_ptr (const value_type &value) BOOST_NOEXCEPT
       {  return pointer_traits<const_node_ptr>::pointer_to(value);  }
-   BOOST_INTRUSIVE_FORCEINLINE static const pointer  &      to_value_ptr(const node_ptr &n)        {  return n; }
-   BOOST_INTRUSIVE_FORCEINLINE static const const_pointer  &to_value_ptr(const const_node_ptr &n)  {  return n; }
+   BOOST_INTRUSIVE_FORCEINLINE static pointer  to_value_ptr(node_ptr n) BOOST_NOEXCEPT
+      {  return n; }
+   BOOST_INTRUSIVE_FORCEINLINE static const_pointer  to_value_ptr(const_node_ptr n) BOOST_NOEXCEPT
+      {  return n; }
 };
 
 } //namespace intrusive

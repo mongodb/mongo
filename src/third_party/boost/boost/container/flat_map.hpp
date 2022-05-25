@@ -39,6 +39,7 @@
 #include <boost/move/detail/fwd_macros.hpp>
 #endif
 #include <boost/move/detail/move_helpers.hpp>
+#include <boost/move/detail/force_ptr.hpp>
 // intrusive
 #include <boost/intrusive/detail/minimal_pair_header.hpp>      //pair
 #include <boost/intrusive/detail/minimal_less_equal_header.hpp>//less, equal
@@ -61,12 +62,12 @@ namespace dtl{
 
 template<class D, class S>
 BOOST_CONTAINER_FORCEINLINE static D &force(S &s)
-{  return *reinterpret_cast<D*>(&s); }
+{  return *move_detail::force_ptr<D*>(&s); }
 
 template<class D, class S>
 BOOST_CONTAINER_FORCEINLINE static D force_copy(const S &s)
 {
-   const D *const vp = reinterpret_cast<const D *>(&s);
+   const D *const vp = move_detail::force_ptr<const D *>(&s);
    D ret_val(*vp);
    return ret_val;
 }
@@ -1265,14 +1266,14 @@ class flat_map
          (m_flat_tree.erase(dtl::force_copy<impl_const_iterator>(p)));
    }
 
-   //! <b>Effects</b>: Erases all elements in the container with key equivalent to x.
+   //! <b>Effects</b>: If present, erases the element in the container with key equivalent to x.
    //!
-   //! <b>Returns</b>: Returns the number of erased elements.
+   //! <b>Returns</b>: Returns the number of erased elements (0/1).
    //!
    //! <b>Complexity</b>: Logarithmic search time plus erasure time
    //!   linear to the elements with bigger keys.
    BOOST_CONTAINER_FORCEINLINE size_type erase(const key_type& x)
-      { return m_flat_tree.erase(x); }
+      { return m_flat_tree.erase_unique(x); }
 
    //! <b>Effects</b>: Erases all the elements in the range [first, last).
    //!

@@ -242,7 +242,7 @@ typedef const WCHAR_ *LPCWSTR_;
 
 #endif // defined( BOOST_USE_WINDOWS_H )
 
-// ::NTSTATUS is defined in ntdef.h, which is not included by windows.h by default, so alwaus use LONG_
+// ::NTSTATUS is defined in ntdef.h or winternl.h in different Windows SDKs, and is not included by windows.h by default, so always use LONG_
 typedef LONG_ NTSTATUS_;
 typedef NTSTATUS_ *PNTSTATUS_;
 

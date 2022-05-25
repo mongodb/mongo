@@ -534,7 +534,8 @@ namespace impl
         actor_element(ActorTupleT const& actor_tuple, is_not_default)
         {
             BOOST_STATIC_ASSERT(ActorTupleT::length <= TupleResultT::length);
-            return actor_tuple[tuple_index<N>()](); // apply the actor
+            tuple_index<N> const idx;
+            return actor_tuple[idx](); // apply the actor
         }
 
         static type

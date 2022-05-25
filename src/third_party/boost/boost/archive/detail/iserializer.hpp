@@ -4,8 +4,10 @@
 // MS compatible compilers support #pragma once
 #if defined(BOOST_MSVC)
 # pragma once
+#if !defined(__clang__)
 #pragma inline_depth(255)
 #pragma inline_recursion(on)
+#endif
 #endif
 
 #if defined(__MWERKS__)

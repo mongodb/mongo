@@ -13,6 +13,7 @@
 
 #include <type_traits>
 #include <cstddef>
+#include <utility>
 
 namespace boost { namespace math { namespace tools { namespace meta_programming {
 
@@ -338,7 +339,6 @@ using mp_remove_if_q = mp_remove_if<L, Q::template fn>;
 // Index sequence
 // Use C++14 index sequence if available
 #if defined(__cpp_lib_integer_sequence) && (__cpp_lib_integer_sequence >= 201304)
-#include <utility>
 template<std::size_t... I>
 using index_sequence = std::index_sequence<I...>;
 
@@ -425,9 +425,6 @@ struct make_integer_sequence_impl
 
 template<typename T, T N>
 using make_integer_sequence = typename detail::make_integer_sequence_impl<T, N>::type;
-
-template<std::size_t... I>
-using index_sequence = integer_sequence<std::size_t, I...>;
 
 template<std::size_t N>
 using make_index_sequence = make_integer_sequence<std::size_t, N>;

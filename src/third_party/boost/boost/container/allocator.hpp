@@ -27,6 +27,9 @@
 #include <boost/container/detail/dlmalloc.hpp>
 #include <boost/container/detail/multiallocation_chain.hpp>
 #include <boost/static_assert.hpp>
+
+#include <boost/move/detail/force_ptr.hpp>
+
 #include <cstddef>
 #include <cassert>
 
@@ -174,7 +177,7 @@ class allocator
    {}
 
    //!Allocates memory for an array of count elements.
-   //!Throws std::bad_alloc if there is no enough memory
+   //!Throws bad_alloc if there is no enough memory
    //!If Version is 2, this allocated memory can only be deallocated
    //!with deallocate() or (for Version == 2) deallocate_many()
    BOOST_CONTAINER_ATTRIBUTE_NODISCARD pointer allocate(size_type count, const void * hint= 0)
@@ -298,7 +301,8 @@ class allocator
                              ,(T*)BOOST_CONTAINER_MEMCHAIN_LASTMEM(&ch)
                              ,BOOST_CONTAINER_MEMCHAIN_SIZE(&ch) );
 /*
-      if(!dlmalloc_multialloc_nodes(n_elements, elem_size*sizeof(T), BOOST_CONTAINER_DL_MULTIALLOC_DEFAULT_CONTIGUOUS, reinterpret_cast<dlmalloc_memchain *>(&chain))){
+      if(!dlmalloc_multialloc_nodes( n_elements, elem_size*sizeof(T), BOOST_CONTAINER_DL_MULTIALLOC_DEFAULT_CONTIGUOUS
+                                   , move_detail::force_ptr<dlmalloc_memchain *>(&chain))){
          boost::container::throw_bad_alloc();
       }*/
    }
@@ -319,7 +323,8 @@ class allocator
                              ,(T*)BOOST_CONTAINER_MEMCHAIN_LASTMEM(&ch)
                              ,BOOST_CONTAINER_MEMCHAIN_SIZE(&ch) );
       /*
-      if(!dlmalloc_multialloc_arrays(n_elements, elem_sizes, sizeof(T), BOOST_CONTAINER_DL_MULTIALLOC_DEFAULT_CONTIGUOUS, reinterpret_cast<dlmalloc_memchain *>(&chain))){
+      if(!dlmalloc_multialloc_arrays( n_elements, elem_sizes, sizeof(T), BOOST_CONTAINER_DL_MULTIALLOC_DEFAULT_CONTIGUOUS
+                                    , move_detail::force_ptr<dlmalloc_memchain *>(&chain))){
          boost::container::throw_bad_alloc();
       }*/
    }
@@ -335,7 +340,7 @@ class allocator
       size_t size(chain.size());
       BOOST_CONTAINER_MEMCHAIN_INIT_FROM(&ch, beg, last, size);
       dlmalloc_multidealloc(&ch);
-      //dlmalloc_multidealloc(reinterpret_cast<dlmalloc_memchain *>(&chain));
+      //dlmalloc_multidealloc(move_detail::force_ptr<dlmalloc_memchain *>(&chain));
    }
 
    private:

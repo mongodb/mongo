@@ -30,7 +30,7 @@ namespace intrusive {
 //! Note: this function does not work with pointer to members that rely on
 //! virtual inheritance.
 template<class Parent, class Member>
-BOOST_INTRUSIVE_FORCEINLINE Parent *get_parent_from_member(Member *member, const Member Parent::* ptr_to_member)
+BOOST_INTRUSIVE_FORCEINLINE Parent *get_parent_from_member(Member *member, const Member Parent::* ptr_to_member) BOOST_NOEXCEPT
 {  return ::boost::intrusive::detail::parent_from_member(member, ptr_to_member);  }
 
 //! Given a const pointer to a member and its corresponding const pointer to data member,
@@ -38,7 +38,7 @@ BOOST_INTRUSIVE_FORCEINLINE Parent *get_parent_from_member(Member *member, const
 //! Note: this function does not work with pointer to members that rely on
 //! virtual inheritance.
 template<class Parent, class Member>
-BOOST_INTRUSIVE_FORCEINLINE const Parent *get_parent_from_member(const Member *member, const Member Parent::* ptr_to_member)
+BOOST_INTRUSIVE_FORCEINLINE const Parent *get_parent_from_member(const Member *member, const Member Parent::* ptr_to_member) BOOST_NOEXCEPT
 {  return ::boost::intrusive::detail::parent_from_member(member, ptr_to_member);  }
 
 }  //namespace intrusive {

@@ -26,6 +26,7 @@
 #include <boost/container/detail/mpl.hpp>
 #include <boost/container/detail/pool_common.hpp>
 #include <boost/move/detail/to_raw_pointer.hpp>
+#include <boost/move/detail/force_ptr.hpp>
 #include <boost/container/detail/type_traits.hpp>
 
 #include <boost/intrusive/pointer_traits.hpp>
@@ -344,7 +345,7 @@ class private_node_pool_impl
    //!Returns a reference to the block hook placed in the end of the block
    static node_t & get_block_hook (void *block, size_type blocksize)
    {
-      return *reinterpret_cast<node_t*>(reinterpret_cast<char*>(block) + blocksize);
+      return *move_detail::force_ptr<node_t*>(reinterpret_cast<char*>(block) + blocksize);
    }
 
    //!Returns the starting address of the block reference to the block hook placed in the end of the block

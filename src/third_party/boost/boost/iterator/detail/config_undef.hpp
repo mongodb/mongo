@@ -21,4 +21,4 @@
 # undef BOOST_ITERATOR_CONFIG_DEF
 #else
 # error missing or nested #include config_def
-#endif 
+#endif

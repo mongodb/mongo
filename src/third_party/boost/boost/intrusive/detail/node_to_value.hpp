@@ -103,7 +103,7 @@ struct node_to_value
    typedef typename pointer_traits<npointer>::
       template rebind_pointer<const ValueTraits>::type const_value_traits_ptr;
 
-   node_to_value(const const_value_traits_ptr &ptr)
+   node_to_value(const_value_traits_ptr ptr)
       :  Base(ptr)
    {}
 

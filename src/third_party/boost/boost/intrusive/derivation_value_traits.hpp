@@ -52,18 +52,18 @@ struct derivation_value_traits
       pointer_traits<const_pointer>::reference                       const_reference;
    static const link_mode_type link_mode = LinkMode;
 
-   static node_ptr to_node_ptr(reference value)
+   BOOST_INTRUSIVE_FORCEINLINE static node_ptr to_node_ptr(reference value) BOOST_NOEXCEPT
    { return node_ptr(&value); }
 
-   static const_node_ptr to_node_ptr(const_reference value)
+   BOOST_INTRUSIVE_FORCEINLINE static const_node_ptr to_node_ptr(const_reference value) BOOST_NOEXCEPT
    { return node_ptr(&value); }
 
-   static pointer to_value_ptr(const node_ptr &n)
+   BOOST_INTRUSIVE_FORCEINLINE static pointer to_value_ptr(node_ptr n) BOOST_NOEXCEPT
    {
       return pointer_traits<pointer>::pointer_to(static_cast<reference>(*n));
    }
 
-   static const_pointer to_value_ptr(const const_node_ptr &n)
+   BOOST_INTRUSIVE_FORCEINLINE static const_pointer to_value_ptr(const_node_ptr n) BOOST_NOEXCEPT
    {
       return pointer_traits<const_pointer>::pointer_to(static_cast<const_reference>(*n));
    }

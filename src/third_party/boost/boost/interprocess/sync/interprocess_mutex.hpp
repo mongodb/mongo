@@ -28,7 +28,6 @@
 #include <boost/interprocess/detail/config_begin.hpp>
 #include <boost/interprocess/exceptions.hpp>
 #include <boost/interprocess/detail/workaround.hpp>
-#include <boost/interprocess/detail/posix_time_types_wrk.hpp>
 #include <boost/assert.hpp>
 #include <boost/interprocess/sync/detail/common_algorithms.hpp>
 
@@ -137,7 +136,18 @@ class interprocess_mutex
    //!Note: A program may deadlock if the thread that has ownership calls 
    //!   this function. If the implementation can detect the deadlock,
    //!   an exception could be thrown.
-   bool timed_lock(const boost::posix_time::ptime &abs_time);
+   template<class TimePoint>
+   bool timed_lock(const TimePoint &abs_time);
+
+   //!Same as `timed_lock`, but this function is modeled after the
+   //!standard library interface.
+   template<class TimePoint> bool try_lock_until(const TimePoint &abs_time)
+   {  return this->timed_lock(abs_time);  }
+
+   //!Same as `timed_lock`, but this function is modeled after the
+   //!standard library interface.
+   template<class Duration>  bool try_lock_for(const Duration &dur)
+   {  return this->timed_lock(ipcdetail::duration_to_ustime(dur)); }
 
    //!Effects: The calling thread releases the exclusive ownership of the mutex.
    //!Throws: interprocess_exception on error.
@@ -172,7 +182,8 @@ inline void interprocess_mutex::lock()
 inline bool interprocess_mutex::try_lock()
 { return m_mutex.try_lock(); }
 
-inline bool interprocess_mutex::timed_lock(const boost::posix_time::ptime &abs_time)
+template <class TimePoint>
+inline bool interprocess_mutex::timed_lock(const TimePoint &abs_time)
 { return m_mutex.timed_lock(abs_time); }
 
 inline void interprocess_mutex::unlock()

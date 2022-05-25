@@ -93,7 +93,7 @@ namespace detail {
    struct builtin_clz_dispatch< ::boost::ulong_long_type >
    {
       static ::boost::ulong_long_type call(::boost::ulong_long_type n)
-      {  return __builtin_clzll(n); }
+      {  return (::boost::ulong_long_type)__builtin_clzll(n); }
    };
    #endif
 
@@ -101,14 +101,14 @@ namespace detail {
    struct builtin_clz_dispatch<unsigned long>
    {
       static unsigned long call(unsigned long n)
-      {  return __builtin_clzl(n); }
+      {  return (unsigned long)__builtin_clzl(n); }
    };
 
    template<>
    struct builtin_clz_dispatch<unsigned int>
    {
       static unsigned int call(unsigned int n)
-      {  return __builtin_clz(n); }
+      {  return (unsigned int)__builtin_clz(n); }
    };
 
    inline std::size_t floor_log2(std::size_t n)
@@ -150,53 +150,6 @@ namespace detail {
       return log2;
    }
 
-   ////////////////////////////
-   // DeBruijn method
-   ////////////////////////////
-
-   //Taken from:
-   //http://stackoverflow.com/questions/11376288/fast-computing-of-log2-for-64-bit-integers
-   //Thanks to Desmond Hume
-
-   inline std::size_t floor_log2 (std::size_t v, integral_constant<std::size_t, 32>)
-   {
-      static const int MultiplyDeBruijnBitPosition[32] =
-      {
-         0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30,
-         8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31
-      };
-
-      v |= v >> 1;
-      v |= v >> 2;
-      v |= v >> 4;
-      v |= v >> 8;
-      v |= v >> 16;
-
-      return MultiplyDeBruijnBitPosition[(std::size_t)(v * 0x07C4ACDDU) >> 27];
-   }
-
-   inline std::size_t floor_log2 (std::size_t v, integral_constant<std::size_t, 64>)
-   {
-      static const std::size_t MultiplyDeBruijnBitPosition[64] = {
-      63,  0, 58,  1, 59, 47, 53,  2,
-      60, 39, 48, 27, 54, 33, 42,  3,
-      61, 51, 37, 40, 49, 18, 28, 20,
-      55, 30, 34, 11, 43, 14, 22,  4,
-      62, 57, 46, 52, 38, 26, 32, 41,
-      50, 36, 17, 19, 29, 10, 13, 21,
-      56, 45, 25, 31, 35, 16,  9, 12,
-      44, 24, 15,  8, 23,  7,  6,  5};
-
-      v |= v >> 1;
-      v |= v >> 2;
-      v |= v >> 4;
-      v |= v >> 8;
-      v |= v >> 16;
-      v |= v >> 32;
-      return MultiplyDeBruijnBitPosition[((std::size_t)((v - (v >> 1))*0x07EDD5E59A4E28C2ULL)) >> 58];
-   }
-
-
    inline std::size_t floor_log2 (std::size_t x)
    {
       const std::size_t Bits = sizeof(std::size_t)*CHAR_BIT;
@@ -209,13 +162,12 @@ namespace detail {
 //http://www.flipcode.com/archives/Fast_log_Function.shtml
 inline float fast_log2 (float val)
 {
-   float f = val;
    unsigned x;
-   std::memcpy(&x, &val, sizeof(f));
+   std::memcpy(&x, &val, sizeof(float));
    const int log_2 = int((x >> 23) & 255) - 128;
    x &= ~(unsigned(255u) << 23u);
    x += unsigned(127) << 23u;
-   std::memcpy(&val, &x, sizeof(f));
+   std::memcpy(&val, &x, sizeof(float));
    //1+log2(m), m ranging from 1 to 2
    //3rd degree polynomial keeping first derivate continuity.
    //For less precision the line can be commented out

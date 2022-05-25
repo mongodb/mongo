@@ -1,4 +1,4 @@
-/* Copyright 2003-2020 Joaquin M Lopez Munoz.
+/* Copyright 2003-2021 Joaquin M Lopez Munoz.
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
@@ -42,6 +42,7 @@
 #include <boost/multi_index/random_access_index_fwd.hpp>
 #include <boost/throw_exception.hpp> 
 #include <boost/tuple/tuple.hpp>
+#include <boost/type_traits/is_copy_constructible.hpp>
 #include <boost/type_traits/is_integral.hpp>
 #include <functional>
 #include <stdexcept> 
@@ -77,15 +78,14 @@ namespace detail{
  * to a given Super
  */
 
+#if defined(BOOST_MSVC)
+#pragma warning(push)
+#pragma warning(disable:4355) /* this used in base member initializer list */
+#endif
+
 template<typename SuperMeta,typename TagList>
 class random_access_index:
   BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS SuperMeta::type
-
-#if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-  ,public safe_mode::safe_container<
-    random_access_index<SuperMeta,TagList> >
-#endif
-
 { 
 #if defined(BOOST_MULTI_INDEX_ENABLE_INVARIANT_CHECKING)&&\
     BOOST_WORKAROUND(__MWERKS__,<=0x3003)
@@ -95,6 +95,12 @@ class random_access_index:
  */
 
 #pragma parse_mfunc_templ off
+#endif
+
+#if !defined(BOOST_NO_MEMBER_TEMPLATE_FRIENDS)
+  /* cross-index access */
+
+  template <typename,typename,typename> friend class index_base;
 #endif
 
   typedef typename SuperMeta::type               super;
@@ -120,8 +126,7 @@ public:
 
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
   typedef safe_mode::safe_iterator<
-    rnd_node_iterator<index_node_type>,
-    random_access_index>                         iterator;
+    rnd_node_iterator<index_node_type> >        iterator;
 #else
   typedef rnd_node_iterator<index_node_type>    iterator;
 #endif
@@ -168,18 +173,15 @@ protected:
 
 private:
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-  typedef safe_mode::safe_container<
-    random_access_index>                      safe_super;
+  typedef safe_mode::safe_container<iterator> safe_container;
 #endif
 
   typedef typename call_traits<
     value_type>::param_type                   value_param_type;
 
-  /* Needed to avoid commas in BOOST_MULTI_INDEX_OVERLOADS_TO_VARTEMPL
-   * expansion.
-   */
+  /* needed to avoid commas in some macros */
 
-  typedef std::pair<iterator,bool>            emplace_return_type;
+  typedef std::pair<iterator,bool>            pair_return_type;
 
 public:
 
@@ -325,7 +327,7 @@ public:
   /* modifiers */
 
   BOOST_MULTI_INDEX_OVERLOADS_TO_VARTEMPL(
-    emplace_return_type,emplace_front,emplace_front_impl)
+    pair_return_type,emplace_front,emplace_front_impl)
     
   std::pair<iterator,bool> push_front(const value_type& x)
                              {return insert(begin(),x);}
@@ -334,7 +336,7 @@ public:
   void                     pop_front(){erase(begin());}
 
   BOOST_MULTI_INDEX_OVERLOADS_TO_VARTEMPL(
-    emplace_return_type,emplace_back,emplace_back_impl)
+    pair_return_type,emplace_back,emplace_back_impl)
 
   std::pair<iterator,bool> push_back(const value_type& x)
                              {return insert(end(),x);}
@@ -343,7 +345,7 @@ public:
   void                     pop_back(){erase(--end());}
 
   BOOST_MULTI_INDEX_OVERLOADS_TO_VARTEMPL_EXTRA_ARG(
-    emplace_return_type,emplace,emplace_impl,iterator,position)
+    pair_return_type,emplace,emplace_impl,iterator,position)
     
   std::pair<iterator,bool> insert(iterator position,const value_type& x)
   {
@@ -525,33 +527,36 @@ public:
 
   /* list operations */
 
-  void splice(iterator position,random_access_index<SuperMeta,TagList>& x)
+  template<typename Index>
+  BOOST_MULTI_INDEX_ENABLE_IF_MERGEABLE(random_access_index,Index,void)
+  splice(iterator position,Index& x)
   {
     BOOST_MULTI_INDEX_CHECK_VALID_ITERATOR(position);
     BOOST_MULTI_INDEX_CHECK_IS_OWNER(position,*this);
-    BOOST_MULTI_INDEX_CHECK_DIFFERENT_CONTAINER(*this,x);
     BOOST_MULTI_INDEX_RND_INDEX_CHECK_INVARIANT;
-    iterator  first=x.begin(),last=x.end();
-    size_type n=0;
-    BOOST_TRY{
-      while(first!=last){
-        if(push_back(*first).second){
-          first=x.erase(first);
-          ++n;
-        }
-        else ++first;
-      }
+    if(x.end().get_node()==this->header()){ /* same container */
+      BOOST_MULTI_INDEX_SAFE_MODE_ASSERT(
+        position==end(),safe_mode::inside_range);
     }
-    BOOST_CATCH(...){
-      relocate(position,end()-n,end());
-      BOOST_RETHROW;
+    else{
+      external_splice(
+        position,x,x.begin(),x.end(),
+        boost::is_copy_constructible<value_type>());
     }
-    BOOST_CATCH_END
-    relocate(position,end()-n,end());
   }
 
-  void splice(
-    iterator position,random_access_index<SuperMeta,TagList>& x,iterator i)
+  template<typename Index>
+  BOOST_MULTI_INDEX_ENABLE_IF_MERGEABLE(random_access_index,Index,void)
+  splice(iterator position,BOOST_RV_REF(Index) x)
+  {
+    splice(position,static_cast<Index&>(x));
+  }
+
+  template<typename Index>
+  BOOST_MULTI_INDEX_ENABLE_IF_MERGEABLE(
+    random_access_index,Index,pair_return_type)
+  splice(
+    iterator position,Index& x,BOOST_DEDUCED_TYPENAME Index::iterator i)
   {
     BOOST_MULTI_INDEX_CHECK_VALID_ITERATOR(position);
     BOOST_MULTI_INDEX_CHECK_IS_OWNER(position,*this);
@@ -559,28 +564,36 @@ public:
     BOOST_MULTI_INDEX_CHECK_DEREFERENCEABLE_ITERATOR(i);
     BOOST_MULTI_INDEX_CHECK_IS_OWNER(i,x);
     BOOST_MULTI_INDEX_RND_INDEX_CHECK_INVARIANT;
-    if(&x==this)relocate(position,i);
+    if(x.end().get_node()==this->header()){ /* same container */
+      index_node_type* pn=position.get_node();
+      index_node_type* in=static_cast<index_node_type*>(i.get_node());
+      if(pn!=in)relocate(pn,in);
+      return std::pair<iterator,bool>(make_iterator(in),true);
+    }
     else{
-      if(insert(position,*i).second){
-
-#if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-    /* MSVC++ 6.0 optimizer has a hard time with safe mode, and the following
-     * workaround is needed. Left it for all compilers as it does no
-     * harm.
-     */
-        i.detach();
-        x.erase(x.make_iterator(i.get_node()));
-#else
-        x.erase(i);
-#endif
-
-      }
+      std::pair<final_node_type*,bool> p=
+        external_splice(
+          position,x,i,boost::is_copy_constructible<value_type>());
+      return std::pair<iterator,bool>(make_iterator(p.first),p.second);
     }
   }
 
-  void splice(
-    iterator position,random_access_index<SuperMeta,TagList>& x,
-    iterator first,iterator last)
+  template<typename Index>
+  BOOST_MULTI_INDEX_ENABLE_IF_MERGEABLE(
+    random_access_index,Index,pair_return_type)
+  splice(
+    iterator position,BOOST_RV_REF(Index) x,
+    BOOST_DEDUCED_TYPENAME Index::iterator i)
+  {
+    return splice(position,static_cast<Index&>(x),i);
+  }
+
+  template<typename Index>
+  BOOST_MULTI_INDEX_ENABLE_IF_MERGEABLE(random_access_index,Index,void)
+  splice(
+    iterator position,Index& x,
+    BOOST_DEDUCED_TYPENAME Index::iterator first,
+    BOOST_DEDUCED_TYPENAME Index::iterator last)
   {
     BOOST_MULTI_INDEX_CHECK_VALID_ITERATOR(position);
     BOOST_MULTI_INDEX_CHECK_IS_OWNER(position,*this);
@@ -590,25 +603,24 @@ public:
     BOOST_MULTI_INDEX_CHECK_IS_OWNER(last,x);
     BOOST_MULTI_INDEX_CHECK_VALID_RANGE(first,last);
     BOOST_MULTI_INDEX_RND_INDEX_CHECK_INVARIANT;
-    if(&x==this)relocate(position,first,last);
-    else{
-      size_type n=0;
-      BOOST_TRY{
-        while(first!=last){
-          if(push_back(*first).second){
-            first=x.erase(first);
-            ++n;
-          }
-          else ++first;
-        }
-      }
-      BOOST_CATCH(...){
-        relocate(position,end()-n,end());
-        BOOST_RETHROW;
-      }
-      BOOST_CATCH_END
-      relocate(position,end()-n,end());
+    if(x.end().get_node()==this->header()){ /* same container */
+      BOOST_MULTI_INDEX_CHECK_OUTSIDE_RANGE(position,first,last);
+      internal_splice(position,first,last);
     }
+    else{
+      external_splice(
+        position,x,first,last,boost::is_copy_constructible<value_type>());
+    }
+  }
+
+  template<typename Index>
+  BOOST_MULTI_INDEX_ENABLE_IF_MERGEABLE(random_access_index,Index,void)
+  splice(
+    iterator position,BOOST_RV_REF(Index) x,
+    BOOST_DEDUCED_TYPENAME Index::iterator first,
+    BOOST_DEDUCED_TYPENAME Index::iterator last)
+  {
+    splice(position,static_cast<Index&>(x),first,last);
   }
 
   void remove(value_param_type value)
@@ -745,17 +757,22 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
     const ctor_args_list& args_list,const allocator_type& al):
     super(args_list.get_tail(),al),
     ptrs(al,header()->impl(),0)
+
+#if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
+    ,safe(*this)
+#endif
+    
   {
   }
 
   random_access_index(const random_access_index<SuperMeta,TagList>& x):
     super(x),
+    ptrs(x.get_allocator(),header()->impl(),x.size())
 
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-    safe_super(),
+    ,safe(*this)
 #endif
 
-    ptrs(x.get_allocator(),header()->impl(),x.size())
   {
     /* The actual copying takes place in subsequent call to copy_().
      */
@@ -764,12 +781,12 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
   random_access_index(
     const random_access_index<SuperMeta,TagList>& x,do_not_copy_elements_tag):
     super(x,do_not_copy_elements_tag()),
+    ptrs(x.get_allocator(),header()->impl(),0)
 
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-    safe_super(),
+    ,safe(*this)
 #endif
 
-    ptrs(x.get_allocator(),header()->impl(),0)
   {
   }
 
@@ -780,9 +797,9 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
 
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
   iterator       make_iterator(index_node_type* node)
-    {return iterator(node,this);}
+    {return iterator(node,&safe);}
   const_iterator make_iterator(index_node_type* node)const
-    {return const_iterator(node,const_cast<random_access_index*>(this));}
+    {return const_iterator(node,const_cast<safe_container*>(&safe));}
 #else
   iterator       make_iterator(index_node_type* node){return iterator(node);}
   const_iterator make_iterator(index_node_type* node)const
@@ -828,13 +845,14 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
     return res;
   }
 
-  void extract_(index_node_type* x)
+  template<typename Dst>
+  void extract_(index_node_type* x,Dst dst)
   {
     ptrs.erase(x->impl());
-    super::extract_(x);
+    super::extract_(x,dst.next());
 
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-    detach_iterators(x);
+    transfer_iterators(dst.get(),x);
 #endif
   }
 
@@ -852,7 +870,7 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
     ptrs.clear();
 
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-    safe_super::detach_dereferenceable_iterators();
+    safe.detach_dereferenceable_iterators();
 #endif
   }
 
@@ -863,7 +881,7 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
     ptrs.swap(x.ptrs,swap_allocators);
 
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-    safe_super::swap(x);
+    safe.swap(x.safe);
 #endif
 
     super::swap_(x,swap_allocators);
@@ -874,7 +892,7 @@ BOOST_MULTI_INDEX_PROTECTED_IF_MEMBER_TEMPLATE_FRIENDS:
     ptrs.swap(x.ptrs);
 
 #if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
-    safe_super::swap(x);
+    safe.swap(x.safe);
 #endif
 
     super::swap_elements_(x);
@@ -1000,6 +1018,13 @@ private:
     iterator it=make_iterator(x);
     safe_mode::detach_equivalent_iterators(it);
   }
+
+  template<typename Dst>
+  void transfer_iterators(Dst& dst,index_node_type* x)
+  {
+    iterator it=make_iterator(x);
+    safe_mode::transfer_equivalent_iterators(dst,it);
+  }
 #endif
 
   template <class InputIterator>
@@ -1085,13 +1110,131 @@ private:
     return std::pair<iterator,bool>(make_iterator(p.first),p.second);
   }
 
-  ptr_array ptrs;
+  template<typename Index>
+  std::pair<final_node_type*,bool> external_splice(
+    iterator position,Index& x,BOOST_DEDUCED_TYPENAME Index::iterator i,
+    boost::true_type /* copy-constructible value */)
+  {
+    if(get_allocator()==x.get_allocator()){
+      return external_splice(position,x,i,boost::false_type());
+    }
+    else{
+      /* backwards compatibility with old, non-transfer-based splice */
+
+      std::pair<iterator,bool> p=insert(position,*i);
+      if(p.second)x.erase(i);
+      return std::pair<final_node_type*,bool>(
+        static_cast<final_node_type*>(p.first.get_node()),p.second);
+    }
+  }
+
+  template<typename Index>
+  std::pair<final_node_type*,bool> external_splice(
+    iterator position,Index& x,BOOST_DEDUCED_TYPENAME Index::iterator i,
+    boost::false_type /* copy-constructible value */)
+  {
+    BOOST_MULTI_INDEX_CHECK_EQUAL_ALLOCATORS(*this,x);
+    std::pair<final_node_type*,bool> p=this->final_transfer_(
+      x,static_cast<final_node_type*>(i.get_node()));
+    if(p.second&&position.get_node()!=header()){
+      relocate(position.get_node(),p.first);
+    }
+    return p;
+  }
+
+  template<typename Iterator>
+  void internal_splice(iterator position,Iterator first,Iterator last)
+  {
+    /* null out [first, last) positions in ptrs array */
+
+    for(Iterator it=first;it!=last;++it){ 
+      *(static_cast<index_node_type*>(it.get_node())->up())=0;
+    }
+
+    node_impl_ptr_pointer pp=node_impl_type::gather_nulls(
+      ptrs.begin(),ptrs.end(),
+      static_cast<index_node_type*>(position.get_node())->up());
+
+    /* relink [first, last) */
+
+    for(Iterator it=first;it!=last;++it,++pp){
+      *pp=static_cast<index_node_type*>(it.get_node());
+      (*pp)->up()=pp;
+    }
+  }
+
+  void internal_splice(iterator position,iterator first,iterator last)
+  {
+    index_node_type* pn=position.get_node();
+    index_node_type* fn=static_cast<index_node_type*>(first.get_node());
+    index_node_type* ln=static_cast<index_node_type*>(last.get_node());
+    if(pn!=ln)relocate(pn,fn,ln);
+  }
+
+  template<typename Index>
+  void external_splice(
+    iterator position,Index& x,
+    BOOST_DEDUCED_TYPENAME Index::iterator first,
+    BOOST_DEDUCED_TYPENAME Index::iterator last,
+    boost::true_type /* copy-constructible value */)
+  {
+    if(get_allocator()==x.get_allocator()){
+      external_splice(position,x,first,last,boost::false_type());
+    }
+    else{
+      /* backwards compatibility with old, non-transfer-based splice */
+
+      size_type n=size();
+      BOOST_TRY{
+        while(first!=last){
+          if(push_back(*first).second)first=x.erase(first);
+          else ++first;
+        }
+      }
+      BOOST_CATCH(...){
+        relocate(position,begin()+n,end());
+        BOOST_RETHROW;
+      }
+      BOOST_CATCH_END
+      relocate(position,begin()+n,end());
+    }
+  }
+
+  template<typename Index>
+  void external_splice(
+    iterator position,Index& x,
+    BOOST_DEDUCED_TYPENAME Index::iterator first,
+    BOOST_DEDUCED_TYPENAME Index::iterator last,
+    boost::false_type /* copy-constructible value */)
+  {
+    BOOST_MULTI_INDEX_CHECK_EQUAL_ALLOCATORS(*this,x);
+    size_type n=size();
+    BOOST_TRY{
+      this->final_transfer_range_(x,first,last);
+    }
+    BOOST_CATCH(...){
+      relocate(position,begin()+n,end());
+      BOOST_RETHROW;
+    }
+    BOOST_CATCH_END
+    relocate(position,begin()+n,end());
+  }
+
+  ptr_array      ptrs;
+
+#if defined(BOOST_MULTI_INDEX_ENABLE_SAFE_MODE)
+  safe_container safe;
+#endif
 
 #if defined(BOOST_MULTI_INDEX_ENABLE_INVARIANT_CHECKING)&&\
     BOOST_WORKAROUND(__MWERKS__,<=0x3003)
 #pragma parse_mfunc_templ reset
 #endif
 };
+
+#if defined(BOOST_MSVC)
+#pragma warning(pop) /* C4355 */
+#endif
 
 /* comparison */
 

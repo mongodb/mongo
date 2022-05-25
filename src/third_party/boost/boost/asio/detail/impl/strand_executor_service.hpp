@@ -2,7 +2,7 @@
 // detail/impl/strand_executor_service.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -106,9 +106,11 @@ public:
       if (push_waiting_to_ready(this_->impl_))
       {
         recycling_allocator<void> allocator;
+        executor_type ex = this_->executor_;
         execution::execute(
             boost::asio::prefer(
-              boost::asio::require(this_->executor_,
+              boost::asio::require(
+                BOOST_ASIO_MOVE_CAST(executor_type)(ex),
                 execution::blocking.never),
             execution::allocator(allocator)),
             BOOST_ASIO_MOVE_CAST(invoker)(*this_));

@@ -10,6 +10,8 @@
 #pragma once
 #endif
 
+#include <cmath>
+#include <cstdint>
 #include <boost/math/special_functions/round.hpp>
 #include <boost/math/special_functions/gamma.hpp>
 #include <boost/math/special_functions/sin_pi.hpp>
@@ -67,13 +69,10 @@ inline T bessel_i_small_z_series(T v, T x, const Policy& pol)
       return prefix;
 
    cyl_bessel_i_small_z<T, Policy> s(v, x);
-   boost::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
-#if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x582))
-   T zero = 0;
-   T result = boost::math::tools::sum_series(s, boost::math::policies::get_epsilon<T, Policy>(), max_iter, zero);
-#else
+   std::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
+   
    T result = boost::math::tools::sum_series(s, boost::math::policies::get_epsilon<T, Policy>(), max_iter);
-#endif
+
    policies::check_series_iterations<T>("boost::math::bessel_j_small_z_series<%1%>(%1%,%1%)", max_iter, pol);
    return prefix * result;
 }
@@ -94,8 +93,8 @@ int temme_ik(T v, T x, T* K, T* K1, const Policy& pol)
 
     // |x| <= 2, Temme series converge rapidly
     // |x| > 2, the larger the |x|, the slower the convergence
-    BOOST_ASSERT(abs(x) <= 2);
-    BOOST_ASSERT(abs(v) <= 0.5f);
+    BOOST_MATH_ASSERT(abs(x) <= 2);
+    BOOST_MATH_ASSERT(abs(v) <= 0.5f);
 
     T gp = boost::math::tgamma1pm1(v, pol);
     T gm = boost::math::tgamma1pm1(-v, pol);
@@ -216,7 +215,7 @@ int CF2_ik(T v, T x, T* Kv, T* Kv1, const Policy& pol)
     // |x| >= |v|, CF2_ik converges rapidly
     // |x| -> 0, CF2_ik fails to converge
 
-    BOOST_ASSERT(abs(x) > 1);
+    BOOST_MATH_ASSERT(abs(x) > 1);
 
     // Steed's algorithm, see Thompson and Barnett,
     // Journal of Computational Physics, vol 64, 490 (1986)

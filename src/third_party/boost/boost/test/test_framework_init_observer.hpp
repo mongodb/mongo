@@ -34,6 +34,8 @@ namespace unit_test {
 class BOOST_TEST_DECL framework_init_observer_t : public test_observer {
 public:
 
+    framework_init_observer_t(): m_has_failure( false ) {}
+
     void        test_start( counter_t, test_unit_id ) BOOST_OVERRIDE;
 
     void        assertion_result( unit_test::assertion_result ) BOOST_OVERRIDE;

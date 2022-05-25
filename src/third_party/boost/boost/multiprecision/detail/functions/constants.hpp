@@ -166,7 +166,7 @@ void calc_pi(T& result, unsigned digits)
 
    T lim;
    lim = ui_type(1);
-   eval_ldexp(lim, lim, -(int)digits);
+   eval_ldexp(lim, lim, -static_cast<int>(digits));
 
    //
    // This algorithm is from:

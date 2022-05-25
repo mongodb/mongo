@@ -1,10 +1,16 @@
 #
-#             Copyright Andrey Semashev 2020.
+#          Copyright Andrey Semashev 2020 - 2021.
 # Distributed under the Boost Software License, Version 1.0.
 #    (See accompanying file LICENSE_1_0.txt or copy at
 #          http://www.boost.org/LICENSE_1_0.txt)
 #
 
+obj has_attribute_init_priority : has_attribute_init_priority.cpp : <include>../src ;
+explicit has_attribute_init_priority ;
+obj has_cxx20_atomic_ref : has_cxx20_atomic_ref.cpp : <include>../src ;
+explicit has_cxx20_atomic_ref ;
+obj has_stat_st_blksize : has_stat_st_blksize.cpp : <include>../src ;
+explicit has_stat_st_blksize ;
 obj has_stat_st_mtim : has_stat_st_mtim.cpp : <include>../src ;
 explicit has_stat_st_mtim ;
 obj has_stat_st_mtimensec : has_stat_st_mtimensec.cpp : <include>../src ;
@@ -21,8 +27,13 @@ obj has_stat_st_birthtimensec : has_stat_st_birthtimensec.cpp : <include>../src 
 explicit has_stat_st_birthtimensec ;
 obj has_stat_st_birthtimespec : has_stat_st_birthtimespec.cpp : <include>../src ;
 explicit has_stat_st_birthtimespec ;
+obj has_fdopendir_nofollow : has_fdopendir_nofollow.cpp : <include>../src ;
+explicit has_fdopendir_nofollow ;
 
-obj has_bcrypt : has_bcrypt.cpp : <include>../src ;
+lib bcrypt ;
+explicit bcrypt ;
+
+exe has_bcrypt : has_bcrypt.cpp : <include>../src <library>bcrypt ;
 explicit has_bcrypt ;
 obj is_windows_ce : is_windows_ce.cpp ;
 explicit is_windows_ce ;
