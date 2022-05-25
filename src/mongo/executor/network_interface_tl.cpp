@@ -38,6 +38,7 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_tl.h"
 #include "mongo/executor/hedging_metrics.h"
+#include "mongo/executor/network_interface_tl_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/transport/transport_layer_manager.h"
@@ -491,6 +492,11 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
                   [](const HostAndPort& target1, const HostAndPort& target2) {
                       return target1.toString() < target2.toString();
                   });
+    }
+
+    if ((request.target.size() > 1) && !request.hedgeOptions &&
+        !gOpportunisticSecondaryTargeting.load()) {
+        request.target.resize(1);
     }
 
     auto [cmdState, future] = CommandState::make(this, request, cbHandle);
