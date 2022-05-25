@@ -85,8 +85,13 @@ assert.soon(() => {
     if (ops.length === 0) {
         return false;
     }
-    assert.eq(ops[0].locks,
-              {ReplicationStateTransition: "w", Global: "r", Database: "r", Collection: "r"});
+    assert.eq(ops[0].locks, {
+        FeatureCompatibilityVersion: "r",
+        ReplicationStateTransition: "w",
+        Global: "r",
+        Database: "r",
+        Collection: "r",
+    });
     return true;
 }, () => "Failed to find create collection in currentOp() output: " + tojson(db.currentOp()));
 
