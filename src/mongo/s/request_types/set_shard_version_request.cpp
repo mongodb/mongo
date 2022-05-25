@@ -97,7 +97,7 @@ StatusWith<SetShardVersionRequest> SetShardVersionRequest::parseFromBSON(const B
 
     {
         try {
-            request._version = ChunkVersion::fromBSONLegacyOrNewerFormat(cmdObj, kVersion);
+            request._version = ChunkVersion::parse(cmdObj[kVersion]);
         } catch (const DBException& ex) {
             return ex.toStatus();
         }

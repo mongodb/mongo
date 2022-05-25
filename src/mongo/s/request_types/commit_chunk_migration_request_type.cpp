@@ -60,7 +60,7 @@ StatusWith<ChunkType> extractChunk(const BSONObj& source, StringData field) {
 
     ChunkVersion version;
     try {
-        version = ChunkVersion::fromBSONLegacyOrNewerFormat(fieldObj, ChunkType::lastmod());
+        version = ChunkVersion::parse(fieldObj[ChunkType::lastmod()]);
         uassert(644490, "Version must be set", version.isSet());
     } catch (const DBException& ex) {
         return ex.toStatus();

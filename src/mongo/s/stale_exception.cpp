@@ -43,36 +43,27 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleDbRoutingVersion);
 
 void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
     bob->append("ns", _nss.ns());
-    _received.appendLegacyWithField(bob, "vReceived");
-    if (_wanted) {
-        _wanted->appendLegacyWithField(bob, "vWanted");
-    }
+    _received.serializeToBSON("vReceived", bob);
+    if (_wanted)
+        _wanted->serializeToBSON("vWanted", bob);
 
     invariant(_shardId != "");
     bob->append("shardId", _shardId.toString());
 }
 
 std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj) {
-    const auto shardId = obj["shardId"].String();
+    auto shardId = obj["shardId"].String();
     uassert(ErrorCodes::NoSuchKey, "The shardId field is missing", !shardId.empty());
 
-    auto extractOptionalChunkVersion = [&obj](StringData field) -> boost::optional<ChunkVersion> {
-        try {
-            return ChunkVersion::fromBSONLegacyOrNewerFormat(obj, field);
-        } catch (const DBException& ex) {
-            auto status = ex.toStatus();
-            if (status != ErrorCodes::NoSuchKey) {
-                throw;
-            }
-        }
-        return boost::none;
-    };
-
-    return std::make_shared<StaleConfigInfo>(
-        NamespaceString(obj["ns"].String()),
-        ChunkVersion::fromBSONLegacyOrNewerFormat(obj, "vReceived"),
-        extractOptionalChunkVersion("vWanted"),
-        ShardId(shardId));
+    return std::make_shared<StaleConfigInfo>(NamespaceString(obj["ns"].String()),
+                                             ChunkVersion::parse(obj["vReceived"]),
+                                             [&] {
+                                                 if (auto vWantedElem = obj["vWanted"])
+                                                     return boost::make_optional(
+                                                         ChunkVersion::parse(vWantedElem));
+                                                 return boost::optional<ChunkVersion>();
+                                             }(),
+                                             ShardId(std::move(shardId)));
 }
 
 void StaleEpochInfo::serialize(BSONObjBuilder* bob) const {

@@ -24,9 +24,7 @@ assert.commandWorked(a.runCommand({
     setShardVersion: "alleyinsider.foo",
     configdb: s._configDB,
     authoritative: true,
-    version: new Timestamp(1, 0),
-    versionEpoch: fooEpoch,
-    versionTimestamp: fooTimestamp,
+    version: {e: fooEpoch, t: fooTimestamp, v: new Timestamp(1, 0)},
     shard: s.shard0.shardName,
     shardHost: s.s.host,
 }));

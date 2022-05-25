@@ -128,8 +128,7 @@ public:
                 nss.isValid());
 
         // Validate chunk version parameter.
-        const ChunkVersion requestedVersion =
-            ChunkVersion::fromBSONLegacyOrNewerFormat(cmdObj, SetShardVersionRequest::kVersion);
+        auto requestedVersion = ChunkVersion::parse(cmdObj[SetShardVersionRequest::kVersion]);
 
         // Step 3
 

@@ -42,28 +42,10 @@ using unittest::assertGet;
 TEST(SetShardVersionRequestTest, ParseFull) {
     const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp(1, 1));
 
-    SetShardVersionRequest request =
-        assertGet(SetShardVersionRequest::parseFromBSON(
-            BSON("setShardVersion"
-                 << "db.coll"
-                 << "version" << Timestamp(chunkVersion.toLong()) << "versionEpoch"
-                 << chunkVersion.epoch() << "versionTimestamp" << chunkVersion.getTimestamp())));
-
-    ASSERT(!request.shouldForceRefresh());
-    ASSERT(!request.isAuthoritative());
-    ASSERT_EQ(request.getNS().toString(), "db.coll");
-    ASSERT_EQ(request.getNSVersion().majorVersion(), chunkVersion.majorVersion());
-    ASSERT_EQ(request.getNSVersion().minorVersion(), chunkVersion.minorVersion());
-    ASSERT_EQ(request.getNSVersion().epoch(), chunkVersion.epoch());
-}
-
-TEST(SetShardVersionRequestTest, ParseFullNewFormat) {
-    const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp(1, 1));
-
     SetShardVersionRequest request = assertGet(SetShardVersionRequest::parseFromBSON([&] {
         BSONObjBuilder builder(BSON("setShardVersion"
                                     << "db.coll"));
-        chunkVersion.appendLegacyWithField(&builder, "version");
+        chunkVersion.serializeToBSON("version", &builder);
         return builder.obj();
     }()));
 
@@ -78,13 +60,13 @@ TEST(SetShardVersionRequestTest, ParseFullNewFormat) {
 TEST(SetShardVersionRequestTest, ParseFullWithAuthoritative) {
     const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp(1, 1));
 
-    SetShardVersionRequest request =
-        assertGet(SetShardVersionRequest::parseFromBSON(
-            BSON("setShardVersion"
-                 << "db.coll"
-                 << "version" << Timestamp(chunkVersion.toLong()) << "versionEpoch"
-                 << chunkVersion.epoch() << "versionTimestamp" << chunkVersion.getTimestamp()
-                 << "authoritative" << true)));
+    SetShardVersionRequest request = assertGet(SetShardVersionRequest::parseFromBSON([&] {
+        BSONObjBuilder builder(BSON("setShardVersion"
+                                    << "db.coll"
+                                    << "authoritative" << true));
+        chunkVersion.serializeToBSON("version", &builder);
+        return builder.obj();
+    }()));
 
     ASSERT(!request.shouldForceRefresh());
     ASSERT(request.isAuthoritative());
@@ -97,11 +79,13 @@ TEST(SetShardVersionRequestTest, ParseFullWithAuthoritative) {
 TEST(SetShardVersionRequestTest, ParseFullNoNS) {
     const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp(1, 1));
 
-    auto ssvStatus =
-        SetShardVersionRequest::parseFromBSON(BSON("setShardVersion"
-                                                   << ""
-                                                   << "version" << Timestamp(chunkVersion.toLong())
-                                                   << "versionEpoch" << chunkVersion.epoch()));
+    auto ssvStatus = SetShardVersionRequest::parseFromBSON([&] {
+        BSONObjBuilder builder(BSON("setShardVersion"
+                                    << ""
+                                    << "authoritative" << true));
+        chunkVersion.serializeToBSON("version", &builder);
+        return builder.obj();
+    }());
 
     ASSERT_EQ(ErrorCodes::InvalidNamespace, ssvStatus.getStatus().code());
 }
@@ -109,11 +93,13 @@ TEST(SetShardVersionRequestTest, ParseFullNoNS) {
 TEST(SetShardVersionRequestTest, ParseFullNSContainsDBOnly) {
     const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp(1, 1));
 
-    auto ssvStatus =
-        SetShardVersionRequest::parseFromBSON(BSON("setShardVersion"
-                                                   << "dbOnly"
-                                                   << "version" << Timestamp(chunkVersion.toLong())
-                                                   << "versionEpoch" << chunkVersion.epoch()));
+    auto ssvStatus = SetShardVersionRequest::parseFromBSON([&] {
+        BSONObjBuilder builder(BSON("setShardVersion"
+                                    << "DBOnly"
+                                    << "authoritative" << true));
+        chunkVersion.serializeToBSON("version", &builder);
+        return builder.obj();
+    }());
 
     ASSERT_EQ(ErrorCodes::InvalidNamespace, ssvStatus.getStatus().code());
 }

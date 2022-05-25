@@ -26,7 +26,7 @@ assert.commandFailed(
 assert.commandFailed(a.runCommand({
     setShardVersion: "alleyinsider.foo",
     configdb: s._configDB,
-    version: new Timestamp(2, 0),
+    version: {e: epoch, t: timestamp, v: new Timestamp(2, 0)},
     authoritative: true
 }),
                      "should have failed because first setShardVersion needs shard info");
@@ -34,7 +34,7 @@ assert.commandFailed(a.runCommand({
 assert.commandFailed(a.runCommand({
     setShardVersion: "alleyinsider.foo",
     configdb: s._configDB,
-    version: new Timestamp(2, 0),
+    version: {e: epoch, t: timestamp, v: new Timestamp(2, 0)},
     authoritative: true,
     shard: "s.shard0.shardName",
     shardHost: s.s.host
@@ -46,9 +46,7 @@ var timestamp = s.getDB('config').collections.findOne({_id: "alleyinsider.foo"})
 assert.commandWorked(a.runCommand({
     setShardVersion: "alleyinsider.foo",
     configdb: s._configDB,
-    version: new Timestamp(1, 0),
-    versionEpoch: epoch,
-    versionTimestamp: timestamp,
+    version: {e: epoch, t: timestamp, v: new Timestamp(1, 0)},
     authoritative: true,
     shard: s.shard0.shardName,
     shardHost: s.s.host
@@ -58,35 +56,20 @@ assert.commandWorked(a.runCommand({
 assert.commandFailed(a.runCommand({
     setShardVersion: "alleyinsider.foo",
     configdb: "a",
-    version: new Timestamp(0, 2),
-    versionEpoch: epoch,
-    versionTimestamp: timestamp
+    version: {e: epoch, t: timestamp, v: new Timestamp(0, 2)},
 }));
 
 assert.commandFailed(a.runCommand({
     setShardVersion: "alleyinsider.foo",
     configdb: s._configDB,
-    version: new Timestamp(0, 2),
-    versionEpoch: epoch,
-    versionTimestamp: timestamp
+    version: {e: epoch, t: timestamp, v: new Timestamp(0, 2)},
 }));
 
 assert.commandFailed(a.runCommand({
     setShardVersion: "alleyinsider.foo",
     configdb: s._configDB,
-    version: new Timestamp(0, 1),
-    versionEpoch: epoch,
-    versionTimestamp: timestamp
+    version: {e: epoch, t: timestamp, v: new Timestamp(0, 1)},
 }));
-
-// the only way that setSharVersion passes is if the shard agrees with the version
-// the shard takes its version from config directly
-// TODO bump timestamps in config
-// assert.eq( a.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : s._configDB ,
-// version : 3 } ).oldVersion.i , 2 , "oldVersion" );
-
-// assert.eq( a.runCommand( { "getShardVersion" : "alleyinsider.foo" } ).global.i , 3 , "my get
-// version B" );
 
 s.stop();
 })();
