@@ -67,7 +67,7 @@ class transaction_context {
     /* Attempt to rollback the transaction given the requirements are met. */
     void try_rollback(const std::string &config = "");
     /* Set a commit timestamp. */
-    void set_commit_timestamp(wt_timestamp_t ts);
+    int set_commit_timestamp(wt_timestamp_t ts);
     /* Set that the transaction needs to be rolled back. */
     void set_needs_rollback(bool rollback);
     /*
