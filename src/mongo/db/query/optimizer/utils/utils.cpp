@@ -318,10 +318,10 @@ public:
 private:
     void extractFromABT(VariableNameSetType& vars, const ABT& v) {
         const auto& result = VariableEnvironment::getVariables(v);
-        for (const Variable* var : result._variables) {
-            if (result._definedVars.count(var->name()) == 0) {
+        for (const Variable& var : result._variables) {
+            if (result._definedVars.count(var.name()) == 0) {
                 // We are interested in either free variables, or variables defined on other nodes.
-                vars.insert(var->name());
+                vars.insert(var.name());
             }
         }
     }

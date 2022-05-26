@@ -33,7 +33,7 @@
 namespace mongo::optimizer {
 ABT::reference_type PathFusion::follow(ABT::reference_type n) {
     if (auto var = n.cast<Variable>(); var) {
-        auto def = _env.getDefinition(var);
+        auto def = _env.getDefinition(*var);
         if (!def.definition.empty() && !def.definition.is<Source>()) {
             return follow(def.definition);
         }

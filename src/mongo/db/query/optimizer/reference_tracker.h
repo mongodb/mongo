@@ -44,7 +44,7 @@ struct Definition {
     ABT::reference_type definedBy;
 
     /**
-     * Pointer to actual definition of variable.
+     * Pointer to actual definition of variable (i.e. the appropriate expression under a Binder).
      */
     ABT::reference_type definition;
 };
@@ -57,12 +57,18 @@ struct CollectedInfo;
 using DefinitionsMap = opt::unordered_map<ProjectionName, Definition>;
 
 struct VariableCollectorResult {
-    opt::unordered_set<const Variable*> _variables;
-    // TODO: consider using a variable environment instance for this, but does not seem to be always
-    // viable, especially with rewrites.
+    // The Variables referenced by the subtree.
+    std::vector<std::reference_wrapper<const Variable>> _variables;
+    // The names of locally-defined Variables. These aren't propagated up the tree during normal
+    // variable resolution. Tracking these separately allows us to easily check, for example, which
+    // variables are referenced in but not defined by the subtree (i.e. variables which should be
+    // defined elsewhere in the ABT).
     opt::unordered_set<std::string> _definedVars;
 };
 
+/**
+ * Helps enforce scoping and validity rules for definitions and Variable references.
+ */
 class VariableEnvironment {
     VariableEnvironment(std::unique_ptr<CollectedInfo> info, const cascades::Memo* memo);
 
@@ -70,43 +76,63 @@ public:
     /**
      * Build the environment for the given ABT tree. The environment is valid as long as the tree
      * does not change. More specifically, if a variable defining node is removed from the tree then
-     * the environment becomes stale and has to be rebuild.
+     * the environment becomes stale and has to be rebuilt.
      */
     static VariableEnvironment build(const ABT& root, const cascades::Memo* memo = nullptr);
     void rebuild(const ABT& root);
 
+    /**
+     * Get information about Variables in the subtree rooted at 'n', including Variables referenced
+     * by the subtree and locally-defined Variables.
+     */
+    static VariableCollectorResult getVariables(const ABT& n);
+
     ~VariableEnvironment();
 
     /**
-     *
+     * Return the projections available to the ancestors of 'node' and the defintions for those
+     * projections.
      */
-    Definition getDefinition(const Variable* var) const;
+    const DefinitionsMap& getDefinitions(ABT::reference_type node) const;
+    const DefinitionsMap& getDefinitions(const Node& node) const;
+
+    bool hasDefinitions(ABT::reference_type node) const;
+    bool hasDefinitions(const Node& node) const;
 
     /**
-     * We may revisit what we return from here.
+     * Returns the projections available to the ancestors of 'node'.
+     */
+    ProjectionNameSet getProjections(const Node& node) const;
+    ProjectionNameSet getProjections(ABT::reference_type node) const;
+
+    /**
+     * Returns the projections produced by the root of the ABT.
      */
     ProjectionNameSet topLevelProjections() const;
 
-    const DefinitionsMap& getDefinitions(const Node* node) const;
-
     /**
-     * Per node projection names
+     * Returns the defintion of 'var' in the ABT, regardless of the visibility of 'var' in the tree.
+     * If there is no definition for 'var', returns an empty Definition.
      */
-    ProjectionNameSet getProjections(const Node* node) const;
-    bool hasDefinitions(const Node* node) const;
-
-    const DefinitionsMap& getDefinitions(ABT::reference_type node) const;
-    bool hasDefinitions(ABT::reference_type node) const;
+    Definition getDefinition(const Variable& var) const;
 
     bool hasFreeVariables() const;
+
+    /**
+     * Returns the number of places in the ABT where there is a free Variable with name 'variable'.
+     */
     size_t freeOccurences(const std::string& variable) const;
 
-    bool isLastRef(const Variable* var) const;
-
-    static VariableCollectorResult getVariables(const ABT& n);
+    /**
+     * Returns whether 'var' is guaranteed to be the last access to the projection to which it
+     * refers.
+     */
+    bool isLastRef(const Variable& var) const;
 
 private:
     std::unique_ptr<CollectedInfo> _info;
+
+    // '_memo' is required to track references in an ABT containing MemoLogicalDelegatorNodes.
     const cascades::Memo* _memo{nullptr};
 };
 

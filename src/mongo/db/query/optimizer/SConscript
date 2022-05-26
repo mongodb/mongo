@@ -67,6 +67,7 @@ env.CppUnitTest(
         "logical_rewriter_optimizer_test.cpp",
         "optimizer_test.cpp",
         "physical_rewriter_optimizer_test.cpp",
+        "reference_tracker_test.cpp",
         "rewrites/path_optimizer_test.cpp",
         "interval_intersection_test.cpp",
     ],

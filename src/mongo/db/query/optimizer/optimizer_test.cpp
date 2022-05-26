@@ -155,8 +155,8 @@ TEST(Optimizer, Tracker4) {
     // Get all definitions from the scan and below (even though there is nothing below the scan).
     auto defs = env.getDefinitions(scanNodeRef);
     // Make sure that variables are defined by the scan (and not by Eval).
-    for (auto v : vars._variables) {
-        auto it = defs.find(v->name());
+    for (const Variable& v : vars._variables) {
+        auto it = defs.find(v.name());
         ASSERT(it != defs.end());
         ASSERT(it->second.definedBy == env.getDefinition(v).definedBy);
     }

@@ -100,7 +100,7 @@ void ConstEval::removeUnusedEvalNodes() {
 }
 
 void ConstEval::transport(ABT& n, const Variable& var) {
-    auto def = _env.getDefinition(&var);
+    auto def = _env.getDefinition(var);
 
     if (!def.definition.empty()) {
         // See if we have already manipulated this definition and if so then use the newer version.
@@ -537,7 +537,7 @@ void ConstEval::transport(ABT& n, const EvaluationNode& op, ABT& child, ABT& exp
             // substitute it with a variable pointing to that source projection.
             if (auto source = _seenProjects.find(&op); source != _seenProjects.end() &&
                 // Make sure that the matched projection is visible to the current 'op'.
-                _env.getProjections(&op).count((*source)->getProjectionName()) &&
+                _env.getProjections(op).count((*source)->getProjectionName()) &&
                 // If we already inlined the matched projection, we don't want to use it as a source
                 // for common expression as it will negate the inlining.
                 !_inlinedDefs.count((*source)->getProjection().ref())) {

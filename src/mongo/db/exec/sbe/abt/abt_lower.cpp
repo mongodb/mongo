@@ -78,20 +78,20 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(const Source&
 }
 
 std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(const Variable& var) {
-    auto def = _env.getDefinition(&var);
+    auto def = _env.getDefinition(var);
 
     if (!def.definedBy.empty()) {
         if (auto let = def.definedBy.cast<Let>(); let) {
             auto it = _letMap.find(let);
             uassert(6624203, "incorrect let map", it != _letMap.end());
 
-            return sbe::makeE<sbe::EVariable>(it->second, 0, _env.isLastRef(&var));
+            return sbe::makeE<sbe::EVariable>(it->second, 0, _env.isLastRef(var));
         } else if (auto lam = def.definedBy.cast<LambdaAbstraction>(); lam) {
             // This is a lambda parameter.
             auto it = _lambdaMap.find(lam);
             uassert(6624204, "incorrect lambda map", it != _lambdaMap.end());
 
-            return sbe::makeE<sbe::EVariable>(it->second, 0, _env.isLastRef(&var));
+            return sbe::makeE<sbe::EVariable>(it->second, 0, _env.isLastRef(var));
         }
     }
     if (auto it = _slotMap.find(var.name()); it != _slotMap.end()) {

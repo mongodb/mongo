@@ -415,7 +415,7 @@ private:
         auto it = _targetGroupMap.find(n.ref());
         const GroupIdType targetGroupId = (it == _targetGroupMap.cend()) ? -1 : it->second;
         const auto result = _memo.addNode(std::move(childGroupIds),
-                                          env.getProjections(&node),
+                                          env.getProjections(node),
                                           targetGroupId,
                                           _insertedNodeIds,
                                           std::move(forMemo));

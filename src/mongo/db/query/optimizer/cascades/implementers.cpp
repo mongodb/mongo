@@ -1025,9 +1025,9 @@ public:
                 const ABT& aggExpr = node.getAggregationExpressions().at(aggIndex);
                 aggregationProjections.push_back(aggExpr);
 
-                for (const auto& var : VariableEnvironment::getVariables(aggExpr)._variables) {
+                for (const Variable& var : VariableEnvironment::getVariables(aggExpr)._variables) {
                     // Add all references this expression requires.
-                    projectionsToAdd.insert(var->name());
+                    projectionsToAdd.insert(var.name());
                 }
             }
         }
