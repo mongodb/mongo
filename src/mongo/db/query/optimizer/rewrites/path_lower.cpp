@@ -249,8 +249,8 @@ void EvalFilterLowering::transport(ABT& n, const PathDefault&, ABT& c) {
     n = make<LambdaAbstraction>(
         name,
         make<If>(make<FunctionCall>("exists", makeSeq(make<Variable>(name))),
-                 Constant::boolean(false),
-                 std::exchange(c, make<Blackhole>())));
+                 make<UnaryOp>(Operations::Not, c),
+                 c));
 
     _changed = true;
 }

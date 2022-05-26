@@ -112,7 +112,21 @@ public:
     }
 
     void visit(const ExistsMatchExpression* expr) override {
-        unsupportedExpression(expr);
+        ABT result = make<PathDefault>(Constant::boolean(false));
+
+        if (!expr->path().empty()) {
+            // TODO SERVER-62961: use "generateFieldPath" when SERVER-62961 is fixed.
+            result = translateFieldPath(
+                FieldPath(expr->path().toString()),
+                std::move(result),
+                [](const std::string& fieldName, const bool isLastElement, ABT input) {
+                    if (!isLastElement) {
+                        input = make<PathTraverse>(std::move(input));
+                    }
+                    return make<PathGet>(fieldName, std::move(input));
+                });
+        }
+        _ctx.push(std::move(result));
     }
 
     void visit(const ExprMatchExpression* expr) override {
