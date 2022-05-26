@@ -38,6 +38,48 @@ namespace mongo::fle {
 using DerivedToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator;
 using TwiceDerived = FLETwiceDerivedTokenGenerator;
 
+size_t sizeArrayElementsMemory(size_t tagCount);
+
+namespace {
+
+inline constexpr size_t arrayElementSize(int digits) {
+    constexpr size_t sizeOfType = 1;
+    constexpr size_t sizeOfBinDataLength = 4;
+    constexpr size_t sizeOfNullMarker = 1;
+    constexpr size_t sizeOfSubType = 1;
+    constexpr size_t sizeOfData = sizeof(PrfBlock);
+    return sizeOfType + sizeOfBinDataLength + sizeOfNullMarker + digits + sizeOfSubType +
+        sizeOfData;
+}
+
+void verifyTagsWillFit(size_t tagCount, size_t memoryLimit) {
+    constexpr size_t largestElementSize = arrayElementSize(std::numeric_limits<size_t>::digits10);
+    constexpr size_t ridiculousNumberOfTags =
+        std::numeric_limits<size_t>::max() / largestElementSize;
+    uassert(6653300, "Encrypted rewrite too many tags", tagCount < ridiculousNumberOfTags);
+    uassert(6401800,
+            "Encrypted rewrite memory limit exceeded",
+            sizeArrayElementsMemory(tagCount) <= memoryLimit);
+}
+
+}  // namespace
+
+size_t sizeArrayElementsMemory(size_t tagCount) {
+    size_t size = 0;
+    size_t power = 1;
+    size_t digits = 1;
+    size_t accountedTags = 0;
+    while (tagCount >= power) {
+        power *= 10;
+        size_t count = std::min(tagCount, power) - accountedTags;
+        size += arrayElementSize(digits) * count;
+        accountedTags += count;
+        digits++;
+    }
+    return size;
+}
+
+
 // The algorithm for constructing a list of tags matching an equality predicate on an encrypted
 // field is as follows:
 //
@@ -135,9 +177,8 @@ std::vector<PrfBlock> readTagsWithContention(const FLEStateCollectionReader& esc
         return acc + eccDoc.end - eccDoc.start + 1;
     });
     auto cumTagCount = binaryTags.size() + numInserts - numDeletes;
-    uassert(6401800,
-            "Encrypted rewrite memory limit exceeded",
-            cumTagCount * sizeof(PrfBlock) <= memoryLimit);
+
+    verifyTagsWillFit(cumTagCount, memoryLimit);
 
     for (uint64_t i = 1; i <= numInserts; i++) {
         if (auto it = std::lower_bound(

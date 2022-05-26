@@ -852,7 +852,8 @@ server_parameters:
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryFLERewriteMemoryLimit:
-    description: "Maximum memory available for encrypted field query rewrites."
+    description: "Maximum memory available for encrypted field query rewrites in bytes. Must be
+    more than zero and less than 16Mb"
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryFLERewriteMemoryLimit"
     cpp_vartype: AtomicWord<int>
@@ -860,6 +861,7 @@ server_parameters:
         expr: 14 * 1024 * 1024
     validator:
         gt: 0
+        lt: 16777216
 
 # Note for adding additional query knobs:
 #

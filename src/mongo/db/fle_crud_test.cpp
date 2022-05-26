@@ -70,6 +70,11 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+namespace fle {
+size_t sizeArrayElementsMemory(size_t tagCount);
+}
+
 namespace {
 
 constexpr auto kIndexKeyId = "12345678-1234-9876-1234-123456789012"_sd;
@@ -1180,8 +1185,8 @@ TEST_F(FleTagsTest, MemoryLimit) {
 
     const auto tagLimit = 10;
 
-    // Set memory limit to 10 tags * 32 bytes per tag
-    internalQueryFLERewriteMemoryLimit.store(tagLimit * 32);
+    // Set memory limit to 10 tags * 40 bytes per tag
+    internalQueryFLERewriteMemoryLimit.store(tagLimit * 40);
 
     // Do 10 inserts
     for (auto i = 0; i < tagLimit; i++) {
@@ -1201,5 +1206,60 @@ TEST_F(FleTagsTest, MemoryLimit) {
     // readTags returns 10 tags which does not exceed memory limit.
     ASSERT_EQ(tagLimit, readTags(doc).size());
 }
+
+TEST_F(FleTagsTest, SampleMemoryLimit) {
+
+    struct S {
+        size_t count;
+        size_t size;
+    };
+
+    // clang-format off
+    static const std::vector<S> testVector{
+        { 0, 0 },
+        { 1, 40 },
+        { 5, 200 },
+        { 10, 400 },
+        { 11, 441 },
+        { 98, 4008 },
+        { 99, 4049 },
+        { 100, 4090 },
+        { 101, 4132 },
+        { 219, 9088 },
+        { 944, 39538 },
+        { 998, 41806 },
+        { 999, 41848 },
+        { 1000, 41890 },
+        { 1001, 41933 },
+        { 1025, 42965 },
+        { 1498, 63304 },
+        { 2049, 86997 },
+        { 2907, 123891 },
+        { 5232, 223866 },
+        { 5845, 250225 },
+        { 7203, 308619 },
+        { 7786, 333688 },
+        { 8383, 359359 },
+        { 9171, 393243 },
+        { 9974, 427772 },
+        { 9986, 428288 },
+        { 9998, 428804 },
+        { 9999, 428847 },
+        { 10000, 428890 },
+        { 10001, 428934 },
+        { 10056, 431354 },
+        { 10907, 468798 },
+        { 12500, 538890 },
+        { 13778, 595122 },
+        { 13822, 597058 },
+    };
+    // clang-format on
+
+    for (auto& xp : testVector) {
+        auto size = mongo::fle::sizeArrayElementsMemory(xp.count);
+        ASSERT_EQ(xp.size, size);
+    }
+}
+
 }  // namespace
 }  // namespace mongo
