@@ -797,7 +797,7 @@ SemiFuture<Value> withCancellation(FutureT&& inputFuture, const CancellationToke
  *
  * Note that this class is not usable for ExecutorFutures because there is no tapAll() function to
  * invoke. If you want similar behavior, simply bind your state to the final callback in the async
- * chain, but do be mindful of TODO(SERVER-52942).
+ * chain, but do be mindful of TODO(SERVER-66126).
  */
 template <typename State>
 class [[nodiscard]] AsyncState {
