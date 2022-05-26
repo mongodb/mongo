@@ -153,6 +153,8 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,   // ret
 
     -1,  // fail
+
+    0,  // applyClassicMatcher
 };
 
 namespace {
@@ -279,6 +281,12 @@ std::string CodeFragment::toString() const {
                 auto accessor = readFromMemory<value::SlotAccessor*>(pcPointer);
                 pcPointer += sizeof(accessor);
                 ss << "accessor: " << static_cast<void*>(accessor);
+                break;
+            }
+            case Instruction::applyClassicMatcher: {
+                const auto* matcher = readFromMemory<const MatchExpression*>(pcPointer);
+                pcPointer += sizeof(matcher);
+                ss << "matcher: " << static_cast<const void*>(matcher);
                 break;
             }
             case Instruction::numConvert: {
@@ -444,6 +452,17 @@ void CodeFragment::appendNumericConvert(value::TypeTags targetTag) {
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, targetTag);
+}
+
+void CodeFragment::appendApplyClassicMatcher(const MatchExpression* matcher) {
+    Instruction i;
+    i.tag = Instruction::applyClassicMatcher;
+    adjustStackSimple(i);
+
+    auto offset = allocateSpace(sizeof(Instruction) + sizeof(matcher));
+
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, matcher);
 }
 
 void CodeFragment::appendSub() {
@@ -5846,6 +5865,31 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 
                     uasserted(code, message);
 
+                    break;
+                }
+                case Instruction::applyClassicMatcher: {
+                    const auto* matcher = readFromMemory<const MatchExpression*>(pcPointer);
+                    pcPointer += sizeof(matcher);
+
+                    auto [ownedObj, tagObj, valObj] = getFromStack(0);
+
+                    BSONObj bsonObjForMatching;
+                    if (tagObj == value::TypeTags::Object) {
+                        BSONObjBuilder builder;
+                        sbe::bson::convertToBsonObj(builder, sbe::value::getObjectView(valObj));
+                        bsonObjForMatching = builder.obj();
+                    } else if (tagObj == value::TypeTags::bsonObject) {
+                        auto bson = value::getRawPointerView(valObj);
+                        bsonObjForMatching = BSONObj(bson);
+                    } else {
+                        MONGO_UNREACHABLE_TASSERT(6681402);
+                    }
+
+                    bool res = matcher->matchesBSON(bsonObjForMatching);
+                    if (ownedObj) {
+                        value::releaseValue(tagObj, valObj);
+                    }
+                    topStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(res));
                     break;
                 }
                 default:

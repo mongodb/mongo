@@ -2060,6 +2060,23 @@ std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
         return {boost::none, std::move(stage)};
     }
 
+    // We only use the classic matcher path (aka "franken matcher") when the plan cache is off,
+    // because embedding the classic matcher into the query execution tree is not compatible with
+    // auto parameterization. All of the constants used in the filter are in the MatchExpression
+    // itself, rather than in slots.
+    if (!feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+        tassert(6681403, "trackIndex=true not supported for classic matcher in SBE", !trackIndex);
+
+        auto expr = makeFunction("applyClassicMatcher",
+                                 makeConstant(sbe::value::TypeTags::classicMatchExpresion,
+                                              sbe::value::bitcastFrom<const MatchExpression*>(
+                                                  root->shallowClone().release())),
+                                 makeVariable(inputSlot));
+
+        auto filterStage = makeFilter<false>(std::move(stage), std::move(expr), planNodeId);
+        return {boost::none, std::move(filterStage)};
+    }
+
     auto stateHelper = makeFilterStateHelper(trackIndex);
     MatchExpressionVisitorContext context{
         state, std::move(stage), inputSlot, root, planNodeId, *stateHelper};
@@ -2068,7 +2085,6 @@ std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
     MatchExpressionPostVisitor postVisitor{&context};
     MatchExpressionWalker walker{&preVisitor, &inVisitor, &postVisitor};
     tree_walker::walk<true, MatchExpression>(root, &walker);
-
     auto [resultSlot, resultStage] = context.done();
     return {resultSlot, std::move(resultStage)};
 }
@@ -2085,8 +2101,29 @@ EvalStage generateIndexFilter(StageBuilderState& state,
         return stage;
     }
 
-    // Index filters never need to track the index of a matching element in the array as they cannot
-    // be used with a positional projection.
+    // We only use the classic matcher path (aka "franken matcher") when the plan cache is off,
+    // because embedding the classic matcher into the query execution tree is not compatible with
+    // auto parameterization. All of the constants used in the filter are in the MatchExpression
+    // itself, rather than in slots.
+    if (!feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+        BSONObjBuilder keyPatternBuilder;
+        for (auto& field : keyFields) {
+            keyPatternBuilder.append(field, 1);
+        }
+        auto keyPatternTree = buildKeyPatternTree(keyPatternBuilder.obj(), keySlots);
+        auto mkObjExpr = buildNewObjExpr(keyPatternTree.get());
+
+        auto expr = makeFunction("applyClassicMatcher",
+                                 makeConstant(sbe::value::TypeTags::classicMatchExpresion,
+                                              sbe::value::bitcastFrom<const MatchExpression*>(
+                                                  root->shallowClone().release())),
+                                 std::move(mkObjExpr));
+
+        return makeFilter<false>(std::move(stage), std::move(expr), planNodeId);
+    }
+
+    // Covered filters never need to track the index of a matching element in the array as they
+    // cannot be used with a positional projection.
     const bool trackIndex = false;
     auto stateHelper = makeFilterStateHelper(trackIndex);
     MatchExpressionVisitorContext context{state,
