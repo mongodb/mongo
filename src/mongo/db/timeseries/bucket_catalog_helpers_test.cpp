@@ -179,5 +179,109 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxSucceedsWithMixedSchemaBucketDocu
     }
 }
 
+TEST_F(BucketCatalogHelpersTest, GenerateSchemaFailsWithMixedSchemaBucketDocumentTest) {
+    ASSERT_OK(createCollection(operationContext(),
+                               kNss.db().toString(),
+                               BSON("create" << kNss.coll() << "timeseries"
+                                             << BSON("timeField"
+                                                     << "time"))));
+
+    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
+    const CollatorInterface* collator = autoColl->getDefaultCollator();
+
+    std::vector<BSONObj> docs = {::mongo::fromjson(R"({control:{min: {a: 1}, max: {a: {}}}})"),
+                                 ::mongo::fromjson(R"({control:{min: {a: {}}, max: {a: 1}}})"),
+                                 ::mongo::fromjson(R"({control:{min: {a: []}, max: {a: {}}}})"),
+                                 ::mongo::fromjson(R"({control:{min: {a: 1}, max: {a: "foo"}}})")};
+
+    for (const BSONObj& doc : docs) {
+        StatusWith<timeseries::Schema> swSchema =
+            timeseries::generateSchemaFromBucketDoc(doc, collator);
+        ASSERT_NOT_OK(swSchema.getStatus());
+    }
+}
+
+TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithInvalidMeasurementsTest) {
+    ASSERT_OK(createCollection(operationContext(),
+                               kNss.db().toString(),
+                               BSON("create" << kNss.coll() << "timeseries"
+                                             << BSON("timeField"
+                                                     << "time"))));
+
+    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
+    const CollatorInterface* collator = autoColl->getDefaultCollator();
+
+    // First item: Bucket document to generate the schema representation of.
+    // Second item: measurement that is incompatible with the generated schema.
+    std::vector<std::pair<BSONObj, BSONObj>> docs = {
+        {::mongo::fromjson(R"({control:{min: {a: 1}, max: {a: 2}}})"),
+         ::mongo::fromjson(R"({a: {}})")},
+        {::mongo::fromjson(R"({control:{min: {a: 1}, max: {a: 2}}})"),
+         ::mongo::fromjson(R"({a: []})")},
+        {::mongo::fromjson(R"({control:{min: {a: 1}, max: {a: 2}}})"),
+         ::mongo::fromjson(R"({a: "1"})")},
+        {::mongo::fromjson(R"({control:{min: {a: "a"}, max: {a: "aa"}}})"),
+         ::mongo::fromjson(R"({a: 123})")},
+        {::mongo::fromjson(R"({control:{min: {a: [1, 2, 3]}, max: {a: [4, 5, 6]}}})"),
+         ::mongo::fromjson(R"({a: {}})")},
+        {::mongo::fromjson(R"({control:{min: {a: [1, 2, 3]}, max: {a: [4, 5, 6]}}})"),
+         ::mongo::fromjson(R"({a: 123})")},
+        {::mongo::fromjson(R"({control:{min: {a: [1, 2, 3]}, max: {a: [4, 5, 6]}}})"),
+         ::mongo::fromjson(R"({a: "abc"})")},
+        {::mongo::fromjson(R"({control:{min: {a: {b: 1}}, max: {a: {b: 2}}}})"),
+         ::mongo::fromjson(R"({a: []})")},
+        {::mongo::fromjson(R"({control:{min: {a: {b: 1}}, max: {a: {b: 2}}}})"),
+         ::mongo::fromjson(R"({a: {b: "abc"}})")},
+        {::mongo::fromjson(R"({control:{min: {a: {b: 1}}, max: {a: {b: 2}}}})"),
+         ::mongo::fromjson(R"({a: {b: []}})")}};
+
+    for (const auto& [minMaxDoc, measurementDoc] : docs) {
+        StatusWith<timeseries::Schema> swSchema =
+            timeseries::generateSchemaFromBucketDoc(minMaxDoc, collator);
+        ASSERT_OK(swSchema.getStatus());
+
+        timeseries::Schema schema = std::move(swSchema.getValue());
+
+        auto result = schema.update(measurementDoc, /*metaField=*/boost::none, collator);
+        ASSERT(result == timeseries::Schema::UpdateStatus::Failed);
+    }
+}
+
+TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithValidMeasurementsTest) {
+    ASSERT_OK(createCollection(operationContext(),
+                               kNss.db().toString(),
+                               BSON("create" << kNss.coll() << "timeseries"
+                                             << BSON("timeField"
+                                                     << "time"))));
+
+    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
+    const CollatorInterface* collator = autoColl->getDefaultCollator();
+
+    // First item: Bucket document to generate the schema representation of.
+    // Second item: measurement that is compatible with the generated schema.
+    std::vector<std::pair<BSONObj, BSONObj>> docs = {
+        {::mongo::fromjson(R"({control:{min: {a: 1}, max: {a: 2}}})"),
+         ::mongo::fromjson(R"({a: 1})")},
+        {::mongo::fromjson(R"({control:{min: {a: 1}, max: {a: 2}}})"),
+         ::mongo::fromjson(R"({a: 5})")},
+        {::mongo::fromjson(R"({control:{min: {a: "a"}, max: {a: "aa"}}})"),
+         ::mongo::fromjson(R"({a: "aaa"})")},
+        {::mongo::fromjson(R"({control:{min: {a: [1, 2, 3]}, max: {a: [4, 5, 6]}}})"),
+         ::mongo::fromjson(R"({a: [7, 8, 9]})")},
+        {::mongo::fromjson(R"({control:{min: {a: {b: 1}}, max: {a: {b: 2}}}})"),
+         ::mongo::fromjson(R"({a: {b: 3}})")}};
+
+    for (const auto& [minMaxDoc, measurementDoc] : docs) {
+        StatusWith<timeseries::Schema> swSchema =
+            timeseries::generateSchemaFromBucketDoc(minMaxDoc, collator);
+        ASSERT_OK(swSchema.getStatus());
+
+        timeseries::Schema schema = std::move(swSchema.getValue());
+
+        auto result = schema.update(measurementDoc, /*metaField=*/boost::none, collator);
+        ASSERT(result == timeseries::Schema::UpdateStatus::Updated);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

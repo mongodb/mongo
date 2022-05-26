@@ -340,6 +340,21 @@ FlatBSONStore<Element, Value>::FlatBSONStore() {
 }
 
 template <class Derived, class Element, class Value>
+typename std::string FlatBSON<Derived, Element, Value>::updateStatusString(
+    UpdateStatus updateStatus) {
+    switch (updateStatus) {
+        case UpdateStatus::Updated:
+            return "updated";
+        case UpdateStatus::Failed:
+            return "failed";
+        case UpdateStatus::NoChange:
+            return "no change";
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+template <class Derived, class Element, class Value>
 typename FlatBSON<Derived, Element, Value>::UpdateStatus FlatBSON<Derived, Element, Value>::update(
     const BSONObj& doc,
     boost::optional<StringData> omitField,
@@ -849,8 +864,15 @@ MinMax MinMax::parseFromBSON(const BSONObj& min,
     MinMax minmax;
 
     // The metadata field is already excluded from generated min/max summaries.
-    minmax.update(min, /*metaField=*/boost::none, stringComparator);
-    minmax.update(max, /*metaField=*/boost::none, stringComparator);
+    UpdateStatus status = minmax.update(min, /*metaField=*/boost::none, stringComparator);
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Failed to update min: " << updateStatusString(status),
+            status != UpdateStatus::Failed);
+
+    status = minmax.update(max, /*metaField=*/boost::none, stringComparator);
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Failed to update max: " << updateStatusString(status),
+            status != UpdateStatus::Failed);
 
     // Clear the updated state as we're only constructing the object from an existing document.
     [[maybe_unused]] auto minUpdates = minmax.minUpdates();
@@ -869,6 +891,25 @@ SchemaStore::Data& SchemaElement::data() {
 
 const SchemaStore::Data& SchemaElement::data() const {
     return _data;
+}
+
+Schema Schema::parseFromBSON(const BSONObj& min,
+                             const BSONObj& max,
+                             const StringData::ComparatorInterface* stringComparator) {
+    Schema schema;
+
+    // The metadata field is already excluded from generated min/max summaries.
+    UpdateStatus status = schema.update(min, /*metaField=*/boost::none, stringComparator);
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Failed to update min: " << updateStatusString(status),
+            status != UpdateStatus::Failed);
+
+    status = schema.update(max, /*metaField=*/boost::none, stringComparator);
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Failed to update max: " << updateStatusString(status),
+            status != UpdateStatus::Failed);
+
+    return schema;
 }
 
 std::pair<Schema::UpdateStatus, SchemaElement::UpdateContext> Schema::_shouldUpdateObj(

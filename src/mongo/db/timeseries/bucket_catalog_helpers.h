@@ -45,4 +45,13 @@ namespace mongo::timeseries {
 StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
                                                const CollatorInterface* collator);
 
+/**
+ * Generates and returns a Schema object from an existing bucket document. Avoids unpacking the
+ * bucket document and relies on the control.min and control.max summary fields.
+ *
+ * Returns a bad status if the bucket document is malformed or contains mixed schema measurements.
+ */
+StatusWith<Schema> generateSchemaFromBucketDoc(const BSONObj& bucketDoc,
+                                               const CollatorInterface* collator);
+
 }  // namespace mongo::timeseries

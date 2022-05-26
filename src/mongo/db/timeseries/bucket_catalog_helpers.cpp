@@ -33,8 +33,9 @@
 
 namespace mongo::timeseries {
 
-StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
-                                               const CollatorInterface* collator) {
+namespace {
+
+StatusWith<std::pair<const BSONObj, const BSONObj>> extractMinAndMax(const BSONObj& bucketDoc) {
     const BSONObj& controlObj = bucketDoc.getObjectField(kBucketControlFieldName);
     if (controlObj.isEmpty()) {
         return {ErrorCodes::BadValue,
@@ -50,7 +51,41 @@ StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
                               << redact(bucketDoc)};
     }
 
-    return MinMax::parseFromBSON(minObj, maxObj, collator);
+    return std::make_pair(minObj, maxObj);
+}
+
+}  // namespace
+
+StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
+                                               const CollatorInterface* collator) {
+    auto swDocs = extractMinAndMax(bucketDoc);
+    if (!swDocs.isOK()) {
+        return swDocs.getStatus();
+    }
+
+    const auto& [minObj, maxObj] = swDocs.getValue();
+
+    try {
+        return MinMax::parseFromBSON(minObj, maxObj, collator);
+    } catch (...) {
+        return exceptionToStatus();
+    }
+}
+
+StatusWith<Schema> generateSchemaFromBucketDoc(const BSONObj& bucketDoc,
+                                               const CollatorInterface* collator) {
+    auto swDocs = extractMinAndMax(bucketDoc);
+    if (!swDocs.isOK()) {
+        return swDocs.getStatus();
+    }
+
+    const auto& [minObj, maxObj] = swDocs.getValue();
+
+    try {
+        return Schema::parseFromBSON(minObj, maxObj, collator);
+    } catch (...) {
+        return exceptionToStatus();
+    }
 }
 
 }  // namespace mongo::timeseries
