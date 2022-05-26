@@ -74,6 +74,93 @@ const OperationContext::Decoration<bool> operationShouldBlockBehindCatalogCacheR
 const OperationContext::Decoration<bool> operationBlockedBehindCatalogCacheRefresh =
     OperationContext::declareDecoration<bool>();
 
+std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    bool isIncremental,
+    const RoutingTableHistoryValueHandle& existingHistory,
+    const CatalogCacheLoader::CollectionAndChangedChunks& collectionAndChunks) {
+    // If a refresh doesn't find new information -> re-use the existing RoutingTableHistory.
+    // Do not re-use the existing routing table if there was a metadata format change.
+    if (isIncremental && collectionAndChunks.changedChunks.size() == 1 &&
+        collectionAndChunks.changedChunks[0].getVersion() == existingHistory->optRt->getVersion() &&
+        collectionAndChunks.changedChunks[0].getVersion().getTimestamp().is_initialized() ==
+            existingHistory->optRt->getVersion().getTimestamp().is_initialized()) {
+
+        const auto& newVersion = collectionAndChunks.changedChunks[0].getVersion();
+        tassert(7032310,
+                fmt::format("allowMigrations field of collection '{}' changed without changing the "
+                            "collection version {}. Old value: {}, new value: {}",
+                            nss.toString(),
+                            newVersion.toString(),
+                            existingHistory->optRt->allowMigrations(),
+                            collectionAndChunks.allowMigrations),
+                collectionAndChunks.allowMigrations == existingHistory->optRt->allowMigrations());
+
+        const auto& oldReshardingFields = existingHistory->optRt->getReshardingFields();
+        const auto& newReshardingFields = collectionAndChunks.reshardingFields;
+        tassert(7032311,
+                fmt::format("reshardingFields field of collection '{}' changed without changing "
+                            "the collection version {}. Old value: {}, new value: {}",
+                            nss.toString(),
+                            newVersion.toString(),
+                            oldReshardingFields->toBSON().toString(),
+                            newReshardingFields->toBSON().toString()),
+                [&] {
+                    if (oldReshardingFields && newReshardingFields)
+                        return oldReshardingFields->toBSON().woCompare(
+                                   newReshardingFields->toBSON()) == 0;
+                    else
+                        return !oldReshardingFields && !newReshardingFields;
+                }());
+
+        return existingHistory->optRt;
+    }
+
+    auto newRoutingHistory = [&] {
+        // If we have routing info already and it's for the same collection epoch, we're
+        // updating. Otherwise, we're making a whole new routing table.
+        if (isIncremental &&
+            existingHistory->optRt->getVersion().epoch() == collectionAndChunks.epoch) {
+            if (existingHistory->optRt->getVersion().getTimestamp().is_initialized() !=
+                collectionAndChunks.creationTime.is_initialized()) {
+                return existingHistory->optRt
+                    ->makeUpdatedReplacingTimestamp(collectionAndChunks.creationTime)
+                    .makeUpdated(collectionAndChunks.reshardingFields,
+                                 collectionAndChunks.allowMigrations,
+                                 collectionAndChunks.changedChunks);
+            } else {
+                return existingHistory->optRt->makeUpdated(collectionAndChunks.reshardingFields,
+                                                           collectionAndChunks.allowMigrations,
+                                                           collectionAndChunks.changedChunks);
+            }
+        }
+
+        auto defaultCollator = [&]() -> std::unique_ptr<CollatorInterface> {
+            if (!collectionAndChunks.defaultCollation.isEmpty()) {
+                // The collation should have been validated upon collection creation
+                return uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                           ->makeFromBSON(collectionAndChunks.defaultCollation));
+            }
+            return nullptr;
+        }();
+
+        return RoutingTableHistory::makeNew(nss,
+                                            collectionAndChunks.uuid,
+                                            KeyPattern(collectionAndChunks.shardKeyPattern),
+                                            std::move(defaultCollator),
+                                            collectionAndChunks.shardKeyIsUnique,
+                                            collectionAndChunks.epoch,
+                                            collectionAndChunks.creationTime,
+                                            collectionAndChunks.timeseriesFields,
+                                            std::move(collectionAndChunks.reshardingFields),
+                                            collectionAndChunks.allowMigrations,
+                                            collectionAndChunks.changedChunks);
+    }();
+
+    return std::make_shared<RoutingTableHistory>(std::move(newRoutingHistory));
+}
+
 }  // namespace
 
 CachedDatabaseInfo::CachedDatabaseInfo(DatabaseTypeValueHandle&& dbt) : _dbt(std::move(dbt)){};
@@ -585,103 +672,22 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
 
         auto collectionAndChunks = _catalogCacheLoader.getChunksSince(nss, lookupVersion).get();
 
-        // If a refresh doesn't find new information -> re-use the existing RoutingTableHistory.
-        // Do not re-use the existing routing table if there was a metadata format change.
-        if (isIncremental && collectionAndChunks.changedChunks.size() == 1 &&
-            collectionAndChunks.changedChunks[0].getVersion() ==
-                existingHistory->optRt->getVersion() &&
-            collectionAndChunks.changedChunks[0].getVersion().getTimestamp().is_initialized() ==
-                existingHistory->optRt->getVersion().getTimestamp().is_initialized()) {
+        std::shared_ptr<RoutingTableHistory> newRoutingHistory = createUpdatedRoutingTableHistory(
+            opCtx, nss, isIncremental, existingHistory, collectionAndChunks);
+        invariant(newRoutingHistory);
 
-            const auto& newVersion = collectionAndChunks.changedChunks[0].getVersion();
-            tassert(
-                7032310,
-                fmt::format("allowMigrations field of collection '{}' changed without changing the "
-                            "collection version {}. Old value: {}, new value: {}",
-                            nss.toString(),
-                            newVersion.toString(),
-                            existingHistory->optRt->allowMigrations(),
-                            collectionAndChunks.allowMigrations),
-                collectionAndChunks.allowMigrations == existingHistory->optRt->allowMigrations());
-
-            const auto& oldReshardingFields = existingHistory->optRt->getReshardingFields();
-            const auto& newReshardingFields = collectionAndChunks.reshardingFields;
-            tassert(
-                7032311,
-                fmt::format("reshardingFields field of collection '{}' changed without changing "
-                            "the collection version {}. Old value: {}, new value: {}",
-                            nss.toString(),
-                            newVersion.toString(),
-                            oldReshardingFields->toBSON().toString(),
-                            newReshardingFields->toBSON().toString()),
-                [&] {
-                    if (oldReshardingFields && newReshardingFields)
-                        return oldReshardingFields->toBSON().woCompare(
-                                   newReshardingFields->toBSON()) == 0;
-                    else
-                        return !oldReshardingFields && !newReshardingFields;
-                }());
-
-            // Despite we didn't find new info, we must update the time of this entry on the cache
-            newComparableVersion.setChunkVersion(newVersion);
-            return LookupResult(OptionalRoutingTableHistory(existingHistory->optRt),
-                                std::move(newComparableVersion));
-        }
-
-        auto newRoutingHistory = [&] {
-            // If we have routing info already and it's for the same collection epoch, we're
-            // updating. Otherwise, we're making a whole new routing table.
-            if (isIncremental &&
-                existingHistory->optRt->getVersion().epoch() == collectionAndChunks.epoch) {
-                if (existingHistory->optRt->getVersion().getTimestamp().is_initialized() !=
-                    collectionAndChunks.creationTime.is_initialized()) {
-                    return existingHistory->optRt
-                        ->makeUpdatedReplacingTimestamp(collectionAndChunks.creationTime)
-                        .makeUpdated(collectionAndChunks.reshardingFields,
-                                     collectionAndChunks.allowMigrations,
-                                     collectionAndChunks.changedChunks);
-                } else {
-                    return existingHistory->optRt->makeUpdated(collectionAndChunks.reshardingFields,
-                                                               collectionAndChunks.allowMigrations,
-                                                               collectionAndChunks.changedChunks);
-                }
-            }
-
-            auto defaultCollator = [&]() -> std::unique_ptr<CollatorInterface> {
-                if (!collectionAndChunks.defaultCollation.isEmpty()) {
-                    // The collation should have been validated upon collection creation
-                    return uassertStatusOK(
-                        CollatorFactoryInterface::get(opCtx->getServiceContext())
-                            ->makeFromBSON(collectionAndChunks.defaultCollation));
-                }
-                return nullptr;
-            }();
-
-            return RoutingTableHistory::makeNew(nss,
-                                                collectionAndChunks.uuid,
-                                                KeyPattern(collectionAndChunks.shardKeyPattern),
-                                                std::move(defaultCollator),
-                                                collectionAndChunks.shardKeyIsUnique,
-                                                collectionAndChunks.epoch,
-                                                collectionAndChunks.creationTime,
-                                                collectionAndChunks.timeseriesFields,
-                                                std::move(collectionAndChunks.reshardingFields),
-                                                collectionAndChunks.allowMigrations,
-                                                collectionAndChunks.changedChunks);
-        }();
-
-        newRoutingHistory.setAllShardsRefreshed();
+        newRoutingHistory->setAllShardsRefreshed();
 
         // Check that the shards all match with what is on the config server
         std::set<ShardId> shardIds;
-        newRoutingHistory.getAllShardIds(&shardIds);
+        newRoutingHistory->getAllShardIds(&shardIds);
         for (const auto& shardId : shardIds) {
             uassertStatusOKWithContext(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId),
                                        str::stream() << "Collection " << nss
                                                      << " references shard which does not exist");
         }
 
-        const ChunkVersion newVersion = newRoutingHistory.getVersion();
+        const ChunkVersion newVersion = newRoutingHistory->getVersion();
         newComparableVersion.setChunkVersion(newVersion);
 
         LOGV2_FOR_CATALOG_REFRESH(4619901,
@@ -694,8 +700,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                                   "duration"_attr = Milliseconds(t.millis()));
         _updateRefreshesStats(isIncremental, false);
 
-        return LookupResult(OptionalRoutingTableHistory(std::make_shared<RoutingTableHistory>(
-                                std::move(newRoutingHistory))),
+        return LookupResult(OptionalRoutingTableHistory(std::move(newRoutingHistory)),
                             std::move(newComparableVersion));
     } catch (const DBException& ex) {
         _stats.countFailedRefreshes.addAndFetch(1);
