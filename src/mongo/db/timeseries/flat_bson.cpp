@@ -843,6 +843,21 @@ BSONObj MinMax::maxUpdates() {
     return builder.obj();
 }
 
+MinMax MinMax::parseFromBSON(const BSONObj& min,
+                             const BSONObj& max,
+                             const StringData::ComparatorInterface* stringComparator) {
+    MinMax minmax;
+
+    // The metadata field is already excluded from generated min/max summaries.
+    minmax.update(min, /*metaField=*/boost::none, stringComparator);
+    minmax.update(max, /*metaField=*/boost::none, stringComparator);
+
+    // Clear the updated state as we're only constructing the object from an existing document.
+    [[maybe_unused]] auto minUpdates = minmax.minUpdates();
+    [[maybe_unused]] auto maxUpdates = minmax.maxUpdates();
+
+    return minmax;
+}
 
 void SchemaElement::initializeRoot() {
     _data.setObject();

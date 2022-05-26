@@ -422,6 +422,13 @@ public:
     BSONObj minUpdates();
     BSONObj maxUpdates();
 
+    /**
+     * Generates and returns a MinMax object from the passed in min and max documents.
+     */
+    static MinMax parseFromBSON(const BSONObj& min,
+                                const BSONObj& max,
+                                const StringData::ComparatorInterface* stringComparator);
+
 protected:
     static std::pair<UpdateStatus, MinMaxElement::UpdateContext> _shouldUpdateObj(
         MinMaxStore::Obj& obj, const BSONElement& elem, MinMaxElement::UpdateContext updateContext);

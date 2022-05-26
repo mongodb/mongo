@@ -23,6 +23,7 @@ env.Library(
     target='bucket_catalog',
     source=[
         'bucket_catalog.cpp',
+        'bucket_catalog_helpers.cpp',
         'flat_bson.cpp',
     ],
     LIBDEPS_PRIVATE=[
@@ -120,6 +121,7 @@ env.Library(
 env.CppUnitTest(
     target='db_timeseries_test',
     source=[
+        'bucket_catalog_helpers_test.cpp',
         'bucket_catalog_test.cpp',
         'minmax_test.cpp',
         'timeseries_dotted_path_support_test.cpp',
