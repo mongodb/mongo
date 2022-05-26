@@ -8,6 +8,8 @@
  *     # Our test infrastructure prevents tests which use the 'setParameter' command from running in
  *     # stepdown suites, since parameters are local to each mongod in the replica set.
  *     does_not_support_stepdowns,
+ *     # 'internalQueryForceClassicEngine' was introduced in 5.1.
+ *     requires_fcv_51
  * ]
  */
 
