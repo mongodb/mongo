@@ -86,7 +86,7 @@ const Seconds kBalanceRoundDefaultInterval(10);
 // be balanced. This value should be set sufficiently low so that imbalanced clusters will quickly
 // reach balanced state, but setting it too low may cause CRUD operations to start failing due to
 // not being able to establish a stable shard version.
-const Seconds kBalancerMigrationsThrottling(1);
+const Seconds kShortBalanceRoundInterval(1);
 
 /**
  * Balancer status response
@@ -242,7 +242,7 @@ Balancer* Balancer::get(OperationContext* operationContext) {
 }
 
 Balancer::Balancer()
-    : _numMigrationsInRound(0),
+    : _balancedLastTime(0),
       _random(std::random_device{}()),
       _clusterStats(std::make_unique<ClusterStatisticsImpl>(_random)),
       _chunkSelectionPolicy(
@@ -667,7 +667,6 @@ void Balancer::_mainThread() {
     LOGV2(6036606, "Balancer worker thread initialised. Entering main loop.");
 
     // Main balancer loop
-    auto prevRoundEndTime = Date_t::fromMillisSinceEpoch(0);
     while (!_stopRequested()) {
         BalanceRoundDetails roundDetails;
 
@@ -742,48 +741,35 @@ void Balancer::_mainThread() {
 
                 if (chunksToRebalance.empty() && chunksToDefragment.empty()) {
                     LOGV2_DEBUG(21862, 1, "No need to move any chunk");
-                    _numMigrationsInRound = 0;
+                    _balancedLastTime = 0;
                 } else {
-                    _numMigrationsInRound =
+                    _balancedLastTime =
                         _moveChunks(opCtx.get(), chunksToRebalance, chunksToDefragment);
 
                     roundDetails.setSucceeded(
                         static_cast<int>(chunksToRebalance.size() + chunksToDefragment.size()),
-                        _numMigrationsInRound);
+                        _balancedLastTime);
 
                     ShardingLogging::get(opCtx.get())
                         ->logAction(opCtx.get(), "balancer.round", "", roundDetails.toBSON())
                         .ignore();
                 }
+
+                LOGV2_DEBUG(21863, 1, "End balancing round");
             }
 
-            LOGV2_DEBUG(21863, 1, "End balancing round");
-            auto currRoundEndTime = Date_t::now();
-            auto balancerInterval = [&]() -> Milliseconds {
-                // If a test is setting a value, or no migrations have been performed, wait for a
-                // fixed amount of time
-                boost::optional<Milliseconds> forcedValue(boost::none);
-                overrideBalanceRoundInterval.execute([&](const BSONObj& data) {
-                    forcedValue = Milliseconds(data["intervalMs"].numberInt());
-                    LOGV2(21864,
-                          "overrideBalanceRoundInterval: using customized balancing interval",
-                          "balancerInterval"_attr = *forcedValue);
-                });
-                if (forcedValue) {
-                    return *forcedValue;
-                }
-                if (_numMigrationsInRound == 0) {
-                    return kBalanceRoundDefaultInterval;
-                }
+            Milliseconds balancerInterval =
+                _balancedLastTime ? kShortBalanceRoundInterval : kBalanceRoundDefaultInterval;
 
-                // Otherwise, apply the throttling constraint
-                auto timeSinceLastEndOfRound = currRoundEndTime - prevRoundEndTime;
-                return timeSinceLastEndOfRound < kBalancerMigrationsThrottling
-                    ? kBalancerMigrationsThrottling - timeSinceLastEndOfRound
-                    : Milliseconds(0);
-            }();
+            overrideBalanceRoundInterval.execute([&](const BSONObj& data) {
+                balancerInterval = Milliseconds(data["intervalMs"].numberInt());
+                LOGV2(21864,
+                      "overrideBalanceRoundInterval: using shorter balancing interval: "
+                      "{balancerInterval}",
+                      "overrideBalanceRoundInterval: using shorter balancing interval",
+                      "balancerInterval"_attr = balancerInterval);
+            });
 
-            prevRoundEndTime = currRoundEndTime;
             _endRound(opCtx.get(), balancerInterval);
         } catch (const DBException& e) {
             LOGV2(21865,
