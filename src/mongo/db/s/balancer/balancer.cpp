@@ -408,10 +408,6 @@ Status Balancer::moveRange(OperationContext* opCtx,
         return std::tuple<ShardId, BSONObj>{chunk.getShardId(), chunk.getMin()};
     }();
 
-    if (fromShardId == request.getToShard()) {
-        return Status::OK();
-    }
-
     ShardsvrMoveRange shardSvrRequest(nss);
     shardSvrRequest.setDbName(NamespaceString::kAdminDb);
     shardSvrRequest.setMoveRangeRequestBase(request.getMoveRangeRequestBase());
