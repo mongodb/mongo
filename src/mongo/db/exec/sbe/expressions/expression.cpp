@@ -581,6 +581,11 @@ static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
     {"collMin", InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendCollMin, true}},
     {"collMax", InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendCollMax, true}},
     {"mod", InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendMod, false}},
+    // Note that we do not provide a pointer to a function for appending the 'applyClassicMatcher'
+    // instruction, because it's required that the first argument to applyClassicMatcher be a
+    // constant MatchExpression. This constant is stored as part of the bytecode itself, to avoid
+    // the stack manipulation overhead.
+    {"applyClassicMatcher", InstrFn{[](size_t n) { return n == 2; }, nullptr, false}},
 };
 }  // namespace
 
@@ -627,6 +632,20 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
                     ctx.aggExpression);
 
             code.appendAccessVal(ctx.accumulator);
+        }
+
+        if (_name == "applyClassicMatcher") {
+            tassert(6681400,
+                    "First argument to applyClassicMatcher must be constant",
+                    _nodes[0]->as<EConstant>());
+            auto [matcherTag, matcherVal] = _nodes[0]->as<EConstant>()->getConstant();
+            tassert(6681409,
+                    "First argument to applyClassicMatcher must be a classic matcher",
+                    matcherTag == value::TypeTags::classicMatchExpresion);
+
+            code.append(_nodes[1]->compileDirect(ctx));
+            code.appendApplyClassicMatcher(value::getClassicMatchExpressionView(matcherVal));
+            return code;
         }
 
         // The order of evaluation is flipped for instruction functions. We may want to change the

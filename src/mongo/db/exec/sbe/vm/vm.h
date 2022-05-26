@@ -317,6 +317,8 @@ struct Instruction {
 
         fail,
 
+        applyClassicMatcher,  // Instruction which calls into the classic engine MatchExpression.
+
         lastInstruction  // this is just a marker used to calculate number of instructions
     };
 
@@ -463,6 +465,8 @@ struct Instruction {
                 return "ret";
             case fail:
                 return "fail";
+            case applyClassicMatcher:
+                return "applyClassicMatcher";
             default:
                 return "unrecognized";
         }
@@ -746,6 +750,7 @@ public:
         appendSimpleInstruction(Instruction::fail);
     }
     void appendNumericConvert(value::TypeTags targetTag);
+    void appendApplyClassicMatcher(const MatchExpression*);
 
     void fixup(int offset);
 

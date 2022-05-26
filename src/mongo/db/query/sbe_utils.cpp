@@ -57,8 +57,14 @@ bool isQuerySbeCompatible(const CollectionPtr* collection,
     const bool isQueryNotAgainstClusteredCollection =
         !(collection->get() && collection->get()->isClustered());
 
+    const bool doesNotRequireMatchDetails =
+        !cq->getProj() || !cq->getProj()->requiresMatchDetails();
+
+    const bool doesNotHaveElemMatchProject = !cq->getProj() || !cq->getProj()->containsElemMatch();
+
     return allExpressionsSupported && isNotCount && doesNotContainMetadataRequirements &&
         isQueryNotAgainstTimeseriesCollection && isQueryNotAgainstClusteredCollection &&
-        doesNotSortOnMetaOrPathWithNumericComponents && isNotOplog;
+        doesNotSortOnMetaOrPathWithNumericComponents && isNotOplog && doesNotRequireMatchDetails &&
+        doesNotHaveElemMatchProject;
 }
 }  // namespace mongo::sbe
