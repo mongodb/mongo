@@ -2680,7 +2680,7 @@ buildvariants:
   expansions:
     toolchain_version: v4
 
-- name: enterprise-rhel80-unoptimized-64-bit
+- name: enterprise-rhel80-no-latch-64-bit
   display_name: "~ Enterprise RHEL 8.0 (without Diagnostic Latches)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -2701,7 +2701,7 @@ buildvariants:
     distros:
     - rhel80-build
 
-- name: enterprise-rhel80-no-latch-64-bit
+- name: enterprise-rhel80-unoptimized-64-bit
   display_name: "~ Enterprise RHEL 8.0 DEBUG (Unoptimized)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
