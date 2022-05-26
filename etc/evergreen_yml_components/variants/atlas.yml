@@ -15,7 +15,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-rhel70
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel70
     multiversion_edition: enterprise
     has_packages: true
@@ -67,8 +67,8 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: .csfle
-  - name: .publish_csfle
+  - name: .crypt
+  - name: .publish_crypt
   - name: unittest_shell_hang_analyzer_gen
   - name: test_packages
     distros:

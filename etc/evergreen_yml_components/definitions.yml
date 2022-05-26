@@ -2755,13 +2755,13 @@ tasks:
       args:
       - "src/evergreen/stitch_support_run_tests.sh"
 
-- name: csfle_create_lib
+- name: crypt_create_lib
   tags: []
   commands:
   - *f_expansions_write
   - func: "scons compile"
     vars:
-      targets: archive-mongo-csfle-dev
+      targets: archive-mongo-crypt-dev
       task_compile_flags: >-
         --allocator=system
         --enable-free-mon=off
@@ -2770,31 +2770,31 @@ tasks:
         --link-model=dynamic-sdk
         --enable-http-client=off
         --ssl=off
-        ${csfle_task_compile_flags}
-        DESTDIR='$BUILD_ROOT/csfle-lib-$MONGO_VERSION'
+        ${crypt_task_compile_flags}
+        DESTDIR='$BUILD_ROOT/crypt-lib-$MONGO_VERSION'
   - command: subprocess.exec
     params:
       binary: bash
       args:
-      - "src/evergreen/csfle_run_tests.sh"
+      - "src/evergreen/crypt_run_tests.sh"
   - command: s3.put
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: "src/mongo-csfle-dev.${ext|tgz}"
-      remote_file: "${project}/mongo_csfle/${build_variant}/${revision}/mongo_csfle_v1-${version}.${ext|tgz}"
+      local_file: "src/mongo-crypt-dev.${ext|tgz}"
+      remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_v1-${version}.${ext|tgz}"
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/tar}
-      display_name: "Mongo CSFLE Library"
+      display_name: "Mongo crypt Library"
 
-- name: csfle_create_debug_lib
+- name: crypt_create_debug_lib
   tags: []
   commands:
   - *f_expansions_write
   - func: "scons compile"
     vars:
-      targets: archive-mongo-csfle-dev archive-mongo-csfle-debug
+      targets: archive-mongo-crypt-dev archive-mongo-crypt-debug
       task_compile_flags: >-
         --dbg=on
         --opt=off
@@ -2803,37 +2803,37 @@ tasks:
         --enterprise-features=fle
         --js-engine=none
         --link-model=dynamic-sdk
-        DESTDIR='$BUILD_ROOT/csfle-lib-$MONGO_VERSION'
+        DESTDIR='$BUILD_ROOT/crypt-lib-$MONGO_VERSION'
   - command: s3.put
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: "src/mongo-csfle-dev.${ext|tgz}"
-      remote_file: "${project}/mongo_csfle/${build_variant}/${revision}/mongo_csfle_v1_dev-${version}.${ext|tgz}"
+      local_file: "src/mongo-crypt-dev.${ext|tgz}"
+      remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_v1_dev-${version}.${ext|tgz}"
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/tar}
-      display_name: "Mongo CSFLE Library dev"
+      display_name: "Mongo Crypt Library dev"
   - command: s3.put
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: "src/mongo-csfle-debug.${ext|tgz}"
-      remote_file: "${project}/mongo_csfle/${build_variant}/${revision}/mongo_csfle_v1_debug-${version}.${ext|tgz}"
+      local_file: "src/mongo-crypt-debug.${ext|tgz}"
+      remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_v1_debug-${version}.${ext|tgz}"
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/tar}
-      display_name: "Mongo CSFLE Library debug"
+      display_name: "Mongo Crypt Library debug"
 
-- name: csfle_install_tests
+- name: crypt_install_tests
   tags: []
   depends_on:
-  - name: csfle_create_debug_lib
+  - name: crypt_create_debug_lib
   commands:
   - *f_expansions_write
   - func: "scons compile"
     vars:
-      targets: archive-mongo-csfle-shlib-test
+      targets: archive-mongo-crypt-shlib-test
       compiling_for_test: true
       task_install_action:
         default
@@ -2843,22 +2843,22 @@ tasks:
         --enterprise-features=fle
         --js-engine=none
         --link-model=static
-        DESTDIR='$BUILD_ROOT/csfle-lib-$MONGO_VERSION'
+        DESTDIR='$BUILD_ROOT/crypt-lib-$MONGO_VERSION'
   - command: s3.put
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: "src/mongo-csfle-shlib-test-runtime.${ext|tgz}"
-      remote_file: "${project}/mongo_csfle/${build_variant}/${revision}/mongo_csfle_shlib_test-${version}.${ext|tgz}"
+      local_file: "src/mongo-crypt-shlib-test-runtime.${ext|tgz}"
+      remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shlib_test-${version}.${ext|tgz}"
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/tar}
-      display_name: "Mongo CSFLE Shared Library Test"
+      display_name: "Mongo Crypt Shared Library Test"
 
-- name: csfle_run_tests
+- name: crypt_run_tests
   tags: []
   depends_on:
-  - name: csfle_install_tests
+  - name: crypt_install_tests
   commands:
   - *f_expansions_write
   - command: subprocess.exec
@@ -2866,7 +2866,7 @@ tasks:
     params:
       binary: bash
       args:
-      - "src/evergreen/csfle_run_tests.sh"
+      - "src/evergreen/crypt_run_tests.sh"
 
 - name: compile_benchmarks
   tags: []
@@ -6979,12 +6979,12 @@ tasks:
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
          'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
 
-- name: csfle_push
-  tags: ["publish_csfle"]
+- name: crypt_push
+  tags: ["publish_crypt"]
   patchable: false
   stepback: false
   depends_on:
-  - name: csfle_create_lib
+  - name: crypt_create_lib
   commands:
   - command: manifest.load
   - func: "f_expansions_write"
@@ -7004,9 +7004,9 @@ tasks:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: ${project}/mongo_csfle/${build_variant}/${revision}/mongo_csfle_v1-${version}.${ext|tgz}
+      remote_file: ${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_v1-${version}.${ext|tgz}
       bucket: mciuploads
-      local_file: src/mongo_csfle_v1.${ext|tgz}
+      local_file: src/mongo_crypt_v1.${ext|tgz}
   - func: "generate compile expansions"
   - func: "apply compile expansions"
   - func: "set up remote credentials"
@@ -7020,74 +7020,74 @@ tasks:
     params:
       binary: bash
       args:
-      - "./src/evergreen/notary_client_csfle_run.sh"
-  # Put the csfle tarball/zipfile
+      - "./src/evergreen/notary_client_crypt_run.sh"
+  # Put the crypt tarball/zipfile
   - command: s3.put
     params:
       aws_secret: ${aws_secret}
-      local_file: src/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+      local_file: src/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}
       aws_key: ${aws_key}
       bucket: build-push-testing
       permissions: public-read
       content_type: ${content_type|application/gzip}
-      remote_file: ${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}
-  # Put the csfle tarball signature
+      remote_file: ${push_path}-STAGE/${push_name}/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}
+  # Put the crypt tarball signature
   - command: s3.put
     params:
       aws_secret: ${aws_secret}
-      local_file: src/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+      local_file: src/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
       aws_key: ${aws_key}
       bucket: build-push-testing
       permissions: public-read
       content_type: ${content_type|application/gzip}
-      remote_file: ${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig
-  # Put the csfle tarball sha1
+      remote_file: ${push_path}-STAGE/${push_name}/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig
+  # Put the crypt tarball sha1
   - command: s3.put
     params:
       aws_secret: ${aws_secret}
-      local_file: src/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+      local_file: src/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
       aws_key: ${aws_key}
       permissions: public-read
       bucket: build-push-testing
       content_type: text/plain
-      remote_file: ${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1
-  # Put the csfle tarball sha256
+      remote_file: ${push_path}-STAGE/${push_name}/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1
+  # Put the crypt tarball sha256
   - command: s3.put
     params:
       aws_secret: ${aws_secret}
-      local_file: src/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+      local_file: src/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
       permissions: public-read
       aws_key: ${aws_key}
       bucket: build-push-testing
       content_type: text/plain
-      remote_file: ${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256
-  # Put the csfle tarball md5
+      remote_file: ${push_path}-STAGE/${push_name}/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256
+  # Put the crypt tarball md5
   - command: s3.put
     params:
       aws_secret: ${aws_secret}
-      local_file: src/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+      local_file: src/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
       aws_key: ${aws_key}
       bucket: build-push-testing
       permissions: public-read
       content_type: text/plain
-      remote_file: ${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5
+      remote_file: ${push_path}-STAGE/${push_name}/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5
   - command: s3Copy.copy
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       s3_copy_files:
       #Binaries
-      - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
-         'destination': {'path': '${push_path}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'}}
+      - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
+         'destination': {'path': '${push_path}/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'}}
       #SHA1 for binaries
-      - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
-         'destination': {'path': '${push_path}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1', 'bucket': '${push_bucket}'}}
+      - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
+         'destination': {'path': '${push_path}/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1', 'bucket': '${push_bucket}'}}
       #SHA256 for binaries
-      - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
-         'destination': {'path': '${push_path}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256', 'bucket': '${push_bucket}'}}
+      - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
+         'destination': {'path': '${push_path}/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256', 'bucket': '${push_bucket}'}}
       #MD5 for binaries
-      - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
-         'destination': {'path': '${push_path}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
+      - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
+         'destination': {'path': '${push_path}/mongo_crypt_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
 
 - <<: *task_template
   name: search
@@ -7534,7 +7534,7 @@ task_groups:
   - "stitch_support_install_tests"
   - "stitch_support_run_tests"
 
-- name: csfle_build
+- name: crypt_build
   setup_task:
   - func: "f_expansions_write"
   - func: "apply compile expansions"
@@ -7559,12 +7559,12 @@ task_groups:
   - func: "generate compile expansions"
   teardown_group:
   - func: "umount shared scons directory"
-  tags: ["csfle"]
+  tags: ["crypt"]
   max_hosts: 1
   tasks:
-  - "csfle_create_lib"
+  - "crypt_create_lib"
 
-- name: csfle_build_debug_and_test
+- name: crypt_build_debug_and_test
   setup_task:
   - func: "f_expansions_write"
   - func: "apply compile expansions"
@@ -7591,6 +7591,6 @@ task_groups:
   - func: "umount shared scons directory"
   max_hosts: 1
   tasks:
-  - "csfle_create_debug_lib"
-  - "csfle_install_tests"
-  - "csfle_run_tests"
+  - "crypt_create_debug_lib"
+  - "crypt_install_tests"
+  - "crypt_run_tests"
