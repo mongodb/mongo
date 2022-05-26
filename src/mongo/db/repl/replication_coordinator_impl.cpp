@@ -4017,6 +4017,17 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
         _clearCommittedSnapshot_inlock();
     }
 
+    // If we have a split config, schedule heartbeats to each recipient member. It informs them of
+    // the new split config.
+    if (newConfig.isSplitConfig()) {
+        const auto now = _replExecutor->now();
+        const auto recipientConfig = newConfig.getRecipientConfig();
+        for (const auto& member : recipientConfig->members()) {
+            _scheduleHeartbeatToTarget_inlock(
+                member.getHostAndPort(), now, newConfig.getReplSetName().toString());
+        }
+    }
+
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
 }
