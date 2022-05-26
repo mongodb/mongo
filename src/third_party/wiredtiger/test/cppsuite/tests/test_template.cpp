@@ -40,13 +40,13 @@ class tracking_table_template : public test_harness::workload_tracking {
     }
 
     void
-    set_tracking_cursor(const tracking_operation &operation, const uint64_t &collection_id,
-      const std::string &key, const std::string &value, wt_timestamp_t ts,
-      scoped_cursor &op_track_cursor) override final
+    set_tracking_cursor(const uint64_t txn_id, const tracking_operation &operation,
+      const uint64_t &collection_id, const std::string &key, const std::string &value,
+      wt_timestamp_t ts, scoped_cursor &op_track_cursor) override final
     {
         /* You can replace this call to define your own tracking table contents. */
         workload_tracking::set_tracking_cursor(
-          operation, collection_id, key, value, ts, op_track_cursor);
+          txn_id, operation, collection_id, key, value, ts, op_track_cursor);
     }
 };
 
@@ -58,10 +58,8 @@ class test_template : public test_harness::test {
     public:
     test_template(const test_harness::test_args &args) : test(args)
     {
-        delete this->_workload_tracking;
-        this->_workload_tracking =
-          new tracking_table_template(_config->get_subconfig(WORKLOAD_TRACKING),
-            _config->get_bool(COMPRESSION_ENABLED), *_timestamp_manager);
+        init_tracking(new tracking_table_template(_config->get_subconfig(WORKLOAD_TRACKING),
+          _config->get_bool(COMPRESSION_ENABLED), *_timestamp_manager));
     }
 
     void

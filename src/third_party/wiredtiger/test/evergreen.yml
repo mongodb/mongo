@@ -1043,6 +1043,17 @@ tasks:
   # All cppsuite pull request tasks must supply the relative path to the config file as we are in
   # the cmake build working directory and the LD_LIBRARY_PATH is .libs.
 
+  - name: cppsuite-cache-resize-test-default
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "cppsuite test"
+        vars:
+          test_config_filename: configs/cache_resize_default.txt
+          test_name: cache_resize
+
   - name: cppsuite-operations-test-default
     tags: ["pull_request"]
     depends_on:

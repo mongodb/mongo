@@ -59,7 +59,7 @@ sed -i "/$SEARCH/a $VALUE" $FILE
 # Add the new test to the run_test() method
 SEARCH="test_template("
 LINE_1="\else if (test_name == \"$1\")\n"
-LINE_2="\ $1(test_harness::test_args{config, test_name, wt_open_config}).run();"
+LINE_2="\ $1(args).run();"
 sed -i "/$SEARCH/a $LINE_1$LINE_2" $FILE
 
 # Add the new test to all existing tests.

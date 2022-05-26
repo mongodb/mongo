@@ -193,7 +193,7 @@ workload_tracking::save_schema_operation(
 }
 
 int
-workload_tracking::save_operation(const tracking_operation &operation,
+workload_tracking::save_operation(const uint64_t txn_id, const tracking_operation &operation,
   const uint64_t &collection_id, const std::string &key, const std::string &value,
   wt_timestamp_t ts, scoped_cursor &op_track_cursor)
 {
@@ -210,14 +210,15 @@ workload_tracking::save_operation(const tracking_operation &operation,
           "save_operation: invalid operation " + std::to_string(static_cast<int>(operation));
         testutil_die(EINVAL, error_message.c_str());
     } else {
-        set_tracking_cursor(operation, collection_id, key, value, ts, op_track_cursor);
+        set_tracking_cursor(txn_id, operation, collection_id, key, value, ts, op_track_cursor);
         ret = op_track_cursor->insert(op_track_cursor.get());
     }
     return (ret);
 }
 
+/* Note that the transaction id is not used in the default implementation of the tracking table. */
 void
-workload_tracking::set_tracking_cursor(const tracking_operation &operation,
+workload_tracking::set_tracking_cursor(const uint64_t txn_id, const tracking_operation &operation,
   const uint64_t &collection_id, const std::string &key, const std::string &value,
   wt_timestamp_t ts, scoped_cursor &op_track_cursor)
 {

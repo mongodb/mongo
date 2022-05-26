@@ -36,5 +36,8 @@
  */
 class operations_test : public test_harness::test {
     public:
-    operations_test(const test_harness::test_args &args) : test(args) {}
+    operations_test(const test_harness::test_args &args) : test(args)
+    {
+        init_tracking();
+    }
 };

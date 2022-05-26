@@ -54,9 +54,9 @@ populate_worker(thread_context *tc)
         uint64_t j = 0;
         while (j < tc->key_count) {
             tc->transaction.begin();
-            std::string value =
-              random_generator::instance().generate_pseudo_random_string(tc->value_size);
-            if (tc->insert(cursor, coll.id, tc->key_to_string(j), value)) {
+            auto key = tc->pad_string(std::to_string(j), tc->key_size);
+            auto value = random_generator::instance().generate_pseudo_random_string(tc->value_size);
+            if (tc->insert(cursor, coll.id, key, value)) {
                 if (tc->transaction.commit()) {
                     ++j;
                 }
@@ -174,10 +174,9 @@ database_operation::insert_operation(thread_context *tc)
         auto &cc = ccv[counter];
         while (tc->transaction.active() && tc->running()) {
             /* Insert a key value pair, rolling back the transaction if required. */
-            std::string value =
-              random_generator::instance().generate_pseudo_random_string(tc->value_size);
-            if (!tc->insert(
-                  cc.cursor, cc.coll.id, tc->key_to_string(start_key + added_count), value)) {
+            auto key = tc->pad_string(std::to_string(start_key + added_count), tc->key_size);
+            auto value = random_generator::instance().generate_pseudo_random_string(tc->value_size);
+            if (!tc->insert(cc.cursor, cc.coll.id, key, value)) {
                 added_count = 0;
                 tc->transaction.rollback();
             } else {
@@ -367,11 +366,11 @@ database_operation::update_operation(thread_context *tc)
 
         /* Choose a random key to update. */
         testutil_assert(coll.get_key_count() != 0);
-        uint64_t key_id =
+        auto key_id =
           random_generator::instance().generate_integer<uint64_t>(0, coll.get_key_count() - 1);
-        std::string value =
-          random_generator::instance().generate_pseudo_random_string(tc->value_size);
-        if (!tc->update(cursor, coll.id, tc->key_to_string(key_id), value)) {
+        auto key = tc->pad_string(std::to_string(key_id), tc->key_size);
+        auto value = random_generator::instance().generate_pseudo_random_string(tc->value_size);
+        if (!tc->update(cursor, coll.id, key, value)) {
             tc->transaction.rollback();
         }
 

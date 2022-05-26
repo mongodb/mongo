@@ -46,7 +46,10 @@ class search_near_03 : public test_harness::test {
     const std::string ALPHABET{"abcdefghijklmnopqrstuvwxyz"};
 
     public:
-    search_near_03(const test_harness::test_args &args) : test(args) {}
+    search_near_03(const test_harness::test_args &args) : test(args)
+    {
+        init_tracking();
+    }
 
     /*
      * Here's how we insert an entry into a unique index:

@@ -52,7 +52,7 @@
 
 namespace test_harness {
 /* Tracking operations. */
-enum class tracking_operation { CREATE_COLLECTION, DELETE_COLLECTION, DELETE_KEY, INSERT };
+enum class tracking_operation { CREATE_COLLECTION, CUSTOM, DELETE_COLLECTION, DELETE_KEY, INSERT };
 
 /* Class used to track operations performed on collections */
 class workload_tracking : public component {
@@ -74,13 +74,13 @@ class workload_tracking : public component {
     void save_schema_operation(
       const tracking_operation &operation, const uint64_t &collection_id, wt_timestamp_t ts);
 
-    virtual void set_tracking_cursor(const tracking_operation &operation,
+    virtual void set_tracking_cursor(const uint64_t txn_id, const tracking_operation &operation,
       const uint64_t &collection_id, const std::string &key, const std::string &value,
       wt_timestamp_t ts, scoped_cursor &op_track_cursor);
 
-    int save_operation(const tracking_operation &operation, const uint64_t &collection_id,
-      const std::string &key, const std::string &value, wt_timestamp_t ts,
-      scoped_cursor &op_track_cursor);
+    int save_operation(const uint64_t txn_id, const tracking_operation &operation,
+      const uint64_t &collection_id, const std::string &key, const std::string &value,
+      wt_timestamp_t ts, scoped_cursor &op_track_cursor);
 
     private:
     scoped_session _session;

@@ -65,7 +65,7 @@ class operation_config {
 class workload_generator : public component {
     public:
     explicit workload_generator(configuration *configuration, database_operation *db_operation,
-      timestamp_manager *timestamp_manager, workload_tracking *tracking, database &database);
+      timestamp_manager *timestamp_manager, database &database);
 
     ~workload_generator();
 
@@ -80,12 +80,15 @@ class workload_generator : public component {
     database &get_database();
     bool db_populated() const;
 
+    /* Set the tracking component. */
+    void set_workload_tracking(workload_tracking *tracking);
+
     private:
     database &_database;
-    database_operation *_database_operation;
+    database_operation *_database_operation = nullptr;
     thread_manager _thread_manager;
-    timestamp_manager *_timestamp_manager;
-    workload_tracking *_tracking;
+    timestamp_manager *_timestamp_manager = nullptr;
+    workload_tracking *_tracking = nullptr;
     std::vector<thread_context *> _workers;
     bool _db_populated = false;
 };

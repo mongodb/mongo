@@ -43,6 +43,7 @@ extern const std::string WORKLOAD_TRACKING;
 
 /* Configuration API consts. */
 extern const std::string CACHE_HS_INSERT;
+extern const std::string CACHE_MAX_WAIT_MS;
 extern const std::string CACHE_SIZE_MB;
 extern const std::string CC_PAGES_REMOVED;
 extern const std::string COLLECTION_COUNT;

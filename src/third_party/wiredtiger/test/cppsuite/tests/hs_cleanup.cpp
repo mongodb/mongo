@@ -42,7 +42,10 @@ using namespace test_harness;
  */
 class hs_cleanup : public test {
     public:
-    hs_cleanup(const test_args &args) : test(args) {}
+    hs_cleanup(const test_args &args) : test(args)
+    {
+        init_tracking();
+    }
 
     void
     update_operation(thread_context *tc) override final

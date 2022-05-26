@@ -41,7 +41,10 @@ using namespace test_harness;
  */
 class search_near_02 : public test_harness::test {
     public:
-    search_near_02(const test_harness::test_args &args) : test(args) {}
+    search_near_02(const test_harness::test_args &args) : test(args)
+    {
+        init_tracking();
+    }
 
     void
     populate(test_harness::database &database, test_harness::timestamp_manager *,

@@ -55,9 +55,9 @@ throttle_config = [
 #
 record_config = [
     Config('key_size', 5, r'''
-        The size of the keys created''', min=0, max=10000),
+        The size of the keys created''', min=1),
     Config('value_size', 5, r'''
-        The size of the values created''', min=0, max=1000000000),
+        The size of the values created''', min=1),
 ]
 
 #
@@ -214,6 +214,8 @@ test_config = [
         type='category', subconfig=workload_tracking),
 
 # Non component top level configuration.
+    Config('cache_max_wait_ms', 0, r'''
+        The strict equivalent of cache_max_wait_ms defined in wiredtiger.''', min=0),
     Config('cache_size_mb', 0, r'''
         The cache size that wiredtiger will be configured to run with''', min=0, max=100000000000),
     Config('compression_enabled', 'false', r'''
@@ -240,6 +242,7 @@ methods = {
     'burst_inserts' : Method(test_config + [
                         Config("burst_duration", 90, r'''
                             How long the insertions will occur for.''')]),
+    'cache_resize' : Method(test_config),
     'cursor_bound_01' : Method(test_config),
     'hs_cleanup' : Method(test_config),
     'operations_test' : Method(test_config),

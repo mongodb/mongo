@@ -42,7 +42,10 @@ namespace test_harness {
  */
 class bounded_cursor_perf : public test {
     public:
-    bounded_cursor_perf(const test_args &args) : test(args) {}
+    bounded_cursor_perf(const test_args &args) : test(args)
+    {
+        init_tracking();
+    }
 
     static void
     set_bounds(scoped_cursor &cursor)

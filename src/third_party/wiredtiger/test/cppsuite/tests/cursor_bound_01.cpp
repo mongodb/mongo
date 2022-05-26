@@ -99,6 +99,7 @@ class cursor_bound_01 : public test {
     {
         /* Track reverse_collator value as it is required for the custom comparator. */
         _reverse_collator_enabled = _config->get_bool(REVERSE_COLLATOR);
+        init_tracking();
     }
 
     bool

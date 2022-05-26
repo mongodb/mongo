@@ -48,14 +48,11 @@ test::test(const test_args &args) : _args(args)
     _runtime_monitor =
       new runtime_monitor(args.test_name, _config->get_subconfig(RUNTIME_MONITOR), _database);
     _timestamp_manager = new timestamp_manager(_config->get_subconfig(TIMESTAMP_MANAGER));
-    _workload_tracking = new workload_tracking(_config->get_subconfig(WORKLOAD_TRACKING),
-      _config->get_bool(COMPRESSION_ENABLED), *_timestamp_manager);
-    _workload_generator = new workload_generator(_config->get_subconfig(WORKLOAD_GENERATOR), this,
-      _timestamp_manager, _workload_tracking, _database);
+    _workload_generator = new workload_generator(
+      _config->get_subconfig(WORKLOAD_GENERATOR), this, _timestamp_manager, _database);
     _thread_manager = new thread_manager();
 
     _database.set_timestamp_manager(_timestamp_manager);
-    _database.set_workload_tracking(_workload_tracking);
     _database.set_create_config(
       _config->get_bool(COMPRESSION_ENABLED), _config->get_bool(REVERSE_COLLATOR));
 
@@ -63,8 +60,22 @@ test::test(const test_args &args) : _args(args)
      * Ordering is not important here, any dependencies between components should be resolved
      * internally by the components.
      */
-    _components = {_workload_tracking, _workload_generator, _timestamp_manager, _runtime_monitor,
-      _checkpoint_manager};
+    _components = {_workload_generator, _timestamp_manager, _runtime_monitor, _checkpoint_manager};
+}
+
+void
+test::init_tracking(workload_tracking *tracking)
+{
+    delete _workload_tracking;
+    if (tracking == nullptr) {
+        /* Fallback to default behavior. */
+        tracking = new workload_tracking(_config->get_subconfig(WORKLOAD_TRACKING),
+          _config->get_bool(COMPRESSION_ENABLED), *_timestamp_manager);
+    }
+    _workload_tracking = tracking;
+    _workload_generator->set_workload_tracking(_workload_tracking);
+    _database.set_workload_tracking(_workload_tracking);
+    _components.push_back(_workload_tracking);
 }
 
 test::~test()
@@ -90,7 +101,7 @@ test::~test()
 void
 test::run()
 {
-    int64_t cache_size_mb, duration_seconds;
+    int64_t cache_max_wait_ms, cache_size_mb, duration_seconds;
     bool enable_logging, statistics_logging;
     configuration *statistics_config;
     std::string statistics_type;
@@ -123,6 +134,10 @@ test::run()
     /* Enable or disable write ahead logging. */
     enable_logging = _config->get_bool(ENABLE_LOGGING);
     db_create_config += ",log=(enabled=" + std::string(enable_logging ? "true" : "false") + ")";
+
+    /* Maximum waiting time for the cache to get unstuck. */
+    cache_max_wait_ms = _config->get_int(CACHE_MAX_WAIT_MS);
+    db_create_config += ",cache_max_wait_ms=" + std::to_string(cache_max_wait_ms);
 
     /* Add the user supplied wiredtiger open config. */
     db_create_config += _args.wt_open_config;

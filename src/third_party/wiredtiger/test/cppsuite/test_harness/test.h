@@ -68,6 +68,9 @@ class test : public database_operation {
     test(const test &) = delete;
     test &operator=(const test &) = delete;
 
+    /* Initialize the tracking component and its dependencies. */
+    void init_tracking(workload_tracking *tracking = nullptr);
+
     /*
      * The primary run function that most tests will be able to utilize without much other code.
      */
