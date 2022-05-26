@@ -838,6 +838,13 @@ tasks:
             {scale: 10,
              schema: denormalized}
 
+  - name: queries_on_columnstore_indexes
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "columnstore"
+
   - name: non_sharded_workloads
     priority: 5
     commands:
@@ -1140,6 +1147,7 @@ buildvariants:
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
+      - name: queries_on_columnstore_indexes
 
   - name: compile-rhel70
     display_name: Compile for Atlas-like
