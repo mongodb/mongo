@@ -52,6 +52,47 @@
 
 namespace mongo {
 
+struct FuturePolicy {};
+
+template <typename T>
+inline constexpr bool isFuturePolicy = std::is_base_of_v<FuturePolicy, T>;
+
+/**
+ * Transitional tags for specifying destruction order semantics for continuations.
+ * The long-term goal is to eliminate `destroyWeak` via manual review of existing
+ * continuations.
+ * A continuation can be switched to `destroyStrong` when it has been determined
+ * that subsequent continuations do not depend on the lifetime of its captures.
+ * The plan is to remove these transitional tags altogether after _all_ continuations
+ * have been thus converted to the strong semantics specification.
+ */
+template <bool strongCleanupValue>
+struct CleanupFuturePolicy : FuturePolicy {
+    static constexpr bool strongCleanup = strongCleanupValue;
+};
+using WeakFuturePolicy = CleanupFuturePolicy<false>;
+using StrongFuturePolicy = CleanupFuturePolicy<true>;
+
+/**
+ * The passed-in continuation function may or may not be cleared
+ * immediately after the function runs. In some contexts the entire
+ * continuation chain will run and callbacks are destroyed as the stack
+ * unwinds. In other contexts, each stage of the continuation will destroy its
+ * callback immediately following execution.
+ */
+inline constexpr WeakFuturePolicy destroyWeak{};
+
+/**
+ * The passed-in continuation function will always be cleared
+ * immediately after the function runs, and before the subsequent continuation runs.
+ */
+inline constexpr StrongFuturePolicy destroyStrong{};
+
+/**
+ * Used by Future implementation details to apply a consistent default FuturePolicy.
+ */
+inline constexpr WeakFuturePolicy destroyDefault{};
+
 template <typename T>
 class Promise;
 
@@ -881,8 +922,9 @@ public:
         return _shared.getNoThrow(interruptible);
     }
 
-    template <typename Func>
-        void getAsync(Func&& func) && noexcept {
+    TEMPLATE(typename Policy, typename Func)
+    REQUIRES(isFuturePolicy<Policy>)
+    void getAsync(Policy policy, Func&& func) && noexcept {
         static_assert(std::is_void<decltype(call(func, std::declval<StatusWith<T>>()))>::value,
                       "func passed to getAsync must return void");
 
@@ -905,8 +947,9 @@ public:
             });
     }
 
-    template <typename Func>
-        auto then(Func&& func) && noexcept {
+    TEMPLATE(typename Policy, typename Func)
+    REQUIRES(isFuturePolicy<Policy>)
+    auto then(Policy policy, Func&& func) && noexcept {
         using Result = NormalizedCallResult<Func, T>;
         if constexpr (!isFutureLike<Result>) {
             return generalImpl(
@@ -959,8 +1002,9 @@ public:
         }
     }
 
-    template <typename Func>
-        auto onCompletion(Func&& func) && noexcept {
+    TEMPLATE(typename Policy, typename Func)
+    REQUIRES(isFuturePolicy<Policy>)
+    auto onCompletion(Policy policy, Func&& func) && noexcept {
         using Wrapper = StatusOrStatusWith<T>;
         using Result = NormalizedCallResult<Func, StatusOrStatusWith<T>>;
         if constexpr (!isFutureLike<Result>) {
@@ -1034,8 +1078,9 @@ public:
         }
     }
 
-    template <typename Func>
-        FutureImpl<FakeVoidToVoid<T>> onError(Func&& func) && noexcept {
+    TEMPLATE(typename Policy, typename Func)
+    REQUIRES(isFuturePolicy<Policy>)
+    FutureImpl<FakeVoidToVoid<T>> onError(Policy policy, Func&& func) && noexcept {
         using Result = NormalizedCallResult<Func, Status>;
         static_assert(
             std::is_same<VoidToFakeVoid<UnwrappedType<Result>>, T>::value,
@@ -1088,8 +1133,9 @@ public:
         }
     }
 
-    template <ErrorCodes::Error code, typename Func>
-        FutureImpl<FakeVoidToVoid<T>> onError(Func&& func) && noexcept {
+    TEMPLATE(ErrorCodes::Error code, typename Policy, typename Func)
+    REQUIRES(isFuturePolicy<Policy>)
+    FutureImpl<FakeVoidToVoid<T>> onError(Policy policy, Func&& func) && noexcept {
         using Result = NormalizedCallResult<Func, Status>;
         static_assert(
             std::is_same_v<UnwrappedType<Result>, FakeVoidToVoid<T>>,
@@ -1100,15 +1146,17 @@ public:
 
         // TODO in C++17 with constexpr if this can be done cleaner and more efficiently by not
         // throwing.
-        return std::move(*this).onError([func = std::forward<Func>(func)](Status&& status) mutable {
-            if (status != code)
-                uassertStatusOK(status);
-            return throwingCall(func, std::move(status));
-        });
+        return std::move(*this).onError(policy,
+                                        [func = std::forward<Func>(func)](Status&& status) mutable {
+                                            if (status != code)
+                                                uassertStatusOK(status);
+                                            return throwingCall(func, std::move(status));
+                                        });
     }
 
-    template <ErrorCategory category, typename Func>
-        FutureImpl<FakeVoidToVoid<T>> onErrorCategory(Func&& func) && noexcept {
+    TEMPLATE(ErrorCategory category, typename Policy, typename Func)
+    REQUIRES(isFuturePolicy<Policy>)
+    FutureImpl<FakeVoidToVoid<T>> onErrorCategory(Policy policy, Func&& func) && noexcept {
         using Result = NormalizedCallResult<Func, Status>;
         static_assert(std::is_same_v<UnwrappedType<Result>, FakeVoidToVoid<T>>,
                       "func passed to Future<T>::onErrorCategory must return T, StatusWith<T>, "
@@ -1117,15 +1165,17 @@ public:
         if (_immediate || (isReady() && _shared->status.isOK()))
             return std::move(*this);
 
-        return std::move(*this).onError([func = std::forward<Func>(func)](Status&& status) mutable {
-            if (!ErrorCodes::isA<category>(status))
-                uassertStatusOK(status);
-            return throwingCall(func, std::move(status));
-        });
+        return std::move(*this).onError(policy,
+                                        [func = std::forward<Func>(func)](Status&& status) mutable {
+                                            if (!ErrorCodes::isA<category>(status))
+                                                uassertStatusOK(status);
+                                            return throwingCall(func, std::move(status));
+                                        });
     }
 
-    template <typename Func>
-        FutureImpl<FakeVoidToVoid<T>> tap(Func&& func) && noexcept {
+    TEMPLATE(typename Policy, typename Func)
+    REQUIRES(isFuturePolicy<Policy>)
+    FutureImpl<FakeVoidToVoid<T>> tap(Policy policy, Func&& func) && noexcept {
         static_assert(std::is_void<decltype(call(func, std::declval<const T&>()))>::value,
                       "func passed to tap must return void");
 
@@ -1134,8 +1184,9 @@ public:
                        [](Func && func, const Status& status) noexcept {});
     }
 
-    template <typename Func>
-        FutureImpl<FakeVoidToVoid<T>> tapError(Func&& func) && noexcept {
+    TEMPLATE(typename Policy, typename Func)
+    REQUIRES(isFuturePolicy<Policy>)
+    FutureImpl<FakeVoidToVoid<T>> tapError(Policy policy, Func&& func) && noexcept {
         static_assert(std::is_void<decltype(call(func, std::declval<const Status&>()))>::value,
                       "func passed to tapError must return void");
 
@@ -1143,8 +1194,9 @@ public:
         ](Func && func, const Status& status) noexcept { call(func, status); });
     }
 
-    template <typename Func>
-        FutureImpl<FakeVoidToVoid<T>> tapAll(Func&& func) && noexcept {
+    TEMPLATE(typename Policy, typename Func)
+    REQUIRES(isFuturePolicy<Policy>)
+    FutureImpl<FakeVoidToVoid<T>> tapAll(Policy policy, Func&& func) && noexcept {
         static_assert(
             std::is_void<decltype(call(func, std::declval<const StatusOrStatusWith<T>&>()))>::value,
             "func passed to tapAll must return void");
@@ -1340,7 +1392,7 @@ private:
 
 template <typename T>
     inline FutureImpl<void> FutureImpl<T>::ignoreValue() && noexcept {
-    return std::move(*this).then([](auto&&) {});
+    return std::move(*this).then(destroyDefault, [](auto&&) {});
 }
 
 }  // namespace future_details
