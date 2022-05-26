@@ -34,11 +34,6 @@
 
 namespace mongo {
 
-Status createIndexOnConfigCollection(OperationContext* opCtx,
-                                     const NamespaceString& ns,
-                                     const BSONObj& keys,
-                                     bool unique);
-
 class ShardLocal : public Shard {
     ShardLocal(const ShardLocal&) = delete;
     ShardLocal& operator=(const ShardLocal&) = delete;
@@ -60,11 +55,6 @@ public:
     std::string toString() const override;
 
     bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) final;
-
-    Status createIndexOnConfig(OperationContext* opCtx,
-                               const NamespaceString& ns,
-                               const BSONObj& keys,
-                               bool unique) override;
 
     void updateLastCommittedOpTime(LogicalTime lastCommittedOpTime) final;
 

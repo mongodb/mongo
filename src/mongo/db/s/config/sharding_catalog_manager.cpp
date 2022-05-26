@@ -46,6 +46,7 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/balancer/type_migration.h"
+#include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/type_lockpings.h"
 #include "mongo/db/s/type_locks.h"
@@ -204,8 +205,7 @@ void abortTransaction(OperationContext* opCtx,
 
 Status createIndexesForConfigChunks(OperationContext* opCtx) {
     const bool unique = true;
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    Status result = configShard->createIndexOnConfig(
+    Status result = createIndexOnConfigCollection(
         opCtx,
         ChunkType::ConfigNS,
         BSON(ChunkType::collectionUUID() << 1 << ChunkType::min() << 1),
@@ -214,7 +214,7 @@ Status createIndexesForConfigChunks(OperationContext* opCtx) {
         return result.withContext("couldn't create uuid_1_min_1 index on config db");
     }
 
-    result = configShard->createIndexOnConfig(
+    result = createIndexOnConfigCollection(
         opCtx,
         ChunkType::ConfigNS,
         BSON(ChunkType::collectionUUID() << 1 << ChunkType::shard() << 1 << ChunkType::min() << 1),
@@ -223,7 +223,7 @@ Status createIndexesForConfigChunks(OperationContext* opCtx) {
         return result.withContext("couldn't create uuid_1_shard_1_min_1 index on config db");
     }
 
-    result = configShard->createIndexOnConfig(
+    result = createIndexOnConfigCollection(
         opCtx,
         ChunkType::ConfigNS,
         BSON(ChunkType::collectionUUID() << 1 << ChunkType::lastmod() << 1),
@@ -420,56 +420,55 @@ Status ShardingCatalogManager::_initConfigVersion(OperationContext* opCtx) {
 
 Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
     const bool unique = true;
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
     Status result = createIndexesForConfigChunks(opCtx);
     if (result != Status::OK()) {
         return result;
     }
 
-    result = configShard->createIndexOnConfig(
-        opCtx,
-        MigrationType::ConfigNS,
-        BSON(MigrationType::ns() << 1 << MigrationType::min() << 1),
-        unique);
+    result =
+        createIndexOnConfigCollection(opCtx,
+                                      MigrationType::ConfigNS,
+                                      BSON(MigrationType::ns() << 1 << MigrationType::min() << 1),
+                                      unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create ns_1_min_1 index on config.migrations");
     }
 
-    result = configShard->createIndexOnConfig(
+    result = createIndexOnConfigCollection(
         opCtx, ShardType::ConfigNS, BSON(ShardType::host() << 1), unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create host_1 index on config db");
     }
 
-    result = configShard->createIndexOnConfig(
+    result = createIndexOnConfigCollection(
         opCtx, LocksType::ConfigNS, BSON(LocksType::lockID() << 1), !unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create lock id index on config db");
     }
 
     result =
-        configShard->createIndexOnConfig(opCtx,
-                                         LocksType::ConfigNS,
-                                         BSON(LocksType::state() << 1 << LocksType::process() << 1),
-                                         !unique);
+        createIndexOnConfigCollection(opCtx,
+                                      LocksType::ConfigNS,
+                                      BSON(LocksType::state() << 1 << LocksType::process() << 1),
+                                      !unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create state and process id index on config db");
     }
 
-    result = configShard->createIndexOnConfig(
+    result = createIndexOnConfigCollection(
         opCtx, LockpingsType::ConfigNS, BSON(LockpingsType::ping() << 1), !unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create lockping ping time index on config db");
     }
 
-    result = configShard->createIndexOnConfig(
+    result = createIndexOnConfigCollection(
         opCtx, TagsType::ConfigNS, BSON(TagsType::ns() << 1 << TagsType::min() << 1), unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create ns_1_min_1 index on config db");
     }
 
-    result = configShard->createIndexOnConfig(
+    result = createIndexOnConfigCollection(
         opCtx, TagsType::ConfigNS, BSON(TagsType::ns() << 1 << TagsType::tag() << 1), !unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create ns_1_tag_1 index on config db");

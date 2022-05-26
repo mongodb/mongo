@@ -418,13 +418,6 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         opCtx, readPrefWithConfigTime, nss.db().toString(), maxTimeMS, findCmdBuilder.done());
 }
 
-Status ShardRemote::createIndexOnConfig(OperationContext* opCtx,
-                                        const NamespaceString& ns,
-                                        const BSONObj& keys,
-                                        bool unique) {
-    MONGO_UNREACHABLE;
-}
-
 void ShardRemote::runFireAndForgetCommand(OperationContext* opCtx,
                                           const ReadPreferenceSetting& readPref,
                                           const std::string& dbName,

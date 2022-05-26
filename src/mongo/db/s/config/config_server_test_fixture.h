@@ -41,6 +41,29 @@ class KeysCollectionDocument;
 class NamespaceString;
 class Shard;
 
+
+/**
+ * Takes two arrays of BSON objects and asserts that they contain the same documents
+ */
+inline void assertBSONObjsSame(const std::vector<BSONObj>& expectedBSON,
+                               const std::vector<BSONObj>& foundBSON) {
+    ASSERT_EQUALS(expectedBSON.size(), foundBSON.size());
+
+    auto flags =
+        BSONObj::ComparisonRules::kIgnoreFieldOrder | BSONObj::ComparisonRules::kConsiderFieldName;
+
+    for (const auto& expectedObj : expectedBSON) {
+        bool wasFound = false;
+        for (const auto& foundObj : foundBSON) {
+            if (expectedObj.woCompare(foundObj, {}, flags) == 0) {
+                wasFound = true;
+                break;
+            }
+        }
+        ASSERT_TRUE(wasFound);
+    }
+}
+
 /**
  * Provides config-specific functionality in addition to the mock storage engine and mock network
  * provided by ShardingMongodTestFixture.

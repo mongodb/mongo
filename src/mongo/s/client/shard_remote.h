@@ -71,11 +71,6 @@ public:
 
     bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) final;
 
-    Status createIndexOnConfig(OperationContext* opCtx,
-                               const NamespaceString& ns,
-                               const BSONObj& keys,
-                               bool unique) override;
-
     void updateLastCommittedOpTime(LogicalTime lastCommittedOpTime) final;
 
     LogicalTime getLastCommittedOpTime() const final;

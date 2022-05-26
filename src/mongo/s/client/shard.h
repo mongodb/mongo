@@ -249,17 +249,6 @@ public:
         boost::optional<long long> limit,
         const boost::optional<BSONObj>& hint = boost::none);
 
-    /**
-     * Builds an index on a config server collection.
-     * Creates the collection if it doesn't yet exist.  Does not error if the index already exists,
-     * so long as the options are the same.
-     * NOTE: Currently only supported for LocalShard.
-     */
-    virtual Status createIndexOnConfig(OperationContext* opCtx,
-                                       const NamespaceString& ns,
-                                       const BSONObj& keys,
-                                       bool unique) = 0;
-
     // This timeout will be used by default in operations against the config server, unless
     // explicitly overridden
     static const Milliseconds kDefaultConfigCommandTimeout;

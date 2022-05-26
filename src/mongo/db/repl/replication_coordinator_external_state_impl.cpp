@@ -80,6 +80,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/chunk_splitter.h"
+#include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/migration_util.h"

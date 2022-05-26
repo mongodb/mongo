@@ -57,28 +57,6 @@ namespace {
 
 using unittest::assertGet;
 
-/**
- * Takes two arrays of BSON objects and asserts that they contain the same documents
- */
-void assertBSONObjsSame(const std::vector<BSONObj>& expectedBSON,
-                        const std::vector<BSONObj>& foundBSON) {
-    ASSERT_EQUALS(expectedBSON.size(), foundBSON.size());
-
-    auto flags =
-        BSONObj::ComparisonRules::kIgnoreFieldOrder | BSONObj::ComparisonRules::kConsiderFieldName;
-
-    for (const auto& expectedObj : expectedBSON) {
-        bool wasFound = false;
-        for (const auto& foundObj : foundBSON) {
-            if (expectedObj.woCompare(foundObj, {}, flags) == 0) {
-                wasFound = true;
-                break;
-            }
-        }
-        ASSERT_TRUE(wasFound);
-    }
-}
-
 class ConfigInitializationTest : public ConfigServerTestFixture {
 protected:
     /*
@@ -344,39 +322,6 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
 
     auto foundTagsIndexes = assertGet(getIndexes(operationContext(), TagsType::ConfigNS));
     assertBSONObjsSame(expectedTagsIndexes, foundTagsIndexes);
-}
-
-TEST_F(ConfigInitializationTest, CompatibleIndexAlreadyExists) {
-    getConfigShard()
-        ->createIndexOnConfig(
-            operationContext(), ShardType::ConfigNS, BSON("host" << 1), /*unique*/ true)
-        .transitional_ignore();
-
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->initializeConfigDatabaseIfNeeded(operationContext()));
-
-    auto expectedShardsIndexes = std::vector<BSONObj>{
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                 << "_id_"),
-        BSON("v" << 2 << "unique" << true << "key" << BSON("host" << 1) << "name"
-                 << "host_1")};
-
-
-    auto foundShardsIndexes = assertGet(getIndexes(operationContext(), ShardType::ConfigNS));
-    assertBSONObjsSame(expectedShardsIndexes, foundShardsIndexes);
-}
-
-TEST_F(ConfigInitializationTest, IncompatibleIndexAlreadyExists) {
-    // Make the index non-unique even though its supposed to be unique, make sure initialization
-    // fails
-    getConfigShard()
-        ->createIndexOnConfig(
-            operationContext(), ShardType::ConfigNS, BSON("host" << 1), /*unique*/ false)
-        .transitional_ignore();
-
-    ASSERT_EQUALS(ErrorCodes::IndexKeySpecsConflict,
-                  ShardingCatalogManager::get(operationContext())
-                      ->initializeConfigDatabaseIfNeeded(operationContext()));
 }
 
 }  // unnamed namespace
