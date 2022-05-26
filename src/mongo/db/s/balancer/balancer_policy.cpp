@@ -291,7 +291,7 @@ std::tuple<ShardId, int64_t> BalancerPolicy::_getLeastLoadedReceiverShard(
     const string& tag,
     const stdx::unordered_set<ShardId>& excludedShards) {
     ShardId best;
-    unsigned currentMin = numeric_limits<unsigned>::max();
+    int64_t currentMin = numeric_limits<int64_t>::max();
 
     const auto shouldBalanceAccordingToDataSize = collDataSizeInfo.has_value();
 
@@ -311,13 +311,13 @@ std::tuple<ShardId, int64_t> BalancerPolicy::_getLeastLoadedReceiverShard(
                 continue;
             }
 
-            const auto shardSize = shardSizeIt->second;
+            int64_t shardSize = shardSizeIt->second;
             if (shardSize < currentMin) {
                 best = stat.shardId;
                 currentMin = shardSize;
             }
         } else {
-            unsigned myChunks = distribution.numberOfChunksInShard(stat.shardId);
+            int64_t myChunks = distribution.numberOfChunksInShard(stat.shardId);
             if (myChunks < currentMin) {
                 best = stat.shardId;
                 currentMin = myChunks;
@@ -689,10 +689,7 @@ bool BalancerPolicy::_singleZoneBalanceBasedOnChunks(const ShardStatisticsVector
         _getLeastLoadedReceiverShard(shardStats, distribution, boost::none, tag, *usedShards);
     if (!to.isValid()) {
         if (migrations->empty()) {
-            LOGV2(21882,
-                  "No available shards to take chunks for zone {zone}",
-                  "No available shards to take chunks for zone",
-                  "zone"_attr = tag);
+            LOGV2(21882, "No available shards to take chunks for zone", "zone"_attr = tag);
         }
         return false;
     }
