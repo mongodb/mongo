@@ -97,7 +97,7 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
     result.appendNumber("totalRefreshing", static_cast<long long>(totalRefreshing));
     result.appendNumber("totalRefreshed", static_cast<long long>(totalRefreshed));
     if (isCCHMEnabled)
-        result.appendNumber("totalNeverUsed", static_cast<long long>(totalWasNeverUsed));
+        result.appendNumber("totalWasNeverUsed", static_cast<long long>(totalWasNeverUsed));
 
 
     if (forFTDC) {
@@ -132,7 +132,7 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
             poolInfo.appendNumber("poolRefreshing", static_cast<long long>(poolStats.refreshing));
             poolInfo.appendNumber("poolRefreshed", static_cast<long long>(poolStats.refreshed));
             if (isCCHMEnabled)
-                poolInfo.appendNumber("poolNeverUsed",
+                poolInfo.appendNumber("poolWasNeverUsed",
                                       static_cast<long long>(poolStats.wasNeverUsed));
 
             for (const auto& host : poolStats.statsByHost) {
@@ -144,7 +144,7 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
                 hostInfo.appendNumber("refreshing", static_cast<long long>(hostStats.refreshing));
                 hostInfo.appendNumber("refreshed", static_cast<long long>(hostStats.refreshed));
                 if (isCCHMEnabled)
-                    hostInfo.appendNumber("neverUsed",
+                    hostInfo.appendNumber("wasNeverUsed",
                                           static_cast<long long>(hostStats.wasNeverUsed));
             }
         }
@@ -162,7 +162,8 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
             hostInfo.appendNumber("refreshing", static_cast<long long>(hostStats.refreshing));
             hostInfo.appendNumber("refreshed", static_cast<long long>(hostStats.refreshed));
             if (isCCHMEnabled)
-                hostInfo.appendNumber("neverUsed", static_cast<long long>(hostStats.wasNeverUsed));
+                hostInfo.appendNumber("wasNeverUsed",
+                                      static_cast<long long>(hostStats.wasNeverUsed));
         }
     }
 }
