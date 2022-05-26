@@ -543,7 +543,8 @@ public:
         write_ops::InsertCommandReply typedRun(OperationContext* opCtx) final try {
             transactionChecks(opCtx, ns());
 
-            if (request().getEncryptionInformation().has_value()) {
+            if (request().getEncryptionInformation().has_value() &&
+                !request().getEncryptionInformation()->getCrudProcessed()) {
                 write_ops::InsertCommandReply insertReply;
                 auto batch = processFLEInsert(opCtx, request(), &insertReply);
                 if (batch == FLEBatchResult::kProcessed) {
@@ -1482,7 +1483,8 @@ public:
             write_ops::UpdateCommandReply updateReply;
             OperationSource source = OperationSource::kStandard;
 
-            if (request().getEncryptionInformation().has_value()) {
+            if (request().getEncryptionInformation().has_value() &&
+                !request().getEncryptionInformation().get().getCrudProcessed()) {
                 return processFLEUpdate(opCtx, request());
             }
 

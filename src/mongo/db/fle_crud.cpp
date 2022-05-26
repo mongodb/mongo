@@ -192,16 +192,20 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     auto edcNss = insertRequest.getNamespace();
     auto ei = insertRequest.getEncryptionInformation().get();
 
+    bool bypassDocumentValidation =
+        insertRequest.getWriteCommandRequestBase().getBypassDocumentValidation();
+
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
 
     auto documents = insertRequest.getDocuments();
     // TODO - how to check if a document will be too large???
+
     uassert(6371202,
             "Only single insert batches are supported in Queryable Encryption",
             documents.size() == 1);
 
     auto document = documents[0];
-    EDCServerCollection::validateEncryptedFieldInfo(document, efc);
+    EDCServerCollection::validateEncryptedFieldInfo(document, efc, bypassDocumentValidation);
     auto serverPayload = std::make_shared<std::vector<EDCServerPayloadInfo>>(
         EDCServerCollection::getEncryptedFieldInfo(document));
 
@@ -225,8 +229,8 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
 
     auto swResult = trun->runNoThrow(
         opCtx,
-        [sharedInsertBlock, reply, ownedDocument](const txn_api::TransactionClient& txnClient,
-                                                  ExecutorPtr txnExec) {
+        [sharedInsertBlock, reply, ownedDocument, bypassDocumentValidation](
+            const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
 
             auto [edcNss2, efc2, serverPayload2, stmtId2] = *sharedInsertBlock.get();
@@ -236,8 +240,13 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
                 fleCrudHangPreInsert.pauseWhileSet();
             }
 
-            *reply = uassertStatusOK(processInsert(
-                &queryImpl, edcNss2, *serverPayload2.get(), efc2, stmtId2, ownedDocument));
+            *reply = uassertStatusOK(processInsert(&queryImpl,
+                                                   edcNss2,
+                                                   *serverPayload2.get(),
+                                                   efc2,
+                                                   stmtId2,
+                                                   ownedDocument,
+                                                   bypassDocumentValidation));
 
             if (MONGO_unlikely(fleCrudHangInsert.shouldFail())) {
                 LOGV2(6371903, "Hanging due to fleCrudHangInsert fail point");
@@ -443,7 +452,8 @@ void processFieldsForInsert(FLEQueryInterface* queryImpl,
                             const NamespaceString& edcNss,
                             std::vector<EDCServerPayloadInfo>& serverPayload,
                             const EncryptedFieldConfig& efc,
-                            int32_t* pStmtId) {
+                            int32_t* pStmtId,
+                            bool bypassDocumentValidation) {
 
     NamespaceString nssEsc(edcNss.db(), efc.getEscCollection().get());
 
@@ -511,7 +521,8 @@ void processFieldsForInsert(FLEQueryInterface* queryImpl,
             ECOCCollection::generateDocument(payload.fieldPathName,
                                              payload.payload.getEncryptedTokens()),
             pStmtId,
-            false));
+            false,
+            bypassDocumentValidation));
         checkWriteErrors(ecocInsertReply);
     }
 }
@@ -721,9 +732,11 @@ StatusWith<write_ops::InsertCommandReply> processInsert(
     std::vector<EDCServerPayloadInfo>& serverPayload,
     const EncryptedFieldConfig& efc,
     int32_t stmtId,
-    BSONObj document) {
+    BSONObj document,
+    bool bypassDocumentValidation) {
 
-    processFieldsForInsert(queryImpl, edcNss, serverPayload, efc, &stmtId);
+    processFieldsForInsert(
+        queryImpl, edcNss, serverPayload, efc, &stmtId, bypassDocumentValidation);
 
     auto finalDoc = EDCServerCollection::finalizeForInsert(document, serverPayload);
 
@@ -794,6 +807,9 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
     auto tokenMap = EncryptionInformationHelpers::getDeleteTokens(edcNss, ei);
     const auto updateOpEntry = updateRequest.getUpdates()[0];
 
+    auto bypassDocumentValidation =
+        updateRequest.getWriteCommandRequestBase().getBypassDocumentValidation();
+
     const auto updateModification = updateOpEntry.getU();
 
     int32_t stmtId = getStmtIdForWriteAt(updateRequest, 0);
@@ -816,10 +832,11 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
     if (updateModification.type() == write_ops::UpdateModification::Type::kModifier) {
         auto updateModifier = updateModification.getUpdateModifier();
         auto setObject = updateModifier.getObjectField("$set");
-        EDCServerCollection::validateEncryptedFieldInfo(setObject, efc);
+        EDCServerCollection::validateEncryptedFieldInfo(setObject, efc, bypassDocumentValidation);
         serverPayload = EDCServerCollection::getEncryptedFieldInfo(updateModifier);
 
-        processFieldsForInsert(queryImpl, edcNss, serverPayload, efc, &stmtId);
+        processFieldsForInsert(
+            queryImpl, edcNss, serverPayload, efc, &stmtId, bypassDocumentValidation);
 
         // Step 2 ----
         auto pushUpdate = EDCServerCollection::finalizeForUpdate(updateModifier, serverPayload);
@@ -828,10 +845,12 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
             pushUpdate, write_ops::UpdateModification::ClassicTag(), false));
     } else {
         auto replacementDocument = updateModification.getUpdateReplacement();
-        EDCServerCollection::validateEncryptedFieldInfo(replacementDocument, efc);
+        EDCServerCollection::validateEncryptedFieldInfo(
+            replacementDocument, efc, bypassDocumentValidation);
         serverPayload = EDCServerCollection::getEncryptedFieldInfo(replacementDocument);
 
-        processFieldsForInsert(queryImpl, edcNss, serverPayload, efc, &stmtId);
+        processFieldsForInsert(
+            queryImpl, edcNss, serverPayload, efc, &stmtId, bypassDocumentValidation);
 
         // Step 2 ----
         auto safeContentReplace =
@@ -846,6 +865,8 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
     newUpdateRequest.setUpdates({newUpdateOpEntry});
     newUpdateRequest.getWriteCommandRequestBase().setStmtIds(boost::none);
     newUpdateRequest.getWriteCommandRequestBase().setStmtId(stmtId);
+    newUpdateRequest.getWriteCommandRequestBase().setBypassDocumentValidation(
+        bypassDocumentValidation);
     ++stmtId;
 
     auto [updateReply, originalDocument] =
@@ -902,6 +923,10 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
                                BatchWriteExecStats* stats,
                                BatchedCommandResponse* response,
                                boost::optional<OID> targetEpoch) {
+
+    if (request.getWriteCommandRequestBase().getEncryptionInformation()->getCrudProcessed()) {
+        return FLEBatchResult::kNotProcessed;
+    }
 
     // TODO (SERVER-65077): Remove FCV check once 6.0 is released
     uassert(6371209,
@@ -1022,6 +1047,9 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
 
     auto newFindAndModifyRequest = findAndModifyRequest;
 
+    const auto bypassDocumentValidation =
+        findAndModifyRequest.getBypassDocumentValidation().value_or(false);
+
     // Step 0 ----
     // Rewrite filter
     auto highCardinalityModeAllowed = findAndModifyRequest.getUpsert().value_or(false)
@@ -1051,9 +1079,11 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
         if (updateModification.type() == write_ops::UpdateModification::Type::kModifier) {
             auto updateModifier = updateModification.getUpdateModifier();
             auto setObject = updateModifier.getObjectField("$set");
-            EDCServerCollection::validateEncryptedFieldInfo(setObject, efc);
+            EDCServerCollection::validateEncryptedFieldInfo(
+                setObject, efc, bypassDocumentValidation);
             serverPayload = EDCServerCollection::getEncryptedFieldInfo(updateModifier);
-            processFieldsForInsert(queryImpl, edcNss, serverPayload, efc, &stmtId);
+            processFieldsForInsert(
+                queryImpl, edcNss, serverPayload, efc, &stmtId, bypassDocumentValidation);
 
             auto pushUpdate = EDCServerCollection::finalizeForUpdate(updateModifier, serverPayload);
 
@@ -1062,10 +1092,12 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
                 pushUpdate, write_ops::UpdateModification::ClassicTag(), false);
         } else {
             auto replacementDocument = updateModification.getUpdateReplacement();
-            EDCServerCollection::validateEncryptedFieldInfo(replacementDocument, efc);
+            EDCServerCollection::validateEncryptedFieldInfo(
+                replacementDocument, efc, bypassDocumentValidation);
             serverPayload = EDCServerCollection::getEncryptedFieldInfo(replacementDocument);
 
-            processFieldsForInsert(queryImpl, edcNss, serverPayload, efc, &stmtId);
+            processFieldsForInsert(
+                queryImpl, edcNss, serverPayload, efc, &stmtId, bypassDocumentValidation);
 
             // Step 2 ----
             auto safeContentReplace =
@@ -1269,9 +1301,22 @@ uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
 }
 
 StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceImpl::insertDocument(
-    const NamespaceString& nss, BSONObj obj, StmtId* pStmtId, bool translateDuplicateKey) {
+    const NamespaceString& nss,
+    BSONObj obj,
+    StmtId* pStmtId,
+    bool translateDuplicateKey,
+    bool bypassDocumentValidation) {
     write_ops::InsertCommandRequest insertRequest(nss);
     insertRequest.setDocuments({obj});
+
+    EncryptionInformation encryptionInformation;
+    encryptionInformation.setCrudProcessed(true);
+
+    // We need to set an empty BSON object here for the schema.
+    encryptionInformation.setSchema(BSONObj());
+    insertRequest.getWriteCommandRequestBase().setEncryptionInformation(encryptionInformation);
+    insertRequest.getWriteCommandRequestBase().setBypassDocumentValidation(
+        bypassDocumentValidation);
 
     int32_t stmtId = *pStmtId;
     if (stmtId != kUninitializedStmtId) {
@@ -1357,6 +1402,7 @@ std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryInterfaceImpl::updateW
     findAndModifyRequest.setLet(
         mergeLetAndCVariables(updateRequest.getLet(), updateOpEntry.getC()));
     findAndModifyRequest.setStmtId(updateRequest.getStmtId());
+    findAndModifyRequest.setBypassDocumentValidation(updateRequest.getBypassDocumentValidation());
 
     auto ei2 = ei;
     ei2.setCrudProcessed(true);
@@ -1398,9 +1444,15 @@ std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryInterfaceImpl::updateW
 }
 
 write_ops::UpdateCommandReply FLEQueryInterfaceImpl::update(
-    const NamespaceString& nss,
-    int32_t stmtId,
-    const write_ops::UpdateCommandRequest& updateRequest) {
+    const NamespaceString& nss, int32_t stmtId, write_ops::UpdateCommandRequest& updateRequest) {
+
+    invariant(!updateRequest.getWriteCommandRequestBase().getEncryptionInformation());
+
+    EncryptionInformation encryptionInformation;
+    encryptionInformation.setCrudProcessed(true);
+
+    encryptionInformation.setSchema(BSONObj());
+    updateRequest.getWriteCommandRequestBase().setEncryptionInformation(encryptionInformation);
 
     dassert(updateRequest.getStmtIds().value_or(std::vector<int32_t>()).empty());
 

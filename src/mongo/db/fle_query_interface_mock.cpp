@@ -54,7 +54,11 @@ uint64_t FLEQueryInterfaceMock::countDocuments(const NamespaceString& nss) {
 }
 
 StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceMock::insertDocument(
-    const NamespaceString& nss, BSONObj obj, StmtId* pStmtId, bool translateDuplicateKey) {
+    const NamespaceString& nss,
+    BSONObj obj,
+    StmtId* pStmtId,
+    bool translateDuplicateKey,
+    bool bypassDocumentValidation) {
     repl::TimestampedBSONObj tb;
     tb.obj = obj;
 
@@ -132,9 +136,7 @@ std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryInterfaceMock::updateW
 }
 
 write_ops::UpdateCommandReply FLEQueryInterfaceMock::update(
-    const NamespaceString& nss,
-    int32_t stmtId,
-    const write_ops::UpdateCommandRequest& updateRequest) {
+    const NamespaceString& nss, int32_t stmtId, write_ops::UpdateCommandRequest& updateRequest) {
     auto [reply, _] = updateWithPreimage(nss, EncryptionInformation(), updateRequest);
     return reply;
 }

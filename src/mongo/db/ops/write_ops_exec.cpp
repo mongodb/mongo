@@ -604,11 +604,36 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
     return res;
 }
 
+
+// Returns the flags that determine the type of document validation we want to
+// perform. First item in the tuple determines whether to bypass document validation altogether,
+// second item determines if _safeContent_ array can be modified in an encrypted collection.
+std::tuple<bool, bool> getDocumentValidationFlags(OperationContext* opCtx,
+                                                  const write_ops::WriteCommandRequestBase& req) {
+    auto& encryptionInfo = req.getEncryptionInformation();
+    const bool fleCrudProcessed = getFleCrudProcessed(opCtx, encryptionInfo);
+    return std::make_tuple(req.getBypassDocumentValidation(), fleCrudProcessed);
+}
 }  // namespace
+
+bool getFleCrudProcessed(OperationContext* opCtx,
+                         const boost::optional<EncryptionInformation>& encryptionInfo) {
+    if (encryptionInfo && encryptionInfo->getCrudProcessed().value_or(false)) {
+        uassert(6666201,
+                "External users cannot have crudProcessed enabled",
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                       ActionType::internal));
+
+        return true;
+    }
+    return false;
+}
 
 WriteResult performInserts(OperationContext* opCtx,
                            const write_ops::InsertCommandRequest& wholeOp,
                            OperationSource source) {
+
     // Insert performs its own retries, so we should only be within a WriteUnitOfWork when run in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -643,8 +668,15 @@ WriteResult performInserts(OperationContext* opCtx,
         uassertStatusOK(userAllowedWriteNS(opCtx, wholeOp.getNamespace()));
     }
 
-    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
-        opCtx, wholeOp.getWriteCommandRequestBase().getBypassDocumentValidation());
+    const auto [disableDocumentValidation, fleCrudProcessed] =
+        getDocumentValidationFlags(opCtx, wholeOp.getWriteCommandRequestBase());
+
+    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
+                                                                      disableDocumentValidation);
+
+    DisableSafeContentValidationIfTrue safeContentValidationDisabler(
+        opCtx, disableDocumentValidation, fleCrudProcessed);
+
     LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
 
     WriteResult out;
@@ -1003,8 +1035,15 @@ WriteResult performUpdates(OperationContext* opCtx,
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
-    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
-        opCtx, wholeOp.getWriteCommandRequestBase().getBypassDocumentValidation());
+    const auto [disableDocumentValidation, fleCrudProcessed] =
+        getDocumentValidationFlags(opCtx, wholeOp.getWriteCommandRequestBase());
+
+    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
+                                                                      disableDocumentValidation);
+
+    DisableSafeContentValidationIfTrue safeContentValidationDisabler(
+        opCtx, disableDocumentValidation, fleCrudProcessed);
+
     LastOpFixer lastOpFixer(opCtx, ns);
 
     bool containsRetry = false;
@@ -1231,8 +1270,15 @@ WriteResult performDeletes(OperationContext* opCtx,
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
-    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
-        opCtx, wholeOp.getWriteCommandRequestBase().getBypassDocumentValidation());
+    const auto [disableDocumentValidation, fleCrudProcessed] =
+        getDocumentValidationFlags(opCtx, wholeOp.getWriteCommandRequestBase());
+
+    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
+                                                                      disableDocumentValidation);
+
+    DisableSafeContentValidationIfTrue safeContentValidationDisabler(
+        opCtx, disableDocumentValidation, fleCrudProcessed);
+
     LastOpFixer lastOpFixer(opCtx, ns);
 
     bool containsRetry = false;

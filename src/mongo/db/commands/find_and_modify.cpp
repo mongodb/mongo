@@ -646,10 +646,15 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     // Collect metrics.
     CmdFindAndModify::collectMetrics(req);
 
-    boost::optional<DisableDocumentValidation> maybeDisableValidation;
-    if (req.getBypassDocumentValidation().value_or(false)) {
-        maybeDisableValidation.emplace(opCtx);
-    }
+    auto disableDocumentValidation = req.getBypassDocumentValidation().value_or(false);
+    auto fleCrudProcessed =
+        write_ops_exec::getFleCrudProcessed(opCtx, req.getEncryptionInformation());
+
+    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
+                                                                      disableDocumentValidation);
+
+    DisableSafeContentValidationIfTrue safeContentValidationDisabler(
+        opCtx, disableDocumentValidation, fleCrudProcessed);
 
     const auto inTransaction = opCtx->inMultiDocumentTransaction();
     uassert(50781,

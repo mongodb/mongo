@@ -972,7 +972,6 @@ void parseAndVerifyInsertUpdatePayload(std::vector<EDCServerPayloadInfo>* pField
 
 void collectEDCServerInfo(std::vector<EDCServerPayloadInfo>* pFields,
                           ConstDataRange cdr,
-
                           StringData fieldPath) {
 
     // TODO - validate field is actually indexed in the schema?
@@ -2053,7 +2052,8 @@ ESCDerivedFromDataTokenAndContentionFactorToken EDCServerPayloadInfo::getESCToke
 }
 
 void EDCServerCollection::validateEncryptedFieldInfo(BSONObj& obj,
-                                                     const EncryptedFieldConfig& efc) {
+                                                     const EncryptedFieldConfig& efc,
+                                                     bool bypassDocumentValidation) {
     stdx::unordered_set<std::string> indexedFields;
     for (auto f : efc.getFields()) {
         if (f.getQueries().has_value()) {
@@ -2070,6 +2070,11 @@ void EDCServerCollection::validateEncryptedFieldInfo(BSONObj& obj,
                     indexedFields.contains(fieldPath.toString()));
         }
     });
+
+    // We should ensure that the user is not manually modifying the safe content array.
+    uassert(6666200,
+            str::stream() << "Cannot modify " << kSafeContent << " field in document.",
+            !obj.hasField(kSafeContent) || bypassDocumentValidation);
 }
 
 
