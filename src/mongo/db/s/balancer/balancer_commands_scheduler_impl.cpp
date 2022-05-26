@@ -206,7 +206,8 @@ void BalancerCommandsSchedulerImpl::start(OperationContext* opCtx,
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(!_workerThreadHandle.joinable());
     if (!_executor) {
-        _executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+        _executor = std::make_unique<executor::ScopedTaskExecutor>(
+            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
     }
     _state = SchedulerState::Recovering;
 
@@ -224,7 +225,6 @@ void BalancerCommandsSchedulerImpl::start(OperationContext* opCtx,
         _state = SchedulerState::Running;
     } else {
         for (auto& requestToRecover : requestsToRecover) {
-            // TODO I'd prefer to simply delete the entries.
             _enqueueRequest(lg, std::move(requestToRecover));
         }
     }
@@ -463,7 +463,7 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
     }
 
     auto swRemoteCommandHandle =
-        _executor->scheduleRemoteCommand(remoteCommand, onRemoteResponseReceived);
+        (*_executor)->scheduleRemoteCommand(remoteCommand, onRemoteResponseReceived);
     return CommandSubmissionResult(params.id, distLockTaken, swRemoteCommandHandle.getStatus());
 }
 
@@ -508,7 +508,8 @@ void BalancerCommandsSchedulerImpl::_applyCommandResponse(
 
 void BalancerCommandsSchedulerImpl::_performDeferredCleanup(
     OperationContext* opCtx,
-    const stdx::unordered_map<UUID, RequestData, UUID::Hash>& requestsHoldingResources) {
+    const stdx::unordered_map<UUID, RequestData, UUID::Hash>& requestsHoldingResources,
+    bool includePersistedData) {
     if (requestsHoldingResources.empty()) {
         return;
     }
@@ -518,7 +519,7 @@ void BalancerCommandsSchedulerImpl::_performDeferredCleanup(
         if (request.holdsDistributedLock()) {
             _distributedLocks.releaseFor(opCtx, request.getNamespace());
         }
-        if (request.requiresRecoveryCleanupOnCompletion()) {
+        if (includePersistedData && request.requiresRecoveryCleanupOnCompletion()) {
             deletePersistedRecoveryInfo(dbClient, request.getCommandInfo());
         }
     }
@@ -580,7 +581,8 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
         // 2.a Free any resource acquired by already completed/aborted requests.
         {
             auto opCtxHolder = cc().makeOperationContext();
-            _performDeferredCleanup(opCtxHolder.get(), completedRequestsToCleanUp);
+            _performDeferredCleanup(
+                opCtxHolder.get(), completedRequestsToCleanUp, true /*includePersistedData*/);
             completedRequestsToCleanUp.clear();
         }
 
@@ -608,17 +610,21 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
         }
     }
     // Wait for each outstanding command to complete, clean out its resources and leave.
-    stdx::unordered_map<UUID, RequestData, UUID::Hash> requestsToClean;
+    (*_executor)->shutdown();
+    (*_executor)->join();
+
+    stdx::unordered_map<UUID, RequestData, UUID::Hash> cancelledRequests;
     {
         stdx::unique_lock<Latch> ul(_mutex);
-        _stateUpdatedCV.wait(
-            ul, [this] { return (_requests.size() == _recentlyCompletedRequestIds.size()); });
-        requestsToClean.swap(_requests);
+        cancelledRequests.swap(_requests);
         _requests.clear();
         _recentlyCompletedRequestIds.clear();
+        _executor.reset();
     }
     auto opCtxHolder = cc().makeOperationContext();
-    _performDeferredCleanup(opCtxHolder.get(), requestsToClean);
+    // Ensure that the clean up won't delete any request recovery document (the commands will be
+    // reissued once the scheduler is restarted)
+    _performDeferredCleanup(opCtxHolder.get(), cancelledRequests, false /*includePersistedData*/);
 }
 
 
