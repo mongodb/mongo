@@ -89,7 +89,7 @@ st.startBalancer();
 assert.gt(findChunksUtil.findChunksByNs(configDB, 'test.foo').count(), 2);
 
 // Make sure we eventually balance the 'test.foo' collection
-st.awaitBalance('foo', 'test', 60 * 1000);
+st.awaitBalance('foo', 'test', 60 * 5 * 1000);
 
 var map = function() {
     emit(this.i, this.j);
