@@ -20,6 +20,7 @@ cd ..
 
 find bench dist examples ext src test \
     -name '*.[ch]' -o \
+    -name '*.cpp' -o \
     -name '*.dox' -o \
     -name '*.in' -o \
     -name 's_*' -o \
