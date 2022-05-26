@@ -60,4 +60,31 @@ assert(numberDecimalsAlmostEqual(NumberDecimal("905721242210.0455427920454969568
 assert.neq(numberDecimalsAlmostEqual(NumberDecimal("905721242210.0455427920454969568"),
                                      NumberDecimal("905721242210.0453137831269007622941"),
                                      16));
+
+// Verify helper works the same with negative numers.
+assert(numberDecimalsAlmostEqual(NumberDecimal("-10001"), NumberDecimal("-10002"), 3));
+assert.neq(numberDecimalsAlmostEqual(NumberDecimal("-10001"), NumberDecimal("-10002"), 5));
+assert(numberDecimalsAlmostEqual(NumberDecimal("-905721242210.0455427920454969568"),
+                                 NumberDecimal("-905721242210.0453137831269007622941"),
+                                 15));
+assert.neq(numberDecimalsAlmostEqual(NumberDecimal("-905721242210.0455427920454969568"),
+                                     NumberDecimal("-905721242210.0453137831269007622941"),
+                                     16));
+
+// Verify mixed-sign arguments aren't equal.
+assert.neq(numberDecimalsAlmostEqual(NumberDecimal("10001"), NumberDecimal("-10002"), 3));
+assert.neq(numberDecimalsAlmostEqual(NumberDecimal("-10001"), NumberDecimal("10002"), 3));
+assert.neq(numberDecimalsAlmostEqual(NumberDecimal("-905721242210.0455427920454969568"),
+                                     NumberDecimal("905721242210.0453137831269007622941"),
+                                     10));
+assert.neq(numberDecimalsAlmostEqual(NumberDecimal("905721242210.0455427920454969568"),
+                                     NumberDecimal("-905721242210.0453137831269007622941"),
+                                     10));
+
+// Regression test for BF-25335
+assert(numberDecimalsAlmostEqual(NumberDecimal("-104735446372966662851.0135276410897"),
+                                 NumberDecimal("-104735446372966750508.0426966190306"),
+                                 10));
+// Regression test for BF-25390
+assert(numberDecimalsAlmostEqual(NumberDecimal("-331.0000000000"), NumberDecimal("-331"), 10));
 }());
