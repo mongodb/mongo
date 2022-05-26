@@ -22,26 +22,6 @@ var $config = extendWorkload($config, function($config, $super) {
     // Total count of documents when initialized.
     $config.data.initialCount = numChunks * numDocs;
 
-    function executeCommandWithRetries(fn, sleepInterval, retries, name) {
-        let result = null;
-        let done = false;
-
-        while (retries > 0 && !done) {
-            result = fn();
-
-            if (result.ok) {
-                print("command succeeded: " + name);
-                done = true;
-            } else {
-                print("command failed: " + name);
-                printjson(result);
-                sleep(sleepInterval);
-            }
-        }
-
-        return result;
-    }
-
     // Run cleanupOrphaned on a random shard's primary node.
     $config.states.cleanupOrphans = function(db, collName, connCache) {
         const ns = db[collName].getFullName();
@@ -53,21 +33,11 @@ var $config = extendWorkload($config, function($config, $super) {
         const shard = connCache.shards[shardNames[randomIndex]];
         const shardPrimary = ChunkHelper.getPrimary(shard);
 
-        let nextKey = {};
-        let result = null;
-
-        let iteration = 0;
-        while (nextKey != null) {
-            result = executeCommandWithRetries(() => {
-                return shardPrimary.adminCommand(
-                    {cleanupOrphaned: ns, startingFromKey: nextKey, secondaryThrottle: true});
-            }, 100, 1000, "cleanupOrphaned");
-
-            nextKey = result.stoppedAtKey;
-            iteration++;
-        }
-
-        assert(result.ok);
+        // Ensure the cleanup of all chunk orphans of the primary shard
+        assert.soonNoExcept(() => {
+            assert.commandWorked(shardPrimary.adminCommand({cleanupOrphaned: ns}));
+            return true;
+        }, undefined, 10 * 1000, 100);
     };
 
     // Verify that counts are stable.
@@ -107,10 +77,10 @@ var $config = extendWorkload($config, function($config, $super) {
             if (chunkIndex > 0) {
                 // Need to retry split command to avoid conflicting with moveChunks issued by the
                 // balancer.
-                let result = executeCommandWithRetries(() => {
-                    return db.adminCommand({split: ns, middle: {skey: splitKey}});
-                }, 100, 10, "split");
-                assertAlways.commandWorked(result);
+                assert.soonNoExcept(() => {
+                    assert.commandWorked(db.adminCommand({split: ns, middle: {skey: splitKey}}));
+                    return true;
+                }, undefined, 10 * 1000, 100);
             }
         }
     };
