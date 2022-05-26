@@ -128,9 +128,6 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx) {
     donorDeletionTask.setPending(true);
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     donorDeletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
-    if (feature_flags::gOrphanTracking.isEnabled(serverGlobalParams.featureCompatibility)) {
-        donorDeletionTask.setNumOrphanDocs(0);
-    }
     migrationutil::persistRangeDeletionTaskLocally(
         opCtx, donorDeletionTask, WriteConcerns::kMajorityWriteConcernShardingTimeout);
 }

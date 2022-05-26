@@ -700,11 +700,7 @@ void persistUpdatedNumOrphans(OperationContext* opCtx,
                               const UUID& migrationId,
                               const UUID& collectionUuid,
                               long long changeInOrphans) {
-    // TODO (SERVER-63819) Remove numOrphanDocsFieldName field from the query
-    // Add $exists to the query to ensure that on upgrade and downgrade, the numOrphanDocs field
-    // is only updated after the upgrade procedure has populated it with an initial value.
-    BSONObj query = BSON("_id" << migrationId << RangeDeletionTask::kNumOrphanDocsFieldName
-                               << BSON("$exists" << true));
+    BSONObj query = BSON("_id" << migrationId);
     try {
         PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
         ScopedRangeDeleterLock rangeDeleterLock(opCtx, collectionUuid);
@@ -750,7 +746,7 @@ long long retrieveNumOrphansFromRecipient(OperationContext* opCtx,
     }
     const auto numOrphanDocsElem =
         rangeDeletionResponse.docs[0].getField(RangeDeletionTask::kNumOrphanDocsFieldName);
-    return numOrphanDocsElem ? numOrphanDocsElem.safeNumberLong() : 0;
+    return numOrphanDocsElem.safeNumberLong();
 }
 
 void notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx,

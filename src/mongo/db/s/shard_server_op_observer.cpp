@@ -275,7 +275,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                     std::make_unique<SubmitRangeDeletionHandler>(opCtx, deletionTask));
             }
 
-            const auto numOrphanDocs = deletionTask.getNumOrphanDocs().value_or(0);
+            const auto numOrphanDocs = deletionTask.getNumOrphanDocs();
             BalancerStatsRegistry::get(opCtx)->onRangeDeletionTaskInsertion(
                 deletionTask.getCollectionUuid(), numOrphanDocs);
         }
@@ -549,7 +549,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         const auto numOrphanDocs = [&] {
             auto numOrphanDocsElem = update_oplog_entry::extractNewValueForField(
                 deletedDoc, RangeDeletionTask::kNumOrphanDocsFieldName);
-            return numOrphanDocsElem ? numOrphanDocsElem.exactNumberLong() : 0;
+            return numOrphanDocsElem.exactNumberLong();
         }();
 
         auto collUuid = [&] {

@@ -29,12 +29,13 @@ function setup() {
     return st;
 }
 
-function writeRangeDeletionTask(collectionUuid, shardConn, pending) {
+function writeRangeDeletionTask(collectionUuid, shardConn, pending, numOrphans) {
     let deletionTask = {
         _id: UUID(),
         nss: ns,
         collectionUuid: collectionUuid,
         donorShardId: "unused",
+        numOrphanDocs: numOrphans,
         range: {min: {x: 50}, max: {x: MaxKey}},
         whenToClean: "now"
     };
@@ -84,7 +85,7 @@ function writeRangeDeletionTask(collectionUuid, shardConn, pending) {
     assert.eq(shard1Coll.find().itcount(), expectedNumDocsShard1);
 
     const collectionUuid = getUUIDFromConfigCollections(st.s, ns);
-    writeRangeDeletionTask(collectionUuid, st.shard0);
+    writeRangeDeletionTask(collectionUuid, st.shard0, false, orphanCount);
 
     // Step down current primary.
     let originalShard0Primary = st.rs0.getPrimary();
@@ -123,7 +124,7 @@ function writeRangeDeletionTask(collectionUuid, shardConn, pending) {
     }
 
     const collectionUuid = getUUIDFromConfigCollections(st.s, ns);
-    writeRangeDeletionTask(collectionUuid, st.shard0, true);
+    writeRangeDeletionTask(collectionUuid, st.shard0, true, orphanCount);
 
     const expectedNumDocsTotal = 0;
     const expectedNumDocsShard0 = 0;

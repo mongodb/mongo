@@ -344,7 +344,6 @@ TEST_F(MigrationUtilsTest, TestUpdateNumberOfOrphans) {
     const auto collectionUuid = UUID::gen();
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     auto rangeDeletionDoc = createDeletionTask(opCtx, kTestNss, collectionUuid, 0, 10);
-    rangeDeletionDoc.setNumOrphanDocs(0);
     store.add(opCtx, rangeDeletionDoc);
 
     migrationutil::persistUpdatedNumOrphans(opCtx, rangeDeletionDoc.getId(), collectionUuid, 5);
