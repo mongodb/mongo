@@ -34,6 +34,7 @@
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/service_context.h"
+#include "mongo/executor/scoped_task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard.h"
@@ -593,7 +594,7 @@ public:
 private:
     enum class SchedulerState { Recovering, Running, Stopping, Stopped };
 
-    std::shared_ptr<executor::TaskExecutor> _executor{nullptr};
+    std::unique_ptr<executor::ScopedTaskExecutor> _executor{nullptr};
 
     // Protects the in-memory state of the Scheduler
     // (_state, _requests, _unsubmittedRequestIds, _recentlyCompletedRequests).
@@ -647,7 +648,8 @@ private:
      */
     void _performDeferredCleanup(
         OperationContext* opCtx,
-        const stdx::unordered_map<UUID, RequestData, UUID::Hash>& requestsHoldingResources);
+        const stdx::unordered_map<UUID, RequestData, UUID::Hash>& requestsHoldingResources,
+        bool includePersistedData);
 
     CommandSubmissionResult _submit(OperationContext* opCtx,
                                     const CommandSubmissionParameters& data);
