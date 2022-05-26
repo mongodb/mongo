@@ -52,7 +52,7 @@ class DocumentValidationSettings {
 public:
     enum flag : std::uint8_t {
         /*
-         * Enables document validation (both schema and internal).
+         * Enables document validation (schema, internal, and safeContent).
          */
         kEnableValidation = 0x00,
         /*
@@ -67,6 +67,12 @@ public:
          * doesn't comply with internal validation rules.
          */
         kDisableInternalValidation = 0x02,
+        /*
+         * If set, modifications to the safeContent array are allowed. This flag is only
+         * enabled when bypass document validation is enabled or if crudProcessed is true
+         * in the query.
+         */
+        kDisableSafeContentValidation = 0x04,
     };
 
     using Flags = std::uint8_t;
@@ -90,6 +96,10 @@ public:
 
     bool isInternalValidationDisabled() const {
         return _flags & kDisableInternalValidation;
+    }
+
+    bool isSafeContentValidationDisabled() const {
+        return _flags & kDisableSafeContentValidation;
     }
 
     bool isDocumentValidationEnabled() const {
@@ -134,11 +144,29 @@ class DisableDocumentSchemaValidationIfTrue {
 public:
     DisableDocumentSchemaValidationIfTrue(OperationContext* opCtx,
                                           bool shouldDisableSchemaValidation) {
-        if (shouldDisableSchemaValidation)
-            _documentSchemaValidationDisabler.emplace(opCtx);
+        if (shouldDisableSchemaValidation) {
+            _documentSchemaValidationDisabler.emplace(
+                opCtx, DocumentValidationSettings::kDisableSchemaValidation);
+        }
     }
 
 private:
     boost::optional<DisableDocumentValidation> _documentSchemaValidationDisabler;
 };
+
+class DisableSafeContentValidationIfTrue {
+public:
+    DisableSafeContentValidationIfTrue(OperationContext* opCtx,
+                                       bool shouldDisableSchemaValidation,
+                                       bool encryptionInformationCrudProcessed) {
+        if (shouldDisableSchemaValidation || encryptionInformationCrudProcessed) {
+            _documentSchemaValidationDisabler.emplace(
+                opCtx, DocumentValidationSettings::kDisableSafeContentValidation);
+        }
+    }
+
+private:
+    boost::optional<DisableDocumentValidation> _documentSchemaValidationDisabler;
+};
+
 }  // namespace mongo

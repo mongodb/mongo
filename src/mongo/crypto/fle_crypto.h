@@ -1010,7 +1010,9 @@ public:
     /**
      * Validate that payload is compatible with schema
      */
-    static void validateEncryptedFieldInfo(BSONObj& obj, const EncryptedFieldConfig& efc);
+    static void validateEncryptedFieldInfo(BSONObj& obj,
+                                           const EncryptedFieldConfig& efc,
+                                           bool bypassDocumentValidation);
 
     /**
      * Get information about all FLE2InsertUpdatePayload payloads

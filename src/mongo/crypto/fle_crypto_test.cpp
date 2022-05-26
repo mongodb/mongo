@@ -728,7 +728,7 @@ BSONObj encryptDocument(BSONObj obj,
     auto result = FLEClientCrypto::transformPlaceholders(obj, keyVault);
 
     if (nullptr != efc) {
-        EDCServerCollection::validateEncryptedFieldInfo(result, *efc);
+        EDCServerCollection::validateEncryptedFieldInfo(result, *efc, false);
     }
 
     // Start Server Side
