@@ -7,6 +7,11 @@
 cache_max_wait_ms=1,
 cache_size_mb=500,
 duration_seconds=15,
+timestamp_manager=
+(
+    # We don't need the timestamp manager to update the timestamps in this test.
+    enabled=false,
+),
 workload_generator=
 (
     custom_config=

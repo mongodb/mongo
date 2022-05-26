@@ -148,14 +148,19 @@ transaction_context::try_rollback(const std::string &config)
         rollback(config);
 }
 
-void
+/*
+ * FIXME: WT-9198 We're concurrently doing a transaction that contains a bunch of operations while
+ * moving the stable timestamp. Eat the occasional EINVAL from the transaction's first commit
+ * timestamp being earlier than the stable timestamp.
+ */
+int
 transaction_context::set_commit_timestamp(wt_timestamp_t ts)
 {
     /* We don't want to set zero timestamps on transactions if we're not using timestamps. */
     if (!_timestamp_manager->enabled())
-        return;
+        return 0;
     const std::string config = COMMIT_TS + "=" + timestamp_manager::decimal_to_hex(ts);
-    testutil_check(_session->timestamp_transaction(_session, config.c_str()));
+    return _session->timestamp_transaction(_session, config.c_str());
 }
 
 void
@@ -220,7 +225,12 @@ thread_context::update(
     testutil_assert(cursor.get() != nullptr);
 
     wt_timestamp_t ts = tsm->get_next_ts();
-    transaction.set_commit_timestamp(ts);
+    ret = transaction.set_commit_timestamp(ts);
+    testutil_assert(ret == 0 || ret == EINVAL);
+    if (ret != 0) {
+        transaction.set_needs_rollback(true);
+        return (false);
+    }
 
     cursor->set_key(cursor.get(), key.c_str());
     cursor->set_value(cursor.get(), value.c_str());
@@ -257,7 +267,12 @@ thread_context::insert(
     testutil_assert(cursor.get() != nullptr);
 
     wt_timestamp_t ts = tsm->get_next_ts();
-    transaction.set_commit_timestamp(ts);
+    ret = transaction.set_commit_timestamp(ts);
+    testutil_assert(ret == 0 || ret == EINVAL);
+    if (ret != 0) {
+        transaction.set_needs_rollback(true);
+        return (false);
+    }
 
     cursor->set_key(cursor.get(), key.c_str());
     cursor->set_value(cursor.get(), value.c_str());
@@ -292,7 +307,12 @@ thread_context::remove(scoped_cursor &cursor, uint64_t collection_id, const std:
     testutil_assert(cursor.get() != nullptr);
 
     wt_timestamp_t ts = tsm->get_next_ts();
-    transaction.set_commit_timestamp(ts);
+    ret = transaction.set_commit_timestamp(ts);
+    testutil_assert(ret == 0 || ret == EINVAL);
+    if (ret != 0) {
+        transaction.set_needs_rollback(true);
+        return (false);
+    }
 
     cursor->set_key(cursor.get(), key.c_str());
     ret = cursor->remove(cursor.get());

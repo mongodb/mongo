@@ -310,6 +310,28 @@ testutil_timestamp_parse(const char *str)
     return (ts);
 }
 
+/*
+ * maximum_stable_ts --
+ *     Return the largest usable stable timestamp from a list of n committed timestamps.
+ */
+static inline wt_timestamp_t
+maximum_stable_ts(wt_timestamp_t *commit_timestamps, uint32_t n)
+{
+    wt_timestamp_t commit_ts, ts;
+    uint32_t i;
+
+    for (ts = WT_TS_MAX, i = 0; i < n; i++) {
+        commit_ts = commit_timestamps[i];
+        if (commit_ts == WT_TS_NONE)
+            return (WT_TS_NONE);
+        if (commit_ts < ts)
+            ts = commit_ts;
+    }
+
+    /* Return one less than the earliest in-use timestamp. */
+    return (ts == WT_TS_MAX ? WT_TS_NONE : ts - 1);
+}
+
 /* Allow tests to add their own death handling. */
 extern void (*custom_die)(void);
 
