@@ -521,10 +521,10 @@ BSONObj numberDecimalsAlmostEqual(const BSONObj& input, void*) {
 
     // 10.0 is used frequently in the rest of the function, so save it to a variable.
     auto ten = Decimal128(10);
-    auto exponent = a.logarithm(ten).toAbs().round();
+    auto exponent = a.toAbs().logarithm(ten).round();
 
     // Return early if arguments are not the same order of magnitude.
-    if (exponent != b.logarithm(ten).toAbs().round()) {
+    if (exponent != b.toAbs().logarithm(ten).round()) {
         return BSON("" << false);
     }
 
