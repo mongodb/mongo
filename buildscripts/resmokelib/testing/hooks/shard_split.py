@@ -178,7 +178,7 @@ class _ShardSplitOptions:
     def get_donor_primary(self):
         """Return a connection to the donor primary."""
         return self.get_donor_rs().get_primary(
-            timeout_secs=self.shard_split_fixture.AWAIT_REPL_TIMEOUT_MINS)
+            timeout_secs=self.shard_split_fixture.AWAIT_REPL_TIMEOUT_MINS * 60)
 
     def get_donor_nodes(self):
         """Return the nodes for the current shard split fixture donor."""
