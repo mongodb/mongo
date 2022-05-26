@@ -976,49 +976,6 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-void ShardingCatalogClientImpl::insertConfigDocumentsAsRetryableWrite(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    std::vector<BSONObj> docs,
-    const WriteConcernOptions& writeConcern) {
-    invariant(nss.db() == NamespaceString::kAdminDb || nss.db() == NamespaceString::kConfigDb);
-
-    AlternativeSessionRegion asr(opCtx);
-    TxnNumber currentTxnNumber = 0;
-
-    std::vector<BSONObj> workingBatch;
-    size_t workingBatchItemSize = 0;
-    int workingBatchDocSize = 0;
-
-    while (!docs.empty()) {
-        BSONObj toAdd = docs.back();
-        docs.pop_back();
-
-        const int docSizePlusOverhead =
-            toAdd.objsize() + write_ops::kRetryableAndTxnBatchWriteBSONSizeOverhead;
-        // Check if pushing this object will exceed the batch size limit or the max object size
-        if ((workingBatchItemSize + 1 > write_ops::kMaxWriteBatchSize) ||
-            (workingBatchDocSize + docSizePlusOverhead > BSONObjMaxUserSize)) {
-            sendRetryableWriteBatchRequestToConfig(
-                asr.opCtx(), nss, workingBatch, currentTxnNumber, writeConcern);
-            ++currentTxnNumber;
-
-            workingBatch.clear();
-            workingBatchItemSize = 0;
-            workingBatchDocSize = 0;
-        }
-
-        workingBatch.push_back(toAdd);
-        ++workingBatchItemSize;
-        workingBatchDocSize += docSizePlusOverhead;
-    }
-
-    if (!workingBatch.empty()) {
-        sendRetryableWriteBatchRequestToConfig(
-            asr.opCtx(), nss, workingBatch, currentTxnNumber, writeConcern);
-    }
-}
-
 StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(
     OperationContext* opCtx,
     const NamespaceString& nss,
