@@ -2,7 +2,7 @@
  * Test $collMod command on a sharded timeseries collection.
  *
  * @tags: [
- *   requires_fcv_51
+ *   requires_fcv_60,
  * ]
  */
 
