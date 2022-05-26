@@ -477,7 +477,7 @@ class NinjaState:
         self.rules = {
             "CMD": {
                 "command": "cmd /c $env$cmd" if sys.platform == "win32" else "$env$cmd",
-                "description": "Building $out",
+                "description": "Built $out",
                 "pool": "local_pool",
             },
             # We add the deps processing variables to this below. We
@@ -487,19 +487,19 @@ class NinjaState:
             # command.
             "CC": {
                 "command": "$env$CC @$out.rsp",
-                "description": "Compiling $out",
+                "description": "Compiled $out",
                 "rspfile": "$out.rsp",
                 "rspfile_content": "$rspc",
             },
             "CXX": {
                 "command": "$env$CXX @$out.rsp",
-                "description": "Compiling $out",
+                "description": "Compiled $out",
                 "rspfile": "$out.rsp",
                 "rspfile_content": "$rspc",
             },
             "LINK": {
                 "command": "$env$LINK @$out.rsp",
-                "description": "Linking $out",
+                "description": "Linked $out",
                 "rspfile": "$out.rsp",
                 "rspfile_content": "$rspc",
                 "pool": "local_pool",
@@ -515,7 +515,7 @@ class NinjaState:
                     "{}$env$AR @$out.rsp".format('' if sys.platform == "win32" else "rm -f $out && "
                                                  ),
                 "description":
-                    "Archiving $out",
+                    "Archived $out",
                 "rspfile":
                     "$out.rsp",
                 "rspfile_content":
@@ -526,16 +526,16 @@ class NinjaState:
             "SYMLINK": {
                 "command": (
                     "cmd /c mklink $out $in" if sys.platform == "win32" else "ln -s $in $out"),
-                "description": "Symlink $in -> $out",
+                "description": "Symlinked $in -> $out",
             },
             "NOOP": {
                 "command": "$NOOP",
-                "description": "Checking $out",
+                "description": "Checked $out",
                 "pool": "local_pool",
             },
             "INSTALL": {
                 "command": "$COPY $in $out",
-                "description": "Install $out",
+                "description": "Installed $out",
                 "pool": "install_pool",
                 # On Windows cmd.exe /c copy does not always correctly
                 # update the timestamp on the output file. This leads
@@ -549,7 +549,7 @@ class NinjaState:
             },
             "TEMPLATE": {
                 "command": "$SCONS_INVOCATION $out",
-                "description": "Rendering $out",
+                "description": "Rendered $out",
                 "pool": "scons_pool",
                 "restat": 1,
             },
@@ -577,7 +577,7 @@ class NinjaState:
             },
             "REGENERATE": {
                 "command": "$SCONS_INVOCATION_W_TARGETS",
-                "description": "Regenerating $self",
+                "description": "Regenerated $self",
                 "depfile": os.path.join(get_path(env['NINJA_BUILDDIR']), '$out.depfile'),
                 "generator": 1,
                 # Console pool restricts to 1 job running at a time,
@@ -1339,7 +1339,7 @@ def CheckNinjaCompdbExpand(env, context):
         text=textwrap.dedent("""
             rule CMD_RSP
               command = $cmd @$out.rsp > fake_output.txt
-              description = Building $out
+              description = Built $out
               rspfile = $out.rsp
               rspfile_content = $rspc
             build fake_output.txt: CMD_RSP fake_input.txt

@@ -5199,7 +5199,7 @@ if get_option('ninja') != 'disabled':
         env.NinjaRule(
             "WINLINK",
             "$env$WINLINK @$out.rsp",
-            description="Linking $out",
+            description="Linked $out",
             deps=None,
             pool="local_pool",
             use_depfile=False,
@@ -5262,7 +5262,7 @@ if get_option('ninja') != 'disabled':
     env.NinjaRule(
         rule="IDLC",
         command="cmd /c $cmd" if env.TargetOSIs("windows") else "$cmd",
-        description="Generating $out",
+        description="Generated $out",
         deps="msvc",
         pool="local_pool",
     )
@@ -5311,7 +5311,7 @@ if get_option('ninja') != 'disabled':
 
     env.NinjaRule(
         rule="TEST_LIST",
-        description="Compiling test list: $out",
+        description="Compiled test list: $out",
         command=cmd,
     )
     env.NinjaRegisterFunctionHandler("test_list_builder_action", ninja_test_list_builder)
