@@ -343,7 +343,8 @@ PartialSchemaReqConversion::PartialSchemaReqConversion()
       _reqMap(),
       _hasIntersected(false),
       _hasTraversed(false),
-      _hasEmptyInterval(false) {}
+      _hasEmptyInterval(false),
+      _retainPredicate(false) {}
 
 PartialSchemaReqConversion::PartialSchemaReqConversion(PartialSchemaRequirements reqMap)
     : _success(true),
@@ -351,7 +352,8 @@ PartialSchemaReqConversion::PartialSchemaReqConversion(PartialSchemaRequirements
       _reqMap(std::move(reqMap)),
       _hasIntersected(false),
       _hasTraversed(false),
-      _hasEmptyInterval(false) {}
+      _hasEmptyInterval(false),
+      _retainPredicate(false) {}
 
 PartialSchemaReqConversion::PartialSchemaReqConversion(ABT bound)
     : _success(true),
@@ -359,7 +361,8 @@ PartialSchemaReqConversion::PartialSchemaReqConversion(ABT bound)
       _reqMap(),
       _hasIntersected(false),
       _hasTraversed(false),
-      _hasEmptyInterval(false) {}
+      _hasEmptyInterval(false),
+      _retainPredicate(false) {}
 
 /**
  * Helper class that builds PartialSchemaRequirements property from an EvalFilter or an EvalPath.
@@ -391,6 +394,7 @@ public:
 
             PartialSchemaReqConversion result{std::move(newMap)};
             result._hasEmptyInterval = pathResult._hasEmptyInterval;
+            result._retainPredicate = pathResult._retainPredicate;
             return result;
         }
 
@@ -421,12 +425,12 @@ public:
             return {};
         }
 
-        auto& leftReq = leftResult._reqMap;
-        auto& rightReq = rightResult._reqMap;
+        auto& leftReqMap = leftResult._reqMap;
+        auto& rightReqMap = rightResult._reqMap;
         if (isMultiplicative) {
             {
                 ProjectionRenames projectionRenames;
-                if (!intersectPartialSchemaReq(leftReq, rightReq, projectionRenames)) {
+                if (!intersectPartialSchemaReq(leftReqMap, rightReqMap, projectionRenames)) {
                     return {};
                 }
                 if (!projectionRenames.empty()) {
@@ -437,7 +441,7 @@ public:
             if (!leftResult._hasTraversed && !rightResult._hasTraversed) {
                 // Intersect intervals only if we have not traversed. E.g. (-inf, 90) ^ (70, +inf)
                 // becomes (70, 90).
-                for (auto& [key, req] : leftReq) {
+                for (auto& [key, req] : leftReqMap) {
                     auto newIntervals = intersectDNFIntervals(req.getIntervals());
                     if (newIntervals) {
                         req.getIntervals() = std::move(newIntervals.get());
@@ -446,7 +450,7 @@ public:
                         break;
                     }
                 }
-            } else if (leftReq.size() > 1) {
+            } else if (leftReqMap.size() > 1) {
                 // Reject if we have traversed, and composed requirements are more than one.
                 return {};
             }
@@ -457,20 +461,91 @@ public:
 
         // We can only perform additive composition (OR) if we have a single matching key on both
         // sides.
-        if (leftReq.size() != 1 || rightReq.size() != 1) {
+        if (leftReqMap.size() != 1 || rightReqMap.size() != 1) {
             return {};
         }
 
-        auto leftEntry = leftReq.begin();
-        auto rightEntry = rightReq.begin();
-        if (!(leftEntry->first == rightEntry->first)) {
+        auto leftEntry = leftReqMap.begin();
+        auto rightEntry = rightReqMap.begin();
+        auto& [leftKey, leftReq] = *leftEntry;
+        auto& [rightKey, rightReq] = *rightEntry;
+
+        if (leftKey == rightKey) {
+            combineIntervalsDNF(false /*intersect*/,
+                                leftEntry->second.getIntervals(),
+                                rightEntry->second.getIntervals());
+            return leftResult;
+        }
+
+        // Here we can combine if paths differ only by a Traverse element and both intervals
+        // are the same, with array bounds. For example:
+        //      Left:   Id,          [[1, 2, 3], [1, 2, 3]]
+        //      Right:  Traverse Id  [[1, 2, 3], [1, 2, 3]]
+        // We can then combine into:
+        //    Traverse Id:           [[1, 2, 3], [1, 2, 3]] OR [1, 1]
+        // We also need to retain the original filter.
+
+        if (leftKey._projectionName != rightKey._projectionName) {
+            return {};
+        }
+        if (leftReq.hasBoundProjectionName() || rightReq.hasBoundProjectionName()) {
             return {};
         }
 
-        combineIntervalsDNF(false /*intersect*/,
-                            leftEntry->second.getIntervals(),
-                            rightEntry->second.getIntervals());
-        return leftResult;
+        auto& leftIntervals = leftReq.getIntervals();
+        auto& rightIntervals = rightReq.getIntervals();
+        const auto& leftInterval = IntervalReqExpr::getSingularDNF(leftIntervals);
+        const auto& rightInterval = IntervalReqExpr::getSingularDNF(rightIntervals);
+        if (!leftInterval || !rightInterval || leftInterval != rightInterval) {
+            return {};
+        }
+        if (!leftInterval->isEquality() || !rightInterval->isEquality()) {
+            // For now only supporting equalities.
+            return {};
+        }
+
+        const ABT& bound = leftInterval->getLowBound().getBound();
+        const auto constBoundPtr = bound.cast<Constant>();
+        if (constBoundPtr == nullptr) {
+            return {};
+        }
+        const auto [tag, val] = constBoundPtr->get();
+        if (tag != sbe::value::TypeTags::Array) {
+            return {};
+        }
+        const sbe::value::Array* arr = sbe::value::getArrayView(val);
+        if (arr->size() == 0) {
+            // For now we do not support empty arrays. Need to translate into null bounds.
+            return {};
+        }
+
+        const auto [elTag, elVal] = arr->getAt(0);
+        const auto [elTagCopy, elValCopy] = sbe::value::copyValue(elTag, elVal);
+        ABT elementBound = make<Constant>(elTagCopy, elValCopy);
+        // Create new interval which uses the first element of the array.
+        const IntervalReqExpr::Node& newInterval =
+            IntervalReqExpr::makeSingularDNF(IntervalRequirement{
+                {true /*inclusive*/, elementBound}, {true /*inclusive*/, elementBound}});
+
+        const ABT& leftPath = leftKey._path;
+        const ABT& rightPath = rightKey._path;
+        if (const auto leftTraversePtr = leftPath.cast<PathTraverse>();
+            leftTraversePtr != nullptr && leftTraversePtr->getPath().is<PathIdentity>() &&
+            rightPath.is<PathIdentity>()) {
+            // leftPath = Id, rightPath = Traverse Id.
+            combineIntervalsDNF(false /*intersect*/, leftIntervals, newInterval);
+            leftResult._retainPredicate = true;
+            return leftResult;
+        } else if (const auto rightTraversePtr = rightPath.cast<PathTraverse>();
+                   rightTraversePtr != nullptr && rightTraversePtr->getPath().is<PathIdentity>() &&
+                   leftPath.is<PathIdentity>()) {
+            // leftPath = Traverse Id, rightPath = Id.
+            combineIntervalsDNF(false /*intersect*/, rightIntervals, newInterval);
+            rightResult._retainPredicate = true;
+            return rightResult;
+        }
+
+        return {};
     }
 
     PartialSchemaReqConversion transport(const ABT& n,

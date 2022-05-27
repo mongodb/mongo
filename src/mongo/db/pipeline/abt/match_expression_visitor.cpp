@@ -113,18 +113,8 @@ public:
 
     void visit(const ExistsMatchExpression* expr) override {
         ABT result = make<PathDefault>(Constant::boolean(false));
-
         if (!expr->path().empty()) {
-            // TODO SERVER-62961: use "generateFieldPath" when SERVER-62961 is fixed.
-            result = translateFieldPath(
-                FieldPath(expr->path().toString()),
-                std::move(result),
-                [](const std::string& fieldName, const bool isLastElement, ABT input) {
-                    if (!isLastElement) {
-                        input = make<PathTraverse>(std::move(input));
-                    }
-                    return make<PathGet>(fieldName, std::move(input));
-                });
+            result = generateFieldPath(FieldPath(expr->path().toString()), std::move(result));
         }
         _ctx.push(std::move(result));
     }
@@ -175,18 +165,30 @@ public:
 
         // Additively compose equality comparisons, creating one for each constant in 'equalities'.
         ABT result = make<PathIdentity>();
+        ABT nonTraversedResult = make<PathIdentity>();
         for (const auto& pred : equalities) {
             const auto [tag, val] = convertFrom(Value(pred));
+            ABT comparison = make<PathCompare>(Operations::Eq, make<Constant>(tag, val));
             if (tag == sbe::value::TypeTags::Null) {
                 // Handle null and missing.
                 maybeComposePath<PathComposeA>(result, make<PathDefault>(Constant::boolean(true)));
+            } else if (tag == sbe::value::TypeTags::Array) {
+                maybeComposePath<PathComposeA>(nonTraversedResult, comparison);
             }
-            maybeComposePath<PathComposeA>(
-                result, make<PathCompare>(Operations::Eq, make<Constant>(tag, val)));
+            maybeComposePath<PathComposeA>(result, std::move(comparison));
         }
 
-        // The path can be empty if we are within an $elemMatch.
+        // The path can be empty if we are within an $elemMatch. In this case elemMatch would insert
+        // a traverse.
         if (!expr->path().empty()) {
+            // When the path we are comparing is a path to an array, the comparison is considered
+            // true if it evaluates to true for the array itself or for any of the array’s elements.
+            // 'result' evaluates the comparison on the array elements, and 'nonTraversedResult'
+            // evaluates the comparison on the array itself.
+
+            result = make<PathTraverse>(std::move(result));
+            maybeComposePath<PathComposeA>(result, std::move(nonTraversedResult));
+
             result = generateFieldPath(FieldPath(expr->path().toString()), std::move(result));
         }
         _ctx.push(std::move(result));
@@ -374,7 +376,16 @@ public:
                                makeSeq(make<Variable>(lambdaProjName),
                                        Constant::int32(expr->typeSet().getBSONTypeMask())))));
 
+        // The path can be empty if we are within an $elemMatch. In this case elemMatch would insert
+        // a traverse.
         if (!expr->path().empty()) {
+            result = make<PathTraverse>(std::move(result));
+            if (expr->typeSet().hasType(BSONType::Array)) {
+                // If we are testing against array type, insert a comparison against the
+                // non-traversed path (the array itself if we have one).
+                result = make<PathComposeA>(make<PathArr>(), std::move(result));
+            }
+
             result = generateFieldPath(FieldPath(expr->path().toString()), std::move(result));
         }
         _ctx.push(std::move(result));
@@ -465,13 +476,17 @@ private:
         return translateFieldPath(
             fieldPath,
             std::move(initial),
-            [](const std::string& fieldName, const bool /*isLastElement*/, ABT input) {
-                return make<PathGet>(fieldName, make<PathTraverse>(std::move(input)));
+            [&](const std::string& fieldName, const bool isLastElement, ABT input) {
+                if (!isLastElement) {
+                    input = make<PathTraverse>(std::move(input));
+                }
+                return make<PathGet>(fieldName, std::move(input));
             });
     }
 
     void generateSimpleComparison(const ComparisonMatchExpressionBase* expr, const Operations op) {
         auto [tag, val] = convertFrom(Value(expr->getData()));
+        const bool isArray = tag == sbe::value::TypeTags::Array;
         ABT result = make<PathCompare>(op, make<Constant>(tag, val));
 
         switch (op) {
@@ -511,7 +526,19 @@ private:
                 break;
         }
 
+        // The path can be empty if we are within an $elemMatch. In this case elemMatch would insert
+        // a traverse.
         if (!expr->path().empty()) {
+            if (isArray) {
+                // When the path we are comparing is a path to an array, the comparison is
+                // considered true if it evaluates to true for the array itself or for any of the
+                // array’s elements.
+
+                result = make<PathComposeA>(make<PathTraverse>(result), result);
+            } else {
+                result = make<PathTraverse>(std::move(result));
+            }
+
             result = generateFieldPath(FieldPath(expr->path().toString()), std::move(result));
         }
         _ctx.push(std::move(result));

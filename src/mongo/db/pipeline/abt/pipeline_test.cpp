@@ -2298,6 +2298,7 @@ TEST(ABTTranslate, PartialIndex) {
         make<Variable>(scanProjName)));
     ASSERT_TRUE(conversionResult._success);
     ASSERT_FALSE(conversionResult._hasEmptyInterval);
+    ASSERT_FALSE(conversionResult._retainPredicate);
 
     Metadata metadata = {
         {{scanDefName,
@@ -2365,6 +2366,7 @@ TEST(ABTTranslate, PartialIndexNegative) {
         make<Variable>(scanProjName)));
     ASSERT_TRUE(conversionResult._success);
     ASSERT_FALSE(conversionResult._hasEmptyInterval);
+    ASSERT_FALSE(conversionResult._retainPredicate);
 
     Metadata metadata = {
         {{scanDefName,

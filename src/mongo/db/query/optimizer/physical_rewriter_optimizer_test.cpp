@@ -3478,6 +3478,109 @@ TEST(PhysRewriter, ObjectElemMatch) {
         optimized);
 }
 
+TEST(PhysRewriter, ArrayConstantIndex) {
+    using namespace properties;
+    PrefixId prefixId;
+
+    ABT scanNode = make<ScanNode>("root", "c1");
+
+    ABT filterNode1 = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathGet>(
+                "b", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(0)))),
+            make<Variable>("root")),
+        std::move(scanNode));
+
+    const auto [tag, val] = sbe::value::makeNewArray();
+    sbe::value::Array* arr = sbe::value::getArrayView(val);
+    for (int i = 0; i < 3; i++) {
+        arr->push_back(sbe::value::TypeTags::NumberInt32, i + 1);
+    }
+    ABT arrayConst = make<Constant>(tag, val);
+
+    // This encodes a match against an array constant.
+    ABT filterNode2 = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathGet>("a",
+                          make<PathComposeA>(
+                              make<PathTraverse>(make<PathCompare>(Operations::Eq, arrayConst)),
+                              make<PathCompare>(Operations::Eq, arrayConst))),
+            make<Variable>("root")),
+        std::move(filterNode1));
+
+    ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"root"}},
+                                  std::move(filterNode2));
+
+    OptPhaseManager phaseManager(
+        {OptPhaseManager::OptPhase::MemoSubstitutionPhase,
+         OptPhaseManager::OptPhase::MemoExplorationPhase,
+         OptPhaseManager::OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"c1",
+           ScanDefinition{{},
+                          {{"index1",
+                            makeCompositeIndexDefinition(
+                                {{"b", CollationOp::Ascending, true /*isMultiKey*/},
+                                 {"a", CollationOp::Ascending, true /*isMultiKey*/}})}}}}}},
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    ASSERT_TRUE(phaseManager.optimize(optimized));
+    ASSERT_BETWEEN(8, 12, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // Demonstrate we get index bounds to handle the array constant, while we also retain the
+    // original filter. We have index bound with the array itself unioned with bound using the first
+    // array element.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [root]\n"
+        "|   PathGet [a]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [[1, 2, 3]]\n"
+        "|   PathTraverse []\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [[1, 2, 3]]\n"
+        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [root]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "GroupBy []\n"
+        "|   |   groupings: \n"
+        "|   |       RefBlock: \n"
+        "|   |           Variable [rid_0]\n"
+        "|   aggregations: \n"
+        "Union []\n"
+        "|   |   BindBlock:\n"
+        "|   |       [rid_0]\n"
+        "|   |           Source []\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
+        "[0], Const [0]], [Const [1], Const [1]]}]\n"
+        "|       BindBlock:\n"
+        "|           [rid_0]\n"
+        "|               Source []\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
+        "[0], Const [0]], [Const [[1, 2, 3]], Const [[1, 2, 3]]]}]\n"
+        "    BindBlock:\n"
+        "        [rid_0]\n"
+        "            Source []\n",
+        optimized);
+}
+
 TEST(PhysRewriter, ParallelScan) {
     using namespace properties;
     PrefixId prefixId;
@@ -4213,6 +4316,7 @@ TEST(PhysRewriter, PartialIndex1) {
         make<Variable>("root")));
     ASSERT_TRUE(conversionResult._success);
     ASSERT_FALSE(conversionResult._hasEmptyInterval);
+    ASSERT_FALSE(conversionResult._retainPredicate);
 
     OptPhaseManager phaseManager(
         {OptPhaseManager::OptPhase::MemoSubstitutionPhase,
@@ -4289,6 +4393,7 @@ TEST(PhysRewriter, PartialIndex2) {
         make<Variable>("root")));
     ASSERT_TRUE(conversionResult._success);
     ASSERT_FALSE(conversionResult._hasEmptyInterval);
+    ASSERT_FALSE(conversionResult._retainPredicate);
 
     OptPhaseManager phaseManager(
         {OptPhaseManager::OptPhase::MemoSubstitutionPhase,
@@ -4363,6 +4468,7 @@ TEST(PhysRewriter, PartialIndexReject) {
         make<Variable>("root")));
     ASSERT_TRUE(conversionResult._success);
     ASSERT_FALSE(conversionResult._hasEmptyInterval);
+    ASSERT_FALSE(conversionResult._retainPredicate);
 
     OptPhaseManager phaseManager(
         {OptPhaseManager::OptPhase::MemoSubstitutionPhase,

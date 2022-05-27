@@ -176,6 +176,11 @@ struct PartialSchemaReqConversion {
 
     // If we have determined that we have a contradiction.
     bool _hasEmptyInterval;
+
+    // If true, retain original predicate after the conversion. In this case, the requirement map
+    // might capture only a part of the predicate.
+    // TODO: consider generalizing to retain only a part of the predicate.
+    bool _retainPredicate;
 };
 
 /**

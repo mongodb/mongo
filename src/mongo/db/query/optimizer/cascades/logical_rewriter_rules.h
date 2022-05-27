@@ -75,6 +75,7 @@ namespace mongo::optimizer::cascades {
                                                                   \
     /* Convert filter and evaluation nodes into sargable nodes */ \
     F(FilterSubstitute)                                           \
+    F(FilterExplore)                                              \
     F(EvaluationSubstitute)                                       \
     F(SargableSplit)                                              \
     F(FilterRIDIntersectReorder)                                  \
