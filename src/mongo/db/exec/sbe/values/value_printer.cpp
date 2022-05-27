@@ -459,8 +459,6 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
         case TypeTags::sortSpec:
             stream << "SortSpec(";
             writeObjectToStream(getSortSpecView(val)->getPattern());
-            stream << ", ";
-            writeCollatorToStream(getSortSpecView(val)->getCollator());
             stream << ')';
             break;
         case TypeTags::indexBounds:

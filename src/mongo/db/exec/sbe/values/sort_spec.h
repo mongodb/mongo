@@ -39,22 +39,16 @@ namespace mongo::sbe::value {
  */
 class SortSpec {
 public:
-    SortSpec(const BSONObj& sortPattern, const CollatorInterface* collator)
-        : _sortPattern(sortPattern.getOwned()), _collator(collator), _keyGen(initKeyGen()) {}
-
-    SortSpec(const SortSpec& other)
-        : _sortPattern(other._sortPattern), _collator(other._collator), _keyGen(initKeyGen()) {}
+    SortSpec(const BSONObj& sortPattern)
+        : _sortPattern(sortPattern.getOwned()), _keyGen(initKeyGen()) {}
+    SortSpec(const SortSpec& other) : _sortPattern(other._sortPattern), _keyGen(initKeyGen()) {}
 
     SortSpec& operator=(const SortSpec&) = delete;
 
-    KeyString::Value generateSortKey(const BSONObj& obj) const;
+    KeyString::Value generateSortKey(const BSONObj& obj, const CollatorInterface* collator);
 
     const BSONObj& getPattern() const {
         return _sortPattern;
-    }
-
-    const CollatorInterface* getCollator() const {
-        return _collator;
     }
 
     size_t getApproximateSize() const;
@@ -63,7 +57,6 @@ private:
     BtreeKeyGenerator initKeyGen() const;
 
     const BSONObj _sortPattern;
-    const CollatorInterface* const _collator;
     const BtreeKeyGenerator _keyGen;
 };
 }  // namespace mongo::sbe::value

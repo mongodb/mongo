@@ -56,7 +56,6 @@ public:
     BtreeKeyGenerator(std::vector<const char*> fieldNames,
                       std::vector<BSONElement> fixed,
                       bool isSparse,
-                      const CollatorInterface* collator,
                       KeyString::Version keyStringVersion,
                       Ordering ordering);
 
@@ -74,12 +73,17 @@ public:
      * 'true' to be able to use an optimized algorithm for the index key generation. Otherwise,
      * this parameter must be set to 'false'. In this case a generic algorithm will be used, which
      * can handle both multikey and non-multikey indexes.
+     *
+     * If the 'collator' argument is set to null, this key generator orders strings according to the
+     * simple binary compare. If non-null, represents the collator used to generate index keys for
+     * indexed strings.
      */
     void getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                  const BSONObj& obj,
                  bool skipMultikey,
                  KeyStringSet* keys,
                  MultikeyPaths* multikeyPaths,
+                 const CollatorInterface* collator = nullptr,
                  boost::optional<RecordId> id = boost::none) const;
 
     size_t getApproximateSize() const;
@@ -152,6 +156,7 @@ private:
                            unsigned numNotFound,
                            const std::vector<PositionalPathInfo>& positionalInfo,
                            MultikeyPaths* multikeyPaths,
+                           const CollatorInterface* collator,
                            boost::optional<RecordId> id) const;
 
     /**
@@ -160,6 +165,7 @@ private:
      */
     void _getKeysWithoutArray(SharedBufferFragmentBuilder& pooledBufferBuilder,
                               const BSONObj& obj,
+                              const CollatorInterface* collator,
                               boost::optional<RecordId> id,
                               KeyStringSet* keys) const;
 
@@ -221,6 +227,7 @@ private:
                              bool mayExpandArrayUnembedded,
                              const std::vector<PositionalPathInfo>& positionalInfo,
                              MultikeyPaths* multikeyPaths,
+                             const CollatorInterface* collator,
                              boost::optional<RecordId> id) const;
 
     KeyString::Value _buildNullKeyString() const;
@@ -246,10 +253,6 @@ private:
     // A vector with size equal to the number of elements in the index key pattern. Each element in
     // the vector is the number of path components in the indexed field.
     std::vector<size_t> _pathLengths;
-
-    // Null if this key generator orders strings according to the simple binary compare. If
-    // non-null, represents the collator used to generate index keys for indexed strings.
-    const CollatorInterface* _collator;
 };
 
 }  // namespace mongo

@@ -89,7 +89,6 @@ BSONElement extractNonArrayElementAtPath(const BSONObj& obj, StringData path) {
 BtreeKeyGenerator::BtreeKeyGenerator(std::vector<const char*> fieldNames,
                                      std::vector<BSONElement> fixed,
                                      bool isSparse,
-                                     const CollatorInterface* collator,
                                      KeyString::Version keyStringVersion,
                                      Ordering ordering)
     : _keyStringVersion(keyStringVersion),
@@ -99,8 +98,7 @@ BtreeKeyGenerator::BtreeKeyGenerator(std::vector<const char*> fieldNames,
       _fieldNames(std::move(fieldNames)),
       _nullKeyString(_buildNullKeyString()),
       _fixed(std::move(fixed)),
-      _emptyPositionalInfo(_fieldNames.size()),
-      _collator(collator) {
+      _emptyPositionalInfo(_fieldNames.size()) {
 
     for (const char* fieldName : _fieldNames) {
         FieldRef fieldRef{fieldName};
@@ -174,6 +172,7 @@ void BtreeKeyGenerator::_getKeysArrEltFixed(const std::vector<const char*>& fiel
                                             bool mayExpandArrayUnembedded,
                                             const std::vector<PositionalPathInfo>& positionalInfo,
                                             MultikeyPaths* multikeyPaths,
+                                            const CollatorInterface* collator,
                                             boost::optional<RecordId> id) const {
     // fieldNamesTemp and fixedTemp are passed in by the caller to be used as temporary data
     // structures as we need them to be mutable in the recursion. When they are stored outside we
@@ -201,6 +200,7 @@ void BtreeKeyGenerator::_getKeysArrEltFixed(const std::vector<const char*>& fiel
                       numNotFound,
                       positionalInfo,
                       multikeyPaths,
+                      collator,
                       id);
 }
 
@@ -209,6 +209,7 @@ void BtreeKeyGenerator::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder
                                 bool skipMultikey,
                                 KeyStringSet* keys,
                                 MultikeyPaths* multikeyPaths,
+                                const CollatorInterface* collator,
                                 boost::optional<RecordId> id) const {
     if (_isIdIndex) {
         // we special case for speed
@@ -218,9 +219,9 @@ void BtreeKeyGenerator::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder
         } else {
             KeyString::PooledBuilder keyString(pooledBufferBuilder, _keyStringVersion, _ordering);
 
-            if (_collator) {
+            if (collator) {
                 keyString.appendBSONElement(e, [&](StringData stringData) {
-                    return _collator->getComparisonString(stringData);
+                    return collator->getComparisonString(stringData);
                 });
             } else {
                 keyString.appendBSONElement(e);
@@ -245,7 +246,7 @@ void BtreeKeyGenerator::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder
             invariant(multikeyPaths->empty());
             multikeyPaths->resize(_fieldNames.size());
         }
-        _getKeysWithoutArray(pooledBufferBuilder, obj, id, keys);
+        _getKeysWithoutArray(pooledBufferBuilder, obj, collator, id, keys);
     } else {
         if (multikeyPaths) {
             invariant(multikeyPaths->empty());
@@ -265,6 +266,7 @@ void BtreeKeyGenerator::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder
                           0,
                           _emptyPositionalInfo,
                           multikeyPaths,
+                          collator,
                           id);
         // Put the sequence back into the set, it will sort and guarantee uniqueness, this is
         // O(NlogN)
@@ -308,6 +310,7 @@ size_t BtreeKeyGenerator::PositionalPathInfo::getApproximateSize() const {
 
 void BtreeKeyGenerator::_getKeysWithoutArray(SharedBufferFragmentBuilder& pooledBufferBuilder,
                                              const BSONObj& obj,
+                                             const CollatorInterface* collator,
                                              boost::optional<RecordId> id,
                                              KeyStringSet* keys) const {
 
@@ -320,9 +323,9 @@ void BtreeKeyGenerator::_getKeysWithoutArray(SharedBufferFragmentBuilder& pooled
             ++numNotFound;
         }
 
-        if (_collator) {
+        if (collator) {
             keyString.appendBSONElement(elem, [&](StringData stringData) {
-                return _collator->getComparisonString(stringData);
+                return collator->getComparisonString(stringData);
             });
         } else {
             keyString.appendBSONElement(elem);
@@ -347,6 +350,7 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,
                                           unsigned numNotFound,
                                           const std::vector<PositionalPathInfo>& positionalInfo,
                                           MultikeyPaths* multikeyPaths,
+                                          const CollatorInterface* collator,
                                           boost::optional<RecordId> id) const {
     BSONElement arrElt;
 
@@ -418,9 +422,9 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,
         }
         KeyString::PooledBuilder keyString(pooledBufferBuilder, _keyStringVersion, _ordering);
         for (const auto& elem : *fixed) {
-            if (_collator) {
+            if (collator) {
                 keyString.appendBSONElement(elem, [&](StringData stringData) {
-                    return _collator->getComparisonString(stringData);
+                    return collator->getComparisonString(stringData);
                 });
             } else {
                 keyString.appendBSONElement(elem);
@@ -463,6 +467,7 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,
                             true,
                             _emptyPositionalInfo,
                             multikeyPaths,
+                            collator,
                             id);
     } else {
         BSONObj arrObj = arrElt.embeddedObject();
@@ -551,6 +556,7 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,
                                 mayExpandArrayUnembedded,
                                 subPositionalInfo,
                                 multikeyPaths,
+                                collator,
                                 id);
         }
     }

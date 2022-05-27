@@ -175,12 +175,12 @@ size_t PcreRegex::getApproximateSize() const {
     return sizeof(PcreRegex) + _pattern.size() + 1 + _options.size() + 1 + pcreSize;
 }
 
-KeyString::Value SortSpec::generateSortKey(const BSONObj& obj) const {
+KeyString::Value SortSpec::generateSortKey(const BSONObj& obj, const CollatorInterface* collator) {
     KeyStringSet keySet;
     SharedBufferFragmentBuilder allocator(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
     const bool skipMultikey = false;
     MultikeyPaths* multikeyPaths = nullptr;
-    _keyGen.getKeys(allocator, obj, skipMultikey, &keySet, multikeyPaths);
+    _keyGen.getKeys(allocator, obj, skipMultikey, &keySet, multikeyPaths, collator);
 
     // When 'isSparse' is false, BtreeKeyGenerator::getKeys() is guaranteed to insert at least
     // one key into 'keySet', so this assertion should always be true.
@@ -212,12 +212,10 @@ BtreeKeyGenerator SortSpec::initKeyGen() const {
     auto version = KeyString::Version::kLatestVersion;
     auto ordering = Ordering::make(_sortPattern);
 
-    return {std::move(fields), std::move(fixed), isSparse, _collator, version, ordering};
+    return {std::move(fields), std::move(fixed), isSparse, version, ordering};
 }
 
 size_t SortSpec::getApproximateSize() const {
-    // _collator points to a block of memory that SortSpec doesn't own, so we don't acccount
-    // for the size of this block of memory here.
     auto size = sizeof(SortSpec);
     size += _sortPattern.isOwned() ? _sortPattern.objsize() : 0;
     size += _keyGen.getApproximateSize() - sizeof(_keyGen);

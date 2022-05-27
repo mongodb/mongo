@@ -506,7 +506,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"hash", BuiltinFn{kAnyNumberOfArgs, vm::Builtin::hash, false}},
     {"ftsMatch", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::ftsMatch, false}},
     {"generateSortKey",
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::generateSortKey, false}},
+     BuiltinFn{[](size_t n) { return n == 2 || n == 3; }, vm::Builtin::generateSortKey, false}},
     {"tsSecond", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tsSecond, false}},
     {"tsIncrement", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tsIncrement, false}},
     {"typeMatch", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::typeMatch, false}},

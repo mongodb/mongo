@@ -4045,12 +4045,21 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetRegexFlags(A
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinGenerateSortKey(ArityType arity) {
-    invariant(arity == 2);
+    invariant(arity == 2 || arity == 3);
 
     auto [ssOwned, ssTag, ssVal] = getFromStack(0);
     auto [objOwned, objTag, objVal] = getFromStack(1);
     if (ssTag != value::TypeTags::sortSpec || !value::isObject(objTag)) {
         return {false, value::TypeTags::Nothing, 0};
+    }
+
+    CollatorInterface* collator{nullptr};
+    if (arity == 3) {
+        auto [collatorOwned, collatorTag, collatorVal] = getFromStack(2);
+        if (collatorTag != value::TypeTags::collator) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        collator = value::getCollatorView(collatorVal);
     }
 
     auto ss = value::getSortSpecView(ssVal);
@@ -4069,7 +4078,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinGenerateSortKey
 
     return {true,
             value::TypeTags::ksValue,
-            value::bitcastFrom<KeyString::Value*>(new KeyString::Value(ss->generateSortKey(obj)))};
+            value::bitcastFrom<KeyString::Value*>(
+                new KeyString::Value(ss->generateSortKey(obj, collator)))};
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(ArityType arity) {

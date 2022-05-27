@@ -118,12 +118,8 @@ bool testKeygen(const BSONObj& kp,
         fixed.push_back(BSONElement());
     }
 
-    auto keyGen = std::make_unique<BtreeKeyGenerator>(fieldNames,
-                                                      fixed,
-                                                      sparse,
-                                                      collator,
-                                                      KeyString::Version::kLatestVersion,
-                                                      Ordering::make(BSONObj()));
+    auto keyGen = std::make_unique<BtreeKeyGenerator>(
+        fieldNames, fixed, sparse, KeyString::Version::kLatestVersion, Ordering::make(BSONObj()));
 
     auto runTest = [&](bool skipMultikey) {
         //
@@ -134,7 +130,7 @@ bool testKeygen(const BSONObj& kp,
         SharedBufferFragmentBuilder allocator(BufBuilder::kDefaultInitSizeBytes);
         KeyStringSet actualKeys;
         MultikeyPaths actualMultikeyPaths;
-        keyGen->getKeys(allocator, obj, skipMultikey, &actualKeys, &actualMultikeyPaths);
+        keyGen->getKeys(allocator, obj, skipMultikey, &actualKeys, &actualMultikeyPaths, collator);
 
         //
         // Check that the results match the expected result.

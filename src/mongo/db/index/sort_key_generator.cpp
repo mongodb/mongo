@@ -72,7 +72,6 @@ SortKeyGenerator::SortKeyGenerator(SortPattern sortPattern, const CollatorInterf
     _indexKeyGen = std::make_unique<BtreeKeyGenerator>(fieldNames,
                                                        fixed,
                                                        isSparse,
-                                                       _collator,
                                                        KeyString::Version::kLatestVersion,
                                                        Ordering::make(_sortSpecWithoutMeta));
 }
@@ -168,7 +167,7 @@ StatusWith<BSONObj> SortKeyGenerator::computeSortKeyFromDocumentWithoutMetadata(
         // multikey when getting the index keys for sorting.
         MultikeyPaths* multikeyPaths = nullptr;
         const auto skipMultikey = false;
-        _indexKeyGen->getKeys(allocator, obj, skipMultikey, &keys, multikeyPaths);
+        _indexKeyGen->getKeys(allocator, obj, skipMultikey, &keys, multikeyPaths, _collator);
     } catch (const AssertionException& e) {
         // Probably a parallel array.
         if (ErrorCodes::CannotIndexParallelArrays == e.code()) {

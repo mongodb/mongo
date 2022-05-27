@@ -1417,17 +1417,24 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         orderBy = _slotIdGenerator.generateMultiple(1);
         direction = {sbe::value::SortDirection::Ascending};
 
+        auto sortSpec = std::make_unique<sbe::value::SortSpec>(sn->pattern);
         auto sortSpecExpr =
             makeConstant(sbe::value::TypeTags::sortSpec,
-                         sbe::value::bitcastFrom<sbe::value::SortSpec*>(
-                             new sbe::value::SortSpec(sn->pattern, _cq.getCollator())));
+                         sbe::value::bitcastFrom<sbe::value::SortSpec*>(sortSpec.release()));
 
-        inputStage = sbe::makeProjectStage(std::move(inputStage),
-                                           root->nodeId(),
-                                           orderBy[0],
-                                           makeFunction("generateSortKey",
-                                                        std::move(sortSpecExpr),
-                                                        makeVariable(outputs.get(kResult))));
+        auto collatorSlot = _data.env->getSlotIfExists("collator"_sd);
+
+        inputStage =
+            sbe::makeProjectStage(std::move(inputStage),
+                                  root->nodeId(),
+                                  orderBy[0],
+                                  collatorSlot ? makeFunction("generateSortKey",
+                                                              std::move(sortSpecExpr),
+                                                              makeVariable(outputs.get(kResult)),
+                                                              makeVariable(*collatorSlot))
+                                               : makeFunction("generateSortKey",
+                                                              std::move(sortSpecExpr),
+                                                              makeVariable(outputs.get(kResult))));
     }
 
     outputs.forEachSlot(childReqs, [&](auto&& slot) { forwardedSlots.push_back(slot); });
