@@ -87,8 +87,8 @@
             result: {value: true, settableAtRuntime: true, settableAtStartup: true}
         },
         {
-            name: "wiredTigerMaxCacheOverflowSizeGB",
-            result: {value: 0, settableAtRuntime: true, settableAtStartup: false}
+            name: "skipShardingConfigurationChecks",
+            result: {value: false, settableAtRuntime: false, settableAtStartup: true}
         },
         {
             name: "shardedIndexConsistencyCheckIntervalMS",
