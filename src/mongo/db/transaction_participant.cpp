@@ -184,7 +184,8 @@ auto performReadWithNoTimestampDBDirectClient(OperationContext* opCtx, Callable&
 }
 
 void rethrowPartialIndexQueryBadValueWithContext(const DBException& ex) {
-    if (ex.reason().find("hint provided does not correspond to an existing index")) {
+    if (ex.reason().find("hint provided does not correspond to an existing index") !=
+        std::string::npos) {
         uassertStatusOKWithContext(
             ex.toStatus(),
             str::stream()
