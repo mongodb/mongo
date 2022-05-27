@@ -391,6 +391,18 @@ TEST_F(ErrorLabelBuilderTest, RetryableWriteErrorsOnCommitAbortHaveRetryableWrit
                                     false /* isInternalClient */,
                                     false /* isMongos */);
     ASSERT_TRUE(commitBuilder.isRetryableWriteError());
+    ASSERT_FALSE(commitBuilder.isTransientTransactionError());
+
+    commandName = "clusterCommitTransaction";
+    ErrorLabelBuilder clusterCommitBuilder(opCtx(),
+                                           sessionInfo,
+                                           commandName,
+                                           ErrorCodes::NotWritablePrimary,
+                                           boost::none,
+                                           false /* isInternalClient */,
+                                           true /* isMongos */);
+    ASSERT_TRUE(commitBuilder.isRetryableWriteError());
+    ASSERT_FALSE(commitBuilder.isTransientTransactionError());
 
     commandName = "coordinateCommitTransaction";
     ErrorLabelBuilder coordinateCommitBuilder(opCtx(),
@@ -401,6 +413,7 @@ TEST_F(ErrorLabelBuilderTest, RetryableWriteErrorsOnCommitAbortHaveRetryableWrit
                                               false /* isInternalClient */,
                                               false /* isMongos */);
     ASSERT_TRUE(coordinateCommitBuilder.isRetryableWriteError());
+    ASSERT_FALSE(commitBuilder.isTransientTransactionError());
 
     commandName = "abortTransaction";
     ErrorLabelBuilder abortBuilder(opCtx(),
@@ -411,6 +424,18 @@ TEST_F(ErrorLabelBuilderTest, RetryableWriteErrorsOnCommitAbortHaveRetryableWrit
                                    false /* isInternalClient */,
                                    false /* isMongos */);
     ASSERT_TRUE(abortBuilder.isRetryableWriteError());
+    ASSERT_FALSE(commitBuilder.isTransientTransactionError());
+
+    commandName = "clusterAbortTransaction";
+    ErrorLabelBuilder clusterAbortBuilder(opCtx(),
+                                          sessionInfo,
+                                          commandName,
+                                          ErrorCodes::NotWritablePrimary,
+                                          boost::none,
+                                          false /* isInternalClient */,
+                                          true /* isMongos */);
+    ASSERT_TRUE(commitBuilder.isRetryableWriteError());
+    ASSERT_FALSE(commitBuilder.isTransientTransactionError());
 }
 
 TEST_F(ErrorLabelBuilderTest, NonResumableChangeStreamError) {

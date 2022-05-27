@@ -40,7 +40,13 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(errorLabelBuilderMockShutdown);
 
-}
+const StringMap<int> commitOrAbortCommands = {{"abortTransaction", 1},
+                                              {"clusterAbortTransaction", 1},
+                                              {"clusterCommitTransaction", 1},
+                                              {"commitTransaction", 1},
+                                              {"coordinateCommitTransaction", 1}};
+
+}  // namespace
 
 bool ErrorLabelBuilder::isTransientTransactionError() const {
     // Note that we only apply the TransientTransactionError label if the "autocommit" field is
@@ -156,8 +162,7 @@ void ErrorLabelBuilder::build(BSONArrayBuilder& labels) const {
 }
 
 bool ErrorLabelBuilder::_isCommitOrAbort() const {
-    return _commandName == "commitTransaction" || _commandName == "coordinateCommitTransaction" ||
-        _commandName == "abortTransaction";
+    return commitOrAbortCommands.find(_commandName) != commitOrAbortCommands.cend();
 }
 
 BSONObj getErrorLabels(OperationContext* opCtx,
