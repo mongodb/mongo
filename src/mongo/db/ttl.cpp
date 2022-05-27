@@ -74,16 +74,25 @@ namespace mongo {
 namespace {
 const auto getTTLMonitor = ServiceContext::declareDecoration<std::unique_ptr<TTLMonitor>>();
 
-// Returns BatchedDeleteStageParams pointer only if the feature flag and the server
-// parameter are enabled.
-std::unique_ptr<BatchedDeleteStageParams> getBatchedDeleteParamsIfEnabled(
-    const CollectionPtr& collection) {
-    // Load batched delete parameters.
-    if (feature_flags::gBatchMultiDeletes.isEnabled(serverGlobalParams.featureCompatibility) &&
-        ttlMonitorBatchDeletes.load()) {
-        return std::make_unique<BatchedDeleteStageParams>();
+bool isBatchingEnabled() {
+    return feature_flags::gBatchMultiDeletes.isEnabled(serverGlobalParams.featureCompatibility) &&
+        ttlMonitorBatchDeletes.load();
+}
+
+// When batching is enabled, returns BatchedDeleteStageParams that limit the amount of work done in
+// a delete such that it is possible not all expired documents will be removed. Returns nullptr
+// otherwise.
+//
+// When batching is disabled, all expired documents are removed by the delete operation.
+std::unique_ptr<BatchedDeleteStageParams> getBatchedDeleteStageParams(bool batchingEnabled) {
+    if (!batchingEnabled) {
+        return nullptr;
     }
-    return nullptr;
+
+    auto batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
+    batchedDeleteParams->targetPassDocs = ttlIndexDeleteTargetDocs.load();
+    batchedDeleteParams->targetPassTimeMS = Milliseconds(ttlIndexDeleteTargetTimeMS.load());
+    return batchedDeleteParams;
 }
 
 // Generates an expiration date based on the user-configured expireAfterSeconds. Includes special
@@ -131,15 +140,69 @@ RecordIdBound makeCollScanEndBound(const CollectionPtr& collection, Date_t expir
     return RecordIdBound(record_id_helpers::keyForDate(expirationDate));
 }
 
+const IndexDescriptor* getValidTTLIndex(OperationContext* opCtx,
+                                        TTLCollectionCache* ttlCollectionCache,
+                                        const CollectionPtr& collection,
+                                        const BSONObj& spec,
+                                        std::string indexName) {
+    if (!spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
+        ttlCollectionCache->deregisterTTLInfo(collection->uuid(), indexName);
+        return nullptr;
+    }
+
+    if (!collection->isIndexReady(indexName)) {
+        return nullptr;
+    }
+
+    const BSONObj key = spec["key"].Obj();
+    if (key.nFields() != 1) {
+        LOGV2_ERROR(22540,
+                    "key for ttl index can only have 1 field, skipping TTL job",
+                    "index"_attr = spec);
+        return nullptr;
+    }
+
+    const IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
+
+    if (!desc) {
+        LOGV2_DEBUG(22535, 1, "index not found; skipping ttl job", "index"_attr = spec);
+        return nullptr;
+    }
+
+    if (IndexType::INDEX_BTREE != IndexNames::nameToType(desc->getAccessMethodName())) {
+        LOGV2_ERROR(22541,
+                    "special index can't be used as a TTL index, skipping TTL job",
+                    "index"_attr = spec);
+        return nullptr;
+    }
+
+    BSONElement secondsExpireElt = spec[IndexDescriptor::kExpireAfterSecondsFieldName];
+    if (!secondsExpireElt.isNumber()) {
+        LOGV2_ERROR(22542,
+                    "TTL indexes require the expire field to be numeric, skipping TTL job",
+                    "field"_attr = IndexDescriptor::kExpireAfterSecondsFieldName,
+                    "type"_attr = typeName(secondsExpireElt.type()),
+                    "index"_attr = spec);
+        return nullptr;
+    }
+    return desc;
+}
+
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(hangTTLMonitorWithLock);
 MONGO_FAIL_POINT_DEFINE(hangTTLMonitorBetweenPasses);
 
+// A TTL pass completes when there are no more expired documents to remove. A single TTL pass may
+// consist of multiple sub-passes. Each sub-pass deletes all the expired documents it can up to
+// 'ttlSubPassTargetSecs'. It is possible for a sub-pass to complete before all expired documents
+// have been removed.
 Counter64 ttlPasses;
+Counter64 ttlSubPasses;
 Counter64 ttlDeletedDocuments;
 
 ServerStatusMetricField<Counter64> ttlPassesDisplay("ttl.passes", &ttlPasses);
+ServerStatusMetricField<Counter64> ttlSubPassesDisplay("ttl.subPasses", &ttlSubPasses);
 ServerStatusMetricField<Counter64> ttlDeletedDocumentsDisplay("ttl.deletedDocuments",
                                                               &ttlDeletedDocuments);
 using MtabType = TenantMigrationAccessBlocker::BlockerType;
@@ -202,10 +265,10 @@ void TTLMonitor::run() {
         } catch (const WriteConflictException&) {
             LOGV2_DEBUG(22531, 1, "got WriteConflictException");
         } catch (const ExceptionForCat<ErrorCategory::Interruption>& interruption) {
-            LOGV2_DEBUG(22532,
-                        1,
-                        "TTLMonitor was interrupted: {interruption}",
-                        "interruption"_attr = interruption);
+            LOGV2_WARNING(22537,
+                          "TTLMonitor was interrupted, waiting before doing another pass",
+                          "interruption"_attr = interruption,
+                          "wait"_attr = Milliseconds(Seconds(ttlMonitorSleepSecs.load())));
         }
     }
 }
@@ -227,220 +290,216 @@ void TTLMonitor::_doTTLPass() {
 
     hangTTLMonitorBetweenPasses.pauseWhileSet(opCtx);
 
+    // Increment the metric after the TTL work has been finished.
+    ON_BLOCK_EXIT([&] { ttlPasses.increment(); });
+
+    bool moreToDelete = true;
+    while (moreToDelete) {
+        // Sub-passes may not delete all documents in the interest of fairness. If a sub-pass
+        // indicates that it did not delete everything possible, we continue performing sub-passes.
+        // This maintains the semantic that a full TTL pass deletes everything it possibly can
+        // before sleeping periodically.
+        moreToDelete = _doTTLSubPass(opCtx);
+    }
+}
+
+bool TTLMonitor::_doTTLSubPass(OperationContext* opCtx) {
     // If part of replSet but not in a readable state (e.g. during initial sync), skip.
     if (repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
             repl::ReplicationCoordinator::modeReplSet &&
         !repl::ReplicationCoordinator::get(opCtx)->getMemberState().readable())
-        return;
+        return false;
+
+    ON_BLOCK_EXIT([&] { ttlSubPasses.increment(); });
 
     TTLCollectionCache& ttlCollectionCache = TTLCollectionCache::get(getGlobalServiceContext());
-    auto ttlInfos = ttlCollectionCache.getTTLInfos();
 
-    // Increment the metric after the TTL work has been finished.
-    ON_BLOCK_EXIT([&] { ttlPasses.increment(); });
+    // Refresh view of current TTL indexes - prevents starvation if a new TTL index is introduced
+    // during a long running pass.
+    TTLCollectionCache::InfoMap work = ttlCollectionCache.getTTLInfos();
 
-    // Perform a pass for every collection and index described as being TTL.
-    for (const auto& [uuid, infos] : ttlInfos) {
-        for (const auto& info : infos) {
-            // Skip collections that have not been made visible yet. The TTLCollectionCache
-            // already has the index information available, so we want to avoid removing it
-            // until the collection is visible.
-            auto collectionCatalog = CollectionCatalog::get(opCtx);
-            if (collectionCatalog->isCollectionAwaitingVisibility(uuid)) {
-                continue;
-            }
-
-            // The collection was dropped.
-            auto nss = collectionCatalog->lookupNSSByUUID(opCtx, uuid);
-            if (!nss) {
-                ttlCollectionCache.deregisterTTLInfo(uuid, info);
-                continue;
-            }
-
-            try {
-                _deleteExpired(opCtx, &ttlCollectionCache, uuid, *nss, info);
-            } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
-                LOGV2_WARNING(22537,
-                              "TTLMonitor was interrupted, waiting before doing another pass",
-                              "wait"_attr = Milliseconds(Seconds(ttlMonitorSleepSecs.load())));
-                return;
-            } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
-                // The TTL index tried to delete some information from a sharded collection
-                // through a direct operation against the shard but the filtering metadata was
-                // not available.
-                //
-                // The current TTL task cannot be completed. However, if the critical section is
-                // not held the code below will fire an asynchronous refresh, hoping that the
-                // next time this task is re-executed the filtering information is already
-                // present.
-                if (auto staleInfo = ex.extraInfo<StaleConfigInfo>();
-                    staleInfo && !staleInfo->getCriticalSectionSignal()) {
-                    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-                    ExecutorFuture<void>(executor)
-                        .then([serviceContext = opCtx->getServiceContext(), nss, staleInfo] {
-                            ThreadClient tc("TTLShardVersionRecovery", serviceContext);
-                            {
-                                stdx::lock_guard<Client> lk(*tc.get());
-                                tc->setSystemOperationKillableByStepdown(lk);
-                            }
-
-                            auto uniqueOpCtx = tc->makeOperationContext();
-                            auto opCtx = uniqueOpCtx.get();
-
-                            onShardVersionMismatchNoExcept(
-                                opCtx, *nss, staleInfo->getVersionWanted())
-                                .ignore();
-                        })
-                        .getAsync([](auto) {});
+    // When batching is enabled, _doTTLIndexDelete will limit the amount of work it
+    // performs in both time and the number of documents it deletes. If it reaches one
+    // of these limits on an index, it will return moreToDelete as true, and we will
+    // re-visit it, but only after passing through every other TTL index. We repeat this
+    // process until we hit the ttlMonitorSubPassTargetSecs time limit.
+    //
+    // When batching is disabled, _doTTLIndexDelete will delete as many documents as
+    // possible without limit.
+    Timer timer;
+    do {
+        TTLCollectionCache::InfoMap moreWork;
+        for (const auto& [uuid, infos] : work) {
+            for (const auto& info : infos) {
+                bool moreToDelete = _doTTLIndexDelete(opCtx, &ttlCollectionCache, uuid, info);
+                if (moreToDelete) {
+                    moreWork[uuid].push_back(info);
                 }
-                LOGV2_WARNING(6353000,
-                              "Error running TTL job on collection: the shard should refresh "
-                              "before being able to complete this task",
-                              logAttrs(*nss),
-                              "error"_attr = ex);
-                continue;
-            } catch (const DBException& ex) {
-                LOGV2_ERROR(5400703,
-                            "Error running TTL job on collection",
-                            logAttrs(*nss),
-                            "error"_attr = ex);
-                continue;
             }
         }
-    }
+
+        work = moreWork;
+    } while (!work.empty() &&
+             Seconds(timer.seconds()) < Seconds(ttlMonitorSubPassTargetSecs.load()));
+
+    // More work signals there may more expired documents to visit.
+    return !work.empty();
 }
 
-void TTLMonitor::_deleteExpired(OperationContext* opCtx,
-                                TTLCollectionCache* ttlCollectionCache,
-                                const UUID& uuid,
-                                const NamespaceString& nss,
-                                const TTLCollectionCache::Info& info) {
-    if (nss.isTemporaryReshardingCollection()) {
+bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
+                                   TTLCollectionCache* ttlCollectionCache,
+                                   const UUID& uuid,
+                                   const TTLCollectionCache::Info& info) {
+    // Skip collections that have not been made visible yet. The TTLCollectionCache
+    // already has the index information available, so we want to avoid removing it
+    // until the collection is visible.
+    auto collectionCatalog = CollectionCatalog::get(opCtx);
+    if (collectionCatalog->isCollectionAwaitingVisibility(uuid)) {
+        return false;
+    }
+
+    // The collection was dropped.
+    auto nss = collectionCatalog->lookupNSSByUUID(opCtx, uuid);
+    if (!nss) {
+        ttlCollectionCache->deregisterTTLInfo(uuid, info);
+        return false;
+    }
+
+    if (nss->isTemporaryReshardingCollection() || nss->isDropPendingNamespace()) {
         // For resharding, the donor shard primary is responsible for performing the TTL
         // deletions.
-        return;
+        return false;
     }
 
-    if (nss.isDropPendingNamespace()) {
-        return;
+    try {
+        uassertStatusOK(userAllowedWriteNS(opCtx, *nss));
+
+        // Attach IGNORED shard version to skip orphans (the range deleter will clear them up)
+        auto scopedRole = ScopedSetShardRole(opCtx, *nss, ChunkVersion::IGNORED(), boost::none);
+        AutoGetCollection coll(opCtx, *nss, MODE_IX);
+        // The collection with `uuid` might be renamed before the lock and the wrong namespace would
+        // be locked and looked up so we double check here.
+        if (!coll || coll->uuid() != uuid)
+            return false;
+
+        // Allow TTL deletion on non-capped collections, and on capped clustered collections.
+        invariant(!coll->isCapped() || (coll->isCapped() && coll->isClustered()));
+
+        if (MONGO_unlikely(hangTTLMonitorWithLock.shouldFail())) {
+            LOGV2(22534,
+                  "Hanging due to hangTTLMonitorWithLock fail point",
+                  "ttlPasses"_attr = ttlPasses.get());
+            hangTTLMonitorWithLock.pauseWhileSet(opCtx);
+        }
+
+        if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, *nss)) {
+            return false;
+        }
+
+        std::shared_ptr<TenantMigrationAccessBlocker> mtab;
+        if (coll.getDb() &&
+            nullptr !=
+                (mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                            .getTenantMigrationAccessBlockerForDbName(
+                                coll.getDb()->name().toString(), MtabType::kRecipient)) &&
+            mtab->checkIfShouldBlockTTL()) {
+            LOGV2_DEBUG(53768,
+                        1,
+                        "Postpone TTL of DB because of active tenant migration",
+                        "tenantMigrationAccessBlocker"_attr = mtab->getDebugInfo().jsonString(),
+                        "database"_attr = coll.getDb()->name().toString());
+            return false;
+        }
+
+        ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nss->db().toString());
+
+        const auto& collection = coll.getCollection();
+        return stdx::visit(
+            visit_helper::Overloaded{[&](const TTLCollectionCache::ClusteredId&) {
+                                         return _deleteExpiredWithCollscan(
+                                             opCtx, ttlCollectionCache, collection);
+                                     },
+                                     [&](const TTLCollectionCache::IndexName& indexName) {
+                                         return _deleteExpiredWithIndex(
+                                             opCtx, ttlCollectionCache, collection, indexName);
+                                     }},
+            info);
+    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+        // The exception is relevant to the entire TTL monitoring process, not just the specific TTL
+        // index. Let the exception escape so it can be addressed at the higher monitoring layer.
+        throw;
+    } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
+        // The TTL index tried to delete some information from a sharded collection
+        // through a direct operation against the shard but the filtering metadata was
+        // not available.
+        //
+        // The current TTL task cannot be completed. However, if the critical section is
+        // not held the code below will fire an asynchronous refresh, hoping that the
+        // next time this task is re-executed the filtering information is already
+        // present.
+        if (auto staleInfo = ex.extraInfo<StaleConfigInfo>();
+            staleInfo && !staleInfo->getCriticalSectionSignal()) {
+            auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+            ExecutorFuture<void>(executor)
+                .then([serviceContext = opCtx->getServiceContext(), nss, staleInfo] {
+                    ThreadClient tc("TTLShardVersionRecovery", serviceContext);
+                    {
+                        stdx::lock_guard<Client> lk(*tc.get());
+                        tc->setSystemOperationKillableByStepdown(lk);
+                    }
+
+                    auto uniqueOpCtx = tc->makeOperationContext();
+                    auto opCtx = uniqueOpCtx.get();
+
+                    onShardVersionMismatchNoExcept(opCtx, *nss, staleInfo->getVersionWanted())
+                        .ignore();
+                })
+                .getAsync([](auto) {});
+        }
+        LOGV2_WARNING(6353000,
+                      "Error running TTL job on collection: the shard should refresh "
+                      "before being able to complete this task",
+                      logAttrs(*nss),
+                      "error"_attr = ex);
+        return false;
+    } catch (const DBException& ex) {
+        LOGV2_ERROR(
+            5400703, "Error running TTL job on collection", logAttrs(*nss), "error"_attr = ex);
+        return false;
     }
-
-    uassertStatusOK(userAllowedWriteNS(opCtx, nss));
-
-    // Attach IGNORED shard version to skip orphans (the range deleter will clear them up)
-    auto scopedRole = ScopedSetShardRole(opCtx, nss, ChunkVersion::IGNORED(), boost::none);
-    AutoGetCollection coll(opCtx, nss, MODE_IX);
-    // The collection with `uuid` might be renamed before the lock and the wrong namespace would
-    // be locked and looked up so we double check here.
-    if (!coll || coll->uuid() != uuid)
-        return;
-
-    // Allow TTL deletion on non-capped collections, and on capped clustered collections.
-    invariant(!coll->isCapped() || (coll->isCapped() && coll->isClustered()));
-
-    if (MONGO_unlikely(hangTTLMonitorWithLock.shouldFail())) {
-        LOGV2(22534,
-              "Hanging due to hangTTLMonitorWithLock fail point",
-              "ttlPasses"_attr = ttlPasses.get());
-        hangTTLMonitorWithLock.pauseWhileSet(opCtx);
-    }
-
-    if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
-        return;
-    }
-
-    std::shared_ptr<TenantMigrationAccessBlocker> mtab;
-    if (coll.getDb() &&
-        nullptr !=
-            (mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                        .getTenantMigrationAccessBlockerForDbName(coll.getDb()->name().toString(),
-                                                                  MtabType::kRecipient)) &&
-        mtab->checkIfShouldBlockTTL()) {
-        LOGV2_DEBUG(53768,
-                    1,
-                    "Postpone TTL of DB because of active tenant migration",
-                    "tenantMigrationAccessBlocker"_attr = mtab->getDebugInfo().jsonString(),
-                    "database"_attr = coll.getDb()->name().toString());
-        return;
-    }
-
-    ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nss.db().toString());
-
-    const auto& collection = coll.getCollection();
-    stdx::visit(visit_helper::Overloaded{[&](const TTLCollectionCache::ClusteredId&) {
-                                             _deleteExpiredWithCollscan(
-                                                 opCtx, ttlCollectionCache, collection);
-                                         },
-                                         [&](const TTLCollectionCache::IndexName& indexName) {
-                                             _deleteExpiredWithIndex(
-                                                 opCtx, ttlCollectionCache, collection, indexName);
-                                         }},
-                info);
 }
 
-void TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
+bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
                                          TTLCollectionCache* ttlCollectionCache,
                                          const CollectionPtr& collection,
                                          std::string indexName) {
     if (!collection->isIndexPresent(indexName)) {
         ttlCollectionCache->deregisterTTLInfo(collection->uuid(), indexName);
-        return;
+        return false;
     }
 
     BSONObj spec = collection->getIndexSpec(indexName);
-    if (!spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
-        ttlCollectionCache->deregisterTTLInfo(collection->uuid(), indexName);
-        return;
-    }
+    const IndexDescriptor* desc =
+        getValidTTLIndex(opCtx, ttlCollectionCache, collection, spec, indexName);
 
-    if (!collection->isIndexReady(indexName)) {
-        return;
-    }
-
-    const BSONObj key = spec["key"].Obj();
-    const StringData name = spec["name"].valueStringData();
-    if (key.nFields() != 1) {
-        LOGV2_ERROR(22540,
-                    "key for ttl index can only have 1 field, skipping TTL job",
-                    "index"_attr = spec);
-        return;
+    if (!desc) {
+        return false;
     }
 
     LOGV2_DEBUG(22533,
                 1,
                 "running TTL job for index",
                 logAttrs(collection->ns()),
-                "key"_attr = key,
-                "name"_attr = name);
+                "key"_attr = desc->keyPattern(),
+                "name"_attr = indexName);
 
-    const IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(opCtx, name);
-    if (!desc) {
-        LOGV2_DEBUG(22535, 1, "index not found; skipping ttl job", "index"_attr = spec);
-        return;
-    }
-
-    if (IndexType::INDEX_BTREE != IndexNames::nameToType(desc->getAccessMethodName())) {
-        LOGV2_ERROR(22541,
-                    "special index can't be used as a TTL index, skipping TTL job",
-                    "index"_attr = spec);
-        return;
-    }
-
-    BSONElement secondsExpireElt = spec[IndexDescriptor::kExpireAfterSecondsFieldName];
-    if (!secondsExpireElt.isNumber()) {
-        LOGV2_ERROR(22542,
-                    "TTL indexes require the expire field to be numeric, skipping TTL job",
-                    "field"_attr = IndexDescriptor::kExpireAfterSecondsFieldName,
-                    "type"_attr = typeName(secondsExpireElt.type()),
-                    "index"_attr = spec);
-        return;
-    }
-
+    auto expireAfterSeconds = spec[IndexDescriptor::kExpireAfterSecondsFieldName].safeNumberLong();
     const Date_t kDawnOfTime = Date_t::fromMillisSinceEpoch(std::numeric_limits<long long>::min());
-    const auto expirationDate =
-        safeExpirationDate(opCtx, collection, secondsExpireElt.safeNumberLong());
+    const auto expirationDate = safeExpirationDate(opCtx, collection, expireAfterSeconds);
     const BSONObj startKey = BSON("" << kDawnOfTime);
     const BSONObj endKey = BSON("" << expirationDate);
+
+    auto key = desc->keyPattern();
     // The canonical check as to whether a key pattern element is "ascending" or
     // "descending" is (elt.number() >= 0).  This is defined by the Ordering class.
     const InternalPlanner::Direction direction = (key.firstElement().number() >= 0)
@@ -461,6 +520,11 @@ void TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
     params->isMulti = true;
     params->canonicalQuery = canonicalQuery.getValue().get();
 
+    // Maintain a consistent view of whether batching is enabled - batching depends on
+    // parameters that can be set at runtime, and it is illegal to try to get
+    // BatchedDeleteStageStats from a non-batched delete.
+    bool batchingEnabled = isBatchingEnabled();
+
     Timer timer;
     auto exec = InternalPlanner::deleteWithIndexScan(opCtx,
                                                      &collection,
@@ -471,7 +535,7 @@ void TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
                                                      BoundInclusion::kIncludeBothStartAndEndKeys,
                                                      PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                      direction,
-                                                     getBatchedDeleteParamsIfEnabled(collection));
+                                                     getBatchedDeleteStageParams(batchingEnabled));
 
     try {
         const auto numDeleted = exec->executeDelete();
@@ -486,17 +550,24 @@ void TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
             LOGV2(5479200,
                   "Deleted expired documents using index",
                   logAttrs(collection->ns()),
-                  "index"_attr = name,
+                  "index"_attr = indexName,
                   "numDeleted"_attr = numDeleted,
                   "duration"_attr = duration);
+        }
+
+        if (batchingEnabled) {
+            auto batchedDeleteStats = exec->getBatchedDeleteStats();
+            // A pass target met implies there may be more to delete.
+            return batchedDeleteStats.passTargetMet;
         }
     } catch (const ExceptionFor<ErrorCodes::QueryPlanKilled>&) {
         // It is expected that a collection drop can kill a query plan while the TTL monitor
         // is deleting an old document, so ignore this error.
     }
+    return false;
 }
 
-void TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
+bool TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
                                             TTLCollectionCache* ttlCollectionCache,
                                             const CollectionPtr& collection) {
     const auto& collOptions = collection->getCollectionOptions();
@@ -509,7 +580,7 @@ void TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
     if (!expireAfterSeconds) {
         ttlCollectionCache->deregisterTTLInfo(collection->uuid(),
                                               TTLCollectionCache::ClusteredId{});
-        return;
+        return false;
     }
 
     LOGV2_DEBUG(5400704, 1, "running TTL job for clustered collection", logAttrs(collection->ns()));
@@ -522,6 +593,11 @@ void TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
     auto params = std::make_unique<DeleteStageParams>();
     params->isMulti = true;
 
+    // Maintain a consistent view of whether batching is enabled - batching depends on
+    // parameters that can be set at runtime, and it is illegal to try to get
+    // BatchedDeleteStageStats from a non-batched delete.
+    bool batchingEnabled = isBatchingEnabled();
+
     // Deletes records using a bounded collection scan from the beginning of time to the
     // expiration time (inclusive).
     Timer timer;
@@ -533,7 +609,7 @@ void TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
                                                   InternalPlanner::Direction::FORWARD,
                                                   startId,
                                                   endId,
-                                                  getBatchedDeleteParamsIfEnabled(collection));
+                                                  getBatchedDeleteStageParams(batchingEnabled));
 
     try {
         const auto numDeleted = exec->executeDelete();
@@ -551,10 +627,17 @@ void TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
                   "numDeleted"_attr = numDeleted,
                   "duration"_attr = duration);
         }
+        if (batchingEnabled) {
+            auto batchedDeleteStats = exec->getBatchedDeleteStats();
+            // A pass target met implies there may be more work to be done on the index.
+            return batchedDeleteStats.passTargetMet;
+        }
     } catch (const ExceptionFor<ErrorCodes::QueryPlanKilled>&) {
         // It is expected that a collection drop can kill a query plan while the TTL monitor
         // is deleting an old document, so ignore this error.
     }
+
+    return false;
 }
 
 void startTTLMonitor(ServiceContext* serviceContext) {
@@ -570,6 +653,14 @@ void shutdownTTLMonitor(ServiceContext* serviceContext) {
     if (ttlMonitor) {
         ttlMonitor->shutdown();
     }
+}
+
+long long TTLMonitor::getTTLPasses_forTest() {
+    return ttlPasses.get();
+}
+
+long long TTLMonitor::getTTLSubPasses_forTest() {
+    return ttlSubPasses.get();
 }
 
 }  // namespace mongo

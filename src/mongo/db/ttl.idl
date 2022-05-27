@@ -46,8 +46,50 @@ server_parameters:
             gt: 0
 
     ttlMonitorBatchDeletes:
-        description: "Allow the TTL monitor to batch deletes."
+        description:
+            "When enabled, the TTLMonitor batches TTL deletions and also removes expired documents
+            more fairly among the TTL indexes. When disabled, it falls back to legacy
+            doc-by-document deletions."
         set_at: [ startup, runtime ]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: ttlMonitorBatchDeletes
         default: true
+
+    ttlMonitorSubPassTargetSecs:
+        description:
+            "Limits (approximately) the amount of time spent iterating over a set TTL indexes where
+            expired documents remain. Additionally, the frequency at which we refresh the view of
+            TTL indexes within a pass where documents remain. 0 means each TTL index will be
+            iterated over once before the sub-pass completes. Only applicable when
+            'ttlMonitorBatchDeletes' is true."
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: ttlMonitorSubPassTargetSecs
+        default: 60
+        validator:
+            gte: 0
+
+    ttlIndexDeleteTargetTimeMS:
+        description:
+            "Limits (approximately) the time, in milliseconds, spent performing a batched delete
+            pass over a given TTL index. 0 means unlimited. Only applicable when
+            'ttlMonitorBatchDeletes' is true."
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: ttlIndexDeleteTargetTimeMS
+        default: 1000
+        validator:
+            gte: 0
+
+    ttlIndexDeleteTargetDocs:
+        description:
+            "Limits (approximately) the number of expired documents removed from a TTL index over a
+            batched delete. 0 means unlimited. Only applicable when 'ttlMonitorBatchDeletes' is
+            true."
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: ttlIndexDeleteTargetDocs
+        default: 50000
+        validator:
+            gte: 0
+

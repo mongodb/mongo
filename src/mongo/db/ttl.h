@@ -66,29 +66,61 @@ public:
      */
     void shutdown();
 
+    long long getTTLPasses_forTest();
+    long long getTTLSubPasses_forTest();
+
 private:
+    friend class TTLTest;
+
     /**
-     * Gets all TTL specifications for every collection and deletes expired documents.
+     * Deletes all expired documents. May consist of several sub-passes.
      */
     void _doTTLPass();
 
     /**
-     * Uses the TTL 'info' to determine which documents are expired and removes them from the
-     * collection when applicble. In some cases (i.e: on temporary resharding collections,
-     * collections pending to be dropped, etc), the TTLMonitor is prohibitied from removing
-     * documents and the method silently returns.
+     * A sub-pass iterates over a list of TTL indexes until there are no more expired documents to
+     * delete or 'ttlSubPassTargetSecs' is exceeded.
+     *
+     * Once it is confirmed there are no more expired documents on an index, the index will not be
+     * visited again for the remainder of the sub-pass.
+     *
+     * Returns true if there are more expired documents to delete. False otherwise.
      */
-    void _deleteExpired(OperationContext* opCtx,
-                        TTLCollectionCache* ttlCollectionCache,
-                        const UUID& uuid,
-                        const NamespaceString& nss,
-                        const TTLCollectionCache::Info& info);
+    bool _doTTLSubPass(OperationContext* opCtx);
+
+    /**
+     * Given a TTL index, attempts to delete all expired documents through the index until
+     * - hitting the batched delete document or time limit for a single TTL index
+     * - removing all expired documents corresponding to the TTLIndex
+     * - reaching an error
+     *
+     * Returns true if there are more expired documents to delete (a batched delete limit is met).
+     * Returns false if there are no more expired documents to delete at this time - including when
+     * errors specific to the TTL index are reached.
+     *
+     * When batching is disabled, always returns false since all expired documents are guaranteed to
+     * be removed.
+     *
+     * In some cases (i.e: on temporary resharding collections, collections pending to be dropped,
+     * etc), the TTLMonitor is prohibitied from removing expired documents - returns false in these
+     * scenarios as well.
+     */
+    bool _doTTLIndexDelete(OperationContext* opCtx,
+                           TTLCollectionCache* ttlCollectionCache,
+                           const UUID& uuid,
+                           const TTLCollectionCache::Info& info);
 
     /**
      * Removes documents from the collection using the specified TTL index after a sufficient
      * amount of time has passed according to its expiry specification.
+     *
+     * Returns true if there are more expired documents to delete through the index at this time.
+     * False otherwise.
+     *
+     * When batching is disabled, always returns false since all expired documents are guaranteed to
+     * be removed.
      */
-    void _deleteExpiredWithIndex(OperationContext* opCtx,
+    bool _deleteExpiredWithIndex(OperationContext* opCtx,
                                  TTLCollectionCache* ttlCollectionCache,
                                  const CollectionPtr& collection,
                                  std::string indexName);
@@ -97,8 +129,14 @@ private:
      * Removes expired documents from a clustered collection using a bounded collection scan.
      * On time-series buckets collections, TTL operates on type 'ObjectId'. On general purpose
      * collections, TTL operates on type 'Date'.
+     *
+     * Returns true if there are more expired documents to delete through the clustered index at
+     * this time. False otherwise.
+     *
+     * When batching is disabled, always returns false since all expired documents are guaranteed to
+     * be removed.
      */
-    void _deleteExpiredWithCollscan(OperationContext* opCtx,
+    bool _deleteExpiredWithCollscan(OperationContext* opCtx,
                                     TTLCollectionCache* ttlCollectionCache,
                                     const CollectionPtr& collection);
 
