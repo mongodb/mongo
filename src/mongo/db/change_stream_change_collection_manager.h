@@ -75,16 +75,21 @@ public:
     Status dropChangeCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId);
 
     /**
-     * Inserts documents to the change collection for the specified tenant. The parameter 'records'
-     * is a vector of oplog records and the parameter 'timestamps' is a vector for respective
+     * Inserts documents to change collections. The parameter 'oplogRecords'
+     * is a vector of oplog records and the parameter 'oplogTimestamps' is a vector for respective
      * timestamp for each oplog record.
+     *
+     * The method fetches the tenant-id from the oplog entry, performs necessary modification to the
+     * document and then write to the tenant's change collection at the specified oplog timestamp.
+     *
+     * Failure in insertion to any change collection will result in a fatal exception and will bring
+     * down the node.
      *
      * TODO: SERVER-65950 make tenantId field mandatory.
      */
-    Status insertDocumentsToChangeCollection(OperationContext* opCtx,
-                                             boost::optional<TenantId> tenantId,
-                                             std::vector<Record>* records,
-                                             const std::vector<Timestamp>& timestamps);
+    void insertDocumentsToChangeCollection(OperationContext* opCtx,
+                                           const std::vector<Record>& oplogRecords,
+                                           const std::vector<Timestamp>& oplogTimestamps);
 };
 
 }  // namespace mongo

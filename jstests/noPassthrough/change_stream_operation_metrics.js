@@ -22,6 +22,19 @@ const secondary = rst.getSecondary();
 const primaryDB = primary.getDB(dbName);
 const secondaryDB = secondary.getDB(dbName);
 
+// TODO SERVER-66840 remove this check.
+const shouldNotRun = (() => {
+    const getParam = primary.adminCommand({getParameter: 1, featureFlagServerlessChangeStreams: 1});
+    return getParam.hasOwnProperty("featureFlagServerlessChangeStreams") &&
+        getParam.featureFlagServerlessChangeStreams.value;
+})();
+
+if (shouldNotRun) {
+    jsTestLog("Temporarily blocked because the change collection is enabled");
+    rst.stopSet();
+    return;
+}
+
 const nDocs = 100;
 
 const clearMetrics = (conn) => {
