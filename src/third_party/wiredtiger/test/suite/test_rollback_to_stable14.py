@@ -170,9 +170,6 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.check(value_modR, uri, nrows, None, 40)
         self.check(value_modS, uri, nrows, None, 50)
 
-        # The test may output the following message in eviction under cache pressure. Ignore that.
-        self.ignoreStdoutPatternIfExists("oldest pinned transaction ID rolled back for eviction")
-
     def test_rollback_to_stable_same_ts(self):
         nrows = 100
 
@@ -278,9 +275,6 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.check(value_a, uri, nrows, None, 20)
         self.check(value_modQ, uri, nrows, None, 30)
 
-        # The test may output the following message in eviction under cache pressure. Ignore that.
-        self.ignoreStdoutPatternIfExists("oldest pinned transaction ID rolled back for eviction")
-
     def test_rollback_to_stable_same_ts_append(self):
         nrows = 100
 
@@ -383,9 +377,6 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         # Check that the correct data is seen at and after the stable timestamp.
         self.check(value_a, uri, nrows, None, 20)
         self.check(value_modQ, uri, nrows, None, 30)
-
-        # The test may output the following message in eviction under cache pressure. Ignore that.
-        self.ignoreStdoutPatternIfExists("oldest pinned transaction ID rolled back for eviction")
 
 if __name__ == '__main__':
     wttest.run()
