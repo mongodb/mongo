@@ -30,12 +30,12 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <functional>
 #include <utility>
 #include <vector>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -50,7 +50,9 @@ namespace mongo {
  * in the (-inf, x) interval if z < x, and in the [y, inf) interval if z >= y. If no partitions are
  * provided, z will be counted in the sole (-inf, inf) interval.
  */
-template <typename T, typename Cmp = std::less<T>>
+template <typename T,
+          typename Cmp = std::less<T>,
+          typename Counter = std::atomic_int64_t>  // NOLINT
 class Histogram {
     struct AtEnd {};
 
@@ -73,7 +75,7 @@ public:
         auto i = std::upper_bound(_partitions.begin(), _partitions.end(), data, _comparator) -
             _partitions.begin();
 
-        _counts[i].addAndFetch(1);
+        ++_counts[i];
     }
 
     const std::vector<T>& getPartitions() const {
@@ -82,8 +84,7 @@ public:
 
     std::vector<int64_t> getCounts() const {
         std::vector<int64_t> r(_counts.size());
-        std::transform(
-            _counts.begin(), _counts.end(), r.begin(), [](auto&& x) { return x.load(); });
+        std::transform(_counts.begin(), _counts.end(), r.begin(), [](auto&& x) { return x; });
         return r;
     }
 
@@ -111,7 +112,7 @@ public:
         iterator(const Histogram* hist, AtEnd) : _h{hist}, _pos{_h->_counts.size()} {}
 
         reference operator*() const {
-            _b.count = _h->_counts[_pos].load();
+            _b.count = _h->_counts[_pos];
             _b.lower = (_pos == 0) ? nullptr : &_h->_partitions[_pos - 1];
             _b.upper = (_pos == _h->_counts.size() - 1) ? nullptr : &_h->_partitions[_pos];
             return _b;
@@ -154,9 +155,9 @@ public:
         return iterator(this, AtEnd{});
     }
 
-private:
+protected:
     std::vector<T> _partitions;
-    std::vector<AtomicWord<int64_t>> _counts;
+    std::vector<Counter> _counts;
     Cmp _comparator;
 };
 
@@ -165,8 +166,8 @@ private:
  * BSON object builder. `histKey` is used as the field name for the appended BSON object containing
  * the data.
  */
-template <typename T>
-void appendHistogram(BSONObjBuilder& bob, const Histogram<T>& hist, const StringData histKey) {
+template <typename... Ts>
+void appendHistogram(BSONObjBuilder& bob, const Histogram<Ts...>& hist, const StringData histKey) {
     BSONObjBuilder histBob(bob.subobjStart(histKey));
     long long totalCount = 0;
 

@@ -34,8 +34,10 @@
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
+#include <memory>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/logv2/log.h"
@@ -337,6 +339,22 @@ public:
     size_t requestsPending() const;
 
     /**
+     * Records the time it took to return the connection since it was requested, so that it can be
+     * reported in the connection pool stats.
+     */
+    void recordConnectionWaitTime(Date_t requestedAt) {
+        _connAcquisitionWaitTimeStats.increment(_parent->_factory->now() - requestedAt);
+    }
+
+    /**
+     * Returns connection acquisition wait time statistics to be included in the connection pool
+     * stats.
+     */
+    const ConnectionWaitTimeHistogram& connectionWaitTimeStats() {
+        return _connAcquisitionWaitTimeStats;
+    };
+
+    /**
      * Returns the HostAndPort for this pool.
      */
     const HostAndPort& host() const {
@@ -467,6 +485,8 @@ private:
 
     size_t _neverUsed = 0;
 
+    ConnectionWaitTimeHistogram _connAcquisitionWaitTimeStats{};
+
     transport::Session::TagMask _tags = transport::Session::kPending;
 
     HostHealth _health;
@@ -593,6 +613,8 @@ void ConnectionPool::get_forTest(const HostAndPort& hostAndPort,
 SemiFuture<ConnectionPool::ConnectionHandle> ConnectionPool::get(const HostAndPort& hostAndPort,
                                                                  transport::ConnectSSLMode sslMode,
                                                                  Milliseconds timeout) {
+    auto connRequestedAt = _factory->now();
+
     stdx::lock_guard lk(_mutex);
 
     auto& pool = _pools[hostAndPort];
@@ -606,6 +628,12 @@ SemiFuture<ConnectionPool::ConnectionHandle> ConnectionPool::get(const HostAndPo
 
     auto connFuture = pool->getConnection(timeout);
     pool->updateState();
+
+    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV()) {
+        connFuture = std::move(connFuture).tap([connRequestedAt, pool = pool](const auto& conn) {
+            pool->recordConnectionWaitTime(connRequestedAt);
+        });
+    }
 
     return std::move(connFuture).semi();
 }
@@ -624,6 +652,10 @@ void ConnectionPool::appendConnectionStats(ConnectionPoolStats* stats) const {
                                      pool->refreshingConnections(),
                                      pool->refreshedConnections(),
                                      pool->neverUsedConnections()};
+
+        if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV()) {
+            hostStats.acquisitionWaitTimes = pool->connectionWaitTimeStats();
+        }
         stats->updateStatsForHost(_name, host, hostStats);
     }
 }

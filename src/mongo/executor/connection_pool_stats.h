@@ -31,10 +31,23 @@
 
 #include "mongo/s/sharding_task_executor_pool_controller.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/histogram.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace executor {
+
+/**
+ * Histogram type to be used for tracking how long it took the connection pool to return a
+ * requested connection.
+ */
+class ConnectionWaitTimeHistogram
+    : public Histogram<Milliseconds, std::less<Milliseconds>, int64_t> {
+public:
+    ConnectionWaitTimeHistogram();
+    ConnectionWaitTimeHistogram& operator+=(const ConnectionWaitTimeHistogram& other);
+};
 
 /**
  * Holds connection information for a specific pool or remote host. These objects are maintained by
@@ -58,6 +71,7 @@ struct ConnectionStatsPer {
     size_t refreshing = 0u;
     size_t refreshed = 0u;
     size_t wasNeverUsed = 0u;
+    ConnectionWaitTimeHistogram acquisitionWaitTimes{};
 };
 
 /**
@@ -66,7 +80,7 @@ struct ConnectionStatsPer {
  * Total connection counts will then be updated accordingly.
  */
 struct ConnectionPoolStats {
-    void updateStatsForHost(std::string pool, HostAndPort host, ConnectionStatsPer newStats);
+    void updateStatsForHost(std::string pool, HostAndPort host, const ConnectionStatsPer& newStats);
 
     // FTDC : Full Time Diagnostic Data Collection
     void appendToBSON(mongo::BSONObjBuilder& result, bool forFTDC = false);
@@ -78,6 +92,8 @@ struct ConnectionPoolStats {
     size_t totalRefreshed = 0u;
     size_t totalWasNeverUsed = 0u;
     boost::optional<ShardingTaskExecutorPoolController::MatchingStrategy> strategy;
+
+    ConnectionWaitTimeHistogram acquisitionWaitTimes{};
 
     using StatsByHost = std::map<HostAndPort, ConnectionStatsPer>;
 

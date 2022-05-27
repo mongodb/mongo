@@ -31,11 +31,20 @@
 
 #include "mongo/executor/connection_pool_stats.h"
 
+#include <algorithm>
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace executor {
+
+namespace {
+constexpr auto kAcquisitionWaitTimesKey = "acquisitionWaitTimes"_sd;
+}  // namespace
 
 ConnectionStatsPer::ConnectionStatsPer(size_t nInUse,
                                        size_t nAvailable,
@@ -59,13 +68,14 @@ ConnectionStatsPer& ConnectionStatsPer::operator+=(const ConnectionStatsPer& oth
     refreshing += other.refreshing;
     refreshed += other.refreshed;
     wasNeverUsed += other.wasNeverUsed;
+    acquisitionWaitTimes += other.acquisitionWaitTimes;
 
     return *this;
 }
 
 void ConnectionPoolStats::updateStatsForHost(std::string pool,
                                              HostAndPort host,
-                                             ConnectionStatsPer newStats) {
+                                             const ConnectionStatsPer& newStats) {
     if (newStats.created == 0) {
         // A pool that has never been successfully used does not get listed
         return;
@@ -86,6 +96,7 @@ void ConnectionPoolStats::updateStatsForHost(std::string pool,
     totalRefreshing += newStats.refreshing;
     totalRefreshed += newStats.refreshed;
     totalWasNeverUsed += newStats.wasNeverUsed;
+    acquisitionWaitTimes += newStats.acquisitionWaitTimes;
 }
 
 void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFTDC) {
@@ -102,19 +113,18 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
 
     if (forFTDC) {
         BSONObjBuilder poolBuilder(result.subobjStart("connectionsInUsePerPool"));
-        for (const auto& pool : statsByPool) {
-            BSONObjBuilder poolInfo(poolBuilder.subobjStart(pool.first));
-            auto& poolStats = pool.second;
-            poolInfo.appendNumber("poolInUse", static_cast<long long>(poolStats.inUse));
-            for (const auto& host : poolStats.statsByHost) {
-                auto hostStats = host.second;
-                poolInfo.appendNumber(host.first.toString(),
-                                      static_cast<long long>(hostStats.inUse));
+        for (const auto& [pool, stats] : statsByPool) {
+            BSONObjBuilder poolInfo(poolBuilder.subobjStart(pool));
+            poolInfo.appendNumber("poolInUse", static_cast<long long>(stats.inUse));
+            for (const auto& [host, stats] : stats.statsByHost) {
+                poolInfo.appendNumber(host.toString(), static_cast<long long>(stats.inUse));
             }
         }
 
         return;
     }
+
+    appendHistogram(result, acquisitionWaitTimes, kAcquisitionWaitTimesKey);
 
     // Process pools stats.
     {
@@ -123,29 +133,31 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
         }
 
         BSONObjBuilder poolBuilder(result.subobjStart("pools"));
-        for (const auto& pool : statsByPool) {
-            BSONObjBuilder poolInfo(poolBuilder.subobjStart(pool.first));
-            auto& poolStats = pool.second;
-            poolInfo.appendNumber("poolInUse", static_cast<long long>(poolStats.inUse));
-            poolInfo.appendNumber("poolAvailable", static_cast<long long>(poolStats.available));
-            poolInfo.appendNumber("poolCreated", static_cast<long long>(poolStats.created));
-            poolInfo.appendNumber("poolRefreshing", static_cast<long long>(poolStats.refreshing));
-            poolInfo.appendNumber("poolRefreshed", static_cast<long long>(poolStats.refreshed));
-            if (isCCHMEnabled)
+        for (const auto& [pool, stats] : statsByPool) {
+            BSONObjBuilder poolInfo(poolBuilder.subobjStart(pool));
+            poolInfo.appendNumber("poolInUse", static_cast<long long>(stats.inUse));
+            poolInfo.appendNumber("poolAvailable", static_cast<long long>(stats.available));
+            poolInfo.appendNumber("poolCreated", static_cast<long long>(stats.created));
+            poolInfo.appendNumber("poolRefreshing", static_cast<long long>(stats.refreshing));
+            poolInfo.appendNumber("poolRefreshed", static_cast<long long>(stats.refreshed));
+            if (isCCHMEnabled) {
                 poolInfo.appendNumber("poolWasNeverUsed",
-                                      static_cast<long long>(poolStats.wasNeverUsed));
+                                      static_cast<long long>(stats.wasNeverUsed));
+                appendHistogram(poolInfo, stats.acquisitionWaitTimes, kAcquisitionWaitTimesKey);
+            }
 
-            for (const auto& host : poolStats.statsByHost) {
-                BSONObjBuilder hostInfo(poolInfo.subobjStart(host.first.toString()));
-                auto& hostStats = host.second;
-                hostInfo.appendNumber("inUse", static_cast<long long>(hostStats.inUse));
-                hostInfo.appendNumber("available", static_cast<long long>(hostStats.available));
-                hostInfo.appendNumber("created", static_cast<long long>(hostStats.created));
-                hostInfo.appendNumber("refreshing", static_cast<long long>(hostStats.refreshing));
-                hostInfo.appendNumber("refreshed", static_cast<long long>(hostStats.refreshed));
-                if (isCCHMEnabled)
+            for (const auto& [host, stats] : stats.statsByHost) {
+                BSONObjBuilder hostInfo(poolInfo.subobjStart(host.toString()));
+                hostInfo.appendNumber("inUse", static_cast<long long>(stats.inUse));
+                hostInfo.appendNumber("available", static_cast<long long>(stats.available));
+                hostInfo.appendNumber("created", static_cast<long long>(stats.created));
+                hostInfo.appendNumber("refreshing", static_cast<long long>(stats.refreshing));
+                hostInfo.appendNumber("refreshed", static_cast<long long>(stats.refreshed));
+                if (isCCHMEnabled) {
                     hostInfo.appendNumber("wasNeverUsed",
-                                          static_cast<long long>(hostStats.wasNeverUsed));
+                                          static_cast<long long>(stats.wasNeverUsed));
+                    appendHistogram(hostInfo, stats.acquisitionWaitTimes, kAcquisitionWaitTimesKey);
+                }
             }
         }
     }
@@ -153,19 +165,38 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
     // Processes hosts stats.
     {
         BSONObjBuilder hostBuilder(result.subobjStart("hosts"));
-        for (auto&& host : statsByHost) {
-            BSONObjBuilder hostInfo(hostBuilder.subobjStart(host.first.toString()));
-            auto hostStats = host.second;
-            hostInfo.appendNumber("inUse", static_cast<long long>(hostStats.inUse));
-            hostInfo.appendNumber("available", static_cast<long long>(hostStats.available));
-            hostInfo.appendNumber("created", static_cast<long long>(hostStats.created));
-            hostInfo.appendNumber("refreshing", static_cast<long long>(hostStats.refreshing));
-            hostInfo.appendNumber("refreshed", static_cast<long long>(hostStats.refreshed));
-            if (isCCHMEnabled)
-                hostInfo.appendNumber("wasNeverUsed",
-                                      static_cast<long long>(hostStats.wasNeverUsed));
+        for (const auto& [host, stats] : statsByHost) {
+            BSONObjBuilder hostInfo(hostBuilder.subobjStart(host.toString()));
+            hostInfo.appendNumber("inUse", static_cast<long long>(stats.inUse));
+            hostInfo.appendNumber("available", static_cast<long long>(stats.available));
+            hostInfo.appendNumber("created", static_cast<long long>(stats.created));
+            hostInfo.appendNumber("refreshing", static_cast<long long>(stats.refreshing));
+            hostInfo.appendNumber("refreshed", static_cast<long long>(stats.refreshed));
+            if (isCCHMEnabled) {
+                hostInfo.appendNumber("wasNeverUsed", static_cast<long long>(stats.wasNeverUsed));
+                appendHistogram(hostInfo, stats.acquisitionWaitTimes, kAcquisitionWaitTimesKey);
+            }
         }
     }
+}
+
+namespace {
+std::vector<Milliseconds> makePartitions() {
+    std::vector<Milliseconds> result;
+    for (int64_t ms = 0; ms <= 1000; ms += 50) {
+        result.push_back(Milliseconds(ms));
+    }
+    return result;
+}
+}  // namespace
+
+ConnectionWaitTimeHistogram::ConnectionWaitTimeHistogram() : Histogram(makePartitions()) {}
+
+ConnectionWaitTimeHistogram& ConnectionWaitTimeHistogram::operator+=(
+    const ConnectionWaitTimeHistogram& other) {
+    std::transform(
+        _counts.begin(), _counts.end(), other._counts.begin(), _counts.begin(), std::plus{});
+    return *this;
 }
 
 }  // namespace executor
