@@ -46,7 +46,6 @@
 |Tiered Storage|Checkpoint|[test_tiered08.py](../test/suite/test_tiered08.py)
 |Tiered Storage|Flush Tier|[test_tiered08.py](../test/suite/test_tiered08.py)
 |Transactions||[test_txn01.py](../test/suite/test_txn01.py)
-|Transactions|Timestamps|[test_txn26.py](../test/suite/test_txn26.py)
 |Truncate||[test_truncate01.py](../test/suite/test_truncate01.py)
 |Truncate|Prepare|[test_prepare13.py](../test/suite/test_prepare13.py)
 |Verify|Prepare|[test_prepare_hs03.py](../test/suite/test_prepare_hs03.py), [test_timestamp18.py](../test/suite/test_timestamp18.py)
