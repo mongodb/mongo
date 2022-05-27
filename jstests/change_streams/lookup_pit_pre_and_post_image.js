@@ -1,7 +1,7 @@
 // Tests that the point-in-time pre- and post-images are loaded correctly in $changeStream running
 // with different arguments for collections with 'changeStreamPreAndPostImages' being enabled.
 // @tags: [
-//   requires_fcv_52,
+//   requires_fcv_60,
 // ]
 (function() {
 "use strict";
