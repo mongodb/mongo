@@ -15,7 +15,6 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 let viewsDB = db.getSiblingDB("views_collation");
 assert.commandWorked(viewsDB.dropDatabase());

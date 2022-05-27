@@ -178,7 +178,7 @@ rst.initiate();
 const primaryDB = rst.getPrimary().getDB(dbName);
 const secondaryDB = rst.getSecondary().getDB(dbName);
 
-if (checkSBEEnabled(primaryDB, ["featureFlagSbePlanCache"])) {
+if (checkSBEEnabled(primaryDB, ["featureFlagSbePlanCache", "featureFlagSbeFull"])) {
     jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
     rst.stopSet();
     return;

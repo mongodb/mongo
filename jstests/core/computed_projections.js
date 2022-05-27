@@ -2,7 +2,7 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For arrayEq and orderedArrayEq.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");             // For checkSBEEnabledOnSomeNode.
 
 const isSBEEnabled = checkSBEEnabledOnSomeNode(db);
 if (isSBEEnabled) {

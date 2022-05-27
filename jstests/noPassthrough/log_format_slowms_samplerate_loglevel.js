@@ -86,7 +86,7 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate}) {
     assert.commandWorked(db.setLogLevel(logLevel, "command"));
     assert.commandWorked(db.setLogLevel(logLevel, "write"));
 
-    const isSBEEnabled = checkSBEEnabled(db);
+    const isSBEEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
     // Certain fields in the log lines on mongoD are not applicable in their counterparts on
     // mongoS, and vice-versa. Ignore these fields when examining the logs of an instance on

@@ -24,7 +24,8 @@ load("jstests/libs/sbe_explain_helpers.js");  // For engineSpecificAssertion.
 
 const coll = db.plan_cache_sbe;
 coll.drop();
-const isSbePlanCacheEnabled = checkSBEEnabled(db, ["featureFlagSbePlanCache"]);
+const isSbePlanCacheEnabled =
+    checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"]);
 
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 

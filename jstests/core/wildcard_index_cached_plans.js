@@ -29,6 +29,8 @@ coll.drop();
 assert.commandWorked(coll.createIndex({"b.$**": 1}));
 assert.commandWorked(coll.createIndex({"a": 1}));
 
+const sbePlanCacheEnabled = checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"]);
+
 // In order for the plan cache to be used, there must be more than one plan available. Insert
 // data into the collection such that the b.$** index will be far more selective than the index
 // on 'a' for the query {a: 1, b: 1}.
@@ -70,7 +72,7 @@ for (let i = 0; i < 2; i++) {
 let cacheEntry = getCacheEntryForQuery(query);
 assert.neq(cacheEntry, null);
 assert.eq(cacheEntry.isActive, true);
-if (!checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+if (!sbePlanCacheEnabled) {
     // Should be at least two plans: one using the {a: 1} index and the other using the b.$** index.
     assert.gte(cacheEntry.creationExecStats.length, 2, tojson(cacheEntry.plans));
 
@@ -123,7 +125,7 @@ assert.neq(getPlanCacheKeyFromShape({query: queryWithBNull, collection: coll, db
 // There should only have been one solution for the above query, so it would get cached only by the
 // SBE plan cache.
 cacheEntry = getCacheEntryForQuery({a: 1, b: null});
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+if (sbePlanCacheEnabled) {
     assert.neq(cacheEntry, null);
     assert.eq(cacheEntry.isActive, true, cacheEntry);
     assert.eq(cacheEntry.isPinned, true, cacheEntry);

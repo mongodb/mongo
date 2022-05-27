@@ -12,7 +12,7 @@
 load('jstests/libs/analyze_plan.js');  // For getPlanStages
 load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
-const isSBEEnabled = checkSBEEnabled(db);
+const isSBEEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 if (!isSBEEnabled) {
     jsTestLog("Skipping test because the SBE feature flag is disabled");
     return;

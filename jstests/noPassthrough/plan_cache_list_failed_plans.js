@@ -8,9 +8,9 @@ const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const testDB = conn.getDB("jstests_plan_cache_list_failed_plans");
 const coll = testDB.test;
-const isSBEEnabled = checkSBEEnabled(testDB);
+const isSBEEnabled = checkSBEEnabled(testDB, ["featureFlagSbeFull"]);
 
-if (checkSBEEnabled(testDB, ["featureFlagSbePlanCache"])) {
+if (checkSBEEnabled(testDB, ["featureFlagSbePlanCache", "featureFlagSbeFull"])) {
     jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
     MongoRunner.stopMongod(conn);
     return;

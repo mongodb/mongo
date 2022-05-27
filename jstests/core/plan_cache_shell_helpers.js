@@ -16,7 +16,8 @@
 load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape.
 load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
-const isSBEPlanCacheEnabled = checkSBEEnabled(db, ["featureFlagSbePlanCache"]);
+const isSBEPlanCacheEnabled =
+    checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"]);
 var coll = db.jstests_plan_cache_shell_helpers;
 coll.drop();
 

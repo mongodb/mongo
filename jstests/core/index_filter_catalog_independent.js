@@ -14,7 +14,6 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");  // For getPlanStages.
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
 const collName = "index_filter_catalog_independent";
 const coll = db[collName];

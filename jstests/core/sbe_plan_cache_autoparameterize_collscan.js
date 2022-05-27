@@ -19,7 +19,7 @@ load("jstests/libs/sbe_util.js");
 
 // This test is specifically verifying the behavior of the SBE plan cache. So if either the SBE plan
 // cache or SBE itself are disabled, bail out.
-if (!checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+if (!checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"])) {
     jsTestLog("Skipping test because either SBE engine or SBE plan cache is disabled");
     return;
 }

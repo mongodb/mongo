@@ -44,12 +44,14 @@ function getSbePlanStages(queryLayerOutput, stage) {
  * Helper to make an assertion depending on the engine being used. If we're in a mixed version
  * cluster, then we assert that either 'classicAssert' or 'sbeAssert' is true because the outcome
  * will depend on which node we're making assertions against. If we're not in a mixed version
- * scenario, then we make an assertion depending on the value of 'isSBEEnabled'.
+ * scenario, then we make an assertion depending on the return value of 'checkSBEEnabled'.
  */
 function engineSpecificAssertion(classicAssert, sbeAssert, theDB, msg) {
     if (checkBothEnginesAreRunOnCluster(theDB)) {
         assert(classicAssert || sbeAssert, msg);
-    } else if (checkSBEEnabled(theDB)) {
+    } else if (checkSBEEnabled(theDB, ["featureFlagSbeFull"])) {
+        // This function assumes that SBE is fully enabled, and will fall back to the classic
+        // assert if it is not.
         assert(sbeAssert, msg);
     } else {
         assert(classicAssert, msg);

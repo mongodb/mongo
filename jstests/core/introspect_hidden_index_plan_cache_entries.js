@@ -14,7 +14,6 @@
 (function() {
 'use strict';
 load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape.
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
 const collName = 'introspect_hidden_index_plan_cache_entries';
 const collNotAffectedName = 'introspect_hidden_index_plan_cache_entries_unaffected';

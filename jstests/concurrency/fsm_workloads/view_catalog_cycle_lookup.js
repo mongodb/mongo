@@ -1,7 +1,6 @@
 'use strict';
 
 load("jstests/libs/fixture_helpers.js");  // For isSharded.
-load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
 
 /**
  * view_catalog_cycle_lookup.js

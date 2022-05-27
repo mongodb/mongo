@@ -14,7 +14,8 @@
 load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromExplain.
 load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
-const isSbePlanCacheEnabled = checkSBEEnabled(db, ["featureFlagSbePlanCache"]);
+const isSbePlanCacheEnabled =
+    checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"]);
 var coll = db.collation_plan_cache;
 coll.drop();
 
