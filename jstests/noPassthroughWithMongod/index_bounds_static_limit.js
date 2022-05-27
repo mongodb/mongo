@@ -9,7 +9,7 @@
 load("jstests/libs/analyze_plan.js");  // For explain helpers.
 load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
-const isSBEEnabled = checkSBEEnabled(db);
+const isSBEEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 if (!isSBEEnabled) {
     // This test is only relevant when SBE is enabled.

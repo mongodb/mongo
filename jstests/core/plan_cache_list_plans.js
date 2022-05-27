@@ -23,7 +23,7 @@ load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 let coll = db.jstests_plan_cache_list_plans;
 coll.drop();
 
-const isSBEAndPlanCacheOn = checkSBEEnabled(db, ["featureFlagSbePlanCache"]);
+const isSBEAndPlanCacheOn = checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"]);
 
 function dumpPlanCacheState() {
     return coll.aggregate([{$planCacheStats: {}}]).toArray();

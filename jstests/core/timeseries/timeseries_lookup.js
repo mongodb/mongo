@@ -11,7 +11,6 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 TimeseriesTest.run((insert) => {
     const testDB = db.getSiblingDB(jsTestName());

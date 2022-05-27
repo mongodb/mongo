@@ -46,7 +46,6 @@
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
-#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collation/collation_index_key.h"
@@ -56,8 +55,6 @@
 #include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_ixselect.h"
-#include "mongo/db/query/projection_parser.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/logv2/log.h"
@@ -1389,26 +1386,6 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             continue;
         }
 
-        auto projStage =
-            dynamic_cast<DocumentSourceSingleDocumentTransformation*>(innerStage->documentSource());
-        if (projStage) {
-            auto projObj =
-                projStage->getTransformer().serializeTransformation(boost::none).toBson();
-            auto projAst =
-                projection_ast::parseAndAnalyze(projStage->getContext(),
-                                                projObj,
-                                                ProjectionPolicies::aggregateProjectionPolicies());
-
-            if (projAst.isSimple()) {
-                solnForAgg = std::make_unique<ProjectionNodeSimple>(
-                    std::move(solnForAgg), *query.root(), projAst);
-            } else {
-                solnForAgg = std::make_unique<ProjectionNodeDefault>(
-                    std::move(solnForAgg), *query.root(), projAst);
-            }
-            continue;
-        }
-
         auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(innerStage->documentSource());
         if (lookupStage) {
             tassert(6369000,
@@ -1430,8 +1407,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
         }
 
         tasserted(5842400,
-                  "Cannot support pushdown of a stage other than $group $project or $lookup at the "
-                  "moment");
+                  "Cannot support pushdown of a stage other than $group or $lookup at the moment");
     }
 
     solution->extendWith(std::move(solnForAgg));

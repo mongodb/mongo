@@ -22,7 +22,9 @@ const largeStr = "A".repeat(1024 * 1024);  // 1MB string
 for (let i = 0; i < memoryLimitMb + 1; ++i)
     assert.commandWorked(testDb.largeColl.insert({x: i, largeStr: largeStr + i}));
 
-const pipeline = [{$group: {_id: '$largeStr', minId: {$min: '$_id'}}}];
+// Inhibit optimization so that $group runs in the classic engine.
+const pipeline =
+    [{$_internalInhibitOptimization: {}}, {$group: {_id: '$largeStr', minId: {$min: '$_id'}}}];
 // Make sure that the pipeline needs to spill to disk.
 assert.throwsWithCode(() => testDb.largeColl.aggregate(pipeline, {allowDiskUse: false}),
                       ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);

@@ -294,6 +294,48 @@ function setLookupPushdownDisabled(value) {
             {allowDiskUse: true});
 }());
 
+// Verify that SBE is only used when a $lookup or a $group is present.
+(function testLookupGroupIsRequiredForPushdown() {
+    // Don't execute this test case if SBE is fully enabled.
+    if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+        jsTestLog("Skipping test case because we are supporting SBE beyond $group and $lookup" +
+                  " pushdown");
+        return;
+    }
+
+    const assertEngineUsed = function(pipeline, isSBE) {
+        const explain = coll.explain().aggregate(pipeline);
+        assert(explain.hasOwnProperty("explainVersion"), explain);
+        if (isSBE) {
+            assert.eq(explain.explainVersion, 2, explain);
+        } else {
+            assert.eq(explain.explainVersion, 1, explain);
+        }
+    };
+
+    const lookup = {$lookup: {from: "coll", localField: "a", foreignField: "b", as: "out"}};
+    const group = {
+        $group: {
+            _id: "$a",
+            out: {$min: "$b"},
+        }
+    };
+    const match = {$match: {a: 1}};
+
+    // $lookup and $group should each run in SBE.
+    assertEngineUsed([lookup], true /* isSBE */);
+    assertEngineUsed([group], true /* isSBE */);
+    assertEngineUsed([lookup, group], true /* isSBE */);
+
+    // $match on its own won't use SBE, nor will an empty pipeline.
+    assertEngineUsed([match], false /* isSBE */);
+    assertEngineUsed([], false /* isSBE */);
+
+    // $match will use SBE if followed by either a $group or a $lookup.
+    assertEngineUsed([match, lookup], true /* isSBE */);
+    assertEngineUsed([match, group], true /* isSBE */);
+})();
+
 // Build an index on the foreign collection that matches the foreignField. This should cause us
 // to choose an indexed nested loop join.
 (function testIndexNestedLoopJoinRegularIndex() {

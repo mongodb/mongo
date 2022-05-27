@@ -44,7 +44,8 @@ function assertQueryInPlanCache(coll, query) {
     assert.eq(1, planCacheEntries.length, planCacheEntries);
 }
 
-const isSbePlanCacheEnabled = checkSBEEnabled(db, ["featureFlagSbePlanCache"]);
+const isSbePlanCacheEnabled =
+    checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"]);
 if (isSbePlanCacheEnabled) {
     const collectionName = "plan_cache_sbe";
     const coll = db[collectionName];

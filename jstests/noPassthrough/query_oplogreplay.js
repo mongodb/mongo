@@ -6,7 +6,6 @@
 
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/storage_engine_utils.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 let replSet = new ReplSetTest({nodes: 1});
 replSet.startSet();

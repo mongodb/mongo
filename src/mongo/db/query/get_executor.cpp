@@ -1295,13 +1295,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<CanonicalQuery> cq,
-    std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy requestedYieldPolicy,
     size_t plannerOptions) {
-    invariant(cq);
-    if (extractAndAttachPipelineStages) {
-        extractAndAttachPipelineStages(cq.get());
-    }
     // Mark that this query uses the SBE engine, unless this has already been set.
     OpDebug& opDebug = CurOp::get(opCtx)->debug();
     if (!opDebug.classicEngineUsed) {
@@ -1383,18 +1378,32 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
+    invariant(canonicalQuery);
     const auto& mainColl = collections.getMainCollection();
     canonicalQuery->setSbeCompatible(
         sbe::isQuerySbeCompatible(&mainColl, canonicalQuery.get(), plannerOptions));
-    return !canonicalQuery->getForceClassicEngine() && canonicalQuery->isSbeCompatible()
-        ? getSlotBasedExecutor(opCtx,
-                               collections,
-                               std::move(canonicalQuery),
-                               extractAndAttachPipelineStages,
-                               yieldPolicy,
-                               plannerOptions)
-        : getClassicExecutor(
-              opCtx, mainColl, std::move(canonicalQuery), yieldPolicy, plannerOptions);
+
+    // Use SBE if 'canonicalQuery' is SBE compatible.
+    if (!canonicalQuery->getForceClassicEngine() && canonicalQuery->isSbeCompatible()) {
+        if (extractAndAttachPipelineStages) {
+            extractAndAttachPipelineStages(canonicalQuery.get());
+        }
+
+        // TODO SERVER-65960: Optionally refactor this logic once we have a mechanism to reattach
+        // pipeline stages.
+        // Use SBE if we find any $group/$lookup stages eligible for execution in SBE or if SBE
+        // is fully enabled. Otherwise, fallback to the classic engine.
+        if (canonicalQuery->pipeline().empty() &&
+            !feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
+            canonicalQuery->setSbeCompatible(false);
+        } else {
+            return getSlotBasedExecutor(
+                opCtx, collections, std::move(canonicalQuery), yieldPolicy, plannerOptions);
+        }
+    }
+
+    return getClassicExecutor(
+        opCtx, mainColl, std::move(canonicalQuery), yieldPolicy, plannerOptions);
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(

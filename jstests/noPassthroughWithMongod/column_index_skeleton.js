@@ -9,19 +9,11 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-const isSBEEnabled = checkSBEEnabled(db);
+const isSBEEnabled = checkSBEEnabled(db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"]);
 
 if (!isSBEEnabled) {
     // This test is only relevant when SBE is enabled.
-    return;
-}
-
-const getParamResponse =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagColumnstoreIndexes: 1}));
-const columnstoreEnabled = getParamResponse.hasOwnProperty("featureFlagColumnstoreIndexes") &&
-    getParamResponse.featureFlagColumnstoreIndexes.value;
-if (!columnstoreEnabled) {
-    jsTestLog("Skipping columnstore test since the feature flag is not enabled.");
+    jsTestLog("Skipping columnstore test since either SBE or columnstore are disabled.");
     return;
 }
 

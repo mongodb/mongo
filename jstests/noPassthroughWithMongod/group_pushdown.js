@@ -46,25 +46,6 @@ let assertGroupPushdown = function(
     assert.sameMembers(results, expectedResults);
 };
 
-let assertProjectPushdown = function(
-    {coll, pipeline, expectProjectToBePushedDown, options = {}} = {}) {
-    const explain = coll.explain().aggregate(pipeline, options);
-
-    let result;
-    if (expectProjectToBePushedDown) {
-        result = getWinningPlan(explain.queryPlanner);
-    } else {
-        result = getWinningPlan(explain.stages[0].$cursor.queryPlanner);
-    }
-
-    // Check that $project uses the query system.
-    assert.eq(expectProjectToBePushedDown,
-              planHasStage(db, result, "PROJECTION_DEFAULT") ||
-                  planHasStage(db, result, "PROJECTION_COVERED") ||
-                  planHasStage(db, result, "PROJECTION_SIMPLE"),
-              explain);
-};
-
 let assertNoGroupPushdown = function(coll, pipeline, expectedResults, options = {}) {
     const explain = coll.explain().aggregate(pipeline, options);
     assert.eq(null, getAggPlanStage(explain, "GROUP"), explain);
@@ -73,7 +54,7 @@ let assertNoGroupPushdown = function(coll, pipeline, expectedResults, options = 
     assert.sameMembers(resultNoGroupPushdown, expectedResults);
 };
 
-let assertResultsMatchWithAndWithoutGroupPushdown = function(
+let assertResultsMatchWithAndWithoutPushdown = function(
     coll, pipeline, expectedResults, expectedGroupCountInExplain) {
     // Make sure the provided pipeline is eligible for pushdown.
     assertGroupPushdown(coll, pipeline, expectedResults, expectedGroupCountInExplain);
@@ -91,27 +72,6 @@ let assertResultsMatchWithAndWithoutGroupPushdown = function(
 
     let resultWithGroupPushdown = coll.aggregate(pipeline).toArray();
     assert.sameMembers(resultNoGroupPushdown, resultWithGroupPushdown);
-};
-
-let assertResultsMatchWithAndWithoutProjectPushdown = function(
-    {coll, pipeline, expectProjectToBePushedDown, expectedResults, options = {}} = {}) {
-    // Make sure the provided pipeline is eligible for project pushdown.
-    assertProjectPushdown(
-        {coll: coll, pipeline: pipeline, expectProjectToBePushedDown: expectProjectToBePushedDown});
-
-    // Turn sbe off.
-    db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true});
-
-    // Sanity check the results when no project pushdown happens.
-    let resultNoProjectPushdown = coll.aggregate(pipeline).toArray();
-    assert.sameMembers(resultNoProjectPushdown, expectedResults);
-
-    // Turn sbe on which will allow $group stages that contain supported accumulators to be pushed
-    // down under certain conditions.
-    db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false});
-
-    let resultWithProjectPushdown = coll.aggregate(pipeline).toArray();
-    assert.sameMembers(resultNoProjectPushdown, resultWithProjectPushdown);
 };
 
 let assertShardedGroupResultsMatch = function(coll, pipeline, expectedGroupCountInExplain = 1) {
@@ -156,41 +116,38 @@ assert.eq(
     [{"_id": 5, "item": "c", "price": 5, "quantity": 10, "date": ISODate("2014-02-15T09:05:00Z")}]);
 
 // Run a simple $group with {$sum: 1} accumulator, and check if it gets pushed down.
-assertResultsMatchWithAndWithoutGroupPushdown(
+assertResultsMatchWithAndWithoutPushdown(
     coll,
     [{$group: {_id: "$item", c: {$sum: NumberInt(1)}}}],
     [{_id: "a", c: NumberInt(2)}, {_id: "b", c: NumberInt(2)}, {_id: "c", c: NumberInt(1)}],
     1);
 
-assertResultsMatchWithAndWithoutGroupPushdown(
+assertResultsMatchWithAndWithoutPushdown(
     coll,
     [{$group: {_id: "$item", c: {$sum: NumberLong(1)}}}],
     [{_id: "a", c: NumberLong(2)}, {_id: "b", c: NumberLong(2)}, {_id: "c", c: NumberLong(1)}],
     1);
 
-assertResultsMatchWithAndWithoutGroupPushdown(
-    coll,
-    [{$group: {_id: "$item", c: {$sum: 1}}}],
-    [{_id: "a", c: 2}, {_id: "b", c: 2}, {_id: "c", c: 1}],
-    1);
+assertResultsMatchWithAndWithoutPushdown(coll,
+                                         [{$group: {_id: "$item", c: {$sum: 1}}}],
+                                         [{_id: "a", c: 2}, {_id: "b", c: 2}, {_id: "c", c: 1}],
+                                         1);
 
 // Run a simple $group with supported $sum accumulator, and check if it gets pushed down.
-assertResultsMatchWithAndWithoutGroupPushdown(
-    coll,
-    [{$group: {_id: "$item", s: {$sum: "$price"}}}],
-    [{_id: "a", s: 15}, {_id: "b", s: 30}, {_id: "c", s: 5}],
-    1);
+assertResultsMatchWithAndWithoutPushdown(coll,
+                                         [{$group: {_id: "$item", s: {$sum: "$price"}}}],
+                                         [{_id: "a", s: 15}, {_id: "b", s: 30}, {_id: "c", s: 5}],
+                                         1);
 
 // The subexpression '$not' is not translated to $coerceToolBool and thus is SBE compatible.
-assertResultsMatchWithAndWithoutGroupPushdown(
-    coll,
-    [{$group: {_id: "$item", c: {$sum: {$not: "$price"}}}}],
-    [{_id: "a", c: 0}, {_id: "b", c: 0}, {_id: "c", c: 0}],
-    1);
+assertResultsMatchWithAndWithoutPushdown(coll,
+                                         [{$group: {_id: "$item", c: {$sum: {$not: "$price"}}}}],
+                                         [{_id: "a", c: 0}, {_id: "b", c: 0}, {_id: "c", c: 0}],
+                                         1);
 
 // Two group stages both get pushed down and the second $group stage refer to only a top-level field
 // which does not exist.
-assertResultsMatchWithAndWithoutGroupPushdown(
+assertResultsMatchWithAndWithoutPushdown(
     coll,
     [{$group: {_id: "$item", s: {$sum: "$price"}}}, {$group: {_id: "$quantity", c: {$count: {}}}}],
     [{_id: null, c: 3}],
@@ -198,7 +155,7 @@ assertResultsMatchWithAndWithoutGroupPushdown(
 
 // Two group stages both get pushed down and the second $group stage refers to only existing
 // top-level fields of the first $group.
-assertResultsMatchWithAndWithoutGroupPushdown(
+assertResultsMatchWithAndWithoutPushdown(
     coll,
     [
         {$group: {_id: "$item", qsum: {$sum: "$quantity"}, msum: {$sum: "$price"}}},
@@ -208,14 +165,14 @@ assertResultsMatchWithAndWithoutGroupPushdown(
     2);
 
 // The $group stage refers to the same top-level field twice.
-assertResultsMatchWithAndWithoutGroupPushdown(
+assertResultsMatchWithAndWithoutPushdown(
     coll,
     [{$group: {_id: "$item", ps1: {$sum: "$price"}, ps2: {$sum: "$price"}}}],
     [{_id: "a", ps1: 15, ps2: 15}, {_id: "b", ps1: 30, ps2: 30}, {_id: "c", ps1: 5, ps2: 5}],
     1);
 
 // The $group stage refers to the same top-level field twice and another top-level field.
-assertResultsMatchWithAndWithoutGroupPushdown(
+assertResultsMatchWithAndWithoutPushdown(
     coll,
     [{
         $group:
@@ -229,7 +186,7 @@ assertResultsMatchWithAndWithoutGroupPushdown(
     1);
 
 // The $group stage refers to two existing sub-fields.
-assertResultsMatchWithAndWithoutGroupPushdown(
+assertResultsMatchWithAndWithoutPushdown(
     coll,
     [
         {$project: {item: 1, price: 1, quantity: 1, dateParts: {$dateToParts: {date: "$date"}}}},
@@ -244,7 +201,7 @@ assertResultsMatchWithAndWithoutGroupPushdown(
     1);
 
 // The $group stage refers to a non-existing sub-field twice.
-assertResultsMatchWithAndWithoutGroupPushdown(
+assertResultsMatchWithAndWithoutPushdown(
     coll,
     [{$group: {_id: "$item", hs: {$sum: {$add: ["$date.hour", "$date.hour"]}}}}],
     [{"_id": "a", "hs": 0}, {"_id": "b", "hs": 0}, {"_id": "c", "hs": 0}],
@@ -287,12 +244,12 @@ assertResultsMatchWithAndWithoutGroupPushdown(
      {$group: {_id: "$_id", ss: {$sum: {$add: ["$indexKeyPattern", "$indexKeyPattern"]}}}}
  ],
 ].forEach(pipeline =>
-              assertResultsMatchWithAndWithoutGroupPushdown(
+              assertResultsMatchWithAndWithoutPushdown(
                   coll, pipeline, [{_id: "a", ss: 30}, {_id: "b", ss: 60}, {_id: "c", ss: 10}], 2));
 
 // The second $group stage refers to both a top-level field and a sub-field twice which does not
 // exist.
-assertResultsMatchWithAndWithoutGroupPushdown(
+assertResultsMatchWithAndWithoutPushdown(
     coll,
     [
         {$group: {_id: "$item", ps: {$sum: "$price"}}},
@@ -306,7 +263,7 @@ assertResultsMatchWithAndWithoutGroupPushdown(
     2);
 
 // The second $group stage refers to a sub-field which does exist.
-assertResultsMatchWithAndWithoutGroupPushdown(
+assertResultsMatchWithAndWithoutPushdown(
     coll,
     [
         {$group: {_id: {i: "$item", p: {$divide: ["$price", 5]}}}},
@@ -316,7 +273,7 @@ assertResultsMatchWithAndWithoutGroupPushdown(
     2);
 
 // Verifies that an optimized expression can be pushed down.
-assertResultsMatchWithAndWithoutGroupPushdown(
+assertResultsMatchWithAndWithoutPushdown(
     coll,
     // {"$ifNull": [1, 2]} will be optimized into just the constant 1.
     [{$group: {_id: {"$ifNull": [1, 2]}, o: {$min: "$quantity"}}}],
@@ -337,75 +294,6 @@ assertGroupPushdown(coll,
 assertGroupPushdown(coll,
                     [{$group: {_id: {"i": "$item"}, s: {$sum: "$price"}}}],
                     [{_id: {i: "a"}, s: 15}, {_id: {i: "b"}, s: 30}, {_id: {i: "c"}, s: 5}]);
-
-assertResultsMatchWithAndWithoutProjectPushdown({
-    coll: coll,
-    pipeline: [{$project: {x: "$item"}}],
-    expectProjectToBePushedDown: true,
-    expectedResults: [
-        {"_id": 5, "x": "c"},
-        {"_id": 4, "x": "b"},
-        {"_id": 3, "x": "a"},
-        {"_id": 2, "x": "b"},
-        {"_id": 1, "x": "a"}
-    ]
-});
-
-assertResultsMatchWithAndWithoutProjectPushdown({
-    coll: coll,
-    pipeline: [{$group: {_id: {"i": "$item"}, s: {$sum: "$price"}}}, {$project: {x: "$s"}}],
-    expectProjectToBePushedDown: true,
-    expectedResults:
-        [{"_id": {"i": "b"}, "x": 30}, {"_id": {"i": "a"}, "x": 15}, {"_id": {"i": "c"}, "x": 5}]
-});
-
-assertResultsMatchWithAndWithoutProjectPushdown({
-    coll: coll,
-    pipeline: [
-        {$group: {_id: "$item", s: {$sum: "$price"}}},
-        {$project: {_id: 1, x: "$s"}},
-        {$group: {_id: "$_id", total: {$sum: "$x"}}}
-    ],
-    expectProjectToBePushedDown: true,
-    expectedResults:
-        [{"_id": "a", "total": 15}, {"_id": "c", "total": 5}, {"_id": "b", "total": 30}]
-});
-
-assertResultsMatchWithAndWithoutProjectPushdown({
-    coll: coll,
-    pipeline: [
-        {$group: {_id: {"i": "$item"}, s: {$sum: "$price"}}},
-        {$addFields: {x: 1}},
-        {$project: {s: 0}}
-    ],
-    expectProjectToBePushedDown: false,
-    expectedResults:
-        [{"_id": {"i": "c"}, "x": 1}, {"_id": {"i": "b"}, "x": 1}, {"_id": {"i": "a"}, "x": 1}]
-});
-
-assertResultsMatchWithAndWithoutProjectPushdown({
-    coll: coll,
-    pipeline: [
-        {$group: {_id: {"i": "$item"}, s: {$sum: "$price"}}},
-        {$addFields: {x: 1}},
-        {$project: {s: 1}}
-    ],
-    expectProjectToBePushedDown: false,
-    expectedResults:
-        [{"_id": {"i": "c"}, "s": 5}, {"_id": {"i": "b"}, "s": 30}, {"_id": {"i": "a"}, "s": 15}]
-});
-
-assertResultsMatchWithAndWithoutProjectPushdown({
-    coll: coll,
-    pipeline: [
-        {$match: {item: "a"}},
-        {$sort: {price: 1}},
-        {$group: {_id: "$item"}},
-        {$project: {x: "$item"}}
-    ],
-    expectProjectToBePushedDown: true,
-    expectedResults: [{"_id": "a"}]
-});
 
 // Run a group with spilling on and check that $group is pushed down.
 assertGroupPushdown(coll,
@@ -507,19 +395,17 @@ assert.commandWorked(coll.insert(docs));
 const verifyGroupPushdownWhenSubplanning = () => {
     const matchWithOr = {$match: {$or: [{"item": "a"}, {"price": 10}]}};
     const groupPushedDown = {$group: {_id: "$item", quantity: {$sum: "$quantity"}}};
-    assertResultsMatchWithAndWithoutGroupPushdown(
-        coll,
-        [matchWithOr, groupPushedDown],
-        [{_id: "a", quantity: 7}, {_id: "b", quantity: 10}],
-        1);
+    assertResultsMatchWithAndWithoutPushdown(coll,
+                                             [matchWithOr, groupPushedDown],
+                                             [{_id: "a", quantity: 7}, {_id: "b", quantity: 10}],
+                                             1);
     // A trival $and with only one $or will be optimized away and thus $or will be the top
     // expression.
     const matchWithTrivialAndOr = {$match: {$and: [{$or: [{"item": "a"}, {"price": 10}]}]}};
-    assertResultsMatchWithAndWithoutGroupPushdown(
-        coll,
-        [matchWithTrivialAndOr, groupPushedDown],
-        [{_id: "a", quantity: 7}, {_id: "b", quantity: 10}],
-        1);
+    assertResultsMatchWithAndWithoutPushdown(coll,
+                                             [matchWithTrivialAndOr, groupPushedDown],
+                                             [{_id: "a", quantity: 7}, {_id: "b", quantity: 10}],
+                                             1);
 };
 
 // Verify that $group can be pushed down when subplanning is involved. With this test case,
@@ -551,7 +437,7 @@ assertNoGroupPushdown(
     ]);
 
 // Verify that $bucket is pushed down to SBE and returns correct results.
-assertResultsMatchWithAndWithoutGroupPushdown(
+assertResultsMatchWithAndWithoutPushdown(
     coll,
     [{
         $bucket:
@@ -559,7 +445,7 @@ assertResultsMatchWithAndWithoutGroupPushdown(
     }],
     [{"_id": 1, "quantity": 15}, {"_id": 10, "quantity": 13}]);
 
-assertResultsMatchWithAndWithoutGroupPushdown(
+assertResultsMatchWithAndWithoutPushdown(
     coll,
     [{
         $bucket: {
@@ -571,7 +457,7 @@ assertResultsMatchWithAndWithoutGroupPushdown(
     [{"_id": 1, "count": 5, "quantity": 28}]);
 
 // Verify that $sortByCount is pushed down to SBE and returns correct results.
-assertResultsMatchWithAndWithoutGroupPushdown(
+assertResultsMatchWithAndWithoutPushdown(
     coll,
     [{$sortByCount: "$item"}],
     [{"_id": "a", "count": 2}, {"_id": "b", "count": 2}, {"_id": "c", "count": 1}]);

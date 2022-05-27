@@ -5,7 +5,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 load("jstests/libs/analyze_plan.js");  // For getAggPlanStages.
 
 const localColl = db.local;

@@ -6,6 +6,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled()'.
+
 const numDocs = 1000;
 const dbName = "sbe_multiplanner_db";
 const collName = "sbe_multiplanner_coll";
@@ -21,6 +23,13 @@ const trialLengthFromWorksKnob = 0.1 * numDocs;
 const conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB(dbName);
+
+// This test assumes that SBE is being used for most queries.
+if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    jsTestLog("Skipping test because SBE is not fully enabled");
+    MongoRunner.stopMongod(conn);
+    return;
+}
 const coll = db[collName];
 
 // Gets the "allPlansExecution" section from the explain of a query that has zero results, but for

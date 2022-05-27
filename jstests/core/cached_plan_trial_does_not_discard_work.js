@@ -19,7 +19,7 @@
 load("jstests/libs/profiler.js");  // getLatestProfileEntry.
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-if (!checkSBEEnabled(db)) {
+if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
     jsTestLog("Skipping test because SBE is disabled");
     return;
 }

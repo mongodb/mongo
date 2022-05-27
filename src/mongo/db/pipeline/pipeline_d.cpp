@@ -66,7 +66,6 @@
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
@@ -110,24 +109,23 @@ namespace {
  * pipeline to prepare for pushdown of $group and $lookup into the inner query layer so that it
  * can be executed using SBE.
  * Group stages are extracted from the pipeline when all of the following conditions are met:
- *    0. When the 'internalQueryForceClassicEngine' feature flag is 'false'.
- *    1. When 'allowDiskUse' is false. We currently don't support spilling in the SBE HashAgg
- *       stage. This will change once that is supported when SERVER-58436 is complete.
- *    2. When the DocumentSourceGroup has 'doingMerge=false', this will change when we implement
- *       hash table spilling in SERVER-58436.
+ *    - When the 'internalQueryForceClassicEngine' feature flag is 'false'.
+ *    - When the 'internalQuerySlotBasedExecutionDisableGroupPushdown' query knob is 'false'.
+ *    - When the 'featureFlagSBEGroupPushdown' feature flag is 'true'.
+ *    - When the DocumentSourceGroup has 'doingMerge=false'.
  *
  * Lookup stages are extracted from the pipeline when all of the following conditions are met:
- *    0. When the 'internalQueryForceClassicEngine' feature flag is 'false'.
- *    1. When the 'featureFlagSBELookupPushdown' feature flag is 'true'.
- *    2. The $lookup uses only the 'localField'/'foreignField' syntax (no pipelines).
- *    3. The foreign collection is neither sharded nor a view.
+ *    - When the 'internalQueryForceClassicEngine' feature flag is 'false'.
+ *    - When the 'internalQuerySlotBasedExecutionDisableLookupPushdown' query knob is 'false'.
+ *    - When the 'featureFlagSBELookupPushdown' feature flag is 'true'.
+ *    - The $lookup uses only the 'localField'/'foreignField' syntax (no pipelines).
+ *    - The foreign collection is neither sharded nor a view.
  */
 std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleStagesForPushdown(
     const intrusive_ptr<ExpressionContext>& expCtx,
     const MultipleCollectionAccessor& collections,
     const CanonicalQuery* cq,
-    Pipeline* pipeline,
-    const bool origSbeCompatible) {
+    Pipeline* pipeline) {
     // We will eventually use the extracted group stages to populate 'CanonicalQuery::pipeline'
     // which requires stages to be wrapped in an interface.
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> stagesForPushdown;
@@ -179,23 +177,6 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
             if (groupStage->sbeCompatible() && !groupStage->doingMerge()) {
                 stagesForPushdown.push_back(
                     std::make_unique<InnerPipelineStageImpl>(groupStage, isLastSource));
-                sources.erase(itr++);
-                continue;
-            }
-            break;
-        }
-
-        // $project pushdown logic.
-        if (auto projectStage =
-                dynamic_cast<DocumentSourceSingleDocumentTransformation*>(itr->get())) {
-            bool projectEligibleForPushdown = feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
-                                                  serverGlobalParams.featureCompatibility) &&
-                origSbeCompatible &&
-                (projectStage->getType() ==
-                 TransformerInterface::TransformerType::kInclusionProjection);
-
-            if (projectEligibleForPushdown) {
-                stagesForPushdown.push_back(std::make_unique<InnerPipelineStageImpl>(projectStage));
                 sources.erase(itr++);
                 continue;
             }
@@ -268,7 +249,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     // Reset the 'sbeCompatible' flag before canonicalizing the 'findCommand' to potentially allow
     // SBE to execute the portion of the query that's pushed down, even if the portion of the query
     // that is not pushed down contains expressions not supported by SBE.
-    bool origSbeCompatible = expCtx->sbeCompatible;
     expCtx->sbeCompatible = true;
 
     auto cq = CanonicalQuery::canonicalize(expCtx->opCtx,
@@ -321,16 +301,15 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     }
 
     auto permitYield = true;
-    return getExecutorFind(
-        expCtx->opCtx,
-        collections,
-        std::move(cq.getValue()),
-        [&, origSbeCompatible](auto* canonicalQuery) {
-            canonicalQuery->setPipeline(extractSbeCompatibleStagesForPushdown(
-                expCtx, collections, canonicalQuery, pipeline, origSbeCompatible));
-        },
-        permitYield,
-        plannerOpts);
+    return getExecutorFind(expCtx->opCtx,
+                           collections,
+                           std::move(cq.getValue()),
+                           [&](auto* canonicalQuery) {
+                               canonicalQuery->setPipeline(extractSbeCompatibleStagesForPushdown(
+                                   expCtx, collections, canonicalQuery, pipeline));
+                           },
+                           permitYield,
+                           plannerOpts);
 }
 
 /**

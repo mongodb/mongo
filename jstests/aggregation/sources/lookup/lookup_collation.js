@@ -13,7 +13,6 @@
  *  2. 'collation' option overrides local collection's collation
  */
 load("jstests/aggregation/extras/utils.js");  // For anyEq.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 load("jstests/libs/analyze_plan.js");         // For getAggPlanStages, getWinningPlan.
 
 (function() {

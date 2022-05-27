@@ -8,11 +8,20 @@
 
 // For 'getLatestProfilerEntry()'.
 load("jstests/libs/profiler.js");
+load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled()'.
 
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
 
 const db = conn.getDB(jsTestName());
+
+// This test assumes that SBE is being used for most queries.
+if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    jsTestLog("Skipping test because SBE is not fully enabled");
+    MongoRunner.stopMongod(conn);
+    return;
+}
+
 assert.commandWorked(db.dropDatabase());
 
 const coll = db.collection;

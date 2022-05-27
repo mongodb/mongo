@@ -81,8 +81,7 @@ feature_flags:
     featureFlagSbePlanCache:
       description: "Feature flag for enabling use of the SBE plan cache"
       cpp_varname: gFeatureFlagSbePlanCache
-      default: true
-      version: 6.0
+      default: false
 
     featureFlagSortArray:
         description: "Feature flag for allowing use of the $sortArray aggregation expression"
@@ -150,4 +149,9 @@ feature_flags:
     featureFlagServerlessChangeStreams:
       description: "Feature flag to enable reading change events from the change collection rather than the oplog"
       cpp_varname: gFeatureFlagServerlessChangeStreams
+      default: false
+
+    featureFlagSbeFull:
+      description: "Feature flag to enable using SBE for a larger number of queries"
+      cpp_varname: gFeatureFlagSbeFull
       default: false

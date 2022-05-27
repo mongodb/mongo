@@ -7,8 +7,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
-
 let viewsDb = db.getSiblingDB("views_validation");
 const kMaxViewDepth = 20;
 

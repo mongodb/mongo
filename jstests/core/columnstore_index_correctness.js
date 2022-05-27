@@ -17,7 +17,8 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-const columnstoreEnabled = checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"]);
+const columnstoreEnabled =
+    checkSBEEnabled(db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"]);
 if (!columnstoreEnabled) {
     jsTestLog("Skipping columnstore index validation test since the feature flag is not enabled.");
     return;

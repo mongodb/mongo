@@ -16,7 +16,7 @@ const conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB("sbe_plan_cache_memory_debug_info");
 
-if (!checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+if (!checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"])) {
     jsTest.log("Skipping test because SBE plan cache is not enabled.");
     MongoRunner.stopMongod(conn);
     return;

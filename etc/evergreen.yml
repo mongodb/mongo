@@ -1619,16 +1619,16 @@ buildvariants:
 #      - rhel80-large
   - name: generate_buildid_to_debug_symbols_mapping
 
-- &enterprise-rhel-80-64-bit-dynamic-sbe-engine
-  name: enterprise-rhel-80-64-bit-dynamic-sbe-engine
-  display_name: "Shared Library Enterprise RHEL 8.0 (SBE Engine)"
+- &enterprise-rhel-80-64-bit-dynamic-classic-engine
+  name: enterprise-rhel-80-64-bit-dynamic-classic-engine
+  display_name: "Shared Library Enterprise RHEL 8.0 (Classic Engine)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   stepback: false
   modules:
   - enterprise
   run_on:
   - rhel80-small
-  expansions: &enterprise-rhel-80-64-bit-dynamic-sbe-engine-expansions
+  expansions: &enterprise-rhel-80-64-bit-dynamic-classic-engine-expansions
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     multiversion_platform: rhel80
@@ -1644,7 +1644,7 @@ buildvariants:
     burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-inmem linux-64-duroff enterprise-rhel-80-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
     test_flags: >-
-      --mongodSetParameters="{internalQueryForceClassicEngine: false}"
+      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
   tasks:
   - name: .aggfuzzer
   - name: .aggregation
@@ -2338,8 +2338,8 @@ buildvariants:
   expansions:
     toolchain_version: v4
 
-- name: rhel80-debug-asan-sbe-engine
-  display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG (SBE Engine)
+- name: rhel80-debug-asan-classic-engine
+  display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG (Classic Engine)
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -2354,7 +2354,7 @@ buildvariants:
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: >-
-      --mongodSetParameters="{internalQueryForceClassicEngine: false}"
+      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
       --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -2493,8 +2493,8 @@ buildvariants:
   expansions:
     toolchain_version: v4
 
-- name: rhel80-debug-ubsan-sbe-engine
-  display_name: "~ UBSAN Enterprise RHEL 8.0 DEBUG (SBE Engine)"
+- name: rhel80-debug-ubsan-classic-engine
+  display_name: "~ UBSAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -2509,7 +2509,7 @@ buildvariants:
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: >-
-      --mongodSetParameters="{internalQueryForceClassicEngine: false}"
+      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
       --excludeWithAnyTags=requires_ocsp_stapling
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -3044,21 +3044,20 @@ buildvariants:
     - windows-vsCurrent-large
 
 ### QO & QE Patch-Specific Build Variants ###
-- <<: *enterprise-rhel-80-64-bit-dynamic-sbe-engine
-  name: enterprise-rhel-80-64-bit-dynamic-sbe-engine-query-patch-only
-  display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (SBE Engine)"
+- <<: *enterprise-rhel-80-64-bit-dynamic-classic-engine
+  name: enterprise-rhel-80-64-bit-dynamic-classic-engine-query-patch-only
+  display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (Classic Engine)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
   expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-sbe-engine-expansions
+    <<: *enterprise-rhel-80-64-bit-dynamic-classic-engine-expansions
     jstestfuzz_num_generated_files: 20
     jstestfuzz_concurrent_num_files: 5
     target_resmoke_time: 30
     max_sub_suites: 3
     test_flags: >-
-      --mongodSetParameters="{internalQueryForceClassicEngine: false}"
+      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
       --excludeWithAnyTags=resource_intensive
 
-# Intentionally derive from SBE to run the SBE tests with all feature flags.
 - <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
   name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-query-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (all feature flags)"
