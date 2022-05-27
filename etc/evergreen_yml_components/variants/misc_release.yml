@@ -67,7 +67,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-amzn64
     compile_flags: --ssl MONGO_DISTMOD=amzn64 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
     multiversion_platform: amzn64
     multiversion_edition: enterprise
@@ -103,7 +103,7 @@ buildvariants:
   - name: slow1_gen
   - name: snmp
   - name: .stitch
-  - name: .csfle
+  - name: .crypt
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -181,7 +181,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-amazon2
     compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: amazon2
     multiversion_edition: enterprise
     has_packages: true
@@ -214,8 +214,8 @@ buildvariants:
   - name: slow1_gen
   - name: snmp
   - name: .stitch
-  - name: .csfle
-  - name: .publish_csfle
+  - name: .crypt
+  - name: .publish_crypt
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -288,7 +288,7 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-enterprise-amazon2
     compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip
     has_packages: true
@@ -371,10 +371,10 @@ buildvariants:
   - name: .sharding .common
   - name: snmp
   - name: .stitch
-  - name: .csfle
+  - name: .crypt
     distros:
     - amazon2-arm64-large
-  - name: .publish_csfle
+  - name: .publish_crypt
     distros:
     - amazon2-arm64-large
   - name: secondary_reads_passthrough_gen
@@ -461,7 +461,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-debian10
     compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: linux_x86_64
     multiversion_edition: base
     multiversion_platform_42_or_later: debian10
@@ -493,8 +493,8 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: .csfle
-  - name: .publish_csfle
+  - name: .crypt
+  - name: .publish_crypt
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -571,7 +571,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-debian11
     compile_flags: --ssl MONGO_DISTMOD=debian11 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: linux_x86_64
     multiversion_edition: base
     multiversion_platform_42_or_later: debian11
@@ -603,8 +603,8 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: .csfle
-  - name: .publish_csfle
+  - name: .crypt
+  - name: .publish_crypt
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -769,7 +769,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-rhel80
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     has_packages: true
@@ -852,10 +852,10 @@ buildvariants:
   - name: .sharding .common
   - name: snmp
   - name: .stitch
-  - name: .csfle
+  - name: .crypt
     distros:
     - rhel80-large
-  - name: .publish_csfle
+  - name: .publish_crypt
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
@@ -934,7 +934,7 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-enterprise-rhel82
     compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: aarch64
@@ -968,10 +968,10 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: .csfle
+  - name: .crypt
     distros:
     - rhel82-arm64-large
-  - name: .publish_csfle
+  - name: .publish_crypt
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -1045,7 +1045,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-suse12
     compile_flags: --ssl MONGO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: suse12
     multiversion_edition: enterprise
     has_packages: true
@@ -1071,8 +1071,8 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: .csfle
-  - name: .publish_csfle
+  - name: .crypt
+  - name: .publish_crypt
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -1095,7 +1095,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-suse15
     compile_flags: --ssl MONGO_DISTMOD=suse15 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -1119,8 +1119,8 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  - name: .csfle
-  - name: .publish_csfle
+  - name: .crypt
+  - name: .publish_crypt
   - name: .publish
     distros:
     - suse15-small
@@ -1250,7 +1250,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1804
     compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
@@ -1271,8 +1271,8 @@ buildvariants:
   - name: libdeps_graph_linting_TG
     distros:
     - ubuntu1804-build
-  - name: .csfle
-  - name: .publish_csfle
+  - name: .crypt
+  - name: .publish_crypt
   - name: .aggfuzzer .common
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -1319,7 +1319,7 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-enterprise-ubuntu1804
     compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
@@ -1352,8 +1352,8 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
-  - name: .csfle
-  - name: .publish_csfle
+  - name: .crypt
+  - name: .publish_crypt
     distros:
     - ubuntu1804-test
   - name: test_packages
@@ -1467,7 +1467,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu2004
     compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: ubuntu2004
     multiversion_edition: enterprise
     has_packages: true
@@ -1481,8 +1481,8 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu2004-large
-  - name: .csfle
-  - name: .publish_csfle
+  - name: .crypt
+  - name: .publish_crypt
   - name: .aggfuzzer .common !.multiversion
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -1522,7 +1522,7 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-enterprise-ubuntu2004
     compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager_enterprise.py
@@ -1554,8 +1554,8 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
-  - name: .csfle
-  - name: .publish_csfle
+  - name: .crypt
+  - name: .publish_crypt
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -1702,10 +1702,10 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
   - name: .concurrency .common
-  - name: .csfle
+  - name: .crypt
     distros:
     - windows-vsCurrent-large
-  - name: .publish_csfle
+  - name: .publish_crypt
     distros:
     - rhel70-small
   - name: disk_wiredtiger
@@ -1868,8 +1868,8 @@ buildvariants:
   - name: push
     distros:
     - rhel70-small
-  - name: .csfle
-  - name: .publish_csfle
+  - name: .crypt
+  - name: .publish_crypt
     distros:
     - rhel70-small
 
@@ -1907,7 +1907,7 @@ buildvariants:
   - name: push
     distros:
     - rhel70-small
-  - name: .csfle
-  - name: .publish_csfle
+  - name: .crypt
+  - name: .publish_crypt
     distros:
     - rhel70-small

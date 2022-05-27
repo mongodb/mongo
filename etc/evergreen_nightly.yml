@@ -125,7 +125,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
     distros:
     - windows-vsCurrent-large
-  - name: .csfle
+  - name: .crypt
     distros:
     - windows-vsCurrent-large
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
@@ -166,7 +166,7 @@ buildvariants:
   expansions: &enterprise-rhel-80-64-bit-dynamic-required-expansions
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
-    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     has_packages: false
@@ -282,10 +282,10 @@ buildvariants:
   - name: .sharding .common
   - name: snmp
   - name: .stitch
-  - name: .csfle
+  - name: .crypt
     distros:
     - rhel80-xlarge
-  - name: csfle_build_debug_and_test
+  - name: crypt_build_debug_and_test
     distros:
     - rhel80-xlarge
   - name: .updatefuzzer
