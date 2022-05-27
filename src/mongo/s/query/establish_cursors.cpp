@@ -304,14 +304,15 @@ void CursorEstablisher::_killOpOnShards(ServiceContext* srvCtx,
     auto opCtx = tc->makeOperationContext();
 
     for (auto&& host : remotes) {
+        executor::RemoteCommandRequest::Options options;
+        options.fireAndForget = true;
         executor::RemoteCommandRequest request(
             host,
             "admin",
             BSON("_killOperations" << 1 << "operationKeys" << BSON_ARRAY(opKey)),
             opCtx.get(),
             executor::RemoteCommandRequestBase::kNoTimeout,
-            boost::none,
-            executor::RemoteCommandRequestBase::FireAndForgetMode::kOn);
+            options);
 
         // We do not process the response to the killOperations request (we make a good-faith
         // attempt at cleaning up the cursors, but ignore any returned errors).

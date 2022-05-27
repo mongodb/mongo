@@ -148,11 +148,11 @@ private:
          * Return the maximum amount of requests that can come from this command.
          */
         size_t maxConcurrentRequests() const noexcept {
-            if (!requestOnAny.hedgeOptions) {
-                return 1ull;
+            if (!requestOnAny.options.isHedgeEnabled) {
+                return 1;
             }
 
-            return requestOnAny.hedgeOptions->count + 1ull;
+            return requestOnAny.options.hedgeCount + 1;
         }
 
         /**

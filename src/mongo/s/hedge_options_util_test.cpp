@@ -72,13 +72,12 @@ protected:
         setParameters(serverParameters);
 
         auto readPref = uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(rspObj));
-        auto hedgeOptions = extractHedgeOptions(cmdObj, readPref);
+        executor::RemoteCommandRequest::Options options;
+        extractHedgeOptions(cmdObj, readPref, options);
 
+        ASSERT_EQ(hedge, options.isHedgeEnabled);
         if (hedge) {
-            ASSERT_TRUE(hedgeOptions.has_value());
-            ASSERT_EQ(hedgeOptions->maxTimeMSForHedgedReads, maxTimeMSForHedgedReads);
-        } else {
-            ASSERT_FALSE(hedgeOptions.has_value());
+            ASSERT_EQ(options.maxTimeMSForHedgedReads, maxTimeMSForHedgedReads);
         }
     }
 

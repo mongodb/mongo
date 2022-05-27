@@ -320,9 +320,7 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(
         std::move(request.dbname), std::move(request.cmdObj), std::move(request.metadata));
     opMsgRequest.securityToken = request.securityToken;
-    auto fireAndForget =
-        request.fireAndForgetMode == executor::RemoteCommandRequest::FireAndForgetMode::kOn;
-    return runCommand(std::move(opMsgRequest), baton, fireAndForget)
+    return runCommand(std::move(opMsgRequest), baton, request.options.fireAndForget)
         .then([this, startTimer = std::move(startTimer)](rpc::UniqueReply response) {
             return executor::RemoteCommandResponse(*response, startTimer.elapsed());
         });

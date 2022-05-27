@@ -232,13 +232,10 @@ auto AsyncRequestsSender::RemoteData::scheduleRemoteCommand(std::vector<HostAndP
                                              HostAndPort(data.getStringField("hostAndPort"))));
         });
 
-    auto hedgeOptions = extractHedgeOptions(_cmdObj, _ars->_readPreference);
-    executor::RemoteCommandRequestOnAny request(std::move(hostAndPorts),
-                                                _ars->_db,
-                                                _cmdObj,
-                                                _ars->_metadataObj,
-                                                _ars->_opCtx,
-                                                hedgeOptions);
+    executor::RemoteCommandRequestOnAny::Options options;
+    extractHedgeOptions(_cmdObj, _ars->_readPreference, options);
+    executor::RemoteCommandRequestOnAny request(
+        std::move(hostAndPorts), _ars->_db, _cmdObj, _ars->_metadataObj, _ars->_opCtx, options);
 
     // We have to make a promise future pair because the TaskExecutor doesn't currently support a
     // future returning variant of scheduleRemoteCommand

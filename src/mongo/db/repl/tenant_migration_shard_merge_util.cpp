@@ -311,7 +311,7 @@ SemiFuture<void> keepBackupCursorAlive(CancellationSource cancellationSource,
         namespaceString.db().toString(),
         std::move(BSON("getMore" << cursorId << "collection" << namespaceString.coll().toString())),
         nullptr);
-    getMoreRequest.fireAndForgetMode = executor::RemoteCommandRequest::FireAndForgetMode::kOn;
+    getMoreRequest.options.fireAndForget = true;
 
     return AsyncTry([executor, getMoreRequest, cancellationSource] {
                return executor->scheduleRemoteCommand(std::move(getMoreRequest),

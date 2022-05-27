@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <algorithm>
 #include <exception>
 #include <memory>
@@ -172,13 +170,10 @@ public:
         ASSERT_EQ(getInProgress(), 0);
     }
 
-    RemoteCommandRequest makeTestCommand(
-        Milliseconds timeout,
-        BSONObj cmd,
-        OperationContext* opCtx = nullptr,
-        boost::optional<RemoteCommandRequest::HedgeOptions> hedgeOptions = boost::none,
-        RemoteCommandRequest::FireAndForgetMode fireAndForgetMode =
-            RemoteCommandRequest::FireAndForgetMode::kOff) {
+    RemoteCommandRequest makeTestCommand(Milliseconds timeout,
+                                         BSONObj cmd,
+                                         OperationContext* opCtx = nullptr,
+                                         RemoteCommandRequest::Options options = {}) {
         auto cs = fixture();
         return RemoteCommandRequest(cs.getServers().front(),
                                     "admin",
@@ -186,8 +181,7 @@ public:
                                     BSONObj(),
                                     opCtx,
                                     timeout,
-                                    hedgeOptions,
-                                    fireAndForgetMode);
+                                    std::move(options));
     }
 
     BSONObj makeEchoCmdObj() {
@@ -373,13 +367,12 @@ TEST_F(NetworkInterfaceTest, CancelRemotely) {
 
     auto cbh = makeCallbackHandle();
     auto deferred = [&] {
+        RemoteCommandRequest::Options options;
+        options.isHedgeEnabled = true;
         // Kick off an "echo" operation, which should block until cancelCommand causes
         // the operation to be killed.
-        auto deferred = runCommand(cbh,
-                                   makeTestCommand(kNoTimeout,
-                                                   makeEchoCmdObj(),
-                                                   nullptr /* opCtx */,
-                                                   RemoteCommandRequest::HedgeOptions()));
+        auto deferred = runCommand(
+            cbh, makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, options));
 
         // Wait for the "echo" operation to start.
         numCurrentOpRan += waitForCommandToStart("echo", kMaxWait);
@@ -431,12 +424,11 @@ TEST_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
 
     auto cbh = makeCallbackHandle();
     auto deferred = [&] {
+        RemoteCommandRequest::Options options;
+        options.isHedgeEnabled = true;
         // Kick off a blocking "echo" operation.
-        auto deferred = runCommand(cbh,
-                                   makeTestCommand(kNoTimeout,
-                                                   makeEchoCmdObj(),
-                                                   nullptr /* opCtx */,
-                                                   RemoteCommandRequest::HedgeOptions()));
+        auto deferred = runCommand(
+            cbh, makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, options));
 
         // Wait for the "echo" operation to start.
         numCurrentOpRan += waitForCommandToStart("echo", kMaxWait);
@@ -597,8 +589,9 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
 }
 
 TEST_F(NetworkInterfaceTest, StartCommand) {
-    auto request = makeTestCommand(
-        kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, RemoteCommandRequest::HedgeOptions());
+    RemoteCommandRequest::Options options;
+    options.isHedgeEnabled = true;
+    auto request = makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, options);
 
     auto deferred = runCommand(makeCallbackHandle(), std::move(request));
 
@@ -640,13 +633,12 @@ TEST_F(NetworkInterfaceTest, FireAndForget) {
     const int numFireAndForgetRequests = 3;
     std::vector<Future<RemoteCommandResponse>> futures;
 
+    RemoteCommandRequest::Options options;
+    options.fireAndForget = true;
     for (int i = 0; i < numFireAndForgetRequests; i++) {
         auto cbh = makeCallbackHandle();
-        auto fireAndForgetRequest = makeTestCommand(kNoTimeout,
-                                                    makeEchoCmdObj(),
-                                                    nullptr /* opCtx */,
-                                                    boost::none /* hedgeOptions */,
-                                                    RemoteCommandRequest::FireAndForgetMode::kOn);
+        auto fireAndForgetRequest =
+            makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, options);
         futures.push_back(runCommand(cbh, fireAndForgetRequest));
     }
 
@@ -677,8 +669,9 @@ TEST_F(NetworkInterfaceInternalClientTest, StartCommandOnAny) {
     auto commandRequest = makeEchoCmdObj();
     auto request = [&] {
         auto cs = fixture();
-        RemoteCommandRequestBase::HedgeOptions ho;
-        ho.count = 1;
+        RemoteCommandRequestBase::Options options;
+        options.isHedgeEnabled = true;
+        options.hedgeCount = 1;
 
         return RemoteCommandRequestOnAny({cs.getServers()},
                                          "admin",
@@ -686,7 +679,7 @@ TEST_F(NetworkInterfaceInternalClientTest, StartCommandOnAny) {
                                          BSONObj(),
                                          nullptr,
                                          RemoteCommandRequest::kNoTimeout,
-                                         ho);
+                                         options);
     }();
 
     auto deferred = runCommandOnAny(makeCallbackHandle(), std::move(request));
