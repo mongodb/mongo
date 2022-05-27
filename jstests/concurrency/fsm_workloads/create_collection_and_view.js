@@ -34,15 +34,14 @@ var $config = (function() {
     const states = {
         init: (db, collName) => {},
         createView: (db, collName) => {
-            // The view creation code may uassert with code 17399 if Collection already exist. In a
-            // sharded collection, we may sometimes get a NamespaceNotFound error, as we attempt to
-            // to do some additional validation on the creation options after we get back the
-            // NamespaceExists error, and the namespace may have been dropped in the meantime.
+            // In a sharded collection, we may sometimes get a NamespaceNotFound error, as we
+            // attempt to to do some additional validation on the creation options after we get back
+            // the NamespaceExists error, and the namespace may have been dropped in the meantime.
             assertAlways.commandWorkedOrFailedWithCode(
                 db.createCollection(
                     getCollectionName(collName),
                     {viewOn: getBaseCollectionName(collName), pipeline: [{$match: {}}]}),
-                [ErrorCodes.NamespaceExists, 17399, ErrorCodes.NamespaceNotFound]);
+                [ErrorCodes.NamespaceExists, ErrorCodes.NamespaceNotFound]);
         },
         createCollection: (db, collName) => {
             // In a sharded collection, we may sometimes get a NamespaceNotFound error. See above.

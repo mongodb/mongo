@@ -743,7 +743,7 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
                                              const CollectionOptions& options) const {
     if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
         if (options.isView()) {
-            uasserted(17399,
+            uasserted(ErrorCodes::NamespaceExists,
                       str::stream()
                           << "Cannot create collection " << nss << " - collection already exists.");
         } else {
