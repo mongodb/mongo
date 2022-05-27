@@ -441,11 +441,11 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
                         "allowMigrations"_attr = coll.getAllowMigrations(),
                         "permitMigrations"_attr = coll.getPermitMigrations(),
                         "defragmentCollection"_attr = coll.getDefragmentCollection());
-            continue;
+        } else {
+            collBatch.push_back(coll);
         }
 
-        collBatch.push_back(coll);
-        if (collBatch.size() < kStatsForBalancingBatchSize && collIt < collections.end()) {
+        if (collBatch.size() < kStatsForBalancingBatchSize && collIt != collections.end()) {
             // keep Accumulating in the batch
             continue;
         }
