@@ -790,6 +790,14 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: false
 
+  internalCascadesOptimizerStdCoutDebugOutput:
+    description: "Enables verbose, non-JSON, debug output for Cascades optimizer."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerStdCoutDebugOutput"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+    test_only: true
+
   internalQueryFrameworkControl:
     description: "Knob to control the optimizer/execution engine to use."
     set_at: [ startup, runtime ]

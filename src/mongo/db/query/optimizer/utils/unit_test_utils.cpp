@@ -45,12 +45,14 @@ void maybePrintABT(const ABT& abt) {
     // Always print using the supported versions to make sure we don't crash.
     const std::string strV1 = ExplainGenerator::explain(abt);
     const std::string strV2 = ExplainGenerator::explainV2(abt);
+    const std::string strV2Compact = ExplainGenerator::explainV2Compact(abt);
     auto [tag, val] = ExplainGenerator::explainBSON(abt);
     sbe::value::ValueGuard vg(tag, val);
 
     if constexpr (kDebugAsserts) {
         std::cout << "V1: " << strV1 << "\n";
         std::cout << "V2: " << strV2 << "\n";
+        std::cout << "V2Compact: " << strV2Compact << "\n";
         std::cout << "BSON: " << ExplainGenerator::printBSON(tag, val) << "\n";
     }
 }

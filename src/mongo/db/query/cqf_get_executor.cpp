@@ -274,7 +274,7 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
     }
 
     {
-        const std::string explain = ExplainGenerator::explainV2(
+        const std::string explain = ExplainGenerator::explainV2Compact(
             make<MemoPhysicalDelegatorNode>(phaseManager.getPhysicalNodeId()),
             true /*displayPhysicalProperties*/,
             &phaseManager.getMemo());
@@ -520,7 +520,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     }
 
     OPTIMIZER_DEBUG_LOG(
-        6264803, 5, "Translated ABT", "explain"_attr = ExplainGenerator::explainV2(abt));
+        6264803, 5, "Translated ABT", "explain"_attr = ExplainGenerator::explainV2Compact(abt));
 
     const int64_t numRecords = collectionExists ? collection->numRecords(opCtx) : -1;
 

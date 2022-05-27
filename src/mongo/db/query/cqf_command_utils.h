@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/query/query_knobs_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-constexpr bool kMongoOptimizerStdCoutDebugOutput = false;
 
 namespace mongo {
 
@@ -57,7 +57,7 @@ void coutPrint(const std::string& msg, const logv2::detail::NamedArg<Args>&... a
 
 #define OPTIMIZER_DEBUG_LOG(ID, DLEVEL, FMTSTR_MESSAGE, ...) \
     LOGV2_DEBUG(ID, DLEVEL, FMTSTR_MESSAGE, ##__VA_ARGS__);  \
-    if (kMongoOptimizerStdCoutDebugOutput)                   \
+    if (internalCascadesOptimizerStdCoutDebugOutput.load())  \
         ::mongo::coutPrint(FMTSTR_MESSAGE, __VA_ARGS__);
 
 /**

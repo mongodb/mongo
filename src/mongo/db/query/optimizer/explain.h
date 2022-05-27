@@ -75,6 +75,13 @@ public:
                                  const cascades::Memo* memo = nullptr,
                                  const NodeToGroupPropsMap& nodeMap = {});
 
+    // Optionally display logical and physical properties using the memo.
+    // whenever memo delegators are printed.
+    static std::string explainV2Compact(const ABT& node,
+                                        bool displayProperties = false,
+                                        const cascades::Memo* memo = nullptr,
+                                        const NodeToGroupPropsMap& nodeMap = {});
+
     static std::string explainNode(const ABT& node);
 
     static std::pair<sbe::value::TypeTags, sbe::value::Value> explainBSON(

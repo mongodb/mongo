@@ -698,5 +698,35 @@ TEST(Properties, Basic) {
     }
 }
 
+TEST(Explain, ExplainV2Compact) {
+    ABT pathNode =
+        make<PathGet>("a",
+                      make<PathTraverse>(
+                          make<PathComposeM>(
+                              make<PathCompare>(Operations::Gte,
+                                                make<UnaryOp>(Operations::Neg, Constant::int64(2))),
+                              make<PathCompare>(Operations::Lt, Constant::int64(7))),
+                          1));
+    ABT scanNode = make<ScanNode>("x1", "test");
+    ABT evalNode = make<EvaluationNode>(
+        "x2", make<EvalPath>(pathNode, make<Variable>("a")), std::move(scanNode));
+
+    ASSERT_EXPLAIN_V2Compact(
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [x2]\n"
+        "|           EvalPath []\n"
+        "|           |   Variable [a]\n"
+        "|           PathGet [a] PathTraverse [1] PathComposeM []\n"
+        "|           |   PathCompare [Lt] Const [7]\n"
+        "|           PathCompare [Gte] UnaryOp [Neg] Const [2]\n"
+        "Scan [test]\n"
+        "    BindBlock:\n"
+        "        [x1]\n"
+        "            Source []\n",
+        evalNode);
+}
+
+
 }  // namespace
 }  // namespace mongo::optimizer

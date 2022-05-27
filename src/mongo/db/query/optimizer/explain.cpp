@@ -43,7 +43,7 @@ BSONObj ABTPrinter::explainBSON() const {
         _abtTree, true /*displayProperties*/, nullptr /*Memo*/, _nodeToPropsMap);
 }
 
-enum class ExplainVersion { V1, V2, V3, Vmax };
+enum class ExplainVersion { V1, V2, V2Compact, V3, Vmax };
 
 bool constexpr operator<(const ExplainVersion v1, const ExplainVersion v2) {
     return static_cast<int>(v1) < static_cast<int>(v2);
@@ -72,6 +72,18 @@ struct CommandStruct {
 
 using CommandVector = std::vector<CommandStruct>;
 
+/**
+ * Helper class for building indented, multiline strings.
+ *
+ * The main operations it supports are:
+ *   - Print a single value, of any type that supports '<<' to std::ostream.
+ *   - Indent/unindent, and add newlines.
+ *   - Print another ExplainPrinterImpl, preserving its 2D layout.
+ *
+ * Being able to print another whole printer makes it easy to build these 2D strings
+ * bottom-up, without passing around a std::ostream. It also allows displaying
+ * child elements in a different order than they were visited.
+ */
 template <const ExplainVersion version = kDefaultExplainVersion>
 class ExplainPrinterImpl {
 public:
@@ -81,6 +93,7 @@ public:
           _osDirty(false),
           _indentCount(0),
           _childrenRemaining(0),
+          _inlineNextChild(false),
           _cmdInsertPos(-1) {}
 
     ~ExplainPrinterImpl() {
@@ -101,6 +114,7 @@ public:
           _osDirty(other._osDirty),
           _indentCount(other._indentCount),
           _childrenRemaining(other._childrenRemaining),
+          _inlineNextChild(other._inlineNextChild),
           _cmdInsertPos(other._cmdInsertPos) {}
 
     template <class T>
@@ -140,12 +154,20 @@ public:
     }
 
     ExplainPrinterImpl& setChildCount(const size_t childCount) {
-        if (version > ExplainVersion::V1) {
+        if (version == ExplainVersion::V1) {
+            return *this;
+        }
+
+        if (version == ExplainVersion::V2Compact && childCount == 1) {
+            _inlineNextChild = true;
             _childrenRemaining = childCount;
-            indent("");
-            for (int i = 0; i < _childrenRemaining - 1; i++) {
-                indent("|");
-            }
+            return *this;
+        }
+
+        _childrenRemaining = childCount;
+        indent("");
+        for (int i = 0; i < _childrenRemaining - 1; i++) {
+            indent("|");
         }
         return *this;
     }
@@ -205,6 +227,10 @@ public:
         return os.str();
     }
 
+    /**
+     * Ends the current line, if there is one. Repeated calls do not create
+     * blank lines.
+     */
     void newLine() {
         if (!_osDirty) {
             return;
@@ -251,8 +277,25 @@ private:
                     _os << element._str;
                 }
             }
+        } else if (_inlineNextChild) {
+            _inlineNextChild = false;
+            // Print 'other' without starting a new line.
+            // Embed its first line into our current one, and keep the rest of its commands.
+            bool first = true;
+            for (const CommandStruct& element : other.getCommands()) {
+                if (first && element._type == CommandType::AddLine) {
+                    _os << singleLevelSpacer << element._str;
+                } else {
+                    newLine();
+                    _cmd.push_back(element);
+                }
+                first = false;
+            }
         } else {
             newLine();
+            // If 'hadChildrenRemaining' then 'other' represents a child of 'this', which means
+            // there was a prior call to setChildCount() that added indentation for it.
+            // If '! hadChildrenRemaining' then create indentation for it now.
             if (!hadChildrenRemaining) {
                 indent();
             }
@@ -281,11 +324,22 @@ private:
         _cmd.emplace_back(CommandType::Unindent, "");
     }
 
+    // Holds completed lines, and indent/unIndent commands.
+    // When '_cmdInsertPos' is nonnegative, some of these lines and commands belong
+    // after the currently-being-built line.
     CommandVector _cmd;
+    // Holds the incomplete line currently being built. Once complete this will become the last
+    // line, unless '_cmdInsertPos' is nonnegative.
     std::ostringstream _os;
+    // True means we have an incomplete line in '_os'.
+    // Once the line is completed with newLine(), this flag is false until
+    // we begin building a new one with print().
     bool _osDirty;
     int _indentCount;
     int _childrenRemaining;
+    bool _inlineNextChild;
+    // When nonnegative, indicates the insertion point where completed lines
+    // should be added to '_cmd'. -1 means completed lines will be added at the end.
     int _cmdInsertPos;
 };
 
@@ -2302,6 +2356,14 @@ std::string ExplainGenerator::explainV2(const ABT& node,
                                         const cascades::Memo* memo,
                                         const NodeToGroupPropsMap& nodeMap) {
     ExplainGeneratorTransporter<ExplainVersion::V2> gen(displayProperties, memo, nodeMap);
+    return gen.generate(node).str();
+}
+
+std::string ExplainGenerator::explainV2Compact(const ABT& node,
+                                               const bool displayProperties,
+                                               const cascades::Memo* memo,
+                                               const NodeToGroupPropsMap& nodeMap) {
+    ExplainGeneratorTransporter<ExplainVersion::V2Compact> gen(displayProperties, memo, nodeMap);
     return gen.generate(node).str();
 }
 

@@ -49,6 +49,10 @@ void maybePrintABT(const ABT& abt);
     maybePrintABT(abt);                  \
     ASSERT_EQ(expected, ExplainGenerator::explainV2(abt))
 
+#define ASSERT_EXPLAIN_V2Compact(expected, abt) \
+    maybePrintABT(abt);                         \
+    ASSERT_EQ(expected, ExplainGenerator::explainV2Compact(abt))
+
 #define ASSERT_EXPLAIN_BSON(expected, abt) \
     maybePrintABT(abt);                    \
     ASSERT_EQ(expected, ExplainGenerator::explainBSON(abt))
