@@ -240,6 +240,10 @@ public:
         return ReshardingMetrics::get(serviceContext);
     }
 
+    BSONObj newShardKeyPattern() {
+        return BSON("newKey" << 1);
+    }
+
     ReshardingRecipientDocument makeStateDocument(bool isAlsoDonor) {
         RecipientShardContext recipientCtx;
         recipientCtx.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
@@ -257,7 +261,7 @@ public:
                                      sourceNss,
                                      sourceUUID,
                                      constructTemporaryReshardingNss(sourceNss.db(), sourceUUID),
-                                     BSON("newKey" << 1));
+                                     newShardKeyPattern());
 
         doc.setCommonReshardingMetadata(std::move(commonMetadata));
         return doc;
@@ -635,7 +639,8 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
     NamespaceString sourceNss = constructTemporaryReshardingNss("sourcedb", doc.getSourceUUID());
 
     FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
-    findRequest.setFilter(BSON("ns" << sourceNss.toString()));
+    findRequest.setFilter(
+        BSON("ns" << sourceNss.toString() << "o2.reshardDoneCatchUp" << BSON("$exists" << true)));
     auto cursor = client.find(std::move(findRequest));
 
     ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";
@@ -654,6 +659,51 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
     ASSERT_TRUE(receivedChangeEvent == expectedChangeEvent);
     ASSERT_TRUE(op.getFromMigrate());
     ASSERT_FALSE(bool(op.getDestinedRecipient())) << op.getEntry();
+}
+
+TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardCollection) {
+    boost::optional<PauseDuringStateTransitions> doneTransitionGuard;
+    doneTransitionGuard.emplace(controller(), RecipientStateEnum::kDone);
+
+    auto doc = makeStateDocument(false /* isAlsoDonor */);
+    auto opCtx = makeOperationContext();
+    auto rawOpCtx = opCtx.get();
+    RecipientStateMachine::insertStateDocument(rawOpCtx, doc);
+    auto recipient = RecipientStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
+
+    notifyToStartCloning(rawOpCtx, *recipient, doc);
+    notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+
+    doneTransitionGuard->wait(RecipientStateEnum::kDone);
+
+    stepDown();
+    doneTransitionGuard.reset();
+    ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
+              ErrorCodes::InterruptedDueToReplStateChange);
+
+    DBDirectClient client(opCtx.get());
+    NamespaceString sourceNss = constructTemporaryReshardingNss("sourcedb", doc.getSourceUUID());
+
+    FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
+    findRequest.setFilter(
+        BSON("ns" << sourceNss.toString() << "o2.shardCollection" << BSON("$exists" << true)));
+    auto cursor = client.find(std::move(findRequest));
+
+    ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";
+    repl::OplogEntry shardCollectionOp(cursor->next());
+
+    ASSERT_EQ(OpType_serializer(shardCollectionOp.getOpType()),
+              OpType_serializer(repl::OpTypeEnum::kNoop))
+        << shardCollectionOp.getEntry();
+    ASSERT_EQ(*shardCollectionOp.getUuid(), doc.getReshardingUUID())
+        << shardCollectionOp.getEntry();
+    ASSERT_EQ(shardCollectionOp.getObject()["msg"].type(), BSONType::Object)
+        << shardCollectionOp.getEntry();
+    ASSERT_FALSE(shardCollectionOp.getFromMigrate());
+
+    auto shardCollEventExpected =
+        BSON("shardCollection" << sourceNss.toString() << "shardKey" << newShardKeyPattern());
+    ASSERT_BSONOBJ_EQ(*shardCollectionOp.getObject2(), shardCollEventExpected);
 }
 
 TEST_F(ReshardingRecipientServiceTest, TruncatesXLErrorOnRecipientDocument) {

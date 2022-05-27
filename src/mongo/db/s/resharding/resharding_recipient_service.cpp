@@ -41,6 +41,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/collation/collation_spec.h"
+#include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -647,6 +648,17 @@ void ReshardingRecipientService::RecipientStateMachine::
                     true /* enforceUniquenessCheck */,
                     shardkeyutil::ValidationBehaviorsShardCollection(opCtx.get()));
             });
+
+        // We add a fake 'shardCollection' notification here so that the C2C replicator can sync the
+        // resharding operation to the target cluster. The only information we have is the shard
+        // key, but all other fields must either be default-valued or are ignored by C2C.
+        // TODO SERVER-66671: The 'createCollRequest' should include the full contents of the
+        // CreateCollectionRequest rather than just the 'shardKey' field.
+        const auto createCollRequest = BSON("shardKey" << _metadata.getReshardingKey().toBSON());
+        notifyChangeStreamsOnShardCollection(opCtx.get(),
+                                             _metadata.getTempReshardingNss(),
+                                             _metadata.getReshardingUUID(),
+                                             createCollRequest);
     }
 
     _transitionToCloning(factory);

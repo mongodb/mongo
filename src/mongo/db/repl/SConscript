@@ -40,6 +40,20 @@ env.Library(
 )
 
 env.Library(
+    target='change_stream_oplog_notification',
+    source=[
+        'change_stream_oplog_notification.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/dbhelpers',
+        'oplog',
+        'oplog_entry',
+    ],
+)
+
+env.Library(
     target='oplog',
     source=[
         'apply_ops.cpp',

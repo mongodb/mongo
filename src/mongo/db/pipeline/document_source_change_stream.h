@@ -246,9 +246,10 @@ public:
 
     // Default regex for collections match which prohibits system collections.
     static constexpr StringData kRegexAllCollections = R"((?!(\$|system\.)))"_sd;
-    // Regex matching all regular collections plus certain system collections.
+
+    // Regex matching all user collections plus collections exposed when 'showSystemEvents' is set.
     static constexpr StringData kRegexAllCollectionsShowSystemEvents =
-        R"((?!(\$|system\.(?!(js$)))))"_sd;
+        R"((?!(\$|system\.(?!(js$|resharding\.)))))"_sd;
 
     static constexpr StringData kRegexAllDBs = R"(^(?!(admin|config|local)\.)[^.]+)"_sd;
     static constexpr StringData kRegexCmdColl = R"(\$cmd$)"_sd;

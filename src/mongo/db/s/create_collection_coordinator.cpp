@@ -41,6 +41,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/recoverable_critical_section_service.h"
@@ -354,42 +355,6 @@ void broadcastDropCollection(OperationContext* opCtx,
 
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
         opCtx, nss, participants, executor, osi);
-}
-
-/**
- * This function writes a no-op oplog entry on shardCollection event.
- */
-void _writeOplogMessage(OperationContext* opCtx,
-                        const NamespaceString& nss,
-                        const UUID& uuid,
-                        const BSONObj cmd) {
-    BSONObjBuilder cmdBuilder;
-    cmdBuilder.append("shardCollection", nss.ns());
-    cmdBuilder.appendElements(cmd);
-
-    BSONObj fullCmd = cmdBuilder.obj();
-
-    repl::MutableOplogEntry oplogEntry;
-    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
-    oplogEntry.setNss(nss);
-    oplogEntry.setUuid(uuid);
-    oplogEntry.setObject(BSON("msg" << BSON("shardCollection" << nss.ns())));
-    oplogEntry.setObject2(fullCmd);
-    oplogEntry.setOpTime(repl::OpTime());
-    oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
-
-    writeConflictRetry(
-        opCtx, "ShardCollectionWritesOplog", NamespaceString::kRsOplogNamespace.ns(), [&] {
-            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-            WriteUnitOfWork wunit(opCtx);
-            const auto& oplogOpTime = repl::logOp(opCtx, &oplogEntry);
-            uassert(8423339,
-                    str::stream() << "Failed to create new oplog entry for oplog with opTime: "
-                                  << oplogEntry.getOpTime().toString() << ": "
-                                  << redact(oplogEntry.toBSON()),
-                    !oplogOpTime.isNull());
-            wunit.commit();
-        });
 }
 
 }  // namespace
@@ -904,7 +869,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
     try {
         insertCollectionEntry(opCtx, nss(), coll, getCurrentSession(_doc));
 
-        _writeOplogMessage(opCtx, nss(), *_collectionUUID, _request.toBSON());
+        notifyChangeStreamsOnShardCollection(opCtx, nss(), *_collectionUUID, _request.toBSON());
 
         LOGV2_DEBUG(5277907, 2, "Collection successfully committed", "namespace"_attr = nss());
 

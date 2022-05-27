@@ -161,7 +161,7 @@ function isChangeStreamEventEq(actualEvent, expectedEvent) {
 function assertChangeStreamEventEq(actualEvent, expectedEvent) {
     assert(isChangeStreamEventEq(actualEvent, expectedEvent),
            () => "Change events did not match. Expected: " + tojsonMaybeTruncate(expectedEvent) +
-               ", Actual: " + tojsonMaybeTruncate(testEvent));
+               ", Actual: " + tojsonMaybeTruncate(actualEvent));
 }
 
 function ChangeStreamTest(_db, name = "ChangeStreamTest") {
