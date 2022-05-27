@@ -6,6 +6,8 @@
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   requires_fastcount,
+ *   # TODO SERVER-30466
+ *   does_not_support_causal_consistency,
  * ]
  */
 

@@ -1,6 +1,8 @@
 // Tests server parameter information shown by explain.
 // @tags: [
 //   does_not_support_stepdowns,
+//   # TODO SERVER-30466
+//   does_not_support_causal_consistency,
 // ]
 
 (function() {

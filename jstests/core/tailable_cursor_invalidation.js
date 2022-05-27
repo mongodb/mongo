@@ -1,6 +1,8 @@
 // @tags: [
 //   requires_capped,
 //   requires_getmore,
+//   # This test has statements that do not support non-local read concern.
+//   does_not_support_causal_consistency,
 // ]
 
 // Tests for the behavior of tailable cursors when a collection is dropped or the cursor is

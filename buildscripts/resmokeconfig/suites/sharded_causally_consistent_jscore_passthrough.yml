@@ -8,8 +8,6 @@ selector:
   - jstests/fle2/**/*.js
   - src/mongo/db/modules/*/jstests/fle2/*.js
   exclude_files:
-  # These tests are run in sharded_causally_consistent_jscore_txns_passthrough.
-  - jstests/core/txns/**/*.js
   # The following tests fail because a certain command or functionality is not supported by
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
@@ -47,36 +45,6 @@ selector:
   - jstests/core/dbcase2.js
   - jstests/core/no_db_created.js
   - jstests/core/killop_drop_collection.js # Uses fsyncLock.
-  # Tests that need triaging & remediation | denylist decision
-  # Comments list possible problem point under review.
-  - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
-  # Tests that fail for Causal Consistency as they have statements that do not support
-  # non-local read concern.
-  - jstests/core/geo_big_polygon3.js
-  - jstests/core/mr*.js
-  - jstests/core/collation.js
-  - jstests/core/loadserverscripts.js
-  - jstests/core/commands_namespace_parsing.js
-  - jstests/core/constructors.js
-  - jstests/core/views/views_all_commands.js
-  - jstests/core/or4.js
-  - jstests/core/recursion.js
-  # Parallel shell is not causally consistent
-  - jstests/core/benchrun_pipeline_updates.js
-  - jstests/core/cursora.js
-  - jstests/core/shellstartparallel.js
-  # TODO SERVER-30466
-  - jstests/core/explain_multi_plan.js
-  - jstests/core/explain_shell_helpers.js
-  - jstests/core/index_partial_read_ops.js
-  - jstests/core/explain_server_params.js
-  - jstests/core/update_arrayFilters.js
-  # The in memory structures are not causally consistent. Details are in DOCS-10626
-  - jstests/core/apitest_dbcollection.js
-  - jstests/core/getmore_invalidated_cursors.js
-  - jstests/core/orf.js #explain.executionStats is not CC
-  # The `dbstats` command builds in-memory structures that are not causally consistent.
-  - jstests/core/dbstats.js
 
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.
@@ -98,6 +66,10 @@ selector:
   - does_not_support_causal_consistency
   # system.profile collection doesn't exist on mongos.
   - requires_profiling
+  # These tests are run in sharded_causally_consistent_jscore_txns_passthrough.
+  - uses_transactions
+  # Parallel shell is not causally consistent because it uses a different session.
+  - uses_parallel_shell
 
 executor:
   archive:

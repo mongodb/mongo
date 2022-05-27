@@ -16,7 +16,6 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
-  - jstests/core/txns/**/*.js
   # Skip any tests that run with auth explicitly.
   - jstests/core/*[aA]uth*.js
 
@@ -108,8 +107,6 @@ selector:
   - jstests/core/verify_update_mods.js
   - jstests/core/views/invalid_system_views.js
   - jstests/core/views/views_all_commands.js
-  # Causes CappedPositionLost on recipient, which is not recoverable
-  - jstests/core/rename_collection_capped.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
   # These tests run getMore commands which are not supported in the tenant migration passthrough.
@@ -138,6 +135,7 @@ selector:
   # Full validation can cause ongoing queries to fail. This can affect the tenant migration
   # process.
   - uses_full_validation
+  - uses_transactions
 
 executor:
   archive:

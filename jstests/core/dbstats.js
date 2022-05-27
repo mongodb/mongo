@@ -2,7 +2,9 @@
 //
 // @tags: [
 //   requires_dbstats,
-//   requires_fcv_53
+//   requires_fcv_53,
+//   # The `dbstats` command builds in-memory structures that are not causally consistent.
+//   does_not_support_causal_consistency,
 // ]
 
 (function() {

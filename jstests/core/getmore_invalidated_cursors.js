@@ -3,6 +3,8 @@
 //   requires_collstats,
 //   requires_getmore,
 //   requires_non_retryable_commands,
+//   # In-memory data structures are not causally consistent.
+//   does_not_support_causal_consistency,
 // ]
 
 // Tests that running a getMore on a cursor that has been invalidated by something like a collection

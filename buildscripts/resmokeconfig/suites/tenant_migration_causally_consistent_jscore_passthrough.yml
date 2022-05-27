@@ -13,48 +13,8 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
-  - jstests/core/txns/**/*.js
   # Skip any tests that run with auth explicitly.
   - jstests/core/*[aA]uth*.js
-
-  #
-  # Denylists from causally_consistent_jscore_passthrough.yml
-  #
-
-  - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
-  # Tests that fail for Causal Consistency as they have statements that do not support
-  # non-local read concern.
-  - jstests/core/geo_big_polygon3.js
-  - jstests/core/mr*.js
-  - jstests/core/collation.js
-  - jstests/core/loadserverscripts.js
-  - jstests/core/bypass_doc_validation.js
-  - jstests/core/commands_namespace_parsing.js
-  - jstests/core/tailable_cursor_invalidation.js
-  - jstests/core/tailable_getmore_batch_size.js
-  - jstests/core/tailable_skip_limit.js
-  - jstests/core/constructors.js
-  - jstests/core/views/views_all_commands.js
-  - jstests/core/or4.js
-  - jstests/core/recursion.js
-  # An index drop does not necessarily cause cursors to be killed on the secondary.
-  - jstests/core/ord.js
-  # The `dbstats` command builds in-memory structures that are not causally consistent.
-  - jstests/core/dbstats.js
-  # TODO SERVER-30466
-  - jstests/core/explain_multi_plan.js
-  - jstests/core/explain_shell_helpers.js
-  - jstests/core/index_partial_read_ops.js
-  - jstests/core/update_arrayFilters.js
-  # TODO SERVER-30488
-  # In-memory data structures are not causally consistent.
-  - jstests/core/apitest_dbcollection.js
-  - jstests/core/getmore_invalidated_cursors.js
-  - jstests/core/orf.js #explain.executionStats is not CC
-  # getMore is not causally consistent if collection is dropped
-  - jstests/core/drop3.js
-  # Explain format is not the same
-  - jstests/core/or_to_in.js # queryPlanner in different spot in explain()
 
   #
   # Denylists from session_jscore_passthrough.yml
@@ -67,9 +27,6 @@ selector:
   # Unacknowledged writes prohibited in an explicit session.
   - jstests/core/crud_api.js
   - jstests/core/batch_write_command_w0.js
-
-  # Causes CappedPositionLost on recipient, which is not recoverable.
-  - jstests/core/rename_collection_capped.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
@@ -104,6 +61,9 @@ selector:
   # process.
   - uses_full_validation
   - tenant_migration_incompatible
+  - uses_transactions
+  # Parallel shell is not causally consistent because it uses a different session.
+  - uses_parallel_shell
 
 executor:
   archive:

@@ -3,7 +3,9 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
-//   requires_fcv_51
+//   requires_fcv_51,
+//   # TODO SERVER-30466
+//   does_not_support_causal_consistency,
 // ]
 
 // Read ops tests for partial indexes.

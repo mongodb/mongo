@@ -3,6 +3,8 @@
 //   requires_fastcount,
 //   requires_getmore,
 //   requires_non_retryable_writes,
+//   # This test has statements that do not support non-local read concern.
+//   does_not_support_causal_consistency,
 // ]
 
 load("jstests/aggregation/extras/utils.js");  // For resultsEq

@@ -2,6 +2,8 @@
 // @tags: [
 //   assumes_balancer_off,
 //   assumes_read_concern_local,
+//   # `explain.executionStats` is not causally consistent.
+//   does_not_support_causal_consistency,
 // ]
 
 (function() {

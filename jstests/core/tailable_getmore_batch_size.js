@@ -1,6 +1,8 @@
 // @tags: [
 //   requires_capped,
 //   requires_getmore,
+//   # This test has statements that do not support non-local read concern.
+//   does_not_support_causal_consistency,
 // ]
 
 // Tests for the behavior of combining the tailable and awaitData options to the getMore command

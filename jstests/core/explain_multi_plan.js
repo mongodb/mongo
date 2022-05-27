@@ -3,6 +3,8 @@
 //   # update/delete on a sharded collection must contain an exact match on _id or contain the shard
 //   # key.
 //   assumes_unsharded_collection,
+//   # TODO SERVER-30466
+//   does_not_support_causal_consistency,
 // ]
 
 /**

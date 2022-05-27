@@ -1,4 +1,8 @@
-// @tags: [requires_getmore]
+// @tags: [
+//   requires_getmore,
+//   # getMore is not causally consistent if collection is dropped.
+//   does_not_support_causal_consistency,
+// ]
 
 t = db.jstests_drop3;
 sub = t.sub;

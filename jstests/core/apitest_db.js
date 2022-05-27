@@ -1,4 +1,6 @@
-// @tags: [does_not_support_stepdowns]
+// @tags: [
+//   does_not_support_stepdowns,
+// ]
 
 /**
  *   Tests for the db object enhancement

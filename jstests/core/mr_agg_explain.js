@@ -2,6 +2,8 @@
  * Tests that running mapReduce with explain behaves as expected.
  * @tags: [
  *   incompatible_with_embedded,
+ *   # mapReduce does not support afterClusterTime.
+ *   does_not_support_causal_consistency,
  * ]
  */
 (function() {

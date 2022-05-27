@@ -6,6 +6,8 @@
  *   requires_capped,
  *   requires_collstats,
  *   requires_fastcount,
+ *   # In-memory data structures are not causally consistent.
+ *   does_not_support_causal_consistency,
  * ]
  */
 

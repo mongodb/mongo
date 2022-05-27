@@ -4,6 +4,8 @@
 //   assumes_no_implicit_collection_creation_after_drop,
 //   requires_multi_updates,
 //   requires_non_retryable_writes,
+//   # TODO SERVER-30466
+//   does_not_support_causal_consistency,
 // ]
 
 // Tests for the arrayFilters option to update and findAndModify.

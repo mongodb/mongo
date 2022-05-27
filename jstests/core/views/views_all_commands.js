@@ -12,6 +12,8 @@
 //   tenant_migration_incompatible,
 //   # Explain of a resolved view must be executed by mongos.
 //   directly_against_shardsvrs_incompatible,
+//   # This test has statements that do not support non-local read concern.
+//   does_not_support_causal_consistency,
 // ]
 
 /*

@@ -3,6 +3,8 @@
 //   requires_fastcount,
 //   requires_multi_updates,
 //   requires_non_retryable_writes,
+//   # This test has statements that do not support non-local read concern.
+//   does_not_support_causal_consistency,
 // ]
 
 //

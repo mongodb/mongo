@@ -4,6 +4,8 @@
 //   does_not_support_stepdowns,
 //   requires_non_retryable_commands,
 //   uses_map_reduce_with_temp_collections,
+//   # This test has statements that do not support non-local read concern.
+//   does_not_support_causal_consistency,
 // ]
 
 // Takes a list of constructors and returns a new list with an extra entry for each constructor with

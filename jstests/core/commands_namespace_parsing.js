@@ -10,6 +10,8 @@
 //   uses_testing_only_commands,
 //   uses_map_reduce_with_temp_collections,
 //   no_selinux,
+//   # This test has statements that do not support non-local read concern.
+//   does_not_support_causal_consistency,
 // ]
 
 // This file tests that commands namespace parsing rejects embedded null bytes.
