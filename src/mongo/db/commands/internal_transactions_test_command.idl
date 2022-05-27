@@ -48,7 +48,7 @@ structs:
       dbName:
         type: string
       command:
-        type: object
+        type: object_owned
       exhaustCursor:
         type: bool
         optional: true
