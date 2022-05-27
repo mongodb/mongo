@@ -32,6 +32,9 @@
 #include "mongo/platform/basic.h"
 
 #include <fmt/format.h>
+#ifdef _WIN32
+#include <io.h>
+#endif
 
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/log.h"
@@ -39,9 +42,38 @@
 #include "mongo/logv2/log_domain_internal.h"
 #include "mongo/logv2/log_options.h"
 #include "mongo/logv2/log_source.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/testing_proctor.h"
 
-namespace mongo::logv2::detail {
+namespace mongo::logv2 {
+namespace {
+thread_local int loggingDepth = 0;
+}  // namespace
+
+bool loggingInProgress() {
+    return loggingDepth > 0;
+}
+
+void signalSafeWriteToStderr(StringData message) {
+    while (!message.empty()) {
+#if defined(_WIN32)
+        auto ret = _write(_fileno(stderr), message.rawData(), message.size());
+#else
+        auto ret = write(STDERR_FILENO, message.rawData(), message.size());
+#endif
+        if (ret == -1) {
+#if !defined(_WIN32)
+            if (errno == EINTR) {
+                continue;
+            }
+#endif
+            return;
+        }
+        message = message.substr(ret);
+    }
+}
+
+namespace detail {
 
 struct UnstructuredValueExtractor {
     void operator()(const char* name, CustomAttributeValue const& val) {
@@ -131,6 +163,9 @@ void doLogImpl(int32_t id,
                LogOptions const& options,
                StringData message,
                TypeErasedAttributeStorage const& attrs) {
+    loggingDepth++;
+    auto updateDepth = makeGuard([] { loggingDepth--; });
+
     dassert(options.component() != LogComponent::kNumLogComponents);
     // TestingProctor isEnabled cannot be called before it has been
     // initialized. But log statements occurring earlier than that still need
@@ -177,4 +212,6 @@ void doUnstructuredLogImpl(LogSeverity const& severity,  // NOLINT
     doLogImpl(0, severity, options, formatted, TypeErasedAttributeStorage());
 }
 
-}  // namespace mongo::logv2::detail
+}  // namespace detail
+
+}  // namespace mongo::logv2
