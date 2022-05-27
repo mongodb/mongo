@@ -30,6 +30,32 @@ checkLog = (function() {
      * is found in the logs. Note: this function does not throw an exception, so the return
      * value should not be ignored.
      */
+    const getLogMessage = function(conn, msg) {
+        const logMessages = getGlobalLog(conn);
+        if (logMessages === null) {
+            return null;
+        }
+        if (msg instanceof RegExp) {
+            for (let logMsg of logMessages) {
+                if (logMsg.search(msg) != -1) {
+                    return logMsg;
+                }
+            }
+        } else {
+            for (let logMsg of logMessages) {
+                if (logMsg.includes(msg)) {
+                    return logMsg;
+                }
+            }
+        }
+        return null;
+    };
+
+    /*
+     * Calls the 'getLog' function on the provided connection 'conn' to see if the provided msg
+     * is found in the logs. Note: this function does not throw an exception, so the return
+     * value should not be ignored.
+     */
     const checkContainsOnce = function(conn, msg) {
         const logMessages = getGlobalLog(conn);
         if (logMessages === null) {
@@ -410,6 +436,7 @@ checkLog = (function() {
 
     return {
         getGlobalLog: getGlobalLog,
+        getLogMessage: getLogMessage,
         checkContainsOnce: checkContainsOnce,
         checkContainsOnceJson: checkContainsOnceJson,
         checkContainsWithCountJson: checkContainsWithCountJson,

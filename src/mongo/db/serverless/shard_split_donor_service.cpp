@@ -421,6 +421,10 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
             })
             .then([this] {
                 stdx::lock_guard<Latch> lg(_mutex);
+                LOGV2(6236700,
+                      "Shard split decision reached",
+                      "id"_attr = _migrationId,
+                      "state"_attr = _stateDoc.getState());
                 return DurableState{_stateDoc.getState(), _abortReason};
             })
             // anchor ensures the instance will still exists even if the primary stepped down
