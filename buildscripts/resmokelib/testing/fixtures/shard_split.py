@@ -239,13 +239,6 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
                 repl_config = donor_client.admin.command({"replSetGetConfig": 1})["config"]
                 repl_members = repl_config["members"]
 
-                # Removes recipient tags from donor nodes which were split from a previous donor
-                # TODO(SERVER-64823): Remove this code once the server implementation removes these tags
-                for member in repl_members:
-                    if 'tags' in member:
-                        if recipient_tag_name in member["tags"]:
-                            del member["tags"][recipient_tag_name]
-
                 for recipient_node in recipient_nodes:
                     # It is possible for the reconfig below to fail with a retryable error code like
                     # 'InterruptedDueToReplStateChange'. In these cases, we need to run the reconfig
