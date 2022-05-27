@@ -713,27 +713,13 @@ private:
             }
 
             AlternativeClientRegion acr(newClient);
-
-            auto setFcvCancellationThreadPool([] {
-                ThreadPool::Options options;
-                options.poolName = "SetFcvDowngradeCancellableOpCtxPool";
-                options.minThreads = 1;
-                options.maxThreads = 1;
-
-                auto threadPool = std::make_shared<ThreadPool>(std::move(options));
-                threadPool->startup();
-                return threadPool;
-            }());
-
-            CancelableOperationContextFactory factory(opCtx->getCancellationToken(),
-                                                      setFcvCancellationThreadPool);
-
-            // We use a CancelableOperationContext in order to stop cleanup if the original opCtx
-            // has been interrupted.
-            auto newOpCtxPtr = factory.makeOperationContext(&cc());
+            auto newOpCtxPtr = cc().makeOperationContext();
             auto newOpCtx = newOpCtxPtr.get();
 
-            _cleanupInternalSessions(newOpCtx);
+            // Ensure that we can interrupt clean up during stepup or stepdown.
+            newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+            _cleanupInternalSessions(newOpCtx, opCtx);
 
             LOGV2(5876101, "Completed removal of internal sessions from config.transactions.");
         }
@@ -846,8 +832,13 @@ private:
      * Removes all child sessions from the config.transactions collection and updates the parent
      * sessions to have the highest txnNumber of either itself or its child sessions.
      */
-    void _cleanupInternalSessions(OperationContext* opCtx) {
-        _updateSessionDocuments(opCtx, _constructParentLsidToTxnNumberMap(opCtx));
+    void _cleanupInternalSessions(OperationContext* opCtx, OperationContext* setFCVOpCtx) {
+        // Take in the setFCV command opCtx and manually check if it has been interrupted to stop
+        // session clean up.
+        auto lsidToTxnNumberMap = _constructParentLsidToTxnNumberMap(opCtx);
+        setFCVOpCtx->checkForInterrupt();
+        _updateSessionDocuments(opCtx, std::move(lsidToTxnNumberMap));
+        setFCVOpCtx->checkForInterrupt();
         _deleteChildSessionDocuments(opCtx);
     }
 
