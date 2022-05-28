@@ -37,21 +37,13 @@
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace {
 const auto getChangeCollectionManager =
     ServiceContext::declareDecoration<boost::optional<ChangeStreamChangeCollectionManager>>();
-
-// TODO: SERVER-65950 create or update the change collection for a particular tenant.
-NamespaceString getTenantChangeCollectionNamespace(boost::optional<TenantId> tenantId) {
-    return NamespaceString{NamespaceString::kConfigDb, NamespaceString::kChangeCollectionName};
-}
-
 }  // namespace
 
 ChangeStreamChangeCollectionManager& ChangeStreamChangeCollectionManager::get(
@@ -70,16 +62,19 @@ void ChangeStreamChangeCollectionManager::create(ServiceContext* service) {
 
 Status ChangeStreamChangeCollectionManager::createChangeCollection(
     OperationContext* opCtx, boost::optional<TenantId> tenantId) {
+    // TODO: SERVER-65950 create or update the change collection for a particular tenant.
+    const NamespaceString nss{NamespaceString::kConfigDb,
+                              NamespaceString::kChangeStreamChangeCollection};
+
     // Make the change collection clustered by '_id'. The '_id' field will have the same value as
     // the 'ts' field of the oplog.
     CollectionOptions changeCollectionOptions;
     changeCollectionOptions.clusteredIndex.emplace(clustered_util::makeDefaultClusteredIdIndex());
     changeCollectionOptions.capped = true;
 
-    auto status = createCollection(
-        opCtx, getTenantChangeCollectionNamespace(tenantId), changeCollectionOptions, BSONObj());
+    auto status = createCollection(opCtx, nss, changeCollectionOptions, BSONObj());
     if (status.code() == ErrorCodes::NamespaceExists) {
-        return Status::OK();
+        return Status(ErrorCodes::Error::OK, "");
     }
 
     return status;
@@ -87,75 +82,21 @@ Status ChangeStreamChangeCollectionManager::createChangeCollection(
 
 Status ChangeStreamChangeCollectionManager::dropChangeCollection(
     OperationContext* opCtx, boost::optional<TenantId> tenantId) {
+    // TODO: SERVER-65950 remove the change collection for a particular tenant.
+    const NamespaceString nss{NamespaceString::kConfigDb,
+                              NamespaceString::kChangeStreamChangeCollection};
     DropReply dropReply;
-    return dropCollection(opCtx,
-                          getTenantChangeCollectionNamespace(tenantId),
-                          &dropReply,
-                          DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+    return dropCollection(
+        opCtx, nss, &dropReply, DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
 }
 
-void ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
+Status ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
     OperationContext* opCtx,
-    const std::vector<Record>& oplogRecords,
-    const std::vector<Timestamp>& oplogTimestamps) {
-    invariant(oplogRecords.size() == oplogTimestamps.size());
-
-    // This method must be called within a 'WriteUnitOfWork'. The caller must be responsible for
-    // commiting the unit of work.
-    invariant(opCtx->lockState()->inAWriteUnitOfWork());
-
-    // Maps statements that should be inserted to the change collection for each tenant.
-    stdx::unordered_map<TenantId, std::vector<InsertStatement>, TenantId::Hasher>
-        tenantToInsertStatements;
-
-    for (size_t idx = 0; idx < oplogRecords.size(); idx++) {
-        auto& record = oplogRecords[idx];
-        auto& ts = oplogTimestamps[idx];
-
-        // Create a mutable document and update the '_id' field with the oplog entry timestamp. The
-        // '_id' field will be use to order the change collection documents.
-        Document oplogDoc(record.data.toBson());
-        MutableDocument changeCollDoc(oplogDoc);
-        changeCollDoc["_id"] = Value(ts);
-
-        // Create an insert statement that should be written at the timestamp 'ts' for a particular
-        // tenant.
-        auto readyChangeCollDoc = changeCollDoc.freeze();
-        tenantToInsertStatements[TenantId::kSystemTenantId].push_back(
-            InsertStatement{readyChangeCollDoc.toBson(), ts, repl::OpTime::kUninitializedTerm});
-    }
-
-    for (auto&& [tenantId, insertStatements] : tenantToInsertStatements) {
-        // TODO SERVER-66715 avoid taking 'AutoGetCollection' and remove
-        // 'AllowLockAcquisitionOnTimestampedUnitOfWork'.
-        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
-        AutoGetCollection tenantChangeCollection(
-            opCtx, getTenantChangeCollectionNamespace(tenantId), LockMode::MODE_IX);
-
-        // The change collection does not exist for a particular tenant because either the change
-        // collection is not enabled or is in the process of enablement. Ignore this insert for now.
-        // TODO: SERVER-65950 move this check before inserting to the map
-        // 'tenantToInsertStatements'.
-        if (!tenantChangeCollection) {
-            continue;
-        }
-
-        // Writes to the change collection should not be replicated.
-        repl::UnreplicatedWritesBlock unReplBlock(opCtx);
-
-        Status status = tenantChangeCollection->insertDocuments(opCtx,
-                                                                insertStatements.begin(),
-                                                                insertStatements.end(),
-                                                                nullptr /* opDebug */,
-                                                                false /* fromMigrate */);
-        if (!status.isOK()) {
-            LOGV2_FATAL(6612300,
-                        "Write to change collection: {ns} failed: {error}",
-                        "Write to change collection failed",
-                        "ns"_attr = tenantChangeCollection->ns().toString(),
-                        "error"_attr = status.toString());
-        }
-    }
+    boost::optional<TenantId> tenantId,
+    std::vector<Record>* records,
+    const std::vector<Timestamp>& timestamps) {
+    // TODO SERVER-65210 add code to insert to the change collection in the primaries.
+    return Status(ErrorCodes::OK, "");
 }
 
 }  // namespace mongo

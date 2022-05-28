@@ -77,7 +77,7 @@ public:
     static constexpr StringData kSystemDotViewsCollectionName = "system.views"_sd;
 
     // Name for the change stream change collection.
-    static constexpr StringData kChangeCollectionName = "system.change_collection"_sd;
+    static constexpr StringData kChangeStreamChangeCollection = "system.change_collection"_sd;
 
     // Names of privilege document collections
     static constexpr StringData kSystemUsers = "system.users"_sd;
@@ -384,6 +384,9 @@ public:
     bool isSystemDotProfile() const {
         return coll() == "system.profile";
     }
+    bool isChangeCollection() const {
+        return (db() == kConfigDb) && coll().startsWith("changes.");
+    }
     bool isSystemDotViews() const {
         return coll() == kSystemDotViewsCollectionName;
     }
@@ -458,7 +461,7 @@ public:
     /**
      * Returns whether the specified namespace is config.system.changeCollection.
      */
-    bool isChangeCollection() const;
+    bool isChangeStreamChangeCollection() const;
 
     /**
      * Returns whether the specified namespace is config.image_collection.

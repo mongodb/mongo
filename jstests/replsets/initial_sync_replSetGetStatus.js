@@ -18,19 +18,6 @@ replSet.startSet();
 replSet.initiate();
 var primary = replSet.getPrimary();
 
-// TODO SERVER-66840 remove this check.
-const shouldNotRun = (() => {
-    const getParam = primary.adminCommand({getParameter: 1, featureFlagServerlessChangeStreams: 1});
-    return getParam.hasOwnProperty("featureFlagServerlessChangeStreams") &&
-        getParam.featureFlagServerlessChangeStreams.value;
-})();
-
-if (shouldNotRun) {
-    jsTestLog("Temporarily blocked because the change collection is enabled");
-    replSet.stopSet();
-    return;
-}
-
 const barColl = primary.getDB('pretest').bar;
 assert.commandWorked(barColl.insert({a: 1}));
 assert.commandWorked(barColl.insert({a: 2}));

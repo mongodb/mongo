@@ -1046,11 +1046,8 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
         }
     }
 
-    // TODO SERVER-66813 fix issue with batch deletion.
-    if (!ns().isChangeCollection()) {
-        opCtx->getServiceContext()->getOpObserver()->onInserts(
-            opCtx, ns(), uuid(), begin, end, fromMigrate);
-    }
+    opCtx->getServiceContext()->getOpObserver()->onInserts(
+        opCtx, ns(), uuid(), begin, end, fromMigrate);
 
     _cappedDeleteAsNeeded(opCtx, records.begin()->id);
 
