@@ -2842,7 +2842,7 @@ tasks:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: "src/mongo-crypt-dev.${ext|tgz}"
-      remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_v1_dev-${version}.${ext|tgz}"
+      remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shared_v1_dev-${version}.${ext|tgz}"
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/tar}
@@ -2852,7 +2852,7 @@ tasks:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: "src/mongo-crypt-debug.${ext|tgz}"
-      remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_v1_debug-${version}.${ext|tgz}"
+      remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shared_v1_debug-${version}.${ext|tgz}"
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/tar}
@@ -7003,7 +7003,7 @@ tasks:
       aws_secret: ${aws_secret}
       remote_file: ${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shared_v1-${version}.${ext|tgz}
       bucket: mciuploads
-      local_file: src/mongo_crypt_v1.${ext|tgz}
+      local_file: src/mongo_crypt_shared_v1.${ext|tgz}
   - func: "generate compile expansions"
   - func: "apply compile expansions"
   - func: "set up remote credentials"
