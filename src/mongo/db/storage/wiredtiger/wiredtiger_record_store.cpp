@@ -894,6 +894,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
       _isEphemeral(params.isEphemeral),
       _isLogged(params.isLogged),
       _isOplog(params.nss.isOplog()),
+      _isChangeCollection(params.nss.isChangeCollection()),
       _forceUpdateWithFullDocument(params.forceUpdateWithFullDocument),
       _oplogMaxSize(params.oplogMaxSize),
       _cappedCallback(params.cappedCallback),
@@ -1416,7 +1417,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
 
         // Increment metrics for each insert separately, as opposed to outside of the loop. The API
         // requires that each record be accounted for separately.
-        if (!_isOplog) {
+        if (!_isOplog && !_isChangeCollection) {
             auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
 
             auto keyLength = computeRecordIdSize(record.id);

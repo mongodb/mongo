@@ -560,10 +560,9 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
 
     // TODO: SERVER-65948 move the change collection creation logic from here to the PM-2502 hooks.
     // The change collection will be created when the change stream is enabled.
-    if (::mongo::feature_flags::gFeatureFlagServerlessChangeStreams.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
-        auto status = changeCollectionManager.createChangeCollection(opCtx, boost::none);
+    if (ChangeStreamChangeCollectionManager::isChangeCollectionEnabled()) {
+        auto status = ChangeStreamChangeCollectionManager::get(opCtx).createChangeCollection(
+            opCtx, boost::none);
         if (!status.isOK()) {
             fassert(6520900, status);
         }

@@ -107,11 +107,13 @@ ValidateState::ValidateState(OperationContext* opCtx,
 
 bool ValidateState::shouldEnforceFastCount() const {
     if (_mode == ValidateMode::kForegroundFullEnforceFastCount) {
-        if (_nss.isOplog()) {
+        if (_nss.isOplog() || _nss.isChangeCollection()) {
             // Oplog writers only take a global IX lock, so the oplog can still be written to even
             // during full validation despite its collection X lock. This can cause validate to
             // incorrectly report an incorrect fast count on the oplog when run in enforceFastCount
             // mode.
+            // The oplog entries are also written to the change collections and are prone to fast
+            // count failures.
             return false;
         } else if (_nss == NamespaceString::kIndexBuildEntryNamespace) {
             // Do not enforce fast count on the 'config.system.indexBuilds' collection. This is an
