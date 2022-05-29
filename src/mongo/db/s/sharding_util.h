@@ -57,7 +57,8 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     StringData dbName,
     const BSONObj& command,
     const std::vector<ShardId>& shardIds,
-    const std::shared_ptr<executor::TaskExecutor>& executor);
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    bool throwOnError = true);
 
 /**
  * Unset the `noAutosplit` and `maxChunkSizeBytes` fields from:
