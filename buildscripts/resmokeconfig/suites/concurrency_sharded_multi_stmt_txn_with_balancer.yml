@@ -121,9 +121,6 @@ selector:
   - jstests/concurrency/fsm_workloads/update_rename.js
   - jstests/concurrency/fsm_workloads/update_rename_noindex.js
 
-  # SERVER-44160 Modify cleanupOrphaned to wait for overlapping ranges to finish
-  - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
-
   # Time-series collections are not supported on mongos.
   - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
 

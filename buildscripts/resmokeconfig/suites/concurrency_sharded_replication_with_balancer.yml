@@ -92,9 +92,6 @@ selector:
   # router tries to commit, it may not know the full participant list.
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
 
-  # SERVER-44160 Modify cleanupOrphaned to wait for overlapping ranges to finish
-  - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
-
   # Inserts directly into system.views using applyOps, which is not available on mongos.
   - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
 
