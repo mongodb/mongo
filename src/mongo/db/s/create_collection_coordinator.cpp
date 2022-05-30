@@ -359,6 +359,7 @@ CreateCollectionCoordinator::CreateCollectionCoordinator(ShardingDDLCoordinatorS
     : ShardingDDLCoordinator(service, initialState),
       _doc(CreateCollectionCoordinatorDocument::parse(
           IDLParserErrorContext("CreateCollectionCoordinatorDocument"), initialState)),
+      _request(_doc.getCreateCollectionRequest()),
       _critSecReason(BSON("command"
                           << "createCollection"
                           << "ns" << nss().toString() << "request"
@@ -371,7 +372,12 @@ boost::optional<BSONObj> CreateCollectionCoordinator::reportForCurrentOp(
     if (const auto& optComment = getForwardableOpMetadata().getComment()) {
         cmdBob.append(optComment.get().firstElement());
     }
-    cmdBob.appendElements(_doc.getCreateCollectionRequest().toBSON());
+    cmdBob.appendElements(_request.toBSON());
+
+    const auto currPhase = [&]() {
+        stdx::lock_guard l{_docMutex};
+        return _doc.getPhase();
+    }();
 
     BSONObjBuilder bob;
     bob.append("type", "op");
@@ -379,7 +385,7 @@ boost::optional<BSONObj> CreateCollectionCoordinator::reportForCurrentOp(
     bob.append("op", "command");
     bob.append("ns", nss().toString());
     bob.append("command", cmdBob.obj());
-    bob.append("currentPhase", _doc.getPhase());
+    bob.append("currentPhase", currPhase);
     bob.append("active", true);
     return bob.obj();
 }
@@ -393,8 +399,7 @@ void CreateCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) con
             "Another create collection with different arguments is already running for the same "
             "namespace",
             SimpleBSONObjComparator::kInstance.evaluate(
-                _doc.getCreateCollectionRequest().toBSON() ==
-                otherDoc.getCreateCollectionRequest().toBSON()));
+                _request.toBSON() == otherDoc.getCreateCollectionRequest().toBSON()));
 }
 
 ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
@@ -402,7 +407,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then([this, anchor = shared_from_this()] {
-            _shardKeyPattern = ShardKeyPattern(*_doc.getShardKey());
+            _shardKeyPattern = ShardKeyPattern(*_request.getShardKey());
             if (_doc.getPhase() < Phase::kCommit) {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
@@ -439,10 +444,12 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             opCtx,
                             nss(),
                             _shardKeyPattern->getKeyPattern().toBSON(),
-                            getCollation(opCtx, nss(), _doc.getCollation()).second,
-                            _doc.getUnique().value_or(false))) {
+
+                            getCollation(opCtx, nss(), _request.getCollation()).second,
+                            _request.getUnique().value_or(false))) {
                     // The collection was already created and commited but there was a stepdown
                     // after the commit.
+
                     RecoverableCriticalSectionService::get(opCtx)
                         ->releaseRecoverableCriticalSection(
                             opCtx,
@@ -484,10 +491,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 _createPolicy(opCtx);
                 _createCollectionAndIndexes(opCtx);
 
-                audit::logShardCollection(opCtx->getClient(),
-                                          nss().ns(),
-                                          *_doc.getCreateCollectionRequest().getShardKey(),
-                                          *_doc.getCreateCollectionRequest().getUnique());
+                audit::logShardCollection(
+                    opCtx->getClient(), nss().ns(), *_request.getShardKey(), *_request.getUnique());
 
                 if (_splitPolicy->isOptimized()) {
                     _createChunks(opCtx);
@@ -591,7 +596,7 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
     uassert(ErrorCodes::InvalidOptions,
             "Hashed shard keys cannot be declared unique. It's possible to ensure uniqueness on "
             "the hashed field by declaring an additional (non-hashed) unique index on the field.",
-            !_shardKeyPattern->isHashedPattern() || !_doc.getUnique().value_or(false));
+            !_shardKeyPattern->isHashedPattern() || !_request.getUnique().value_or(false));
 
     // Ensure that a time-series collection cannot be sharded unless the feature flag is enabled.
     if (nss().isTimeseriesBucketsCollection()) {
@@ -608,7 +613,7 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
             !nss().isSystem() || nss() == NamespaceString::kLogicalSessionsNamespace ||
                 nss().isTemporaryReshardingCollection() || nss().isTimeseriesBucketsCollection());
 
-    if (_doc.getNumInitialChunks()) {
+    if (_request.getNumInitialChunks()) {
         // Ensure numInitialChunks is within valid bounds.
         // Cannot have more than kMaxSplitPoints initial chunks per shard. Setting a maximum of
         // 1,000,000 chunks in total to limit the amount of memory this command consumes so there is
@@ -617,7 +622,7 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
         const int maxNumInitialChunksForShards =
             Grid::get(opCtx)->shardRegistry()->getNumShardsNoReload() * shardutil::kMaxSplitPoints;
         const int maxNumInitialChunksTotal = 1000 * 1000;  // Arbitrary limit to memory consumption
-        int numChunks = _doc.getNumInitialChunks().value();
+        int numChunks = _request.getNumInitialChunks().value();
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "numInitialChunks cannot be more than either: "
                               << maxNumInitialChunksForShards << ", " << shardutil::kMaxSplitPoints
@@ -652,12 +657,12 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(OperationContext* 
         5277903, 2, "Create collection _createCollectionAndIndexes", "namespace"_attr = nss());
 
     boost::optional<Collation> collation;
-    std::tie(collation, _collationBSON) = getCollation(opCtx, nss(), _doc.getCollation());
+    std::tie(collation, _collationBSON) = getCollation(opCtx, nss(), _request.getCollation());
 
     // We need to implicitly create a timeseries view and underlying bucket collection.
-    if (_collectionEmpty && _doc.getTimeseries()) {
+    if (_collectionEmpty && _request.getTimeseries()) {
         const auto viewName = nss().getTimeseriesViewNamespace();
-        auto createCmd = makeCreateCommand(viewName, collation, _doc.getTimeseries().get());
+        auto createCmd = makeCreateCommand(viewName, collation, _request.getTimeseries().get());
 
         BSONObj createRes;
         DBDirectClient localClient(opCtx);
@@ -679,7 +684,7 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(OperationContext* 
         nss(),
         *_shardKeyPattern,
         _collationBSON,
-        _doc.getUnique().value_or(false),
+        _request.getUnique().value_or(false),
         shardkeyutil::ValidationBehaviorsShardCollection(opCtx));
 
     auto replClientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
@@ -706,9 +711,9 @@ void CreateCollectionCoordinator::_createPolicy(OperationContext* opCtx) {
     _splitPolicy = InitialSplitPolicy::calculateOptimizationStrategy(
         opCtx,
         *_shardKeyPattern,
-        _doc.getNumInitialChunks() ? *_doc.getNumInitialChunks() : 0,
-        _doc.getPresplitHashedZones() ? *_doc.getPresplitHashedZones() : false,
-        _doc.getInitialSplitPoints(),
+        _request.getNumInitialChunks() ? *_request.getNumInitialChunks() : 0,
+        _request.getPresplitHashedZones() ? *_request.getPresplitHashedZones() : false,
+        _request.getInitialSplitPoints(),
         getTagsAndValidate(opCtx, nss(), _shardKeyPattern->toBSON()),
         getNumShards(opCtx),
         *_collectionEmpty);
@@ -809,9 +814,9 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
 
     coll.setKeyPattern(_shardKeyPattern->getKeyPattern());
 
-    if (_doc.getCreateCollectionRequest().getTimeseries()) {
+    if (_request.getTimeseries()) {
         TypeCollectionTimeseriesFields timeseriesFields;
-        timeseriesFields.setTimeseriesOptions(*_doc.getCreateCollectionRequest().getTimeseries());
+        timeseriesFields.setTimeseriesOptions(*_request.getTimeseries());
         coll.setTimeseriesFields(std::move(timeseriesFields));
     }
 
@@ -819,8 +824,8 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
         coll.setDefaultCollation(_collationBSON.value());
     }
 
-    if (_doc.getUnique()) {
-        coll.setUnique(*_doc.getUnique());
+    if (_request.getUnique()) {
+        coll.setUnique(*_request.getUnique());
     }
 
     _doc = _updateSession(opCtx, _doc);
@@ -888,7 +893,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
 
 void CreateCollectionCoordinator::_logStartCreateCollection(OperationContext* opCtx) {
     BSONObjBuilder collectionDetail;
-    collectionDetail.append("shardKey", *_doc.getCreateCollectionRequest().getShardKey());
+    collectionDetail.append("shardKey", *_request.getShardKey());
     collectionDetail.append("collection", nss().ns());
     collectionDetail.append("primary", ShardingState::get(opCtx)->shardId().toString());
     ShardingLogging::get(opCtx)->logChange(
@@ -936,10 +941,15 @@ void CreateCollectionCoordinator::_enterPhase(Phase newPhase) {
                 "oldPhase"_attr = CreateCollectionCoordinatorPhase_serializer(_doc.getPhase()));
 
     if (_doc.getPhase() == Phase::kUnset) {
-        _doc = _insertStateDocument(std::move(newDoc));
-        return;
+        newDoc = _insertStateDocument(std::move(newDoc));
+    } else {
+        newDoc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
     }
-    _doc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
+
+    {
+        stdx::unique_lock ul{_docMutex};
+        _doc = std::move(newDoc);
+    }
 }
 
 }  // namespace mongo

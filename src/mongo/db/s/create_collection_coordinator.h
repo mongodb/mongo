@@ -139,8 +139,11 @@ private:
     void _performNoopRetryableWriteOnParticipants(
         OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor);
 
-
+    mutable Mutex _docMutex = MONGO_MAKE_LATCH("CreateCollectionCoordinator::_docMutex");
     CreateCollectionCoordinatorDocument _doc;
+
+    const mongo::CreateCollectionRequest _request;
+
     const BSONObj _critSecReason;
 
     // The shard key of the collection, static for the duration of the coordinator and reflects the

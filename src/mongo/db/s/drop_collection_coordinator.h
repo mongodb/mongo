@@ -33,7 +33,6 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/drop_collection_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
-
 namespace mongo {
 
 class DropCollectionCoordinator final : public ShardingDDLCoordinator {
@@ -86,6 +85,7 @@ private:
     void _performNoopRetryableWriteOnParticipants(
         OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor);
 
+    mutable Mutex _docMutex = MONGO_MAKE_LATCH("DropCollectionCoordinator::_docMutex");
     DropCollectionCoordinatorDocument _doc;
 };
 
