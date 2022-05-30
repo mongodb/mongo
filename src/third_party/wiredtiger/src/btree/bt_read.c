@@ -56,11 +56,15 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
     if (__wt_hazard_count(session, ref) > 1)
         return (false);
 
-    /* If we can do an in-memory split, do it. */
-    if (__wt_leaf_page_can_split(session, page))
-        return (true);
-    if (footprint < btree->maxmempage)
+    /*
+     * If the page is less than the maximum size and can be split in-memory, let's try that first
+     * without forcing the page to evict on release.
+     */
+    if (footprint < btree->maxmempage) {
+        if (__wt_leaf_page_can_split(session, page))
+            return (true);
         return (false);
+    }
 
     /* Bump the oldest ID, we're about to do some visibility checks. */
     WT_IGNORE_RET(__wt_txn_update_oldest(session, 0));

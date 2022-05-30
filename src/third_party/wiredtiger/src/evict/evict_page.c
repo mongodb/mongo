@@ -134,9 +134,6 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
      */
     time_start = 0;
     if (LF_ISSET(WT_EVICT_CALL_URGENT)) {
-        /* Set this page to be evicted as soon as possible. */
-        __wt_page_evict_soon(session, ref);
-
         time_start = __wt_clock(session);
         WT_STAT_CONN_INCR(session, cache_eviction_force);
 
