@@ -601,15 +601,16 @@ bool TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
     // Deletes records using a bounded collection scan from the beginning of time to the
     // expiration time (inclusive).
     Timer timer;
-    auto exec =
-        InternalPlanner::deleteWithCollectionScan(opCtx,
-                                                  &collection,
-                                                  std::move(params),
-                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                  InternalPlanner::Direction::FORWARD,
-                                                  startId,
-                                                  endId,
-                                                  getBatchedDeleteStageParams(batchingEnabled));
+    auto exec = InternalPlanner::deleteWithCollectionScan(
+        opCtx,
+        &collection,
+        std::move(params),
+        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+        InternalPlanner::Direction::FORWARD,
+        startId,
+        endId,
+        CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords,
+        getBatchedDeleteStageParams(batchingEnabled));
 
     try {
         const auto numDeleted = exec->executeDelete();

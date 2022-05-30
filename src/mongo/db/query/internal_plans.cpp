@@ -122,7 +122,8 @@ CollectionScanParams createCollectionScanParams(
     InternalPlanner::Direction direction,
     boost::optional<RecordId> resumeAfterRecordId,
     boost::optional<RecordIdBound> minRecord,
-    boost::optional<RecordIdBound> maxRecord) {
+    boost::optional<RecordIdBound> maxRecord,
+    CollectionScanParams::ScanBoundInclusion boundInclusion) {
     const auto& collection = *coll;
     invariant(collection);
 
@@ -137,6 +138,7 @@ CollectionScanParams createCollectionScanParams(
     } else {
         params.direction = CollectionScanParams::BACKWARD;
     }
+    params.boundInclusion = boundInclusion;
     return params;
 }
 }  // namespace
@@ -148,7 +150,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
     const Direction direction,
     boost::optional<RecordId> resumeAfterRecordId,
     boost::optional<RecordIdBound> minRecord,
-    boost::optional<RecordIdBound> maxRecord) {
+    boost::optional<RecordIdBound> maxRecord,
+    CollectionScanParams::ScanBoundInclusion boundInclusion) {
     const auto& collection = *coll;
     invariant(collection);
 
@@ -157,8 +160,14 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
 
-    auto collScanParams = createCollectionScanParams(
-        expCtx, ws.get(), coll, direction, resumeAfterRecordId, minRecord, maxRecord);
+    auto collScanParams = createCollectionScanParams(expCtx,
+                                                     ws.get(),
+                                                     coll,
+                                                     direction,
+                                                     resumeAfterRecordId,
+                                                     minRecord,
+                                                     maxRecord,
+                                                     boundInclusion);
 
     auto cs = _collectionScan(expCtx, ws.get(), &collection, collScanParams);
 
@@ -208,6 +217,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     Direction direction,
     boost::optional<RecordIdBound> minRecord,
     boost::optional<RecordIdBound> maxRecord,
+    CollectionScanParams::ScanBoundInclusion boundInclusion,
     std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams) {
     const auto& collection = *coll;
     invariant(collection);
@@ -220,8 +230,14 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
         expCtx->setIsCappedDelete();
     }
 
-    auto collScanParams = createCollectionScanParams(
-        expCtx, ws.get(), coll, direction, boost::none /* resumeAfterId */, minRecord, maxRecord);
+    auto collScanParams = createCollectionScanParams(expCtx,
+                                                     ws.get(),
+                                                     coll,
+                                                     direction,
+                                                     boost::none /* resumeAfterId */,
+                                                     minRecord,
+                                                     maxRecord,
+                                                     boundInclusion);
 
     auto root = _collectionScan(expCtx, ws.get(), &collection, collScanParams);
 

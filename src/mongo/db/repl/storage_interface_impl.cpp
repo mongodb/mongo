@@ -730,27 +730,40 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                                .getKey()
                                .firstElement()
                                .fieldNameStringData() == "_id") {
-                // This collection is clustered by _id. Use a bounded collection scan, since a
-                // separate _id index is likely not available.
-                if (boundInclusion != BoundInclusion::kIncludeBothStartAndEndKeys) {
-                    return Result(
-                        ErrorCodes::InvalidOptions,
-                        "bound inclusion must be BoundInclusion::kIncludeBothStartAndEndKeys for "
-                        "bounded collection scan");
-                }
 
-                // Note: this is a limitation of this helper, not bounded collection scans.
-                if (direction != InternalPlanner::FORWARD) {
-                    return Result(ErrorCodes::InvalidOptions,
-                                  "bounded collection scans only support forward scans");
-                }
+                auto collScanBoundInclusion = [boundInclusion]() {
+                    switch (boundInclusion) {
+                        case BoundInclusion::kExcludeBothStartAndEndKeys:
+                            return CollectionScanParams::ScanBoundInclusion::
+                                kExcludeBothStartAndEndRecords;
+                        case BoundInclusion::kIncludeStartKeyOnly:
+                            return CollectionScanParams::ScanBoundInclusion::
+                                kIncludeStartRecordOnly;
+                        case BoundInclusion::kIncludeEndKeyOnly:
+                            return CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly;
+                        case BoundInclusion::kIncludeBothStartAndEndKeys:
+                            return CollectionScanParams::ScanBoundInclusion::
+                                kIncludeBothStartAndEndRecords;
+                        default:
+                            MONGO_UNREACHABLE;
+                    }
+                }();
 
                 boost::optional<RecordIdBound> minRecord, maxRecord;
-                if (!startKey.isEmpty()) {
-                    minRecord = RecordIdBound(record_id_helpers::keyForObj(startKey));
-                }
-                if (!endKey.isEmpty()) {
-                    maxRecord = RecordIdBound(record_id_helpers::keyForObj(endKey));
+                if (direction == InternalPlanner::FORWARD) {
+                    if (!startKey.isEmpty()) {
+                        minRecord = RecordIdBound(record_id_helpers::keyForObj(startKey));
+                    }
+                    if (!endKey.isEmpty()) {
+                        maxRecord = RecordIdBound(record_id_helpers::keyForObj(endKey));
+                    }
+                } else {
+                    if (!startKey.isEmpty()) {
+                        maxRecord = RecordIdBound(record_id_helpers::keyForObj(startKey));
+                    }
+                    if (!endKey.isEmpty()) {
+                        minRecord = RecordIdBound(record_id_helpers::keyForObj(endKey));
+                    }
                 }
 
                 planExecutor = isFind
@@ -760,7 +773,8 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                                                       direction,
                                                       boost::none /* resumeAfterId */,
                                                       minRecord,
-                                                      maxRecord)
+                                                      maxRecord,
+                                                      collScanBoundInclusion)
                     : InternalPlanner::deleteWithCollectionScan(
                           opCtx,
                           &collection,
@@ -768,7 +782,8 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                           PlanYieldPolicy::YieldPolicy::NO_YIELD,
                           direction,
                           minRecord,
-                          maxRecord);
+                          maxRecord,
+                          collScanBoundInclusion);
             } else {
                 // Use index scan.
                 auto indexCatalog = collection->getIndexCatalog();

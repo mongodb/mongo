@@ -358,30 +358,31 @@ void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTim
             opCtx.get(), currentTimeForTimeBasedExpiration));
 
     for (const auto& collectionRange : expiredPreImages) {
-        writeConflictRetry(opCtx.get(),
-                           "ChangeStreamExpiredPreImagesRemover",
-                           NamespaceString::kChangeStreamPreImagesNamespace.ns(),
-                           [&] {
-                               auto params = std::make_unique<DeleteStageParams>();
-                               params->isMulti = true;
+        writeConflictRetry(
+            opCtx.get(),
+            "ChangeStreamExpiredPreImagesRemover",
+            NamespaceString::kChangeStreamPreImagesNamespace.ns(),
+            [&] {
+                auto params = std::make_unique<DeleteStageParams>();
+                params->isMulti = true;
 
-                               std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams;
-                               if (isBatchedRemoval) {
-                                   batchedDeleteParams =
-                                       std::make_unique<BatchedDeleteStageParams>();
-                               }
+                std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams;
+                if (isBatchedRemoval) {
+                    batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
+                }
 
-                               auto exec = InternalPlanner::deleteWithCollectionScan(
-                                   opCtx.get(),
-                                   &preImagesColl,
-                                   std::move(params),
-                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                   InternalPlanner::Direction::FORWARD,
-                                   RecordIdBound(collectionRange.first),
-                                   RecordIdBound(collectionRange.second),
-                                   std::move(batchedDeleteParams));
-                               numberOfRemovals += exec->executeDelete();
-                           });
+                auto exec = InternalPlanner::deleteWithCollectionScan(
+                    opCtx.get(),
+                    &preImagesColl,
+                    std::move(params),
+                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                    InternalPlanner::Direction::FORWARD,
+                    RecordIdBound(collectionRange.first),
+                    RecordIdBound(collectionRange.second),
+                    CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords,
+                    std::move(batchedDeleteParams));
+                numberOfRemovals += exec->executeDelete();
+            });
     }
 
     if (numberOfRemovals > 0) {
