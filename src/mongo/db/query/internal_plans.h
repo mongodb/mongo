@@ -81,7 +81,9 @@ public:
         Direction direction = FORWARD,
         boost::optional<RecordId> resumeAfterRecordId = boost::none,
         boost::optional<RecordIdBound> minRecord = boost::none,
-        boost::optional<RecordIdBound> maxRecord = boost::none);
+        boost::optional<RecordIdBound> maxRecord = boost::none,
+        CollectionScanParams::ScanBoundInclusion boundInclusion =
+            CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords);
 
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> collectionScan(
         OperationContext* opCtx,
@@ -100,6 +102,8 @@ public:
         Direction direction = FORWARD,
         boost::optional<RecordIdBound> minRecord = boost::none,
         boost::optional<RecordIdBound> maxRecord = boost::none,
+        CollectionScanParams::ScanBoundInclusion boundInclusion =
+            CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords,
         boost::optional<std::unique_ptr<BatchedDeleteStageBatchParams>> batchParams = boost::none);
 
     /**

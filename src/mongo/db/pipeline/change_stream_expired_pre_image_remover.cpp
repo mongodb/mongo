@@ -377,6 +377,7 @@ void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTim
                     InternalPlanner::Direction::FORWARD,
                     RecordIdBound(collectionRange.first),
                     RecordIdBound(collectionRange.second),
+                    CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords,
                     std::move(batchParams));
                 numberOfRemovals += exec->executeDelete();
             });
