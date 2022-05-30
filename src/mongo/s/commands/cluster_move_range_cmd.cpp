@@ -76,14 +76,13 @@ public:
             configsvrRequest.setMoveRangeRequestBase(req.getMoveRangeRequestBase());
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            const auto commandResponse =
-                uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-                    opCtx,
-                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                    NamespaceString::kAdminDb.toString(),
-                    configsvrRequest.toBSON(BSON(WriteConcernOptions::kWriteConcernField
-                                                 << opCtx->getWriteConcern().toBSON())),
-                    Shard::RetryPolicy::kIdempotent));
+            const auto commandResponse = uassertStatusOK(configShard->runCommand(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                NamespaceString::kAdminDb.toString(),
+                configsvrRequest.toBSON(BSON(WriteConcernOptions::kWriteConcernField
+                                             << opCtx->getWriteConcern().toBSON())),
+                Shard::RetryPolicy::kIdempotent));
 
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(commandResponse));
         }
