@@ -1680,7 +1680,7 @@ err:
 
 /*
  * __meta_retrieve_timestamp --
- *     Retrieve a timestamp from the metadata. Not present explicitly means WT_TXN_NONE.
+ *     Retrieve a timestamp from the metadata. Not present explicitly means WT_TS_NONE.
  */
 static int
 __meta_retrieve_timestamp(WT_SESSION_IMPL *session, const char *system_uri,

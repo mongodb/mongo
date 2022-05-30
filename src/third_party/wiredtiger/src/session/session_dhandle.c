@@ -292,16 +292,13 @@ __session_fetch_checkpoint_meta(WT_SESSION_IMPL *session, const char *ckpt_name,
   WT_CKPT_SNAPSHOT *info_ret, uint64_t *snapshot_time_ret, uint64_t *stable_time_ret,
   uint64_t *oldest_time_ret)
 {
-    /* Get the timestamps. */
-    WT_RET(__wt_meta_read_checkpoint_timestamp(
-      session, ckpt_name, &info_ret->stable_ts, stable_time_ret));
-    WT_RET(
-      __wt_meta_read_checkpoint_oldest(session, ckpt_name, &info_ret->oldest_ts, oldest_time_ret));
+    WT_DECL_RET;
+    uint64_t *snapshot_txns;
 
-    /* Get the snapshot. */
+    /* Get the snapshot first; it's written last as the checkpoint completes. */
     WT_RET(__wt_meta_read_checkpoint_snapshot(session, ckpt_name, &info_ret->snapshot_write_gen,
-      &info_ret->snapshot_min, &info_ret->snapshot_max, &info_ret->snapshot_txns,
-      &info_ret->snapshot_count, snapshot_time_ret));
+      &info_ret->snapshot_min, &info_ret->snapshot_max, &snapshot_txns, &info_ret->snapshot_count,
+      snapshot_time_ret));
 
     /*
      * If we successfully read a null snapshot, set the min and max to WT_TXN_MAX so everything is
@@ -312,10 +309,22 @@ __session_fetch_checkpoint_meta(WT_SESSION_IMPL *session, const char *ckpt_name,
      */
     if (info_ret->snapshot_min == WT_TXN_NONE && info_ret->snapshot_max == WT_TXN_NONE) {
         info_ret->snapshot_min = info_ret->snapshot_max = WT_TXN_MAX;
-        WT_ASSERT(session, info_ret->snapshot_txns == NULL && info_ret->snapshot_count == 0);
+        WT_ASSERT(session, snapshot_txns == NULL && info_ret->snapshot_count == 0);
     }
 
+    /* Get the timestamps. */
+    WT_ERR(__wt_meta_read_checkpoint_timestamp(
+      session, ckpt_name, &info_ret->stable_ts, stable_time_ret));
+    WT_ERR(
+      __wt_meta_read_checkpoint_oldest(session, ckpt_name, &info_ret->oldest_ts, oldest_time_ret));
+
+    /* Wait until we succeed to assign this, to be sure it can't be cleaned up twice. */
+    info_ret->snapshot_txns = snapshot_txns;
     return (0);
+
+err:
+    __wt_free(session, snapshot_txns);
+    return (ret);
 }
 
 /*
@@ -437,9 +446,16 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
      * checkpoint is finishing at this very moment, so we retry.
      *
      * (It is actually slightly more complicated: either timestamp might not be present, in which
-     * case the time will read back as zero. The snapshot is written last, and always written, so we
-     * accept the timestamp times if they less than or equal to the snapshot time. We are only
-     * racing if they are newer.)
+     * case both the timestamp and its associated time will read back as zero. We take advantage of
+     * the knowledge that for both these timestamps the system cannot transition from a state with
+     * the timestamp set to one where it is not, and therefore once any checkpoint includes either
+     * timestamp, every subsequent checkpoint will too. Since the snapshot is written after both
+     * timestamps, we read it first. Then for each timestamp, if we read it and find it present, it
+     * must be from the same checkpoint as the snapshot or the next. If it isn't present, its
+     * absence might technically be associated with the next checkpoint, but if so it cannot have
+     * been present in the snapshot's checkpoint either and we are ok to proceed. So we retry if
+     * either timestamp's wall time is newer than the snapshot's. Then, to partially crosscheck this
+     * logic we assert that the wall time is either the same as the snapshot's or zero.)
      *
      * This scheme relies on the fact we take steps to make sure that the checkpoint wall clock time
      * does not run backward, and that successive checkpoints are never given the same wall clock
@@ -535,6 +551,11 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
             if (ds_time > snapshot_time || hs_time > snapshot_time || stable_time > snapshot_time ||
               oldest_time > snapshot_time)
                 ret = __wt_set_return(session, EBUSY);
+            else {
+                /* Crosscheck that we didn't somehow get an older timestamp. */
+                WT_ASSERT(session, stable_time == snapshot_time || stable_time == 0);
+                WT_ASSERT(session, oldest_time == snapshot_time || oldest_time == 0);
+            }
 
             /*
              * Return the snapshot's wall time as the (global) checkpoint ID. The ID is a 64-bit
@@ -579,12 +600,13 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
         /*
          * There's a potential race: we get the name of the most recent unnamed checkpoint, but if
          * it's discarded (or locked so it can be discarded) by the time we try to open it, we'll
-         * fail the open. Retry in those cases; a new version checkpoint should surface, and we
+         * fail the open. Retry in those cases; a new checkpoint version should surface, and we
          * can't return an error. The application will be justifiably upset if we can't open the
          * last checkpoint instance of an object.
          *
          * The WT_NOTFOUND condition will eventually clear; some unnamed checkpoint existed when we
-         * looked up the name (otherwise we would have failed then) so a new one must be progress.
+         * looked up the name (otherwise we would have failed then) so a new one must be in
+         * progress.
          *
          * At this point we should either have ret == 0 and the handles we were asked for, or ret !=
          * 0 and no handles.
