@@ -194,7 +194,7 @@ public:
         }
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto commandResponse = configShard->runCommandWithFixedRetryAttempts(
+        auto commandResponse = configShard->runCommand(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             NamespaceString::kAdminDb.toString(),
