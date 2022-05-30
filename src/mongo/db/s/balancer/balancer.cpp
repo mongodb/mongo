@@ -358,7 +358,7 @@ Status Balancer::rebalanceSingleChunk(OperationContext* opCtx,
     auto response =
         _commandScheduler
             ->requestMoveChunk(opCtx, *migrateInfo, settings, true /* issuedByRemoteUser */)
-            .getNoThrow();
+            .getNoThrow(opCtx);
     return processManualMigrationOutcome(opCtx, chunk.getMin(), nss, migrateInfo->to, response);
 }
 
@@ -387,7 +387,7 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
     auto response =
         _commandScheduler
             ->requestMoveChunk(opCtx, migrateInfo, settings, true /* issuedByRemoteUser */)
-            .getNoThrow();
+            .getNoThrow(opCtx);
     return processManualMigrationOutcome(opCtx, chunk.getMin(), nss, newShardId, response);
 }
 
@@ -420,7 +420,7 @@ Status Balancer::moveRange(OperationContext* opCtx,
 
     auto response =
         _commandScheduler->requestMoveRange(opCtx, shardSvrRequest, wc, issuedByRemoteUser)
-            .getNoThrow();
+            .getNoThrow(opCtx);
     return processManualMigrationOutcome(
         opCtx, min, nss, shardSvrRequest.getToShard(), std::move(response));
 }
