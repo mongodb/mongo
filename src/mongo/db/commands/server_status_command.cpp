@@ -65,7 +65,8 @@ public:
     }
 
     std::string help() const final {
-        return "returns lots of administrative server statistics";
+        return "returns lots of administrative server statistics. Optionally set {..., all: 1} to "
+               "retrieve all server status sections.";
     }
 
     void addRequiredPrivileges(const std::string& dbname,
@@ -107,6 +108,11 @@ public:
         timeBuilder.appendNumber("after basic",
                                  durationCount<Milliseconds>(clock->now() - runStart));
 
+        // Individual section 'includeByDefault()' settings will be bypassed if the caller specified
+        // {all: 1}.
+        const auto& allElem = cmdObj["all"];
+        bool includeAllSections = allElem.type() ? allElem.trueValue() : false;
+
         // --- all sections
         auto registry = ServerStatusSectionRegistry::get();
         for (auto i = registry->begin(); i != registry->end(); ++i) {
@@ -123,7 +129,7 @@ public:
                 include = elem.trueValue();
             }
 
-            if (!include) {
+            if (!include && !includeAllSections) {
                 continue;
             }
 

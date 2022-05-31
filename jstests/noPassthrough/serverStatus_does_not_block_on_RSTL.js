@@ -43,24 +43,13 @@ checkLog.containsJson(testDB, 6001600);
 
 try {
     jsTestLog("Running serverStatus concurrently with the RSTL X lock held by the sleep cmd");
-    const serverStatusResult = assert.commandWorked(testDB.adminCommand({
-        serverStatus: 1,
-        repl: 1,
-        mirroredReads: 1,
-        advisoryHostFQDNs: 1,
-        defaultRWConcern: 1,
-        heapProfile: 1,
-        http_client: 1,
-        latchAnalysis: 1,
-        opWriteConcernCounters: 1,
-        oplog: 1,
-        resourceConsumption: 1,
-        sharding: 1,
-        tenantMigrationAccessBlocker: 1,
-        watchdog: 1,
-        maxTimeMS: 20 * 1000
-    }));
+    const serverStatusResult =
+        assert.commandWorked(testDB.adminCommand({serverStatus: 1, all: 1, maxTimeMS: 20 * 1000}));
     jsTestLog("ServerStatus results: " + tojson(serverStatusResult));
+
+    // Check that serverStatus includes some non-default sections, as a sanity check.
+    assert(serverStatusResult["repl"]);
+    assert(serverStatusResult["mirroredReads"]);
 } finally {
     jsTestLog("Ensure the sleep cmd releases the lock so that the server can shutdown");
     assert.commandWorked(testDB.killOp(sleepCmdOpID));  // kill the sleep cmd
