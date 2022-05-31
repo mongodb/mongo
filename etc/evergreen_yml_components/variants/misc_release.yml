@@ -290,8 +290,13 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0
     has_packages: true
+    multiversion_platform: amazon2
+    multiversion_edition: enterprise
+    multiversion_architecture: arm64
+    multiversion_architecture_42_or_later: aarch64
+    multiversion_skip_install_for_40: "true"
     packager_script: packager_enterprise.py
     packager_arch: aarch64
     packager_distro: amazon2

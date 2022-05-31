@@ -57,3 +57,32 @@ class TestCalculateFcvConstants(TestCase):
             Version(v)
             for v in ["4.0", "4.2", "4.4", "4.7", "4.8", "4.9", "5.0", "5.1", "5.2", "5.3"]
         ])
+
+    def test_fcv_constants_should_be_accurate_for_future_git_tag(self):
+        mongo_version = under_test.MongoVersion(mongo_version="100.0")
+        mongo_releases = under_test.MongoReleases(
+            **{
+                "featureCompatibilityVersions": [
+                    "4.0", "4.2", "4.4", "4.7", "4.8", "4.9", "5.0", "5.1", "5.2", "5.3", "6.0",
+                    "6.1", "100.0"
+                ],
+                "longTermSupportReleases": ["4.0", "4.2", "4.4", "5.0", "6.0"],
+            })
+
+        multiversion_service = under_test.MultiversionService(
+            mongo_version=mongo_version,
+            mongo_releases=mongo_releases,
+        )
+
+        fcv_constants = multiversion_service.calculate_fcv_constants()
+
+        self.assertEqual(fcv_constants.latest, Version("100.0"))
+        self.assertEqual(fcv_constants.last_continuous, Version("6.1"))
+        self.assertEqual(fcv_constants.last_lts, Version("6.0"))
+        self.assertEqual(fcv_constants.requires_fcv_tag_list,
+                         [Version(v) for v in ["6.1", "100.0"]])
+        self.assertEqual(fcv_constants.requires_fcv_tag_list_continuous, [Version("100.0")])
+        self.assertEqual(fcv_constants.fcvs_less_than_latest, [
+            Version(v) for v in
+            ["4.0", "4.2", "4.4", "4.7", "4.8", "4.9", "5.0", "5.1", "5.2", "5.3", "6.0", "6.1"]
+        ])
