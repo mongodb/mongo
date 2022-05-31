@@ -96,7 +96,7 @@ public:
 
     /**
      * Iterates through the SessionCatalog under the SessionCatalog mutex and applies 'workerFn' to
-     * each Session which matches the specified 'matcher'. Does not support reaping.
+     * each Session which matches the specified 'lsid' or 'matcher'. Does not support reaping.
      *
      * NOTE: Since this method runs with the session catalog mutex, the work done by 'workerFn' is
      * not allowed to block, perform I/O or acquire any lock manager locks.
@@ -106,6 +106,11 @@ public:
     void scanSession(const LogicalSessionId& lsid, const ScanSessionsCallbackFn& workerFn);
     void scanSessions(const SessionKiller::Matcher& matcher,
                       const ScanSessionsCallbackFn& workerFn);
+
+    /**
+     * Same as the above but only applies 'workerFn' to parent Sessions.
+     */
+    void scanParentSessions(const ScanSessionsCallbackFn& workerFn);
 
     /**
      * Same as the above but applies 'parentSessionWorkerFn' to the Session whose session id is
