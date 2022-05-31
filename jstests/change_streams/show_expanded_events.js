@@ -2,10 +2,11 @@
  * Tests the behavior of change streams in the presence of 'showExpandedEvents' flag.
  *
  * @tags: [
- *   requires_fcv_60,
+ *   requires_fcv_61,
  *   # The test assumes certain ordering of the events. The chunk migrations on a sharded collection
  *   # could break the test.
  *   assumes_unsharded_collection,
+ *   featureFlagChangeStreamsFurtherEnrichedEvents,
  * ]
  */
 (function() {
@@ -109,7 +110,12 @@ assertChangeEvent(() => assert.commandWorked(coll.update({_id: 0}, {$inc: {a: 1}
     ns,
     operationType: 'update',
     documentKey: {_id: 0},
-    updateDescription: {removedFields: [], updatedFields: {a: 3}, truncatedArrays: []},
+    updateDescription: {
+        removedFields: [],
+        updatedFields: {a: 3},
+        truncatedArrays: [],
+        specialFields: {arrayIndices: {}, dottedFields: {}}
+    },
 });
 
 // Test change stream event for 'remove' operation.

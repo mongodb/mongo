@@ -5,7 +5,9 @@ selector:
   - jstests/change_streams/**/*.js
   exclude_files:
   # Expects oplog entries to be in $v:2 format.
+  - jstests/change_streams/expanded_update_description.js
   - jstests/change_streams/pipeline_style_updates_v2_oplog_entries.js
+  - jstests/change_streams/show_expanded_events.js
 
   exclude_with_any_tags:
   ##

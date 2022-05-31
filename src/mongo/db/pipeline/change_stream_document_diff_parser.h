@@ -39,6 +39,8 @@ struct DeltaUpdateDescription {
     Document updatedFields;
     std::vector<Value> removedFields;
     std::vector<Value> truncatedArrays;
+    Document arrayIndices;
+    Document dottedFields;
 };
 
 /**

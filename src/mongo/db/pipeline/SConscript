@@ -179,7 +179,8 @@ env.Library(
         'field_path',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/exec/sort_executor', '$BUILD_DIR/mongo/db/index/key_generator'
+        '$BUILD_DIR/mongo/db/exec/sort_executor',
+        '$BUILD_DIR/mongo/db/index/key_generator',
     ],
 )
 
@@ -535,6 +536,7 @@ env.CppUnitTest(
         'accumulator_js_test.cpp' if get_option('js-engine') != 'none' else [],
         'accumulator_test.cpp',
         'aggregation_request_test.cpp',
+        'change_stream_document_diff_parser_test.cpp',
         'change_stream_event_transform_test.cpp',
         'change_stream_expired_pre_image_remover_test.cpp',
         'change_stream_rewrites_test.cpp',
