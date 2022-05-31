@@ -147,6 +147,9 @@ protected:
         // We have to use setMyLastAppliedOpTimeAndWallTimeForward since this thread races with
         // ReplicationExternalStateImpl::onTransitionToPrimary.
         _replCoord->setMyLastAppliedOpTimeAndWallTimeForward(newOpTimeAndWallTime);
+        // We know we're at a no-holes point and we've already advanced visibility; we need
+        // to notify waiters since we changed the lastAppliedSnapshot.
+        signalOplogWaiters();
     }
 
     void _recordDurable(const OpTimeAndWallTime& newOpTimeAndWallTime) {

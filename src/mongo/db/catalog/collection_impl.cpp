@@ -811,9 +811,9 @@ Status CollectionImpl::insertDocumentsForOplog(OperationContext* opCtx,
 
     _cappedDeleteAsNeeded(opCtx, records->begin()->id);
 
-    opCtx->recoveryUnit()->onCommit(
-        [this](boost::optional<Timestamp>) { _shared->notifyCappedWaitersIfNeeded(); });
-
+    // We do not need to notify capped waiters, as we have not yet updated oplog visibility, so
+    // these inserts will not be visible.  When visibility updates, it will notify capped
+    // waiters.
     return status;
 }
 

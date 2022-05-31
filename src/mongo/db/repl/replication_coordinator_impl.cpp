@@ -292,6 +292,7 @@ InitialSyncerInterface::Options createInitialSyncerOptions(
                                externalState](const OpTimeAndWallTime& opTimeAndWallTime) {
         // Note that setting the last applied opTime forward also advances the global timestamp.
         replCoord->setMyLastAppliedOpTimeAndWallTimeForward(opTimeAndWallTime);
+        signalOplogWaiters();
         // The oplog application phase of initial sync starts timestamping writes, causing
         // WiredTiger to pin this data in memory. Advancing the oldest timestamp in step with the
         // last applied optime here will permit WiredTiger to evict this data as it sees fit.
@@ -835,6 +836,7 @@ void ReplicationCoordinatorImpl::_initialSyncerCompletionFunction(
 
         const auto lastApplied = opTimeStatus.getValue();
         _setMyLastAppliedOpTimeAndWallTime(lock, lastApplied, false);
+        signalOplogWaiters();
 
         _topCoord->resetMaintenanceCount();
     }
@@ -1406,6 +1408,7 @@ void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeAndWallTime(
     stdx::unique_lock<Latch> lock(_mutex);
     // The optime passed to this function is required to represent a consistent database state.
     _setMyLastAppliedOpTimeAndWallTime(lock, opTimeAndWallTime, false);
+    signalOplogWaiters();
     _reportUpstream_inlock(std::move(lock));
 }
 
@@ -1478,9 +1481,6 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
             return waitOpTime <= opTime;
         },
         opTime);
-
-    // Notify the oplog waiters after updating the local snapshot.
-    signalOplogWaiters();
 
     if (opTime.isNull()) {
         return;

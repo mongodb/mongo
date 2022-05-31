@@ -380,6 +380,11 @@ public:
      * necessarily commit in sequential order. It is also used when we finish oplog batch
      * application on secondaries, to avoid any potential race conditions around setting the
      * applied optime from more than one thread.
+     *
+     * Since the last applied op time and wall time might not be visible (i.e. there may be
+     * "oplog holes" from oplog entries with earlier timestamps which commit after this one)
+     * this method does not notify oplog waiters.  Callers which know the new lastApplied is at
+     * a no-holes point should call signalOplogWaiters after calling this method.
      */
     virtual void setMyLastAppliedOpTimeAndWallTimeForward(
         const OpTimeAndWallTime& opTimeAndWallTime) = 0;
