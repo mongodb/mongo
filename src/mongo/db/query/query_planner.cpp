@@ -45,6 +45,7 @@
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
+#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
@@ -203,7 +204,7 @@ bool hintMatchesColumnStoreIndex(const BSONObj& hintObj, const ColumnIndexEntry&
 std::pair<DepsTracker, DepsTracker> computeDeps(const QueryPlannerParams& params,
                                                 const CanonicalQuery& query) {
     DepsTracker filterDeps;
-    query.root()->addDependencies(&filterDeps);
+    match_expression::addDependencies(query.root(), &filterDeps);
     DepsTracker outputDeps;
     if (!query.getProj() || query.getProj()->requiresDocument()) {
         outputDeps.needWholeDocument = true;

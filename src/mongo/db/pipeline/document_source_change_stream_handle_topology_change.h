@@ -74,6 +74,8 @@ public:
         return DistributedPlanLogic{nullptr, this, change_stream_constants::kSortSpec};
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
 private:
     DocumentSourceChangeStreamHandleTopologyChange(const boost::intrusive_ptr<ExpressionContext>&);
 

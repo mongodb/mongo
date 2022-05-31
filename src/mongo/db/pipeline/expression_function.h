@@ -88,7 +88,6 @@ private:
                        bool assignFirstArgToThis,
                        std::string funcSourceString,
                        std::string lang);
-    void _doAddDependencies(DepsTracker* deps) const final override;
 
     const boost::intrusive_ptr<Expression>& _passedArgs;
     bool _assignFirstArgToThis;

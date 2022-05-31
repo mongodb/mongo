@@ -41,6 +41,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
+#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/query/collation/collation_index_key.h"
@@ -440,7 +441,7 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
 
 bool pathDependenciesAreExact(StringData key, const MatchExpression* expr) {
     DepsTracker columnDeps;
-    expr->addDependencies(&columnDeps);
+    match_expression::addDependencies(expr, &columnDeps);
     return !columnDeps.needWholeDocument && columnDeps.fields == OrderedPathSet{key.toString()};
 }
 
@@ -824,7 +825,7 @@ bool isIndependentOf(const MatchExpression& expr, const OrderedPathSet& pathSet)
     }
 
     auto depsTracker = DepsTracker{};
-    expr.addDependencies(&depsTracker);
+    match_expression::addDependencies(&expr, &depsTracker);
     // Match expressions that generate random numbers can't be safely split out and pushed down.
     if (depsTracker.needRandomGenerator || depsTracker.needWholeDocument) {
         return false;
@@ -848,7 +849,7 @@ bool isOnlyDependentOn(const MatchExpression& expr, const OrderedPathSet& pathSe
 
     // Now add the match expression's paths and see if the dependencies are the same.
     auto exprDepsTracker = DepsTracker{};
-    expr.addDependencies(&exprDepsTracker);
+    match_expression::addDependencies(&expr, &exprDepsTracker);
     // Match expressions that generate random numbers can't be safely split out and pushed down.
     if (exprDepsTracker.needRandomGenerator) {
         return false;

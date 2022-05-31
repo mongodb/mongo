@@ -97,7 +97,7 @@ env.Library(
     source='parsed_update_array_filters.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/mongo/db/query_expressions',
     ],
 )
 

@@ -60,7 +60,6 @@ public:
 
 private:
     ExpressionTestApiVersion(ExpressionContext* expCtx, bool unstable, bool deprecated);
-    void _doAddDependencies(DepsTracker* deps) const final override;
 
     bool _unstable;
     bool _deprecated;

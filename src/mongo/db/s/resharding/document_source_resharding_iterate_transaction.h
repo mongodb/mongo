@@ -78,6 +78,8 @@ public:
         return DocumentSourceReshardingIterateTransaction::kStageName.rawData();
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
 protected:
     DocumentSource::GetNextResult doGetNext() override;
 

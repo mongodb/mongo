@@ -119,6 +119,8 @@ public:
         std::vector<Value>& array,
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
 private:
     DocumentSourcePlanCacheStats(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 

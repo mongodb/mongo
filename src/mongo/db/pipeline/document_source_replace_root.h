@@ -32,6 +32,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
 
 namespace mongo {
 
@@ -66,7 +67,7 @@ public:
     }
 
     DepsTracker::State addDependencies(DepsTracker* deps) const final {
-        _newRoot->addDependencies(deps);
+        expression::addDependencies(_newRoot.get(), deps);
         // This stage will replace the entire document with a new document, so any existing fields
         // will be replaced and cannot be required as dependencies.
         return DepsTracker::State::EXHAUSTIVE_FIELDS;
@@ -79,6 +80,10 @@ public:
 
     const boost::intrusive_ptr<Expression>& getExpression() const {
         return _newRoot;
+    }
+
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {
+        expression::addVariableRefs(_newRoot.get(), refs);
     }
 
 private:

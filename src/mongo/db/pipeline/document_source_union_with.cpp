@@ -391,15 +391,19 @@ DepsTracker::State DocumentSourceUnionWith::getDependencies(DepsTracker* deps) c
     for (auto&& source : _pipeline->getSources()) {
         source->getDependencies(&subDeps);
     }
-    // Add sub-pipeline variable dependencies. Do not add field dependencies, since these refer
-    // to the fields from the foreign collection rather than the local collection.
-    // Similarly, do not add SEARCH_META as a dependency, since it is scoped to one pipeline.
-    for (auto&& varId : subDeps.vars) {
-        if (varId != Variables::kSearchMetaId)
-            deps->vars.insert(varId);
-    }
 
     return DepsTracker::State::SEE_NEXT;
+}
+
+void DocumentSourceUnionWith::addVariableRefs(std::set<Variables::Id>* refs) const {
+    // Add sub-pipeline variable dependencies. Do not add SEARCH_META as a dependency, since it is
+    // scoped to one pipeline.
+    std::set<Variables::Id> subPipeRefs;
+    _pipeline->addVariableRefs(&subPipeRefs);
+    for (auto&& varId : subPipeRefs) {
+        if (varId != Variables::kSearchMetaId)
+            refs->insert(varId);
+    }
 }
 
 void DocumentSourceUnionWith::detachFromOperationContext() {

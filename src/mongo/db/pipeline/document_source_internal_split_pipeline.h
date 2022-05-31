@@ -75,6 +75,8 @@ public:
                 UnionRequirement::kAllowed};
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
 private:
     DocumentSourceInternalSplitPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         HostTypeRequirement mergeType)

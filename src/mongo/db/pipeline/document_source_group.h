@@ -75,6 +75,8 @@ public:
 
     DepsTracker::State addDependencies(DepsTracker* deps) const final;
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final;
+
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
     static std::unique_ptr<GroupFromFirstDocumentTransformation> create(
@@ -96,6 +98,7 @@ public:
 
     boost::intrusive_ptr<DocumentSource> optimize() final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
+    void addVariableRefs(std::set<Variables::Id>* refs) const final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     const char* getSourceName() const final;
     GetModPathsReturn getModifiedPaths() const final;

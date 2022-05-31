@@ -274,12 +274,10 @@ bool DocumentSourceFacet::usedDisk() {
 }
 
 DepsTracker::State DocumentSourceFacet::getDependencies(DepsTracker* deps) const {
-    const bool scopeHasVariables = pExpCtx->variablesParseState.hasDefinedVariables();
     for (auto&& facet : _facets) {
         auto subDepsTracker = facet.pipeline->getDependencies(deps->getUnavailableMetadata());
 
         deps->fields.insert(subDepsTracker.fields.begin(), subDepsTracker.fields.end());
-        deps->vars.insert(subDepsTracker.vars.begin(), subDepsTracker.vars.end());
 
         deps->needWholeDocument = deps->needWholeDocument || subDepsTracker.needWholeDocument;
 
@@ -289,10 +287,7 @@ DepsTracker::State DocumentSourceFacet::getDependencies(DepsTracker* deps) const
             deps->getNeedsMetadata(DocumentMetadataFields::kTextScore) ||
                 subDepsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 
-        // If there are variables defined at this stage's scope, there may be dependencies upon
-        // them in subsequent pipelines. Keep enumerating.
-        if (deps->needWholeDocument && deps->getNeedsMetadata(DocumentMetadataFields::kTextScore) &&
-            !scopeHasVariables) {
+        if (deps->needWholeDocument && deps->getNeedsMetadata(DocumentMetadataFields::kTextScore)) {
             break;
         }
     }
@@ -300,6 +295,12 @@ DepsTracker::State DocumentSourceFacet::getDependencies(DepsTracker* deps) const
     // We will combine multiple documents into one, and the output document will have new fields, so
     // we will stop looking for dependencies at this point.
     return DepsTracker::State::EXHAUSTIVE_ALL;
+}
+
+void DocumentSourceFacet::addVariableRefs(std::set<Variables::Id>* refs) const {
+    for (auto&& facet : _facets) {
+        facet.pipeline->addVariableRefs(refs);
+    }
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(

@@ -70,6 +70,8 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
 private:
     virtual Value serialize(boost::optional<ExplainOptions::Verbosity>) const override {
         MONGO_UNREACHABLE;

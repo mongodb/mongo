@@ -326,6 +326,12 @@ public:
     DepsTracker getDependencies(boost::optional<QueryMetadataBitSet> unavailableMetadata) const;
 
     /**
+     * Populate 'refs' with the variables referred to by this pipeline, including user and system
+     * variables but excluding $$ROOT. Note that field path references are not considered variables.
+     */
+    void addVariableRefs(std::set<Variables::Id>* refs) const;
+
+    /**
      * Returns the dependencies needed by the SourceContainer. 'unavailableMetadata' should reflect
      * what metadata is not present on documents that are input to the front of the pipeline. If
      * 'unavailableMetadata' is specified, this method will throw if any of the dependencies

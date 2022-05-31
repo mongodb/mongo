@@ -118,6 +118,11 @@ DepsTracker::State DocumentSourceSingleDocumentTransformation::getDependencies(
     return _parsedTransform->addDependencies(deps);
 }
 
+void DocumentSourceSingleDocumentTransformation::addVariableRefs(
+    std::set<Variables::Id>* refs) const {
+    _parsedTransform->addVariableRefs(refs);
+}
+
 DocumentSource::GetModPathsReturn DocumentSourceSingleDocumentTransformation::getModifiedPaths()
     const {
     return _parsedTransform->getModifiedPaths();

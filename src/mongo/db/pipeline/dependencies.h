@@ -149,16 +149,6 @@ struct DepsTracker {
     }
 
     /**
-     * Returns 'true' if any of the DepsTracker's variables appear in the passed 'ids' set.
-     */
-    bool hasVariableReferenceTo(const std::set<Variables::Id>& ids) const {
-        std::vector<Variables::Id> match;
-        std::set_intersection(
-            vars.begin(), vars.end(), ids.begin(), ids.end(), std::back_inserter(match));
-        return !match.empty();
-    }
-
-    /**
      * Returns a value with bits set indicating the types of metadata not available to the
      * pipeline.
      */
@@ -216,7 +206,6 @@ struct DepsTracker {
      */
     OrderedPathSet fields;
 
-    std::set<Variables::Id> vars;    // IDs of referenced variables.
     bool needWholeDocument = false;  // If true, ignore 'fields'; the whole document is needed.
 
     // The output of some operators (such as $sample and $rand) depends on a source of fresh random

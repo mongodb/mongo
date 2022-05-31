@@ -133,6 +133,20 @@ public:
     void serialize(boost::optional<ExplainOptions::Verbosity> explain,
                    MutableDocument* output) const;
 
+    /**
+     * Append the variables referred to by this projection to the set 'refs', without clearing any
+     * pre-existing references. Should not include $$ROOT or field path expressions.
+     */
+    void addVariableRefs(std::set<Variables::Id>* refs) const {
+        for (auto&& expressionPair : _expressions) {
+            expression::addVariableRefs(expressionPair.second.get(), refs);
+        }
+
+        for (auto&& childPair : _children) {
+            childPair.second->addVariableRefs(refs);
+        }
+    }
+
 protected:
     /**
      * Creates the child if it doesn't already exist. 'field' is not allowed to be dotted. Returns

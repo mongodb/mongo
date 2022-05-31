@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/document_source_bucket_auto.h"
 
 #include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 
@@ -125,13 +126,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::optimize() {
 }
 
 DepsTracker::State DocumentSourceBucketAuto::getDependencies(DepsTracker* deps) const {
-    // Add the 'groupBy' expression.
-    _groupByExpression->addDependencies(deps);
+    expression::addDependencies(_groupByExpression.get(), deps);
 
-    // Add the 'output' fields.
     for (auto&& accumulatedField : _accumulatedFields) {
         // Anything the per-doc expression depends on, the whole stage depends on.
-        accumulatedField.expr.argument->addDependencies(deps);
+        expression::addDependencies(accumulatedField.expr.argument.get(), deps);
         // The initializer should be an ExpressionConstant, or something that optimizes to one.
         // ExpressionConstant doesn't have dependencies.
     }
@@ -140,6 +139,16 @@ DepsTracker::State DocumentSourceBucketAuto::getDependencies(DepsTracker* deps) 
     // depend on any further fields. The grouping process will remove any metadata from the
     // documents, so there can be no further dependencies on metadata.
     return DepsTracker::State::EXHAUSTIVE_ALL;
+}
+
+void DocumentSourceBucketAuto::addVariableRefs(std::set<Variables::Id>* refs) const {
+    expression::addVariableRefs(_groupByExpression.get(), refs);
+
+    for (auto&& accumulatedField : _accumulatedFields) {
+        expression::addVariableRefs(accumulatedField.expr.argument.get(), refs);
+        // The initializer should be an ExpressionConstant, or something that optimizes to one.
+        // ExpressionConstant doesn't have dependencies.
+    }
 }
 
 DocumentSource::GetNextResult DocumentSourceBucketAuto::populateSorter() {

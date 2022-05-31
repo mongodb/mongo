@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/inclusion_projection_executor.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
 
 namespace mongo::projection_executor {
 using ComputedFieldsPolicy = ProjectionPolicies::ComputedFieldsPolicy;
@@ -139,7 +140,7 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
             continue;
         }
         DepsTracker deps;
-        expressionIt->second->addDependencies(&deps);
+        expression::addDependencies(expressionIt->second.get(), &deps);
         auto topLevelFieldNames =
             deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes)
                 .getFieldNames<std::set<std::string>>();
@@ -220,7 +221,7 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInAddFields(
             break;
         }
         DepsTracker deps;
-        expressionIt->second->addDependencies(&deps);
+        expression::addDependencies(expressionIt->second.get(), &deps);
         auto topLevelFieldNames =
             deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes)
                 .getFieldNames<std::set<std::string>>();

@@ -70,6 +70,8 @@ public:
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
     /**
      * Creates a new $unwind DocumentSource from a BSON specification.
      */

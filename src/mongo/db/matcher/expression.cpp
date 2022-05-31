@@ -156,25 +156,6 @@ void MatchExpression::setCollator(const CollatorInterface* collator) {
     _doSetCollator(collator);
 }
 
-void MatchExpression::addDependencies(DepsTracker* deps) const {
-    for (size_t i = 0; i < numChildren(); ++i) {
-
-        // Don't recurse through MatchExpression nodes which require an entire array or entire
-        // subobject for matching.
-        const auto type = matchType();
-        switch (type) {
-            case MatchExpression::ELEM_MATCH_VALUE:
-            case MatchExpression::ELEM_MATCH_OBJECT:
-            case MatchExpression::INTERNAL_SCHEMA_OBJECT_MATCH:
-                continue;
-            default:
-                getChild(i)->addDependencies(deps);
-        }
-    }
-
-    _doAddDependencies(deps);
-}
-
 MatchExpression::ErrorAnnotation::SchemaAnnotations::SchemaAnnotations(
     const BSONObj& jsonSchemaElement) {
     auto title = jsonSchemaElement[JSONSchemaParser::kSchemaTitleKeyword];

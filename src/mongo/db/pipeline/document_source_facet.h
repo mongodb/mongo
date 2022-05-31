@@ -107,6 +107,7 @@ public:
      * Takes a union of all sub-pipelines, and adds them to 'deps'.
      */
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
+    void addVariableRefs(std::set<Variables::Id>* refs) const final;
 
     const char* getSourceName() const final {
         return DocumentSourceFacet::kStageName.rawData();

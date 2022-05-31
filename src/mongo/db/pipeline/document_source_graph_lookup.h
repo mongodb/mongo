@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
@@ -104,10 +105,19 @@ public:
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
-        _startWith->addDependencies(deps);
+        expression::addDependencies(_startWith.get(), deps);
         return DepsTracker::State::SEE_NEXT;
     };
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {
+        expression::addVariableRefs(_startWith.get(), refs);
+        if (_additionalFilter) {
+            match_expression::addVariableRefs(
+                uassertStatusOK(MatchExpressionParser::parse(*_additionalFilter, _fromExpCtx))
+                    .get(),
+                refs);
+        }
+    }
     void addInvolvedCollections(stdx::unordered_set<NamespaceString>* collectionNames) const final;
 
     void detachFromOperationContext() final;

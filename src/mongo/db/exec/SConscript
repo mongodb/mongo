@@ -59,7 +59,7 @@ env.Library(
         "bucket_unpacker.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/matcher/expressions",
+        "$BUILD_DIR/mongo/db/query_expressions",
         "document_value/document_value",
     ],
     LIBDEPS_PRIVATE=[
@@ -101,7 +101,7 @@ env.Library(
         'projection_node.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/mongo/db/query_expressions',
     ],
 )
 

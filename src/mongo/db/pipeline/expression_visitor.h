@@ -382,7 +382,7 @@ using ExpressionConstVisitor = ExpressionVisitor<true>;
  *
  * struct FieldPathVisitor : public SelectiveConstExpressionVisitorBase {
  *     // To avoid overloaded-virtual warnings.
- *     using public SelectiveConstExpressionVisitorBase::visit;
+ *     using SelectiveConstExpressionVisitorBase::visit;
  *
  *     void visit(const ExpressionFieldPath* expr) final {
  *         // logic for what to do with an ExpressionFieldPath.

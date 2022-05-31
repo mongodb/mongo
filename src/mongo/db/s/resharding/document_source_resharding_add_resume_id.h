@@ -51,6 +51,8 @@ public:
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const;

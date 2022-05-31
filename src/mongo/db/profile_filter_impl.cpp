@@ -31,6 +31,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/profile_filter_impl.h"
 
@@ -50,7 +51,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpCtx() {
 
 ProfileFilterImpl::ProfileFilterImpl(BSONObj expr) : _matcher(expr.getOwned(), makeExpCtx()) {
     DepsTracker deps;
-    _matcher.getMatchExpression()->addDependencies(&deps);
+    match_expression::addDependencies(_matcher.getMatchExpression(), &deps);
     uassert(4910201,
             "Profile filter is not allowed to depend on metadata",
             !deps.getNeedsAnyMetadata());

@@ -43,6 +43,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -549,7 +550,7 @@ BSONObj DocumentSourceMatch::getQuery() const {
 
 DepsTracker::State DocumentSourceMatch::getDependencies(DepsTracker* deps) const {
     // Get all field or variable dependencies.
-    _expression->addDependencies(deps);
+    match_expression::addDependencies(_expression.get(), deps);
 
     if (isTextQuery()) {
         // A $text aggregation field should return EXHAUSTIVE_FIELDS, since we don't necessarily
@@ -560,6 +561,10 @@ DepsTracker::State DocumentSourceMatch::getDependencies(DepsTracker* deps) const
     }
 
     return DepsTracker::State::SEE_NEXT;
+}
+
+void DocumentSourceMatch::addVariableRefs(std::set<Variables::Id>* refs) const {
+    match_expression::addVariableRefs(_expression.get(), refs);
 }
 
 DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,

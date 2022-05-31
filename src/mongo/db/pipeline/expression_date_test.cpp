@@ -34,6 +34,7 @@
 
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -1769,7 +1770,7 @@ TEST_F(ExpressionDateDiffTest, AddsDependencies) {
                                                             Value{"$startOfWeekField"_sd});
 
     // Verify that dependencies for $dateDiff expression are determined correctly.
-    auto depsTracker = dateDiffExpression->getDependencies();
+    auto depsTracker = expression::getDependencies(dateDiffExpression.get());
     ASSERT_TRUE(
         (depsTracker.fields ==
          OrderedPathSet{
@@ -1867,7 +1868,7 @@ TEST_F(ExpressionDateTruncTest, AddsDependencies) {
                                                                    Value{"$startOfWeekField"_sd});
 
     // Verify that dependencies for $dateTrunc expression are determined correctly.
-    const auto depsTracker = dateTruncExpression->getDependencies();
+    const auto depsTracker = expression::getDependencies(dateTruncExpression.get());
     ASSERT_TRUE(
         (depsTracker.fields ==
          OrderedPathSet{
@@ -2177,7 +2178,7 @@ TEST_F(ExpressionDateArithmeticsTest, AddsDependencies) {
         auto dateAddExp =
             Expression::parseExpression(expCtx.get(), doc, expCtx->variablesParseState);
         DepsTracker dependencies;
-        dateAddExp->addDependencies(&dependencies);
+        expression::addDependencies(dateAddExp.get(), &dependencies);
         ASSERT_EQ(dependencies.fields.size(), 4UL);
         ASSERT_EQ(dependencies.fields.count("date"), 1UL);
         ASSERT_EQ(dependencies.fields.count("unit"), 1UL);

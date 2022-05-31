@@ -58,10 +58,6 @@ Value ExpressionFunction::serialize(bool explain) const {
     return Value(Document{{kExpressionName, d.freezeToValue()}});
 }
 
-void ExpressionFunction::_doAddDependencies(mongo::DepsTracker* deps) const {
-    _children[0]->addDependencies(deps);
-}
-
 boost::intrusive_ptr<Expression> ExpressionFunction::parse(ExpressionContext* const expCtx,
                                                            BSONElement expr,
                                                            const VariablesParseState& vps) {

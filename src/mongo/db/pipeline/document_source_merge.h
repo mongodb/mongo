@@ -165,6 +165,16 @@ public:
         }
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {
+        // Although $merge is not allowed in sub-pipelines and this method is used for correlation
+        // analysis, the method is generic enough to be used in the future for other purposes.
+        if (_letVariables) {
+            for (auto&& [name, expr] : *_letVariables) {
+                expression::addVariableRefs(expr.get(), refs);
+            }
+        }
+    }
+
 private:
     /**
      * Builds a new $merge stage which will merge all documents into 'outputNs'. If

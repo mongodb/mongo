@@ -94,6 +94,8 @@ public:
         _limit = newLimit;
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
 private:
     DocumentSourceLimit(const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long limit);
     GetNextResult doGetNext() final;

@@ -106,6 +106,8 @@ public:
         return DepsTracker::State::EXHAUSTIVE_ALL;
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
     int getBucketMaxSpanSeconds() const {
         return _bucketMaxSpanSeconds;
     }

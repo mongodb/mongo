@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -187,11 +188,17 @@ public:
 
     virtual std::unique_ptr<WindowFunctionState> buildRemovable() const = 0;
 
-    void addDependencies(DepsTracker* deps) const {
+    virtual void addDependencies(DepsTracker* deps) const {
         if (_input) {
-            _input->addDependencies(deps);
+            expression::addDependencies(_input.get(), deps);
         }
-    };
+    }
+
+    virtual void addVariableRefs(std::set<Variables::Id>* refs) const {
+        if (_input) {
+            expression::addVariableRefs(_input.get(), refs);
+        }
+    }
 
     virtual Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
         MutableDocument args;
@@ -913,6 +920,26 @@ public:
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final;
 
     std::unique_ptr<WindowFunctionState> buildRemovable() const final;
+
+    void addDependencies(DepsTracker* deps) const final {
+        if (_input) {
+            expression::addDependencies(_input.get(), deps);
+        }
+
+        if (nExpr) {
+            expression::addDependencies(nExpr.get(), deps);
+        }
+    }
+
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {
+        if (_input) {
+            expression::addVariableRefs(_input.get(), refs);
+        }
+
+        if (nExpr) {
+            expression::addVariableRefs(nExpr.get(), refs);
+        }
+    }
 
     // TODO SERVER-59327 make these members private
     boost::intrusive_ptr<::mongo::Expression> nExpr;

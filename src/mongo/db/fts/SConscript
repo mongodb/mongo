@@ -66,7 +66,7 @@ baseEnv.Library(
         "$BUILD_DIR/mongo/db/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/common",
         "$BUILD_DIR/mongo/db/fts/unicode/unicode",
-        "$BUILD_DIR/mongo/db/matcher/expressions",
+        "$BUILD_DIR/mongo/db/query_expressions",
         "$BUILD_DIR/mongo/util/md5",
         "$BUILD_DIR/third_party/shim_stemmer",
     ],
@@ -115,7 +115,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/fts/fts_query_noop",
-        "$BUILD_DIR/mongo/db/matcher/expressions",
+        "$BUILD_DIR/mongo/db/query_expressions",
         "base_fts",
     ],
 )

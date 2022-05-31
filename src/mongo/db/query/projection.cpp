@@ -30,6 +30,8 @@
 #include "mongo/db/query/projection.h"
 
 #include "mongo/base/exact_cast.h"
+#include "mongo/db/matcher/match_expression_dependencies.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/query/projection_ast_path_tracking_visitor.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/db/query/util/make_data_structure.h"
@@ -131,7 +133,8 @@ public:
     }
 
     void visit(const MatchExpressionASTNode* node) final {
-        node->matchExpression()->addDependencies(&_context->data().fieldDependencyTracker);
+        match_expression::addDependencies(&(*node->matchExpression()),
+                                          &_context->data().fieldDependencyTracker);
     }
 
     void visit(const ProjectionPositionalASTNode* node) final {
@@ -153,7 +156,8 @@ public:
     void visit(const ExpressionASTNode* node) final {
         // The output of an expression on a dotted path depends on whether that field is an array.
         invariant(node->parent());
-        node->expressionRaw()->addDependencies(&_context->data().fieldDependencyTracker);
+        expression::addDependencies(node->expressionRaw(),
+                                    &_context->data().fieldDependencyTracker);
 
         if (_context->fullPath().getPathLength() > 1) {
             // If assigning to a top-level field, the value of that field is not actually required.

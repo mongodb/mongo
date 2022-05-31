@@ -38,6 +38,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
@@ -1389,12 +1390,12 @@ struct GroupNode : public QuerySolutionNode {
           shouldProduceBson(shouldProduceBson) {
         // Use the DepsTracker to extract the fields that the 'groupByExpression' and accumulator
         // expressions depend on.
-        for (auto& groupByExprField : groupByExpression->getDependencies().fields) {
+        for (auto& groupByExprField : expression::getDependencies(groupByExpression.get()).fields) {
             requiredFields.insert(groupByExprField);
         }
         for (auto&& acc : accumulators) {
             auto argExpr = acc.expr.argument;
-            for (auto& argExprField : argExpr->getDependencies().fields) {
+            for (auto& argExprField : expression::getDependencies(argExpr.get()).fields) {
                 requiredFields.insert(argExprField);
             }
         }

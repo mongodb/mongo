@@ -81,6 +81,8 @@ public:
         return DepsTracker::State::SEE_NEXT;  // This doesn't affect needed fields
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
     /**
      * The $skip stage must run on the merging half of the pipeline.
      */

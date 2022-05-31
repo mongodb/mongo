@@ -132,6 +132,12 @@ public:
         return BSON(kStageName << "{}");
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {
+        // The assumption is that dependency analysis and non-correlated prefix analysis happens
+        // before a $cursor is attached to a pipeline.
+        MONGO_UNREACHABLE;
+    }
+
 protected:
     DocumentSourceCursor(const MultipleCollectionAccessor& collections,
                          std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,

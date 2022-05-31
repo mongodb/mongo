@@ -535,6 +535,12 @@ void Pipeline::addFinalSource(intrusive_ptr<DocumentSource> source) {
     _sources.push_back(source);
 }
 
+void Pipeline::addVariableRefs(std::set<Variables::Id>* refs) const {
+    for (auto&& source : _sources) {
+        source->addVariableRefs(refs);
+    }
+}
+
 DepsTracker Pipeline::getDependencies(
     boost::optional<QueryMetadataBitSet> unavailableMetadata) const {
     return getDependenciesForContainer(getContext(), _sources, unavailableMetadata);
@@ -555,7 +561,6 @@ DepsTracker Pipeline::getDependenciesForContainer(
         DepsTracker localDeps(deps.getUnavailableMetadata());
         DepsTracker::State status = source->getDependencies(&localDeps);
 
-        deps.vars.insert(localDeps.vars.begin(), localDeps.vars.end());
         deps.needRandomGenerator |= localDeps.needRandomGenerator;
 
         if (status == DepsTracker::State::NOT_SUPPORTED) {

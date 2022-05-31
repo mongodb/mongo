@@ -66,6 +66,8 @@ public:
         std::string idField,
         long long collectionSize);
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
 private:
     DocumentSourceSampleFromRandomCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          long long size,

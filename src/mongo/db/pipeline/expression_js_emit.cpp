@@ -98,10 +98,6 @@ ExpressionInternalJsEmit::ExpressionInternalJsEmit(ExpressionContext* const expC
     expCtx->sbeCompatible = false;
 }
 
-void ExpressionInternalJsEmit::_doAddDependencies(mongo::DepsTracker* deps) const {
-    _children[0]->addDependencies(deps);
-}
-
 boost::intrusive_ptr<Expression> ExpressionInternalJsEmit::parse(ExpressionContext* const expCtx,
                                                                  BSONElement expr,
                                                                  const VariablesParseState& vps) {

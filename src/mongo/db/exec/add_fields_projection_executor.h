@@ -111,6 +111,10 @@ public:
         return DepsTracker::State::SEE_NEXT;
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {
+        _root->addVariableRefs(refs);
+    }
+
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {
         OrderedPathSet computedPaths;
         StringMap<std::string> renamedPaths;

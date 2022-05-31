@@ -192,10 +192,6 @@ private:
      */
     bool _matchesBSONObj(const BSONObj& obj) const;
 
-    void _doAddDependencies(DepsTracker* deps) const final {
-        deps->needWholeDocument = true;
-    }
-
     // The names of the properties are owned by the BSONObj used to create this match expression.
     // Since that BSONObj must outlive this object, we can safely store StringData.
     StringDataSet _properties;

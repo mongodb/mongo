@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/platform/basic.h"
@@ -257,9 +258,9 @@ void Variables::seedVariablesWithLetParameters(ExpressionContext* const expCtx,
         auto expr = Expression::parseOperand(expCtx, elem, expCtx->variablesParseState);
 
         uassert(4890500,
-                "Command let Expression tried to access a field, but this is not allowed because "
+                "Command let Expression tried to access a field, but this is not allowed because"
                 "Command let Expressions run before the query examines any documents.",
-                expr->getDependencies().hasNoRequirements());
+                expression::getDependencies(expr.get()).hasNoRequirements());
         Value value = expr->evaluate(Document{}, &expCtx->variables);
 
         if (maybeSystemVarValidator) {

@@ -102,7 +102,7 @@ env.Library(
         'task_executor_interface',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/mongo/db/query_expressions',
     ],
 )
 

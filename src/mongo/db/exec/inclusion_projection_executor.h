@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_node.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/expression_walker.h"
 
 namespace mongo::projection_executor {
@@ -64,7 +65,7 @@ public:
         }
 
         for (auto&& expressionPair : _expressions) {
-            expressionPair.second->addDependencies(deps);
+            expression::addDependencies(expressionPair.second.get(), deps);
         }
 
         for (auto&& childPair : _children) {
@@ -225,9 +226,16 @@ public:
     DepsTracker::State addDependencies(DepsTracker* deps) const final {
         _root->reportDependencies(deps);
         if (_rootReplacementExpression) {
-            _rootReplacementExpression->addDependencies(deps);
+            expression::addDependencies(_rootReplacementExpression.get(), deps);
         }
         return DepsTracker::State::EXHAUSTIVE_FIELDS;
+    }
+
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {
+        _root->addVariableRefs(refs);
+        if (_rootReplacementExpression) {
+            expression::addVariableRefs(_rootReplacementExpression.get(), refs);
+        }
     }
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {

@@ -25,7 +25,7 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/crypto/encrypted_field_config",
         "$BUILD_DIR/mongo/db/cst/cst",
-        "$BUILD_DIR/mongo/db/matcher/expressions",
+        "$BUILD_DIR/mongo/db/query_expressions",
         "collation/collator_factory_interface",
         "collation/collator_interface",
         "projection_ast",
@@ -59,6 +59,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_plan_stats',
         '$BUILD_DIR/mongo/db/index/expression_params',
+        "$BUILD_DIR/mongo/db/query_expressions",
         'canonical_query',
         'query_index_bounds',
         'query_knobs',
@@ -84,7 +85,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/matcher/expressions",
+        "$BUILD_DIR/mongo/db/query_expressions",
     ],
 )
 
@@ -114,7 +115,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_stages',
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_storage',
         "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/matcher/expressions",
+        "$BUILD_DIR/mongo/db/query_expressions",
         "$BUILD_DIR/mongo/db/storage/execution_context",
     ],
 )
@@ -128,7 +129,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/matcher/expressions",
+        "$BUILD_DIR/mongo/db/query_expressions",
     ],
 )
 
@@ -326,7 +327,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
-        '$BUILD_DIR/mongo/db/pipeline/expression_context',
+        '$BUILD_DIR/mongo/db/query_expressions',
     ],
 )
 

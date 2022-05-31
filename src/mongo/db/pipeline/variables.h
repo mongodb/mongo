@@ -77,6 +77,17 @@ public:
         return id >= 0;
     }
 
+    /**
+     * Returns 'true' if any of the 'vars' appear in the passed 'ids' set.
+     */
+    static bool hasVariableReferenceTo(const std::set<Variables::Id>& vars,
+                                       const std::set<Variables::Id>& ids) {
+        std::vector<Variables::Id> match;
+        std::set_intersection(
+            vars.begin(), vars.end(), ids.begin(), ids.end(), std::back_inserter(match));
+        return !match.empty();
+    }
+
     // Ids for builtin variables.
     static constexpr auto kRootId = Id(-1);
     static constexpr auto kRemoveId = Id(-2);

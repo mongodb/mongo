@@ -68,8 +68,13 @@ Value DocumentSourceSetVariableFromSubPipeline::serialize(
 
 DepsTracker::State DocumentSourceSetVariableFromSubPipeline::getDependencies(
     DepsTracker* deps) const {
-    // TODO SERVER-63845: change to NOT_SUPPORTED.
-    return DepsTracker::State::SEE_NEXT;
+    return DepsTracker::State::NOT_SUPPORTED;
+}
+
+void DocumentSourceSetVariableFromSubPipeline::addVariableRefs(
+    std::set<Variables::Id>* refs) const {
+    refs->insert(_variableID);
+    _subPipeline->addVariableRefs(refs);
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceSetVariableFromSubPipeline::createFromBson(

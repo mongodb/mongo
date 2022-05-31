@@ -69,6 +69,8 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
 private:
     DocumentSourceChangeStreamCheckTopologyChange(
         const boost::intrusive_ptr<ExpressionContext>& expCtx)

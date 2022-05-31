@@ -696,6 +696,12 @@ public:
     }
 
     /**
+     * Populate 'refs' with the variables referred to by this stage, including user and system
+     * variables but excluding $$ROOT. Note that field path references are not considered variables.
+     */
+    virtual void addVariableRefs(std::set<Variables::Id>* refs) const = 0;
+
+    /**
      * If this stage can be run in parallel across a distributed collection, returns boost::none.
      * Otherwise, returns a struct representing what needs to be done to merge each shard's pipeline
      * into a single stream of results. Must not mutate the existing source object; if different

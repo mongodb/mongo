@@ -474,11 +474,6 @@ public:
     void setCollator(const CollatorInterface* collator);
 
     /**
-     * Add the fields required for matching to 'deps'.
-     */
-    void addDependencies(DepsTracker* deps) const;
-
-    /**
      * Serialize the MatchExpression to BSON, appending to 'out'. Output of this method is expected
      * to be a valid query object, that, when parsed, produces a logically equivalent
      * MatchExpression. If 'includePath' is false then the serialization should assume it's in a
@@ -564,8 +559,6 @@ protected:
      * to the collator that occur after initialization time.
      */
     virtual void _doSetCollator(const CollatorInterface* collator){};
-
-    virtual void _doAddDependencies(DepsTracker* deps) const {}
 
     void _debugAddSpace(StringBuilder& debug, int indentationLevel) const;
 

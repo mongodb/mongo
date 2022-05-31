@@ -149,10 +149,6 @@ private:
      */
     bool _matchesBSONObj(const BSONObj& obj) const;
 
-    void _doAddDependencies(DepsTracker* deps) const final {
-        deps->needWholeDocument = true;
-    }
-
     std::shared_ptr<GeometryContainer> _geoContainer;
     std::string _indexField;
     std::string _field;

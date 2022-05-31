@@ -48,6 +48,7 @@
 #include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/sbe_stage_builder.h"
@@ -1000,7 +1001,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     auto [indexFilterKeyBitset, indexFilterKeyFields] = [&]() {
         if (ixn->filter) {
             DepsTracker tracker;
-            ixn->filter->addDependencies(&tracker);
+            match_expression::addDependencies(ixn->filter.get(), &tracker);
             return makeIndexKeyInclusionSet(ixn->index.keyPattern, tracker.fields);
         }
         return std::make_pair(sbe::IndexKeysInclusionSet{}, std::vector<std::string>{});
@@ -1247,7 +1248,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     auto [indexFilterKeyBitset, indexFilterKeyFields] = [&]() {
         if (ixn->filter) {
             DepsTracker tracker;
-            ixn->filter->addDependencies(&tracker);
+            match_expression::addDependencies(ixn->filter.get(), &tracker);
             return makeIndexKeyInclusionSet(ixn->index.keyPattern, tracker.fields);
         }
         return std::make_pair(sbe::IndexKeysInclusionSet{}, std::vector<std::string>{});

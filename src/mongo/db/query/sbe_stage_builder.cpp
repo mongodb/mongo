@@ -59,6 +59,7 @@
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/abt/field_map_builder.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_visitor.h"
@@ -875,7 +876,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Tag which of the paths should be included into the output.
     DepsTracker residual;
     if (csn->postAssemblyFilter) {
-        csn->postAssemblyFilter->addDependencies(&residual);
+        match_expression::addDependencies(csn->postAssemblyFilter.get(), &residual);
     }
     std::vector<bool> includeInOutput(paths.size(), false);
     for (size_t i = 0; i < paths.size(); i++) {

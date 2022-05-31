@@ -136,9 +136,10 @@ TEST_F(PositionalProjectionExecutionTest, ShouldAddInclusionFieldsAndWholeDocume
     DepsTracker deps;
     executor->addDependencies(&deps);
 
-    ASSERT_EQ(deps.fields.size(), 2UL);
+    // Note that the 'bar' dependency is coming from the root projection and *not* the match
+    // expression.
+    ASSERT_EQ(deps.fields.size(), 1UL);
     ASSERT_EQ(deps.fields.count("bar"), 1UL);
-    ASSERT_EQ(deps.fields.count("foo.bar"), 1UL);
     ASSERT(deps.needWholeDocument);
 }
 

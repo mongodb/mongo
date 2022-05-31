@@ -99,6 +99,4 @@ Value ExpressionTestApiVersion::evaluate(const Document& root, Variables* variab
     return Value(1);
 }
 
-void ExpressionTestApiVersion::_doAddDependencies(DepsTracker* deps) const {}
-
 }  // namespace mongo

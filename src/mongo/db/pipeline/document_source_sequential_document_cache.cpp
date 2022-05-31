@@ -123,9 +123,11 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
     //  2. depends on a variable defined in this scope, or
     //  3. generates random numbers.
     DocumentSource* lastPtr = nullptr;
+    std::set<Variables::Id> prefixVarRefs;
     for (; prefixSplit != container->end(); ++prefixSplit) {
+        (*prefixSplit)->addVariableRefs(&prefixVarRefs);
         if (((*prefixSplit)->getDependencies(&deps) == DepsTracker::State::NOT_SUPPORTED) ||
-            deps.hasVariableReferenceTo(varIDs) || deps.needRandomGenerator) {
+            Variables::hasVariableReferenceTo(prefixVarRefs, varIDs) || deps.needRandomGenerator) {
             break;
         }
 

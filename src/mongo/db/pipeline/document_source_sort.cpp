@@ -402,6 +402,10 @@ DepsTracker::State DocumentSourceSort::getDependencies(DepsTracker* deps) const 
     return DepsTracker::State::SEE_NEXT;
 }
 
+void DocumentSourceSort::addVariableRefs(std::set<Variables::Id>* refs) const {
+    // It's impossible for $sort or the find command's sort to refer to a variable.
+}
+
 intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(15973, "the $sort key specification must be an object", elem.type() == Object);

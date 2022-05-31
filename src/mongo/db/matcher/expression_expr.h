@@ -133,12 +133,6 @@ private:
 
     void _doSetCollator(const CollatorInterface* collator) final;
 
-    void _doAddDependencies(DepsTracker* deps) const final {
-        if (_expression) {
-            _expression->addDependencies(deps);
-        }
-    }
-
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
     boost::intrusive_ptr<Expression> _expression;

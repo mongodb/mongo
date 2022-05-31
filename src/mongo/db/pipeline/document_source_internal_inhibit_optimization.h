@@ -69,6 +69,8 @@ public:
         return boost::none;
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
 private:
     GetNextResult doGetNext() final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;

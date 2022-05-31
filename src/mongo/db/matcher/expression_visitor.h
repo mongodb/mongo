@@ -168,4 +168,88 @@ public:
 
 using MatchExpressionMutableVisitor = MatchExpressionVisitor<false>;
 using MatchExpressionConstVisitor = MatchExpressionVisitor<true>;
+
+/**
+ * This class provides null implementations for all visit methods so that a derived class can
+ * override visit method(s) only for interested 'MatchExpression' types. For example, if one wants
+ * to visit only 'EqualityMatchExpression', one can override only void visit(const
+ * EqualityMatchExpression*).
+ *
+ * struct EqVisitor : public SelectiveMatchExpressionVisitorBase<true> {
+ *     // To avoid overloaded-virtual warnings.
+ *     using SelectiveMatchExpressionVisitorBase<true>::visit;
+ *
+ *     void visit(const EqualityMatchExpression* expr) final {
+ *         // logic for what to do with an EqualityMatchExpression.
+ *     }
+ * };
+ *
+ * NOTE: Take caution when deriving from this class as you lose the compile-time safety of ensuring
+ * that new expressions must consider the impact in the corresponding visitor implementation.
+ */
+template <bool IsConst>
+struct SelectiveMatchExpressionVisitorBase : public MatchExpressionVisitor<IsConst> {
+    template <typename T>
+    using MaybeConstPtr = tree_walker::MaybeConstPtr<IsConst, T>;
+
+    void visit(MaybeConstPtr<AlwaysFalseMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<AlwaysTrueMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<AndMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<BitsAllClearMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<BitsAllSetMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<BitsAnyClearMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<BitsAnySetMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<ElemMatchObjectMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<ElemMatchValueMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<EqualityMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<ExistsMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<ExprMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<GTEMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<GTMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<GeoMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<GeoNearMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalBucketGeoWithinMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalExprEqMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalExprGTMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalExprGTEMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalExprLTMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalExprLTEMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaAllElemMatchFromIndexMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaAllowedPropertiesMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaBinDataEncryptedTypeExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaBinDataFLE2EncryptedTypeExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaBinDataSubTypeExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaCondMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaEqMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaFmodMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaMatchArrayIndexMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaMaxItemsMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaMaxLengthMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaMaxPropertiesMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaMinItemsMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaMinLengthMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaMinPropertiesMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaObjectMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaRootDocEqMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaTypeExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaUniqueItemsMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalSchemaXorMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<LTEMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<LTMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<ModMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<NorMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<NotMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<OrMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<RegexMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<SizeMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<TextMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<TextNoOpMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<TwoDPtInAnnulusExpression> expr) override {}
+    void visit(MaybeConstPtr<TypeMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<WhereMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<WhereNoOpMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<EncryptedBetweenMatchExpression> expr) override {}
+};
+
 }  // namespace mongo

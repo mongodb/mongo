@@ -138,6 +138,8 @@ public:
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final;
+
     GetModPathsReturn getModifiedPaths() const final {
         // This stage does not modify or rename any paths.
         return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};

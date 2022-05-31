@@ -91,6 +91,8 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const override;
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
     static boost::intrusive_ptr<DocumentSourceChangeStreamCheckResumability> createFromBson(
         BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 

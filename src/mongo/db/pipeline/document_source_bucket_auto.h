@@ -48,6 +48,8 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final;
+
     const char* getSourceName() const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
 

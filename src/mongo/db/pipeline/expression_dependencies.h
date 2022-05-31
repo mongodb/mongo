@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,45 +29,26 @@
 
 #pragma once
 
-#include "mongo/db/exec/js_function.h"
-#include "mongo/db/matcher/expression_where_base.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/expression.h"
 
-namespace mongo {
+namespace mongo::expression {
 
-class OperationContext;
+/**
+ * Add the dependencies required by 'expr' to 'deps', including any metadata or field references.
+ */
+void addDependencies(const Expression* expr, DepsTracker* deps);
 
-class WhereMatchExpression final : public WhereMatchExpressionBase {
-public:
-    WhereMatchExpression(OperationContext* opCtx, WhereParams params, StringData dbName);
+/**
+ * Convenience wrapper around addDependencies.
+ */
+DepsTracker getDependencies(const Expression* expr);
 
-    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
+/**
+ * Append the variables referred to by 'expr' to the set 'refs', without clearing any pre-existing
+ * references. Should not include $$ROOT or field path expressions.
+ */
+void addVariableRefs(const Expression* expr, std::set<Variables::Id>* refs);
 
-    std::unique_ptr<MatchExpression> shallowClone() const final;
-
-    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
-        visitor->visit(this);
-    }
-
-    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
-        visitor->visit(this);
-    }
-
-    const JsFunction& getPredicate() const {
-        validateState();
-        return *_jsFunction;
-    }
-
-    std::unique_ptr<JsFunction> extractPredicate() {
-        return std::move(_jsFunction);
-    }
-
-private:
-    void validateState() const {
-        tassert(6403600, "JsFunction is unavailable", _jsFunction);
-    }
-
-    OperationContext* const _opCtx;
-    std::unique_ptr<JsFunction> _jsFunction;
-};
-
-}  // namespace mongo
+}  // namespace mongo::expression

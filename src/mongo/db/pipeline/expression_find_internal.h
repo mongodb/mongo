@@ -104,13 +104,8 @@ public:
         return this;
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final {
-        for (const auto& child : _children) {
-            child->addDependencies(deps);
-        }
-        _matchExpr->addDependencies(deps);
-        deps->needWholeDocument = true;
+    const CopyableMatchExpression& getMatchExpr() const {
+        return _matchExpr;
     }
 
 private:
@@ -171,14 +166,6 @@ public:
         return this;
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final {
-        invariant(_children.size() == 1ul);
-
-        _children[0]->addDependencies(deps);
-        deps->needWholeDocument = true;
-    }
-
 private:
     const FieldPath _path;
     const boost::optional<int> _skip;
@@ -233,13 +220,8 @@ public:
         return this;
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final {
-        invariant(_children.size() == 1ul);
-
-        _children[0]->addDependencies(deps);
-        _matchExpr->addDependencies(deps);
-        deps->needWholeDocument = true;
+    const CopyableMatchExpression& getMatchExpr() const {
+        return _matchExpr;
     }
 
 private:

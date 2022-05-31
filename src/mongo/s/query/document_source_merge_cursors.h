@@ -148,6 +148,8 @@ public:
         _ownCursors = false;
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;

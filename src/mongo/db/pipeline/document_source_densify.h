@@ -390,6 +390,11 @@ public:
         return DepsTracker::State::SEE_NEXT;
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {
+        // The partition expression cannot refer to any variables because it is internally generated
+        // based on a set of field paths.
+    }
+
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return DistributedPlanLogic{nullptr, this, boost::none};
     }

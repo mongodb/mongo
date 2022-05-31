@@ -92,8 +92,6 @@ private:
                              boost::intrusive_ptr<Expression> thisRef,
                              std::string funcSourceString);
 
-    void _doAddDependencies(DepsTracker* deps) const final override;
-
     const boost::intrusive_ptr<Expression>& _thisRef;
     std::string _funcSource;
 };

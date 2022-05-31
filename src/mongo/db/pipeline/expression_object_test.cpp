@@ -38,6 +38,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -266,7 +267,7 @@ TEST(ExpressionObjectDependencies, ConstantValuesShouldNotBeAddedToDependencies)
     auto object =
         ExpressionObject::create(&expCtx, {{"a", ExpressionConstant::create(&expCtx, Value{5})}});
     DepsTracker deps;
-    object->addDependencies(&deps);
+    expression::addDependencies(object.get(), &deps);
     ASSERT_EQ(deps.fields.size(), 0UL);
 }
 
@@ -275,19 +276,19 @@ TEST(ExpressionObjectDependencies, FieldPathsShouldBeAddedToDependencies) {
     auto object = ExpressionObject::create(
         &expCtx, {{"x", ExpressionFieldPath::deprecatedCreate(&expCtx, "c.d")}});
     DepsTracker deps;
-    object->addDependencies(&deps);
+    expression::addDependencies(object.get(), &deps);
     ASSERT_EQ(deps.fields.size(), 1UL);
     ASSERT_EQ(deps.fields.count("c.d"), 1UL);
 };
 
-TEST(ExpressionObjectDependencies, VariablesShouldBeAddedToDependencies) {
+TEST(ExpressionObjectDependencies, VariablesShouldBeAddedToReferences) {
     auto expCtx = ExpressionContextForTest{};
     auto varID = expCtx.variablesParseState.defineVariable("var1");
     auto fieldPath = ExpressionFieldPath::parse(&expCtx, "$$var1", expCtx.variablesParseState);
-    DepsTracker deps;
-    fieldPath->addDependencies(&deps);
-    ASSERT_EQ(deps.vars.size(), 1UL);
-    ASSERT_EQ(deps.vars.count(varID), 1UL);
+    std::set<Variables::Id> refs;
+    expression::addVariableRefs(fieldPath.get(), &refs);
+    ASSERT_EQ(refs.size(), 1UL);
+    ASSERT_EQ(refs.count(varID), 1UL);
 }
 
 TEST(ExpressionObjectDependencies, LocalLetVariablesShouldBeFilteredOutOfDependencies) {
@@ -300,10 +301,10 @@ TEST(ExpressionObjectDependencies, LocalLetVariablesShouldBeFilteredOutOfDepende
                                                                                 << "$$var2"))));
     auto expressionLet =
         ExpressionLet::parse(&expCtx, letSpec.firstElement(), expCtx.variablesParseState);
-    DepsTracker deps;
-    expressionLet->addDependencies(&deps);
-    ASSERT_EQ(deps.vars.size(), 1UL);
-    ASSERT_EQ(expCtx.variablesParseState.getVariable("var1"), *deps.vars.begin());
+    std::set<Variables::Id> refs;
+    expression::addVariableRefs(expressionLet.get(), &refs);
+    ASSERT_EQ(refs.size(), 1UL);
+    ASSERT_EQ(expCtx.variablesParseState.getVariable("var1"), *refs.begin());
 }
 
 TEST(ExpressionObjectDependencies, LocalMapVariablesShouldBeFilteredOutOfDependencies) {
@@ -319,10 +320,10 @@ TEST(ExpressionObjectDependencies, LocalMapVariablesShouldBeFilteredOutOfDepende
 
     auto expressionMap =
         ExpressionMap::parse(&expCtx, mapSpec.firstElement(), expCtx.variablesParseState);
-    DepsTracker deps;
-    expressionMap->addDependencies(&deps);
-    ASSERT_EQ(deps.vars.size(), 1UL);
-    ASSERT_EQ(expCtx.variablesParseState.getVariable("var1"), *deps.vars.begin());
+    std::set<Variables::Id> refs;
+    expression::addVariableRefs(expressionMap.get(), &refs);
+    ASSERT_EQ(refs.size(), 1UL);
+    ASSERT_EQ(expCtx.variablesParseState.getVariable("var1"), *refs.begin());
 }
 
 TEST(ExpressionObjectDependencies, LocalFilterVariablesShouldBeFilteredOutOfDependencies) {
@@ -336,10 +337,10 @@ TEST(ExpressionObjectDependencies, LocalFilterVariablesShouldBeFilteredOutOfDepe
 
     auto expressionFilter =
         ExpressionFilter::parse(&expCtx, filterSpec.firstElement(), expCtx.variablesParseState);
-    DepsTracker deps;
-    expressionFilter->addDependencies(&deps);
-    ASSERT_EQ(deps.vars.size(), 1UL);
-    ASSERT_EQ(expCtx.variablesParseState.getVariable("var1"), *deps.vars.begin());
+    std::set<Variables::Id> refs;
+    expression::addVariableRefs(expressionFilter.get(), &refs);
+    ASSERT_EQ(refs.size(), 1UL);
+    ASSERT_EQ(expCtx.variablesParseState.getVariable("var1"), *refs.begin());
 }
 
 //

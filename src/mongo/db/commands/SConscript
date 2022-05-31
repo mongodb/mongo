@@ -696,7 +696,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/curop',
-        '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/mongo/db/query_expressions',
         '$BUILD_DIR/mongo/db/server_options_core',
     ],
 )

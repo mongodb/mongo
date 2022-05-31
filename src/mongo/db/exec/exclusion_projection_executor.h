@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_node.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
 
 namespace mongo::projection_executor {
 /**
@@ -56,7 +57,7 @@ public:
         // We may have expression dependencies though, as $meta expression can be used with
         // exclusion.
         for (auto&& expressionPair : _expressions) {
-            expressionPair.second->addDependencies(deps);
+            expression::addDependencies(expressionPair.second.get(), deps);
         }
 
         for (auto&& childPair : _children) {
@@ -137,9 +138,16 @@ public:
     DepsTracker::State addDependencies(DepsTracker* deps) const final {
         _root->reportDependencies(deps);
         if (_rootReplacementExpression) {
-            _rootReplacementExpression->addDependencies(deps);
+            expression::addDependencies(_rootReplacementExpression.get(), deps);
         }
         return DepsTracker::State::SEE_NEXT;
+    }
+
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {
+        _root->addVariableRefs(refs);
+        if (_rootReplacementExpression) {
+            expression::addVariableRefs(_rootReplacementExpression.get(), refs);
+        }
     }
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {

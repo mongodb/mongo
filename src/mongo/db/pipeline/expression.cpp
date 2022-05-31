@@ -946,10 +946,6 @@ intrusive_ptr<Expression> ExpressionCoerceToBool::optimize() {
     return intrusive_ptr<Expression>(this);
 }
 
-void ExpressionCoerceToBool::_doAddDependencies(DepsTracker* deps) const {
-    pExpression->addDependencies(deps);
-}
-
 Value ExpressionCoerceToBool::evaluate(const Document& root, Variables* variables) const {
     Value pResult(pExpression->evaluate(root, variables));
     bool b = pResult.coerceToBool();
@@ -1201,10 +1197,6 @@ ExpressionConstant::ExpressionConstant(ExpressionContext* const expCtx, const Va
 intrusive_ptr<Expression> ExpressionConstant::optimize() {
     /* nothing to do */
     return intrusive_ptr<Expression>(this);
-}
-
-void ExpressionConstant::_doAddDependencies(DepsTracker* deps) const {
-    /* nothing to do */
 }
 
 Value ExpressionConstant::evaluate(const Document& root, Variables* variables) const {
@@ -1565,42 +1557,6 @@ Value ExpressionDateFromParts::evaluate(const Document& root, Variables* variabl
     MONGO_UNREACHABLE;
 }
 
-void ExpressionDateFromParts::_doAddDependencies(DepsTracker* deps) const {
-    if (_year) {
-        _year->addDependencies(deps);
-    }
-    if (_month) {
-        _month->addDependencies(deps);
-    }
-    if (_day) {
-        _day->addDependencies(deps);
-    }
-    if (_hour) {
-        _hour->addDependencies(deps);
-    }
-    if (_minute) {
-        _minute->addDependencies(deps);
-    }
-    if (_second) {
-        _second->addDependencies(deps);
-    }
-    if (_millisecond) {
-        _millisecond->addDependencies(deps);
-    }
-    if (_isoWeekYear) {
-        _isoWeekYear->addDependencies(deps);
-    }
-    if (_isoWeek) {
-        _isoWeek->addDependencies(deps);
-    }
-    if (_isoDayOfWeek) {
-        _isoDayOfWeek->addDependencies(deps);
-    }
-    if (_timeZone) {
-        _timeZone->addDependencies(deps);
-    }
-}
-
 /* ---------------------- ExpressionDateFromString --------------------- */
 
 REGISTER_STABLE_EXPRESSION(dateFromString, ExpressionDateFromString::parse);
@@ -1774,25 +1730,6 @@ Value ExpressionDateFromString::evaluate(const Document& root, Variables* variab
     }
 }
 
-void ExpressionDateFromString::_doAddDependencies(DepsTracker* deps) const {
-    _dateString->addDependencies(deps);
-    if (_timeZone) {
-        _timeZone->addDependencies(deps);
-    }
-
-    if (_format) {
-        _format->addDependencies(deps);
-    }
-
-    if (_onNull) {
-        _onNull->addDependencies(deps);
-    }
-
-    if (_onError) {
-        _onError->addDependencies(deps);
-    }
-}
-
 /* ---------------------- ExpressionDateToParts ----------------------- */
 
 REGISTER_STABLE_EXPRESSION(dateToParts, ExpressionDateToParts::parse);
@@ -1942,17 +1879,6 @@ Value ExpressionDateToParts::evaluate(const Document& root, Variables* variables
     }
 }
 
-void ExpressionDateToParts::_doAddDependencies(DepsTracker* deps) const {
-    _date->addDependencies(deps);
-    if (_timeZone) {
-        _timeZone->addDependencies(deps);
-    }
-    if (_iso8601) {
-        _iso8601->addDependencies(deps);
-    }
-}
-
-
 /* ---------------------- ExpressionDateToString ----------------------- */
 
 REGISTER_STABLE_EXPRESSION(dateToString, ExpressionDateToString::parse);
@@ -2091,21 +2017,6 @@ Value ExpressionDateToString::evaluate(const Document& root, Variables* variable
     }
 
     return Value(uassertStatusOK(timeZone->formatDate(kISOFormatString, date.coerceToDate())));
-}
-
-void ExpressionDateToString::_doAddDependencies(DepsTracker* deps) const {
-    _date->addDependencies(deps);
-    if (_timeZone) {
-        _timeZone->addDependencies(deps);
-    }
-
-    if (_onNull) {
-        _onNull->addDependencies(deps);
-    }
-
-    if (_format) {
-        _format->addDependencies(deps);
-    }
 }
 
 /* ----------------------- ExpressionDateDiff ---------------------------- */
@@ -2285,17 +2196,6 @@ Value ExpressionDateDiff::evaluate(const Document& root, Variables* variables) c
     return Value{dateDiff(startDate, endDate, unit, *timezone, startOfWeek)};
 }
 
-void ExpressionDateDiff::_doAddDependencies(DepsTracker* deps) const {
-    _startDate->addDependencies(deps);
-    _endDate->addDependencies(deps);
-    _unit->addDependencies(deps);
-    if (_timeZone) {
-        _timeZone->addDependencies(deps);
-    }
-    if (_startOfWeek) {
-        _startOfWeek->addDependencies(deps);
-    }
-}
 
 /* ----------------------- ExpressionDivide ---------------------------- */
 
@@ -2424,12 +2324,6 @@ intrusive_ptr<Expression> ExpressionObject::optimize() {
     return this;
 }
 
-void ExpressionObject::_doAddDependencies(DepsTracker* deps) const {
-    for (auto&& child : _children) {
-        child->addDependencies(deps);
-    }
-}
-
 Value ExpressionObject::evaluate(const Document& root, Variables* variables) const {
     MutableDocument outputDoc;
     for (auto&& pair : _expressions) {
@@ -2543,18 +2437,6 @@ bool ExpressionFieldPath::representsPath(const std::string& dottedPath) const {
         return false;
     }
     return _fieldPath.tail().fullPath() == dottedPath;
-}
-
-void ExpressionFieldPath::_doAddDependencies(DepsTracker* deps) const {
-    if (_variable == Variables::kRootId) {  // includes CURRENT when it is equivalent to ROOT.
-        if (_fieldPath.getPathLength() == 1) {
-            deps->needWholeDocument = true;  // need full doc if just "$$ROOT"
-        } else {
-            deps->fields.insert(_fieldPath.tail().fullPath());
-        }
-    } else {
-        deps->vars.insert(_variable);
-    }
 }
 
 Value ExpressionFieldPath::evaluatePathArray(size_t index, const Value& input) const {
@@ -2830,14 +2712,6 @@ Value ExpressionFilter::evaluate(const Document& root, Variables* variables) con
     return Value(std::move(output));
 }
 
-void ExpressionFilter::_doAddDependencies(DepsTracker* deps) const {
-    _input->addDependencies(deps);
-    _cond->addDependencies(deps);
-    if (_limit) {
-        (*_limit)->addDependencies(deps);
-    }
-}
-
 /* ------------------------- ExpressionFloor -------------------------- */
 
 StatusWith<Value> ExpressionFloor::apply(Value arg) {
@@ -2979,16 +2853,6 @@ Value ExpressionLet::evaluate(const Document& root, Variables* variables) const 
     return _subExpression->evaluate(root, variables);
 }
 
-void ExpressionLet::_doAddDependencies(DepsTracker* deps) const {
-    for (auto&& idToNameExp : _variables) {
-        // Add the external dependencies from the 'vars' statement.
-        idToNameExp.second.expression->addDependencies(deps);
-    }
-
-    // Add subexpression dependencies, which may contain a mix of local and external variable refs.
-    _subExpression->addDependencies(deps);
-}
-
 /* ------------------------- ExpressionMap ----------------------------- */
 
 REGISTER_STABLE_EXPRESSION(map, ExpressionMap::parse);
@@ -3093,11 +2957,6 @@ Value ExpressionMap::evaluate(const Document& root, Variables* variables) const 
     }
 
     return Value(std::move(output));
-}
-
-void ExpressionMap::_doAddDependencies(DepsTracker* deps) const {
-    _input->addDependencies(deps);
-    _each->addDependencies(deps);
 }
 
 Expression::ComputedPaths ExpressionMap::getComputedPaths(const std::string& exprFieldPath,
@@ -3253,17 +3112,6 @@ Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const
             MONGO_UNREACHABLE;
     }
     MONGO_UNREACHABLE;
-}
-
-void ExpressionMeta::_doAddDependencies(DepsTracker* deps) const {
-    if (_metaType == MetaType::kSearchScore || _metaType == MetaType::kSearchHighlights ||
-        _metaType == MetaType::kSearchScoreDetails) {
-        // We do not add the dependencies for searchScore, searchHighlights, or searchScoreDetails
-        // because those values are not stored in the collection (or in mongod at all).
-        return;
-    }
-
-    deps->setNeedsMetadata(_metaType, true);
 }
 
 /* ----------------------- ExpressionMod ---------------------------- */
@@ -3922,12 +3770,6 @@ ExpressionInternalFLEEqual::ExpressionInternalFLEEqual(ExpressionContext* const 
     expCtx->sbeCompatible = false;
 }
 
-void ExpressionInternalFLEEqual::_doAddDependencies(DepsTracker* deps) const {
-    for (auto&& operand : _children) {
-        operand->addDependencies(deps);
-    }
-}
-
 REGISTER_STABLE_EXPRESSION(_internalFleEq, ExpressionInternalFLEEqual::parse);
 
 intrusive_ptr<Expression> ExpressionInternalFLEEqual::parse(ExpressionContext* const expCtx,
@@ -4003,12 +3845,6 @@ ExpressionInternalFLEBetween::ExpressionInternalFLEBetween(ExpressionContext* co
                                                            std::vector<ConstDataRange> edcTokens)
     : Expression(expCtx, {std::move(field)}), _evaluator(serverToken, contentionFactor, edcTokens) {
     expCtx->sbeCompatible = false;
-}
-
-void ExpressionInternalFLEBetween::_doAddDependencies(DepsTracker* deps) const {
-    for (auto&& operand : _children) {
-        operand->addDependencies(deps);
-    }
 }
 
 REGISTER_STABLE_EXPRESSION(_internalFleBetween, ExpressionInternalFLEBetween::parse);
@@ -4199,12 +4035,6 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
         _children = std::move(optimizedOperands);
     }
     return this;
-}
-
-void ExpressionNary::_doAddDependencies(DepsTracker* deps) const {
-    for (auto&& operand : _children) {
-        operand->addDependencies(deps);
-    }
 }
 
 void ExpressionNary::addOperand(const intrusive_ptr<Expression>& pExpression) {
@@ -4676,12 +4506,6 @@ intrusive_ptr<Expression> ExpressionReduce::optimize() {
     return this;
 }
 
-void ExpressionReduce::_doAddDependencies(DepsTracker* deps) const {
-    _input->addDependencies(deps);
-    _initial->addDependencies(deps);
-    _in->addDependencies(deps);
-}
-
 Value ExpressionReduce::serialize(bool explain) const {
     return Value(Document{{"$reduce",
                            Document{{"input", _input->serialize(explain)},
@@ -4690,12 +4514,6 @@ Value ExpressionReduce::serialize(bool explain) const {
 }
 
 /* ------------------------ ExpressionReplaceBase ------------------------ */
-
-void ExpressionReplaceBase::_doAddDependencies(DepsTracker* deps) const {
-    _input->addDependencies(deps);
-    _find->addDependencies(deps);
-    _replacement->addDependencies(deps);
-}
 
 Value ExpressionReplaceBase::serialize(bool explain) const {
     return Value(Document{{getOpName(),
@@ -4983,10 +4801,6 @@ const char* ExpressionSortArray::getOpName() const {
 intrusive_ptr<Expression> ExpressionSortArray::optimize() {
     _input = _input->optimize();
     return this;
-}
-
-void ExpressionSortArray::_doAddDependencies(DepsTracker* deps) const {
-    _input->addDependencies(deps);
 }
 
 Value ExpressionSortArray::serialize(bool explain) const {
@@ -5878,17 +5692,6 @@ boost::intrusive_ptr<Expression> ExpressionSwitch::parse(ExpressionContext* cons
     return new ExpressionSwitch(expCtx, std::move(children), std::move(branches));
 }
 
-void ExpressionSwitch::_doAddDependencies(DepsTracker* deps) const {
-    for (auto&& branch : _branches) {
-        branch.first->addDependencies(deps);
-        branch.second->addDependencies(deps);
-    }
-
-    if (_default) {
-        _default->addDependencies(deps);
-    }
-}
-
 boost::intrusive_ptr<Expression> ExpressionSwitch::optimize() {
     if (_default) {
         _default = _default->optimize();
@@ -6199,13 +6002,6 @@ Value ExpressionTrim::serialize(bool explain) const {
                            {"chars", _characters ? _characters->serialize(explain) : Value()}}}});
 }
 
-void ExpressionTrim::_doAddDependencies(DepsTracker* deps) const {
-    _input->addDependencies(deps);
-    if (_characters) {
-        _characters->addDependencies(deps);
-    }
-}
-
 /* ------------------------- ExpressionRound and ExpressionTrunc -------------------------- */
 
 void assertFlagsValid(uint32_t flags,
@@ -6510,18 +6306,6 @@ Value ExpressionZip::serialize(bool explain) const {
     return Value(DOC("$zip" << DOC("inputs" << Value(serializedInput) << "defaults"
                                             << Value(serializedDefaults) << "useLongestLength"
                                             << serializedUseLongestLength)));
-}
-
-void ExpressionZip::_doAddDependencies(DepsTracker* deps) const {
-    std::for_each(
-        _inputs.begin(), _inputs.end(), [&deps](intrusive_ptr<Expression> inputExpression) -> void {
-            inputExpression->addDependencies(deps);
-        });
-    std::for_each(_defaults.begin(),
-                  _defaults.end(),
-                  [&deps](intrusive_ptr<Expression> defaultExpression) -> void {
-                      defaultExpression->addDependencies(deps);
-                  });
 }
 
 /* -------------------------- ExpressionConvert ------------------------------ */
@@ -7093,17 +6877,6 @@ Value ExpressionConvert::serialize(bool explain) const {
                                     {"onNull", _onNull ? _onNull->serialize(explain) : Value()}}}});
 }
 
-void ExpressionConvert::_doAddDependencies(DepsTracker* deps) const {
-    _input->addDependencies(deps);
-    _to->addDependencies(deps);
-    if (_onError) {
-        _onError->addDependencies(deps);
-    }
-    if (_onNull) {
-        _onNull->addDependencies(deps);
-    }
-}
-
 BSONType ExpressionConvert::computeTargetType(Value targetTypeName) const {
     BSONType targetType;
     if (targetTypeName.getType() == BSONType::String) {
@@ -7348,14 +7121,6 @@ void ExpressionRegex::_extractRegexAndOptions(RegexExecutionState* executionStat
                 executionState->options->find('\0', 0) == std::string::npos);
 }
 
-void ExpressionRegex::_doAddDependencies(DepsTracker* deps) const {
-    _input->addDependencies(deps);
-    _regex->addDependencies(deps);
-    if (_options) {
-        _options->addDependencies(deps);
-    }
-}
-
 boost::optional<std::pair<boost::optional<std::string>, std::string>>
 ExpressionRegex::getConstantPatternAndOptions() const {
     if (!ExpressionConstant::isNullOrConstant(_regex) ||
@@ -7552,10 +7317,6 @@ intrusive_ptr<Expression> ExpressionRandom::optimize() {
     return intrusive_ptr<Expression>(this);
 }
 
-void ExpressionRandom::_doAddDependencies(DepsTracker* deps) const {
-    deps->needRandomGenerator = true;
-}
-
 Value ExpressionRandom::serialize(const bool explain) const {
     return Value(DOC(getOpName() << Document()));
 }
@@ -7581,10 +7342,6 @@ Value ExpressionToHashedIndexKey::evaluate(const Document& root, Variables* vari
 
 Value ExpressionToHashedIndexKey::serialize(bool explain) const {
     return Value(DOC("$toHashedIndexKey" << _children[0]->serialize(explain)));
-}
-
-void ExpressionToHashedIndexKey::_doAddDependencies(DepsTracker* deps) const {
-    _children[0]->addDependencies(deps);
 }
 
 /* ------------------------- ExpressionDateArithmetics -------------------------- */
@@ -7631,15 +7388,6 @@ auto commonDateArithmeticsParse(ExpressionContext* const expCtx,
     return parsedArgs;
 }
 }  // namespace
-
-void ExpressionDateArithmetics::_doAddDependencies(DepsTracker* deps) const {
-    _startDate->addDependencies(deps);
-    _unit->addDependencies(deps);
-    _amount->addDependencies(deps);
-    if (_timeZone) {
-        _timeZone->addDependencies(deps);
-    }
-}
 
 boost::intrusive_ptr<Expression> ExpressionDateArithmetics::optimize() {
     _startDate = _startDate->optimize();
@@ -7986,19 +7734,6 @@ Value ExpressionDateTrunc::evaluate(const Document& root, Variables* variables) 
     return Value{truncateDate(date, unit, binSize, *timezone, startOfWeek)};
 }
 
-void ExpressionDateTrunc::_doAddDependencies(DepsTracker* deps) const {
-    _date->addDependencies(deps);
-    _unit->addDependencies(deps);
-    if (_binSize) {
-        _binSize->addDependencies(deps);
-    }
-    if (_timeZone) {
-        _timeZone->addDependencies(deps);
-    }
-    if (_startOfWeek) {
-        _startOfWeek->addDependencies(deps);
-    }
-}
 
 /* -------------------------- ExpressionGetField ------------------------------ */
 
@@ -8095,11 +7830,6 @@ Value ExpressionGetField::evaluate(const Document& root, Variables* variables) c
 
 intrusive_ptr<Expression> ExpressionGetField::optimize() {
     return intrusive_ptr<Expression>(this);
-}
-
-void ExpressionGetField::_doAddDependencies(DepsTracker* deps) const {
-    _input->addDependencies(deps);
-    _field->addDependencies(deps);
 }
 
 Value ExpressionGetField::serialize(const bool explain) const {
@@ -8212,12 +7942,6 @@ Value ExpressionSetField::evaluate(const Document& root, Variables* variables) c
 
 intrusive_ptr<Expression> ExpressionSetField::optimize() {
     return intrusive_ptr<Expression>(this);
-}
-
-void ExpressionSetField::_doAddDependencies(DepsTracker* deps) const {
-    _input->addDependencies(deps);
-    _field->addDependencies(deps);
-    _value->addDependencies(deps);
 }
 
 Value ExpressionSetField::serialize(const bool explain) const {

@@ -201,28 +201,6 @@ public:
     }
 
     /**
-     * Add the fields and variables used in this expression to 'deps'. References to variables which
-     * are local to a particular expression will be filtered out of the tracker upon return.
-     */
-    void addDependencies(DepsTracker* deps) const {
-        _doAddDependencies(deps);
-
-        // Filter out references to any local variables.
-        if (_boundaryVariableId) {
-            deps->vars.erase(deps->vars.upper_bound(*_boundaryVariableId), deps->vars.end());
-        }
-    }
-
-    /**
-     * Convenience wrapper around addDependencies.
-     */
-    DepsTracker getDependencies() const {
-        DepsTracker deps;
-        addDependencies(&deps);
-        return deps;
-    }
-
-    /**
      * Serialize the Expression tree recursively.
      *
      * If 'explain' is false, the returned Value must result in the same Expression when parsed by
@@ -344,6 +322,10 @@ public:
         return _expCtx;
     }
 
+    boost::optional<Variables::Id> getBoundaryVariableId() const {
+        return _boundaryVariableId;
+    }
+
 protected:
     using ExpressionVector = std::vector<boost::intrusive_ptr<Expression>>;
 
@@ -357,8 +339,6 @@ protected:
         }
     }
 
-    virtual void _doAddDependencies(DepsTracker* deps) const = 0;
-
     /**
      * Owning container for all sub-Expressions.
      *
@@ -371,6 +351,9 @@ protected:
     ExpressionVector _children;
 
 private:
+    // Tracks the latest Variable ID which is defined outside of this expression. Useful for
+    // dependency analysis to avoid reporting dependencies to local variables defined by this
+    // Expression.
     boost::optional<Variables::Id> _boundaryVariableId;
     ExpressionContext* const _expCtx;
 };
@@ -416,8 +399,6 @@ protected:
     explicit ExpressionNary(ExpressionContext* const expCtx) : Expression(expCtx) {}
     ExpressionNary(ExpressionContext* const expCtx, ExpressionVector&& children)
         : Expression(expCtx, std::move(children)) {}
-
-    void _doAddDependencies(DepsTracker* deps) const override;
 };
 
 /// Inherit from ExpressionVariadic or ExpressionFixedArity instead of directly from this class.
@@ -592,11 +573,6 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const {
-        _n->addDependencies(deps);
-        _output->addDependencies(deps);
-    }
 
 private:
     boost::intrusive_ptr<Expression> _n;
@@ -747,9 +723,6 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const override;
-
 private:
     Value _value;
 };
@@ -871,13 +844,6 @@ protected:
           _opName(opName),
           _date(_children[0]),
           _timeZone(_children[1]) {}
-
-    void _doAddDependencies(DepsTracker* deps) const final {
-        _date->addDependencies(deps);
-        if (_timeZone) {
-            _timeZone->addDependencies(deps);
-        }
-    }
 
     /**
      * Subclasses should implement this to do their actual date-related logic. Uses 'timezone' to
@@ -1240,9 +1206,6 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
-
 private:
     ExpressionCoerceToBool(ExpressionContext* expCtx, boost::intrusive_ptr<Expression> pExpression);
 
@@ -1406,9 +1369,6 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
-
 private:
     boost::intrusive_ptr<Expression>& _dateString;
     boost::intrusive_ptr<Expression>& _timeZone;
@@ -1451,9 +1411,6 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
-
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     /**
@@ -1535,9 +1492,6 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
-
 private:
     boost::optional<int> evaluateIso8601Flag(const Document& root, Variables* variables) const;
 
@@ -1572,9 +1526,6 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
-
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     boost::intrusive_ptr<Expression>& _format;
@@ -1706,8 +1657,6 @@ private:
      * Converts 'value' to Date_t type for $dateDiff expression for parameter 'parameterName'.
      */
     static Date_t convertToDate(const Value& value, StringData parameterName);
-
-    void _doAddDependencies(DepsTracker* deps) const final;
 
     // Starting time instant expression. Accepted types: Date_t, Timestamp, OID.
     boost::intrusive_ptr<Expression>& _startDate;
@@ -1881,7 +1830,6 @@ public:
     }
 
 protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
     ExpressionFieldPath(ExpressionContext* expCtx,
                         const std::string& fieldPath,
                         Variables::Id variable);
@@ -1942,9 +1890,6 @@ public:
     bool hasLimit() const {
         return this->_limit ? true : false;
     }
-
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     // The name of the variable to set to each element in the array.
@@ -2175,9 +2120,6 @@ public:
         return _variables;
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
-
 private:
     ExpressionLet(ExpressionContext* expCtx,
                   VariableMap&& vars,
@@ -2269,7 +2211,6 @@ public:
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
-    void _doAddDependencies(DepsTracker* deps) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -2298,7 +2239,6 @@ public:
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
-    void _doAddDependencies(DepsTracker* deps) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -2340,9 +2280,6 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
-
 private:
     std::string _varName;
     Variables::Id _varId;
@@ -2372,9 +2309,6 @@ public:
     DocumentMetadataFields::MetaType getMetaType() const {
         return _metaType;
     }
-
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     DocumentMetadataFields::MetaType _metaType;
@@ -2579,9 +2513,6 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
-
 private:
     ExpressionObject(
         ExpressionContext* expCtx,
@@ -2700,9 +2631,6 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
-
 private:
     boost::intrusive_ptr<Expression>& _input;
     boost::intrusive_ptr<Expression>& _initial;
@@ -2730,7 +2658,6 @@ public:
     Value serialize(bool explain) const final;
 
 protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
     virtual Value _doEval(StringData input, StringData find, StringData replacement) const = 0;
 
     // These are owned by this->Expression::_children. They are references to intrusive_ptr instead
@@ -3021,9 +2948,6 @@ public:
         return _sortBy.sortPattern;
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
-
 private:
     boost::intrusive_ptr<Expression>& _input;
     PatternValueCmp _sortBy;
@@ -3110,14 +3034,6 @@ public:
         return this;
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const override {
-        auto fp = getFieldPath();
-        // We require everything below the first field.
-        deps->fields.insert(std::string(fp.getSubpath(0)));
-    }
-
-private:
     FieldPath getFieldPath() const {
         auto inputConstExpression = dynamic_cast<ExpressionConstant*>(_children[0].get());
         uassert(5511201,
@@ -3388,9 +3304,6 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
-
 private:
     boost::intrusive_ptr<Expression>& _default;
     std::vector<ExpressionPair> _branches;
@@ -3476,9 +3389,6 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
-
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     /**
@@ -3728,9 +3638,6 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
-
 private:
     bool _useLongestLength;
     std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> _inputs;
@@ -3767,9 +3674,6 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
-
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     BSONType computeTargetType(Value typeName) const;
@@ -3888,8 +3792,6 @@ private:
 
     void _compile(RegexExecutionState* executionState) const;
 
-    void _doAddDependencies(DepsTracker* deps) const final;
-
     /**
      * Expressions which, when evaluated for a given document, produce the the regex pattern, the
      * regex option flags, and the input text to which the regex should be applied.
@@ -3996,9 +3898,6 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final override;
-
 private:
     explicit ExpressionRandom(ExpressionContext* expCtx);
 
@@ -4027,9 +3926,6 @@ public:
 
     Value evaluate(const Document& root, Variables* variables) const;
     Value serialize(bool explain) const final;
-
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
 };
 
 class ExpressionDateArithmetics : public Expression {
@@ -4054,8 +3950,6 @@ public:
     Value evaluate(const Document& root, Variables* variables) const final;
 
 protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
-
     /**
      * Subclasses should implement this to do their actual date arithmetics.
      */
@@ -4214,8 +4108,6 @@ private:
      */
     static unsigned long long convertToBinSize(const Value& value);
 
-    void _doAddDependencies(DepsTracker* deps) const final;
-
     // Expression that evaluates to a date to truncate. Accepted BSON types: Date, bsonTimestamp,
     // jstOID.
     boost::intrusive_ptr<Expression>& _date;
@@ -4288,9 +4180,6 @@ public:
 
     static constexpr auto kExpressionName = "$getField"_sd;
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final override;
-
 private:
     boost::intrusive_ptr<Expression>& _field;
     boost::intrusive_ptr<Expression>& _input;
@@ -4332,9 +4221,6 @@ public:
     }
 
     static constexpr auto kExpressionName = "$setField"_sd;
-
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final override;
 
 private:
     boost::intrusive_ptr<Expression>& _field;

@@ -95,6 +95,8 @@ public:
         return boost::none;
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 

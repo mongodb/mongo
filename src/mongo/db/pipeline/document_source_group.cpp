@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/util/destructor_guard.h"
@@ -98,7 +99,7 @@ Document GroupFromFirstDocumentTransformation::serializeTransformation(
 
 DepsTracker::State GroupFromFirstDocumentTransformation::addDependencies(DepsTracker* deps) const {
     for (auto&& expr : _accumulatorExprs) {
-        expr.second->addDependencies(deps);
+        expression::addDependencies(expr.second.get(), deps);
     }
 
     // This stage will replace the entire document with a new document, so any existing fields
@@ -106,6 +107,12 @@ DepsTracker::State GroupFromFirstDocumentTransformation::addDependencies(DepsTra
     // instead of EXHAUSTIVE_FIELDS, as in ReplaceRootTransformation, because the stages that
     // follow a $group stage should not depend on document metadata.
     return DepsTracker::State::EXHAUSTIVE_ALL;
+}
+
+void GroupFromFirstDocumentTransformation::addVariableRefs(std::set<Variables::Id>* refs) const {
+    for (auto&& expr : _accumulatorExprs) {
+        expression::addVariableRefs(expr.second.get(), refs);
+    }
 }
 
 DocumentSource::GetModPathsReturn GroupFromFirstDocumentTransformation::getModifiedPaths() const {
@@ -342,16 +349,26 @@ Value DocumentSourceGroup::serialize(boost::optional<ExplainOptions::Verbosity> 
 DepsTracker::State DocumentSourceGroup::getDependencies(DepsTracker* deps) const {
     // add the _id
     for (size_t i = 0; i < _idExpressions.size(); i++) {
-        _idExpressions[i]->addDependencies(deps);
+        expression::addDependencies(_idExpressions[i].get(), deps);
     }
 
     // add the rest
     for (auto&& accumulatedField : _accumulatedFields) {
-        accumulatedField.expr.argument->addDependencies(deps);
+        expression::addDependencies(accumulatedField.expr.argument.get(), deps);
         // Don't add initializer, because it doesn't refer to docs from the input stream.
     }
 
     return DepsTracker::State::EXHAUSTIVE_ALL;
+}
+
+void DocumentSourceGroup::addVariableRefs(std::set<Variables::Id>* refs) const {
+    for (const auto& idExpr : _idExpressions) {
+        expression::addVariableRefs(idExpr.get(), refs);
+    }
+
+    for (auto&& accumulatedField : _accumulatedFields) {
+        expression::addVariableRefs(accumulatedField.expr.argument.get(), refs);
+    }
 }
 
 DocumentSource::GetModPathsReturn DocumentSourceGroup::getModifiedPaths() const {

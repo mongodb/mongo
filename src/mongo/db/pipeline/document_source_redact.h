@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
 
 namespace mongo {
 
@@ -70,6 +71,10 @@ public:
 
     boost::intrusive_ptr<Expression> getExpression() {
         return _expression;
+    }
+
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {
+        expression::addVariableRefs(_expression.get(), refs);
     }
 
 private:

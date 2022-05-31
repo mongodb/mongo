@@ -653,7 +653,7 @@ public:
         intrusive_ptr<Expression> nested = ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
         intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create(&expCtx, nested);
         DepsTracker dependencies;
-        expression->addDependencies(&dependencies);
+        expression::addDependencies(expression.get(), &dependencies);
         ASSERT_EQUALS(1U, dependencies.fields.size());
         ASSERT_EQUALS(1U, dependencies.fields.count("a.b"));
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
@@ -751,7 +751,7 @@ public:
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionConstant::create(&expCtx, Value(5));
         DepsTracker dependencies;
-        expression->addDependencies(&dependencies);
+        expression::addDependencies(expression.get(), &dependencies);
         ASSERT_EQUALS(0U, dependencies.fields.size());
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
         ASSERT_EQUALS(false, dependencies.getNeedsAnyMetadata());
@@ -3494,7 +3494,7 @@ TEST(ExpressionToHashedIndexKeyTest, DoesAddInputDependencies) {
     auto expression = Expression::parseExpression(&expCtx, obj, expCtx.variablesParseState);
 
     DepsTracker deps;
-    expression->addDependencies(&deps);
+    expression::addDependencies(expression.get(), &deps);
     ASSERT_EQ(deps.fields.count("someValue"), 1u);
     ASSERT_EQ(deps.fields.size(), 1u);
 }

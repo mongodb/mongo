@@ -129,6 +129,8 @@ public:
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final;
+
     /**
      * Returns true if the $geoNear specification requires the geoNear point metadata.
      */
