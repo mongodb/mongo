@@ -50,6 +50,12 @@ SHA256Block getLogicalSessionUserDigestForLoggedInUser(const OperationContext* o
 SHA256Block getLogicalSessionUserDigestFor(StringData user, StringData db);
 
 /**
+ * Returns if the given session is a parent session, ie only has fields that could have come from an
+ * external client.
+ */
+bool isParentSessionId(const LogicalSessionId& sessionId);
+
+/**
  * Returns the parent session id for the given session id if there is one.
  */
 boost::optional<LogicalSessionId> getParentSessionId(const LogicalSessionId& sessionId);
