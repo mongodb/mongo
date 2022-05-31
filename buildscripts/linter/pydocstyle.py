@@ -11,7 +11,7 @@ class PyDocstyleLinter(base.LinterBase):
     def __init__(self):
         # type: () -> None
         """Create a pydocstyle linter."""
-        super(PyDocstyleLinter, self).__init__("pydocstyle", "2.1.1")
+        super(PyDocstyleLinter, self).__init__("pydocstyle", "6.1.1")
 
     def get_lint_version_cmd_args(self):
         # type: () -> List[str]

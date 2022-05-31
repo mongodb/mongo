@@ -18,7 +18,7 @@ from buildscripts.resmokelib import utils  # pylint: disable=wrong-import-positi
 
 
 def main():
-    """Main."""
+    """Collect system resources."""
     usage = "usage: %prog [options]"
     parser = optparse.OptionParser(description=__doc__, usage=usage)
     parser.add_option(

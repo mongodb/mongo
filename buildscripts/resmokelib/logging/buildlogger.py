@@ -27,7 +27,10 @@ _INCOMPLETE_LOG_OUTPUT = threading.Event()
 
 
 def is_log_output_incomplete():  # noqa: D205,D400
-    """Return true if we failed to write all of the log output to the buildlogger server, and return
+    """
+    Indicate whether the log output is incomplete.
+
+    Return true if we failed to write all of the log output to the buildlogger server, and return
     false otherwise.
     """
     return _INCOMPLETE_LOG_OUTPUT.is_set()

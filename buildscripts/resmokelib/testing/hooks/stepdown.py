@@ -46,6 +46,9 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
             use_stepdown_permitted_file: use a file to control if stepdown thread should do a stepdown.
             wait_for_mongos_retarget: whether to run validate on all mongoses for each collection
                 in each database, after pausing the stepdown thread.
+            auth_options: dictionary of auth options.
+            background_reconfig: whether to conduct reconfig in the background.
+            should_downgrade: whether dowgrades should be performed as part of the stepdown.
 
         Note that the "terminate" and "kill" arguments are named after the "SIGTERM" and
         "SIGKILL" signals that are used to stop the process. On Windows, there are no signals,

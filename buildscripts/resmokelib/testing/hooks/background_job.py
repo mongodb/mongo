@@ -60,8 +60,10 @@ class _BackgroundJob(threading.Thread):  # pylint: disable=too-many-instance-att
         self.join()
 
     def pause(self):  # noqa: D205,D400
-        """Signal the background thread that it should stop executing 'self._hook_test_case', and
-        wait until the current execution has finished.
+        """
+        Signal the background thread that it should stop executing 'self._hook_test_case'.
+
+        Wait until the current execution has finished.
         """
         self._hook_test_case.signal_stop_test()
         with self._lock:

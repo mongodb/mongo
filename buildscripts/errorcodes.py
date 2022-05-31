@@ -239,14 +239,15 @@ def read_error_codes(src_root='src/mongo'):
 
 
 def replace_bad_codes(errors, next_code_generator):  # pylint: disable=too-many-locals
-    """Modify C++ source files to replace invalid assertion codes.
+    """
+    Modify C++ source files to replace invalid assertion codes.
 
     For now, we only modify zero codes.
 
-    Args:
-        errors: list of AssertLocation
-        next_code_generator: generator -> int, next non-conflicting assertion code
+    :param errors: list of AssertLocation
+    :param next_code_generator: generator -> int, next non-conflicting assertion code
     """
+
     zero_errors = [e for e in errors if int(e.code) == 0]
     skip_errors = [e for e in errors if int(e.code) != 0]
 
@@ -296,7 +297,7 @@ def coerce_to_number(ticket_value):
 
 
 def main():
-    """Main."""
+    """Validate error codes."""
     parser = OptionParser(description=__doc__.strip())
     parser.add_option("--fix", dest="replace", action="store_true", default=False,
                       help="Fix zero codes in source files [default: %default]")

@@ -422,6 +422,7 @@ class _Selector(object):
 
         Args:
             test_file_explorer: a TestFileExplorer instance.
+            tests_are_files: whether tests are files.
         """
         self._test_file_explorer = test_file_explorer
         self._tests_are_files = tests_are_files

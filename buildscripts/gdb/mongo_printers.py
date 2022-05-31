@@ -579,6 +579,7 @@ def find_match_brackets(search, opening='<', closing='>'):
     Example:
         'Foo<T>::iterator<U>''
         returns 5
+
     """
     index = search.find(opening)
     if index == -1:
