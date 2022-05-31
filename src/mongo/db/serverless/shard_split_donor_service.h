@@ -171,7 +171,7 @@ private:
         const ScopedTaskExecutorPtr& executor, const CancellationToken& primaryToken);
 
     ExecutorFuture<void> _removeSplitConfigFromDonor(const ScopedTaskExecutorPtr& executor,
-                                                     const CancellationToken& token);
+                                                     const CancellationToken& primaryToken);
 
     ExecutorFuture<DurableState> _handleErrorOrEnterAbortedState(
         StatusWith<DurableState> durableState,

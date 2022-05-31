@@ -442,12 +442,14 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
     _completionPromise.setWith([&] {
         return ExecutorFuture(**executor)
             .then([&] { return _decisionPromise.getFuture().semi().ignoreValue(); })
-            .then([this, executor, primaryToken] {
+            .onCompletion([this, executor, primaryToken](Status status) {
+                // Always remove the split config, whether the operation was aborted or committed.
                 auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                 pauseShardSplitBeforeSplitConfigRemoval.pauseWhileSetAndNotCanceled(opCtx.get(),
                                                                                     primaryToken);
-
-                return _removeSplitConfigFromDonor(executor, primaryToken);
+                return _removeSplitConfigFromDonor(executor, primaryToken).then([status]() {
+                    return status;
+                });
             })
             .then([this, executor, primaryToken] {
                 auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
@@ -1071,21 +1073,18 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_removeSplitConf
                      "id"_attr = _migrationId,
                      "config"_attr = config);
 
-               const auto updatedVersion = config.getConfigVersion() + 1;
-
                BSONObjBuilder newConfigBob(
                    config.toBSON().removeField("recipientConfig").removeField("version"));
-               newConfigBob.append("version", updatedVersion);
+               newConfigBob.append("version", config.getConfigVersion() + 1);
 
-               auto opCtxHolder = _cancelableOpCtxFactory->makeOperationContext(&cc());
-               auto newConfig = newConfigBob.obj();
-
-               DBDirectClient client(opCtxHolder.get());
+               auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+               DBDirectClient client(opCtx.get());
 
                BSONObj result;
-               const bool returnValue = client.runCommand(NamespaceString::kAdminDb.toString(),
-                                                          BSON("replSetReconfig" << newConfig),
-                                                          result);
+               const bool returnValue =
+                   client.runCommand(NamespaceString::kAdminDb.toString(),
+                                     BSON("replSetReconfig" << newConfigBob.obj()),
+                                     result);
                uassert(
                    ErrorCodes::BadValue, "Invalid return value for replSetReconfig", returnValue);
                uassertStatusOK(getStatusFromCommandResult(result));
