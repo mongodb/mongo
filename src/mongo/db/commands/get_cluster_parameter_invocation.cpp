@@ -43,10 +43,6 @@ namespace mongo {
 std::pair<std::vector<std::string>, std::vector<BSONObj>>
 GetClusterParameterInvocation::retrieveRequestedParameters(OperationContext* opCtx,
                                                            const CmdBody& cmdBody) {
-    uassert(ErrorCodes::IllegalOperation,
-            "featureFlagClusterWideConfig not enabled",
-            gFeatureFlagClusterWideConfig.isEnabled(serverGlobalParams.featureCompatibility));
-
     ServerParameterSet* clusterParameters = ServerParameterSet::getClusterParameterSet();
     std::vector<std::string> parameterNames;
     std::vector<BSONObj> parameterValues;

@@ -1,7 +1,5 @@
 // Tests time-based pre-image retention policy of change stream pre-images remover job.
 // @tags: [
-//  requires_fcv_60,
-//  featureFlagClusterWideConfig,
 //  requires_replication,
 // ]
 (function() {

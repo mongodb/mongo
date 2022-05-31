@@ -4179,7 +4179,7 @@ var authCommandsLib = {
           skipTest: (conn) => {
               const hello = assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
               const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
-              return !TestData.setParameters.featureFlagClusterWideConfig || isStandalone;
+              return isStandalone;
           },
           testcases: [
             {
@@ -5672,7 +5672,7 @@ var authCommandsLib = {
           skipTest: (conn) => {
               const hello = assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
               const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
-              return !TestData.setParameters.featureFlagClusterWideConfig || isStandalone;
+              return isStandalone;
           },
           testcases: [
               {
