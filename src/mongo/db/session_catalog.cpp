@@ -183,6 +183,22 @@ void SessionCatalog::scanSessions(const SessionKiller::Matcher& matcher,
     }
 }
 
+void SessionCatalog::scanParentSessions(const ScanSessionsCallbackFn& workerFn) {
+    stdx::lock_guard<Latch> lg(_mutex);
+
+    LOGV2_DEBUG(6685000,
+                2,
+                "Scanning {sessionCount} sessions",
+                "Scanning sessions",
+                "sessionCount"_attr = _sessions.size());
+
+    for (auto& [parentLsid, sri] : _sessions) {
+        ObservableSession osession(lg, sri.get(), &sri->parentSession);
+        workerFn(osession);
+        invariant(!osession._markedForReap, "Cannot reap a session via 'scanSessions'");
+    }
+}
+
 LogicalSessionIdSet SessionCatalog::scanSessionsForReap(
     const LogicalSessionId& parentLsid,
     const ScanSessionsCallbackFn& parentSessionWorkerFn,

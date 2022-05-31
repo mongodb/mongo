@@ -47,18 +47,15 @@ int RouterSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
 
     // Find the possibly expired logical session ids in the in-memory catalog.
     LogicalSessionIdSet possiblyExpiredLogicalSessionIds;
-    catalog->scanSessions(
-        SessionKiller::Matcher(KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)}),
-        [&](const ObservableSession& session) {
-            const auto sessionId = session.getSessionId();
-
-            // Skip child transaction sessions since they correspond to the same logical session as
-            // their parent transaction session so they have the same last check-out time as the
-            // the parent's.
-            if (session.getLastCheckout() < possiblyExpired && !getParentSessionId(sessionId)) {
-                possiblyExpiredLogicalSessionIds.insert(session.getSessionId());
-            }
-        });
+    // Skip child transaction sessions since they correspond to the same logical session as their
+    // parent transaction session so they have the same last check-out time as the parent's.
+    catalog->scanParentSessions([&](const ObservableSession& session) {
+        const auto sessionId = session.getSessionId();
+        invariant(!getParentSessionId(sessionId));
+        if (session.getLastCheckout() < possiblyExpired) {
+            possiblyExpiredLogicalSessionIds.insert(session.getSessionId());
+        }
+    });
     // From the possibly expired logical session ids, find the ones that have been removed from
     // from the config.system.sessions collection.
     auto expiredLogicalSessionIds =
