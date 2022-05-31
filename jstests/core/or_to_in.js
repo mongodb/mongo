@@ -13,7 +13,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/sbe_util.js");  // For checkBothEnginesAreRunOnCluster.
 
-const coll = db.orToIn;
+var coll = db.orToIn;
 coll.drop();
 
 function compareValues(v1, v2) {
@@ -32,6 +32,13 @@ function assertEquivPlanAndResult(expectedQuery, actualQuery) {
     // The queries must be rewritten into the same form.
     assert.docEq(expectedExplain.parsedQuery, actualExplain.parsedQuery);
 
+    // Check if the test queries produce the same plans with collations
+    const expectedExplainColln =
+        coll.find(expectedQuery).sort({f1: 1}).collation({locale: 'en_US'}).explain("queryPlanner");
+    const actualExplainColln =
+        coll.find(actualQuery).sort({f1: 1}).collation({locale: 'en_US'}).explain("queryPlanner");
+    assert.docEq(expectedExplainColln.parsedQuery, actualExplainColln.parsedQuery);
+
     // Make sure both queries have the same access plan.
     const expectedPlan = getWinningPlan(expectedExplain.queryPlanner);
     const actualPlan = getWinningPlan(actualExplain.queryPlanner);
@@ -43,6 +50,13 @@ function assertEquivPlanAndResult(expectedQuery, actualQuery) {
     const expectedRes = coll.find(expectedQuery).toArray();
     const actualRes = coll.find(actualQuery).toArray();
     assert(arrayEq(expectedRes, actualRes, false, compareValues),
+           `expected=${expectedRes}, actual=${actualRes}`);
+    // also with collation
+    const expectedResColln =
+        coll.find(expectedQuery).sort({f1: 1}).collation({locale: 'en_US'}).toArray();
+    const actualResColln =
+        coll.find(actualQuery).sort({f1: 1}).collation({locale: 'en_US'}).toArray();
+    assert(arrayEq(expectedResColln, actualResColln, false, compareValues),
            `expected=${expectedRes}, actual=${actualRes}`);
 }
 
@@ -61,7 +75,7 @@ function assertOrNotRewrittenToIn(query) {
     }
 }
 
-assert.commandWorked(coll.insert([
+const data = [
     {_id: 0, f1: 3, f2: 7},
     {_id: 1, f1: 1, f2: [32, 42, 52, [11]]},
     {_id: 2, f1: 2, f2: 9},
@@ -74,7 +88,9 @@ assert.commandWorked(coll.insert([
     {_id: 9, f1: NaN, f2: NaN},
     {_id: 10, f1: 1, f2: [32, 52]},
     {_id: 11, f1: 1, f2: [42, [13, 11]]}
-]));
+];
+
+assert.commandWorked(coll.insert(data));
 
 // Pairs of queries where the first one is expressed via OR (which is supposed to be
 // rewritten as IN), and the second one is an equivalent query using IN.
@@ -103,6 +119,7 @@ const positiveTestQueries = [
     [{$or: [{f2: 52}, {f2: 13}]}, {f2: {$in: [52, 13]}}],
     [{$or: [{f2: [11]}, {f2: [23]}]}, {f2: {$in: [[11], [23]]}}],
     [{$or: [{f1: 42}, {f1: null}]}, {f1: {$in: [42, null]}}],
+    [{$or: [{f1: "a"}, {f1: "b"}, {f1: /c/}]}, {f1: {$in: ["a", "b", /c/]}}],
 ];
 
 // These $or queries should not be rewritten into $in because of different semantics.
@@ -132,4 +149,19 @@ assert.commandWorked(coll.createIndex({f2: 1}));
 assert.commandWorked(coll.createIndex({f1: 1, f2: 1}));
 
 testOrToIn(positiveTestQueries);  // three indexes, requires multiplanning
+
+// Test with a collection that has a collation, and that collation is the same as the query
+// collation
+coll.drop();
+assert.commandWorked(db.createCollection("orToIn", {collation: {locale: 'en_US'}}));
+coll = db.orToIn;
+assert.commandWorked(coll.insert(data));
+testOrToIn(positiveTestQueries);
+// Test with a collection that has a collation, and that collation is different from the query
+// collation
+coll.drop();
+assert.commandWorked(db.createCollection("orToIn", {collation: {locale: 'de'}}));
+coll = db.orToIn;
+assert.commandWorked(coll.insert(data));
+testOrToIn(positiveTestQueries);
 }());
