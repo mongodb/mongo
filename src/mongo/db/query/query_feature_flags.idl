@@ -98,7 +98,8 @@ feature_flags:
     featureFlagChangeStreamsFurtherEnrichedEvents:
       description: "Feature flag for enabling the reshardCollection and refineCollectionShardKey events, as well as enhancements to the updateDescription field for update events"
       cpp_varname: gFeatureFlagChangeStreamsFurtherEnrichedEvents
-      default: false
+      default: true
+      version: 6.1
 
     featureFlagLocf:
         description: "Feature flag for allowing $locf window function"
