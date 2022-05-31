@@ -271,11 +271,14 @@ ExecutorFuture<void> TransactionWithRetries::_bestEffortAbort() {
 
 // Sets the appropriate options on the given client and operation context for running internal
 // commands.
-void primeInternalClientAndOpCtx(Client* client, OperationContext* opCtx) {
+void primeInternalClient(Client* client) {
     auto as = AuthorizationSession::get(client);
     if (as) {
         as->grantInternalAuthorization(client);
     }
+
+    stdx::lock_guard<Client> lk(*client);
+    client->setSystemOperationKillableByStepdown(lk);
 }
 
 Future<DbResponse> DefaultSEPTransactionClientBehaviors::handleRequest(
@@ -293,12 +296,12 @@ SemiFuture<BSONObj> SEPTransactionClient::runCommand(StringData dbName, BSONObj 
     invariant(!haveClient());
     auto client = _serviceContext->makeClient("SEP-internal-txn-client");
     AlternativeClientRegion clientRegion(client);
-    auto cancellableOpCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-    primeInternalClientAndOpCtx(&cc(), cancellableOpCtx.get());
+    auto opCtxHolder = cc().makeOperationContext();
+    primeInternalClient(&cc());
 
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(dbName, cmdBuilder.obj());
     auto requestMessage = opMsgRequest.serialize();
-    return _behaviors->handleRequest(cancellableOpCtx.get(), requestMessage)
+    return _behaviors->handleRequest(opCtxHolder.get(), requestMessage)
         .then([this](DbResponse dbResponse) {
             auto reply = rpc::makeReply(&dbResponse.response)->getCommandReply().getOwned();
             _hooks->runReplyHook(reply);

@@ -264,10 +264,7 @@ public:
                          std::unique_ptr<SEPTransactionClientBehaviors> behaviors)
         : _serviceContext(opCtx->getServiceContext()),
           _executor(executor),
-          _behaviors(std::move(behaviors)) {
-        _cancelableOpCtxFactory = std::make_unique<CancelableOperationContextFactory>(
-            opCtx->getCancellationToken(), executor);
-    }
+          _behaviors(std::move(behaviors)) {}
 
     SEPTransactionClient(const SEPTransactionClient&) = delete;
     SEPTransactionClient operator=(const SEPTransactionClient&) = delete;
@@ -298,7 +295,6 @@ private:
     std::shared_ptr<executor::TaskExecutor> _executor;
     std::unique_ptr<SEPTransactionClientBehaviors> _behaviors;
     std::unique_ptr<details::TxnMetadataHooks> _hooks;
-    std::unique_ptr<CancelableOperationContextFactory> _cancelableOpCtxFactory;
 };
 
 /**
