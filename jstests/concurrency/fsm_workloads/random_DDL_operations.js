@@ -10,7 +10,7 @@
  *  ]
  */
 
-const dbPrefix = 'fsmDB_';
+const dbPrefix = jsTestName() + '_DB_';
 const dbCount = 2;
 const collPrefix = 'sharded_coll_';
 const collCount = 2;
