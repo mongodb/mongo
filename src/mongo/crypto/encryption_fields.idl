@@ -57,7 +57,7 @@ structs:
                 unstable: true
             contention:
                 description: "Contention factor for field, 0 means it has extremely high set number of distinct values"
-                type: long
+                type: exactInt64
                 default: 0
                 unstable: true
                 validator: { gte: 0 }
