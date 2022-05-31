@@ -630,7 +630,7 @@ public:
     std::unique_ptr<EExpression> clone() const override;
 
     vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
-
+    vm::CodeFragment compileBodyDirect(CompileCtx& ctx) const;
     std::vector<DebugPrinter::Block> debugPrint() const override;
 
     size_t estimateSize() const final;

@@ -281,7 +281,9 @@ struct Instruction {
         collComparisonKey,
         getFieldOrElement,
         traverseP,  // traverse projection paths
+        traversePConst,
         traverseF,  // traverse filter paths
+        traverseFConst,
         setField,
         getArraySize,  // number of elements
 
@@ -413,8 +415,12 @@ struct Instruction {
                 return "getFieldOrElement";
             case traverseP:
                 return "traverseP";
+            case traversePConst:
+                return "traversePConst";
             case traverseF:
                 return "traverseF";
+            case traverseFConst:
+                return "traverseFConst";
             case setField:
                 return "setField";
             case getArraySize:
@@ -713,9 +719,11 @@ public:
     void appendTraverseP() {
         appendSimpleInstruction(Instruction::traverseP);
     }
+    void appendTraverseP(int codePosition);
     void appendTraverseF() {
         appendSimpleInstruction(Instruction::traverseF);
     }
+    void appendTraverseF(int codePosition, Instruction::Constants k);
     void appendSetField() {
         appendSimpleInstruction(Instruction::setField);
     }
@@ -976,12 +984,17 @@ private:
                                                                       value::Value fieldValue);
 
     std::tuple<bool, value::TypeTags, value::Value> traverseP(const CodeFragment* code);
+    std::tuple<bool, value::TypeTags, value::Value> traverseP(const CodeFragment* code,
+                                                              int64_t position);
     std::tuple<bool, value::TypeTags, value::Value> traverseP_nested(const CodeFragment* code,
                                                                      int64_t position,
                                                                      value::TypeTags tag,
                                                                      value::Value val);
 
     std::tuple<bool, value::TypeTags, value::Value> traverseF(const CodeFragment* code);
+    std::tuple<bool, value::TypeTags, value::Value> traverseF(const CodeFragment* code,
+                                                              int64_t position,
+                                                              bool compareArray);
     std::tuple<bool, value::TypeTags, value::Value> setField();
 
     std::tuple<bool, value::TypeTags, value::Value> getArraySize(value::TypeTags tag,

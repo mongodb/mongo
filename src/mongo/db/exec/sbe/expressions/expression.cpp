@@ -653,6 +653,39 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
 
                 return code;
             }
+        } else if (_name == "traverseF" && _nodes[1]->as<ELocalLambda>() &&
+                   _nodes[2]->as<EConstant>()) {
+            auto lambda = _nodes[1]->as<ELocalLambda>();
+            auto [tag, val] = _nodes[2]->as<EConstant>()->getConstant();
+
+            auto body = lambda->compileBodyDirect(ctx);
+            // Jump around the body.
+            code.appendJump(body.instrs().size());
+
+            // Remember the position and append the body.
+            auto bodyPosition = code.instrs().size();
+            code.appendNoStack(std::move(body));
+
+            code.append(_nodes[0]->compileDirect(ctx));
+            code.appendTraverseF(bodyPosition,
+                                 value::bitcastTo<bool>(val) ? vm::Instruction::True
+                                                             : vm::Instruction::False);
+            return code;
+        } else if (_name == "traverseP" && _nodes[1]->as<ELocalLambda>()) {
+            auto lambda = _nodes[1]->as<ELocalLambda>();
+
+            auto body = lambda->compileBodyDirect(ctx);
+            // Jump around the body.
+            code.appendJump(body.instrs().size());
+
+            // Remember the position and append the body.
+            auto bodyPosition = code.instrs().size();
+            code.appendNoStack(std::move(body));
+
+            code.append(_nodes[0]->compileDirect(ctx));
+            code.appendTraverseP(bodyPosition);
+
+            return code;
         }
 
         // The order of evaluation is flipped for instruction functions. We may want to change the
@@ -802,9 +835,7 @@ std::unique_ptr<EExpression> ELocalLambda::clone() const {
     return std::make_unique<ELocalLambda>(_frameId, _nodes.back()->clone());
 }
 
-vm::CodeFragment ELocalLambda::compileDirect(CompileCtx& ctx) const {
-    vm::CodeFragment code;
-
+vm::CodeFragment ELocalLambda::compileBodyDirect(CompileCtx& ctx) const {
     // Compile the body first so we know its size.
     auto body = _nodes.back()->compileDirect(ctx);
     body.appendRet();
@@ -812,6 +843,14 @@ vm::CodeFragment ELocalLambda::compileDirect(CompileCtx& ctx) const {
     body.fixup(1);
     // Lambda parameter is no longer accessible after this point so remove any fixup information.
     body.removeFixup(_frameId);
+
+    return body;
+}
+
+vm::CodeFragment ELocalLambda::compileDirect(CompileCtx& ctx) const {
+    vm::CodeFragment code;
+
+    auto body = compileBodyDirect(ctx);
 
     // Jump around the body.
     code.appendJump(body.instrs().size());

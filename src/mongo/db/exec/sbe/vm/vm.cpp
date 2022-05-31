@@ -114,7 +114,9 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     -1,  // collComparisonKey
     -1,  // getFieldOrElement
     -1,  // traverseP
+    0,   // traversePConst
     -2,  // traverseF
+    0,   // traverseFConst
     -2,  // setField
     0,   // getArraySize
 
@@ -217,7 +219,9 @@ std::string CodeFragment::toString() const {
             case Instruction::collComparisonKey:
             case Instruction::getFieldOrElement:
             case Instruction::traverseP:
+            case Instruction::traversePConst:
             case Instruction::traverseF:
+            case Instruction::traverseFConst:
             case Instruction::setField:
             case Instruction::aggSum:
             case Instruction::aggMin:
@@ -597,6 +601,35 @@ void CodeFragment::appendIsRecordId() {
     appendSimpleInstruction(Instruction::isRecordId);
 }
 
+void CodeFragment::appendTraverseP(int codePosition) {
+    Instruction i;
+    i.tag = Instruction::traversePConst;
+    adjustStackSimple(i);
+
+    auto size = sizeof(Instruction) + sizeof(codePosition);
+    auto offset = allocateSpace(size);
+
+    int codeOffset = codePosition - _instrs.size();
+
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, codeOffset);
+}
+
+void CodeFragment::appendTraverseF(int codePosition, Instruction::Constants k) {
+    Instruction i;
+    i.tag = Instruction::traverseFConst;
+    adjustStackSimple(i);
+
+    auto size = sizeof(Instruction) + sizeof(codePosition) + sizeof(k);
+    auto offset = allocateSpace(size);
+
+    int codeOffset = codePosition - _instrs.size();
+
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, k);
+    offset += writeToMemory(offset, codeOffset);
+}
+
 void CodeFragment::appendFunction(Builtin f, ArityType arity) {
     Instruction i;
     const bool isSmallArity = (arity <= std::numeric_limits<SmallArityType>::max());
@@ -851,20 +884,31 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::traverseP(const CodeFr
     // Traverse a projection path - evaluate the input lambda on every element of the input array.
     // The traversal is recursive; i.e. we visit nested arrays if any.
     auto [lamOwn, lamTag, lamVal] = getFromStack(0);
-    auto [own, tag, val] = getFromStack(1);
+    popAndReleaseStack();
 
     if (lamTag != value::TypeTags::LocalLambda) {
+        popAndReleaseStack();
         return {false, value::TypeTags::Nothing, 0};
     }
     int64_t lamPos = value::bitcastTo<int64_t>(lamVal);
 
+    return traverseP(code, lamPos);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::traverseP(const CodeFragment* code,
+                                                                    int64_t position) {
+    auto [own, tag, val] = getFromStack(0);
+
+    value::ValueGuard input(own ? tag : value::TypeTags::Nothing, own ? val : 0);
+    popStack();
+
     if (value::isArray(tag)) {
-        return traverseP_nested(code, lamPos, tag, val);
+        return traverseP_nested(code, position, tag, val);
     } else {
         // Transfer the ownership to the lambda
-        setStack(1, false, value::TypeTags::Nothing, 0);
         pushStack(own, tag, val);
-        return runLambdaInternal(code, lamPos);
+        input.reset();
+        return runLambdaInternal(code, position);
     }
 }
 
@@ -900,14 +944,30 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::traverseP_nested(const
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::traverseF(const CodeFragment* code) {
     // Traverse a filter path - evaluate the input lambda (predicate) on every element of the input
     // array without resursion.
-    auto [lamOwn, lamTag, lamVal] = getFromStack(1);
-    auto [ownInput, tagInput, valInput] = getFromStack(2);
     auto [numberOwn, numberTag, numberVal] = getFromStack(0);
+    popAndReleaseStack();
+    auto [lamOwn, lamTag, lamVal] = getFromStack(0);
+    popAndReleaseStack();
 
     if (lamTag != value::TypeTags::LocalLambda) {
+        popAndReleaseStack();
         return {false, value::TypeTags::Nothing, 0};
     }
     int64_t lamPos = value::bitcastTo<int64_t>(lamVal);
+
+    bool compareArray = numberTag == value::TypeTags::Boolean && value::bitcastTo<bool>(numberVal);
+
+    return traverseF(code, lamPos, compareArray);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::traverseF(const CodeFragment* code,
+                                                                    int64_t position,
+                                                                    bool compareArray) {
+    auto [ownInput, tagInput, valInput] = getFromStack(0);
+
+    value::ValueGuard input(ownInput ? tagInput : value::TypeTags::Nothing,
+                            ownInput ? valInput : 0);
+    popStack();
 
     if (value::isArray(tagInput)) {
         // Return true if any of the array elements is true.
@@ -915,7 +975,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::traverseF(const CodeFr
              enumerator.advance()) {
             auto [elemTag, elemVal] = enumerator.getViewOfValue();
             pushStack(false, elemTag, elemVal);
-            auto [retOwn, retTag, retVal] = runLambdaInternal(code, lamPos);
+            auto [retOwn, retTag, retVal] = runLambdaInternal(code, position);
 
             bool isTrue = (retTag == value::TypeTags::Boolean) && value::bitcastTo<bool>(retVal);
             if (retOwn) {
@@ -929,19 +989,19 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::traverseF(const CodeFr
 
         // If this is a filter over a number path then run over the whole array. More details in
         // SERVER-27442.
-        if (numberTag == value::TypeTags::Boolean && value::bitcastTo<bool>(numberVal)) {
+        if (compareArray) {
             // Transfer the ownership to the lambda
-            setStack(2, false, value::TypeTags::Nothing, 0);
             pushStack(ownInput, tagInput, valInput);
-            return runLambdaInternal(code, lamPos);
+            input.reset();
+            return runLambdaInternal(code, position);
         }
 
         return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
     } else {
         // Transfer the ownership to the lambda
-        setStack(2, false, value::TypeTags::Nothing, 0);
         pushStack(ownInput, tagInput, valInput);
-        return runLambdaInternal(code, lamPos);
+        input.reset();
+        return runLambdaInternal(code, position);
     }
 }
 
@@ -4586,9 +4646,9 @@ void ByteCode::swapStack() {
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::runLambdaInternal(
     const CodeFragment* code, int64_t position) {
     runInternal(code, value::bitcastTo<int64_t>(position));
-    swapStack();
-    popStack();
     auto [retOwn, retTag, retVal] = getFromStack(0);
+    swapStack();
+    popAndReleaseStack();
     popStack();
 
     return {retOwn, retTag, retVal};
@@ -5263,18 +5323,36 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 }
                 case Instruction::traverseP: {
                     auto [owned, tag, val] = traverseP(code);
-                    for (uint8_t cnt = 0; cnt < 2; ++cnt) {
-                        popAndReleaseStack();
-                    }
+
+                    pushStack(owned, tag, val);
+                    break;
+                }
+                case Instruction::traversePConst: {
+                    auto offset = readFromMemory<int>(pcPointer);
+                    pcPointer += sizeof(offset);
+                    auto codePosition = pcPointer - code->instrs().data() + offset;
+
+                    auto [owned, tag, val] = traverseP(code, codePosition);
 
                     pushStack(owned, tag, val);
                     break;
                 }
                 case Instruction::traverseF: {
                     auto [owned, tag, val] = traverseF(code);
-                    for (uint8_t cnt = 0; cnt < 3; ++cnt) {
-                        popAndReleaseStack();
-                    }
+
+                    pushStack(owned, tag, val);
+                    break;
+                }
+                case Instruction::traverseFConst: {
+                    auto k = readFromMemory<Instruction::Constants>(pcPointer);
+                    pcPointer += sizeof(k);
+
+                    auto offset = readFromMemory<int>(pcPointer);
+                    pcPointer += sizeof(offset);
+                    auto codePosition = pcPointer - code->instrs().data() + offset;
+
+                    auto [owned, tag, val] =
+                        traverseF(code, codePosition, k == Instruction::True ? true : false);
 
                     pushStack(owned, tag, val);
                     break;
