@@ -252,6 +252,8 @@ last-continuous:
       test_file: jstests/sharding/resharding_metrics_increment.js
     - ticket: SERVER-64395
       test_file: jstests/sharding/resharding_abort_command.js
+    - ticket: SERVER-66379
+      test_file: jstests/core/or_to_in.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -637,6 +639,8 @@ last-lts:
       test_file: jstests/sharding/resharding_metrics_increment.js
     - ticket: SERVER-64395
       test_file: jstests/sharding/resharding_abort_command.js
+    - ticket: SERVER-66379
+      test_file: jstests/core/or_to_in.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
