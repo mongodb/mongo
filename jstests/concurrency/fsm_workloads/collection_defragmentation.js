@@ -38,6 +38,19 @@ function getExtendedCollectionShardKey(configDB, ns) {
     return currentShardKey;
 }
 
+function getAllChunks(configDB, ns, keyPattern) {
+    let chunksCursor = findChunksUtil.findChunksByNs(configDB, ns).sort(keyPattern);
+    let chunkArray = [];
+    while (!chunksCursor.isExhausted()) {
+        while (chunksCursor.objsLeftInBatch()) {
+            chunkArray.push(chunksCursor.next());
+        }
+        chunksCursor =
+            findChunksUtil.findChunksByNs(configDB, ns).sort(keyPattern).skip(chunkArray.length);
+    }
+    return chunkArray;
+}
+
 var $config = (function() {
     var states = {
         init: function init(db, collName, connCache) {
@@ -98,12 +111,10 @@ var $config = (function() {
             const configDB = randomDB.getSiblingDB('config');
             const keyPattern = getCollectionShardKey(configDB, randomColl.getFullName());
 
-            // Get all the chunks
-            const chunks = findChunksUtil.findChunksByNs(configDB, randomColl.getFullName())
-                               .sort(keyPattern)
-                               .toArray();
+            // Get all the chunks without using getMore so the test can run with stepdowns.
+            const chunks = getAllChunks(configDB, randomColl.getFullName(), keyPattern);
 
-            // No chunks to merge is there are less than 2 chunks
+            // No possible merges if there are less than 2 chunks.
             if (chunks.length < 2) {
                 return;
             }
