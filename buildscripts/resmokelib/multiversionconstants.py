@@ -1,17 +1,20 @@
 """FCV and Server binary version constants used for multiversion testing."""
 import os
 import shutil
-from subprocess import call, CalledProcessError, check_output, STDOUT, DEVNULL
+from subprocess import DEVNULL, STDOUT, CalledProcessError, call, check_output
+
 import structlog
 
 try:
     # when running resmoke
-    from buildscripts.resmokelib.multiversion.multiversion_service import MongoReleases, MongoVersion, MultiversionService
-    from buildscripts.resmokelib.multiversionsetupconstants import USE_EXISTING_RELEASES_FILE
+    from buildscripts.resmokelib.multiversion.multiversion_service import (
+        MongoReleases, MongoVersion, MultiversionService)
+    from buildscripts.resmokelib.multiversionsetupconstants import \
+        USE_EXISTING_RELEASES_FILE
 except ImportError:
     # when running db-contrib-tool
+    from multiversion.multiversion_service import (MongoReleases, MongoVersion, MultiversionService)
     from multiversionsetupconstants import USE_EXISTING_RELEASES_FILE
-    from multiversion.multiversion_service import MongoReleases, MongoVersion, MultiversionService
 
 LOGGER = structlog.getLogger(__name__)
 
@@ -73,11 +76,6 @@ else:
         "Skipping generating releases file since the --useExistingReleasesFile flag has been set")
 
 
-def version_str(version):
-    """Return a string of the given version in 'MAJOR.MINOR' form."""
-    return '{}.{}'.format(version.major, version.minor)
-
-
 def evg_project_str(version):
     """Return the evergreen project name for the given version."""
     return 'mongodb-mongo-v{}.{}'.format(version.major, version.minor)
@@ -90,20 +88,20 @@ multiversion_service = MultiversionService(
 
 fcv_constants = multiversion_service.calculate_fcv_constants()
 
-LAST_LTS_BIN_VERSION = version_str(fcv_constants.last_lts)
-LAST_CONTINUOUS_BIN_VERSION = version_str(fcv_constants.last_continuous)
+LAST_LTS_BIN_VERSION = fcv_constants.get_last_lts_fcv()
+LAST_CONTINUOUS_BIN_VERSION = fcv_constants.get_last_continuous_fcv()
 
-LAST_LTS_FCV = version_str(fcv_constants.last_lts)
-LAST_CONTINUOUS_FCV = version_str(fcv_constants.last_continuous)
-LATEST_FCV = version_str(fcv_constants.latest)
+LAST_LTS_FCV = fcv_constants.get_last_lts_fcv()
+LAST_CONTINUOUS_FCV = fcv_constants.get_last_continuous_fcv()
+LATEST_FCV = fcv_constants.get_latest_fcv()
 
-LAST_CONTINUOUS_MONGO_BINARY = "mongo-" + LAST_CONTINUOUS_BIN_VERSION
-LAST_CONTINUOUS_MONGOD_BINARY = "mongod-" + LAST_CONTINUOUS_BIN_VERSION
-LAST_CONTINUOUS_MONGOS_BINARY = "mongos-" + LAST_CONTINUOUS_BIN_VERSION
+LAST_CONTINUOUS_MONGO_BINARY = fcv_constants.build_last_continuous_binary("mongo")
+LAST_CONTINUOUS_MONGOD_BINARY = fcv_constants.build_last_continuous_binary("mongod")
+LAST_CONTINUOUS_MONGOS_BINARY = fcv_constants.build_last_continuous_binary("mongos")
 
-LAST_LTS_MONGO_BINARY = "mongo-" + LAST_LTS_BIN_VERSION
-LAST_LTS_MONGOD_BINARY = "mongod-" + LAST_LTS_BIN_VERSION
-LAST_LTS_MONGOS_BINARY = "mongos-" + LAST_LTS_BIN_VERSION
+LAST_LTS_MONGO_BINARY = fcv_constants.build_last_lts_binary("mongo")
+LAST_LTS_MONGOD_BINARY = fcv_constants.build_last_lts_binary("mongod")
+LAST_LTS_MONGOS_BINARY = fcv_constants.build_last_lts_binary("mongos")
 
 REQUIRES_FCV_TAG_LATEST = fcv_constants.get_latest_tag()
 

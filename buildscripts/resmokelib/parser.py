@@ -8,6 +8,7 @@ from buildscripts.resmokelib.discovery import DiscoveryPlugin
 from buildscripts.resmokelib.generate_fcv_constants import \
     GenerateFCVConstantsPlugin
 from buildscripts.resmokelib.hang_analyzer import HangAnalyzerPlugin
+from buildscripts.resmokelib.multiversion import MultiversionPlugin
 from buildscripts.resmokelib.powercycle import PowercyclePlugin
 from buildscripts.resmokelib.run import RunPlugin
 from buildscripts.resmokelib.symbolizer import SymbolizerPlugin
@@ -21,6 +22,7 @@ _PLUGINS = [
     SymbolizerPlugin(),
     GenerateFCVConstantsPlugin(),
     DiscoveryPlugin(),
+    MultiversionPlugin(),
 ]
 
 

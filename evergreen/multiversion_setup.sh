@@ -6,8 +6,13 @@ cd src
 set -o errexit
 set -o verbose
 
+activate_venv
+
 setup_db_contrib_tool_venv
-activate_db_contrib_tool_venv
+
+export PIPX_HOME="${workdir}/pipx"
+export PIPX_BIN_DIR="${workdir}/pipx/bin"
+export PATH="$PATH:$PIPX_BIN_DIR"
 
 rm -rf /data/install /data/multiversion
 
@@ -15,13 +20,16 @@ edition="${multiversion_edition}"
 platform="${multiversion_platform}"
 architecture="${multiversion_architecture}"
 
-db-contrib-tool setup-repro-env \
-  --installDir /data/install \
-  --linkDir /data/multiversion \
-  --edition $edition \
-  --platform $platform \
-  --architecture $architecture \
-  4.0
+if [ -z "${multiversion_skip_install_for_40}" ]; then
+  db-contrib-tool setup-repro-env \
+    --installDir /data/install \
+    --linkDir /data/multiversion \
+    --edition $edition \
+    --platform $platform \
+    --architecture $architecture \
+    --debug \
+    4.0
+fi
 
 # The platform and architecture for how some of the binaries are reported in
 # https://downloads.mongodb.org/full.json changed between MongoDB 4.0 and MongoDB 4.2.
@@ -46,6 +54,7 @@ db-contrib-tool setup-repro-env \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
+  --debug \
   4.2
 
 # The platform and architecture for how some of the binaries are reported in
@@ -82,5 +91,8 @@ db-contrib-tool setup-repro-env \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
+  --fallbackToMaster \
+  --resmokeCmd "python buildscripts/resmoke.py" \
+  --debug \
   $last_lts_arg \
-  $last_continuous_arg 4.4 5.0 5.1
+  $last_continuous_arg 4.4 5.0

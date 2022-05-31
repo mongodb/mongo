@@ -17,7 +17,12 @@ VERSION_RE = re.compile(r'^[0-9]+\.[0-9]+')
 
 def tag_str(version: Version) -> str:
     """Return a tag for the given version."""
-    return 'requires_fcv_{}{}'.format(version.major, version.minor)
+    return f"requires_fcv_{version.major}{version.minor}"
+
+
+def version_str(version: Version) -> str:
+    """Return a string of the given version in 'MAJOR.MINOR' form."""
+    return f"{version.major}.{version.minor}"
 
 
 class FcvConstantValues(NamedTuple):
@@ -58,6 +63,38 @@ class FcvConstantValues(NamedTuple):
     def get_latest_tag(self) -> str:
         """Get a string version of the latest FCV."""
         return tag_str(self.latest)
+
+    def get_last_lts_fcv(self) -> str:
+        """Get a string version of the last LTS FCV."""
+        return version_str(self.last_lts)
+
+    def get_last_continuous_fcv(self) -> str:
+        """Get a string version of the last continuous FCV."""
+        return version_str(self.last_continuous)
+
+    def get_latest_fcv(self) -> str:
+        """Get a string version of the latest FCV."""
+        return version_str(self.latest)
+
+    def build_last_lts_binary(self, base_name: str) -> str:
+        """
+        Build the name of the binary that the LTS version of the given tool will have.
+
+        :param base_name: Base name of binary (mongo, mongod, mongos).
+        :return: Name of LTS version of the given tool.
+        """
+        last_lts = self.get_last_lts_fcv()
+        return f"{base_name}-{last_lts}"
+
+    def build_last_continuous_binary(self, base_name: str) -> str:
+        """
+        Build the name of the binary that the continuous version of the given tool will have.
+
+        :param base_name: Base name of binary (mongo, mongod, mongos).
+        :return: Name of continuous version of the given tool.
+        """
+        last_continuous = self.get_last_continuous_fcv()
+        return f"{base_name}-{last_continuous}"
 
 
 class MongoVersion(BaseModel):

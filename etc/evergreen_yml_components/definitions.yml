@@ -895,6 +895,7 @@ functions:
 
   "do multiversion setup":
   - *f_expansions_write
+  - *set_up_venv
   - *do_multiversion_setup
 
   # Used by generator
@@ -6387,7 +6388,6 @@ tasks:
   - func: "set up remote credentials"
   - *f_expansions_write
   - func: "configure evergreen api credentials"
-  - func: "do multiversion setup"
   - func: "run tests"
     vars:
       resmoke_jobs_max: 1

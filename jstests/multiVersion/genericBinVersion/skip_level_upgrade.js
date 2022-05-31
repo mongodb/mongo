@@ -11,6 +11,8 @@
  * - Benignly fail to run --repair on the latest version.
  * - Successfully restart the node in the original version.
  * - Verify data files are intact.
+ *
+ * @tags: [requires_v4_0]
  */
 
 (function() {

@@ -12,7 +12,6 @@ from buildscripts.resmokelib.testing.suite import Suite
 
 TEST_DISCOVERY_SUBCOMMAND = "test-discovery"
 SUITECONFIG_SUBCOMMAND = "suiteconfig"
-MULTIVERSION_SUBCOMMAND = "multiversion-config"
 
 
 class SuiteTestList(BaseModel):
@@ -81,40 +80,6 @@ class SuiteConfigSubcommand(Subcommand):
         print(yaml.safe_dump(suite.get_config()))
 
 
-class MultiversionConfig(BaseModel):
-    """Multiversion Configuration."""
-
-    last_versions: List[str]
-    requires_fcv_tag: str
-    requires_fcv_tag_lts: str
-    requires_fcv_tag_continuous: str
-
-
-class MultiversionConfigSubcommand(Subcommand):
-    """Subcommand for discovering multiversion configuration."""
-
-    def execute(self):
-        """Execute the subcommand."""
-        mv_config = self.determine_multiversion_config()
-        print(yaml.safe_dump(mv_config.dict()))
-
-    @staticmethod
-    def determine_multiversion_config() -> MultiversionConfig:
-        """Discover the current multiversion configuration."""
-        from buildscripts.resmokelib import multiversionconstants
-        multiversion_service = MultiversionService(
-            mongo_version=MongoVersion.from_yaml_file(multiversionconstants.MONGO_VERSION_YAML),
-            mongo_releases=MongoReleases.from_yaml_file(multiversionconstants.RELEASES_YAML),
-        )
-        fcv_constants = multiversion_service.calculate_fcv_constants()
-        return MultiversionConfig(
-            last_versions=multiversionconstants.OLD_VERSIONS,
-            requires_fcv_tag=fcv_constants.get_fcv_tag_list(),
-            requires_fcv_tag_lts=fcv_constants.get_lts_fcv_tag_list(),
-            requires_fcv_tag_continuous=fcv_constants.get_continuous_fcv_tag_list(),
-        )
-
-
 class DiscoveryPlugin(PluginInterface):
     """Test discovery plugin."""
 
@@ -132,9 +97,6 @@ class DiscoveryPlugin(PluginInterface):
                                        help="Display configuration of a test suite.")
         parser.add_argument("--suite", metavar="SUITE", help="Suite to run against.")
 
-        parser = subparsers.add_parser(MULTIVERSION_SUBCOMMAND,
-                                       help="Display configuration for multiversion testing")
-
     def parse(self, subcommand, parser, parsed_args, **kwargs) -> Optional[Subcommand]:
         """
         Resolve command-line options to a Subcommand or None.
@@ -150,6 +112,4 @@ class DiscoveryPlugin(PluginInterface):
             return TestDiscoverySubcommand(parsed_args.suite)
         if subcommand == SUITECONFIG_SUBCOMMAND:
             return SuiteConfigSubcommand(parsed_args.suite)
-        if subcommand == MULTIVERSION_SUBCOMMAND:
-            return MultiversionConfigSubcommand()
         return None
