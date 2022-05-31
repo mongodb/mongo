@@ -2,7 +2,7 @@
  * Tests that errors generated as part of ReplicationCoordinatorImpl startup do not cause the server
  * to hang during shutdown.
  *
- * @tags: [requires_persistence, requires_fcv_53]
+ * @tags: [requires_persistence, requires_fcv_60]
  */
 
 (function() {
