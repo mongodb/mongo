@@ -2733,6 +2733,14 @@ void TransactionParticipant::Participant::_setNewTxnNumberAndRetryCounter(
 
     // Reset the transactional state
     _resetTransactionStateAndUnlock(&lk, TransactionState::kNone);
+
+    invariant(!lk);
+    if (isParentSessionId(_sessionId())) {
+        // Only observe parent sessions because retryable transactions begin the same txnNumber on
+        // their parent session.
+        OperationContextSession::observeNewTxnNumberStarted(
+            opCtx, _sessionId(), txnNumberAndRetryCounter.getTxnNumber());
+    }
 }
 
 void RetryableWriteTransactionParticipantCatalog::addParticipant(

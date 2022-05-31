@@ -200,6 +200,26 @@ protected:
         });
     }
 
+    void runFunctionFromDifferentOpCtx(std::function<void(OperationContext*)> func) {
+        auto newClientOwned = getServiceContext()->makeClient("newClient");
+        AlternativeClientRegion acr(newClientOwned);
+        auto newOpCtx = cc().makeOperationContext();
+        func(newOpCtx.get());
+    }
+
+    void runTransactionLeaveOpen(LogicalSessionId lsid, TxnNumber txnNumber) {
+        runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+            opCtx->setLogicalSessionId(lsid);
+            opCtx->setTxnNumber(txnNumber);
+            opCtx->setInMultiDocumentTransaction();
+            auto opCtxSession = std::make_unique<RouterOperationContextSession>(opCtx);
+
+            auto txnRouter = TransactionRouter::get(opCtx);
+            txnRouter.beginOrContinueTxn(
+                opCtx, *opCtx->getTxnNumber(), TransactionRouter::TransactionActions::kStart);
+        });
+    }
+
 private:
     // Enables the transaction router to retry within a transaction on stale version and snapshot
     // errors for the duration of each test.
@@ -5302,5 +5322,72 @@ TEST_F(TransactionRouterMetricsTest, IsTrackingOverIfTxnImplicitlyAborted) {
     implicitAbortInProgress();
     ASSERT(txnRouter().isTrackingOver());
 }
+
+bool doesExistInCatalog(const LogicalSessionId& lsid, SessionCatalog* sessionCatalog) {
+    bool existsInCatalog{false};
+    sessionCatalog->scanSession(lsid,
+                                [&](const ObservableSession& session) { existsInCatalog = true; });
+    return existsInCatalog;
+}
+
+TEST_F(TransactionRouterTest, EagerlyReapRetryableSessionsUponNewClientTransaction) {
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    ASSERT_EQ(sessionCatalog->size(), 0);
+
+    // Add a parent session with one retryable child.
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = 0;
+    runTransactionLeaveOpen(parentLsid, parentTxnNumber);
+
+    auto retryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runTransactionLeaveOpen(retryableChildLsid, 0);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+
+    // Start a higher txnNumber client transaction and verify the child was erased.
+
+    parentTxnNumber++;
+    runTransactionLeaveOpen(parentLsid, parentTxnNumber);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+}
+
+TEST_F(TransactionRouterTest, EagerlyReapRetryableSessionsUponNewRetryableTransaction) {
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    ASSERT_EQ(sessionCatalog->size(), 0);
+
+    // Add a parent session with one retryable child.
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = 0;
+    runTransactionLeaveOpen(parentLsid, parentTxnNumber);
+
+    auto retryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runTransactionLeaveOpen(retryableChildLsid, 0);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+
+    // Start a higher txnNumber retryable transaction and verify the child was erased.
+
+    parentTxnNumber++;
+    auto higherRetryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runTransactionLeaveOpen(higherRetryableChildLsid, 0);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(higherRetryableChildLsid, sessionCatalog));
+}
+
 }  // unnamed namespace
 }  // namespace mongo

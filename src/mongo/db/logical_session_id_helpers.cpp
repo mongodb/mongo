@@ -84,6 +84,11 @@ SHA256Block getLogicalSessionUserDigestFor(StringData user, StringData db) {
     return SHA256Block::computeHash({ConstDataRange(fn.c_str(), fn.size())});
 }
 
+bool isParentSessionId(const LogicalSessionId& sessionId) {
+    // All child sessions must have a txnUUID.
+    return !sessionId.getTxnUUID();
+}
+
 boost::optional<LogicalSessionId> getParentSessionId(const LogicalSessionId& sessionId) {
     if (sessionId.getTxnUUID()) {
         return LogicalSessionId{sessionId.getId(), sessionId.getUid()};

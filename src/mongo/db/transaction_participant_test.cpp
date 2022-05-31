@@ -47,6 +47,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/transaction_participant.h"
@@ -348,6 +349,33 @@ protected:
                                        false /* autocommit */,
                                        startNewTxn /* startTransaction */);
         return opCtxSession;
+    }
+
+    void checkOutSessionFromDiferentOpCtx(const LogicalSessionId& lsid,
+                                          bool beginOrContinueTxn,
+                                          boost::optional<TxnNumber> txnNumber = boost::none,
+                                          boost::optional<bool> autocommit = boost::none,
+                                          boost::optional<bool> startTransaction = boost::none,
+                                          bool commitTxn = false) {
+        runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+            opCtx->setLogicalSessionId(lsid);
+            if (txnNumber) {
+                opCtx->setTxnNumber(*txnNumber);
+                opCtx->setInMultiDocumentTransaction();
+            }
+
+            auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+
+            if (beginOrContinueTxn) {
+                auto txnParticipant = TransactionParticipant::get(opCtx);
+                txnParticipant.beginOrContinue(
+                    opCtx, {*opCtx->getTxnNumber()}, autocommit, startTransaction);
+
+                if (commitTxn) {
+                    txnParticipant.commitUnpreparedTransaction(opCtx);
+                }
+            }
+        });
     }
 
     const LogicalSessionId _sessionId{makeLogicalSessionIdForTest()};
@@ -1660,6 +1688,30 @@ protected:
     void tearDown() final {
         serverGlobalParams.clusterRole = ClusterRole::None;
         TxnParticipantTest::tearDown();
+    }
+
+    void runRetryableWrite(LogicalSessionId lsid, TxnNumber txnNumber) {
+        runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+            opCtx->setLogicalSessionId(lsid);
+            opCtx->setTxnNumber(txnNumber);
+            auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+            TransactionParticipant::get(opCtx).beginOrContinue(
+                opCtx, {*opCtx->getTxnNumber()}, boost::none, boost::none);
+        });
+    }
+
+    void runAndCommitTransaction(LogicalSessionId lsid, TxnNumber txnNumber) {
+        runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+            opCtx->setLogicalSessionId(lsid);
+            opCtx->setTxnNumber(txnNumber);
+            opCtx->setInMultiDocumentTransaction();
+            auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+
+            auto txnParticipant = TransactionParticipant::get(opCtx);
+            txnParticipant.beginOrContinue(opCtx, {*opCtx->getTxnNumber()}, false, true);
+            txnParticipant.unstashTransactionResources(opCtx, "find");
+            txnParticipant.commitUnpreparedTransaction(opCtx);
+        });
     }
 
     RAIIServerParameterControllerForTest _controller{"featureFlagInternalTransactions", true};
@@ -5430,6 +5482,398 @@ TEST_F(TxnParticipantTest,
                            AssertionException,
                            6611001);
     }
+}
+
+bool doesExistInCatalog(const LogicalSessionId& lsid, SessionCatalog* sessionCatalog) {
+    bool existsInCatalog{false};
+    sessionCatalog->scanSession(lsid,
+                                [&](const ObservableSession& session) { existsInCatalog = true; });
+    return existsInCatalog;
+}
+
+TEST_F(ShardTxnParticipantTest, EagerlyReapRetryableSessionsUponNewClientTransaction) {
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    ASSERT_EQ(sessionCatalog->size(), 0);
+
+    // Add a parent session with one retryable child.
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = 0;
+    runRetryableWrite(parentLsid, parentTxnNumber);
+
+    auto retryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runAndCommitTransaction(retryableChildLsid, 0);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+
+    // Start a higher txnNumber client transaction and verify the child was erased.
+
+    parentTxnNumber++;
+    runAndCommitTransaction(parentLsid, parentTxnNumber);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+}
+
+TEST_F(ShardTxnParticipantTest, EagerlyReapRetryableSessionsUponNewClientRetryableWrite) {
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    ASSERT_EQ(sessionCatalog->size(), 0);
+
+    // Add a parent session with one retryable child.
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = 0;
+    runRetryableWrite(parentLsid, parentTxnNumber);
+
+    auto retryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runAndCommitTransaction(retryableChildLsid, 0);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+
+    // Start a higher txnNumber retryable write and verify the child was erased.
+
+    parentTxnNumber++;
+    runRetryableWrite(parentLsid, parentTxnNumber);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+}
+
+TEST_F(ShardTxnParticipantTest, EagerlyReapRetryableSessionsUponNewRetryableTransaction) {
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    ASSERT_EQ(sessionCatalog->size(), 0);
+
+    // Add a parent session with one retryable child.
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = 0;
+    runRetryableWrite(parentLsid, parentTxnNumber);
+
+    auto retryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runAndCommitTransaction(retryableChildLsid, 0);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+
+    // Start a higher txnNumber retryable transaction and verify the child was erased.
+
+    parentTxnNumber++;
+    auto higherRetryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runAndCommitTransaction(higherRetryableChildLsid, 0);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(higherRetryableChildLsid, sessionCatalog));
+}
+
+TEST_F(
+    ShardTxnParticipantTest,
+    EagerlyReapRetryableSessionsOnlyUponNewTransactionBegunAndIgnoresNonRetryableAndUnrelatedSessions) {
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    ASSERT_EQ(sessionCatalog->size(), 0);
+
+    // Add a parent session with two retryable children and one non-retryable child.
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = 0;
+    runRetryableWrite(parentLsid, parentTxnNumber);
+
+    auto retryableChildLsid1 =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runAndCommitTransaction(retryableChildLsid1, 0);
+
+    auto retryableChildLsid2 =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runAndCommitTransaction(retryableChildLsid2, 0);
+
+    auto nonRetryableChildLsid = makeLogicalSessionIdWithTxnUUIDForTest(parentLsid);
+    runAndCommitTransaction(nonRetryableChildLsid, 0);
+
+    // Add entries for unrelated sessions to verify they aren't affected.
+
+    auto parentLsidOther = makeLogicalSessionIdForTest();
+    runRetryableWrite(parentLsidOther, 0);
+
+    auto retryableChildLsidOther =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsidOther, parentTxnNumber);
+    runAndCommitTransaction(retryableChildLsidOther, 0);
+
+    auto nonRetryableChildLsidOther =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsidOther, parentTxnNumber);
+    runAndCommitTransaction(nonRetryableChildLsidOther, 0);
+
+    ASSERT_EQ(sessionCatalog->size(), 2);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(nonRetryableChildLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid1, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
+    ASSERT(doesExistInCatalog(parentLsidOther, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsidOther, sessionCatalog));
+    ASSERT(doesExistInCatalog(nonRetryableChildLsidOther, sessionCatalog));
+
+    // Check out with a higher txnNumber and verify we don't reap until a transaction has begun on
+    // it.
+
+    parentTxnNumber++;
+
+    // Does not call beginOrContinue.
+    runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+        opCtx->setLogicalSessionId(parentLsid);
+        opCtx->setTxnNumber(parentTxnNumber);
+        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+    });
+    // Does not call beginOrContinue.
+    auto higherRetryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+        opCtx->setLogicalSessionId(higherRetryableChildLsid);
+        opCtx->setTxnNumber(0);
+        opCtx->setInMultiDocumentTransaction();
+        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+    });
+    // beginOrContinue fails because no startTransaction=true.
+    runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+        opCtx->setLogicalSessionId(parentLsid);
+        opCtx->setTxnNumber(parentTxnNumber);
+        opCtx->setInMultiDocumentTransaction();
+        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        ASSERT_THROWS_CODE(
+            txnParticipant.beginOrContinue(opCtx, {*opCtx->getTxnNumber()}, false, boost::none),
+            AssertionException,
+            ErrorCodes::NoSuchTransaction);
+    });
+    // Non-retryable child sessions shouldn't affect retryable sessions.
+    auto newNonRetryableChildLsid = makeLogicalSessionIdWithTxnUUIDForTest(parentLsid);
+    runAndCommitTransaction(newNonRetryableChildLsid, 0);
+
+    // No sessions should have been reaped.
+    ASSERT_EQ(sessionCatalog->size(), 2);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(nonRetryableChildLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid1, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
+    ASSERT(doesExistInCatalog(parentLsidOther, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsidOther, sessionCatalog));
+    ASSERT(doesExistInCatalog(nonRetryableChildLsidOther, sessionCatalog));
+
+    // Call beginOrContinue for a higher txnNumber and verify we do erase old sessions for the
+    // active session.
+
+    runRetryableWrite(parentLsid, parentTxnNumber);
+
+    // The two retryable children for parentLsid should have been reaped.
+    ASSERT_EQ(sessionCatalog->size(), 2);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(nonRetryableChildLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid1, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
+    ASSERT(doesExistInCatalog(parentLsidOther, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsidOther, sessionCatalog));
+    ASSERT(doesExistInCatalog(nonRetryableChildLsidOther, sessionCatalog));
+}
+
+TEST_F(ShardTxnParticipantTest, EagerlyReapLowerTxnNumbers) {
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    ASSERT_EQ(sessionCatalog->size(), 0);
+
+    // Add a parent session with two retryable children.
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = 1;
+    runRetryableWrite(parentLsid, parentTxnNumber);
+
+    auto retryableChildLsid1 =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runAndCommitTransaction(retryableChildLsid1, 0);
+
+    auto retryableChildLsid2 =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runAndCommitTransaction(retryableChildLsid2, 0);
+
+    auto lowerRetryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber - 1);
+    runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+        opCtx->setLogicalSessionId(lowerRetryableChildLsid);
+        opCtx->setTxnNumber(0);
+        opCtx->setInMultiDocumentTransaction();
+        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+    });
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid1, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
+    ASSERT(doesExistInCatalog(lowerRetryableChildLsid, sessionCatalog));
+
+    // Start a higher txnNumber retryable transaction and verify the child was erased.
+
+    parentTxnNumber++;
+    runRetryableWrite(parentLsid, parentTxnNumber);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid1, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(lowerRetryableChildLsid, sessionCatalog));
+}
+
+TEST_F(ShardTxnParticipantTest, EagerlyReapSkipsHigherUnusedTxnNumbers) {
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    ASSERT_EQ(sessionCatalog->size(), 0);
+
+    // Add a parent session with one retryable child.
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = 1;
+    runRetryableWrite(parentLsid, parentTxnNumber);
+
+    auto retryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runAndCommitTransaction(retryableChildLsid, 0);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+
+    // Check out a higher txnNumber retryable transaction but do not start it and verify it does not
+    // reap and is not reaped.
+
+    auto higherUnusedRetryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber + 10);
+    runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+        opCtx->setLogicalSessionId(higherUnusedRetryableChildLsid);
+        opCtx->setTxnNumber(0);
+        opCtx->setInMultiDocumentTransaction();
+        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+    });
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(higherUnusedRetryableChildLsid, sessionCatalog));
+
+    parentTxnNumber++;  // Still less than in higherUnusedRetryableChildLsid.
+    runRetryableWrite(parentLsid, parentTxnNumber);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(higherUnusedRetryableChildLsid, sessionCatalog));
+}
+
+TEST_F(ShardTxnParticipantTest, EagerlyReapSkipsKilledSessions) {
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    ASSERT_EQ(sessionCatalog->size(), 0);
+
+    // Add a parent session with two retryable children.
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = 1;
+    runRetryableWrite(parentLsid, parentTxnNumber);
+
+    auto retryableChildLsid1 =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runAndCommitTransaction(retryableChildLsid1, 0);
+
+    auto retryableChildLsid2 =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runAndCommitTransaction(retryableChildLsid2, 0);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid1, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
+
+    // Kill one retryable child and verify no sessions in its SRI can be reaped until it has been
+    // checked out by its killer.
+
+    parentTxnNumber++;
+    boost::optional<SessionCatalog::KillToken> killToken;
+    runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+        opCtx->setLogicalSessionId(parentLsid);
+        opCtx->setTxnNumber(parentTxnNumber);
+        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+
+        TransactionParticipant::get(opCtx).beginOrContinue(
+            opCtx, {*opCtx->getTxnNumber()}, boost::none, boost::none);
+
+        // Kill after checking out the session because we can't check out the session again
+        // after a kill without checking out with the killToken first.
+        killToken = sessionCatalog->killSession(retryableChildLsid1);
+    });
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid1, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
+
+    // Check out for kill the killed retryable session and now both retryable sessions can be
+    // reaped.
+    runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+        sessionCatalog->checkOutSessionForKill(opCtx, std::move(*killToken));
+    });
+
+    // A new client txnNumber must be seen to trigger the reaping, so the sessions shouldn't have
+    // been reaped upon releasing the killed session.
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid1, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
+
+    parentTxnNumber++;
+    runRetryableWrite(parentLsid, parentTxnNumber);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid1, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
+}
+
+TEST_F(ShardTxnParticipantTest, CheckingOutEagerlyReapedSessionDoesNotCrash) {
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    ASSERT_EQ(sessionCatalog->size(), 0);
+
+    // Add a parent session with one retryable child.
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = 0;
+    runRetryableWrite(parentLsid, parentTxnNumber);
+
+    auto retryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runAndCommitTransaction(retryableChildLsid, 0);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+
+    // Start a higher txnNumber client transaction and verify the child was erased.
+
+    parentTxnNumber++;
+    runAndCommitTransaction(parentLsid, parentTxnNumber);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+
+    // Check out the child again to verify this doesn't crash.
+    ASSERT_THROWS_CODE(runAndCommitTransaction(retryableChildLsid, 1),
+                       AssertionException,
+                       ErrorCodes::TransactionTooOld);
 }
 
 }  // namespace

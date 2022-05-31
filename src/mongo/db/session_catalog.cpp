@@ -89,7 +89,7 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionInner(
     stdx::unique_lock<Latch> ul(_mutex);
 
     auto sri = _getOrCreateSessionRuntimeInfo(ul, lsid);
-    auto session = sri->getSession(lsid);
+    auto session = sri->getSession(ul, lsid);
     invariant(session);
 
     if (killToken) {
@@ -148,7 +148,7 @@ void SessionCatalog::scanSession(const LogicalSessionId& lsid,
     stdx::lock_guard<Latch> lg(_mutex);
 
     if (auto sri = _getSessionRuntimeInfo(lg, lsid)) {
-        auto session = sri->getSession(lsid);
+        auto session = sri->getSession(lg, lsid);
         invariant(session);
 
         ObservableSession osession(lg, sri, session);
@@ -259,7 +259,7 @@ SessionCatalog::KillToken SessionCatalog::killSession(const LogicalSessionId& ls
 
     auto sri = _getSessionRuntimeInfo(lg, lsid);
     uassert(ErrorCodes::NoSuchSession, "Session not found", sri);
-    auto session = sri->getSession(lsid);
+    auto session = sri->getSession(lg, lsid);
     uassert(ErrorCodes::NoSuchSession, "Session not found", session);
     return ObservableSession(lg, sri, session).kill();
 }
@@ -275,7 +275,7 @@ void SessionCatalog::createSessionIfDoesNotExist(const LogicalSessionId& lsid) {
 }
 
 SessionCatalog::SessionRuntimeInfo* SessionCatalog::_getSessionRuntimeInfo(
-    WithLock, const LogicalSessionId& lsid) {
+    WithLock wl, const LogicalSessionId& lsid) {
     auto parentLsid = castToParentSessionId(lsid);
     auto sriIt = _sessions.find(parentLsid);
 
@@ -284,7 +284,7 @@ SessionCatalog::SessionRuntimeInfo* SessionCatalog::_getSessionRuntimeInfo(
     }
 
     auto sri = sriIt->second.get();
-    auto session = sri->getSession(lsid);
+    auto session = sri->getSession(wl, lsid);
 
     if (session) {
         return sri;
@@ -322,7 +322,8 @@ SessionCatalog::SessionRuntimeInfo* SessionCatalog::_getOrCreateSessionRuntimeIn
 
 void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
                                      Session* session,
-                                     boost::optional<KillToken> killToken) {
+                                     boost::optional<KillToken> killToken,
+                                     boost::optional<TxnNumber> clientTxnNumberStarted) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     // Make sure we have exactly the same session on the map and that it is still associated with an
@@ -341,9 +342,30 @@ void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
         invariant(sri->killsRequested > 0);
         --sri->killsRequested;
     }
+
+    if (clientTxnNumberStarted.has_value()) {
+        // Since the given txnNumber successfully started, we know any child sessions with older
+        // txnNumbers can be discarded. This needed to wait until a transaction started because that
+        // can fail, e.g. if the active transaction is prepared.
+        auto numReaped = stdx::erase_if(sri->childSessions, [&](auto&& it) {
+            ObservableSession osession(lg, sri, &it.second);
+            if (it.first.getTxnNumber() && *it.first.getTxnNumber() < *clientTxnNumberStarted) {
+                osession.markForReap(ObservableSession::ReapMode::kExclusive);
+            }
+            return osession._shouldBeReaped();
+        });
+
+        LOGV2_DEBUG(6685200,
+                    4,
+                    "Erased child sessions",
+                    "releasedLsid"_attr = session->getSessionId(),
+                    "clientTxnNumber"_attr = *clientTxnNumberStarted,
+                    "childSessionsRemaining"_attr = sri->childSessions.size(),
+                    "numReaped"_attr = numReaped);
+    }
 }
 
-Session* SessionCatalog::SessionRuntimeInfo::getSession(const LogicalSessionId& lsid) {
+Session* SessionCatalog::SessionRuntimeInfo::getSession(WithLock, const LogicalSessionId& lsid) {
     if (lsid == parentSession._sessionId) {
         return &parentSession;
     }
@@ -486,6 +508,38 @@ void OperationContextSession::checkOut(OperationContext* opCtx) {
     // this session are safe to use while the lock is held
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     checkedOutSession.emplace(std::move(scopedCheckedOutSession));
+}
+
+void OperationContextSession::observeNewTxnNumberStarted(OperationContext* opCtx,
+                                                         const LogicalSessionId& lsid,
+                                                         TxnNumber txnNumber) {
+    auto& checkedOutSession = operationSessionDecoration(opCtx);
+    invariant(checkedOutSession);
+
+    LOGV2_DEBUG(6685201,
+                4,
+                "Observing new retryable write number started on session",
+                "lsid"_attr = lsid,
+                "txnNumber"_attr = txnNumber);
+
+    const auto& checkedOutLsid = (*checkedOutSession)->getSessionId();
+    if (isParentSessionId(lsid)) {
+        // Observing a new transaction/retryable write on a parent session.
+
+        // The operation must have checked out the parent session itself or a child session of the
+        // parent. This is safe because both share the same SessionRuntimeInfo.
+        dassert(lsid == checkedOutLsid || lsid == *getParentSessionId(checkedOutLsid));
+
+        checkedOutSession->observeNewClientTxnNumberStarted(txnNumber);
+    } else if (isInternalSessionForRetryableWrite(lsid)) {
+        // Observing a new internal transaction on a retryable session.
+
+        // A transaction on a child session is always begun on an operation that checked it out
+        // directly.
+        dassert(lsid == checkedOutLsid);
+
+        checkedOutSession->observeNewClientTxnNumberStarted(*lsid.getTxnNumber());
+    }
 }
 
 }  // namespace mongo

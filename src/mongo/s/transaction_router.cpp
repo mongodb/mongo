@@ -1436,34 +1436,39 @@ void TransactionRouter::Router::appendRecoveryToken(BSONObjBuilder* builder) con
 
 void TransactionRouter::Router::_resetRouterState(
     OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
 
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            "Cannot start a new transaction while the previous is yielded",
-            o(lk).activeYields == 0);
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                "Cannot start a new transaction while the previous is yielded",
+                o(lk).activeYields == 0);
 
-    o(lk).txnNumberAndRetryCounter.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
-    o(lk).txnNumberAndRetryCounter.setTxnRetryCounter(
-        *txnNumberAndRetryCounter.getTxnRetryCounter());
-    o(lk).commitType = CommitType::kNotInitiated;
-    p().isRecoveringCommit = false;
-    o(lk).participants.clear();
-    o(lk).coordinatorId.reset();
-    p().recoveryShardId.reset();
-    o(lk).apiParameters = {};
-    o(lk).readConcernArgs = {};
-    o(lk).atClusterTime.reset();
-    o(lk).abortCause = std::string();
-    o(lk).metricsTracker.emplace(opCtx->getServiceContext());
-    p().terminationInitiated = false;
+        o(lk).txnNumberAndRetryCounter.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
+        o(lk).txnNumberAndRetryCounter.setTxnRetryCounter(
+            *txnNumberAndRetryCounter.getTxnRetryCounter());
+        o(lk).commitType = CommitType::kNotInitiated;
+        p().isRecoveringCommit = false;
+        o(lk).participants.clear();
+        o(lk).coordinatorId.reset();
+        p().recoveryShardId.reset();
+        o(lk).apiParameters = {};
+        o(lk).readConcernArgs = {};
+        o(lk).atClusterTime.reset();
+        o(lk).abortCause = std::string();
+        o(lk).metricsTracker.emplace(opCtx->getServiceContext());
+        p().terminationInitiated = false;
 
-    auto tickSource = opCtx->getServiceContext()->getTickSource();
-    o(lk).metricsTracker->trySetActive(tickSource, tickSource->getTicks());
+        auto tickSource = opCtx->getServiceContext()->getTickSource();
+        o(lk).metricsTracker->trySetActive(tickSource, tickSource->getTicks());
 
-    // TODO SERVER-37115: Parse statement ids from the client and remember the statement id
-    // of the command that started the transaction, if one was included.
-    p().latestStmtId = kDefaultFirstStmtId;
-    p().firstStmtId = kDefaultFirstStmtId;
+        // TODO SERVER-37115: Parse statement ids from the client and remember the statement id
+        // of the command that started the transaction, if one was included.
+        p().latestStmtId = kDefaultFirstStmtId;
+        p().firstStmtId = kDefaultFirstStmtId;
+    }
+
+    OperationContextSession::observeNewTxnNumberStarted(
+        opCtx, _sessionId(), txnNumberAndRetryCounter.getTxnNumber());
 };
 
 void TransactionRouter::Router::_resetRouterStateForStartTransaction(
