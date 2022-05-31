@@ -428,13 +428,17 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 return DurableState{_stateDoc.getState(), _abortReason};
             })
             // anchor ensures the instance will still exists even if the primary stepped down
-            .onError([this, executor, primaryToken, abortToken, anchor = shared_from_this()](
-                         StatusWith<DurableState> statusWithState) {
+            .onCompletion([this, executor, primaryToken, abortToken, anchor = shared_from_this()](
+                              StatusWith<DurableState> statusWithState) {
                 // only cancel operations on stepdown from here out
                 _cancelableOpCtxFactory.emplace(primaryToken, _markKilledExecutor);
 
-                return _handleErrorOrEnterAbortedState(
-                    statusWithState, executor, primaryToken, abortToken);
+                if (!statusWithState.isOK()) {
+                    return _handleErrorOrEnterAbortedState(
+                        statusWithState, executor, primaryToken, abortToken);
+                }
+
+                return ExecutorFuture(**executor, statusWithState);
             })
             .unsafeToInlineFuture();
     });
