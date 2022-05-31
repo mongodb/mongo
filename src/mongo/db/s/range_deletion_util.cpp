@@ -34,9 +34,8 @@
 #include "mongo/db/s/range_deletion_util.h"
 
 #include <algorithm>
-#include <utility>
-
 #include <boost/optional.hpp>
+#include <utility>
 
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
@@ -56,6 +55,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/remove_saver.h"
@@ -66,11 +66,7 @@
 #include "mongo/util/future_util.h"
 
 namespace mongo {
-
 namespace {
-const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                WriteConcernOptions::kWriteConcernTimeoutSharding);
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeDoingDeletion);
 MONGO_FAIL_POINT_DEFINE(suspendRangeDeletion);
@@ -239,7 +235,6 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     return numDeleted;
 }
 
-
 template <typename Callable>
 auto withTemporaryOperationContext(Callable&& callable, const NamespaceString& nss) {
     ThreadClient tc(migrationutil::kRangeDeletionThreadName, getGlobalServiceContext());
@@ -299,8 +294,8 @@ void ensureRangeDeletionTaskStillExists(OperationContext* opCtx, const UUID& mig
 }
 
 /**
- * Delete the range in a sequence of batches until there are no more documents to
- * delete or deletion returns an error.
+ * Delete the range in a sequence of batches until there are no more documents to delete or deletion
+ * returns an error.
  */
 ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskExecutor>& executor,
                                           const NamespaceString& nss,
@@ -325,32 +320,34 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                            ensureRangeDeletionTaskStillExists(opCtx, *migrationId);
                        }
 
-                       AutoGetCollection collection(opCtx, nss, MODE_IX);
+                       int numDeleted;
 
-                       // Ensure the collection exists and has not been dropped or dropped and
-                       // recreated.
-                       uassert(
-                           ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
-                           "Collection has been dropped since enqueuing this range "
-                           "deletion task. No need to delete documents.",
-                           !collectionUuidHasChanged(
-                               nss, collection.getCollection(), collectionUuid));
+                       {
+                           AutoGetCollection collection(opCtx, nss, MODE_IX);
 
-                       auto numDeleted = uassertStatusOK(deleteNextBatch(opCtx,
-                                                                         collection.getCollection(),
-                                                                         keyPattern,
-                                                                         range,
-                                                                         numDocsToRemovePerBatch));
-                       LOGV2_DEBUG(
-                           23769,
-                           1,
-                           "Deleted {numDeleted} documents in pass in namespace {namespace} with "
-                           "UUID  {collectionUUID} for range {range}",
-                           "Deleted documents in pass",
-                           "numDeleted"_attr = numDeleted,
-                           "namespace"_attr = nss.ns(),
-                           "collectionUUID"_attr = collectionUuid,
-                           "range"_attr = range.toString());
+                           // Ensure the collection exists and has not been dropped or dropped and
+                           // recreated
+                           uassert(ErrorCodes::
+                                       RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
+                                   "Collection has been dropped since enqueuing this range "
+                                   "deletion task. No need to delete documents.",
+                                   !collectionUuidHasChanged(
+                                       nss, collection.getCollection(), collectionUuid));
+
+                           numDeleted = uassertStatusOK(deleteNextBatch(opCtx,
+                                                                        collection.getCollection(),
+                                                                        keyPattern,
+                                                                        range,
+                                                                        numDocsToRemovePerBatch));
+                       }
+
+                       LOGV2_DEBUG(23769,
+                                   1,
+                                   "Deleted documents in pass",
+                                   "numDeleted"_attr = numDeleted,
+                                   "namespace"_attr = nss.ns(),
+                                   "collectionUUID"_attr = collectionUuid,
+                                   "range"_attr = range.toString());
 
                        if (numDeleted > 0) {
                            // (SERVER-62368) The range-deleter executor is mono-threaded, so
@@ -359,21 +356,22 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                            opCtx->sleepFor(delayBetweenBatches);
                        }
 
-                       return numDeleted;
+                       return numDeleted == 0;
                    },
                    nss);
            })
-        .until([=](StatusWith<int> swNumDeleted) {
-            // Continue iterating until there are no more documents to delete, retrying on
-            // any error that doesn't indicate that this node is stepping down.
-            return (swNumDeleted.isOK() && swNumDeleted.getValue() < numDocsToRemovePerBatch) ||
-                swNumDeleted.getStatus() ==
+        .until([=](StatusWith<bool> swAllDocumentsInRangeDeleted) {
+            // Continue iterating until there are no more documents to delete, retrying on any
+            // error that doesn't indicate that this node is stepping down.
+            return (swAllDocumentsInRangeDeleted.isOK() &&
+                    swAllDocumentsInRangeDeleted.getValue()) ||
+                swAllDocumentsInRangeDeleted ==
                 ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist ||
-                swNumDeleted.getStatus() ==
+                swAllDocumentsInRangeDeleted ==
                 ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist ||
-                swNumDeleted.getStatus().code() == ErrorCodes::KeyPatternShorterThanBound ||
-                ErrorCodes::isShutdownError(swNumDeleted.getStatus()) ||
-                ErrorCodes::isNotPrimaryError(swNumDeleted.getStatus());
+                swAllDocumentsInRangeDeleted == ErrorCodes::KeyPatternShorterThanBound ||
+                ErrorCodes::isShutdownError(swAllDocumentsInRangeDeleted.getStatus()) ||
+                ErrorCodes::isNotPrimaryError(swAllDocumentsInRangeDeleted.getStatus());
         })
         .on(executor, CancellationToken::uncancelable())
         .ignoreValue();
@@ -504,7 +502,6 @@ void deleteRangeDeletionTasksForRename(OperationContext* opCtx,
     rangeDeletionsForRenameStore.remove(opCtx,
                                         QUERY(RangeDeletionTask::kNssFieldName << toNss.ns()));
 }
-
 
 SharedSemiFuture<void> removeDocumentsInRange(
     const std::shared_ptr<executor::TaskExecutor>& executor,

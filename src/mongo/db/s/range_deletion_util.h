@@ -28,9 +28,8 @@
  */
 #pragma once
 
-#include <list>
-
 #include <boost/optional.hpp>
+#include <list>
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
@@ -38,18 +37,6 @@
 #include "mongo/s/catalog/type_chunk.h"
 
 namespace mongo {
-
-class BSONObj;
-
-// The maximum number of documents to delete in a single batch during range deletion.
-// secondaryThrottle and rangeDeleterBatchDelayMS apply between each batch.
-// Must be positive or 0 (the default), which means to use the value of
-// internalQueryExecYieldIterations (or 1 if that's negative or zero).
-extern AtomicWord<int> rangeDeleterBatchSize;
-
-// After completing a batch of document deletions, the time in millis to wait before commencing the
-// next batch of deletions.
-extern AtomicWord<int> rangeDeleterBatchDelayMS;
 
 /**
  * Deletes a range of orphaned documents for the given namespace and collection UUID. Returns a
