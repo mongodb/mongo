@@ -339,7 +339,9 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
     } else {
         services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
         services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
-        services.push_back(std::make_unique<ShardSplitDonorService>(serviceContext));
+        if (getGlobalReplSettings().isServerless()) {
+            services.push_back(std::make_unique<ShardSplitDonorService>(serviceContext));
+        }
     }
 
     for (auto& service : services) {
@@ -1118,8 +1120,10 @@ void setUpObservers(ServiceContext* serviceContext) {
         opObserverRegistry->addObserver(std::make_unique<repl::TenantMigrationDonorOpObserver>());
         opObserverRegistry->addObserver(
             std::make_unique<repl::TenantMigrationRecipientOpObserver>());
-        opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<UserWriteBlockModeOpObserver>());
+        if (getGlobalReplSettings().isServerless()) {
+            opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
+        }
     } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
         opObserverRegistry->addObserver(std::make_unique<ConfigServerOpObserver>());
@@ -1129,8 +1133,10 @@ void setUpObservers(ServiceContext* serviceContext) {
         opObserverRegistry->addObserver(std::make_unique<repl::TenantMigrationDonorOpObserver>());
         opObserverRegistry->addObserver(
             std::make_unique<repl::TenantMigrationRecipientOpObserver>());
-        opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<UserWriteBlockModeOpObserver>());
+        if (getGlobalReplSettings().isServerless()) {
+            opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
+        }
     }
     opObserverRegistry->addObserver(std::make_unique<AuthOpObserver>());
     opObserverRegistry->addObserver(
