@@ -86,6 +86,8 @@ last-continuous:
       test_file: jstests/replsets/initial_sync_with_partial_transaction.js
     - ticket: SERVER-66719
       test_file: jstests/replsets/dbhash_lock_acquisition.js
+    - ticket: SERVER-66379
+      test_file: jstests/core/or_to_in.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -332,6 +334,8 @@ last-lts:
       test_file: jstests/replsets/initial_sync_with_partial_transaction.js
     - ticket: SERVER-66719
       test_file: jstests/replsets/dbhash_lock_acquisition.js
+    - ticket: SERVER-66379
+      test_file: jstests/core/or_to_in.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

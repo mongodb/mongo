@@ -199,7 +199,9 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                     childPath = childExpression->path().toString();
                     eqCollator = curCollator;
                     countEquivEqPaths = 1;
-                } else if (*childPath == childExpression->path() && eqCollator == curCollator) {
+                } else if (*childPath == childExpression->path() &&
+                           (childExpression->matchType() == MatchExpression::REGEX ||
+                            eqCollator == curCollator)) {
                     ++countEquivEqPaths;  // subsequent equality on the same path
                 } else {
                     ++countNonEquivExpr;  // equality on another path
