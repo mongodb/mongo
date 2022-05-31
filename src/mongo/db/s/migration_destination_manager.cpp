@@ -564,6 +564,10 @@ repl::OpTime MigrationDestinationManager::fetchAndApplyBatch(
 
         try {
             while (true) {
+                DisableDocumentValidation documentValidationDisabler(
+                    applicationOpCtx.get(),
+                    DocumentValidationSettings::kDisableSchemaValidation |
+                        DocumentValidationSettings::kDisableInternalValidation);
                 auto nextBatch = batches.pop(applicationOpCtx.get());
                 if (!applyBatchFn(applicationOpCtx.get(), nextBatch)) {
                     return;
@@ -1368,14 +1372,22 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                         return toInsert;
                     }());
 
-                    const auto reply = write_ops_exec::performInserts(
-                        opCtx, insertOp, OperationSource::kFromMigrate);
-
-                    for (unsigned long i = 0; i < reply.results.size(); ++i) {
-                        uassertStatusOKWithContext(reply.results[i],
-                                                   str::stream()
-                                                       << "Insert of " << insertOp.getDocuments()[i]
-                                                       << " failed.");
+                    {
+                        // Disable the schema validation (during document inserts and updates)
+                        // and any internal validation for opCtx for performInserts()
+                        DisableDocumentValidation documentValidationDisabler(
+                            opCtx,
+                            DocumentValidationSettings::kDisableSchemaValidation |
+                                DocumentValidationSettings::kDisableInternalValidation);
+                        const auto reply = write_ops_exec::performInserts(
+                            opCtx, insertOp, OperationSource::kFromMigrate);
+                        for (unsigned long i = 0; i < reply.results.size(); ++i) {
+                            uassertStatusOKWithContext(reply.results[i],
+                                                       str::stream() << "Insert of "
+                                                                     << insertOp.getDocuments()[i]
+                                                                     << " failed.");
+                        }
+                        // Revert to the original DocumentValidationSettings for opCtx
                     }
 
                     migrationutil::persistUpdatedNumOrphans(
