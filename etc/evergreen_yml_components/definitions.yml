@@ -1665,6 +1665,8 @@ functions:
       binary: bash
       args:
       - "./src/evergreen/functions/code_coverage_data_process.sh"
+      env:
+        GCOV_TOOL: ${gcov_tool}
 
   "tar code coverage data": &tar_code_coverage_data
     command: archive.targz_pack
