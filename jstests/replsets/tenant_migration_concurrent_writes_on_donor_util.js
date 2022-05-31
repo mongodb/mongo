@@ -34,7 +34,6 @@ function checkTenantMigrationAccessBlockerForConcurrentWritesTest(node, tenantId
 
 function runCommandForConcurrentWritesTest(testOpts, expectedError) {
     let res;
-
     if (testOpts.isMultiUpdate && !testOpts.testInTransaction) {
         // Multi writes outside a transaction cannot be automatically retried, so we return a
         // different error code than usual. This does not apply to the MaxTimeMS case because the
@@ -52,7 +51,6 @@ function runCommandForConcurrentWritesTest(testOpts, expectedError) {
         assert.commandWorked(testOpts.runAgainstAdminDb
                                  ? testOpts.primaryDB.adminCommand(testOpts.command)
                                  : testOpts.primaryDB.runCommand(testOpts.command));
-
         let commitTxnCommand = {
             commitTransaction: 1,
             txnNumber: testOpts.command.txnNumber,
@@ -178,6 +176,17 @@ function runTestForConcurrentWritesTest(
 
     // This cleanup step is necessary for the shard merge protocol to work correctly.
     cleanUpForConcurrentWritesTest(dbName, primary);
+}
+
+function setupTestForConcurrentWritesTest(testCase, collName, testOpts) {
+    if (testCase.explicitlyCreateCollection) {
+        createCollectionAndInsertDocsForConcurrentWritesTest(
+            testOpts.primaryDB, collName, testCase.isCapped);
+    }
+
+    if (testCase.setUp) {
+        testCase.setUp(testOpts.primaryDB, collName, testOpts.testInTransaction);
+    }
 }
 
 const isNotWriteCommand = "not a write command";

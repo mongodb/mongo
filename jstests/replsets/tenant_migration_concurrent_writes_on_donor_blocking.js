@@ -34,75 +34,145 @@ const kTenantDefinedDbName = "0";
 
 const kMaxTimeMS = 1 * 1000;
 
+const kTenantID = "tenantId";
+const migrationOpts = {
+    migrationIdString: extractUUIDFromObject(UUID()),
+    tenantId: kTenantID,
+};
+
+let countBlockedWrites = 0;
+
 /**
  * Tests that the donor blocks writes that are executed in the blocking state.
  */
-function testBlockWritesAfterMigrationEnteredBlocking(testCase, testOpts) {
-    const tenantId = testOpts.dbName.split('_')[0];
-    const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(UUID()),
-        tenantId,
-    };
-
-    let blockingFp =
-        configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
-
-    assert.commandWorked(
-        tenantMigrationTest.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
-
-    // Run the command after the migration enters the blocking state.
-    blockingFp.wait();
+function testBlockWritesAfterMigrationEnteredBlocking_blocking(testOpts) {
     testOpts.command.maxTimeMS = kMaxTimeMS;
     runCommandForConcurrentWritesTest(testOpts, ErrorCodes.MaxTimeMSExpired);
-
-    // Allow the migration to complete.
-    blockingFp.off();
-    TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(
-        migrationOpts, false /* retryOnRetryableErrors */));
-
-    testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
-    checkTenantMigrationAccessBlockerForConcurrentWritesTest(
-        testOpts.primaryDB, tenantId, {numBlockedWrites: 1});
-
-    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
-    tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString);
 }
 
 const testCases = TenantMigrationConcurrentWriteUtil.testCases;
 
-// Run test cases while the migration is in blocking state.
-for (const [commandName, testCase] of Object.entries(testCases)) {
-    let baseDbName = commandName + "-inBlocking0";
+const testOptsMap = {};
 
-    if (testCase.skip) {
-        print("Skipping " + commandName + ": " + testCase.skip);
-        continue;
-    }
+/**
+ * run the setup for each cases before the migration starts
+ */
+function setupTestsBeforeMigration() {
+    for (const [commandName, testCase] of Object.entries(testCases)) {
+        let baseDbName = kTenantID + "_" + commandName + "-inCommitted0";
 
-    runTestForConcurrentWritesTest(donorPrimary,
-                                   testCase,
-                                   testBlockWritesAfterMigrationEnteredBlocking,
-                                   baseDbName + "Basic_" + kTenantDefinedDbName,
-                                   kCollName);
+        if (testCase.skip) {
+            print("Skipping " + commandName + ": " + testCase.skip);
+            continue;
+        }
 
-    if (testCase.testInTransaction) {
-        runTestForConcurrentWritesTest(donorPrimary,
-                                       testCase,
-                                       testBlockWritesAfterMigrationEnteredBlocking,
-                                       baseDbName + "Txn_" + kTenantDefinedDbName,
-                                       kCollName,
-                                       {testInTransaction: true});
-    }
+        let basicFullDb = baseDbName + "Basic-" + kTenantDefinedDbName;
+        const basicTestOpts = makeTestOptionsForConcurrentWritesTest(
+            donorPrimary, testCase, basicFullDb, kCollName, false, false);
+        testOptsMap[basicFullDb] = basicTestOpts;
 
-    if (testCase.testAsRetryableWrite) {
-        runTestForConcurrentWritesTest(donorPrimary,
-                                       testCase,
-                                       testBlockWritesAfterMigrationEnteredBlocking,
-                                       baseDbName + "Retryable_" + kTenantDefinedDbName,
-                                       kCollName,
-                                       {testAsRetryableWrite: true});
+        setupTestForConcurrentWritesTest(testCase, kCollName, basicTestOpts);
+
+        if (testCase.testInTransaction) {
+            let TxnFullDb = baseDbName + "Txn-" + kTenantDefinedDbName;
+            const txnTestOpts = makeTestOptionsForConcurrentWritesTest(
+                donorPrimary, testCase, TxnFullDb, kCollName, true, false);
+            testOptsMap[TxnFullDb] = txnTestOpts;
+
+            setupTestForConcurrentWritesTest(testCase, kCollName, txnTestOpts);
+        }
+
+        if (testCase.testAsRetryableWrite) {
+            let retryableFullDb = baseDbName + "Retryable-" + kTenantDefinedDbName;
+            const retryableTestOpts = makeTestOptionsForConcurrentWritesTest(
+                donorPrimary, testCase, retryableFullDb, kCollName, false, true);
+            testOptsMap[retryableFullDb] = retryableTestOpts;
+
+            setupTestForConcurrentWritesTest(testCase, kCollName, retryableTestOpts);
+        }
     }
 }
+
+/**
+ * Run the test cases after the migration has committed
+ */
+function runTestsWhileBlocking() {
+    for (const [commandName, testCase] of Object.entries(testCases)) {
+        let baseDbName = kTenantID + "_" + commandName + "-inCommitted0";
+        if (testCase.skip) {
+            continue;
+        }
+
+        testBlockWritesAfterMigrationEnteredBlocking_blocking(
+            testOptsMap[baseDbName + "Basic-" + kTenantDefinedDbName]);
+        countBlockedWrites += 1;
+
+        if (testCase.testInTransaction) {
+            testBlockWritesAfterMigrationEnteredBlocking_blocking(
+                testOptsMap[baseDbName + "Txn-" + kTenantDefinedDbName]);
+            countBlockedWrites += 1;
+        }
+
+        if (testCase.testAsRetryableWrite) {
+            testBlockWritesAfterMigrationEnteredBlocking_blocking(
+                testOptsMap[baseDbName + "Retryable-" + kTenantDefinedDbName]);
+            countBlockedWrites += 1;
+        }
+    }
+}
+
+/**
+ * Run the test cases after the migration has committed
+ */
+function runTestsAfterMigrationCommitted() {
+    for (const [commandName, testCase] of Object.entries(testCases)) {
+        let baseDbName = kTenantID + "_" + commandName + "-inCommitted0";
+        if (testCase.skip) {
+            continue;
+        }
+
+        const basicTesTOpts = testOptsMap[baseDbName + "Basic-" + kTenantDefinedDbName];
+        testCase.assertCommandFailed(
+            basicTesTOpts.primaryDB, basicTesTOpts.dbName, basicTesTOpts.collName);
+
+        if (testCase.testInTransaction) {
+            const txnTesTOpts = testOptsMap[baseDbName + "Txn-" + kTenantDefinedDbName];
+            testCase.assertCommandFailed(
+                txnTesTOpts.primaryDB, txnTesTOpts.dbName, txnTesTOpts.collName);
+        }
+
+        if (testCase.testAsRetryableWrite) {
+            const retryableTestOpts = testOptsMap[baseDbName + "Retryable-" + kTenantDefinedDbName];
+            testCase.assertCommandFailed(
+                retryableTestOpts.primaryDB, retryableTestOpts.dbName, retryableTestOpts.collName);
+        }
+    }
+}
+
+setupTestsBeforeMigration();
+
+assert.commandWorked(
+    tenantMigrationTest.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
+
+// Run the command after the migration enters the blocking state.
+let blockFp = configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
+blockFp.wait();
+
+// Run test cases while the migration is in blocking state.
+runTestsWhileBlocking();
+
+// Allow the migration to complete.
+blockFp.off();
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(
+    migrationOpts, false /* retryOnRetryableErrors */));
+
+// run test after blocking is over and the migration committed.
+runTestsAfterMigrationCommitted();
+checkTenantMigrationAccessBlockerForConcurrentWritesTest(
+    donorPrimary, kTenantID, {numBlockedWrites: countBlockedWrites});
+
+assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString);
 
 tenantMigrationTest.stop();
 })();

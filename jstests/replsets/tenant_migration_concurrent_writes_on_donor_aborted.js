@@ -31,24 +31,17 @@ const kCollName = "testColl";
 
 const kTenantDefinedDbName = "0";
 
+const kTenantID = "tenantId";
+const migrationOpts = {
+    migrationIdString: extractUUIDFromObject(UUID()),
+    tenantId: kTenantID,
+};
+
 /**
  * Tests that the donor does not reject writes after the migration aborts.
  */
 function testDoNotRejectWritesAfterMigrationAborted(testCase, testOpts) {
     const tenantId = testOpts.dbName.split('_')[0];
-    const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(UUID()),
-        tenantId,
-    };
-
-    let abortFp =
-        configureFailPoint(testOpts.primaryDB, "abortTenantMigrationBeforeLeavingBlockingState");
-    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(migrationOpts, {
-        retryOnRetryableErrors: false,
-        automaticForgetMigration: false,
-        enableDonorStartMigrationFsync: true
-    }));
-    abortFp.off();
 
     // Wait until the in-memory migration state is updated after the migration has majority
     // committed the abort decision. Otherwise, the command below is expected to block and then get
@@ -63,46 +56,91 @@ function testDoNotRejectWritesAfterMigrationAborted(testCase, testOpts) {
     testCase.assertCommandSucceeded(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
     checkTenantMigrationAccessBlockerForConcurrentWritesTest(
         testOpts.primaryDB, tenantId, {numTenantMigrationAbortedErrors: 0});
-
-    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
-    tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString);
 }
 
 const testCases = TenantMigrationConcurrentWriteUtil.testCases;
+const testOptsMap = {};
 
-// Run test cases after an aborted migration.
-for (const [commandName, testCase] of Object.entries(testCases)) {
-    let baseDbName = commandName + "-inAborted0";
+/**
+ * run the setup for each cases before the migration starts
+ */
+function setupTestsBeforeMigration() {
+    for (const [commandName, testCase] of Object.entries(testCases)) {
+        let baseDbName = kTenantID + "_" + commandName + "-inCommitted0";
 
-    if (testCase.skip) {
-        print("Skipping " + commandName + ": " + testCase.skip);
-        continue;
-    }
+        if (testCase.skip) {
+            print("Skipping " + commandName + ": " + testCase.skip);
+            continue;
+        }
 
-    runTestForConcurrentWritesTest(donorPrimary,
-                                   testCase,
-                                   testDoNotRejectWritesAfterMigrationAborted,
-                                   baseDbName + "Basic_" + kTenantDefinedDbName,
-                                   kCollName);
+        let basicFullDb = baseDbName + "Basic-" + kTenantDefinedDbName;
+        const basicTestOpts = makeTestOptionsForConcurrentWritesTest(
+            donorPrimary, testCase, basicFullDb, kCollName, false, false);
+        testOptsMap[basicFullDb] = basicTestOpts;
+        setupTestForConcurrentWritesTest(testCase, kCollName, basicTestOpts);
 
-    if (testCase.testInTransaction) {
-        runTestForConcurrentWritesTest(donorPrimary,
-                                       testCase,
-                                       testDoNotRejectWritesAfterMigrationAborted,
-                                       baseDbName + "Txn_" + kTenantDefinedDbName,
-                                       kCollName,
-                                       {testInTransaction: true});
-    }
+        if (testCase.testInTransaction) {
+            let TxnFullDb = baseDbName + "Txn-" + kTenantDefinedDbName;
+            const txnTestOpts = makeTestOptionsForConcurrentWritesTest(
+                donorPrimary, testCase, TxnFullDb, kCollName, true, false);
+            testOptsMap[TxnFullDb] = txnTestOpts;
+            setupTestForConcurrentWritesTest(testCase, kCollName, txnTestOpts);
+        }
 
-    if (testCase.testAsRetryableWrite) {
-        runTestForConcurrentWritesTest(donorPrimary,
-                                       testCase,
-                                       testDoNotRejectWritesAfterMigrationAborted,
-                                       baseDbName + "Retryable_" + kTenantDefinedDbName,
-                                       kCollName,
-                                       {testAsRetryableWrite: true});
+        if (testCase.testAsRetryableWrite) {
+            let retryableFullDb = baseDbName + "Retryable-" + kTenantDefinedDbName;
+            const retryableTestOpts = makeTestOptionsForConcurrentWritesTest(
+                donorPrimary, testCase, retryableFullDb, kCollName, false, true);
+            testOptsMap[retryableFullDb] = retryableTestOpts;
+            setupTestForConcurrentWritesTest(testCase, kCollName, retryableTestOpts);
+        }
     }
 }
+
+/**
+ * Run the test cases after the migration has committed
+ */
+function runTestsAfterMigration() {
+    for (const [commandName, testCase] of Object.entries(testCases)) {
+        let baseDbName = kTenantID + "_" + commandName + "-inCommitted0";
+        if (testCase.skip) {
+            continue;
+        }
+
+        const basicTesTOpts = testOptsMap[baseDbName + "Basic-" + kTenantDefinedDbName];
+        testDoNotRejectWritesAfterMigrationAborted(testCase, basicTesTOpts);
+
+        if (testCase.testInTransaction) {
+            const txnTesTOpts = testOptsMap[baseDbName + "Txn-" + kTenantDefinedDbName];
+            testDoNotRejectWritesAfterMigrationAborted(testCase, txnTesTOpts);
+        }
+
+        if (testCase.testAsRetryableWrite) {
+            const retryableTestOpts = testOptsMap[baseDbName + "Retryable-" + kTenantDefinedDbName];
+            testDoNotRejectWritesAfterMigrationAborted(testCase, retryableTestOpts);
+        }
+    }
+}
+
+setupTestsBeforeMigration();
+
+let abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
+
+// verify the migration aborts.
+TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(migrationOpts, {
+    retryOnRetryableErrors: false,
+    automaticForgetMigration: false,
+    enableDonorStartMigrationFsync: true
+}));
+
+// Allow the migration to complete and abort.
+abortFp.off();
+
+// run test after the migration has aborted.
+runTestsAfterMigration();
+
+assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString);
 
 tenantMigrationTest.stop();
 })();
