@@ -65,4 +65,26 @@ const ef = result[0].options.encryptedFields;
 assert.eq(ef.escCollection, "enxcol_.basic.esc");
 assert.eq(ef.eccCollection, "enxcol_.basic.ecc");
 assert.eq(ef.ecocCollection, "enxcol_.basic.ecoc");
+
+assert.commandWorked(dbTest.createCollection("basic_int64_cf", {
+    encryptedFields: {
+        "fields": [{
+            "path": "firstName",
+            "keyId": UUID("11d58b8a-0c6c-4d69-a0bd-70c6d9befae9"),
+            "bsonType": "string",
+            "queries": {"queryType": "equality", contention: NumberLong(123)}
+        }]
+    }
+}));
+
+assert.commandWorked(dbTest.createCollection("basic_int32_cf", {
+    encryptedFields: {
+        "fields": [{
+            "path": "firstName",
+            "keyId": UUID("11d58b8a-0c6c-4d69-a0bd-70c6d9befae9"),
+            "bsonType": "string",
+            "queries": {"queryType": "equality", contention: NumberInt(123)}
+        }]
+    }
+}));
 }());
