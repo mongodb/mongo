@@ -1144,10 +1144,7 @@ void setUpObservers(ServiceContext* serviceContext) {
     opObserverRegistry->addObserver(
         std::make_unique<repl::PrimaryOnlyServiceOpObserver>(serviceContext));
     opObserverRegistry->addObserver(std::make_unique<FcvOpObserver>());
-
-    if (gFeatureFlagClusterWideConfig.isEnabledAndIgnoreFCV()) {
-        opObserverRegistry->addObserver(std::make_unique<ClusterServerParameterOpObserver>());
-    }
+    opObserverRegistry->addObserver(std::make_unique<ClusterServerParameterOpObserver>());
 
     setupFreeMonitoringOpObserver(opObserverRegistry.get());
 

@@ -87,11 +87,6 @@ structs:
                 default: 0
 
 feature_flags:
-    featureFlagClusterWideConfig:
-        description: Mechanism for cluster-wide configuration options
-        cpp_varname: gFeatureFlagClusterWideConfig
-        default: true
-        version: 6.0
     featureFlagClusterWideConfigM2:
         description: Mechanism for cluster-wide configuration options, milestone 2
         cpp_varname: gFeatureFlagClusterWideConfigM2

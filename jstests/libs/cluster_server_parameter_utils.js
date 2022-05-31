@@ -347,14 +347,12 @@ function testInvalidClusterParameterCommands(conn) {
         testInvalidGetClusterParameter(conn.getPrimary());
 
         // Assert that setting a nonexistent parameter on the primary returns an error.
-        assert.commandFailedWithCode(
-            adminDB.runCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}),
-            ErrorCodes.NoSuchKey);
+        assert.commandFailed(
+            adminDB.runCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}));
 
         // Assert that running setClusterParameter with a scalar value fails.
-        assert.commandFailedWithCode(
-            adminDB.runCommand({setClusterParameter: {testIntClusterParameter: 5}}),
-            ErrorCodes.IllegalOperation);
+        assert.commandFailed(
+            adminDB.runCommand({setClusterParameter: {testIntClusterParameter: 5}}));
 
         conn.getSecondaries().forEach(function(secondary) {
             // Assert that setClusterParameter cannot be run on a secondary.
@@ -373,14 +371,12 @@ function testInvalidClusterParameterCommands(conn) {
         testInvalidGetClusterParameter(conn.s0);
 
         // Assert that setting a nonexistent parameter on the mongos returns an error.
-        assert.commandFailedWithCode(
-            adminDB.runCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}),
-            ErrorCodes.NoSuchKey);
+        assert.commandFailed(
+            adminDB.runCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}));
 
         // Assert that running setClusterParameter with a scalar value fails.
-        assert.commandFailedWithCode(
-            adminDB.runCommand({setClusterParameter: {testIntClusterParameter: 5}}),
-            ErrorCodes.IllegalOperation);
+        assert.commandFailed(
+            adminDB.runCommand({setClusterParameter: {testIntClusterParameter: 5}}));
 
         const shards = [conn.rs0, conn.rs1, conn.rs2];
         shards.forEach(function(shard) {

@@ -4,10 +4,6 @@
 (function() {
 'use strict';
 
-if (!TestData.setParameters.featureFlagClusterWideConfig) {
-    return;
-}
-
 const kUnknownCSPLogId = 6226300;
 const kUnknownCSPLogComponent = 'control';
 const kUnknownCSPLogLevel = 3;
