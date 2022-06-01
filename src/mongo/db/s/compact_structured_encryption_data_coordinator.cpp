@@ -246,9 +246,7 @@ void CompactStructuredEncryptionDataCoordinator::_enterPhase(Phase newPhase) {
                 "oldPhase"_attr = CompactStructuredEncryptionDataPhase_serializer(_doc.getPhase()),
                 "newPhase"_attr = CompactStructuredEncryptionDataPhase_serializer(newPhase));
 
-    if (_doc.getPhase() == Phase::kRenameEcocForCompact) {
-        doc.setSkipCompact(_skipCompact);
-        doc.setEcocRenameUuid(_ecocRenameUuid);
+    if (_doc.getPhase() == Phase::kUnset) {
         doc = _insertStateDocument(std::move(doc));
     } else {
         auto opCtx = cc().makeOperationContext();
@@ -268,6 +266,9 @@ ExecutorFuture<void> CompactStructuredEncryptionDataCoordinator::_runImpl(
         .then(_executePhase(Phase::kRenameEcocForCompact,
                             [this, anchor = shared_from_this()](const auto& state) {
                                 doRenameOperation(state, &_skipCompact, &_ecocRenameUuid);
+                                stdx::unique_lock ul{_docMutex};
+                                _doc.setSkipCompact(_skipCompact);
+                                _doc.setEcocRenameUuid(_ecocRenameUuid);
                             }))
         .then(_executePhase(Phase::kCompactStructuredEncryptionData,
                             [this, anchor = shared_from_this()](const auto& state) {
