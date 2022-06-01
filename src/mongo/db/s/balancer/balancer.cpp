@@ -417,6 +417,7 @@ Status Balancer::moveRange(OperationContext* opCtx,
     const auto [secondaryThrottle, wc] =
         getSecondaryThrottleAndWriteConcern(request.getSecondaryThrottle());
     shardSvrRequest.setSecondaryThrottle(secondaryThrottle);
+    shardSvrRequest.setForceJumbo(request.getForceJumbo());
 
     auto response =
         _commandScheduler->requestMoveRange(opCtx, shardSvrRequest, wc, issuedByRemoteUser)

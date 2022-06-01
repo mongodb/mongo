@@ -74,6 +74,8 @@ public:
             ConfigsvrMoveRange configsvrRequest(nss);
             configsvrRequest.setDbName(NamespaceString::kAdminDb);
             configsvrRequest.setMoveRangeRequestBase(req.getMoveRangeRequestBase());
+            configsvrRequest.setForceJumbo(request().getForceJumbo() ? ForceJumbo::kForceManual
+                                                                     : ForceJumbo::kDoNotForce);
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             const auto commandResponse = uassertStatusOK(configShard->runCommand(

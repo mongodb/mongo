@@ -186,11 +186,11 @@ public:
         moveRangeReq.setMax(chunk->getMax());
         moveRangeReq.setWaitForDelete(waitForDelete);
 
-        moveRangeReq.setForceJumbo(forceJumbo ? ForceJumbo::kForceManual : ForceJumbo::kDoNotForce);
-
         ConfigsvrMoveRange configsvrRequest(nss);
         configsvrRequest.setDbName(NamespaceString::kAdminDb);
         configsvrRequest.setMoveRangeRequestBase(moveRangeReq);
+        configsvrRequest.setForceJumbo(forceJumbo ? ForceJumbo::kForceManual
+                                                  : ForceJumbo::kDoNotForce);
         if (secondaryThrottle.getSecondaryThrottle() == MigrationSecondaryThrottleOptions::kOn) {
             configsvrRequest.setSecondaryThrottle(secondaryThrottle);
         }
