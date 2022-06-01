@@ -74,7 +74,7 @@ __curextract_insert(WT_CURSOR *cursor)
     ret = cextract->f(cextract->idxc);
 
 err:
-    API_END_RET(session, ret);
+    API_END_RET_STAT(session, ret, cursor_insert);
 }
 
 /*
@@ -208,7 +208,7 @@ __wt_curtable_get_value(WT_CURSOR *cursor, ...)
     va_end(ap);
 
 err:
-    API_END_RET(session, ret);
+    API_END_RET_STAT(session, ret, cursor_get_value);
 }
 
 /*
