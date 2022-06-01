@@ -100,7 +100,7 @@ InternalSessionPool::Session InternalSessionPool::acquireSystemSession() {
     const InternalSessionPool::Session session = [&] {
         stdx::lock_guard<Latch> lock(_mutex);
 
-        auto const& systemUserDigest = (*internalSecurity.getUser())->getDigest();
+        const auto& systemUserDigest = makeSystemLogicalSessionId().getUid();
         auto session = _acquireSession(systemUserDigest, lock);
         return session ? *session
                        : InternalSessionPool::Session(makeSystemLogicalSessionId(), TxnNumber(0));
@@ -120,7 +120,7 @@ InternalSessionPool::Session InternalSessionPool::acquireStandaloneSession(
     const InternalSessionPool::Session session = [&] {
         stdx::lock_guard<Latch> lock(_mutex);
 
-        auto const& userDigest = getLogicalSessionUserDigestForLoggedInUser(opCtx);
+        const auto& userDigest = getLogicalSessionUserDigestForLoggedInUser(opCtx);
         auto session = _acquireSession(userDigest, lock);
         return session ? *session
                        : InternalSessionPool::Session(makeLogicalSessionId(opCtx), TxnNumber(0));
@@ -143,11 +143,11 @@ InternalSessionPool::Session InternalSessionPool::acquireChildSession(
         auto it = _childSessions.find(parentLsid);
         if (it != _childSessions.end()) {
             auto session = std::move(it->second);
+            invariant(parentLsid == getParentSessionId(session.getSessionId()));
             _childSessions.erase(it);
             return session;
         } else {
-            auto lsid = LogicalSessionId{parentLsid.getId(), parentLsid.getUid()};
-            lsid.setTxnUUID(UUID::gen());
+            auto lsid = makeLogicalSessionIdWithTxnUUID(parentLsid);
             auto session = InternalSessionPool::Session(lsid, TxnNumber(0));
             return session;
         }
@@ -174,7 +174,7 @@ void InternalSessionPool::release(Session session) {
     const auto& lsid = session.getSessionId();
     if (lsid.getTxnUUID()) {
         stdx::lock_guard<Latch> lock(_mutex);
-        _childSessions.insert({std::move(lsid), std::move(session)});
+        _childSessions.insert({*getParentSessionId(lsid), std::move(session)});
     } else {
         stdx::lock_guard<Latch> lock(_mutex);
 
