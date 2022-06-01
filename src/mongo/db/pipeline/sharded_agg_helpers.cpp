@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -56,6 +57,7 @@
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/query/document_source_update_on_add_shard.h"
 #include "mongo/s/query/establish_cursors.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
 
@@ -849,6 +851,17 @@ DispatchShardPipelineResults dispatchShardPipeline(
     boost::optional<ShardedExchangePolicy> exchangeSpec;
     boost::optional<SplitPipeline> splitPipelines;
 
+    // If set, the pipeline is not valid to be run if the collection is sharded. The given string
+    // is the error message to print if the collection is sharded.
+    auto pipelinePtr = pipeline.get();
+    const auto failOnShardedCollection = [opCtx, pipelinePtr]() {
+        if (opCtx->getServiceContext() && pipelinePtr) {
+            return getSearchHelpers(opCtx->getServiceContext())
+                ->validatePipelineForShardedCollection(*pipelinePtr);
+        }
+        return boost::optional<std::string>{};
+    }();
+
     if (needsSplit) {
         LOGV2_DEBUG(20906,
                     5,
@@ -931,14 +944,35 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                                            collationObj);
         }
     } else {
-        cursors = establishShardCursors(opCtx,
-                                        expCtx->mongoProcessInterface->taskExecutor,
-                                        expCtx->ns,
-                                        hasChangeStream,
-                                        executionNsRoutingInfo,
-                                        shardIds,
-                                        targetedCommand,
-                                        ReadPreferenceSetting::get(opCtx));
+        try {
+            cursors = establishShardCursors(opCtx,
+                                            expCtx->mongoProcessInterface->taskExecutor,
+                                            expCtx->ns,
+                                            mustRunOnAll,
+                                            executionNsRoutingInfo,
+                                            shardIds,
+                                            targetedCommand,
+                                            ReadPreferenceSetting::get(opCtx));
+
+        } catch (const StaleConfigException& e) {
+            // Check to see if the command failed because of a stale shard version or something
+            // else.
+            auto staleInfo = e.extraInfo<StaleConfigInfo>();
+            uassert(6441003, "StaleConfigInfo was null during sharded aggregation", staleInfo);
+            if (failOnShardedCollection && staleInfo->getVersionWanted() &&
+                staleInfo->getVersionWanted() != ChunkVersion::UNSHARDED()) {
+                // If we thought the collection was not sharded, we were wrong. Collection must be
+                // sharded.
+                uassert(5858100, *failOnShardedCollection, executionNsRoutingInfo->cm());
+            }
+            throw;
+        }
+        // If we thought the collection was sharded and the shard confirmed this, fail if the query
+        // isn't valid on a sharded collection.
+        uassert(6347900,
+                *failOnShardedCollection,
+                !failOnShardedCollection || !executionNsRoutingInfo->cm());
+
         invariant(cursors.size() % shardIds.size() == 0,
                   str::stream() << "Number of cursors (" << cursors.size()
                                 << ") is not a multiple of producers (" << shardIds.size() << ")");

@@ -256,6 +256,7 @@ pipelineEnv.Library(
         'document_source_union_with.cpp',
         'document_source_unwind.cpp',
         'pipeline.cpp',
+        'search_helper.cpp',
         'semantic_analysis.cpp',
         'sequential_document_cache.cpp',
         'tee_buffer.cpp',
