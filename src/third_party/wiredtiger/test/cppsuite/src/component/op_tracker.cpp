@@ -26,20 +26,40 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/main/test.h"
+#include "op_tracker.h"
 
-using namespace test_harness;
+#include "perf_plotter.h"
 
-/*
- * The "base test" that the framework uses, because its not overloading any of the database
- * operation methods it will perform as they are defined and is therefore the "base".
- *
- * Can be used to create stress tests in various ways.
- */
-class operations_test : public test {
-    public:
-    operations_test(const test_args &args) : test(args)
-    {
-        init_tracking();
-    }
-};
+namespace test_harness {
+op_tracker::op_tracker(const std::string id, const std::string &test_name)
+    : _id(id), _test_name(test_name), _it_count(0), _total_time_taken(0)
+{
+}
+
+void
+op_tracker::append_stats()
+{
+    uint64_t avg = (uint64_t)_total_time_taken / _it_count;
+    std::string stat = "{\"name\":\"" + _id + "\",\"value\":" + std::to_string(avg) + "}";
+    perf_plotter::instance().add_stat(stat);
+}
+
+template <typename T>
+auto
+op_tracker::track(T lambda)
+{
+    auto _start_time = std::chrono::steady_clock::now();
+    int ret = lambda();
+    auto _end_time = std::chrono::steady_clock::now();
+    _total_time_taken += (_end_time - _start_time).count();
+    _it_count += 1;
+
+    return ret;
+}
+
+op_tracker::~op_tracker()
+{
+    if (_it_count != 0)
+        append_stats();
+}
+}; // namespace test_harness

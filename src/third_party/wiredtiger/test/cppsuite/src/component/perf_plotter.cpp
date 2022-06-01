@@ -26,20 +26,41 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/main/test.h"
+#include "perf_plotter.h"
 
-using namespace test_harness;
+namespace test_harness {
+void
+perf_plotter::add_stat(const std::string &stat_string)
+{
+    std::lock_guard<std::mutex> lg(_stat_mutex);
+    _stats.push_back(stat_string);
+}
 
-/*
- * The "base test" that the framework uses, because its not overloading any of the database
- * operation methods it will perform as they are defined and is therefore the "base".
- *
- * Can be used to create stress tests in various ways.
- */
-class operations_test : public test {
-    public:
-    operations_test(const test_args &args) : test(args)
-    {
-        init_tracking();
-    }
-};
+void
+perf_plotter::output_perf_file(const std::string &test_name)
+{
+    std::ofstream perf_file;
+    std::string stat_info = "[{\"info\":{\"test_name\": \"" + test_name + "\"},\"metrics\": [";
+
+    perf_file.open(test_name + ".json");
+
+    for (const auto &stat : _stats)
+        stat_info += stat + ",";
+
+    /* Remove last extra comma. */
+    if (stat_info.back() == ',')
+        stat_info.pop_back();
+
+    perf_file << stat_info << "]}]";
+    perf_file.close();
+}
+
+perf_plotter &
+perf_plotter::instance()
+{
+    static perf_plotter _instance;
+    return (_instance);
+}
+
+perf_plotter::perf_plotter() {}
+} // namespace test_harness

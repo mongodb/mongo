@@ -26,20 +26,53 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/main/test.h"
+#ifndef CONN_API_H
+#define CONN_API_H
 
-using namespace test_harness;
+/* Following definitions are required in order to use printing format specifiers in C++. */
+#ifndef __STDC_LIMIT_MACROS
+#define __STDC_LIMIT_MACROS
+#endif
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
 
+#include <mutex>
+
+#include "scoped_types.h"
+
+namespace test_harness {
 /*
- * The "base test" that the framework uses, because its not overloading any of the database
- * operation methods it will perform as they are defined and is therefore the "base".
- *
- * Can be used to create stress tests in various ways.
+ * Singleton class owning the database connection, provides access to sessions and any other
+ * required connection API calls.
  */
-class operations_test : public test {
+class connection_manager {
     public:
-    operations_test(const test_args &args) : test(args)
-    {
-        init_tracking();
-    }
+    static connection_manager &instance();
+
+    public:
+    /* No copies of the singleton allowed. */
+    connection_manager(connection_manager const &) = delete;
+    connection_manager &operator=(connection_manager const &) = delete;
+
+    void close();
+    void create(const std::string &config, const std::string &home);
+    scoped_session create_session();
+
+    WT_CONNECTION *get_connection();
+
+    /*
+     * set_timestamp calls into the connection API in a thread safe manner to set global timestamps.
+     */
+    void set_timestamp(const std::string &config);
+
+    private:
+    connection_manager();
+
+    private:
+    WT_CONNECTION *_conn = nullptr;
+    std::mutex _conn_mutex;
 };
+} // namespace test_harness
+
+#endif

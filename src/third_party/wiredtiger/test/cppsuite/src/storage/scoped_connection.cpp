@@ -26,20 +26,20 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/main/test.h"
+#include "scoped_connection.h"
 
-using namespace test_harness;
+#include "connection_manager.h"
 
-/*
- * The "base test" that the framework uses, because its not overloading any of the database
- * operation methods it will perform as they are defined and is therefore the "base".
- *
- * Can be used to create stress tests in various ways.
- */
-class operations_test : public test {
-    public:
-    operations_test(const test_args &args) : test(args)
-    {
-        init_tracking();
-    }
-};
+namespace test_harness {
+
+scoped_connection::scoped_connection(const std::string &db_conn_config, const std::string &home)
+{
+    connection_manager::instance().create(db_conn_config, home);
+}
+
+scoped_connection::~scoped_connection()
+{
+    connection_manager::instance().close();
+}
+
+} // namespace test_harness

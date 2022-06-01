@@ -26,20 +26,38 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/main/test.h"
+#include "checkpoint_manager.h"
 
-using namespace test_harness;
+#include "src/common/api_const.h"
+#include "src/common/logger.h"
+#include "src/main/configuration.h"
+#include "src/storage/connection_manager.h"
 
-/*
- * The "base test" that the framework uses, because its not overloading any of the database
- * operation methods it will perform as they are defined and is therefore the "base".
- *
- * Can be used to create stress tests in various ways.
- */
-class operations_test : public test {
-    public:
-    operations_test(const test_args &args) : test(args)
-    {
-        init_tracking();
-    }
-};
+extern "C" {
+#include "test_util.h"
+}
+
+namespace test_harness {
+checkpoint_manager::checkpoint_manager(configuration *configuration)
+    : component(CHECKPOINT_MANAGER, configuration)
+{
+}
+
+void
+checkpoint_manager::load()
+{
+    /* Load the general component things. */
+    component::load();
+
+    /* Create session that we'll use for checkpointing. */
+    if (_enabled)
+        _session = connection_manager::instance().create_session();
+}
+
+void
+checkpoint_manager::do_work()
+{
+    logger::log_msg(LOG_INFO, "Running checkpoint");
+    testutil_check(_session->checkpoint(_session.get(), nullptr));
+}
+} // namespace test_harness

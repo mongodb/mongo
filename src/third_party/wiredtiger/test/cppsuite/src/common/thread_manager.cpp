@@ -26,20 +26,35 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/main/test.h"
+#include "thread_manager.h"
 
-using namespace test_harness;
+#include "logger.h"
 
-/*
- * The "base test" that the framework uses, because its not overloading any of the database
- * operation methods it will perform as they are defined and is therefore the "base".
- *
- * Can be used to create stress tests in various ways.
- */
-class operations_test : public test {
-    public:
-    operations_test(const test_args &args) : test(args)
-    {
-        init_tracking();
+namespace test_harness {
+thread_manager::~thread_manager()
+{
+    for (auto &it : _workers) {
+        if (it != nullptr && it->joinable()) {
+            logger::log_msg(LOG_ERROR, "You should've called join on the thread manager");
+            it->join();
+        }
+        delete it;
+        it = nullptr;
     }
-};
+    _workers.clear();
+}
+
+void
+thread_manager::join()
+{
+    for (const auto &it : _workers) {
+        while (!it->joinable()) {
+            /* Helpful for diagnosing hangs. */
+            logger::log_msg(LOG_TRACE, "Thread manager: Waiting to join.");
+            /* Check every so often to avoid spamming the log. */
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        it->join();
+    }
+}
+} // namespace test_harness

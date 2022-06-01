@@ -26,9 +26,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "test_harness/test.h"
-#include "test_harness/util/api_const.h"
-#include "test_harness/workload/random_generator.h"
+#include "src/common/api_const.h"
+#include "src/common/random_generator.h"
+#include "src/main/test.h"
 
 using namespace test_harness;
 
@@ -40,13 +40,13 @@ using namespace test_harness;
  *  - M threads will traverse the collections and ensure that the number of records in the
  * collections don't change.
  */
-class search_near_03 : public test_harness::test {
+class search_near_03 : public test {
     /* A 2D array consisted of a mapping between each collection and their inserted prefixes. */
     std::vector<std::vector<std::string>> prefixes_map;
     const std::string ALPHABET{"abcdefghijklmnopqrstuvwxyz"};
 
     public:
-    search_near_03(const test_harness::test_args &args) : test(args)
+    search_near_03(const test_args &args) : test(args)
     {
         init_tracking();
     }
@@ -143,8 +143,8 @@ class search_near_03 : public test_harness::test {
     }
 
     void
-    populate(test_harness::database &database, test_harness::timestamp_manager *tsm,
-      test_harness::configuration *config, test_harness::workload_tracking *tracking) override final
+    populate(database &database, timestamp_manager *tsm, configuration *config,
+      workload_tracking *tracking) override final
     {
         uint64_t collection_count, key_count, key_size;
         std::vector<thread_context *> workers;
@@ -217,7 +217,7 @@ class search_near_03 : public test_harness::test {
     }
 
     void
-    insert_operation(test_harness::thread_context *tc) override final
+    insert_operation(thread_context *tc) override final
     {
         std::map<uint64_t, scoped_cursor> cursors;
         std::string prefix_key;
@@ -261,7 +261,7 @@ class search_near_03 : public test_harness::test {
     }
 
     void
-    read_operation(test_harness::thread_context *tc) override final
+    read_operation(thread_context *tc) override final
     {
         uint64_t key_count = 0;
         int ret = 0;

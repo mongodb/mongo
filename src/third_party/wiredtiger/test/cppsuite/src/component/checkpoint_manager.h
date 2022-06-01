@@ -26,20 +26,29 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/main/test.h"
+#ifndef CHECKPOINT_MANAGER_H
+#define CHECKPOINT_MANAGER_H
 
-using namespace test_harness;
+#include "component.h"
 
-/*
- * The "base test" that the framework uses, because its not overloading any of the database
- * operation methods it will perform as they are defined and is therefore the "base".
- *
- * Can be used to create stress tests in various ways.
- */
-class operations_test : public test {
+#include "src/storage/scoped_types.h"
+
+namespace test_harness {
+class checkpoint_manager : public component {
     public:
-    operations_test(const test_args &args) : test(args)
-    {
-        init_tracking();
-    }
+    explicit checkpoint_manager(configuration *configuration);
+    virtual ~checkpoint_manager() = default;
+
+    /* Delete the copy constructor and the assignment operator. */
+    checkpoint_manager(const checkpoint_manager &) = delete;
+    checkpoint_manager &operator=(const checkpoint_manager &) = delete;
+
+    void load() override final;
+    void do_work() override final;
+
+    private:
+    scoped_session _session;
 };
+} // namespace test_harness
+
+#endif

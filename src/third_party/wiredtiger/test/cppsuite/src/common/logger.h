@@ -26,20 +26,49 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/main/test.h"
+#ifndef LOGGER_H
+#define LOGGER_H
 
-using namespace test_harness;
+/* Following definitions are required in order to use printing format specifiers in C++. */
+#ifndef __STDC_LIMIT_MACROS
+#define __STDC_LIMIT_MACROS
+#endif
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
 
+#include <mutex>
+
+/* Define helpful functions related to debugging. */
+namespace test_harness {
+
+/* Possible log levels. If you change anything here make sure you update LOG_LEVELS accordingly. */
+#define LOG_ERROR 0
+#define LOG_WARN 1
+#define LOG_INFO 2
 /*
- * The "base test" that the framework uses, because its not overloading any of the database
- * operation methods it will perform as they are defined and is therefore the "base".
- *
- * Can be used to create stress tests in various ways.
+ * The trace log level can incur a performance overhead since the current logging implementation
+ * requires per-line locking.
  */
-class operations_test : public test {
+#define LOG_TRACE 3
+
+void get_time(char *time_buf, size_t buf_size);
+
+class logger {
     public:
-    operations_test(const test_args &args) : test(args)
-    {
-        init_tracking();
-    }
+    /* Current log level. Default is LOG_WARN. */
+    static int64_t trace_level;
+
+    /* Include date in the logs if enabled. Default is true. */
+    static bool include_date;
+
+    public:
+    /* Used to print out traces for debugging purpose. */
+    static void log_msg(int64_t trace_type, const std::string &str);
+
+    /* Make sure the class will not be instantiated. */
+    logger() = delete;
 };
+} // namespace test_harness
+
+#endif

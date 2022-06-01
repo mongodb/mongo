@@ -26,11 +26,15 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "test_harness/test.h"
+#include "src/common/api_const.h"
+#include "src/common/random_generator.h"
+#include "src/component/workload_tracking.h"
+#include "src/main/test.h"
 
-namespace test_harness {
+using namespace test_harness;
+
 /* Defines what data is written to the tracking table for use in custom validation. */
-class tracking_table_cache_resize : public test_harness::workload_tracking {
+class tracking_table_cache_resize : public workload_tracking {
 
     public:
     tracking_table_cache_resize(
@@ -55,16 +59,16 @@ class tracking_table_cache_resize : public test_harness::workload_tracking {
  * than the cache size they are rejected, so only transactions made when cache size is 500MB should
  * be allowed.
  */
-class cache_resize : public test_harness::test {
+class cache_resize : public test {
     public:
-    cache_resize(const test_harness::test_args &args) : test(args)
+    cache_resize(const test_args &args) : test(args)
     {
         init_tracking(new tracking_table_cache_resize(_config->get_subconfig(WORKLOAD_TRACKING),
           _config->get_bool(COMPRESSION_ENABLED), *_timestamp_manager));
     }
 
     void
-    custom_operation(test_harness::thread_context *tc) override final
+    custom_operation(thread_context *tc) override final
     {
         WT_CONNECTION *conn = connection_manager::instance().get_connection();
         WT_CONNECTION_IMPL *conn_impl = (WT_CONNECTION_IMPL *)conn;
@@ -120,7 +124,7 @@ class cache_resize : public test_harness::test {
     }
 
     void
-    insert_operation(test_harness::thread_context *tc) override final
+    insert_operation(thread_context *tc) override final
     {
         const uint64_t collection_count = tc->db.get_collection_count();
         testutil_assert(collection_count > 0);
@@ -233,5 +237,3 @@ class cache_resize : public test_harness::test {
          */
     }
 };
-
-} // namespace test_harness

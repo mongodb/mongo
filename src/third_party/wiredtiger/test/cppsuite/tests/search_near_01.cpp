@@ -26,13 +26,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "test_harness/util/api_const.h"
-#include "test_harness/workload/random_generator.h"
-#include "test_harness/workload/thread_context.h"
-#include "test_harness/test.h"
-#include "test_harness/thread_manager.h"
+#include "src/common/api_const.h"
+#include "src/common/random_generator.h"
+#include "src/main/test.h"
 
 using namespace test_harness;
+
 /*
  * In this test, we want to verify that search_near with prefix enabled only traverses the portion
  * of the tree that follows the prefix portion of the search key. The test is composed of a populate
@@ -43,7 +42,7 @@ using namespace test_harness;
  *  - Using WiredTiger statistics to validate that the number of entries traversed is within
  * bounds of the search key.
  */
-class search_near_01 : public test_harness::test {
+class search_near_01 : public test {
     uint64_t keys_per_prefix = 0;
     uint64_t srchkey_len = 0;
     const std::string ALPHABET{"abcdefghijklmnopqrstuvwxyz"};
@@ -102,14 +101,14 @@ class search_near_01 : public test_harness::test {
     }
 
     public:
-    search_near_01(const test_harness::test_args &args) : test(args)
+    search_near_01(const test_args &args) : test(args)
     {
         init_tracking();
     }
 
     void
-    populate(test_harness::database &database, test_harness::timestamp_manager *tsm,
-      test_harness::configuration *config, test_harness::workload_tracking *tracking) override final
+    populate(database &database, timestamp_manager *tsm, configuration *config,
+      workload_tracking *tracking) override final
     {
         uint64_t collection_count, key_size;
         std::vector<thread_context *> workers;
@@ -180,8 +179,8 @@ class search_near_01 : public test_harness::test {
     }
 
     static void
-    perform_search_near(test_harness::thread_context *tc, std::string collection_name,
-      uint64_t srchkey_len, std::atomic<int64_t> &z_key_searches)
+    perform_search_near(thread_context *tc, std::string collection_name, uint64_t srchkey_len,
+      std::atomic<int64_t> &z_key_searches)
     {
         std::string srch_key;
         int cmpp = 0;
@@ -223,13 +222,13 @@ class search_near_01 : public test_harness::test {
     }
 
     void
-    read_operation(test_harness::thread_context *tc) override final
+    read_operation(thread_context *tc) override final
     {
         /* Make sure that thread statistics cursor is null before we open it. */
         testutil_assert(tc->stat_cursor.get() == nullptr);
         /* This test will only work with one read thread. */
         testutil_assert(tc->thread_count == 1);
-        test_harness::configuration *workload_config, *read_config;
+        configuration *workload_config, *read_config;
         std::vector<thread_context *> workers;
         std::atomic<int64_t> z_key_searches;
         int64_t entries_stat, expected_entries, prefix_stat, prev_entries_stat, prev_prefix_stat;
