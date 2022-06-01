@@ -37,7 +37,7 @@ namespace mongo {
 /**
  * Logs a warning message for use of a legacy opcode or getLastError command once per each unique
  * client in 60 minutes-period by default.
- * - The specific deprecated op code or command is given by 'op' parameter.
+ * - The specific unsupported op code or command is given by 'op' parameter.
  * - Each client is identified by remote IP if client metadata is not available. If client metadata
  *   is available, a client is identified by client metadata’s application name + driver name +
  *   driver version.
@@ -49,7 +49,7 @@ namespace mongo {
  *   - If this value is 0, every legacy op code or getLastError request is logged with a warning
  *     message.
  */
-void warnDeprecation(Client& client, StringData op);
+void warnUnsupportedOp(Client& client, StringData op);
 
 /**
  * Callback that gets invoked when 'deprecatedWireOpsWarningPeriodInSeconds' setting is changed.

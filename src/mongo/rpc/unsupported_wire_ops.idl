@@ -28,16 +28,15 @@
 global:
     cpp_namespace: mongo
     cpp_includes:
-    - "mongo/rpc/warn_deprecated_wire_ops.h"
+    - "mongo/rpc/warn_unsupported_wire_ops.h"
 
 server_parameters:
     deprecatedWireOpsWarningPeriodInSeconds:
-        description: "The period in which the server logs a warning message for deprecated op codes
-                      and getLastError command. The server logs a warning message only once per each
-                      client in this period irrespective of how many such requests have been
-                      received.
-                      Such requests include OP_QUERY, OP_GET_MORE, OP_KILL_CURSORS, OP_INSERT,
-                      OP_UPDATE, OP_DELETE op codes and getLastError command."
+        description: "The period in which the server logs a warning message for use of removed op
+        codes and getLastError command. The server logs a warning message only once per each client
+        in this period irrespective of how many such requests have been received. Such requests
+        include OP_QUERY, OP_GET_MORE, OP_KILL_CURSORS, OP_INSERT, OP_UPDATE, OP_DELETE op codes and
+        getLastError command."
         set_at: [ startup, runtime ]
         cpp_vartype: AtomicWord<int>
         on_update: "onUpdateOfWireOpsWarningPeriod"

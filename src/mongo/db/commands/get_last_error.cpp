@@ -33,7 +33,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/rpc/warn_deprecated_wire_ops.h"
+#include "mongo/rpc/warn_unsupported_wire_ops.h"
 
 namespace mongo {
 namespace {
@@ -64,7 +64,7 @@ public:
                    const BSONObj&,
                    std::string&,
                    BSONObjBuilder&) {
-        warnDeprecation(*opCtx->getClient(), "getLastError");
+        warnUnsupportedOp(*opCtx->getClient(), "getLastError");
         uasserted(5739000, "getLastError command is not supported");
         return false;
     }

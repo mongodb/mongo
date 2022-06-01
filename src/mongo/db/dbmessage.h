@@ -426,10 +426,10 @@ enum InsertOptions {
  * The OP_INSERT command is no longer supported, so new callers of this function should not be
  * added! This is currently retained for the limited purpose of unit testing.
  */
-Message makeDeprecatedInsertMessage(StringData ns,
-                                    const BSONObj* objs,
-                                    size_t count,
-                                    int flags = 0);
+Message makeUnsupportedOpInsertMessage(StringData ns,
+                                       const BSONObj* objs,
+                                       size_t count,
+                                       int flags = 0);
 
 /**
  * A response to a DbMessage.
@@ -451,5 +451,5 @@ struct DbResponse {
 /**
  * Helper to build an error DbResponse for OP_QUERY and OP_GET_MORE.
  */
-DbResponse makeErrorResponseToDeprecatedOpQuery(StringData errorMsg);
+DbResponse makeErrorResponseToUnsupportedOpQuery(StringData errorMsg);
 }  // namespace mongo
