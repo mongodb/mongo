@@ -35,6 +35,8 @@ selector:
   # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
   # we expect a second drop to return status OK.
   - jstests/core/explain_upsert.js
+  # This test uses `benchRun` which spawns connections which do not inherit the causal session.
+  - jstests/core/benchrun_pipeline_updates.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

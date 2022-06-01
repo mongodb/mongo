@@ -45,6 +45,8 @@ selector:
   - jstests/core/dbcase2.js
   - jstests/core/no_db_created.js
   - jstests/core/killop_drop_collection.js # Uses fsyncLock.
+  # This test uses `benchRun` which spawns connections which do not inherit the causal session.
+  - jstests/core/benchrun_pipeline_updates.js
 
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.

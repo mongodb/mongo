@@ -66,6 +66,8 @@ selector:
   # out by mongos when authentication is enabled.
   # Refer to filter in cluster_list_collections_cmd.cpp
   - jstests/core/timeseries/timeseries_*.js
+  # This test uses `benchRun` which spawns connections which do not inherit the causal session.
+  - jstests/core/benchrun_pipeline_updates.js
 
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos

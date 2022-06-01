@@ -48,6 +48,8 @@ selector:
   - jstests/core/killop_drop_collection.js # Uses fsyncLock.
   # TODO SERVER-61050
   - jstests/core/timeseries/timeseries_merge.js
+  # This test uses `benchRun` which spawns connections which do not inherit the causal session.
+  - jstests/core/benchrun_pipeline_updates.js
 
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.
