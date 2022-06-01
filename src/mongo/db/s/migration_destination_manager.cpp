@@ -738,6 +738,10 @@ Status MigrationDestinationManager::exitCriticalSection(OperationContext* opCtx,
                         "requested"_attr = sessionId,
                         "current"_attr = _sessionId);
 
+            // No need to hold _mutex from here on. Release it because the lines below will acquire
+            // other locks and holding the mutex could lead to deadlocks.
+            lock.unlock();
+
             if (migrationRecipientRecoveryDocumentExists(opCtx, sessionId)) {
                 // This node may have stepped down and interrupted the migrateThread, which reset
                 // _sessionId. But the critical section may not have been released so it will be
