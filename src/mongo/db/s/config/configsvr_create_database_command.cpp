@@ -83,19 +83,10 @@ public:
 
             auto dbname = request().getCommandParameter();
 
-            if (request().getEnableSharding()) {
-                uassert(ErrorCodes::BadValue,
-                        str::stream() << "Enable sharding can only be set to `true`",
-                        *request().getEnableSharding());
-
-                audit::logEnableSharding(opCtx->getClient(), dbname);
-            }
+            audit::logEnableSharding(opCtx->getClient(), dbname);
 
             auto dbt = ShardingCatalogManager::get(opCtx)->createDatabase(
-                opCtx,
-                dbname,
-                request().getPrimaryShardId(),
-                request().getEnableSharding().value_or(false));
+                opCtx, dbname, request().getPrimaryShardId());
 
             return {dbt.getVersion()};
         }

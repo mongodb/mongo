@@ -34,27 +34,7 @@ var $config = extendWorkload($config, function($config, $super) {
             throw e;
         }
 
-        // TODO SERVER-63983: remove the following if block once 6.0 becomes lastLTS
-        if (targetFCV == lastLTSFCV || targetFCV == lastContinuousFCV) {
-            for (var i = 0; i < dbCount; i++) {
-                const dbName = dbPrefix + i;
-                assertAlways.commandWorked(
-                    db.getSiblingDB(dbName).adminCommand({enablesharding: dbName}));
-            }
-        }
-
         jsTestLog('setFCV state finished');
-    };
-
-    // TODO SERVER-63983: remove the following state override once 6.0 becomes lastLTS
-    $config.states.create = function(db, collName, connCache) {
-        db = getRandomDb(db);
-        const coll = getRandomCollection(db);
-        const fullNs = coll.getFullName();
-        jsTestLog('Executing create state: ' + fullNs);
-        assertAlways.commandWorkedOrFailedWithCode(
-            db.adminCommand({shardCollection: fullNs, key: {_id: 1}, unique: false}),
-            [ErrorCodes.IllegalOperation]);
     };
 
     $config.transitions = {

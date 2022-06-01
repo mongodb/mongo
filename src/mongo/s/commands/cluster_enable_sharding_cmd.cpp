@@ -74,7 +74,6 @@ public:
 
             ConfigsvrCreateDatabase configsvrCreateDatabase{dbName.toString()};
             configsvrCreateDatabase.setDbName(NamespaceString::kAdminDb);
-            configsvrCreateDatabase.setEnableSharding(true);
             configsvrCreateDatabase.setPrimaryShardId(request().getPrimaryShard());
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();

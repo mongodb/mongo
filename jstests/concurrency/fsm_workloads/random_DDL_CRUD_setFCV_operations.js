@@ -41,20 +41,6 @@ var $config = extendWorkload($config, function($config, $super) {
         jsTestLog('setFCV state finished');
     };
 
-    // TODO SERVER-63983: remove the following state override once 6.0 becomes lastLTS
-    $config.states.create = function(db, collName, connCache) {
-        assertAlways.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-        try {
-            $super.states.create.apply(this, arguments);
-        } catch (e) {
-            if (e.code === ErrorCodes.IllegalOperation) {
-                // FCV downgrade happened between enableSharding and shardCollection
-                return;
-            }
-            throw e;
-        }
-    };
-
     $config.transitions = {
         init: {create: 0.23, CRUD: 0.23, drop: 0.23, rename: 0.23, setFCV: 0.08},
         create: {create: 0.23, CRUD: 0.23, drop: 0.23, rename: 0.23, setFCV: 0.08},

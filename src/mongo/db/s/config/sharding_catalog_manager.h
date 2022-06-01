@@ -389,12 +389,9 @@ public:
      * exists, and if not, creates a new one that matches these prerequisites. If a database already
      * exists and matches all the prerequisites returns success, otherwise throws NamespaceNotFound.
      */
-    DatabaseType createDatabase(
-        OperationContext* opCtx,
-        StringData dbName,
-        const boost::optional<ShardId>& optPrimaryShard,
-        // # TODO SERVER-63983: remove enableSharding paramter when 6.0 becomes lastLTS
-        bool enableSharding = false);
+    DatabaseType createDatabase(OperationContext* opCtx,
+                                StringData dbName,
+                                const boost::optional<ShardId>& optPrimaryShard);
 
     //
     // Collection Operations

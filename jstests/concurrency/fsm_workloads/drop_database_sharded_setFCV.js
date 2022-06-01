@@ -33,15 +33,6 @@ var $config = extendWorkload($config, function($config, $super) {
         jsTestLog('setFCV state finished');
     };
 
-    // TODO SERVER-63983: remove the following state override once 6.0 becomes lastLTS
-    $config.states.shardCollection = function(db, collName) {
-        let coll = getRandomCollection(db);
-        jsTestLog('Executing shardCollection state: ' + coll.getFullName());
-        assertAlways.commandWorkedOrFailedWithCode(
-            db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
-            [ErrorCodes.NamespaceNotFound, ErrorCodes.StaleDbVersion, ErrorCodes.IllegalOperation]);
-    };
-
     $config.transitions = {
         init: {enableSharding: 0.3, dropDatabase: 0.3, shardCollection: 0.3, setFCV: 0.1},
         enableSharding: {enableSharding: 0.3, dropDatabase: 0.3, shardCollection: 0.3, setFCV: 0.1},
