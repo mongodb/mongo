@@ -84,7 +84,7 @@ assert.soon(function() {
 const collSizeOnShard0BeforeNoopRounds = getCollSizeMB(ns, st.shard0.rs.getPrimary());
 const collSizeOnShard1BeforeNoopRounds = getCollSizeMB(ns, st.shard1.rs.getPrimary());
 const chunksBeforeNoopRound = findChunksUtil.findChunksByNs(st.config, ns).toArray();
-var errMsg = '[Before noop round] Data on shard0 = ' + collSizeOnShard0BeforeNoopRounds +
+var errMsg = '[BEFORE NOOP ROUND] Data on shard0 = ' + collSizeOnShard0BeforeNoopRounds +
     ' and data on shard 1 = ' + collSizeOnShard1BeforeNoopRounds +
     ' - chunks before noop round = ' + JSON.stringify(chunksBeforeNoopRound);
 assert.lte(collSizeOnShard0BeforeNoopRounds - collSizeOnShard1BeforeNoopRounds,
@@ -108,14 +108,9 @@ st.stopBalancer();
 jsTestLog("Printing sharding status after stopping balancer");
 st.printShardingStatus();
 
-const collSizeOnShard0AfterNoopRounds = getCollSizeMB(ns, st.shard0.rs.getPrimary());
-const collSizeOnShard1AfterNoopRounds = getCollSizeMB(ns, st.shard1.rs.getPrimary());
+// Check that no move has been performed during the noop rounds (if the routing table did not
+// change, it means data are still balanced)
 const chunksAfterNoopRound = findChunksUtil.findChunksByNs(st.config, ns).toArray();
-errMsg = '[AFTER NOOP ROUND] Data on shard0 = ' + collSizeOnShard0AfterNoopRounds +
-    ' and data on shard 1 = ' + collSizeOnShard1AfterNoopRounds +
-    ' - chunks before noop round = ' + JSON.stringify(chunksAfterNoopRound);
-assert.eq(collSizeOnShard0BeforeNoopRounds, collSizeOnShard0AfterNoopRounds, errMsg);
-assert.eq(collSizeOnShard1BeforeNoopRounds, collSizeOnShard1AfterNoopRounds, errMsg);
 assert.eq(chunksBeforeNoopRound, chunksAfterNoopRound);
 
 st.stop();
