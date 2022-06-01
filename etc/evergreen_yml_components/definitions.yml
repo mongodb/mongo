@@ -498,20 +498,6 @@ functions:
       args:
       - "src/evergreen/functions/binaries_extract.sh"
 
-  "get version expansions": &get_version_expansions
-    command: s3.get
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      remote_file: ${project}/${version_id}/version_expansions.yml
-      bucket: mciuploads
-      local_file: src/version_expansions.yml
-
-  "apply version expansions": &apply_version_expansions
-    command: expansions.update
-    params:
-      file: src/version_expansions.yml
-
   "check binary version": &check_binary_version
     command: subprocess.exec
     params:
@@ -797,7 +783,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/pip-requirements-${task_id}-${execution}.txt
       bucket: mciuploads
       permissions: public-read
-      content_type: text/plain
+      content_type: atext-plain
       display_name: Pip Requirements
 
   "send benchmark results":
@@ -848,8 +834,6 @@ functions:
   - *adjust_venv
   - *fetch_binaries
   - *extract_binaries
-  - *apply_version_expansions
-  - *f_expansions_write
   - *check_binary_version
   - *get_buildnumber
   - *f_expansions_write
@@ -1193,8 +1177,6 @@ functions:
       - "src/evergreen/scons_lint.sh"
 
   "scons compile":
-  - *get_version_expansions
-  - *apply_version_expansions
   - *f_expansions_write
   - command: subprocess.exec
     type: test
@@ -1202,24 +1184,6 @@ functions:
       binary: bash
       args:
       - "src/evergreen/scons_compile.sh"
-
-  "generate version expansions":
-  - *f_expansions_write
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "src/evergreen/functions/version_expansions_generate.sh"
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/version_expansions.yml
-      remote_file: ${project}/${version_id}/version_expansions.yml
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/x-yaml
-      display_name: version expansions
 
   "generate compile expansions":
   - *f_expansions_write
@@ -2081,7 +2045,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/local-resmoke-invocation-${task_id}-${execution}.txt
       bucket: mciuploads
       permissions: public-read
-      content_type: text/plain
+      content_type: atext-plain
       display_name: Resmoke.py Invocation for Local Usage
 
 
@@ -2130,9 +2094,7 @@ tasks:
 ## compile - build all scons targets except unittests ##
 - name: compile_dist_test
   tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
+  depends_on: []
   commands:
   - func: "scons compile"
     vars:
@@ -2157,6 +2119,7 @@ tasks:
   depends_on:
   - name: compile_dist_test
   commands:
+  - *f_expansions_write
   - func: "scons compile"
     vars:
       targets: >-
@@ -2212,7 +2175,6 @@ tasks:
       - "./etc/repo_config.yaml"
       - "./etc/scons/**"
       - "buildscripts/**"
-      - "version_expansions.yml"
       - "compile_expansions.yml"
       - "all_feature_flags.txt"  # Must correspond to the definition in buildscripts/idl/lib.py.
       - "jstests/**"
@@ -2278,9 +2240,6 @@ tasks:
 
 - name: compile_ninja
   tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
   commands:
   - func: "scons compile"
     vars:
@@ -2301,9 +2260,6 @@ tasks:
 
 - name: compile_ninja_next
   tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
   commands:
   - func: "scons compile"
     vars:
@@ -2325,9 +2281,6 @@ tasks:
 
 - name: compile_build_tools_next
   tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
   commands:
   - func: "scons compile"
     vars:
@@ -2338,9 +2291,6 @@ tasks:
 
 - name: libdeps_graph_linting
   tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
   commands:
   - *f_expansions_write
   - command: subprocess.exec
@@ -2400,10 +2350,8 @@ tasks:
 - name: clang_tidy
   tags: []
   exec_timeout_secs: 3600 # 1 hour timeout for the task overall
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
   commands:
+  - *f_expansions_write
   - func: "scons compile"
     vars:
       targets: generated-sources compiledb
@@ -2450,7 +2398,7 @@ tasks:
 ## run_unittests with UndoDB live-record ##
 #- name: run_unittests_with_recording
 #  depends_on:
-#  - name: compile_unittests_for_recorded_unittest
+#    - name: compile_unittests_for_recorded_unittest
 #  commands:
 #    - *f_expansions_write
 #    - func: "run diskstats"
@@ -2479,9 +2427,6 @@ tasks:
 ##compile_and_archive_libfuzzertests - build libfuzzertests ##
 - name: compile_and_archive_libfuzzertests
   tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
   commands:
   - func: "scons compile"
     vars:
@@ -2512,9 +2457,6 @@ tasks:
 
 - name: server_discovery_and_monitoring_json_test
   tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
   commands:
   - func: "scons compile"
     vars:
@@ -2527,9 +2469,6 @@ tasks:
 
 - name: server_selection_json_test
   tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
   commands:
   - func: "scons compile"
     vars:
@@ -2577,9 +2516,6 @@ tasks:
 
 - name: compile_visibility_test
   tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
   commands:
   - func: "scons compile"
     vars:
@@ -2618,8 +2554,6 @@ tasks:
 - name: embedded_sdk_install_dev
   tags: []
   depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
   - name: embedded_sdk_build_cdriver
   commands:
   - func: "scons compile"
@@ -2766,9 +2700,6 @@ tasks:
 
 - name: stitch_support_create_lib
   tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
   commands:
   - *f_expansions_write
   - func: "scons compile"
@@ -2819,8 +2750,6 @@ tasks:
   depends_on:
   - name: stitch_support_install_tests
   commands:
-  - func: "get version expansions"
-  - func: "apply version expansions"
   - *f_expansions_write
   - command: subprocess.exec
     type: test
@@ -2831,9 +2760,6 @@ tasks:
 
 - name: crypt_create_lib
   tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
   commands:
   - *f_expansions_write
   - func: "scons compile"
@@ -2867,9 +2793,6 @@ tasks:
 
 - name: crypt_create_debug_lib
   tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
   commands:
   - *f_expansions_write
   - func: "scons compile"
@@ -2940,8 +2863,6 @@ tasks:
   depends_on:
   - name: crypt_install_tests
   commands:
-  - func: "get version expansions"
-  - func: "apply version expansions"
   - *f_expansions_write
   - command: subprocess.exec
     type: test
@@ -2952,9 +2873,7 @@ tasks:
 
 - name: compile_benchmarks
   tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
+  depends_on: []
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
@@ -4247,18 +4166,6 @@ tasks:
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "generate version"
-
-- name: version_expansions_gen
-  commands:
-  - command: manifest.load
-  - *git_get_project
-  - *f_expansions_write
-  - *add_git_tag
-  - *kill_processes
-  - *cleanup_environment
-  - func: "set up venv"
-  - func: "upload pip requirements"
-  - func: "generate version expansions"
 
 - <<: *gen_task_template
   name: auth_audit_gen
@@ -7621,7 +7528,6 @@ task_groups:
   tags: ["stitch"]
   tasks:
   - "stitch_support_create_lib"
-
 - <<: *stitch_support_task_group_template
   name: stitch_support_lib_build_and_test
   tags: ["stitch"]
