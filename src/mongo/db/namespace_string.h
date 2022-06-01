@@ -76,6 +76,9 @@ public:
     // Name for the system views collection
     static constexpr StringData kSystemDotViewsCollectionName = "system.views"_sd;
 
+    // Name for the system.js collection
+    static constexpr StringData kSystemDotJavascriptCollectionName = "system.js"_sd;
+
     // Name for the change stream change collection.
     static constexpr StringData kChangeCollectionName = "system.change_collection"_sd;
 
@@ -386,6 +389,9 @@ public:
     }
     bool isSystemDotViews() const {
         return coll() == kSystemDotViewsCollectionName;
+    }
+    bool isSystemDotJavascript() const {
+        return coll() == kSystemDotJavascriptCollectionName;
     }
     bool isServerConfigurationCollection() const {
         return (db() == kAdminDb) && (coll() == "system.version");

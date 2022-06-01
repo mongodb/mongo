@@ -57,6 +57,7 @@ constexpr StringData NamespaceString::kAdminDb;
 constexpr StringData NamespaceString::kLocalDb;
 constexpr StringData NamespaceString::kConfigDb;
 constexpr StringData NamespaceString::kSystemDotViewsCollectionName;
+constexpr StringData NamespaceString::kSystemDotJavascriptCollectionName;
 constexpr StringData NamespaceString::kOrphanCollectionPrefix;
 constexpr StringData NamespaceString::kOrphanCollectionDb;
 
