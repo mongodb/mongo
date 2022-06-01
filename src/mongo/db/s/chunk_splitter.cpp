@@ -338,7 +338,6 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
             }
             return balancerConfig->getMaxChunkSizeBytes();
         }();
-        invariant(ChunkSizeSettingsType::checkMaxChunkSizeValid(maxChunkSizeBytes));
 
         LOGV2_DEBUG(21906,
                     1,

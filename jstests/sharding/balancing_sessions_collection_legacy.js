@@ -113,7 +113,8 @@ const st = new ShardingTest({
     shards: numShards,
     other: {configOptions: {setParameter: {minNumChunksForSessionsCollection: kMinNumChunks}}}
 });
-// TODO SERVER-66078 adapt this test for data size aware balancing
+
+// TODO SERVER-66782 delete this file
 if (FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'),
                               "BalanceAccordingToDataSize")) {
     jsTestLog("Skipping as featureFlagBalanceAccordingToDataSize is enabled");

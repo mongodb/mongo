@@ -254,6 +254,9 @@ last-continuous:
       test_file: jstests/sharding/resharding_metrics_increment.js
     - ticket: SERVER-64395
       test_file: jstests/sharding/resharding_abort_command.js
+    - ticket: SERVER-66078
+      test_file: jstests/sharding/data_size_aware_balancing_sessions_collection.js
+
     - ticket: SERVER-66379
       test_file: jstests/core/or_to_in.js
 
@@ -643,6 +646,8 @@ last-lts:
       test_file: jstests/sharding/resharding_metrics_increment.js
     - ticket: SERVER-64395
       test_file: jstests/sharding/resharding_abort_command.js
+    - ticket: SERVER-66078
+      test_file: jstests/sharding/data_size_aware_balancing_sessions_collection.js
     - ticket: SERVER-66379
       test_file: jstests/core/or_to_in.js
 
