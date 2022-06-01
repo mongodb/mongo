@@ -229,7 +229,10 @@ var $config = (function() {
                 index: {[indexField]: 1},
                 collectionUUID: this.collUUID
             };
-            testCommand(db, namespace, "dropIndexes", dropIndexCmd, this);
+            // Consecutive drop commands can results in 'IndexNotFound' error, so on retry some
+            // shards can fail while others succeed.
+            testCommand(
+                db, namespace, "dropIndexes", dropIndexCmd, this, [ErrorCodes.IndexNotFound]);
         }
 
         return {init: init, rename: rename, crud: crud, indexCommands: indexCommands};
