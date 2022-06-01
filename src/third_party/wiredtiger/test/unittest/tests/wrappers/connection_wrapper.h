@@ -13,6 +13,10 @@
 #include <string>
 #include "wt_internal.h"
 
+#ifdef _WIN32
+#include "windows_shim.h"
+#endif
+
 /*
  * Prefer a "real" class over a mock class when you need a fully fleshed-out connection or session.
  * There's a speed cost to this, since it will write a bunch of files to disk during the test, which

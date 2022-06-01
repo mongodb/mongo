@@ -1030,6 +1030,8 @@ tasks:
       - func: "compile wiredtiger"
         vars:
           posix_configure_flags: -DENABLE_STRICT=1 -DHAVE_DIAGNOSTIC=1 -DENABLE_LZ4=1 -DENABLE_SNAPPY=1 -DENABLE_ZLIB=1 -DHAVE_UNITTEST=1
+          # Different flags for windows based on what is supported and enabled by default.
+          windows_configure_flags: -DHAVE_DIAGNOSTIC=1 -DHAVE_UNITTEST=1
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build"
@@ -4353,6 +4355,7 @@ buildvariants:
     - name: make-check-test
     - name: ".unit_test"
     - name: fops
+    - name: unittest-test
 
 - name: macos-1014
   display_name: "OS X 10.14"

@@ -37,7 +37,7 @@ TEST_CASE("Reconciliation tracking: ovfl_discard_verbose", "[reconciliation]")
 
     SECTION("handle null page and tag")
     {
-        REQUIRE(__ut_ovfl_discard_verbose(session, nullptr, nullptr, nullptr) == 0);
+        REQUIRE(__ut_ovfl_discard_verbose(session, nullptr, nullptr, nullptr) == EINVAL);
     }
 }
 
