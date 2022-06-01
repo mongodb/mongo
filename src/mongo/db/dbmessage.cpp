@@ -138,7 +138,10 @@ T DbMessage::readAndAdvance() {
     return t;
 }
 
-Message makeDeprecatedInsertMessage(StringData ns, const BSONObj* objs, size_t count, int flags) {
+Message makeUnsupportedOpInsertMessage(StringData ns,
+                                       const BSONObj* objs,
+                                       size_t count,
+                                       int flags) {
     return makeMessage(dbInsert, [&](BufBuilder& b) {
         int reservedFlags = 0;
         if (flags & InsertOption_ContinueOnError)
@@ -153,9 +156,12 @@ Message makeDeprecatedInsertMessage(StringData ns, const BSONObj* objs, size_t c
     });
 }
 
-DbResponse makeErrorResponseToDeprecatedOpQuery(StringData errorMsg) {
+DbResponse makeErrorResponseToUnsupportedOpQuery(StringData errorMsg) {
     BSONObjBuilder err;
-    err.append("$err", errorMsg);
+    err.append("$err",
+               str::stream() << errorMsg
+                             << ". The client driver may require an upgrade. For more details see "
+                                "https://dochub.mongodb.org/core/legacy-opcode-removal");
     err.append("code", 5739101);
     err.append("ok", 0.0);
     BSONObj errObj = err.done();

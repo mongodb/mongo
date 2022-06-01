@@ -51,12 +51,12 @@ long getOpCount(BSONObj serverStatus, const char* opName) {
     return serverStatus["opcounters"][opName].Long();
 }
 
-long getDeprecatedOpCount(BSONObj serverStatus, const char* opName) {
-    auto deprecatedOpcounters = serverStatus["opcounters"]["deprecated"];
-    return deprecatedOpcounters ? deprecatedOpcounters[opName].Long() : 0;
+long getUnsupportedOpCount(BSONObj serverStatus, const char* opName) {
+    auto unsupportedOpcounters = serverStatus["opcounters"]["deprecated"];
+    return unsupportedOpcounters ? unsupportedOpcounters[opName].Long() : 0;
 }
 
-Message makeDeprecatedUpdateMessage(StringData ns, BSONObj query, BSONObj update, int flags) {
+Message makeUnsupportedOpUpdateMessage(StringData ns, BSONObj query, BSONObj update, int flags) {
     return makeMessage(dbUpdate, [&](BufBuilder& b) {
         const int reservedFlags = 0;
         b.appendNum(reservedFlags);
@@ -68,7 +68,7 @@ Message makeDeprecatedUpdateMessage(StringData ns, BSONObj query, BSONObj update
     });
 }
 
-Message makeDeprecatedRemoveMessage(StringData ns, BSONObj query, int flags) {
+Message makeUnsupportedOpRemoveMessage(StringData ns, BSONObj query, int flags) {
     return makeMessage(dbDelete, [&](BufBuilder& b) {
         const int reservedFlags = 0;
         b.appendNum(reservedFlags);
@@ -79,7 +79,7 @@ Message makeDeprecatedRemoveMessage(StringData ns, BSONObj query, int flags) {
     });
 }
 
-Message makeDeprecatedKillCursorsMessage(long long cursorId) {
+Message makeUnsupportedOpKillCursorsMessage(long long cursorId) {
     return makeMessage(dbKillCursors, [&](BufBuilder& b) {
         b.appendNum((int)0);  // reserved
         b.appendNum((int)1);  // number
@@ -87,12 +87,12 @@ Message makeDeprecatedKillCursorsMessage(long long cursorId) {
     });
 }
 
-Message makeDeprecatedQueryMessage(StringData ns,
-                                   BSONObj query,
-                                   int nToReturn,
-                                   int nToSkip,
-                                   const BSONObj* fieldsToReturn,
-                                   int queryOptions) {
+Message makeUnsupportedOpQueryMessage(StringData ns,
+                                      BSONObj query,
+                                      int nToReturn,
+                                      int nToSkip,
+                                      const BSONObj* fieldsToReturn,
+                                      int queryOptions) {
     return makeMessage(dbQuery, [&](BufBuilder& b) {
         b.appendNum(queryOptions);
         b.appendStr(ns);
@@ -104,7 +104,10 @@ Message makeDeprecatedQueryMessage(StringData ns,
     });
 }
 
-Message makeDeprecatedGetMoreMessage(StringData ns, long long cursorId, int nToReturn, int flags) {
+Message makeUnsupportedOpGetMoreMessage(StringData ns,
+                                        long long cursorId,
+                                        int nToReturn,
+                                        int flags) {
     return makeMessage(dbGetMore, [&](BufBuilder& b) {
         b.appendNum(flags);
         b.appendStr(ns);
@@ -113,8 +116,8 @@ Message makeDeprecatedGetMoreMessage(StringData ns, long long cursorId, int nToR
     });
 }
 
-// Issue a find command request so we can use cursor id from it to test the deprecated getMore
-// and killCursors ops.
+// Issue a find command request so we can use cursor id from it to test the unsupported getMore
+// and killCursors wire protocol ops.
 int64_t getValidCursorIdFromFindCmd(DBClientBase* conn, const char* collName) {
     Message findCmdRequest =
         OpMsgRequest::fromDBAndBody("testOpLegacy", BSON("find" << collName << "batchSize" << 2))
@@ -130,16 +133,16 @@ int64_t getValidCursorIdFromFindCmd(DBClientBase* conn, const char* collName) {
     return cursorId;
 }
 
-TEST(OpLegacy, DeprecatedWriteOpsCounters) {
+TEST(OpLegacy, UnsupportedWriteOpsCounters) {
     auto conn = getIntegrationTestConnection();
-    const std::string ns = "testOpLegacy.DeprecatedWriteOpsCounters";
+    const std::string ns = "testOpLegacy.UnsupportedWriteOpsCounters";
 
-    // Cache the counters prior to running the deprecated requests.
+    // Cache the counters prior to running the unsupported requests.
     auto serverStatusCmd = fromjson("{serverStatus: 1}");
     BSONObj serverStatusReplyPrior;
     ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReplyPrior));
 
-    // Building parts for the deprecated requests.
+    // Building parts for the unsupported requests.
     const BSONObj doc1 = fromjson("{a: 1}");
     const BSONObj doc2 = fromjson("{a: 2}");
     const BSONObj insert[2] = {doc1, doc2};
@@ -148,30 +151,30 @@ TEST(OpLegacy, DeprecatedWriteOpsCounters) {
 
     // Issue the requests. They are expected to fail but should still be counted.
     Message ignore;
-    auto opInsert = makeDeprecatedInsertMessage(ns, insert, 2, 0 /*continue on error*/);
+    auto opInsert = makeUnsupportedOpInsertMessage(ns, insert, 2, 0 /*continue on error*/);
     ASSERT_THROWS(conn->call(opInsert, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
 
-    auto opUpdate = makeDeprecatedUpdateMessage(ns, query, update, 0 /*no upsert, no multi*/);
+    auto opUpdate = makeUnsupportedOpUpdateMessage(ns, query, update, 0 /*no upsert, no multi*/);
     ASSERT_THROWS(conn->call(opUpdate, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
 
-    auto opDelete = makeDeprecatedRemoveMessage(ns, query, 0 /*limit*/);
+    auto opDelete = makeUnsupportedOpRemoveMessage(ns, query, 0 /*limit*/);
     ASSERT_THROWS(conn->call(opDelete, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
 
-    // Check the opcounters after running the deprecated operations.
+    // Check the opcounters after running the unsupported operations.
     BSONObj serverStatusReply;
     ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReply));
 
-    ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "insert") + 2,
-              getDeprecatedOpCount(serverStatusReply, "insert"));
+    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "insert") + 2,
+              getUnsupportedOpCount(serverStatusReply, "insert"));
 
-    ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "update") + 1,
-              getDeprecatedOpCount(serverStatusReply, "update"));
+    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "update") + 1,
+              getUnsupportedOpCount(serverStatusReply, "update"));
 
-    ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "delete") + 1,
-              getDeprecatedOpCount(serverStatusReply, "delete"));
+    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "delete") + 1,
+              getUnsupportedOpCount(serverStatusReply, "delete"));
 
-    ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "total") + 2 + 1 + 1,
-              getDeprecatedOpCount(serverStatusReply, "total"));
+    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "total") + 2 + 1 + 1,
+              getUnsupportedOpCount(serverStatusReply, "total"));
 }
 
 void assertFailure(const Message response, StringData expectedErr) {
@@ -186,65 +189,65 @@ void assertFailure(const Message response, StringData expectedErr) {
         << responseBody;
 }
 
-TEST(OpLegacy, DeprecatedReadOpsCounters) {
+TEST(OpLegacy, UnsupportedReadOpsCounters) {
     auto conn = getIntegrationTestConnection();
-    const std::string ns = "testOpLegacy.DeprecatedReadOpsCounters";
+    const std::string ns = "testOpLegacy.UnsupportedReadOpsCounters";
 
     BSONObj insert = fromjson(R"({
-        insert: "DeprecatedReadOpsCounters",
+        insert: "UnsupportedReadOpsCounters",
         documents: [ {a: 1},{a: 2},{a: 3},{a: 4},{a: 5},{a: 6},{a: 7} ]
     })");
     BSONObj ignoreResponse;
     ASSERT(conn->runCommand("testOpLegacy", insert, ignoreResponse));
 
-    // Cache the counters prior to running the deprecated requests.
+    // Cache the counters prior to running the unsupported requests.
     auto serverStatusCmd = fromjson("{serverStatus: 1}");
     BSONObj serverStatusReplyPrior;
     ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReplyPrior));
 
-    // Issue the deprecated requests. They all should fail one way or another.
-    Message opQueryRequest = makeDeprecatedQueryMessage(ns,
-                                                        fromjson("{}"),
-                                                        2 /*nToReturn*/,
-                                                        0 /*nToSkip*/,
-                                                        nullptr /*fieldsToReturn*/,
-                                                        0 /*queryOptions*/);
+    // Issue the unsupported requests. They all should fail one way or another.
+    Message opQueryRequest = makeUnsupportedOpQueryMessage(ns,
+                                                           fromjson("{}"),
+                                                           2 /*nToReturn*/,
+                                                           0 /*nToSkip*/,
+                                                           nullptr /*fieldsToReturn*/,
+                                                           0 /*queryOptions*/);
     Message opQueryReply;
     ASSERT(conn->call(opQueryRequest, opQueryReply));
     assertFailure(opQueryReply, "OP_QUERY is no longer supported");
 
-    const int64_t cursorId = getValidCursorIdFromFindCmd(conn.get(), "DeprecatedReadOpsCounters");
+    const int64_t cursorId = getValidCursorIdFromFindCmd(conn.get(), "UnsupportedReadOpsCounters");
 
     Message opGetMoreRequest =
-        makeDeprecatedGetMoreMessage(ns, cursorId, 2 /*nToReturn*/, 0 /*flags*/);
+        makeUnsupportedOpGetMoreMessage(ns, cursorId, 2 /*nToReturn*/, 0 /*flags*/);
     Message opGetMoreReply;
     ASSERT(conn->call(opGetMoreRequest, opGetMoreReply));
     assertFailure(opGetMoreReply, "OP_GET_MORE is no longer supported");
 
-    Message opKillCursorsRequest = makeDeprecatedKillCursorsMessage(cursorId);
+    Message opKillCursorsRequest = makeUnsupportedOpKillCursorsMessage(cursorId);
     Message opKillCursorsReply;
     ASSERT_THROWS(conn->call(opKillCursorsRequest, opKillCursorsReply),
                   ExceptionForCat<ErrorCategory::NetworkError>);
 
-    // Check the opcounters after running the deprecated operations.
+    // Check the opcounters after running the unsupported operations.
     BSONObj serverStatusReply;
     ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReply));
 
-    ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "query") + 1,
-              getDeprecatedOpCount(serverStatusReply, "query"));
+    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "query") + 1,
+              getUnsupportedOpCount(serverStatusReply, "query"));
 
-    ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "getmore") + 1,
-              getDeprecatedOpCount(serverStatusReply, "getmore"));
+    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "getmore") + 1,
+              getUnsupportedOpCount(serverStatusReply, "getmore"));
 
-    ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "killcursors") + 1,
-              getDeprecatedOpCount(serverStatusReply, "killcursors"));
+    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "killcursors") + 1,
+              getUnsupportedOpCount(serverStatusReply, "killcursors"));
 
-    ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "total") + 1 + 1 + 1,
-              getDeprecatedOpCount(serverStatusReply, "total"));
+    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "total") + 1 + 1 + 1,
+              getUnsupportedOpCount(serverStatusReply, "total"));
 }
 
-// The dochub link for deprecation warning messages.
-static constexpr auto docLink = "https://dochub.mongodb.org/core/legacy-opcode-compatibility";
+// The dochub link for warning messages about the removed op codes.
+static constexpr auto docLink = "https://dochub.mongodb.org/core/legacy-opcode-removal";
 
 // Check whether the most recent "deprecation" entry in the log matches the given opName and
 // severity (if the 'severity' string isn't empty). Return 'false' if no deprecation entries found.
@@ -279,14 +282,14 @@ void getLastError(DBClientBase* conn) {
     ASSERT_EQ(status.code(), expectedCode) << replyObj;
 }
 
-void exerciseDeprecatedOps(DBClientBase* conn, const std::string& expectedSeverity) {
-    // Build the deprecated requests and the getLog command.
-    const std::string ns = "testOpLegacy.exerciseDeprecatedOps";
+void exerciseUnsupportedOps(DBClientBase* conn, const std::string& expectedSeverity) {
+    // Build the unsupported requests and the getLog command.
+    const std::string ns = "testOpLegacy.exerciseUnsupportedOps";
 
     // Insert some docs into the collection so even though the legacy write ops are failing we can
     // still test getMore, killCursors and query.
     BSONObj data = fromjson(R"({
-        insert: "exerciseDeprecatedOps",
+        insert: "exerciseUnsupportedOps",
         documents: [ {a: 1},{a: 2},{a: 3},{a: 4},{a: 5},{a: 6},{a: 7} ]
     })");
     BSONObj ignoreResponse;
@@ -297,16 +300,16 @@ void exerciseDeprecatedOps(DBClientBase* conn, const std::string& expectedSeveri
     const BSONObj insert[2] = {doc1, doc2};
     const BSONObj query = fromjson("{a: {$lt: 42}}");
     const BSONObj update = fromjson("{$set: {b: 2}}");
-    auto opInsert = makeDeprecatedInsertMessage(ns, insert, 2, 0 /*continue on error*/);
-    auto opUpdate = makeDeprecatedUpdateMessage(ns, query, update, 0 /*no upsert, no multi*/);
-    auto opDelete = makeDeprecatedRemoveMessage(ns, query, 0 /*limit*/);
-    auto opQuery = makeDeprecatedQueryMessage(
+    auto opInsert = makeUnsupportedOpInsertMessage(ns, insert, 2, 0 /*continue on error*/);
+    auto opUpdate = makeUnsupportedOpUpdateMessage(ns, query, update, 0 /*no upsert, no multi*/);
+    auto opDelete = makeUnsupportedOpRemoveMessage(ns, query, 0 /*limit*/);
+    auto opQuery = makeUnsupportedOpQueryMessage(
         ns, query, 2 /*nToReturn*/, 0 /*nToSkip*/, nullptr /*fieldsToReturn*/, 0 /*queryOptions*/);
     Message ignore;
 
-    // The first deprecated call after adding a suppression is still logged with elevated severity
-    // and after it the suppression kicks in. Any deprecated op can be used to start the suppression
-    // period, here we chose getLastError.
+    // The first unsupported call after adding a suppression is still logged with elevated severity
+    // and after it the suppression kicks in. Any unsupported op can be used to start the
+    // suppression period, here we chose getLastError.
     getLastError(conn);
 
     ASSERT_THROWS(conn->call(opInsert, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
@@ -322,14 +325,14 @@ void exerciseDeprecatedOps(DBClientBase* conn, const std::string& expectedSeveri
     ASSERT(conn->call(opQuery, replyQuery));
     ASSERT(wasLogged(conn, "query", expectedSeverity));
 
-    int64_t cursorId = getValidCursorIdFromFindCmd(conn, "exerciseDeprecatedOps");
+    int64_t cursorId = getValidCursorIdFromFindCmd(conn, "exerciseUnsupportedOps");
 
-    auto opGetMore = makeDeprecatedGetMoreMessage(ns, cursorId, 2 /*nToReturn*/, 0 /*flags*/);
+    auto opGetMore = makeUnsupportedOpGetMoreMessage(ns, cursorId, 2 /*nToReturn*/, 0 /*flags*/);
     Message replyGetMore;
     ASSERT(conn->call(opGetMore, replyGetMore));
     ASSERT(wasLogged(conn, "getmore", expectedSeverity));
 
-    auto opKillCursors = makeDeprecatedKillCursorsMessage(cursorId);
+    auto opKillCursors = makeUnsupportedOpKillCursorsMessage(cursorId);
     ASSERT_THROWS(conn->call(opKillCursors, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
     ASSERT(wasLogged(conn, "killcursors", expectedSeverity));
 
@@ -337,16 +340,16 @@ void exerciseDeprecatedOps(DBClientBase* conn, const std::string& expectedSeveri
     ASSERT(wasLogged(conn, "remove", expectedSeverity));
 }
 
-void setDeprecatedWireOpsWarningPeriod(DBClientBase* conn, Seconds timeout) {
+void setUnsupportedWireOpsWarningPeriod(DBClientBase* conn, Seconds timeout) {
     const BSONObj warningTimeout =
         BSON("setParameter" << 1 << "deprecatedWireOpsWarningPeriodInSeconds" << timeout.count());
     BSONObj response;
     ASSERT(conn->runCommand("admin", warningTimeout, response));
 }
 
-class DeprecatedWireOpsWarningPeriodScope {
+class UnsupportedWireOpsWarningPeriodScope {
 public:
-    DeprecatedWireOpsWarningPeriodScope() {
+    UnsupportedWireOpsWarningPeriodScope() {
         auto conn = getIntegrationTestConnection();
         BSONObj currentSetting;
         ASSERT(conn->runCommand(
@@ -355,17 +358,17 @@ public:
             currentSetting));
         timeout = currentSetting["deprecatedWireOpsWarningPeriodInSeconds"].Int();
     }
-    ~DeprecatedWireOpsWarningPeriodScope() {
+    ~UnsupportedWireOpsWarningPeriodScope() {
         auto conn = getIntegrationTestConnection();
-        setDeprecatedWireOpsWarningPeriod(conn.get(), Seconds{timeout});
+        setUnsupportedWireOpsWarningPeriod(conn.get(), Seconds{timeout});
     }
 
 private:
     int timeout = 3600;
 };
 
-TEST(OpLegacy, DeprecatedOpsLogging) {
-    DeprecatedWireOpsWarningPeriodScope timeoutSettingScope;
+TEST(OpLegacy, UnsupportedOpsLogging) {
+    UnsupportedWireOpsWarningPeriodScope timeoutSettingScope;
 
     auto conn = getIntegrationTestConnection();
 
@@ -375,11 +378,11 @@ TEST(OpLegacy, DeprecatedOpsLogging) {
         "admin", fromjson("{getParameter: 1, logComponentVerbosity: {command: 1}}"), logSettings));
     ASSERT_LTE(2, logSettings["logComponentVerbosity"]["command"]["verbosity"].Int());
 
-    setDeprecatedWireOpsWarningPeriod(conn.get(), Seconds{0} /*timeout*/);
-    exerciseDeprecatedOps(conn.get(), "W" /*expectedSeverity*/);
+    setUnsupportedWireOpsWarningPeriod(conn.get(), Seconds{0} /*timeout*/);
+    exerciseUnsupportedOps(conn.get(), "W" /*expectedSeverity*/);
 
-    setDeprecatedWireOpsWarningPeriod(conn.get(), Seconds{3600} /*timeout*/);
-    exerciseDeprecatedOps(conn.get(), "D2" /*expectedSeverity*/);
+    setUnsupportedWireOpsWarningPeriod(conn.get(), Seconds{3600} /*timeout*/);
+    exerciseUnsupportedOps(conn.get(), "D2" /*expectedSeverity*/);
 }
 
 TEST(OpLegacy, GenericCommandViaOpQuery) {
@@ -395,12 +398,12 @@ TEST(OpLegacy, GenericCommandViaOpQuery) {
     ASSERT(wasLogged(conn.get(), "getLastError", ""));
 
     // The actual command doesn't matter, as long as it's not 'hello' or 'isMaster'.
-    auto opQuery = makeDeprecatedQueryMessage("testOpLegacy.$cmd",
-                                              serverStatusCmd,
-                                              1 /*nToReturn*/,
-                                              0 /*nToSkip*/,
-                                              nullptr /*fieldsToReturn*/,
-                                              0 /*queryOptions*/);
+    auto opQuery = makeUnsupportedOpQueryMessage("testOpLegacy.$cmd",
+                                                 serverStatusCmd,
+                                                 1 /*nToReturn*/,
+                                                 0 /*nToSkip*/,
+                                                 nullptr /*fieldsToReturn*/,
+                                                 0 /*queryOptions*/);
     Message replyQuery;
     ASSERT(conn->call(opQuery, replyQuery));
     QueryResult::ConstView qr = replyQuery.singleData().view2ptr();
@@ -415,8 +418,8 @@ TEST(OpLegacy, GenericCommandViaOpQuery) {
 
     BSONObj serverStatusReply;
     ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReply));
-    ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "query") + 1,
-              getDeprecatedOpCount(serverStatusReply, "query"));
+    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "query") + 1,
+              getUnsupportedOpCount(serverStatusReply, "query"));
 }
 
 // 'hello' and 'isMaster' commands, issued via OP_QUERY protocol, are still fully supported.
@@ -432,12 +435,12 @@ void testAllowedCommand(const char* command, ErrorCodes::Error code = ErrorCodes
     getLastError(conn.get());
     ASSERT(wasLogged(conn.get(), "getLastError", ""));
 
-    auto opQuery = makeDeprecatedQueryMessage("testOpLegacy.$cmd",
-                                              fromjson(command),
-                                              1 /*nToReturn*/,
-                                              0 /*nToSkip*/,
-                                              nullptr /*fieldsToReturn*/,
-                                              0 /*queryOptions*/);
+    auto opQuery = makeUnsupportedOpQueryMessage("testOpLegacy.$cmd",
+                                                 fromjson(command),
+                                                 1 /*nToReturn*/,
+                                                 0 /*nToSkip*/,
+                                                 nullptr /*fieldsToReturn*/,
+                                                 0 /*queryOptions*/);
     Message replyQuery;
     ASSERT(conn->call(opQuery, replyQuery));
     QueryResult::ConstView qr = replyQuery.singleData().view2ptr();
@@ -450,8 +453,8 @@ void testAllowedCommand(const char* command, ErrorCodes::Error code = ErrorCodes
 
     BSONObj serverStatusReply;
     ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReply));
-    ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "query"),
-              getDeprecatedOpCount(serverStatusReply, "query"));
+    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "query"),
+              getUnsupportedOpCount(serverStatusReply, "query"));
 }
 
 TEST(OpLegacy, IsSelfCommandViaOpQuery) {

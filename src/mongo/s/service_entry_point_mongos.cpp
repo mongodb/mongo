@@ -47,7 +47,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
-#include "mongo/rpc/warn_deprecated_wire_ops.h"
+#include "mongo/rpc/warn_unsupported_wire_ops.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/load_balancer_support.h"
@@ -146,36 +146,36 @@ Future<DbResponse> HandleRequest::handleRequest() {
         case dbQuery:
             if (!nsString.isCommand()) {
                 globalOpCounters.gotQueryDeprecated();
-                warnDeprecation(*(rec->getOpCtx()->getClient()), networkOpToString(dbQuery));
+                warnUnsupportedOp(*(rec->getOpCtx()->getClient()), networkOpToString(dbQuery));
                 return Future<DbResponse>::makeReady(
-                    makeErrorResponseToDeprecatedOpQuery("OP_QUERY is no longer supported"));
+                    makeErrorResponseToUnsupportedOpQuery("OP_QUERY is no longer supported"));
             }
             [[fallthrough]];  // It's a query containing a command
         case dbMsg:
             return std::make_unique<CommandOpRunner>(shared_from_this())->run();
         case dbGetMore: {
             globalOpCounters.gotGetMoreDeprecated();
-            warnDeprecation(*(rec->getOpCtx()->getClient()), networkOpToString(dbGetMore));
+            warnUnsupportedOp(*(rec->getOpCtx()->getClient()), networkOpToString(dbGetMore));
             return Future<DbResponse>::makeReady(
-                makeErrorResponseToDeprecatedOpQuery("OP_GET_MORE is no longer supported"));
+                makeErrorResponseToUnsupportedOpQuery("OP_GET_MORE is no longer supported"));
         }
         case dbKillCursors:
             globalOpCounters.gotKillCursorsDeprecated();
-            warnDeprecation(*(rec->getOpCtx()->getClient()), networkOpToString(op));
+            warnUnsupportedOp(*(rec->getOpCtx()->getClient()), networkOpToString(op));
             uasserted(5745707, "OP_KILL_CURSORS is no longer supported");
         case dbInsert: {
             auto opInsert = InsertOp::parseLegacy(rec->getMessage());
             globalOpCounters.gotInsertsDeprecated(opInsert.getDocuments().size());
-            warnDeprecation(*(rec->getOpCtx()->getClient()), networkOpToString(op));
+            warnUnsupportedOp(*(rec->getOpCtx()->getClient()), networkOpToString(op));
             uasserted(5745706, "OP_INSERT is no longer supported");
         }
         case dbUpdate:
             globalOpCounters.gotUpdateDeprecated();
-            warnDeprecation(*(rec->getOpCtx()->getClient()), networkOpToString(op));
+            warnUnsupportedOp(*(rec->getOpCtx()->getClient()), networkOpToString(op));
             uasserted(5745705, "OP_UPDATE is no longer supported");
         case dbDelete:
             globalOpCounters.gotDeleteDeprecated();
-            warnDeprecation(*(rec->getOpCtx()->getClient()), networkOpToString(op));
+            warnUnsupportedOp(*(rec->getOpCtx()->getClient()), networkOpToString(op));
             uasserted(5745704, "OP_DELETE is no longer supported");
         default:
             MONGO_UNREACHABLE;

@@ -74,7 +74,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/rewrite_state_change_errors.h"
-#include "mongo/rpc/warn_deprecated_wire_ops.h"
+#include "mongo/rpc/warn_unsupported_wire_ops.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"

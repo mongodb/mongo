@@ -404,7 +404,7 @@ TEST(LegacyWriteOpsParsers, SingleInsert) {
     const std::string ns = "test.foo";
     const BSONObj obj = BSON("x" << 1);
     for (bool continueOnError : {false, true}) {
-        auto message = makeDeprecatedInsertMessage(
+        auto message = makeUnsupportedOpInsertMessage(
             ns, &obj, 1, continueOnError ? InsertOption_ContinueOnError : 0);
         const auto op = InsertOp::parseLegacy(message);
         ASSERT_EQ(op.getNamespace().ns(), ns);
@@ -419,7 +419,7 @@ TEST(LegacyWriteOpsParsers, EmptyMultiInsertFails) {
     const std::string ns = "test.foo";
     for (bool continueOnError : {false, true}) {
         auto objs = std::vector<BSONObj>{};
-        auto message = makeDeprecatedInsertMessage(
+        auto message = makeUnsupportedOpInsertMessage(
             ns, objs.data(), objs.size(), (continueOnError ? InsertOption_ContinueOnError : 0));
         ASSERT_THROWS_CODE(
             InsertOp::parseLegacy(message), AssertionException, ErrorCodes::InvalidLength);
@@ -432,7 +432,7 @@ TEST(LegacyWriteOpsParsers, RealMultiInsert) {
     const BSONObj obj1 = BSON("x" << 1);
     for (bool continueOnError : {false, true}) {
         auto objs = std::vector<BSONObj>{obj0, obj1};
-        auto message = makeDeprecatedInsertMessage(
+        auto message = makeUnsupportedOpInsertMessage(
             ns, objs.data(), objs.size(), continueOnError ? InsertOption_ContinueOnError : 0);
         const auto op = InsertOp::parseLegacy(message);
         ASSERT_EQ(op.getNamespace().ns(), ns);

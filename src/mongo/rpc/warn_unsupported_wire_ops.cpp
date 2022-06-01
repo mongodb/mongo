@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/rpc/warn_deprecated_wire_ops.h"
+#include "mongo/rpc/warn_unsupported_wire_ops.h"
 
 #include <fmt/format.h>
 #include <string>
@@ -39,8 +39,8 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
-#include "mongo/rpc/deprecated_wire_ops_gen.h"
 #include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/rpc/unsupported_wire_ops_gen.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/synchronized_value.h"
@@ -91,7 +91,7 @@ Status onUpdateOfWireOpsWarningPeriod(const int& /*timeout*/) {
     return Status::OK();
 }
 
-void warnDeprecation(Client& client, StringData op) {
+void warnUnsupportedOp(Client& client, StringData op) {
     std::string clientKey;
     BSONObj clientInfo;
     if (auto clientMetadata = ClientMetadata::get(&client); clientMetadata) {
@@ -107,8 +107,9 @@ void warnDeprecation(Client& client, StringData op) {
 
     LOGV2_DEBUG(5578800,
                 getSeveritySource().get(clientKey).toInt(),
-                "Deprecated operation requested. For more details see "
-                "https://dochub.mongodb.org/core/legacy-opcode-compatibility",
+                "Received wire protocol op code or command that is no longer supported. "
+                "The client driver may require an upgrade. "
+                "For more details see https://dochub.mongodb.org/core/legacy-opcode-removal",
                 "op"_attr = op,
                 "clientInfo"_attr = clientInfo);
 }
@@ -128,10 +129,13 @@ void checkAllowedOpQueryCommand(Client& client, StringData cmd) {
 
     if (std::find(allowedOpQueryCommands.begin(), allowedOpQueryCommands.end(), cmd) ==
         allowedOpQueryCommands.end()) {
-        warnDeprecation(client, networkOpToString(dbQuery));
+        warnUnsupportedOp(client, networkOpToString(dbQuery));
         globalOpCounters.gotQueryDeprecated();
-        uasserted(ErrorCodes::UnsupportedOpQueryCommand,
-                  "Unsupported OP_QUERY command: {}"_format(cmd));
+        uasserted(
+            ErrorCodes::UnsupportedOpQueryCommand,
+            "Unsupported OP_QUERY command: {}. The client driver may require an upgrade. "
+            "For more details see https://dochub.mongodb.org/core/legacy-opcode-removal"_format(
+                cmd));
     }
 }
 

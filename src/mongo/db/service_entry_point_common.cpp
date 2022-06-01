@@ -101,7 +101,7 @@
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/rpc/warn_deprecated_wire_ops.h"
+#include "mongo/rpc/warn_unsupported_wire_ops.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/transport/hello_metrics.h"
@@ -2066,8 +2066,8 @@ struct QueryOpRunner : SynchronousOpRunner {
         invariant(!executionContext->nsString().isCommand());
 
         globalOpCounters.gotQueryDeprecated();
-        warnDeprecation(executionContext->client(), networkOpToString(dbQuery));
-        return makeErrorResponseToDeprecatedOpQuery("OP_QUERY is no longer supported");
+        warnUnsupportedOp(executionContext->client(), networkOpToString(dbQuery));
+        return makeErrorResponseToUnsupportedOpQuery("OP_QUERY is no longer supported");
     }
 };
 
@@ -2075,8 +2075,8 @@ struct GetMoreOpRunner : SynchronousOpRunner {
     using SynchronousOpRunner::SynchronousOpRunner;
     DbResponse runSync() override {
         globalOpCounters.gotGetMoreDeprecated();
-        warnDeprecation(executionContext->client(), networkOpToString(dbGetMore));
-        return makeErrorResponseToDeprecatedOpQuery("OP_GET_MORE is no longer supported");
+        warnUnsupportedOp(executionContext->client(), networkOpToString(dbGetMore));
+        return makeErrorResponseToUnsupportedOpQuery("OP_GET_MORE is no longer supported");
     }
 };
 
@@ -2168,7 +2168,7 @@ std::unique_ptr<HandleRequest::OpRunner> HandleRequest::makeOpRunner() {
 }
 
 DbResponse FireAndForgetOpRunner::runSync() {
-    warnDeprecation(executionContext->client(), networkOpToString(executionContext->op()));
+    warnUnsupportedOp(executionContext->client(), networkOpToString(executionContext->op()));
     runAndForget();
     return {};
 }
