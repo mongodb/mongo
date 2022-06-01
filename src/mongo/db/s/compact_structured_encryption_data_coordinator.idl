@@ -39,6 +39,7 @@ enums:
         description: "The current phase of the compactStructuredEncryptionData pipeline"
         type: string
         values:
+            kUnset: "unset"
             kRenameEcocForCompact: "rename-ecoc-for-compact"
             kCompactStructuredEncryptionData: "compact-structured-encryption-data"
             kDropTempCollection: "drop-temp-collection"
@@ -53,7 +54,7 @@ structs:
             phase:
                 description: "Current phase"
                 type: CompactStructuredEncryptionDataPhase
-                default: kRenameEcocForCompact
+                default: kUnset
             skipCompact:
                 description: "Whether to skip the compaction operation"
                 type: bool
