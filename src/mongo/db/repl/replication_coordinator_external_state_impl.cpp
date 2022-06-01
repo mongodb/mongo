@@ -1032,9 +1032,10 @@ bool ReplicationCoordinatorExternalStateImpl::tooStale() {
 }
 
 void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationContext* opCtx) {
-    // Acquire the GlobalLock in mode IS to conflict with database drops which acquire the
-    // GlobalLock in mode X.
-    Lock::GlobalLock lk(opCtx, MODE_IS);
+    // Acquire the GlobalLock in mode IX to conflict with database drops which acquire the
+    // GlobalLock in mode X. Additionally, acquire the GlobalLock in IX instead of IS to prevent
+    // lock upgrade when removing the temporary collections.
+    Lock::GlobalLock lk(opCtx, MODE_IX);
 
     StorageEngine* storageEngine = _service->getStorageEngine();
     std::vector<DatabaseName> dbNames = storageEngine->listDatabases();
