@@ -580,14 +580,14 @@ void ShardingCatalogManager::configureCollectionBalancing(
     {
         BSONObjBuilder setBuilder(updateCmd.subobjStart("$set"));
         if (chunkSizeMB && *chunkSizeMB != 0) {
-            // verify we got a positive integer in range [1MB, 1GB]
+            auto chunkSizeBytes = static_cast<int64_t>(*chunkSizeMB) * 1024 * 1024;
+            bool withinRange = nss == NamespaceString::kLogicalSessionsNamespace
+                ? (chunkSizeBytes > 0 && chunkSizeBytes <= 1024 * 1024 * 1024)
+                : ChunkSizeSettingsType::checkMaxChunkSizeValid(chunkSizeBytes);
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "Chunk size '" << *chunkSizeMB << "' out of range [1MB, 1GB]",
-                    *chunkSizeMB > 0 &&
-                        *chunkSizeMB < std::numeric_limits<int32_t>::max() / (1024 * 1024) &&
-                        ChunkSizeSettingsType::checkMaxChunkSizeValid(*chunkSizeMB * 1024 * 1024));
-            setBuilder.append(CollectionType::kMaxChunkSizeBytesFieldName,
-                              *chunkSizeMB * 1024 * 1024);
+                    withinRange);
+            setBuilder.append(CollectionType::kMaxChunkSizeBytesFieldName, chunkSizeBytes);
             updatedFields++;
         }
         if (defragmentCollection) {
@@ -636,6 +636,7 @@ void ShardingCatalogManager::configureCollectionBalancing(
                                                                      false /* multi */),
                                 txnNumber);
                             const auto numDocsModified = UpdateOp::parseResponse(res).getN();
+                            // TODO SERVER-66915 replace error code with NamespaceNotSharded
                             uassert(ErrorCodes::ConflictingOperationInProgress,
                                     str::stream() << "Expected to match one doc for query " << query
                                                   << " but matched " << numDocsModified,
