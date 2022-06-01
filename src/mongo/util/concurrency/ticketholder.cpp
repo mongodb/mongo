@@ -41,10 +41,122 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-
 namespace mongo {
 
 TicketHolder::~TicketHolder() = default;
+
+Status TicketHolder::resize(int newSize) {
+    stdx::lock_guard<Latch> lk(_resizeMutex);
+
+    if (newSize < 5)
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Minimum value for ticketholder is 5; given " << newSize);
+
+    AdmissionContext admCtx;
+    while (_outof.load() < newSize) {
+        _release(&admCtx);
+        _outof.fetchAndAdd(1);
+    }
+
+    while (_outof.load() > newSize) {
+        auto ticket = waitForTicket(nullptr, &admCtx, WaitMode::kUninterruptible);
+        ticket.discard();
+        _outof.subtractAndFetch(1);
+    }
+
+    invariant(_outof.load() == newSize);
+    return Status::OK();
+}
+
+void TicketHolder::appendStats(BSONObjBuilder& b) const {
+    b.append("out", used());
+    b.append("available", available());
+    b.append("totalTickets", outof());
+    auto removed = _totalRemovedQueue.loadRelaxed();
+    auto added = _totalAddedQueue.loadRelaxed();
+    b.append("addedToQueue", added);
+    b.append("removedFromQueue", removed);
+    b.append("queueLength", std::max(static_cast<int>(added - removed), 0));
+    auto finished = _totalFinishedProcessing.loadRelaxed();
+    auto started = _totalStartedProcessing.loadRelaxed();
+    b.append("startedProcessing", started);
+    b.append("processing", std::max(static_cast<int>(started - finished), 0));
+    b.append("finishedProcessing", finished);
+    b.append("totalTimeProcessingMicros", _totalTimeProcessingMicros.loadRelaxed());
+    b.append("canceled", _totalCanceled.loadRelaxed());
+    b.append("newAdmissions", _totalNewAdmissions.loadRelaxed());
+    _appendImplStats(b);
+}
+
+void TicketHolder::_releaseAndUpdateMetrics(AdmissionContext* admCtx) noexcept {
+    _totalFinishedProcessing.fetchAndAddRelaxed(1);
+    auto startTime = admCtx->getStartProcessingTime();
+    auto tickSource = _serviceContext->getTickSource();
+    auto delta = tickSource->spanTo<Microseconds>(startTime, tickSource->getTicks());
+    _totalTimeProcessingMicros.fetchAndAddRelaxed(delta.count());
+    _release(admCtx);
+}
+
+Ticket TicketHolder::waitForTicket(OperationContext* opCtx,
+                                   AdmissionContext* admCtx,
+                                   WaitMode waitMode) {
+    auto res = waitForTicketUntil(opCtx, admCtx, Date_t::max(), waitMode);
+    invariant(res);
+    return std::move(*res);
+}
+
+boost::optional<Ticket> TicketHolder::tryAcquire(AdmissionContext* admCtx) {
+    invariant(admCtx);
+
+    auto ticket = _tryAcquireImpl(admCtx);
+    // Track statistics.
+    if (ticket) {
+        if (admCtx->getAdmissions() == 0) {
+            _totalNewAdmissions.fetchAndAddRelaxed(1);
+        }
+        admCtx->start(_serviceContext->getTickSource());
+        _totalStartedProcessing.fetchAndAddRelaxed(1);
+    }
+    return ticket;
+}
+
+
+boost::optional<Ticket> TicketHolder::waitForTicketUntil(OperationContext* opCtx,
+                                                         AdmissionContext* admCtx,
+                                                         Date_t until,
+                                                         WaitMode waitMode) {
+    invariant(admCtx);
+
+    // Attempt a quick acquisition first.
+    if (auto ticket = tryAcquire(admCtx)) {
+        return ticket;
+    }
+
+    // Track statistics
+
+    _totalAddedQueue.fetchAndAddRelaxed(1);
+    ON_BLOCK_EXIT([&] { _totalRemovedQueue.fetchAndAddRelaxed(1); });
+
+    // Enqueue.
+    ScopeGuard cancelWait([&] {
+        // Update statistics.
+        _totalCanceled.fetchAndAddRelaxed(1);
+    });
+
+    auto ticket = _waitForTicketUntilImpl(opCtx, admCtx, until, waitMode);
+
+    if (ticket) {
+        cancelWait.dismiss();
+        if (admCtx->getAdmissions() == 0) {
+            _totalNewAdmissions.fetchAndAddRelaxed(1);
+        }
+        admCtx->start(_serviceContext->getTickSource());
+        _totalStartedProcessing.fetchAndAddRelaxed(1);
+        return ticket;
+    } else {
+        return boost::none;
+    }
+}
 
 #if defined(__linux__)
 namespace {
@@ -77,7 +189,8 @@ void tsFromDate(const Date_t& deadline, struct timespec& ts) {
 }
 }  // namespace
 
-SemaphoreTicketHolder::SemaphoreTicketHolder(int num, ServiceContext*) : _outof(num) {
+SemaphoreTicketHolder::SemaphoreTicketHolder(int num, ServiceContext* serviceContext)
+    : TicketHolder(num, serviceContext) {
     check(sem_init(&_sem, 0, num));
 }
 
@@ -85,7 +198,7 @@ SemaphoreTicketHolder::~SemaphoreTicketHolder() {
     check(sem_destroy(&_sem));
 }
 
-boost::optional<Ticket> SemaphoreTicketHolder::tryAcquire(AdmissionContext* admCtx) {
+boost::optional<Ticket> SemaphoreTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
     while (0 != sem_trywait(&_sem)) {
         if (errno == EAGAIN)
             return boost::none;
@@ -95,23 +208,21 @@ boost::optional<Ticket> SemaphoreTicketHolder::tryAcquire(AdmissionContext* admC
     return Ticket{this, admCtx};
 }
 
-Ticket SemaphoreTicketHolder::waitForTicket(OperationContext* opCtx,
-                                            AdmissionContext* admCtx,
-                                            WaitMode waitMode) {
-    auto ticket = waitForTicketUntil(opCtx, admCtx, Date_t::max(), waitMode);
-    invariant(ticket);
-    return std::move(*ticket);
-}
+boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
+                                                                       AdmissionContext* admCtx,
+                                                                       Date_t until,
+                                                                       WaitMode waitMode) {
 
-boost::optional<Ticket> SemaphoreTicketHolder::waitForTicketUntil(OperationContext* opCtx,
-                                                                  AdmissionContext* admCtx,
-                                                                  Date_t until,
-                                                                  WaitMode waitMode) {
+    auto tickSource = _serviceContext->getTickSource();
+    // Track statistics
+    auto currentWaitTime = tickSource->getTicks();
+    auto updateQueuedTime = [&]() {
+        auto oldWaitTime = std::exchange(currentWaitTime, tickSource->getTicks());
+        auto waitDelta = tickSource->spanTo<Microseconds>(oldWaitTime, currentWaitTime).count();
+        _totalTimeQueuedMicros.fetchAndAddRelaxed(waitDelta);
+    };
 
-    // Attempt to get a ticket without waiting in order to avoid expensive time calculations.
-    if (sem_trywait(&_sem) == 0) {
-        return Ticket{this, admCtx};
-    }
+    ON_BLOCK_EXIT(updateQueuedTime);
 
     const Milliseconds intervalMs(500);
     struct timespec ts;
@@ -139,6 +250,8 @@ boost::optional<Ticket> SemaphoreTicketHolder::waitForTicketUntil(OperationConte
         // It is possible to unset 'errno' after a call to checkForInterrupt().
         if (waitMode == WaitMode::kInterruptible)
             opCtx->checkForInterrupt();
+
+        updateQueuedTime();
     }
     return Ticket{this, admCtx};
 }
@@ -147,55 +260,20 @@ void SemaphoreTicketHolder::_release(AdmissionContext* admCtx) noexcept {
     check(sem_post(&_sem));
 }
 
-Status SemaphoreTicketHolder::resize(int newSize) {
-    stdx::lock_guard<Latch> lk(_resizeMutex);
-
-    if (newSize < 5)
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Minimum value for semaphore is 5; given " << newSize);
-
-    if (newSize > SEM_VALUE_MAX)
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Maximum value for semaphore is " << SEM_VALUE_MAX
-                                    << "; given " << newSize);
-
-    AdmissionContext admCtx;
-    while (_outof.load() < newSize) {
-        _release(&admCtx);
-        _outof.fetchAndAdd(1);
-    }
-
-    while (_outof.load() > newSize) {
-        auto ticket = waitForTicket(nullptr, &admCtx, WaitMode::kUninterruptible);
-        ticket.discard();
-        _outof.subtractAndFetch(1);
-    }
-
-    invariant(_outof.load() == newSize);
-    return Status::OK();
-}
-
 int SemaphoreTicketHolder::available() const {
     int val = 0;
     check(sem_getvalue(&_sem, &val));
     return val;
 }
 
-int SemaphoreTicketHolder::used() const {
-    return outof() - available();
-}
-
-int SemaphoreTicketHolder::outof() const {
-    return _outof.load();
-}
-
 #else
 
-SemaphoreTicketHolder::SemaphoreTicketHolder(int num, ServiceContext*) : _outof(num), _num(num) {}
+SemaphoreTicketHolder::SemaphoreTicketHolder(int num, ServiceContext* svcCtx)
+    : TicketHolder(num, svcCtx), _num(num) {}
 
 SemaphoreTicketHolder::~SemaphoreTicketHolder() = default;
 
-boost::optional<Ticket> SemaphoreTicketHolder::tryAcquire(AdmissionContext* admCtx) {
+boost::optional<Ticket> SemaphoreTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
     stdx::lock_guard<Latch> lk(_mutex);
     if (!_tryAcquire()) {
         return boost::none;
@@ -203,24 +281,10 @@ boost::optional<Ticket> SemaphoreTicketHolder::tryAcquire(AdmissionContext* admC
     return Ticket{this, admCtx};
 }
 
-Ticket SemaphoreTicketHolder::waitForTicket(OperationContext* opCtx,
-                                            AdmissionContext* admCtx,
-                                            WaitMode waitMode) {
-    stdx::unique_lock<Latch> lk(_mutex);
-
-    if (waitMode == WaitMode::kInterruptible) {
-        opCtx->waitForConditionOrInterrupt(_newTicket, lk, [this] { return _tryAcquire(); });
-    } else {
-        _newTicket.wait(lk, [this] { return _tryAcquire(); });
-    }
-    return Ticket{this, admCtx};
-}
-
-
-boost::optional<Ticket> SemaphoreTicketHolder::waitForTicketUntil(OperationContext* opCtx,
-                                                                  AdmissionContext* admCtx,
-                                                                  Date_t until,
-                                                                  WaitMode waitMode) {
+boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
+                                                                       AdmissionContext* admCtx,
+                                                                       Date_t until,
+                                                                       WaitMode waitMode) {
     stdx::unique_lock<Latch> lk(_mutex);
 
     bool taken = [&] {
@@ -228,8 +292,13 @@ boost::optional<Ticket> SemaphoreTicketHolder::waitForTicketUntil(OperationConte
             return opCtx->waitForConditionOrInterruptUntil(
                 _newTicket, lk, until, [this] { return _tryAcquire(); });
         } else {
-            return _newTicket.wait_until(
-                lk, until.toSystemTimePoint(), [this] { return _tryAcquire(); });
+            if (until == Date_t::max()) {
+                _newTicket.wait(lk, [this] { return _tryAcquire(); });
+                return true;
+            } else {
+                return _newTicket.wait_until(
+                    lk, until.toSystemTimePoint(), [this] { return _tryAcquire(); });
+            }
         }
     }();
     if (!taken) {
@@ -246,38 +315,8 @@ void SemaphoreTicketHolder::_release(AdmissionContext* admCtx) noexcept {
     _newTicket.notify_one();
 }
 
-Status SemaphoreTicketHolder::resize(int newSize) {
-    stdx::lock_guard<Latch> lk(_mutex);
-
-    int used = _outof.load() - _num;
-    if (used > newSize) {
-        std::stringstream ss;
-        ss << "can't resize since we're using (" << used << ") "
-           << "more than newSize(" << newSize << ")";
-
-        std::string errmsg = ss.str();
-        LOGV2(23120, "{errmsg}", "errmsg"_attr = errmsg);
-        return Status(ErrorCodes::BadValue, errmsg);
-    }
-
-    _outof.store(newSize);
-    _num = _outof.load() - used;
-
-    // Potentially wasteful, but easier to see is correct
-    _newTicket.notify_all();
-    return Status::OK();
-}
-
 int SemaphoreTicketHolder::available() const {
     return _num;
-}
-
-int SemaphoreTicketHolder::used() const {
-    return outof() - _num;
-}
-
-int SemaphoreTicketHolder::outof() const {
-    return _outof.load();
 }
 
 bool SemaphoreTicketHolder::_tryAcquire() {
@@ -292,13 +331,12 @@ bool SemaphoreTicketHolder::_tryAcquire() {
 }
 #endif
 
-void SemaphoreTicketHolder::appendStats(BSONObjBuilder& b) const {
-    b.append("out", used());
-    b.append("available", available());
-    b.append("totalTickets", outof());
+void SemaphoreTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
+    b.append("totalTimeQueuedMicros", _totalTimeQueuedMicros.loadRelaxed());
 }
+
 FifoTicketHolder::FifoTicketHolder(int num, ServiceContext* serviceContext)
-    : _capacity(num), _serviceContext(serviceContext) {
+    : TicketHolder(num, serviceContext) {
     _ticketsAvailable.store(num);
     _enqueuedElements.store(0);
 }
@@ -308,28 +346,9 @@ FifoTicketHolder::~FifoTicketHolder() {}
 int FifoTicketHolder::available() const {
     return _ticketsAvailable.load();
 }
-int FifoTicketHolder::used() const {
-    return outof() - available();
-}
-int FifoTicketHolder::outof() const {
-    return _capacity.load();
-}
-int FifoTicketHolder::queued() const {
-    auto removed = _totalRemovedQueue.loadRelaxed();
-    auto added = _totalAddedQueue.loadRelaxed();
-    return std::max(static_cast<int>(added - removed), 0);
-}
 
 void FifoTicketHolder::_release(AdmissionContext* admCtx) noexcept {
     invariant(admCtx);
-
-    auto tickSource = _serviceContext->getTickSource();
-
-    // Update statistics.
-    _totalFinishedProcessing.fetchAndAddRelaxed(1);
-    auto startTime = admCtx->getStartProcessingTime();
-    auto delta = tickSource->spanTo<Microseconds>(startTime, tickSource->getTicks());
-    _totalTimeProcessingMicros.fetchAndAddRelaxed(delta.count());
 
     stdx::lock_guard lk(_queueMutex);
     // This loop will most of the time be executed only once. In case some operations in the
@@ -338,7 +357,6 @@ void FifoTicketHolder::_release(AdmissionContext* admCtx) noexcept {
     while (true) {
         if (!_queue.empty()) {
             auto elem = _queue.front();
-            _enqueuedElements.subtractAndFetch(1);
             {
                 stdx::lock_guard elemLk(elem->modificationMutex);
                 if (elem->state != WaitingState::Waiting) {
@@ -358,8 +376,7 @@ void FifoTicketHolder::_release(AdmissionContext* admCtx) noexcept {
     }
 }
 
-boost::optional<Ticket> FifoTicketHolder::tryAcquire(AdmissionContext* admCtx) {
-    invariant(admCtx);
+boost::optional<Ticket> FifoTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
 
     auto queued = _enqueuedElements.load();
     if (queued > 0)
@@ -371,34 +388,14 @@ boost::optional<Ticket> FifoTicketHolder::tryAcquire(AdmissionContext* admCtx) {
         return boost::none;
     }
 
-    // Update statistics.
-    if (admCtx->getAdmissions() == 0) {
-        _totalNewAdmissions.fetchAndAddRelaxed(1);
-    }
-    admCtx->start(_serviceContext->getTickSource());
-    _totalStartedProcessing.fetchAndAddRelaxed(1);
     return Ticket{this, admCtx};
 }
 
-Ticket FifoTicketHolder::waitForTicket(OperationContext* opCtx,
-                                       AdmissionContext* admCtx,
-                                       WaitMode waitMode) {
-    auto res = waitForTicketUntil(opCtx, admCtx, Date_t::max(), waitMode);
-    invariant(res);
-    return std::move(*res);
-}
 
-boost::optional<Ticket> FifoTicketHolder::waitForTicketUntil(OperationContext* opCtx,
-                                                             AdmissionContext* admCtx,
-                                                             Date_t until,
-                                                             WaitMode waitMode) {
-    invariant(admCtx);
-
-    // Attempt a quick acquisition first.
-    if (auto ticket = tryAcquire(admCtx)) {
-        return ticket;
-    }
-
+boost::optional<Ticket> FifoTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
+                                                                  AdmissionContext* admCtx,
+                                                                  Date_t until,
+                                                                  WaitMode waitMode) {
     auto tickSource = _serviceContext->getTickSource();
     // Track statistics
     auto currentWaitTime = tickSource->getTicks();
@@ -407,44 +404,29 @@ boost::optional<Ticket> FifoTicketHolder::waitForTicketUntil(OperationContext* o
         auto waitDelta = tickSource->spanTo<Microseconds>(oldWaitTime, currentWaitTime).count();
         _totalTimeQueuedMicros.fetchAndAddRelaxed(waitDelta);
     };
-    auto startProcessing = [&] {
-        _totalStartedProcessing.fetchAndAddRelaxed(1);
-        admCtx->start(tickSource);
-    };
-    _totalAddedQueue.fetchAndAddRelaxed(1);
-    if (admCtx->getAdmissions() == 0) {
-        _totalNewAdmissions.fetchAndAddRelaxed(1);
-    }
 
-    ScopeGuard dequed([&] {
-        updateQueuedTime();
-        _totalRemovedQueue.fetchAndAddRelaxed(1);
-    });
+    ON_BLOCK_EXIT(updateQueuedTime);
 
     // Enqueue.
     auto waitingElement = std::make_shared<WaitingElement>();
     waitingElement->state = WaitingState::Waiting;
     {
         stdx::lock_guard lk(_queueMutex);
-        _enqueuedElements.addAndFetch(1);
         // Check for available tickets under the queue lock, in case a ticket has just been
         // released.
         auto remaining = _ticketsAvailable.subtractAndFetch(1);
         if (remaining >= 0) {
-            _enqueuedElements.subtractAndFetch(1);
-            startProcessing();
             return Ticket{this, admCtx};
         }
         _ticketsAvailable.addAndFetch(1);
         // We copy-construct the shared_ptr here as the waiting element needs to be alive in both
         // release() and waitForTicket(). Otherwise the code could lead to a segmentation fault
         _queue.emplace(waitingElement);
+        _enqueuedElements.addAndFetch(1);
     }
 
+    ON_BLOCK_EXIT([&] { _enqueuedElements.subtractAndFetch(1); });
     ScopeGuard cancelWait([&] {
-        // Update statistics.
-        _totalCanceled.fetchAndAddRelaxed(1);
-
         bool hasAssignedTicket = false;
         {
             stdx::lock_guard lk(waitingElement->modificationMutex);
@@ -454,7 +436,6 @@ boost::optional<Ticket> FifoTicketHolder::waitForTicketUntil(OperationContext* o
         if (hasAssignedTicket) {
             // To cover the edge case of getting a ticket assigned before cancelling the ticket
             // request. As we have been granted a ticket we must release it.
-            startProcessing();
             _release(admCtx);
         }
     });
@@ -481,55 +462,14 @@ boost::optional<Ticket> FifoTicketHolder::waitForTicketUntil(OperationContext* o
 
     if (assigned) {
         cancelWait.dismiss();
-        startProcessing();
         return Ticket{this, admCtx};
     } else {
         return boost::none;
     }
 }
 
-Status FifoTicketHolder::resize(int newSize) {
-    stdx::lock_guard<Latch> lk(_resizeMutex);
-
-    if (newSize < 5)
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Minimum value for ticket holder is 5; given " << newSize);
-
-    AdmissionContext admCtx;
-    while (_capacity.load() < newSize) {
-        admCtx.start(_serviceContext->getTickSource());
-        _release(&admCtx);
-        _capacity.fetchAndAdd(1);
-    }
-
-    while (_capacity.load() > newSize) {
-        auto ticket = waitForTicket(nullptr, &admCtx, WaitMode::kUninterruptible);
-        ticket.discard();
-        _capacity.subtractAndFetch(1);
-    }
-
-    invariant(_capacity.load() == newSize);
-    return Status::OK();
-}
-
-void FifoTicketHolder::appendStats(BSONObjBuilder& b) const {
-    b.append("out", used());
-    b.append("available", available());
-    b.append("totalTickets", outof());
-    auto removed = _totalRemovedQueue.loadRelaxed();
-    auto added = _totalAddedQueue.loadRelaxed();
-    b.append("addedToQueue", added);
-    b.append("removedFromQueue", removed);
-    b.append("queueLength", std::max(static_cast<int>(added - removed), 0));
+void FifoTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
     b.append("totalTimeQueuedMicros", _totalTimeQueuedMicros.loadRelaxed());
-    auto finished = _totalFinishedProcessing.loadRelaxed();
-    auto started = _totalStartedProcessing.loadRelaxed();
-    b.append("startedProcessing", started);
-    b.append("finishedProcessing", finished);
-    b.append("processing", std::max(static_cast<int>(started - finished), 0));
-    b.append("totalTimeProcessingMicros", _totalTimeProcessingMicros.loadRelaxed());
-    b.append("canceled", _totalCanceled.loadRelaxed());
-    b.append("newAdmissions", _totalNewAdmissions.loadRelaxed());
 }
 
 }  // namespace mongo

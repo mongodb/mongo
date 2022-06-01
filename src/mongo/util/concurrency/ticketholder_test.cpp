@@ -165,15 +165,17 @@ TEST_F(TicketHolderTest, FifoBasicMetrics) {
     boost::optional<Ticket> ticket =
         holder.waitForTicket(_opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
 
-    unittest::Barrier barrier(2);
-    stdx::thread waiting([this, &holder, &barrier]() {
+    unittest::Barrier barrierAcquiredTicket(2);
+    unittest::Barrier barrierReleaseTicket(2);
+    stdx::thread waiting([&]() {
         auto client = this->getServiceContext()->makeClient("waiting");
         auto opCtx = client->makeOperationContext();
         AdmissionContext admCtx;
 
         auto ticket =
             holder.waitForTicket(opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
-        barrier.countDownAndWait();
+        barrierAcquiredTicket.countDownAndWait();
+        barrierReleaseTicket.countDownAndWait();
     });
 
     while (holder.queued() == 0) {
@@ -208,8 +210,9 @@ TEST_F(TicketHolderTest, FifoBasicMetrics) {
         // Wait for thread to take ticket.
     }
 
+    barrierAcquiredTicket.countDownAndWait();
     tickSource->advance(Microseconds(200));
-    barrier.countDownAndWait();
+    barrierReleaseTicket.countDownAndWait();
 
     waiting.join();
 

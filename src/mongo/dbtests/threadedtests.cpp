@@ -233,9 +233,11 @@ class TicketHolderWaits : public ThreadedTest<10> {
     static const int rooms = 3;
 
 public:
-    TicketHolderWaits()
-        : _hotel(rooms),
-          _tickets(std::make_unique<SemaphoreTicketHolder>(_hotel._nRooms, nullptr)) {}
+    TicketHolderWaits() : _hotel(rooms) {
+        auto client = Client::getCurrent();
+        _tickets =
+            std::make_unique<SemaphoreTicketHolder>(_hotel._nRooms, client->getServiceContext());
+    }
 
 private:
     class Hotel {
