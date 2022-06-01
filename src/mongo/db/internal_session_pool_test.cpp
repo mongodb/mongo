@@ -103,24 +103,59 @@ TEST_F(InternalSessionPoolTest, AcquireWithParentSessionFromPoolWithoutParentEnt
     ASSERT_EQ(TxnNumber(0), session.getTxnNumber());
 }
 
+TEST_F(InternalSessionPoolTest, AcquireChildForSameParentWithoutIntermediateRelease) {
+    LogicalSessionId parentLsid = makeLogicalSessionIdForTest();
+
+    auto childLsid1 = makeLogicalSessionIdWithTxnUUID(parentLsid);
+    _pool->release(InternalSessionPool::Session(childLsid1, TxnNumber(0)));
+
+    auto childSession1 = _pool->acquireChildSession(opCtx(), parentLsid);
+
+    ASSERT_NOT_EQUALS(parentLsid, childSession1.getSessionId());
+    ASSERT_EQ(childLsid1, childSession1.getSessionId());
+    ASSERT_EQ(TxnNumber(1), childSession1.getTxnNumber());
+
+    // If we acquire a child for the same parent without first releasing the checked out child, it
+    // shouldn't block or prevent future child session reuse.
+
+    auto childSession2 = _pool->acquireChildSession(opCtx(), parentLsid);
+    ASSERT_NOT_EQUALS(parentLsid, childSession2.getSessionId());
+    ASSERT_NOT_EQUALS(childLsid1, childSession2.getSessionId());
+    ASSERT_EQ(TxnNumber(0), childSession2.getTxnNumber());
+
+    _pool->release(childSession2);
+
+    auto childSession3 = _pool->acquireChildSession(opCtx(), parentLsid);
+    ASSERT_EQ(childSession2.getSessionId(), childSession3.getSessionId());
+    ASSERT_EQ(TxnNumber(1), childSession3.getTxnNumber());
+
+    // Releasing the first child session back into the pool should overwrite the previous session
+    // and still allow for reuse.
+
+    _pool->release(childSession1);
+
+    auto childSession4 = _pool->acquireChildSession(opCtx(), parentLsid);
+    ASSERT_EQ(childSession1.getSessionId(), childSession4.getSessionId());
+    ASSERT_EQ(TxnNumber(2), childSession4.getTxnNumber());
+}
+
 TEST_F(InternalSessionPoolTest, AcquireWithParentSessionFromPoolWithParentEntry) {
     LogicalSessionId parentLsid1 = makeLogicalSessionIdForTest();
     LogicalSessionId parentLsid2 = makeLogicalSessionIdForTest();
 
-    // Set txnUUID for parentLsids.
-    parentLsid1.setTxnUUID(UUID::gen());
-    parentLsid2.setTxnUUID(UUID::gen());
+    // Create child sessions for each parent session and release them in the pool.
+    auto childLsid1 = makeLogicalSessionIdWithTxnUUID(parentLsid1);
+    auto childLsid2 = makeLogicalSessionIdWithTxnUUID(parentLsid2);
 
-    auto parentSession1 = InternalSessionPool::Session(parentLsid1, TxnNumber(1));
-    _pool->release(parentSession1);
-
-    auto parentSession2 = InternalSessionPool::Session(parentLsid2, TxnNumber(2));
-    _pool->release(parentSession2);
+    _pool->release(InternalSessionPool::Session(childLsid1, TxnNumber(1)));
+    _pool->release(InternalSessionPool::Session(childLsid2, TxnNumber(2)));
 
     auto childSession2 = _pool->acquireChildSession(opCtx(), parentLsid2);
 
     ASSERT_NOT_EQUALS(parentLsid1, childSession2.getSessionId());
-    ASSERT_EQ(parentLsid2, childSession2.getSessionId());
+    ASSERT_NOT_EQUALS(childLsid1, childSession2.getSessionId());
+    ASSERT_NOT_EQUALS(parentLsid2, childSession2.getSessionId());
+    ASSERT_EQ(childLsid2, childSession2.getSessionId());
 
     // txnNumber should be 1 larger than the released parent session.
     ASSERT_EQ(TxnNumber(3), childSession2.getTxnNumber());
