@@ -169,6 +169,7 @@ static const char *const __stats_dsrc_desc[] = {
   "cursor: close calls that result in cache",
   "cursor: create calls",
   "cursor: cursor bound calls that return an error",
+  "cursor: cursor bounds cleared from reset",
   "cursor: cursor cache calls that return an error",
   "cursor: cursor close calls that return an error",
   "cursor: cursor compare calls that return an error",
@@ -461,6 +462,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->cursor_cache = 0;
     stats->cursor_create = 0;
     stats->cursor_bound_error = 0;
+    stats->cursor_bounds_reset = 0;
     stats->cursor_cache_error = 0;
     stats->cursor_close_error = 0;
     stats->cursor_compare_error = 0;
@@ -741,6 +743,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->cursor_cache += from->cursor_cache;
     to->cursor_create += from->cursor_create;
     to->cursor_bound_error += from->cursor_bound_error;
+    to->cursor_bounds_reset += from->cursor_bounds_reset;
     to->cursor_cache_error += from->cursor_cache_error;
     to->cursor_close_error += from->cursor_close_error;
     to->cursor_compare_error += from->cursor_compare_error;
@@ -1025,6 +1028,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->cursor_cache += WT_STAT_READ(from, cursor_cache);
     to->cursor_create += WT_STAT_READ(from, cursor_create);
     to->cursor_bound_error += WT_STAT_READ(from, cursor_bound_error);
+    to->cursor_bounds_reset += WT_STAT_READ(from, cursor_bounds_reset);
     to->cursor_cache_error += WT_STAT_READ(from, cursor_cache_error);
     to->cursor_close_error += WT_STAT_READ(from, cursor_close_error);
     to->cursor_compare_error += WT_STAT_READ(from, cursor_compare_error);
@@ -1367,6 +1371,7 @@ static const char *const __stats_connection_desc[] = {
   "hot or large page",
   "cursor: cached cursor count",
   "cursor: cursor bound calls that return an error",
+  "cursor: cursor bounds cleared from reset",
   "cursor: cursor bulk loaded cursor insert calls",
   "cursor: cursor cache calls that return an error",
   "cursor: cursor close calls that result in cache",
@@ -1951,6 +1956,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cursor_reposition = 0;
     /* not clearing cursor_cached_count */
     stats->cursor_bound_error = 0;
+    stats->cursor_bounds_reset = 0;
     stats->cursor_insert_bulk = 0;
     stats->cursor_cache_error = 0;
     stats->cursor_cache = 0;
@@ -2537,6 +2543,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cursor_reposition += WT_STAT_READ(from, cursor_reposition);
     to->cursor_cached_count += WT_STAT_READ(from, cursor_cached_count);
     to->cursor_bound_error += WT_STAT_READ(from, cursor_bound_error);
+    to->cursor_bounds_reset += WT_STAT_READ(from, cursor_bounds_reset);
     to->cursor_insert_bulk += WT_STAT_READ(from, cursor_insert_bulk);
     to->cursor_cache_error += WT_STAT_READ(from, cursor_cache_error);
     to->cursor_cache += WT_STAT_READ(from, cursor_cache);

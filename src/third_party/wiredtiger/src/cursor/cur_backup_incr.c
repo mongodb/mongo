@@ -122,8 +122,7 @@ __curbackup_incr_next(WT_CURSOR *cursor)
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     wt_off_t size;
-    uint64_t start_bitoff, total_len;
-    uint32_t raw;
+    uint64_t start_bitoff, total_len, raw;
     const char *file;
     bool found;
 

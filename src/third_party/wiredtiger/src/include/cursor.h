@@ -32,6 +32,8 @@
       {NULL, 0, NULL, 0, 0},                /* WT_ITEM value */                                 \
       0,                                    /* int saved_err */                                 \
       NULL,                                 /* internal_uri */                                  \
+      {NULL, 0, NULL, 0, 0},                /* WT_ITEM lower bound */                           \
+      {NULL, 0, NULL, 0, 0},                /* WT_ITEM upper bound */                           \
       0                                     /* uint32_t flags */                                \
     }
 

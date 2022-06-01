@@ -46,9 +46,11 @@ class bounded_cursor_perf : public test {
     static void
     set_bounds(scoped_cursor &cursor)
     {
-        cursor->set_key(cursor.get(), std::string(1, ('0' - 1)).c_str());
+        std::string lower_bound(1, ('0' - 1));
+        cursor->set_key(cursor.get(), lower_bound.c_str());
         cursor->bound(cursor.get(), "bound=lower");
-        cursor->set_key(cursor.get(), std::string(1, ('9' + 1)).c_str());
+        std::string upper_bound(1, ('9' + 1));
+        cursor->set_key(cursor.get(), upper_bound.c_str());
         cursor->bound(cursor.get(), "bound=upper");
     }
 

@@ -563,7 +563,7 @@ extern int __wt_cursor_equals_notsup(WT_CURSOR *cursor, WT_CURSOR *other, int *e
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_cursor_get_key(WT_CURSOR *cursor, ...)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
+extern int __wt_cursor_get_keyv(WT_CURSOR *cursor, uint64_t flags, va_list ap)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_cursor_get_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -597,7 +597,7 @@ extern int __wt_cursor_reopen_notsup(WT_CURSOR *cursor, bool check_only)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_cursor_search_near_notsup(WT_CURSOR *cursor, int *exact)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
+extern int __wt_cursor_set_keyv(WT_CURSOR *cursor, uint64_t flags, va_list ap)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_cursor_set_valuev(WT_CURSOR *cursor, const char *fmt, va_list ap)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

@@ -511,7 +511,7 @@ __curtable_insert(WT_CURSOR *cursor)
     WT_CURSOR_TABLE *ctable;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    uint32_t flag_orig;
+    uint64_t flag_orig;
     u_int i;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
