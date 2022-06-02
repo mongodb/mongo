@@ -1830,8 +1830,9 @@ Status ReplicationCoordinatorImpl::setLastDurableOptime_forTest(long long cfgVer
 
     const UpdatePositionArgs::UpdateInfo update(
         OpTime(), Date_t(), opTime, wallTime, cfgVer, memberId);
-    const auto status = _setLastOptime(lock, update);
-    return status;
+    const auto statusWithOpTime = _setLastOptimeForMember(lock, update);
+    _updateStateAfterRemoteOpTimeUpdates(lock, statusWithOpTime.getValue());
+    return statusWithOpTime.getStatus();
 }
 
 Status ReplicationCoordinatorImpl::setLastAppliedOptime_forTest(long long cfgVer,
@@ -1847,25 +1848,29 @@ Status ReplicationCoordinatorImpl::setLastAppliedOptime_forTest(long long cfgVer
 
     const UpdatePositionArgs::UpdateInfo update(
         opTime, wallTime, OpTime(), Date_t(), cfgVer, memberId);
-    const auto status = _setLastOptime(lock, update);
-    return status;
+    const auto statusWithOpTime = _setLastOptimeForMember(lock, update);
+    _updateStateAfterRemoteOpTimeUpdates(lock, statusWithOpTime.getValue());
+    return statusWithOpTime.getStatus();
 }
 
-Status ReplicationCoordinatorImpl::_setLastOptime(WithLock lk,
-                                                  const UpdatePositionArgs::UpdateInfo& args) {
-    auto result = _topCoord->setLastOptime(args, _replExecutor->now());
+StatusWith<OpTime> ReplicationCoordinatorImpl::_setLastOptimeForMember(
+    WithLock lk, const UpdatePositionArgs::UpdateInfo& args) {
+    auto result = _topCoord->setLastOptimeForMember(args, _replExecutor->now());
     if (!result.isOK())
         return result.getStatus();
     const bool advancedOpTime = result.getValue();
+    _rescheduleLivenessUpdate_inlock(args.memberId);
+    return advancedOpTime ? std::max(args.appliedOpTime, args.durableOpTime) : OpTime();
+}
+
+void ReplicationCoordinatorImpl::_updateStateAfterRemoteOpTimeUpdates(
+    WithLock lk, const OpTime& maxRemoteOpTime) {
     // Only update committed optime if the remote optimes increased.
-    if (advancedOpTime) {
+    if (!maxRemoteOpTime.isNull()) {
         _updateLastCommittedOpTimeAndWallTime(lk);
         // Wait up replication waiters on optime changes.
-        _wakeReadyWaiters(lk, std::max(args.appliedOpTime, args.durableOpTime));
+        _wakeReadyWaiters(lk, maxRemoteOpTime);
     }
-
-    _rescheduleLivenessUpdate_inlock(args.memberId);
-    return Status::OK();
 }
 
 bool ReplicationCoordinatorImpl::isCommitQuorumSatisfied(
@@ -5079,18 +5084,22 @@ void ReplicationCoordinatorImpl::_wakeReadyWaiters(WithLock lk, boost::optional<
 Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const UpdatePositionArgs& updates) {
     stdx::unique_lock<Latch> lock(_mutex);
     Status status = Status::OK();
-    bool somethingChanged = false;
+    bool gotValidUpdate = false;
+    OpTime maxRemoteOpTime;
     for (UpdatePositionArgs::UpdateIterator update = updates.updatesBegin();
          update != updates.updatesEnd();
          ++update) {
-        status = _setLastOptime(lock, *update);
-        if (!status.isOK()) {
+        auto statusWithOpTime = _setLastOptimeForMember(lock, *update);
+        if (!statusWithOpTime.isOK()) {
+            status = statusWithOpTime.getStatus();
             break;
         }
-        somethingChanged = true;
+        maxRemoteOpTime = std::max(maxRemoteOpTime, statusWithOpTime.getValue());
+        gotValidUpdate = true;
     }
+    _updateStateAfterRemoteOpTimeUpdates(lock, maxRemoteOpTime);
 
-    if (somethingChanged && !_getMemberState_inlock().primary()) {
+    if (gotValidUpdate && !_getMemberState_inlock().primary()) {
         lock.unlock();
         // Must do this outside _mutex
         _externalState->forwardSecondaryProgress();

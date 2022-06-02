@@ -1364,14 +1364,14 @@ void TopologyCoordinator::setMyLastDurableOpTimeAndWallTime(OpTimeAndWallTime op
     myMemberData.setLastDurableOpTimeAndWallTime(opTimeAndWallTime, now);
 }
 
-StatusWith<bool> TopologyCoordinator::setLastOptime(const UpdatePositionArgs::UpdateInfo& args,
-                                                    Date_t now) {
+StatusWith<bool> TopologyCoordinator::setLastOptimeForMember(
+    const UpdatePositionArgs::UpdateInfo& args, Date_t now) {
     if (_selfIndex == -1) {
         // Ignore updates when we're in state REMOVED.
         return Status(ErrorCodes::NotPrimaryOrSecondary,
                       "Received replSetUpdatePosition command but we are in state REMOVED");
     }
-    invariant(_rsConfig.isInitialized());  // Can only use setLastOptime in replSet mode.
+    invariant(_rsConfig.isInitialized());  // Can only use setLastOptimeForMember in replSet mode.
 
     MemberId memberId;
     try {
