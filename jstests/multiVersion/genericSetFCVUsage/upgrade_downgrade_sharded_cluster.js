@@ -17,7 +17,7 @@ load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster
 
 const dbName = jsTestName();
 
-// TODO SERVER-57417 remove feature flag check once enabled
+// TODO SERVER-65815 remove feature flag check once enabled
 const orphansTrackingFeatureFlagEnabled = TestData.setParameters.featureFlagOrphanTracking;
 
 //==========//
@@ -53,7 +53,7 @@ function setupClusterAndDatabase(binVersion) {
     assert.commandWorked(
         st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
-    // TODO SERVER-57417 remove feature flag check once enabled
+    // TODO SERVER-65815 remove feature flag check once enabled
     if (orphansTrackingFeatureFlagEnabled) {
         // TODO SERVER-64400 remove this scope once 6.0 branches out
         // - Shard collection (one big chunk on shard0)
@@ -110,7 +110,7 @@ function checkClusterAfterBinaryUpgrade() {
 
 function checkClusterAfterFCVUpgrade(fcv) {
     checkConfigAndShardsFCV(fcv);
-    // TODO SERVER-57417 remove feature flag check once enabled
+    // TODO SERVER-65815 remove feature flag check once enabled
     if (orphansTrackingFeatureFlagEnabled) {
         // TODO SERVER-64400 remove this scope once 6.0 branches out
         // Check that orphans counter has been populated
@@ -120,7 +120,7 @@ function checkClusterAfterFCVUpgrade(fcv) {
 }
 
 function checkClusterAfterFCVDowngrade() {
-    // TODO SERVER-57417 remove feature flag check once enabled
+    // TODO SERVER-65815 remove feature flag check once enabled
     if (orphansTrackingFeatureFlagEnabled) {
         // TODO SERVER-64400 remove this scope once 6.0 branches out
         // Check that orphans counter has been unset
