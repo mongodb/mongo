@@ -22,9 +22,7 @@ variables:
       - name: schedule_global_auto_tasks
         variant: task_generation
   _real_expansions: &_expansion_updates
-    # TODO: Disable in SERVER-57226.
-    - key: enable_detect_changes
-      value: "true"
+      []
   ###
 
 ###
@@ -190,12 +188,6 @@ functions:
       params:
         script: ./src/dsi/run-dsi determine_failure -m TEST
   f_dsi_post_run:
-    # TODO: SERVER-57226 will let us move this json.send to after dsi's post_run.
-    # This is preferred to keep DSI execution contiguous.
-    - command: json.send
-      params:
-        name: perf
-        file: ./build/LegacyPerfJson/perf.json
     - command: shell.exec
       params:
         script: ./src/dsi/run-dsi post_run
