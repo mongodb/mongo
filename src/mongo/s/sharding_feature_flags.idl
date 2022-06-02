@@ -39,7 +39,8 @@ feature_flags:
   featureFlagBalanceAccordingToDataSize:
     description: Balancer taking decisions based on the data size if enabled, based on number of chunks if disabled
     cpp_varname: feature_flags::gBalanceAccordingToDataSize
-    default: false
+    default: true
+    version: 6.1
   featureFlagShardingDataTransformMetrics:
       description: Feature flag for enabling the new metrics for global indexes and resharding.
       cpp_varname: feature_flags::gFeatureFlagShardingDataTransformMetrics
