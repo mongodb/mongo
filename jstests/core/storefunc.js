@@ -1,4 +1,5 @@
 // @tags: [
+//   assumes_no_implicit_collection_creation_after_drop,
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
 // ]
@@ -35,4 +36,11 @@ assert.eq(6, s.findOne().value, "setup - B");
 
 assert(s.getIndexKeys().length > 0, "no indexes");
 assert(s.getIndexKeys()[0]._id, "no _id index");
+
+// Renaming from system.js to another system namespace is an existing
+// check handled by both the access control system and command namespace checking.
+assert.commandFailedWithCode(s.renameCollection('system.js_old'),
+                             [ErrorCodes.IllegalOperation, ErrorCodes.Unauthorized]);
+testdb.old_system_js.drop();
+assert.commandWorked(s.renameCollection('old_system_js'));
 })();
