@@ -1,6 +1,8 @@
-// @tags: [does_not_support_stepdowns, requires_profiling]
-//
 // Tests that profiled $lookups contain the correct namespace and that Top is updated accordingly.
+// @tags: [
+//  does_not_support_stepdowns,
+//  requires_profiling,
+// ]
 
 (function() {
 "use strict";

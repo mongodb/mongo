@@ -13,6 +13,7 @@
  *    # This test contains assertions on the number of executed operations, and tenant migrations
  *    # passthrough suites automatically retry operations on TenantMigrationAborted errors.
  *    tenant_migration_incompatible,
+ *    does_not_support_repeated_reads,
  * ]
  */
 

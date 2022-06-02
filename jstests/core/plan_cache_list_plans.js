@@ -11,6 +11,7 @@
 //   assumes_read_preference_unchanged,
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
+//   does_not_support_repeated_reads,
 //   inspects_whether_plan_cache_entry_is_active,
 // ]
 

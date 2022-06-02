@@ -11,6 +11,7 @@
 //     incompatible_with_embedded,
 //     # This test depends on hardcoded database name equality.
 //     tenant_migration_incompatible,
+//     does_not_support_repeated_reads,
 // ]
 
 (function() {

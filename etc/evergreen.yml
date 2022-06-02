@@ -1428,6 +1428,7 @@ buildvariants:
   - name: burn_in_tests_gen
   - name: .aggfuzzer
   - name: .aggregation
+  - name: aggregation_repeat_queries
   - name: audit
   - name: .auth
   - name: unittest_shell_hang_analyzer_gen
@@ -1450,6 +1451,7 @@ buildvariants:
     - rhel80-medium
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
+  - name: jsCore_repeat_queries
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.

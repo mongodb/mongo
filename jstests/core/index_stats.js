@@ -8,6 +8,7 @@
 //   # key.
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
+//   does_not_support_repeated_reads,
 //   requires_non_retryable_writes,
 //   # Tenant migrations passthrough suites automatically retry operations on TenantMigrationAborted
 //   # errors.

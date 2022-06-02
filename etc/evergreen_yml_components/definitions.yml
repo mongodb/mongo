@@ -4022,6 +4022,14 @@ tasks:
   - func: "run tests"
 
 - <<: *task_template
+  name: aggregation_repeat_queries
+  depends_on:
+  - name: aggregation
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
   name: aggregation_disabled_optimization
   tags: ["aggregation", "common"]
   depends_on:
@@ -4561,6 +4569,15 @@ tasks:
   - func: "run tests"
     vars:
       suite: core
+
+- <<: *task_template
+  name: jsCore_repeat_queries
+  tags: ["jscore"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      suite: core_repeat_queries
 
 - <<: *task_template
   name: config_fuzzer_jsCore

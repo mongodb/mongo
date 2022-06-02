@@ -7,6 +7,7 @@
 //   assumes_read_preference_unchanged,
 //   # The aggregation stage $currentOp cannot run with a readConcern other than 'local'
 //   assumes_read_concern_unchanged,
+//   does_not_support_repeated_reads,
 //   does_not_support_stepdowns,
 //   # Uses $where operator
 //   requires_scripting,

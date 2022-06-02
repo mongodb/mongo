@@ -2,8 +2,8 @@
 // @tags: [
 //   uses_multiple_connections,
 //   assumes_standalone_mongod,
+//   does_not_support_repeated_reads,
 // ]
-// Legacy write mode test also available at jstests/gle.
 
 (function() {
 'use strict';
