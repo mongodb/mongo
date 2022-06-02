@@ -415,11 +415,17 @@ void parseInclusion(ParseContext* ctx,
 
         FieldPath path(pathWithoutPositionalOperator);
 
-        auto matcher = CopyableMatchExpression{ctx->queryObj,
-                                               ctx->expCtx,
-                                               std::make_unique<ExtensionsCallbackNoop>(),
-                                               MatchExpressionParser::kBanAllSpecialFeatures,
-                                               true /* optimize expression */};
+        // Parse the match expression in order to ensure that no special features are used with
+        // positional projection.
+        uassertStatusOK(
+            MatchExpressionParser::parse(ctx->queryObj,
+                                         ctx->expCtx,
+                                         ExtensionsCallbackNoop{},
+                                         MatchExpressionParser::kBanAllSpecialFeatures));
+
+        // Copy the original match expression, which makes sure to preserve any input parameter ids
+        // attached to the tree.
+        CopyableMatchExpression matcher{ctx->queryObj, ctx->query->shallowClone()};
 
         invariant(ctx->query);
         addNodeAtPath(parent,

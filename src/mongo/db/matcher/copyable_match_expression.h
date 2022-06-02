@@ -67,6 +67,9 @@ public:
             : std::move(parseResult.getValue());
     }
 
+    CopyableMatchExpression(BSONObj matchAST, std::unique_ptr<MatchExpression> matchExpr)
+        : _matchAST(matchAST), _matchExpr(std::move(matchExpr)) {}
+
     /**
      * Sets the collator on the underlying MatchExpression and all clones(!).
      */
