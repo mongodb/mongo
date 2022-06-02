@@ -75,11 +75,11 @@ assert.commandWorked(
     st.shard0.getDB("config").getCollection("rangeDeletions").insert(rangeDeletionDocs[0]));
 
 // Step down
-assert.commandWorked(st.rs0.getPrimary().adminCommand({replSetStepDown: 300, force: true}));
-st.rs0.awaitNodesAgreeOnPrimary();
+let newPrimary = st.rs0.getSecondaries()[0];
+beforeDeletionFailpoint = configureFailPoint(newPrimary, "hangBeforeDoingDeletion");
+st.rs0.stepUp(newPrimary);
 
 // Allow another batch deletion
-beforeDeletionFailpoint = configureFailPoint(st.shard0, "hangBeforeDoingDeletion");
 afterDeletionFailpoint.off();
 beforeDeletionFailpoint.wait();
 afterDeletionFailpoint = configureFailPoint(st.shard0, "hangAfterDoingDeletion");
