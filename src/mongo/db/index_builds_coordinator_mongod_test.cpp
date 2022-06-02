@@ -86,6 +86,9 @@ void IndexBuildsCoordinatorMongodTest::setUp() {
 }
 
 void IndexBuildsCoordinatorMongodTest::tearDown() {
+    // Resume index builds left running by test failures so that shutdown() will not block.
+    _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
+
     _indexBuildsCoord->shutdown(operationContext());
     _indexBuildsCoord.reset();
     // All databases are dropped during tear down.
@@ -155,24 +158,27 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
 
     // Register an index build on _testFooNss.
+    auto testFoo1BuildUUID = UUID::gen();
     auto testFoo1Future =
         assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
                                                      _testFooNss.db().toString(),
                                                      _testFooUUID,
                                                      makeSpecs(_testFooNss, {"a", "b"}),
-                                                     UUID::gen(),
+                                                     testFoo1BuildUUID,
                                                      IndexBuildProtocol::kTwoPhase,
                                                      _indexBuildOptions));
 
     ASSERT_EQ(_indexBuildsCoord->numInProgForDb(_testFooNss.db()), 1);
     ASSERT(_indexBuildsCoord->inProgForCollection(_testFooUUID));
     ASSERT(_indexBuildsCoord->inProgForDb(_testFooNss.db()));
-    ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoIndexBuildInProgForCollection(_testFooUUID),
-                       AssertionException,
-                       ErrorCodes::BackgroundOperationInProgressForNamespace);
-    ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoBgOpInProgForDb(_testFooNss.db()),
-                       AssertionException,
-                       ErrorCodes::BackgroundOperationInProgressForDatabase);
+    ASSERT_THROWS_WITH_CHECK(
+        _indexBuildsCoord->assertNoIndexBuildInProgForCollection(_testFooUUID),
+        ExceptionFor<ErrorCodes::BackgroundOperationInProgressForNamespace>,
+        [&](const auto& ex) { ASSERT_STRING_CONTAINS(ex.reason(), testFoo1BuildUUID.toString()); });
+    ASSERT_THROWS_WITH_CHECK(
+        _indexBuildsCoord->assertNoBgOpInProgForDb(_testFooNss.db()),
+        ExceptionFor<ErrorCodes::BackgroundOperationInProgressForDatabase>,
+        [&](const auto& ex) { ASSERT_STRING_CONTAINS(ex.reason(), testFoo1BuildUUID.toString()); });
 
     // Register a second index build on _testFooNss.
     auto testFoo2Future =
@@ -382,7 +388,10 @@ TEST_F(IndexBuildsCoordinatorMongodTest, AbortBuildIndexDueToTenantMigration) {
 
     // we currently have one index build in progress.
     ASSERT_EQ(1, _indexBuildsCoord->getActiveIndexBuildCount(operationContext()));
-    ASSERT_THROWS(_indexBuildsCoord->assertNoIndexBuildInProgress(), mongo::DBException);
+    ASSERT_THROWS_WITH_CHECK(
+        _indexBuildsCoord->assertNoIndexBuildInProgress(),
+        ExceptionFor<ErrorCodes::BackgroundOperationInProgressForDatabase>,
+        [&](const auto& ex) { ASSERT_STRING_CONTAINS(ex.reason(), buildUUID.toString()); });
 
     ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
         operationContext(), buildUUID, HostAndPort("test1", 1234)));

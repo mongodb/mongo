@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <fmt/format.h>
+
 #include "mongo/db/active_index_builds.h"
 #include "mongo/db/catalog/index_builds_manager.h"
 #include "mongo/logv2/log.h"
@@ -65,10 +67,14 @@ void ActiveIndexBuilds::waitForAllIndexBuildsToStopForShutdown(OperationContext*
 
 void ActiveIndexBuilds::assertNoIndexBuildInProgress() const {
     stdx::unique_lock<Latch> lk(_mutex);
-    uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
-            str::stream() << "cannot perform operation: there are currently "
-                          << _allIndexBuilds.size() << " index builds running.",
-            _allIndexBuilds.size() == 0);
+    if (!_allIndexBuilds.empty()) {
+        auto firstIndexBuild = _allIndexBuilds.cbegin()->second;
+        uasserted(ErrorCodes::BackgroundOperationInProgressForDatabase,
+                  fmt::format("cannot perform operation: there are currently {} index builds "
+                              "running. Found index build: {}",
+                              _allIndexBuilds.size(),
+                              firstIndexBuild->buildUUID.toString()));
+    }
 }
 
 void ActiveIndexBuilds::waitUntilAnIndexBuildFinishes(OperationContext* opCtx) {
