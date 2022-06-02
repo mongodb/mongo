@@ -76,10 +76,6 @@ structs:
                 type: bool
                 description: "If set, wait for the chunk migration to finish before returning"
                 default: false
-            forceJumbo:
-                type: ForceJumbo
-                description: "Specifies the policy to use for jumbo chunks"
-                default: kDoNotForce
 
 commands:
     clusterMoveRange:
@@ -93,6 +89,10 @@ commands:
         chained_structs:
             MoveRangeRequestBase: MoveRangeRequestBase
         fields:
+            forceJumbo:
+                type: bool
+                description: "Specifies whether or not forcing jumbo chunks move"
+                default: false
             secondaryThrottle:
                 type: optionalBool
                 description: "Secondary throttle policy to adopt during the migration"
@@ -108,6 +108,10 @@ commands:
         chained_structs:
             MoveRangeRequestBase: MoveRangeRequestBase
         fields:
+            forceJumbo:
+                type: ForceJumbo
+                description: "Specifies the policy to use for jumbo chunks"
+                default: kDoNotForce
             secondaryThrottle:
                 type: MigrationSecondaryThrottle
                 description: "Secondary throttle policy to adopt during the migration"
@@ -137,6 +141,10 @@ commands:
             maxChunkSizeBytes:
                 type: safeInt64
                 description: "Max size of data to move"
+            forceJumbo:
+                type: ForceJumbo
+                description: "Specifies the policy to use for jumbo chunks"
+                default: kDoNotForce
             secondaryThrottle:
                 type: optionalBool
                 description: "Secondary throttle policy to adopt during the migration"
