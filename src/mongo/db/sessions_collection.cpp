@@ -231,8 +231,7 @@ LogicalSessionIdSet SessionsCollection::_doFindRemoved(
         batch.push_back(record);
     };
 
-
-    LogicalSessionIdSet activeSessions;
+    LogicalSessionIdSet removed{sessions.begin(), sessions.end()};
 
     auto wrappedSend = [&](BSONObj batch) {
         BSONObjBuilder batchWithReadConcernLocal(batch);
@@ -244,7 +243,7 @@ LogicalSessionIdSet SessionsCollection::_doFindRemoved(
             SessionsCollectionFetchResult::parse("SessionsCollectionFetchResult"_sd, swBatchResult);
 
         for (const auto& lsid : result.getCursor().getFirstBatch()) {
-            activeSessions.insert(lsid.get_id());
+            removed.erase(lsid.get_id());
         }
     };
 
@@ -266,18 +265,6 @@ LogicalSessionIdSet SessionsCollection::_doFindRemoved(
     };
 
     runBulkGeneric(makeT, add, sendLocal, sessions);
-
-    LogicalSessionIdSet removed;
-    for (const auto& session : sessions) {
-        if (activeSessions.find(session) != activeSessions.end()) {
-            continue;
-        }
-        if (auto parentSession = getParentSessionId(session);
-            parentSession && (activeSessions.find(*parentSession) != activeSessions.end())) {
-            continue;
-        }
-        removed.insert(session);
-    }
 
     return removed;
 }

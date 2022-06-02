@@ -211,23 +211,64 @@ const auto kLastWriteDateFieldName = SessionTxnRecord::kLastWriteDateFieldName;
 
 /**
  * Removes the the config.transactions and the config.image_collection entries for the transaction
- * sessions in 'possiblyExpiredTransactionSessionIds' that are actually expired. Returns the number
+ * sessions in 'expiredTransactionSessionIdsNotInUse' that are safe to reap. Returns the number
  * of transaction sessions whose entries were removed.
  */
 int removeSessionsTransactionRecords(
     OperationContext* opCtx,
     SessionsCollection& sessionsCollection,
-    const LogicalSessionIdSet& possiblyExpiredTransactionSessionIds) {
-    if (possiblyExpiredTransactionSessionIds.empty()) {
+    const LogicalSessionIdSet& expiredTransactionSessionIdsNotInUse) {
+    if (expiredTransactionSessionIdsNotInUse.empty()) {
         return 0;
     }
 
-    // From the possibly expired transaction session ids, find the ones which are actually
-    // expired/removed.
-    auto expiredTransactionSessionIds =
-        sessionsCollection.findRemovedSessions(opCtx, possiblyExpiredTransactionSessionIds);
+    // From the expired transaction session ids that are no longer in use, find the ones that are
+    // safe to reap.
+    LogicalSessionIdSet transactionSessionIdsToReap;
+    {
+        LogicalSessionIdSet possiblyExpiredLogicalSessionIds;
+        LogicalSessionIdMap<LogicalSessionIdSet>
+            transactionSessionIdsToReapIfLogicalSessionsExpired;
 
-    if (expiredTransactionSessionIds.empty()) {
+        for (const auto& transactionSessionId : expiredTransactionSessionIdsNotInUse) {
+            if (isInternalSessionForRetryableWrite(transactionSessionId)) {
+                // It is safe to reap an internal transaction session for retryable write if it
+                // its transaction record has already expired since by design internal transaction
+                // sessions for retryable write are never reused and reaping them would not
+                // interrupt operations on other transaction sessions for the logical sessions that
+                // they correspond to.
+                transactionSessionIdsToReap.insert(transactionSessionId);
+            } else {
+                // It not safe to reap an internal transaction session for non-retryable write until
+                // the logical session that it corresponds to has expired, even if its transaction
+                // record has already expired. The reason is that each internal transaction session
+                // for non-retryable write is kept in the internal session pool and is reusable
+                // as long as the logical session that its correspond to has not expired and so
+                // reaping it would interrupt any operation that is running on it. The same applies
+                // to a parent transaction session since reaping it would interrupt all operations
+                // on that logical session.
+                auto logicalSessionId = castToParentSessionId(transactionSessionId);
+                possiblyExpiredLogicalSessionIds.insert(logicalSessionId);
+                transactionSessionIdsToReapIfLogicalSessionsExpired[logicalSessionId].insert(
+                    transactionSessionId);
+            }
+        }
+
+        if (!transactionSessionIdsToReapIfLogicalSessionsExpired.empty()) {
+            auto expiredLogicalSessionIds =
+                sessionsCollection.findRemovedSessions(opCtx, possiblyExpiredLogicalSessionIds);
+            for (const auto& [logicalSessionId, transactionSessionIds] :
+                 transactionSessionIdsToReapIfLogicalSessionsExpired) {
+                if (expiredLogicalSessionIds.find(logicalSessionId) !=
+                    expiredLogicalSessionIds.end()) {
+                    transactionSessionIdsToReap.insert(transactionSessionIds.begin(),
+                                                       transactionSessionIds.end());
+                }
+            }
+        }
+    }
+
+    if (transactionSessionIdsToReap.empty()) {
         return 0;
     }
 
@@ -248,7 +289,7 @@ int removeSessionsTransactionRecords(
         }());
         imageDeleteOp.setDeletes([&] {
             std::vector<write_ops::DeleteOpEntry> entries;
-            for (const auto& transactionSessionId : expiredTransactionSessionIds) {
+            for (const auto& transactionSessionId : transactionSessionIdsToReap) {
                 entries.emplace_back(
                     BSON(LogicalSessionRecord::kIdFieldName << transactionSessionId.toBSON()),
                     false /* multi = false */);
@@ -269,7 +310,7 @@ int removeSessionsTransactionRecords(
         }());
         sessionDeleteOp.setDeletes([&] {
             std::vector<write_ops::DeleteOpEntry> entries;
-            for (const auto& transactionSessionId : expiredTransactionSessionIds) {
+            for (const auto& transactionSessionId : transactionSessionIdsToReap) {
                 entries.emplace_back(
                     BSON(LogicalSessionRecord::kIdFieldName << transactionSessionId.toBSON()),
                     false /* multi = false */);
@@ -304,7 +345,7 @@ int removeExpiredTransactionSessionsFromDisk(
     // limit.
     const int kMaxBatchSize = 10'000;
 
-    LogicalSessionIdSet possiblyExpiredTransactionSessionIds;
+    LogicalSessionIdSet expiredTransactionSessionIdsNotInUse;
     int numReaped = 0;
     while (cursor->more()) {
         auto transactionSession = SessionsCollectionFetchResultIndividualResult::parse(
@@ -316,15 +357,15 @@ int removeExpiredTransactionSessionsFromDisk(
             continue;
         }
 
-        possiblyExpiredTransactionSessionIds.insert(transactionSessionId);
-        if (possiblyExpiredTransactionSessionIds.size() > kMaxBatchSize) {
+        expiredTransactionSessionIdsNotInUse.insert(transactionSessionId);
+        if (expiredTransactionSessionIdsNotInUse.size() > kMaxBatchSize) {
             numReaped += removeSessionsTransactionRecords(
-                opCtx, sessionsCollection, possiblyExpiredTransactionSessionIds);
-            possiblyExpiredTransactionSessionIds.clear();
+                opCtx, sessionsCollection, expiredTransactionSessionIdsNotInUse);
+            expiredTransactionSessionIdsNotInUse.clear();
         }
     }
     numReaped += removeSessionsTransactionRecords(
-        opCtx, sessionsCollection, possiblyExpiredTransactionSessionIds);
+        opCtx, sessionsCollection, expiredTransactionSessionIdsNotInUse);
 
     return numReaped;
 }

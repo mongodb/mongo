@@ -259,7 +259,9 @@ SessionCatalog::KillToken SessionCatalog::killSession(const LogicalSessionId& ls
 
     auto sri = _getSessionRuntimeInfo(lg, lsid);
     uassert(ErrorCodes::NoSuchSession, "Session not found", sri);
-    return ObservableSession(lg, sri, &sri->parentSession).kill();
+    auto session = sri->getSession(lsid);
+    uassert(ErrorCodes::NoSuchSession, "Session not found", session);
+    return ObservableSession(lg, sri, session).kill();
 }
 
 size_t SessionCatalog::size() const {
@@ -358,12 +360,17 @@ SessionCatalog::KillToken ObservableSession::kill(ErrorCodes::Error reason) cons
     const bool firstKiller = (0 == _sri->killsRequested);
     ++_sri->killsRequested;
 
-    // For currently checked-out sessions, interrupt the operation context so that the current owner
-    // can release the session
     if (firstKiller && hasCurrentOperation()) {
+        // Interrupt the current OperationContext if its running on the transaction session
+        // that is being killed or if we are killing the parent transaction session.
         invariant(_clientLock.owns_lock());
-        const auto serviceContext = _sri->checkoutOpCtx->getServiceContext();
-        serviceContext->killOperation(_clientLock, _sri->checkoutOpCtx, reason);
+        const auto checkedOutLsid = _sri->checkoutOpCtx->getLogicalSessionId();
+        const auto lsidToKill = getSessionId();
+        const bool isKillingParentSession = !getParentSessionId(lsidToKill);
+        if ((checkedOutLsid == lsidToKill) || isKillingParentSession) {
+            const auto serviceContext = _sri->checkoutOpCtx->getServiceContext();
+            serviceContext->killOperation(_clientLock, _sri->checkoutOpCtx, reason);
+        }
     }
 
     return SessionCatalog::KillToken(getSessionId());
