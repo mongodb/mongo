@@ -43,7 +43,7 @@ BSON document that describes the properties of a collection and its indexes. The
 class allows read and write access to the durable data.
 
 Starting in v5.2, catalog entries for time-series collections have a new flag called
-`timeseriesBucketsMayHaveMixedSchemaData` in the `md` field. Time-series collections upgraded from 
+`timeseriesBucketsMayHaveMixedSchemaData` in the `md` field. Time-series collections upgraded from
 versions earlier than v5.2 may have mixed-schema data in buckets. This flag gets set to `true` as
 part of the upgrade process and is removed as part of the downgrade process through the
 [collMod command](https://github.com/mongodb/mongo/blob/cf80c11bc5308d9b889ed61c1a3eeb821839df56/src/mongo/db/catalog/coll_mod.cpp#L644-L663).
@@ -101,7 +101,7 @@ thread than the thread calling `CollectionCatalog::write`.
 To avoid a bottleneck in the case the catalog contains a large number of collections (being slow to
 copy), concurrent writes are batched together. Any thread that enters `CollectionCatalog::write`
 while a catalog instance is being copied is enqueued. When the copy finishes, all enqueued write
-jobs are run on that catalog instance by the copying thread. 
+jobs are run on that catalog instance by the copying thread.
 
 ### Collection objects
 Objects of the `Collection` class provide access to a collection's properties between
@@ -141,7 +141,7 @@ shallowed copied. Notably, a shallow copy is made for the [`IndexCatalog`](#inde
 
 The oplog `Collection` follows special rules, it does not use [read-copy-update][] or any other form
 of synchronization. Modifications operate directly on the instance installed in the catalog. It is
-not allowed to read concurrently with writes on the oplog `Collection`. 
+not allowed to read concurrently with writes on the oplog `Collection`.
 
 Finally, there are two kinds of decorations on `Collection` objects. The `Collection` object derives
 from `DecorableCopyable` and requires `Decoration`s to implement a copy-constructor. Collection
@@ -479,7 +479,7 @@ In MongoDB, Resources are arranged in a hierarchy, in order to provide an orderi
 deadlocks when locking multiple Resources, and also as an implementation of Intent Locking (an
 optimization for locking higher level resources). The hierarchy of ResourceTypes is as follows:
 
-1. Global (three - see below) 
+1. Global (three - see below)
 1. Database (one per database on the server)
 1. Collection (one per collection on the server)
 
@@ -933,6 +933,28 @@ regulate when to write a chunk of sorted data out to disk in a temporary file.
 _Code spelunking starting points:_
 
 * [_The External Sorter Classes_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/sorter/sorter.h)
+
+# The TTLMonitor
+
+The TTLMonitor runs as a background job on each mongod. On a mongod primary, the TTLMonitor is responsible for removing documents expired on [TTL Indexes](https://www.mongodb.com/docs/manual/core/index-ttl/) across the mongod instance. It continuously runs in a loop that sleeps for ['ttlMonitorSleepSecs'](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl#L39) and then performs a TTL Pass to remove all expired documents.
+
+The TTLMonitor exhibits different behavior pending on whether batched deletes are enabled. When enabled (the default), the TTLMonitor batches TTL deletions and also removes expired documents more fairly among TTL indexes. When disabled, the TTLMonitor falls back to legacy, doc-by-doc deletions and deletes all expired documents from a single TTL index before moving to the next one. The legacy behavior can lead to the TTLMonitor getting "stuck" deleting large ranges of documents on a single TTL index, starving other indexes of deletes at regular intervals.
+
+### Fair TTL Deletion
+If ['ttlMonitorBatchDeletes'](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl#L48) is specified, the TTLMonitor will batch deletes and provides fair TTL deletion as follows:
+* The TTL pass consists of one or more subpasses.
+* Each subpass refreshes its view of TTL indexes in the system. It removes documents on each TTL index in a round-robin fashion until there are no more expired documents or ['ttlMonitorSubPassTargetSecs'](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl#L58) is reached.
+  * The delete on each TTL index removes up to ['ttlIndexDeleteTargetDocs'](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl#L84) or runs up to ['ttlIndexDeleteTargetTimeMS'](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl#L72), whichever target is met first. The same TTL index can be queued up to be revisited in the same subpass if there are outstanding deletions.
+  * A TTL index is not visited any longer in a subpass once all documents are deleted.
+* If there are outstanding deletions by the end of the subpass for any TTL index, a new subpass starts immediately within the same pass.
+
+_Code spelunking starting points:_
+
+* [_The TTLMonitor Class_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.h)
+* [_The TTLCollectionCache Class_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl_collection_cache.h)
+* [_ttl.idl_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl)
+
+TODO SERVER-66898: Refresh links
 
 # Repair
 
@@ -1586,20 +1608,20 @@ tunable with the server parameters `documentUnitSizeBytes` and `indexEntryUnitSi
 
 ## Total Write Units
 
-For writes, the code also calculates a special combined document and index unit. The code attempts 
-to associate index writes with an associated document write, and takes those bytes collectively to 
+For writes, the code also calculates a special combined document and index unit. The code attempts
+to associate index writes with an associated document write, and takes those bytes collectively to
 calculate units. For each set of bytes written, a unit is calculated as the following:
 ```
 units = ceil (set bytes / unit size in bytes)
 ```
 
 To associate index writes with document writes, the algorithm is the following:
-Within a storage transaction, if a document write precedes as-yet-unassigned index writes, assign 
+Within a storage transaction, if a document write precedes as-yet-unassigned index writes, assign
 such index bytes with the preceding document bytes, up until the next document write.
-If a document write follows as-yet-unassigned index writes, assign such index bytes with the 
+If a document write follows as-yet-unassigned index writes, assign such index bytes with the
 following document bytes.
 
-The `totalUnitWriteSizeBytes` server parameter affects the unit calculation size for the above 
+The `totalUnitWriteSizeBytes` server parameter affects the unit calculation size for the above
 calculation.
 
 
@@ -1661,7 +1683,7 @@ schema, per returned document:
   idxEntryBytesWritten: 0,
   // The number of index entry units attempted to be written to or deleted from the storage engine
   idxEntryUnitsWritten: 0,
-  // The total number of document plus associated index entry units attempted to be written to 
+  // The total number of document plus associated index entry units attempted to be written to
   // or deleted from the storage engine
   totalUnitsWritten: 0
 }
