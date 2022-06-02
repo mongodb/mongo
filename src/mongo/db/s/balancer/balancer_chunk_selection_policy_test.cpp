@@ -33,6 +33,7 @@
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy_impl.h"
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
 #include "mongo/db/s/balancer/migration_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 
@@ -173,6 +174,8 @@ TEST_F(BalancerChunkSelectionTest, TagRangesOverlap) {
 }
 
 TEST_F(BalancerChunkSelectionTest, TagRangeMaxNotAlignedWithChunkMax) {
+    RAIIServerParameterControllerForTest featureFlagBalanceAccordingToDataSize{
+        "featureFlagBalanceAccordingToDataSize", false};
     // Set up two shards in the metadata.
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     ShardType::ConfigNS,
@@ -281,6 +284,8 @@ TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCanBeAutoSplitted
 }
 
 TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCanBeBalanced) {
+    RAIIServerParameterControllerForTest featureFlagBalanceAccordingToDataSize{
+        "featureFlagBalanceAccordingToDataSize", false};
     // Set up two shards in the metadata.
     ASSERT_OK(catalogClient()->insertConfigDocument(
         operationContext(), ShardType::ConfigNS, kShard0, kMajorityWriteConcern));
