@@ -147,8 +147,7 @@ __curlog_kv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 {
     WT_CURSOR_LOG *cl;
     WT_DECL_RET;
-    uint64_t raw;
-    uint32_t fileid, key_count, opsize, optype;
+    uint32_t fileid, key_count, opsize, optype, raw;
 
     cl = (WT_CURSOR_LOG *)cursor;
     /* Temporarily turn off raw so we can do direct cursor operations. */
@@ -233,8 +232,7 @@ __curlog_search(WT_CURSOR *cursor)
     WT_DECL_RET;
     WT_LSN key;
     WT_SESSION_IMPL *session;
-    uint64_t raw;
-    uint32_t counter, key_file, key_offset;
+    uint32_t counter, key_file, key_offset, raw;
 
     cl = (WT_CURSOR_LOG *)cursor;
     /* Temporarily turn off raw so we can do direct cursor operations. */

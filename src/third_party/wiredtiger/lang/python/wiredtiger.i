@@ -119,7 +119,7 @@ from packing import pack, unpack
 	    SWIGTYPE_p___wt_cursor, 0);
 	if (*$1 != NULL) {
 		PY_CALLBACK *pcb;
-		uint64_t json, version_cursor;
+		uint32_t json, version_cursor;
 
 		json = (*$1)->flags & WT_CURSTD_DUMP_JSON;
 		version_cursor = (*$1)->flags & WT_CURSTD_VERSION_CURSOR;
