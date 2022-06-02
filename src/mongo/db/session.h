@@ -62,6 +62,10 @@ public:
         return _parentSession;
     }
 
+    int getCachedHighestTxnNumberWithChildSessions() {
+        return _cachedHighestTxnNumberWithChildSessions;
+    }
+
 private:
     // The session id of the transaction session that this object represents.
     const LogicalSessionId _sessionId;
@@ -74,6 +78,11 @@ private:
     // Counts how many threads are blocked waiting for this Session to become available. Used to
     // block reaping of this Session from the SessionCatalog.
     int _numWaitingToCheckOut{0};
+
+    // Cache of the highest txnNumber on seen on a child session for this session's logical session.
+    // Cached to avoid taking the session catalog mutex to read and because this is only best
+    // effort to minimize sessions read when refreshing a transaction participant.
+    int _cachedHighestTxnNumberWithChildSessions{kUninitializedTxnNumber};
 };
 
 }  // namespace mongo

@@ -105,6 +105,7 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionInner(
 
     sri->checkoutOpCtx = opCtx;
     sri->lastCheckout = Date_t::now();
+    session->_cachedHighestTxnNumberWithChildSessions = sri->highestTxnNumberWithChildSessions;
 
     return ScopedCheckedOutSession(*this, std::move(sri), session, std::move(killToken));
 }
@@ -321,6 +322,7 @@ void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
     }
 
     sri->checkoutOpCtx = nullptr;
+    session->_cachedHighestTxnNumberWithChildSessions = kUninitializedTxnNumber;
     sri->availableCondVar.notify_all();
 
     if (killToken) {
