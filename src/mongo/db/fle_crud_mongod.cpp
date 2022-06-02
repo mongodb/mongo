@@ -167,6 +167,7 @@ void stopFLECrud() {
     // Check if it was started
     if (_fleCrudExecutor.get() != nullptr) {
         _fleCrudExecutor->shutdown();
+        _fleCrudExecutor->join();
     }
 }
 
