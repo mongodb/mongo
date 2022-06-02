@@ -913,9 +913,10 @@ let MongosAPIParametersUtil = (function() {
                 permittedInTxn: false,
                 requiresShardedCollection: true,
                 setUp: () => {
-                    // Collection is already split into chunks [MinKey, 10], (10, MaxKey].
                     assert.commandWorked(
                         st.s.adminCommand({split: "db.collection", middle: {_id: -5}}));
+                    assert.commandWorked(
+                        st.s.adminCommand({split: "db.collection", middle: {_id: 10}}));
                     // Now the chunks are: [MinKey, -5], (-5, 10], (10, MaxKey].
                 },
                 command: () => ({mergeChunks: "db.collection", bounds: [{_id: MinKey}, {_id: 10}]})
@@ -1546,37 +1547,16 @@ let MongosAPIParametersUtil = (function() {
         for (let i = 0; i < testInstances.length; ++i) {
             const {apiParameters, commandName, runOrExplain} = testInstances[i];
 
-            // Creating a new db implicitly should succeed with 'apiStrict: true'.
-            assert.commandWorked(st.s.getDB("db").runCommand(
-                {create: 'collection', apiVersion: '1', apiStrict: true}));
+            assert.commandWorked(
+                st.s.adminCommand({enableSharding: "db", primaryShard: st.shard0.shardName}));
 
             if (shardedCollection) {
-                jsTestLog("Sharded setup");
-                assert.commandWorked(st.s.getDB("db")["collection"].insert(
-                    {_id: 0}, {writeConcern: {w: "majority"}}));
-                assert.commandWorked(st.s.getDB("db")["collection"].insert(
-                    {_id: 20}, {writeConcern: {w: "majority"}}));
-
-                assert.commandWorked(st.s.adminCommand({enableSharding: "db"}));
-                st.ensurePrimaryShard("db", st.shard0.shardName);
                 assert.commandWorked(
                     st.s.adminCommand({shardCollection: "db.collection", key: {_id: 1}}));
-
-                // The chunk with _id 0 is on shard 0.
-                assert.commandWorked(
-                    st.s.adminCommand({split: "db.collection", middle: {_id: 10}}));
-                assert.commandWorked(st.s.adminCommand({
-                    moveChunk: "db.collection",
-                    find: {_id: 20},
-                    to: st.shard1.shardName,
-                    _waitForDelete: true
-                }));
-            } else {
-                jsTestLog("Unsharded setup");
-                assert.commandWorked(st.s.getDB("db")["collection"].insert(
-                    {_id: 0}, {writeConcern: {w: "majority"}}));
-                st.ensurePrimaryShard("db", st.shard0.shardName);
             }
+
+            assert.commandWorked(
+                st.s.getDB("db")["collection"].insert({_id: 0}, {writeConcern: {w: "majority"}}));
 
             const configPrimary = st.configRS.getPrimary();
             const shardZeroPrimary = st.rs0.getPrimary();
