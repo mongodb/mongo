@@ -3,12 +3,6 @@
 t = db.insert1;
 t.drop();
 
-// Previously in insert2.js.
-// Failing to insert an invalid document with a regex for the _id field
-// should not result in the collection being created.
-assert.commandFailed(t.insert({_id: /x/}));
-assert.isnull(t.exists());
-
 var o = {a: 1};
 t.insert(o);
 var doc = t.findOne();
