@@ -16,8 +16,12 @@ var defragmentationUtil = (function() {
         assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {key: 1}}));
         // Turn off balancer for this collection
         if (disableCollectionBalancing) {
+            // Use 'retryWrites' when writing to the configsvr because mongos does not automatically
+            // retry those.
+            const mongosSession = mongos.startSession({retryWrites: true});
+            const sessionConfigDB = mongosSession.getDatabase('config');
             assert.commandWorked(
-                mongos.getDB('config').collections.update({_id: ns}, {$set: {"noBalance": true}}));
+                sessionConfigDB.collections.update({_id: ns}, {$set: {"noBalance": true}}));
         }
 
         createAndDistributeChunks(mongos, ns, numChunks, chunkSpacing);
