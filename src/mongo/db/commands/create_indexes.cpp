@@ -497,7 +497,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
     boost::optional<UUID> collectionUUID;
     CreateIndexesReply reply;
     {
-        Lock::DBLock dbLock(opCtx, ns.db(), MODE_IS);
+        Lock::DBLock dbLock(opCtx, ns.db(), MODE_IX);
         checkDatabaseShardingState(opCtx, ns);
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
             uasserted(ErrorCodes::NotWritablePrimary,
@@ -505,7 +505,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
         }
 
         bool indexExists = writeConflictRetry(opCtx, "createCollectionWithIndexes", ns.ns(), [&] {
-            AutoGetCollection collection(opCtx, ns, MODE_IS);
+            AutoGetCollection collection(opCtx, ns, MODE_IX);
             CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx);
 
             checkCollectionUUIDMismatch(
@@ -515,8 +515,6 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
             // exist while holding an intent lock.
             if (collection &&
                 indexesAlreadyExist(opCtx, collection.getCollection(), specs, &reply)) {
-                repl::ReplClientInfo::forClient(opCtx->getClient())
-                    .setLastOpToSystemLastOpTime(opCtx);
                 return true;
             }
 
