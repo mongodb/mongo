@@ -671,6 +671,7 @@ StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(OperationContext* op
 
     const auto& collection = coll.getCollection();
     if (!collection) {
+        checkCollectionUUIDMismatch(opCtx, nss, nullptr, cmd.getCollectionUUID());
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "ns does not exist for unique index conversion: " << nss);
     }
