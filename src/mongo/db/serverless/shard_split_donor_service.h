@@ -174,7 +174,7 @@ private:
                                                      const CancellationToken& primaryToken);
 
     ExecutorFuture<DurableState> _handleErrorOrEnterAbortedState(
-        StatusWith<DurableState> durableState,
+        Status status,
         const ScopedTaskExecutorPtr& executor,
         const CancellationToken& instanceAbortToken,
         const CancellationToken& abortToken);

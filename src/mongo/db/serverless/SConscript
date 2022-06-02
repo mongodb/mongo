@@ -64,6 +64,7 @@ env.Library(
     source=[
         'shard_split_donor_service.cpp',
         'shard_split_donor_op_observer.cpp',
+        'shard_split_statistics.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/primary_only_service',

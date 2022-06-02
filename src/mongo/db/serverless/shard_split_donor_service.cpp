@@ -38,6 +38,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/serverless/shard_split_statistics.h"
 #include "mongo/db/serverless/shard_split_utils.h"
 #include "mongo/executor/cancelable_executor.h"
 #include "mongo/executor/connection_pool.h"
@@ -342,6 +343,9 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
     _markKilledExecutor->startup();
     _cancelableOpCtxFactory.emplace(primaryToken, _markKilledExecutor);
 
+    auto criticalSectionTimer = std::make_shared<Timer>();
+    auto criticalSectionWithoutCatchupTimer = std::make_shared<Timer>();
+
     _decisionPromise.setWith([&] {
         const bool shouldRemoveStateDocumentOnRecipient = [&]() {
             stdx::lock_guard<Latch> lg(_mutex);
@@ -385,12 +389,12 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 .unsafeToInlineFuture();
         }
 
-        _initiateTimeout(executor, abortToken);
         LOGV2(6086506,
               "Starting shard split.",
               "id"_attr = _migrationId,
               "timeout"_attr = repl::shardSplitTimeoutMS.load());
 
+        _initiateTimeout(executor, abortToken);
         return ExecutorFuture(**executor)
             .then([this, executor, primaryToken, abortToken] {
                 // Note we do not use the abort split token here because the abortShardSplit
@@ -401,7 +405,8 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 }
                 return _enterBlockingOrAbortedState(executor, primaryToken, abortToken);
             })
-            .then([this, executor, abortToken] {
+            .then([this, executor, abortToken, criticalSectionTimer] {
+                criticalSectionTimer->reset();
                 checkForTokenInterrupt(abortToken);
                 _cancelableOpCtxFactory.emplace(abortToken, _markKilledExecutor);
 
@@ -413,32 +418,49 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
 
                 return _waitForRecipientToReachBlockTimestamp(executor, abortToken);
             })
-            .then([this, executor, abortToken] {
+            .then([this, executor, abortToken, criticalSectionWithoutCatchupTimer] {
+                criticalSectionWithoutCatchupTimer->reset();
                 return _applySplitConfigToDonor(executor, abortToken);
             })
             .then([this, executor, abortToken] {
                 return _waitForRecipientToAcceptSplitAndTriggerElection(executor, abortToken);
             })
-            .then([this] {
-                stdx::lock_guard<Latch> lg(_mutex);
+            // anchor ensures the instance will still exists even if the primary stepped down
+            .onCompletion([this,
+                           executor,
+                           primaryToken,
+                           abortToken,
+                           criticalSectionTimer,
+                           criticalSectionWithoutCatchupTimer,
+                           anchor = shared_from_this()](Status status) {
+                // only cancel operations on stepdown from here out
+                _cancelableOpCtxFactory.emplace(primaryToken, _markKilledExecutor);
+
                 LOGV2(6236700,
                       "Shard split decision reached",
                       "id"_attr = _migrationId,
                       "state"_attr = _stateDoc.getState());
-                return DurableState{_stateDoc.getState(), _abortReason};
-            })
-            // anchor ensures the instance will still exists even if the primary stepped down
-            .onCompletion([this, executor, primaryToken, abortToken, anchor = shared_from_this()](
-                              StatusWith<DurableState> statusWithState) {
-                // only cancel operations on stepdown from here out
-                _cancelableOpCtxFactory.emplace(primaryToken, _markKilledExecutor);
 
-                if (!statusWithState.isOK()) {
-                    return _handleErrorOrEnterAbortedState(
-                        statusWithState, executor, primaryToken, abortToken);
+                {
+                    stdx::lock_guard<Latch> lg(_mutex);
+                    if (!_stateDoc.getExpireAt()) {
+                        if (_abortReason) {
+                            ShardSplitStatistics::get(_serviceContext)->incrementTotalAborted();
+                        } else {
+                            ShardSplitStatistics::get(_serviceContext)
+                                ->incrementTotalCommitted(
+                                    Milliseconds{criticalSectionTimer->millis()},
+                                    Milliseconds{criticalSectionWithoutCatchupTimer->millis()});
+                        }
+                    }
                 }
 
-                return ExecutorFuture(**executor, statusWithState);
+                if (!status.isOK()) {
+                    return _handleErrorOrEnterAbortedState(
+                        status, executor, primaryToken, abortToken);
+                }
+
+                return ExecutorFuture(**executor, DurableState{_stateDoc.getState(), _abortReason});
             })
             .unsafeToInlineFuture();
     });
@@ -954,7 +976,7 @@ void ShardSplitDonorService::DonorStateMachine::_initiateTimeout(
 
 ExecutorFuture<ShardSplitDonorService::DonorStateMachine::DurableState>
 ShardSplitDonorService::DonorStateMachine::_handleErrorOrEnterAbortedState(
-    StatusWith<DurableState> statusWithState,
+    Status status,
     const ScopedTaskExecutorPtr& executor,
     const CancellationToken& primaryToken,
     const CancellationToken& abortToken) {
@@ -976,30 +998,23 @@ ShardSplitDonorService::DonorStateMachine::_handleErrorOrEnterAbortedState(
         }
     }
 
-    const auto status = statusWithState.getStatus();
     if (ErrorCodes::isNotPrimaryError(status) || ErrorCodes::isShutdownError(status)) {
         // Don't abort the split on retriable errors that may have been generated by the local
         // server shutting/stepping down because it can be resumed when the client retries.
-        return ExecutorFuture(**executor, statusWithState);
+        return ExecutorFuture(**executor, StatusWith<DurableState>{status});
     }
 
     // Make sure we don't change the status if the abortToken is cancelled due to a POS instance
     // interruption.
     if (abortToken.isCanceled() && !primaryToken.isCanceled()) {
-        statusWithState =
+        status =
             Status(ErrorCodes::TenantMigrationAborted, "Aborted due to 'abortShardSplit' command.");
     }
 
     {
         stdx::lock_guard<Latch> lg(_mutex);
-
         if (!_abortReason) {
-            _abortReason = statusWithState.getStatus();
-        }
-
-        if (_abortSource) {
-            // Cancel source to ensure all child threads (RSM monitor, etc) terminate.
-            _abortSource->cancel();
+            _abortReason = status;
         }
 
         BSONObjBuilder bob;

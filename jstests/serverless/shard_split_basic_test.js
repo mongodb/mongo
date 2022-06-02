@@ -19,14 +19,20 @@ const test =
 test.addRecipientNodes();
 test.donor.awaitSecondaryNodes();
 
+const donorPrimary = test.getDonorPrimary();
 const operation = test.createSplitOperation(tenantIds);
 assert.commandWorked(operation.commit());
 
-assertMigrationState(test.getDonorPrimary(), operation.migrationId, "committed");
+assertMigrationState(donorPrimary, operation.migrationId, "committed");
 
 operation.forget();
 
-test.cleanupSuccesfulCommitted(operation.migrationId, tenantIds);
+const status = donorPrimary.adminCommand({serverStatus: 1});
+assert.eq(status.shardSplits.totalCommitted, 1);
+assert.eq(status.shardSplits.totalAborted, 0);
+assert.gt(status.shardSplits.totalCommittedDurationMillis, 0);
+assert.gt(status.shardSplits.totalCommittedDurationWithoutCatchupMillis, 0);
 
+test.cleanupSuccesfulCommitted(operation.migrationId, tenantIds);
 test.stop();
 })();
