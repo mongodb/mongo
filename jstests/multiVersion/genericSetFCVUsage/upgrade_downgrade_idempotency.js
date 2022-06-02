@@ -56,5 +56,4 @@ function runTest(downgradeVersion) {
 }
 
 runTest('last-lts');
-runTest('last-continuous');
 }());

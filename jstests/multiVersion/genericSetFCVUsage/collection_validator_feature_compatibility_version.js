@@ -315,7 +315,4 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
 testCollectionValidatorFCVBehavior("last-lts", testCasesLastStable);
 testCollectionValidatorFCVBehavior(
     "last-lts", testCasesLastStableWithFeatureFlags, featureFlagsToEnable);
-testCollectionValidatorFCVBehavior("last-continuous", testCasesLastContinuous);
-testCollectionValidatorFCVBehavior(
-    "last-continuous", testCasesLastContinuousWithFeatureFlags, featureFlagsToEnable);
 }());

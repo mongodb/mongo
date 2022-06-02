@@ -258,7 +258,4 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
 testViewDefinitionFCVBehavior("last-lts", testCasesLastStable);
 testViewDefinitionFCVBehavior(
     "last-lts", testCasesLastStableWithFeatureFlags, featureFlagsToEnable);
-testViewDefinitionFCVBehavior("last-continuous", testCasesLastContinuous);
-testViewDefinitionFCVBehavior(
-    "last-continuous", testCasesLastContinuousWithFeatureFlags, featureFlagsToEnable);
 }());
