@@ -1126,7 +1126,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenChildSessionIsNotCheckedOut) {
     runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
 }
 
-TEST_F(SessionCatalogTest, KillingChildSessionInterruptsParentSession) {
+TEST_F(SessionCatalogTest, KillingChildSessionDoesNotInterruptParentSession) {
     auto runTest = [&](const LogicalSessionId& parentLsid, const LogicalSessionId& childLsid) {
         auto killToken = [this, &parentLsid, &childLsid] {
             assertCanCheckoutSession(childLsid);
@@ -1137,9 +1137,8 @@ TEST_F(SessionCatalogTest, KillingChildSessionInterruptsParentSession) {
 
             auto killToken = catalog()->killSession(childLsid);
 
-            // Make sure the owning operation context is interrupted
-            ASSERT_THROWS_CODE(
-                opCtx->checkForInterrupt(), AssertionException, ErrorCodes::Interrupted);
+            // Make sure the owning operation context is not interrupted.
+            opCtx->checkForInterrupt();
 
             // Make sure that the checkOutForKill call will wait for the owning operation context to
             // check the session back in
@@ -1369,7 +1368,7 @@ TEST_F(SessionCatalogTest, MarkSessionAsKilledCanBeCalledMoreThanOnce) {
     runTest(makeLogicalSessionIdWithTxnUUIDForTest());
 }
 
-TEST_F(SessionCatalogTest, MarkSessionsAsKilledWhenSessionDoesNotExist) {
+TEST_F(SessionCatalogTest, MarkNonExistentSessionAsKilled) {
     auto runTest = [&](const LogicalSessionId& nonExistentLsid) {
         ASSERT_THROWS_CODE(
             catalog()->killSession(nonExistentLsid), AssertionException, ErrorCodes::NoSuchSession);
@@ -1378,6 +1377,61 @@ TEST_F(SessionCatalogTest, MarkSessionsAsKilledWhenSessionDoesNotExist) {
     runTest(makeLogicalSessionIdForTest());
     runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     runTest(makeLogicalSessionIdWithTxnUUIDForTest());
+}
+
+TEST_F(SessionCatalogTest, MarkNonExistentChildSessionAsKilledWhenParentSessionExists) {
+    auto runTest = [&](const LogicalSessionId& parentLsid,
+                       const LogicalSessionId& nonExistentChildLsid) {
+        createSession(parentLsid);
+        ASSERT_THROWS_CODE(catalog()->killSession(nonExistentChildLsid),
+                           AssertionException,
+                           ErrorCodes::NoSuchSession);
+    };
+
+    {
+        auto parentLsid = makeLogicalSessionIdForTest();
+        runTest(parentLsid, makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid));
+    }
+
+    {
+        auto parentLsid = makeLogicalSessionIdForTest();
+        runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
+    }
+}
+
+
+TEST_F(SessionCatalogTest, MarkNonExistentChildSessionAsKilledWhenOtherChildSessionExists) {
+    auto runTest = [&](const LogicalSessionId& existentChildLsid,
+                       const LogicalSessionId& nonExistentChildLsid) {
+        createSession(existentChildLsid);
+        ASSERT_THROWS_CODE(catalog()->killSession(nonExistentChildLsid),
+                           AssertionException,
+                           ErrorCodes::NoSuchSession);
+    };
+
+    {
+        auto parentLsid = makeLogicalSessionIdForTest();
+        runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid),
+                makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid));
+    }
+
+    {
+        auto parentLsid = makeLogicalSessionIdForTest();
+        runTest(makeLogicalSessionIdWithTxnUUIDForTest(parentLsid),
+                makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
+    }
+
+    {
+        auto parentLsid = makeLogicalSessionIdForTest();
+        runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid),
+                makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
+    }
+
+    {
+        auto parentLsid = makeLogicalSessionIdForTest();
+        runTest(makeLogicalSessionIdWithTxnUUIDForTest(parentLsid),
+                makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid));
+    }
 }
 
 TEST_F(SessionCatalogTestWithDefaultOpCtx, SessionDiscarOperationContextAfterCheckIn) {

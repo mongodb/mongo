@@ -1,7 +1,6 @@
 /*
- * Test that the logical cache reaper reaps Session/TransactionParticipant objects and the
- * config.transactions and config.image_collection entries that correspond to the same retryable
- * write atomically.
+ * Test that the logical session cache reaper reaps transaction sessions that correspond to the same
+ * retryable write atomically.
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
@@ -72,31 +71,18 @@ function makeSessionOptsForTest() {
     };
 }
 
-function assertNumSessionsCollEntries(sessionOpts, expectedNum) {
-    const filter = {"_id.id": sessionOpts.parentLsid.id};
-    assert.eq(expectedNum,
-              sessionsColl.find(filter).itcount(),
-              tojson(sessionsColl.find(filter).toArray()));
-}
-
-function assertNumTransactionsCollEntries(sessionOpts, expectedNum) {
-    const filter = {"_id.id": sessionOpts.parentLsid.id};
-    assert.eq(expectedNum,
-              transactionsColl.find(filter).itcount(),
-              tojson(transactionsColl.find(filter).toArray()));
-}
-
-function assertNumImagesCollEntries(sessionOpts, expectedNum) {
-    const filter = {"_id.id": sessionOpts.parentLsid.id};
-    assert.eq(
-        expectedNum, imageColl.find(filter).itcount(), tojson(imageColl.find(filter).toArray()));
-}
-
 function assertNumEntries(
     sessionOpts, {numSessionsCollEntries, numTransactionsCollEntries, numImageCollEntries}) {
-    assertNumSessionsCollEntries(sessionOpts, numSessionsCollEntries);
-    assertNumTransactionsCollEntries(sessionOpts, numTransactionsCollEntries);
-    assertNumImagesCollEntries(sessionOpts, numImageCollEntries);
+    const filter = {"_id.id": sessionOpts.parentLsid.id};
+
+    const sessionsCollEntries = sessionsColl.find(filter).toArray();
+    assert.eq(numSessionsCollEntries, sessionsCollEntries.length, sessionsCollEntries);
+
+    const transactionsCollEntries = transactionsColl.find(filter).toArray();
+    assert.eq(numTransactionsCollEntries, transactionsCollEntries.length, transactionsCollEntries);
+
+    const imageCollEntries = imageColl.find(filter).toArray();
+    assert.eq(numImageCollEntries, imageCollEntries.length, imageCollEntries);
 }
 
 // Test reaping when neither the external session nor the internal sessions are checked out.

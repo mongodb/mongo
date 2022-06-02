@@ -1,7 +1,11 @@
 /**
- * Tests that the lifetime of the config.transactions and config.image_collection entries for
- * child sessions is tied to the lifetime of the config.system.sessions entry for their parent
- * sessions.
+ * Tests that the reaper does not reap expired internal transaction sessions for non-retryable
+ * writes or non-internal transaction sessions until the logical sessions that they correspond to
+ * have expired.
+ *
+ * Tests that the logical session cache reaper reaps expired internal transaction sessions for old
+ * retryable writes even when the config.system.sessions entries for the logical sessions that they
+ * correspond to still exist (i.e. the logical sessions still haven't expired).
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
@@ -9,8 +13,10 @@
 (function() {
 "use strict";
 
-// This test makes assertions about the number of sessions, which are not compatible with
-// implicit sessions.
+load("jstests/sharding/libs/sharded_transactions_helpers.js");
+
+// This test runs the reapLogicalSessionCacheNow command. That can lead to direct writes to the
+// config.transactions collection, which cannot be performed on a session.
 TestData.disableImplicitSessions = true;
 
 const rst = new ReplSetTest({
@@ -18,6 +24,7 @@ const rst = new ReplSetTest({
     nodeOptions: {
         setParameter: {
             maxSessions: 1,
+            // Make transaction records expire immediately.
             TransactionRecordMinimumLifetimeMinutes: 0,
             storeFindAndModifyImagesInSideCollection: true
         }
@@ -37,162 +44,184 @@ const transactionsColl = primary.getCollection(kConfigTxnsNs);
 const imageColl = primary.getCollection(kImageCollNs);
 const oplogColl = primary.getCollection(kOplogCollNs);
 
-const kDbName = "testDb";
-const kCollName = "testColl";
-const testDB = primary.getDB(kDbName);
+const dbName = "testDb";
+const collName = "testColl";
+const testDB = primary.getDB(dbName);
+const testColl = testDB.getCollection(collName);
 
-assert.commandWorked(testDB.createCollection(kCollName));
-assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
+assert.commandWorked(testDB.runCommand({
+    insert: collName,
+    documents: [{_id: 0}, {_id: 1}],
+}));
 
 const sessionUUID = UUID();
 const parentLsid = {
     id: sessionUUID
 };
+const parentLsidFilter = makeLsidFilter(parentLsid, "_id");
+let parentTxnNumber = 0;
+const childTxnNumber = NumberLong(0);
 
-const kInternalTxnNumber = NumberLong(0);
+let numTransactionsCollEntriesReaped = 0;
 
-let numTransactionsCollEntries = 0;
-let numImageCollEntries = 0;
+{
+    jsTest.log("Test reaping when there is an expired internal transaction session for a " +
+               "non-retryable write without an open transaction");
 
-assert.commandWorked(
-    testDB.runCommand({insert: kCollName, documents: [{_id: 0}], lsid: parentLsid}));
+    parentTxnNumber++;
+    assert.commandWorked(testDB.runCommand({
+        findAndModify: collName,
+        query: {_id: 0},
+        update: {$set: {x: 0}},
+        lsid: parentLsid,
+        txnNumber: NumberLong(parentTxnNumber),
+    }));
+    assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
+    assert.eq(1, sessionsColl.find({"_id.id": sessionUUID}).itcount());
+    assert.eq(1, transactionsColl.find(parentLsidFilter).itcount());
+    assert.eq(1, imageColl.find(parentLsidFilter).itcount());
 
-const childLsid0 = {
-    id: sessionUUID,
-    txnUUID: UUID()
-};
-assert.commandWorked(testDB.runCommand({
-    update: kCollName,
-    updates: [{q: {_id: 0}, u: {$set: {a: 0}}}],
-    lsid: childLsid0,
-    txnNumber: kInternalTxnNumber,
-    startTransaction: true,
-    autocommit: false
-}));
-assert.commandWorked(testDB.adminCommand(
-    {commitTransaction: 1, lsid: childLsid0, txnNumber: kInternalTxnNumber, autocommit: false}));
-numTransactionsCollEntries++;
-assert.eq(numTransactionsCollEntries, transactionsColl.find().itcount());
+    const childLsid = {id: sessionUUID, txnUUID: UUID()};
+    const childLsidFilter = makeLsidFilter(childLsid, "_id");
+    assert.commandWorked(testDB.runCommand({
+        findAndModify: collName,
+        query: {_id: 0},
+        update: {$set: {y: 0}},
+        lsid: childLsid,
+        txnNumber: childTxnNumber,
+        startTransaction: true,
+        autocommit: false
+    }));
+    assert.commandWorked(
+        testDB.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
 
-jsTest.log("Verify that the config.transactions entry for the internal transaction for " +
-           "the non-retryable update did not get reaped after command returned");
-assert.eq(numTransactionsCollEntries, transactionsColl.find().itcount());
+    assert.eq({_id: 0, x: 0, y: 0}, testColl.findOne({_id: 0}));
 
-const parentTxnNumber1 = NumberLong(1);
+    // Verify that the config.transactions entry for the internal transaction session for
+    // non-retryable write does not get reaped automatically when the transaction committed.
+    assert.eq(1, sessionsColl.find({"_id.id": sessionUUID}).itcount());
+    assert.eq(1, transactionsColl.find(parentLsidFilter).itcount());
+    assert.eq(1, transactionsColl.find(childLsidFilter).itcount());
+    assert.eq(1, imageColl.find(parentLsidFilter).itcount());
+    assert.eq(0, imageColl.find(childLsidFilter).itcount());
 
-assert.commandWorked(testDB.runCommand({
-    update: kCollName,
-    updates: [{q: {_id: 0}, u: {$set: {b: 0}}}],
-    lsid: parentLsid,
-    txnNumber: parentTxnNumber1,
-    stmtId: NumberInt(0)
-}));
-numTransactionsCollEntries++;
+    // Force the logical session cache to reap, and verify that the config.transactions entries for
+    // the internal transaction session for non-retryable write and the non-internal transaction
+    // session do not get reaped because the config.system.sessions entry still has not been
+    // deleted.
+    assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
+    assert.eq(1, sessionsColl.find({"_id.id": sessionUUID}).itcount());
+    assert.eq(1, transactionsColl.find(parentLsidFilter).itcount());
+    assert.eq(1, transactionsColl.find(childLsidFilter).itcount());
+    assert.eq(1, imageColl.find(parentLsidFilter).itcount());
+    assert.eq(0, imageColl.find(childLsidFilter).itcount());
 
-const childLsid1 = {
-    id: sessionUUID,
-    txnNumber: parentTxnNumber1,
-    txnUUID: UUID()
-};
-assert.commandWorked(testDB.runCommand({
-    update: kCollName,
-    updates: [{q: {_id: 0}, u: {$set: {c: 0}}}],
-    lsid: childLsid1,
-    txnNumber: kInternalTxnNumber,
-    stmtId: NumberInt(1),
-    startTransaction: true,
-    autocommit: false
-}));
-assert.commandWorked(testDB.adminCommand(
-    {commitTransaction: 1, lsid: childLsid1, txnNumber: kInternalTxnNumber, autocommit: false}));
-numTransactionsCollEntries++;
+    // Delete the config.system.sessions entry, force the logical session cache to reap again, and
+    // verify that the config.transactions entries for both sessions do get reaped this time.
+    assert.commandWorked(sessionsColl.remove({}));
+    assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
+    assert.eq(0, sessionsColl.find({"_id.id": sessionUUID}).itcount());
+    assert.eq(0, transactionsColl.find(parentLsidFilter).itcount());
+    assert.eq(0, transactionsColl.find(childLsidFilter).itcount());
+    assert.eq(0, imageColl.find(parentLsidFilter).itcount());
+    assert.eq(0, imageColl.find(parentLsidFilter).itcount());
+    numTransactionsCollEntriesReaped += 2;
+}
 
-const parentTxnNumber2 = NumberLong(2);
+{
+    jsTest.log("Test reaping when there is an expired internal transaction session for a " +
+               "previous retryable write (i.e. with an old txnNumber)");
 
-assert.commandWorked(testDB.runCommand({
-    findAndModify: kCollName,
-    query: {_id: 0},
-    update: {$set: {d: 0}},
-    lsid: parentLsid,
-    txnNumber: parentTxnNumber2,
-    stmtId: NumberInt(0)
-}));
-numImageCollEntries++;
+    parentTxnNumber++;
+    assert.commandWorked(testDB.runCommand({
+        findAndModify: collName,
+        query: {_id: 1},
+        update: {$set: {x: 1}},
+        lsid: parentLsid,
+        txnNumber: NumberLong(parentTxnNumber),
+    }));
+    assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
+    assert.eq(1, sessionsColl.find({"_id.id": sessionUUID}).itcount());
+    assert.eq(1, transactionsColl.find(parentLsidFilter).itcount());
 
-jsTest.log("Verify that the config.transactions entry for the retryable internal transaction for " +
-           "the update did not get reaped although there is already a new retryable write");
-assert.eq(numTransactionsCollEntries, transactionsColl.find().itcount());
+    parentTxnNumber++;
+    const childLsid = {id: sessionUUID, txnNumber: NumberLong(parentTxnNumber), txnUUID: UUID()};
+    const childLsidFilter = makeLsidFilter(childLsid, "_id");
+    assert.commandWorked(testDB.runCommand({
+        findAndModify: collName,
+        query: {_id: 1},
+        update: {$set: {y: 1}},
+        lsid: childLsid,
+        txnNumber: childTxnNumber,
+        startTransaction: true,
+        autocommit: false
+    }));
+    assert.commandWorked(
+        testDB.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
 
-const childLsid2 = {
-    id: sessionUUID,
-    txnNumber: parentTxnNumber2,
-    txnUUID: UUID()
-};
-assert.commandWorked(testDB.runCommand({
-    findAndModify: kCollName,
-    query: {_id: 0},
-    update: {$set: {e: 0}},
-    lsid: childLsid2,
-    txnNumber: kInternalTxnNumber,
-    stmtId: NumberInt(1),
-    startTransaction: true,
-    autocommit: false
-}));
-assert.commandWorked(testDB.adminCommand(
-    {commitTransaction: 1, lsid: childLsid2, txnNumber: kInternalTxnNumber, autocommit: false}));
-numTransactionsCollEntries++;
-numImageCollEntries++;
+    assert.eq({_id: 1, x: 1, y: 1}, testColl.findOne({_id: 1}));
 
-const parentTxnNumber3 = NumberLong(3);
+    parentTxnNumber++;
+    assert.commandWorked(testDB.runCommand({
+        findAndModify: collName,
+        query: {_id: 1},
+        update: {$set: {y: 1}},
+        lsid: parentLsid,
+        txnNumber: NumberLong(parentTxnNumber),
+        startTransaction: true,
+        autocommit: false
+    }));
 
-assert.commandWorked(testDB.runCommand({
-    insert: kCollName,
-    documents: [{_id: 1}],
-    lsid: parentLsid,
-    txnNumber: parentTxnNumber3,
-    stmtId: NumberInt(0)
-}));
+    // Verify that the the config.transactions entry and config.image_collection entry for the
+    // internal transaction session for the previous retryable write do not get reaped automatically
+    // when the new txnNumber started.
+    assert.eq(1, sessionsColl.find({"_id.id": sessionUUID}).itcount());
+    assert.eq(1, transactionsColl.find(parentLsidFilter).itcount());
+    assert.eq(1, transactionsColl.find(childLsidFilter).itcount());
+    assert.eq(1, imageColl.find(parentLsidFilter).itcount());
+    assert.eq(1, imageColl.find(childLsidFilter).itcount());
 
-jsTest.log("Verify that the config.transactions entry for the retryable internal transaction for " +
-           "the findAndModify did not get reaped although there is already a new retryable write");
-assert.eq(numTransactionsCollEntries, transactionsColl.find().itcount());
-assert.eq(numImageCollEntries, imageColl.find().itcount());
+    // Force the logical session cache to reap, and verify that the config.transactions entry and
+    // config.image_collection entry for the internal transaction session for the previous
+    // retryable write do get reaped although the config.system.sessions entry still has not been
+    // deleted.
+    assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
+    assert.eq(1, sessionsColl.find({"_id.id": sessionUUID}).itcount());
+    assert.eq(1, transactionsColl.find(parentLsidFilter).itcount());
+    assert.eq(0, transactionsColl.find(childLsidFilter).itcount());
+    assert.eq(1, imageColl.find(parentLsidFilter).itcount());
+    assert.eq(0, imageColl.find(childLsidFilter).itcount());
+    numTransactionsCollEntriesReaped++;
 
-assert.eq({_id: 0, a: 0, b: 0, c: 0, d: 0, e: 0},
-          testDB.getCollection(kCollName).findOne({_id: 0}));
-assert.eq({_id: 1}, testDB.getCollection(kCollName).findOne({_id: 1}));
+    assert.commandWorked(
+        testDB.adminCommand(makeCommitTransactionCmdObj(parentLsid, parentTxnNumber)));
+    assert.eq({_id: 1, x: 1, y: 1}, testColl.findOne({_id: 1}));
+    assert.eq(1, sessionsColl.find({"_id.id": sessionUUID}).itcount());
+    assert.eq(1, transactionsColl.find(parentLsidFilter).itcount());
+    assert.eq(1, imageColl.find(parentLsidFilter).itcount());
 
-assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
+    // Force the logical session cache to reap, and verify that the config.transactions entry and
+    // config.image_collection entry for the non-internal transaction session do not get reaped
+    // because the config.system.sessions entry still has not been deleted.
+    assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
+    assert.eq(1, sessionsColl.find({"_id.id": sessionUUID}).itcount());
+    assert.eq(1, transactionsColl.find(parentLsidFilter).itcount());
+    assert.eq(1, imageColl.find(parentLsidFilter).itcount());
 
-assert.eq(1, sessionsColl.find({"_id.id": sessionUUID}).itcount());
-assert.eq(numTransactionsCollEntries, transactionsColl.find().itcount());
-assert.eq(numImageCollEntries, imageColl.find().itcount());
-
-assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-
-jsTest.log("Verify that the config.transactions entries for internal transactions did not get " +
-           "reaped although they are expired since the config.system.sessions entry for the " +
-           "parent session still has not been deleted");
-
-assert.eq(1, sessionsColl.find({"_id.id": sessionUUID}).itcount());
-assert.eq(numTransactionsCollEntries,
-          transactionsColl.find().itcount(),
-          tojson(transactionsColl.find().toArray()));
-assert.eq(numImageCollEntries, imageColl.find().itcount());
-
-// Remove the session doc so the parent session gets reaped when reapLogicalSessionCacheNow is run.
-assert.commandWorked(sessionsColl.remove({}));
-assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-
-jsTest.log("Verify that the config.transactions entries got reaped since the " +
-           "config.system.sessions entry for the parent session had already been deleted");
-assert.eq(0, sessionsColl.find().itcount());
-assert.eq(0, transactionsColl.find().itcount(), tojson(transactionsColl.find().toArray()));
-assert.eq(0, imageColl.find().itcount());
+    // Delete the config.system.sessions entry, force the logical session cache to reap again, and
+    // verify that the config.transactions entry for the expired transaction session does get
+    // reaped this time.
+    assert.commandWorked(sessionsColl.remove({}));
+    assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
+    assert.eq(0, sessionsColl.find({"_id.id": sessionUUID}).itcount());
+    assert.eq(0, transactionsColl.find(parentLsidFilter).itcount());
+    assert.eq(0, imageColl.find(parentLsidFilter).itcount());
+    numTransactionsCollEntriesReaped++;
+}
 
 // Validate that writes to config.transactions do not generate oplog entries, with the exception of
 // deletions.
-assert.eq(numTransactionsCollEntries, oplogColl.find({op: 'd', ns: kConfigTxnsNs}).itcount());
+assert.eq(numTransactionsCollEntriesReaped, oplogColl.find({op: 'd', ns: kConfigTxnsNs}).itcount());
 assert.eq(0, oplogColl.find({op: {'$ne': 'd'}, ns: kConfigTxnsNs}).itcount());
 
 rst.stopSet();
