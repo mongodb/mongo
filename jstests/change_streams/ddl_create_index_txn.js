@@ -3,7 +3,6 @@
  * createIndexes is done in a transaction.
  *
  * @tags: [
- *     __TEMPORARILY_DISABLED__,
  *     uses_transactions,
  *     requires_majority_read_concern,
  *     featureFlagChangeStreamsVisibility,
@@ -23,18 +22,18 @@ load("jstests/libs/change_stream_util.js");                  // For ChangeStream
 load("jstests/libs/fixture_helpers.js");                     // For FixtureHelpers.isMongos.
 load('jstests/libs/collection_drop_recreate.js');            // 'assertDropCollection'.
 
-const dbName = "test";
-const collName = jsTestName();
+const dbName = jsTestName() + "_db0";
+const collName = jsTestName() + '_1';
 const otherCollName = jsTestName() + "_2";
-const coll = db[jsTestName()];
+const coll = db.getSiblingDB(dbName)[jsTestName()];
 
-const otherDBName = jsTestName() + "_db";
+const otherDBName = jsTestName() + "_3";
 const otherDB = db.getSiblingDB(otherDBName);
 const otherDBCollName = "someColl";
 
 const session = db.getMongo().startSession();
 
-const sessionDB = session.getDatabase(db.getName());
+const sessionDB = session.getDatabase(dbName);
 const sessionOtherDB = session.getDatabase(otherDBName);
 const sessionColl = sessionDB[collName];
 const sessionOtherColl = sessionDB[otherCollName];
@@ -47,8 +46,8 @@ assertDropCollection(sessionOtherDB, otherDBCollName);
 let csOptions = {showExpandedEvents: true};
 const pipeline = [{$changeStream: csOptions}, {$project: {"lsid.uid": 0}}];
 
-let cst = new ChangeStreamTest(db);
-let changeStream = cst.startWatchingChanges({pipeline, collection: coll});
+let cst = new ChangeStreamTest(sessionDB);
+let changeStream = cst.startWatchingChanges({pipeline, collection: collName});
 
 const testStartTime = changeStream.postBatchResumeToken;
 assert.neq(testStartTime, undefined);
@@ -60,21 +59,31 @@ const txnOptions = {
 
 withTxnAndAutoRetryOnMongos(session, () => {
     assert.commandWorked(sessionColl.createIndex({unused: 1}));
-    assert.commandWorked(sessionOtherColl.createIndex({unused: 1}));
-    assert.commandWorked(sessionOtherDBColl.createIndex({unused: 1}));
 }, txnOptions);
 
 const lsid = session.getSessionId();
-const txnNumber = session.getTxnNumber_forTesting();
+const txnNumberColl = session.getTxnNumber_forTesting();
+
+withTxnAndAutoRetryOnMongos(session, () => {
+    assert.commandWorked(sessionOtherColl.createIndex({unused: 1}));
+}, txnOptions);
+
+const txnNumberOtherColl = session.getTxnNumber_forTesting();
+
+withTxnAndAutoRetryOnMongos(session, () => {
+    assert.commandWorked(sessionOtherDBColl.createIndex({unused: 1}));
+}, txnOptions);
+
+const txnNumberOtherDBColl = session.getTxnNumber_forTesting();
 
 const expectedChanges = [
-    {operationType: "create", ns: {db: dbName, coll: collName}, lsid, txnNumber},
+    {operationType: "create", ns: {db: dbName, coll: collName}},
     {
         operationType: "createIndexes",
         ns: {db: dbName, coll: collName},
         "operationDescription": {"indexes": [{"v": 2, "key": {"unused": 1}, "name": "unused_1"}]},
         lsid,
-        txnNumber
+        txnNumber: txnNumberColl
     }
 ];
 
@@ -89,7 +98,7 @@ const otherCollEvents = [
         ns: {db: dbName, coll: otherCollName},
         "operationDescription": {"indexes": [{"v": 2, "key": {"unused": 1}, "name": "unused_1"}]},
         lsid,
-        txnNumber
+        txnNumber: txnNumberOtherColl
     }
 ];
 expectedChanges.push(...otherCollEvents);
@@ -108,7 +117,7 @@ const otherDBEvents = [
         ns: {db: otherDBName, coll: otherDBCollName},
         "operationDescription": {"indexes": [{"v": 2, "key": {"unused": 1}, "name": "unused_1"}]},
         lsid,
-        txnNumber
+        txnNumber: txnNumberOtherDBColl
     }
 ];
 expectedChanges.push(...otherDBEvents);
