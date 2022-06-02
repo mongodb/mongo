@@ -176,6 +176,10 @@ public:
             }
 
             if (cmd.getEncryptedFields()) {
+                uassert(6662201,
+                        "Queryable Encryption is only supported when FCV supports 6.0",
+                        gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility));
+
                 uassert(6367301,
                         "Encrypted fields cannot be used with capped collections",
                         !cmd.getCapped());

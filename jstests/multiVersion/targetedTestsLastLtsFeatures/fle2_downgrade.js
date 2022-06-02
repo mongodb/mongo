@@ -44,8 +44,8 @@ function runTest(targetFCV) {
     assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 }
 
-targetFCV(lastLTSFCV);
-targetFCV(lastContinuousFCV);
+runTest(lastLTSFCV);
+runTest(lastContinuousFCV);
 
 rst.stopSet();
 }());
