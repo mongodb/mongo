@@ -7,6 +7,8 @@
  * - Create a new collection.
  * - Insert a document into the new collection.
  * - Create an index on the new collection.
+ *
+ * @tags: [requires_v4.0]
  */
 
 (function() {
