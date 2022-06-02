@@ -112,12 +112,17 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
         }
     }
 
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        feature_flags::gOrphanTracking.isEnabled(serverGlobalParams.featureCompatibility)) {
-        result->appendNumber(
-            kOrphanCountField,
-            BalancerStatsRegistry::get(opCtx)->getCollNumOrphanDocsFromDiskIfNeeded(
-                opCtx, collection->uuid()));
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+        !nss.isNamespaceAlwaysUnsharded()) {
+        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            feature_flags::gOrphanTracking.isEnabled(serverGlobalParams.featureCompatibility)) {
+            result->appendNumber(
+                kOrphanCountField,
+                BalancerStatsRegistry::get(opCtx)->getCollNumOrphanDocsFromDiskIfNeeded(
+                    opCtx, collection->uuid()));
+        }
+    } else {
+        result->appendNumber(kOrphanCountField, 0);
     }
 
     const RecordStore* recordStore = collection->getRecordStore();
