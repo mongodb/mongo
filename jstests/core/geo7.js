@@ -1,19 +1,33 @@
-t = db.geo7;
+/**
+ * Tests that we can create both simple and compound geo indexes.
+ * Also tests that a geo index can support non-geo searches on the indexed field.
+ */
+(function() {
+'use strict';
+
+const docs = [
+    {_id: 1, y: [1, 1]},
+    {_id: 2, y: [1, 1], z: 3},
+    {_id: 3, y: [1, 1], z: 4},
+    {_id: 4, y: [1, 1], z: 5},
+];
+
+let t = db.geo7_compound;
 t.drop();
 
-t.insert({_id: 1, y: [1, 1]});
-t.insert({_id: 2, y: [1, 1], z: 3});
-t.insert({_id: 3, y: [1, 1], z: 4});
-t.insert({_id: 4, y: [1, 1], z: 5});
-
-t.createIndex({y: "2d", z: 1});
+assert.commandWorked(t.createIndex({y: "2d", z: 1}));
+assert.commandWorked(t.insert(docs));
 
 assert.eq(1, t.find({y: [1, 1], z: 3}).itcount(), "A1");
 
-t.dropIndex({y: "2d", z: 1});
+t = db.geo7_simple;
+t.drop();
 
-t.createIndex({y: "2d"});
+assert.commandWorked(t.createIndex({y: "2d"}));
+assert.commandWorked(t.insert(docs));
+
 assert.eq(1, t.find({y: [1, 1], z: 3}).itcount(), "A2");
 
-t.insert({_id: 5, y: 5});
+assert.commandWorked(t.insert({_id: 5, y: 5}));
 assert.eq(5, t.findOne({y: 5})._id, "B1");
+})();
