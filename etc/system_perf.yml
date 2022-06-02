@@ -1388,6 +1388,7 @@ buildvariants:
       - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: smoke_test
+      - name: ycsb_60GB
 
   - name: linux-3-node-1dayhistory-15gbwtcache
     display_name: Linux 3-Node ReplSet 1 Day History 15 GB WiredTiger Cache
@@ -1409,6 +1410,7 @@ buildvariants:
       - name: crud_workloads
       - name: crud_workloads_majority
       - name: smoke_test
+      - name: ycsb_60GB
 
   - name: linux-3-shard
     display_name: Linux 3-Shard Cluster
