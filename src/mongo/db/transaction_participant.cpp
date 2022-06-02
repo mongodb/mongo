@@ -336,14 +336,8 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
  * found in the session catalog and the config.transactions collection.
  */
 TxnNumber fetchHighestTxnNumberWithInternalSessions(OperationContext* opCtx,
-                                                    const LogicalSessionId& parentLsid) {
-    TxnNumber highestTxnNumber{kUninitializedTxnNumber};
-
-    const auto sessionCatalog = SessionCatalog::get(opCtx);
-    sessionCatalog->scanSession(parentLsid, [&](const ObservableSession& osession) {
-        highestTxnNumber = osession.getHighestTxnNumberWithChildSessions();
-    });
-
+                                                    const LogicalSessionId& parentLsid,
+                                                    TxnNumber cachedHighestTxnNumber) {
     try {
         performReadWithNoTimestampDBDirectClient(opCtx, [&](DBDirectClient* client) {
             FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
@@ -351,7 +345,7 @@ TxnNumber fetchHighestTxnNumberWithInternalSessions(OperationContext* opCtx,
                                        << parentLsid.toBSON()
                                        << (SessionTxnRecord::kSessionIdFieldName + "." +
                                            LogicalSessionId::kTxnNumberFieldName)
-                                       << BSON("$gte" << highestTxnNumber)));
+                                       << BSON("$gte" << cachedHighestTxnNumber)));
             findRequest.setSort(BSON((SessionTxnRecord::kSessionIdFieldName + "." +
                                       LogicalSessionId::kTxnNumberFieldName)
                                      << -1));
@@ -365,7 +359,8 @@ TxnNumber fetchHighestTxnNumberWithInternalSessions(OperationContext* opCtx,
                 const auto doc = cursor->next();
                 const auto childLsid = LogicalSessionId::parse(
                     IDLParserErrorContext("LogicalSessionId"), doc.getObjectField("_id"));
-                highestTxnNumber = std::max(highestTxnNumber, *childLsid.getTxnNumber());
+                cachedHighestTxnNumber =
+                    std::max(cachedHighestTxnNumber, *childLsid.getTxnNumber());
                 invariant(!cursor->more());
             }
         });
@@ -374,7 +369,7 @@ TxnNumber fetchHighestTxnNumberWithInternalSessions(OperationContext* opCtx,
         throw;
     }
 
-    return highestTxnNumber;
+    return cachedHighestTxnNumber;
 }
 
 void updateSessionEntry(OperationContext* opCtx,
@@ -2858,7 +2853,8 @@ void TransactionParticipant::Participant::_refreshSelfFromStorageIfNeeded(Operat
     if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
             serverGlobalParams.featureCompatibility) &&
         !_isInternalSession()) {
-        const auto txnNumber = fetchHighestTxnNumberWithInternalSessions(opCtx, _sessionId());
+        const auto txnNumber = fetchHighestTxnNumberWithInternalSessions(
+            opCtx, _sessionId(), _session()->getCachedHighestTxnNumberWithChildSessions());
         if (txnNumber > o().activeTxnNumberAndRetryCounter.getTxnNumber()) {
             _setNewTxnNumberAndRetryCounter(opCtx, {txnNumber, kUninitializedTxnRetryCounter});
         }
