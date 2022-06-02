@@ -35,7 +35,8 @@ feature_flags:
   featureFlagNoMoreAutoSplitter:
     description: "Guarding code for the no more auto-splitter project"
     cpp_varname: feature_flags::gNoMoreAutoSplitter
-    default: false
+    default: true
+    version: 6.1
   featureFlagBalanceAccordingToDataSize:
     description: Balancer taking decisions based on the data size if enabled, based on number of chunks if disabled
     cpp_varname: feature_flags::gBalanceAccordingToDataSize

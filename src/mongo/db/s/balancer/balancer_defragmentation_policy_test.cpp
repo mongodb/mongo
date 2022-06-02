@@ -32,6 +32,7 @@
 #include "mongo/db/s/balancer/balancer_random.h"
 #include "mongo/db/s/balancer/cluster_statistics_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 
 namespace mongo {
 namespace {
@@ -321,7 +322,26 @@ TEST_F(BalancerDefragmentationPolicyTest, TestRemoveCollectionEndsDefragmentatio
     ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
 }
 
+TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneUserCancellationFinishesDefragmentation) {
+    auto coll = setupCollectionWithPhase({makeConfigChunkEntry()});
+    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+
+    // Collection should be in phase 1
+    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMergeAndMeasureChunks);
+
+    // User cancellation of defragmentation
+    _defragmentationPolicy.abortCollectionDefragmentation(operationContext(), kNss);
+
+    // Defragmentation should complete since the NoMoreAutoSplitter feature flag is enabled
+    auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    ASSERT_TRUE(nextAction == boost::none);
+    ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
+    verifyExpectedDefragmentationPhaseOndisk(boost::none);
+}
+
 TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneUserCancellationBeginsPhase3) {
+    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
+        "featureFlagNoMoreAutoSplitter", false};
     auto coll = setupCollectionWithPhase({makeConfigChunkEntry()});
     _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
 
@@ -728,6 +748,8 @@ TEST_F(BalancerDefragmentationPolicyTest,
  */
 
 TEST_F(BalancerDefragmentationPolicyTest, DefragmentationBeginsWithPhase3FromPersistedSetting) {
+    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
+        "featureFlagNoMoreAutoSplitter", false};
     auto coll = setupCollectionWithPhase({makeConfigChunkEntry(kPhase3DefaultChunkSize)},
                                          DefragmentationPhaseEnum::kSplitChunks);
     // Defragmentation does not start until startCollectionDefragmentation is called
@@ -742,6 +764,8 @@ TEST_F(BalancerDefragmentationPolicyTest, DefragmentationBeginsWithPhase3FromPer
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, SingleLargeChunkCausesAutoSplitAndSplitActions) {
+    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
+        "featureFlagNoMoreAutoSplitter", false};
     auto coll = setupCollectionWithPhase({makeConfigChunkEntry(kPhase3DefaultChunkSize)},
                                          DefragmentationPhaseEnum::kSplitChunks);
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
@@ -759,6 +783,8 @@ TEST_F(BalancerDefragmentationPolicyTest, SingleLargeChunkCausesAutoSplitAndSpli
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, CollectionMaxChunkSizeIsUsedForPhase3) {
+    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
+        "featureFlagNoMoreAutoSplitter", false};
     // One chunk > 1KB should trigger AutoSplitVector
     auto coll = setupCollectionWithPhase(
         {makeConfigChunkEntry(2 * 1024)}, DefragmentationPhaseEnum::kSplitChunks, 1024);
@@ -777,6 +803,8 @@ TEST_F(BalancerDefragmentationPolicyTest, CollectionMaxChunkSizeIsUsedForPhase3)
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestRetryableFailedAutoSplitActionGetsReissued) {
+    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
+        "featureFlagNoMoreAutoSplitter", false};
     auto coll = setupCollectionWithPhase({makeConfigChunkEntry(kPhase3DefaultChunkSize)},
                                          DefragmentationPhaseEnum::kSplitChunks);
     _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
@@ -805,6 +833,8 @@ TEST_F(BalancerDefragmentationPolicyTest, TestRetryableFailedAutoSplitActionGets
 
 TEST_F(BalancerDefragmentationPolicyTest,
        TestAcknowledgeAutoSplitActionTriggersSplitOnResultingRange) {
+    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
+        "featureFlagNoMoreAutoSplitter", false};
     auto coll = setupCollectionWithPhase({makeConfigChunkEntry(kPhase3DefaultChunkSize)},
                                          DefragmentationPhaseEnum::kSplitChunks);
     _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
@@ -833,6 +863,8 @@ TEST_F(BalancerDefragmentationPolicyTest,
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAutoSplitWithNoSplitPointsDoesNotTriggerSplit) {
+    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
+        "featureFlagNoMoreAutoSplitter", false};
     auto coll = setupCollectionWithPhase({makeConfigChunkEntry(kPhase3DefaultChunkSize)},
                                          DefragmentationPhaseEnum::kSplitChunks);
     _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
@@ -850,6 +882,8 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAutoSplitWithNoSplitPointsDoesNotT
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestMoreThan16MBSplitPointsTriggersSplitAndAutoSplit) {
+    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
+        "featureFlagNoMoreAutoSplitter", false};
     auto coll = setupCollectionWithPhase({makeConfigChunkEntry(kPhase3DefaultChunkSize)},
                                          DefragmentationPhaseEnum::kSplitChunks);
     _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
@@ -880,6 +914,8 @@ TEST_F(BalancerDefragmentationPolicyTest, TestMoreThan16MBSplitPointsTriggersSpl
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestFailedSplitChunkActionGetsReissued) {
+    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
+        "featureFlagNoMoreAutoSplitter", false};
     auto coll = setupCollectionWithPhase({makeConfigChunkEntry(kPhase3DefaultChunkSize)},
                                          DefragmentationPhaseEnum::kSplitChunks);
     _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
@@ -914,6 +950,8 @@ TEST_F(BalancerDefragmentationPolicyTest, TestFailedSplitChunkActionGetsReissued
 
 TEST_F(BalancerDefragmentationPolicyTest,
        TestAcknowledgeLastSuccessfulSplitActionEndsDefragmentation) {
+    RAIIServerParameterControllerForTest featureFlagNoMoreAutoSplitterOff{
+        "featureFlagNoMoreAutoSplitter", false};
     auto coll = setupCollectionWithPhase({makeConfigChunkEntry(kPhase3DefaultChunkSize)},
                                          DefragmentationPhaseEnum::kSplitChunks);
     _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
