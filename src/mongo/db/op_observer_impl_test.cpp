@@ -745,6 +745,37 @@ TEST_F(OpObserverTest, SingleStatementInsertTestIncludesTenantId) {
     ASSERT_EQ(uuid, *entry.getUuid());
 }
 
+TEST_F(OpObserverTest, SingleStatementUpdateTestIncludesTenantId) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    auto opCtx = cc().makeOperationContext();
+    const NamespaceString nss(TenantId(OID::gen()), "testDB", "testColl");
+    auto uuid = UUID::gen();
+
+    CollectionUpdateArgs updateArgs;
+    updateArgs.updatedDoc = BSON("_id" << 0 << "data"
+                                       << "x");
+    updateArgs.update = BSON("$set" << BSON("data"
+                                            << "x"));
+    updateArgs.criteria = BSON("_id" << 0);
+    OplogUpdateEntryArgs update(&updateArgs, nss, uuid);
+
+    WriteUnitOfWork wuow(opCtx.get());
+    AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+
+    OpObserverRegistry opObserver;
+    opObserver.addObserver(std::make_unique<OpObserverImpl>());
+    opObserver.onUpdate(opCtx.get(), update);
+    wuow.commit();
+
+    auto oplogEntryObj = getSingleOplogEntry(opCtx.get());
+    const repl::OplogEntry& entry = assertGet(repl::OplogEntry::parse(oplogEntryObj));
+
+    ASSERT(nss.tenantId().has_value());
+    ASSERT_EQ(*nss.tenantId(), *entry.getTid());
+    ASSERT_EQ(nss, entry.getNss());
+    ASSERT_EQ(uuid, *entry.getUuid());
+}
+
 /**
  * Test fixture for testing OpObserver behavior specific to the SessionCatalog.
  */
@@ -1619,6 +1650,63 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
                                       << BSON("op"
                                               << "u"
                                               << "ns" << nss2.toString() << "ui" << uuid2 << "o"
+                                              << BSON("$set" << BSON("data"
+                                                                     << "y"))
+                                              << "o2" << BSON("_id" << 1))));
+    ASSERT_BSONOBJ_EQ(oExpected, o);
+    ASSERT_FALSE(oplogEntry.hasField("prepare"));
+    ASSERT_FALSE(oplogEntry.getBoolField("prepare"));
+}
+
+TEST_F(OpObserverTransactionTest, TransactionalUpdateTestIncludesTenantId) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    const NamespaceString nss1(TenantId(OID::gen()), "testDB", "testColl");
+    const NamespaceString nss2(TenantId(OID::gen()), "testDB2", "testColl2");
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "update");
+
+    CollectionUpdateArgs updateArgs1;
+    updateArgs1.stmtIds = {0};
+    updateArgs1.updatedDoc = BSON("_id" << 0 << "data"
+                                        << "x");
+    updateArgs1.update = BSON("$set" << BSON("data"
+                                             << "x"));
+    updateArgs1.criteria = BSON("_id" << 0);
+    OplogUpdateEntryArgs update1(&updateArgs1, nss1, uuid1);
+
+    CollectionUpdateArgs updateArgs2;
+    updateArgs2.stmtIds = {1};
+    updateArgs2.updatedDoc = BSON("_id" << 1 << "data"
+                                        << "y");
+    updateArgs2.update = BSON("$set" << BSON("data"
+                                             << "y"));
+    updateArgs2.criteria = BSON("_id" << 1);
+    OplogUpdateEntryArgs update2(&updateArgs2, nss2, uuid2);
+
+    WriteUnitOfWork wuow(opCtx());
+    AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
+    AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
+    opObserver().onUpdate(opCtx(), update1);
+    opObserver().onUpdate(opCtx(), update2);
+    auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
+    opObserver().onUnpreparedTransactionCommit(opCtx(), &txnOps, 0);
+    auto oplogEntry = getSingleOplogEntry(opCtx());
+    checkCommonFields(oplogEntry);
+    auto o = oplogEntry.getObjectField("o");
+    auto oExpected =
+        BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                           << "u"
+                                           << "tid" << nss1.tenantId().get() << "ns"
+                                           << nss1.toString() << "ui" << uuid1 << "o"
+                                           << BSON("$set" << BSON("data"
+                                                                  << "x"))
+                                           << "o2" << BSON("_id" << 0))
+                                      << BSON("op"
+                                              << "u"
+                                              << "tid" << nss2.tenantId().get() << "ns"
+                                              << nss2.toString() << "ui" << uuid2 << "o"
                                               << BSON("$set" << BSON("data"
                                                                      << "y"))
                                               << "o2" << BSON("_id" << 1))));
@@ -2764,7 +2852,6 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) 
         opCtx->getServiceContext()->getOpObserver()->onDelete(
             opCtx, _nssWithTid, _uuid, kUninitializedStmtId, args);
     }
-    // TODO: SERVER-62765 add support for onUpdate
     // (2) Update
     {
         CollectionUpdateArgs collUpdateArgs;
@@ -2812,12 +2899,16 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) 
         ASSERT(innerEntry.getNss() == _nssWithTid);
         ASSERT(0 == innerEntry.getObject().woCompare(BSON("_id" << 1)));
     }
-    // TODO: SERVER-62765 add support for onUpdate
+
     {
         const auto innerEntry = innerEntries[2];
         ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
         ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kUpdate);
         ASSERT(innerEntry.getNss() == _nssWithTid);
+        ASSERT(innerEntry.getNss().tenantId().has_value());
+        ASSERT(*innerEntry.getNss().tenantId() == *_nssWithTid.tenantId());
+        ASSERT(innerEntry.getTid().has_value());
+        ASSERT(*innerEntry.getTid() == *_nssWithTid.tenantId());
         ASSERT(0 ==
                innerEntry.getObject().woCompare(BSON("fieldToUpdate"
                                                      << "valueToUpdate")));

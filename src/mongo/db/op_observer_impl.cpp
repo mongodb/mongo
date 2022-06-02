@@ -193,6 +193,9 @@ struct ImageBundle {
 OpTimeBundle replLogUpdate(OperationContext* opCtx,
                            const OplogUpdateEntryArgs& args,
                            MutableOplogEntry* oplogEntry) {
+    // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
+    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
+        oplogEntry->setTid(args.nss.tenantId());
     oplogEntry->setNss(args.nss);
     oplogEntry->setUuid(args.uuid);
 
