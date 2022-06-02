@@ -15,7 +15,7 @@ variables:
     - variant: linux-wt-standalone
       name: compile
   _real_expansions: &_expansion_updates
-    []
+      []
   ###
 
   ###
@@ -166,10 +166,6 @@ functions:
       params:
         script: ./src/dsi/run-dsi determine_failure -m TEST
   f_dsi_post_run:
-    - command: json.send
-      params:
-        name: perf
-        file: ./build/LegacyPerfJson/perf.json
     - command: shell.exec
       params:
         script: ./src/dsi/run-dsi post_run
