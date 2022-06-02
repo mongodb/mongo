@@ -23,9 +23,11 @@ assert.commandWorked(t.createIndex({a: 1}));
 }
 
 // Generate enough documents for index to be preferable.
-for (let i = 0; i < 100; i++) {
-    assert.commandWorked(t.insert({a: i + 10}));
+const bulk = t.initializeUnorderedBulkOp();
+for (let i = 0; i < 400; i++) {
+    bulk.insert({a: i + 10});
 }
+assert.commandWorked(bulk.execute());
 
 {
     const res = t.explain("executionStats").aggregate([{$match: {a: {$eq: [2]}}}]);
