@@ -26,18 +26,30 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "test_harness/test.h"
+#ifndef THROTTLE_H
+#define THROTTLE_H
 
-/*
- * The "base test" that the framework uses, because its not overloading any of the database
- * operation methods it will perform as they are defined and is therefore the "base".
- *
- * Can be used to create stress tests in various ways.
- */
-class operations_test : public test_harness::test {
+#include <string>
+
+/* Forward declarations for classes to reduce compilation time and modules coupling. */
+class configuration;
+
+namespace test_harness {
+class throttle {
     public:
-    operations_test(const test_harness::test_args &args) : test(args)
-    {
-        init_tracking();
-    }
+    explicit throttle(const std::string &throttle_rate);
+
+    /* Use optional and default to 1s per op in case something doesn't define this. */
+    explicit throttle(configuration *config);
+
+    /* Default to a second per operation. */
+    throttle();
+
+    void sleep();
+
+    private:
+    uint64_t _ms = 1000;
 };
+} // namespace test_harness
+
+#endif

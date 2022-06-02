@@ -1,1 +1,0 @@
-# WiredTiger cppsuite

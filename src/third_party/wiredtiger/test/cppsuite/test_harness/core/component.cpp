@@ -26,18 +26,60 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "test_harness/test.h"
+#include "component.h"
+#include "test_harness/util/api_const.h"
 
-/*
- * The "base test" that the framework uses, because its not overloading any of the database
- * operation methods it will perform as they are defined and is therefore the "base".
- *
- * Can be used to create stress tests in various ways.
- */
-class operations_test : public test_harness::test {
-    public:
-    operations_test(const test_harness::test_args &args) : test(args)
-    {
-        init_tracking();
+namespace test_harness {
+component::component(const std::string &name, configuration *config) : _config(config), _name(name)
+{
+}
+
+component::~component()
+{
+    delete _config;
+}
+
+void
+component::load()
+{
+    logger::log_msg(LOG_INFO, "Loading component: " + _name);
+    _enabled = _config->get_optional_bool(ENABLED, true);
+    _throttle = throttle(_config);
+    /* If we're not enabled we shouldn't be running. */
+    _running = _enabled;
+}
+
+void
+component::run()
+{
+    logger::log_msg(LOG_INFO, "Running component: " + _name);
+    while (_enabled && _running) {
+        do_work();
+        _throttle.sleep();
     }
-};
+}
+
+void
+component::do_work()
+{
+    /* Not implemented. */
+}
+
+bool
+component::enabled() const
+{
+    return (_enabled);
+}
+
+void
+component::end_run()
+{
+    _running = false;
+}
+
+void
+component::finish()
+{
+    logger::log_msg(LOG_INFO, "Running finish stage of component: " + _name);
+}
+} // namespace test_harness

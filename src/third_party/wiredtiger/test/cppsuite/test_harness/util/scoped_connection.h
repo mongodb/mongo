@@ -26,18 +26,31 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "test_harness/test.h"
+#ifndef SCOPED_CONNECTION_H
+#define SCOPED_CONNECTION_H
 
-/*
- * The "base test" that the framework uses, because its not overloading any of the database
- * operation methods it will perform as they are defined and is therefore the "base".
- *
- * Can be used to create stress tests in various ways.
- */
-class operations_test : public test_harness::test {
+/* Following definitions are required in order to use printing format specifiers in C++. */
+#ifndef __STDC_LIMIT_MACROS
+#define __STDC_LIMIT_MACROS
+#endif
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
+
+extern "C" {
+#include "test_util.h"
+}
+
+#include "../connection_manager.h"
+
+namespace test_harness {
+
+class scoped_connection {
     public:
-    operations_test(const test_harness::test_args &args) : test(args)
-    {
-        init_tracking();
-    }
+    explicit scoped_connection(
+      const std::string &db_conn_config, const std::string &home = DEFAULT_DIR);
+    ~scoped_connection();
 };
+
+} // namespace test_harness
+#endif

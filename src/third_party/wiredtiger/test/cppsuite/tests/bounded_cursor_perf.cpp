@@ -26,10 +26,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/component/op_tracker.cpp"
-#include "src/main/test.h"
+#include <time.h>
 
-using namespace test_harness;
+#include "test_harness/core/op_tracker.cpp"
+#include "test_harness/test.h"
+#include "test_harness/util/api_const.h"
+#include "test_harness/workload/random_generator.h"
+
+namespace test_harness {
 
 /*
  * This test performs cursor traversal operations next() and prev() on a collection with both
@@ -110,3 +114,4 @@ class bounded_cursor_perf : public test {
         }
     }
 };
+} // namespace test_harness

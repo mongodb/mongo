@@ -26,8 +26,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/common/random_generator.h"
-#include "src/main/test.h"
+#include "test_harness/test.h"
+
+#include "test_harness/connection_manager.h"
 
 using namespace test_harness;
 

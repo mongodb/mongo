@@ -25,19 +25,34 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
-#include "test_harness/test.h"
-
+#ifndef PERF_PLOTTER_H
+#define PERF_PLOTTER_H
+#include <fstream>
+#include <mutex>
+#include <vector>
+namespace test_harness {
 /*
- * The "base test" that the framework uses, because its not overloading any of the database
- * operation methods it will perform as they are defined and is therefore the "base".
- *
- * Can be used to create stress tests in various ways.
+ * Singleton class owning the perf plot json, provides access to add statistics, and a central call
+ * point to output the file.
  */
-class operations_test : public test_harness::test {
+class perf_plotter {
     public:
-    operations_test(const test_harness::test_args &args) : test(args)
-    {
-        init_tracking();
-    }
+    static perf_plotter &instance();
+
+    public:
+    /* No copies of the singleton allowed. */
+    perf_plotter(perf_plotter const &) = delete;
+    perf_plotter &operator=(perf_plotter const &) = delete;
+
+    /* Anyone can get the perf_plotter and add a statistic to it. */
+    void add_stat(const std::string &stat_string);
+    void output_perf_file(const std::string &test_name);
+
+    private:
+    perf_plotter();
+    std::vector<std::string> _stats;
+    std::mutex _stat_mutex;
 };
+} // namespace test_harness
+
+#endif

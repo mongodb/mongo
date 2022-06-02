@@ -33,16 +33,15 @@
  * test_template.cpp and create_script.sh.
  */
 
-#include "src/common/api_const.h"
-#include "src/common/logger.h"
-#include "src/common/random_generator.h"
-#include "src/common/thread_manager.h"
-#include "src/storage/connection_manager.h"
-#include "src/storage/scoped_connection.h"
+#include "test_harness/connection_manager.h"
+#include "test_harness/thread_manager.h"
+#include "test_harness/util/api_const.h"
+#include "test_harness/util/logger.h"
+#include "test_harness/util/scoped_connection.h"
+#include "test_harness/workload/random_generator.h"
 
 extern "C" {
 #include "wiredtiger.h"
-#include "test_util.h"
 }
 
 using namespace test_harness;

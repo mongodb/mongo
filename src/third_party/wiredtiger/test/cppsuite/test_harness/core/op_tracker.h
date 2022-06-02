@@ -26,18 +26,33 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "test_harness/test.h"
+#include <chrono>
+#include <fstream>
+#include <string>
+
+namespace test_harness {
 
 /*
- * The "base test" that the framework uses, because its not overloading any of the database
- * operation methods it will perform as they are defined and is therefore the "base".
- *
- * Can be used to create stress tests in various ways.
+ * Class that tracks the performance of given operations and appends the stats to the perf file.
  */
-class operations_test : public test_harness::test {
+class op_tracker {
     public:
-    operations_test(const test_harness::test_args &args) : test(args)
-    {
-        init_tracking();
-    }
+    explicit op_tracker(const std::string id, const std::string &test_name);
+    virtual ~op_tracker();
+
+    /* Calculates the average time and appends the stat to the perf file. */
+    void append_stats();
+
+    /*
+     * Does timing for a given operation and keeps track of how many operations have been executed
+     * as well as total time taken.
+     */
+    template <typename T> auto track(T lambda);
+
+    private:
+    std::string _id;
+    std::string _test_name;
+    int _it_count;
+    uint64_t _total_time_taken;
 };
+} // namespace test_harness
