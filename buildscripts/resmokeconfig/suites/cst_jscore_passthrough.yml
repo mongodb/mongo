@@ -279,7 +279,6 @@ selector:
   - jstests/core/indexs.js
   - jstests/core/indexs.js
   - jstests/core/indexu.js
-  - jstests/core/insert2.js
   - jstests/core/json1.js
   - jstests/core/json_schema/bsontype.js
   - jstests/core/json_schema/misc_validation.js
