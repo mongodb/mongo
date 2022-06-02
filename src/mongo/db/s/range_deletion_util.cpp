@@ -295,12 +295,17 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                                           const UUID& collectionUuid,
                                           const BSONObj& keyPattern,
                                           const ChunkRange& range,
-                                          const UUID& migrationId,
-                                          int numDocsToRemovePerBatch,
-                                          Milliseconds delayBetweenBatches) {
+                                          const UUID& migrationId) {
     return AsyncTry([=] {
                return withTemporaryOperationContext(
                    [=](OperationContext* opCtx) {
+                       int numDocsToRemovePerBatch = rangeDeleterBatchSize.load();
+                       if (numDocsToRemovePerBatch <= 0) {
+                           numDocsToRemovePerBatch = kRangeDeleterBatchSizeDefault;
+                       }
+
+                       Milliseconds delayBetweenBatches(rangeDeleterBatchDelayMS.load());
+
                        LOGV2_DEBUG(5346200,
                                    1,
                                    "Starting batch deletion",
@@ -511,7 +516,6 @@ SharedSemiFuture<void> removeDocumentsInRange(
     const BSONObj& keyPattern,
     const ChunkRange& range,
     const UUID& migrationId,
-    int numDocsToRemovePerBatch,
     Seconds delayForActiveQueriesOnSecondariesToComplete) {
     return std::move(waitForActiveQueriesToComplete)
         .thenRunOn(executor)
@@ -529,23 +533,14 @@ SharedSemiFuture<void> removeDocumentsInRange(
         .then([=]() mutable {
             LOGV2_DEBUG(23772,
                         1,
-                        "Beginning deletion of any documents in {namespace} range {range} with  "
-                        "numDocsToRemovePerBatch {numDocsToRemovePerBatch}",
                         "Beginning deletion of documents",
                         "namespace"_attr = nss.ns(),
-                        "range"_attr = redact(range.toString()),
-                        "numDocsToRemovePerBatch"_attr = numDocsToRemovePerBatch);
+                        "range"_attr = redact(range.toString()));
 
             notifySecondariesThatDeletionIsOccurring(nss, collectionUuid, range);
 
-            return deleteRangeInBatches(executor,
-                                        nss,
-                                        collectionUuid,
-                                        keyPattern,
-                                        range,
-                                        migrationId,
-                                        numDocsToRemovePerBatch,
-                                        Milliseconds(rangeDeleterBatchDelayMS.load()))
+            return deleteRangeInBatches(
+                       executor, nss, collectionUuid, keyPattern, range, migrationId)
                 .onCompletion([=](Status s) {
                     if (!s.isOK() &&
                         s.code() !=
