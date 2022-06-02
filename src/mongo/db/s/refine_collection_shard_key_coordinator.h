@@ -49,11 +49,6 @@ public:
         MongoProcessInterface::CurrentOpConnectionsMode connMode,
         MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
-protected:
-    RefineCollectionShardKeyCoordinator(ShardingDDLCoordinatorService* service,
-                                        const BSONObj& initialState,
-                                        bool persistCoordinatorDocument);
-
 private:
     ShardingDDLCoordinatorMetadata const& metadata() const override {
         return _doc.getShardingDDLCoordinatorMetadata();
@@ -88,15 +83,7 @@ private:
 
     const KeyPattern _newShardKey;
     KeyPattern _oldShardKey;
-    const bool _persistCoordinatorDocument;  // TODO: SERVER-62850 remove this then 6.0 branches out
     boost::optional<UUID> _collectionUUID;
-};
-
-// TODO: SERVER-62850 remove this then 6.0 branches out
-class RefineCollectionShardKeyCoordinator_NORESILIENT : public RefineCollectionShardKeyCoordinator {
-public:
-    RefineCollectionShardKeyCoordinator_NORESILIENT(ShardingDDLCoordinatorService* service,
-                                                    const BSONObj& initialState);
 };
 
 }  // namespace mongo

@@ -87,10 +87,6 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
             return std::make_shared<RefineCollectionShardKeyCoordinator>(service,
                                                                          std::move(initialState));
             break;
-        case DDLCoordinatorTypeEnum::kRefineCollectionShardKeyNoResilient:
-            return std::make_shared<RefineCollectionShardKeyCoordinator_NORESILIENT>(
-                service, std::move(initialState));
-            break;
         case DDLCoordinatorTypeEnum::kSetAllowMigrations:
             return std::make_shared<SetAllowMigrationsCoordinator>(service,
                                                                    std::move(initialState));

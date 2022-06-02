@@ -33,7 +33,6 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/s/refine_collection_shard_key_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/s/refine_collection_shard_key_coordinator_feature_flags_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -70,26 +69,16 @@ public:
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-            const auto coordinatorCompletionFuture = [&]() -> SharedSemiFuture<void> {
-                FixedFCVRegion fixedFcvRegion(opCtx);
-                const auto coordinatorType =
-                    feature_flags::gFeatureFlagRecoverableRefineCollectionShardKeyCoordinator
-                        .isEnabled(serverGlobalParams.featureCompatibility)
-                    ? DDLCoordinatorTypeEnum::kRefineCollectionShardKey
-                    : DDLCoordinatorTypeEnum::kRefineCollectionShardKeyNoResilient;
+            auto coordinatorDoc = RefineCollectionShardKeyCoordinatorDocument();
+            coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                {{ns(), DDLCoordinatorTypeEnum::kRefineCollectionShardKey}});
+            coordinatorDoc.setRefineCollectionShardKeyRequest(
+                request().getRefineCollectionShardKeyRequest());
 
-                auto coordinatorDoc = RefineCollectionShardKeyCoordinatorDocument();
-                coordinatorDoc.setShardingDDLCoordinatorMetadata({{ns(), coordinatorType}});
-                coordinatorDoc.setRefineCollectionShardKeyRequest(
-                    request().getRefineCollectionShardKeyRequest());
-
-                auto service = ShardingDDLCoordinatorService::getService(opCtx);
-                auto refineCoordinator = checked_pointer_cast<RefineCollectionShardKeyCoordinator>(
-                    service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
-                return refineCoordinator->getCompletionFuture();
-            }();
-
-            coordinatorCompletionFuture.get(opCtx);
+            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto refineCoordinator = checked_pointer_cast<RefineCollectionShardKeyCoordinator>(
+                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+            refineCoordinator->getCompletionFuture().get(opCtx);
         }
 
         bool supportsWriteConcern() const override {
