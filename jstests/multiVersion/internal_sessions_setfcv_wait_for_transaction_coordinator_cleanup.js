@@ -169,8 +169,15 @@ function runTestWithFailoverBeforeDocumentRemoval(lsid) {
             autocommit: false,
         }));
 
-        assert.commandWorked(conn.adminCommand(
-            {commitTransaction: 1, lsid: lsid, txnNumber: NumberLong(0), autocommit: false}));
+        // In the case where a commitTransaction retry attempt happens to execute after the
+        // transaction entry is removed from config.transactions and
+        // config.transaction_coordinators upon completion of the transaction and fcv downgrade, we
+        // have no way to recover the transaction decision, so the server will return
+        // NoSuchTransaction.
+        assert.commandWorkedOrFailedWithCode(
+            conn.adminCommand(
+                {commitTransaction: 1, lsid: lsid, txnNumber: NumberLong(0), autocommit: false}),
+            ErrorCodes.NoSuchTransaction);
     };
 
     const transactionCommitThread = new Thread(insertDocumentsInTransaction, st.s.host, txnParams);
