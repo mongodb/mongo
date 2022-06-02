@@ -545,7 +545,7 @@ buildvariants:
   #- name: secondary_reads_passthrough_gen
   #- name: session_jscore_passthrough
   #- name: .sharding .jscore !.wo_snapshot
-  - name: .sharding .common
+  #- name: .sharding .common
   #- name: snmp
   #- name: update_fuzzer_gen
 
