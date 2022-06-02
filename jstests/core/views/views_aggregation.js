@@ -147,10 +147,6 @@ assert.commandWorked(viewsDB.runCommand({
         viewsDB.runCommand(
             {aggregate: "largeView", pipeline: [{$sort: {x: -1}}], cursor: {}, allowDiskUse: true}),
         "Expected aggregate to succeed since 'allowDiskUse' was specified");
-
-    assert.commandWorked(
-        viewsDB.runCommand({aggregate: "largeView", pipeline: [{$sort: {x: -1}}], cursor: {}}),
-        "Expected aggregate to succeed since 'allowDiskUse' is true by default");
 })();
 
 // Test explain modes on a view.
