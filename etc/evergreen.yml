@@ -2865,15 +2865,25 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-build
+    patch_only: true
   - name: .aggregation !.no_async
+    patch_only: true
   - name: .sharding .auth
+    patch_only: true
   - name: .sharding .causally_consistent !.wo_snapshot
+    patch_only: true
   - name: .concurrency .common !.kill_terminate
+    patch_only: true
   - name: .integration !.audit
+    patch_only: true
   - name: .jscore .common
+    patch_only: true
   - name: .logical_session_cache .one_sec
+    patch_only: true
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+    patch_only: true
   - name: .sharding .common !.csrs
+    patch_only: true
 
 - name: shared-scons-cache-pruning
   display_name: "Shared SCons Cache Pruning"
