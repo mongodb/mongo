@@ -55,10 +55,14 @@ public:
     }
 
     ~DeadlineFuture() {
-        auto lk = stdx::lock_guard(_mutex);
-        _executor->cancel(_timeoutCbHandle.get());
-        // The _executor holds the shared ptr on this, the callback will set the promise.
-        invariant(get().isReady());
+        {
+            auto lk = stdx::lock_guard(_mutex);
+            if (_timeoutCbHandle) {
+                _executor->cancel(_timeoutCbHandle.get());
+            }
+            // The _executor holds the shared ptr on this, the callback will set the promise.
+            invariant(get().isReady());
+        }
     }
 
     SharedSemiFuture<ResultStatus> get() const {
@@ -104,6 +108,7 @@ private:
             std::move(inputFuture).onCompletion([this, self](StatusWith<ResultStatus> status) {
                 auto lk = stdx::lock_guard(_mutex);
                 _executor->cancel(_timeoutCbHandle.get());
+                _timeoutCbHandle = boost::none;
                 if (!get().isReady()) {
                     _outputFuturePromise->setFrom(status);
                 }
