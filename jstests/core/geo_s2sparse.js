@@ -1,5 +1,10 @@
 // Test behavior of 2dsphere and sparse.  See SERVER-9639.
 // All V2 2dsphere indices are sparse in the geo fields.
+//
+// @tags: [
+//     # TODO(SERVER_60823): remove incompatible_with_gcov
+//     incompatible_with_gcov,
+// ]
 
 (function() {
 "use strict";

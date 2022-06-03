@@ -1,4 +1,10 @@
 // this tests 1% of all points
+//
+// @tags: [
+//     # TODO(SERVER_60823): remove incompatible_with_gcov
+//     incompatible_with_gcov,
+// ]
+
 load("jstests/libs/geo_near_random.js");
 
 var test = new GeoNearRandomTest("geo_near_random2");
