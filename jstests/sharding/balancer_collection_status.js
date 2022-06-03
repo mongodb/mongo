@@ -14,17 +14,13 @@ let st = new ShardingTest({
     }
 });
 
-function runBalancer(rounds) {
+function runBalancer() {
     st.startBalancer();
-    let numRounds = 0;
 
-    // Let the balancer run for caller specified number of rounds.
-    assert.soon(() => {
-        st.awaitBalancerRound();
-        st.printShardingStatus(true);
-        numRounds++;
-        return (numRounds === rounds);
-    }, 'Balancer failed to run for ' + rounds + ' rounds', 1000 * 60 * (3 * rounds));
+    // Let the balancer run until balanced.
+    st.printShardingStatus(true);
+    st.awaitBalance('col', 'db');
+    st.printShardingStatus(true);
 
     st.stopBalancer();
 }
@@ -72,13 +68,8 @@ result = assert.commandWorked(st.s0.adminCommand({balancerCollectionStatus: 'db.
 assert.eq(result.balancerCompliant, false);
 assert.eq(result.firstComplianceViolation, 'chunksImbalance');
 
-// run balancer with 3 rounds
-runBalancer(3);
-
-// the chunks must be balanced now
-result = assert.commandWorked(st.s0.adminCommand({balancerCollectionStatus: 'db.col'}));
-
-assert.eq(result.balancerCompliant, true);
+// run balancer until balanced
+runBalancer();
 
 // manually move a chunk to a shard before creating zones (this will help
 // testing the zone violation)
@@ -99,15 +90,8 @@ result = assert.commandWorked(st.s0.adminCommand({balancerCollectionStatus: 'db.
 assert.eq(result.balancerCompliant, false);
 assert.eq(result.firstComplianceViolation, 'zoneViolation');
 
-// run balancer, we don't know exactly where the first run moved the chunks
-// so lets run 3 rounds just in case
-runBalancer(3);
-
-// the chunks must be balanced now
-result = assert.commandWorked(st.s0.adminCommand({balancerCollectionStatus: 'db.col'}));
-
-// All chunks are balanced and in the correct zone
-assert.eq(result.balancerCompliant, true);
+// run balancer until balanced
+runBalancer();
 
 const configDB = st.configRS.getPrimary().getDB('config');
 const fcvDoc = configDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
