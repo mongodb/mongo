@@ -56,6 +56,12 @@ SHA256Block getLogicalSessionUserDigestFor(StringData user, StringData db);
 bool isParentSessionId(const LogicalSessionId& sessionId);
 
 /**
+ * Returns if the given session is a child session, ie it was created on behalf of an operation that
+ * already had a session.
+ */
+bool isChildSession(const LogicalSessionId& sessionId);
+
+/**
  * Returns the parent session id for the given session id if there is one.
  */
 boost::optional<LogicalSessionId> getParentSessionId(const LogicalSessionId& sessionId);

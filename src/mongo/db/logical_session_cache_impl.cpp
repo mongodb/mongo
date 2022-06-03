@@ -380,8 +380,8 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
 void LogicalSessionCacheImpl::endSessions(const LogicalSessionIdSet& sessions) {
     for (const auto& lsid : sessions) {
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "Cannot specify a session id with parent session id " << lsid,
-                !getParentSessionId(lsid));
+                str::stream() << "Cannot specify a child session id " << lsid,
+                isParentSessionId(lsid));
     }
     stdx::lock_guard<Latch> lk(_mutex);
     _endingSessions.insert(begin(sessions), end(sessions));
@@ -446,8 +446,8 @@ std::vector<LogicalSessionId> LogicalSessionCacheImpl::listIds(
 boost::optional<LogicalSessionRecord> LogicalSessionCacheImpl::peekCached(
     const LogicalSessionId& lsid) const {
     uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "Cannot specify a session id with parent session id " << lsid,
-            !getParentSessionId(lsid));
+            str::stream() << "Cannot specify a child session id " << lsid,
+            isParentSessionId(lsid));
 
     stdx::lock_guard<Latch> lk(_mutex);
     const auto it = _activeSessions.find(lsid);

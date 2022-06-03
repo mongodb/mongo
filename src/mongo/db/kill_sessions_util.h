@@ -40,7 +40,7 @@ namespace kill_sessions {
  * Validation callback to check if a given lsid has an associated parent session.
  */
 inline Status validateLsid(const LogicalSessionId& lsid) {
-    if (getParentSessionId(lsid)) {
+    if (isChildSession(lsid)) {
         return {ErrorCodes::InvalidOptions, "Cannot kill a child session"};
     }
     return Status::OK();

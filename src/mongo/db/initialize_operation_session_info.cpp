@@ -99,7 +99,7 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
             return {};
         }
 
-        if (getParentSessionId(lsid)) {
+        if (isChildSession(lsid)) {
             uassert(ErrorCodes::InvalidOptions,
                     "Internal sessions are only allowed for internal clients",
                     isAuthorizedForInternalClusterAction);
