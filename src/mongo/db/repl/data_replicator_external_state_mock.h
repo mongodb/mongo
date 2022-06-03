@@ -50,7 +50,7 @@ public:
     OpTimeWithTerm getCurrentTermAndLastCommittedOpTime() override;
 
     void processMetadata(const rpc::ReplSetMetadata& metadata,
-                         rpc::OplogQueryMetadata oqMetadata) override;
+                         const rpc::OplogQueryMetadata& oqMetadata) override;
 
     ChangeSyncSourceAction shouldStopFetching(const HostAndPort& source,
                                               const rpc::ReplSetMetadata& replMetadata,

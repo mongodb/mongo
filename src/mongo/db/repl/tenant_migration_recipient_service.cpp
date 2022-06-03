@@ -213,7 +213,7 @@ public:
 
     // Tenant migration does not require the metadata from the oplog query.
     void processMetadata(const rpc::ReplSetMetadata& replMetadata,
-                         rpc::OplogQueryMetadata oqMetadata) final {}
+                         const rpc::OplogQueryMetadata& oqMetadata) final {}
 
     // Tenant migration does not change sync source depending on metadata.
     ChangeSyncSourceAction shouldStopFetching(const HostAndPort& source,

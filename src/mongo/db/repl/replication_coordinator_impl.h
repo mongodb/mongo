@@ -1463,17 +1463,6 @@ private:
     EventHandle _processReplSetMetadata_inlock(const rpc::ReplSetMetadata& replMetadata);
 
     /**
-     * Prepares a metadata object for ReplSetMetadata.
-     */
-    void _prepareReplSetMetadata_inlock(const OpTime& lastOpTimeFromClient,
-                                        BSONObjBuilder* builder) const;
-
-    /**
-     * Prepares a metadata object for OplogQueryMetadata.
-     */
-    void _prepareOplogQueryMetadata_inlock(int rbid, BSONObjBuilder* builder) const;
-
-    /**
      * Blesses a snapshot to be used for new committed reads.
      *
      * Returns true if the value was updated to `newCommittedSnapshot`.

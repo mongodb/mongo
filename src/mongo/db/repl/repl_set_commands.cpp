@@ -685,7 +685,7 @@ public:
         if (metadataResult.isOK()) {
             // New style update position command has metadata, which may inform the
             // upstream of a higher term.
-            auto metadata = metadataResult.getValue();
+            const auto& metadata = metadataResult.getValue();
             replCoord->processReplSetMetadata(metadata);
         }
 

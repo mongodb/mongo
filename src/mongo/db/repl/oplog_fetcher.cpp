@@ -817,7 +817,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
                     "metadata"_attr = _metadataObj);
         return oqMetadataResult.getStatus();
     }
-    auto oqMetadata = oqMetadataResult.getValue();
+    const auto& oqMetadata = oqMetadataResult.getValue();
 
     if (_firstBatch) {
         auto status =
@@ -884,7 +884,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
                     "metadata"_attr = _metadataObj);
         return metadataResult.getStatus();
     }
-    auto replSetMetadata = metadataResult.getValue();
+    const auto& replSetMetadata = metadataResult.getValue();
 
     // Determine if we should stop syncing from our current sync source.
     auto changeSyncSourceAction = _dataReplicatorExternalState->shouldStopFetching(

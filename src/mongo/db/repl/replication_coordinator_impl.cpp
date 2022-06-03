@@ -5716,28 +5716,27 @@ void ReplicationCoordinatorImpl::prepareReplMetadata(const BSONObj& metadataRequ
         invariant(-1 != rbid);
     }
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    boost::optional<rpc::ReplSetMetadata> replSetMetadata;
+    boost::optional<rpc::OplogQueryMetadata> oplogQueryMetadata;
+    {
+        stdx::lock_guard<Latch> lk(_mutex);
 
-    if (hasReplSetMetadata) {
-        _prepareReplSetMetadata_inlock(lastOpTimeFromClient, builder);
+        if (hasReplSetMetadata) {
+            OpTime lastVisibleOpTime =
+                std::max(lastOpTimeFromClient, _getCurrentCommittedSnapshotOpTime_inlock());
+            replSetMetadata = _topCoord->prepareReplSetMetadata(lastVisibleOpTime);
+        }
+
+        if (hasOplogQueryMetadata) {
+            oplogQueryMetadata = _topCoord->prepareOplogQueryMetadata(rbid);
+        }
     }
 
-    if (hasOplogQueryMetadata) {
-        _prepareOplogQueryMetadata_inlock(rbid, builder);
-    }
-}
-
-void ReplicationCoordinatorImpl::_prepareReplSetMetadata_inlock(const OpTime& lastOpTimeFromClient,
-                                                                BSONObjBuilder* builder) const {
-    OpTime lastVisibleOpTime =
-        std::max(lastOpTimeFromClient, _getCurrentCommittedSnapshotOpTime_inlock());
-    auto metadata = _topCoord->prepareReplSetMetadata(lastVisibleOpTime);
-    metadata.writeToMetadata(builder).transitional_ignore();
-}
-
-void ReplicationCoordinatorImpl::_prepareOplogQueryMetadata_inlock(int rbid,
-                                                                   BSONObjBuilder* builder) const {
-    _topCoord->prepareOplogQueryMetadata(rbid).writeToMetadata(builder).transitional_ignore();
+    // Do BSON serialization outside lock.
+    if (replSetMetadata)
+        invariantStatusOK(replSetMetadata->writeToMetadata(builder));
+    if (oplogQueryMetadata)
+        invariantStatusOK(oplogQueryMetadata->writeToMetadata(builder));
 }
 
 bool ReplicationCoordinatorImpl::getWriteConcernMajorityShouldJournal() {
