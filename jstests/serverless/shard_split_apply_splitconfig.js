@@ -7,6 +7,7 @@ function populateRecipientMembers(splitConfig) {
         member._id = idx;
         member.votes = 1;
         member.priority = 1;
+        member.hidden = false;
         return member;
     });
 }

@@ -146,8 +146,8 @@ TEST(MakeSplitConfig, ValidateSplitConfigIntegrityTest) {
                                                     << "NY"))
                                  << BSON("_id" << 1 << "host"
                                                << "localhost:20002"
-                                               << "priority" << 0 << "votes" << 0 << "tags"
-                                               << BSON(recipientTagName << "one"))
+                                               << "priority" << 0 << "hidden" << true << "votes"
+                                               << 0 << "tags" << BSON(recipientTagName << "one"))
                                  << BSON("_id" << 2 << "host"
                                                << "localhost:20003"
                                                << "priority" << 6))
@@ -161,6 +161,11 @@ TEST(MakeSplitConfig, ValidateSplitConfigIntegrityTest) {
     ASSERT_EQ(splitConfig.getReplSetName(), donorConfigSetName);
     ASSERT_TRUE(splitConfig.toBSON().hasField("members"));
     ASSERT_EQUALS(2, splitConfig.getNumMembers());
+
+    for (const auto& member : splitConfig.getRecipientConfig()->members()) {
+        ASSERT_FALSE(member.isHidden());
+    }
+
     ASSERT_TRUE(splitConfig.isSplitConfig());
 
     auto recipientConfigPtr = splitConfig.getRecipientConfig();
@@ -222,7 +227,7 @@ TEST(MakeSplitConfig, RecipientConfigValidationTest) {
         BSON("_id" << UUID::gen() << "tenantIds" << tenantIds << "recipientTagName"
                    << recipientTagName << "recipientSetName" << recipientSetName));
 
-    auto makeConfig = [&](auto setName, bool shouldVote, bool uniqueTagValue) {
+    auto makeConfig = [&](auto setName, bool shouldVote, bool uniqueTagValue, bool hidden) {
         auto vote = shouldVote ? 1 : 0;
         return ReplSetConfig::parse(BSON(
             "_id"
@@ -230,20 +235,21 @@ TEST(MakeSplitConfig, RecipientConfigValidationTest) {
             << BSON_ARRAY(
                    BSON("_id" << 0 << "host"
                               << "localhost:20001"
-                              << "priority" << 0 << "votes" << vote << "tags"
+                              << "priority" << 0 << "hidden" << hidden << "votes" << vote << "tags"
                               << BSON(recipientTagName
                                       << (uniqueTagValue ? UUID::gen().toString() : "") + "one"))
                    << BSON("_id" << 1 << "host"
                                  << "localhost:20002"
-                                 << "priority" << 0 << "votes" << vote << "tags"
+                                 << "priority" << 0 << "hidden" << hidden << "votes" << vote
+                                 << "tags"
                                  << BSON(recipientTagName
                                          << (uniqueTagValue ? UUID::gen().toString() : "") + "one"))
-                   << BSON(
-                          "_id" << 2 << "host"
-                                << "localhost:20003"
-                                << "priority" << 0 << "votes" << vote << "tags"
-                                << BSON(recipientTagName
-                                        << (uniqueTagValue ? UUID::gen().toString() : "") + "one")))
+                   << BSON("_id"
+                           << 2 << "host"
+                           << "localhost:20003"
+                           << "priority" << 0 << "hidden" << hidden << "votes" << vote << "tags"
+                           << BSON(recipientTagName
+                                   << (uniqueTagValue ? UUID::gen().toString() : "") + "one")))
             << "settings" << BSON("electionTimeoutMillis" << 1000)));
     };
 
@@ -251,7 +257,7 @@ TEST(MakeSplitConfig, RecipientConfigValidationTest) {
     auto recipientTagNameOptional = boost::make_optional<StringData>(recipientTagName);
 
     // Test we fail here because recipientSetName == localConfig.getReplSetName.
-    ReplSetConfig config = makeConfig(recipientSetName, false, true);
+    ReplSetConfig config = makeConfig(recipientSetName, false, true, true);
     ASSERT_EQ(serverless::validateRecipientNodesForShardSplit(statedoc, config).code(),
               ErrorCodes::BadValue);
 
@@ -271,16 +277,21 @@ TEST(MakeSplitConfig, RecipientConfigValidationTest) {
               ErrorCodes::InvalidReplicaSetConfig);
 
     // Test we fail since recipient tags don't have unique value associated.
-    config = makeConfig(donorConfigSetName, false, false);
+    config = makeConfig(donorConfigSetName, false, false, true);
     ASSERT_EQ(serverless::validateRecipientNodesForShardSplit(statedoc, config),
               ErrorCodes::InvalidOptions);
 
     // Test we fail since recipient nodes should be non-voting.
-    config = makeConfig(donorConfigSetName, true, true);
+    config = makeConfig(donorConfigSetName, true, true, true);
     ASSERT_EQ(serverless::validateRecipientNodesForShardSplit(statedoc, config),
               ErrorCodes::InvalidOptions);
 
-    config = makeConfig(donorConfigSetName, false, true);
+    // Test we fail since recipient nodes should be hidden.
+    config = makeConfig(donorConfigSetName, false, true, false);
+    ASSERT_EQ(serverless::validateRecipientNodesForShardSplit(statedoc, config),
+              ErrorCodes::InvalidOptions);
+
+    config = makeConfig(donorConfigSetName, false, true, true);
     ASSERT_OK(serverless::validateRecipientNodesForShardSplit(statedoc, config));
 }
 

@@ -63,7 +63,7 @@ void reconfigToAddRecipientNodes(ServiceContext* serviceContext,
     }
     for (auto node : recipientNodes) {
         members.append(BSON("_id" << idx++ << "host" << node.toString() << "priority" << 0
-                                  << "votes" << 0 << "tags"
+                                  << "hidden" << 1 << "votes" << 0 << "tags"
                                   << BSON(recipientTagName << UUID::gen().toString())));
     }
 

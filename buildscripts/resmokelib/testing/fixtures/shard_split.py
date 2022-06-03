@@ -247,7 +247,7 @@ class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
                     # retry.
                     recipient_host = recipient_node.get_internal_connection_string()
                     recipient_entry = {
-                        "host": recipient_host, "votes": 0, "priority": 0,
+                        "host": recipient_host, "votes": 0, "priority": 0, "hidden": True,
                         "tags": {recipient_tag_name: str(ObjectId())}
                     }
                     member_exists = False

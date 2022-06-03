@@ -300,6 +300,7 @@ class BasicServerlessTest {
                 host: node.host,
                 votes: 0,
                 priority: 0,
+                hidden: true,
                 tags: {[this.recipientTagName]: ObjectId().valueOf()}
             });
         });
