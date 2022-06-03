@@ -444,7 +444,6 @@ void DBClientCursor::requestMore() {
 void DBClientCursor::exhaustReceiveMore() {
     verify(_cursorId);
     verify(_batch.pos == _batch.objs.size());
-    uassert(40675, "Cannot have limit for exhaust query", _limit == 0);
     Message response;
     verify(_client);
     uassertStatusOK(

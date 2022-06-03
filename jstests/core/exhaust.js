@@ -59,5 +59,17 @@ for (let i = 0; i < numDocs; ++i) {
 assert.commandWorked(bulk.execute());
 
 assert.eq(numDocs, coll.find().addOption(DBQuery.Option.exhaust).itcount());
+
+// Test that exhaust query with a limit is allowed.
+assert.eq(numDocs, coll.find().addOption(DBQuery.Option.exhaust).limit(numDocs + 1).itcount());
+assert.eq(numDocs - 1, coll.find().addOption(DBQuery.Option.exhaust).limit(numDocs - 1).itcount());
+
+// Test that exhaust with batchSize and limit is allowed.
+assert.eq(
+    numDocs,
+    coll.find().addOption(DBQuery.Option.exhaust).limit(numDocs + 1).batchSize(100).itcount());
+assert.eq(
+    numDocs - 1,
+    coll.find().addOption(DBQuery.Option.exhaust).limit(numDocs - 1).batchSize(100).itcount());
 }());
 }());
