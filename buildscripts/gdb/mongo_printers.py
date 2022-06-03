@@ -922,20 +922,23 @@ class MemoPrinter(OptimizerTypePrinter):
 def register_abt_printers(pp):
     """Registers a number of pretty printers related to the CQF optimizer."""
 
-    # ABT printer.
-    abt_type = gdb.lookup_type("mongo::optimizer::ABT").strip_typedefs()
-    pp.add('ABT', abt_type.name, True, ABTPrinter)
+    try:
+        # ABT printer.
+        abt_type = gdb.lookup_type("mongo::optimizer::ABT").strip_typedefs()
+        pp.add('ABT', abt_type.name, True, ABTPrinter)
 
-    # IntervalRequirement printer.
-    pp.add("Interval", "mongo::optimizer::IntervalRequirement", False, IntervalPrinter)
+        # IntervalRequirement printer.
+        pp.add("Interval", "mongo::optimizer::IntervalRequirement", False, IntervalPrinter)
 
-    # PartialSchemaRequirements printer.
-    schema_req_type = gdb.lookup_type(
-        "mongo::optimizer::PartialSchemaRequirements").strip_typedefs()
-    pp.add("PartialSchemaRequirements", schema_req_type.name, False, PartialSchemaReqMapPrinter)
+        # PartialSchemaRequirements printer.
+        schema_req_type = gdb.lookup_type(
+            "mongo::optimizer::PartialSchemaRequirements").strip_typedefs()
+        pp.add("PartialSchemaRequirements", schema_req_type.name, False, PartialSchemaReqMapPrinter)
 
-    # Memo printer.
-    pp.add("Memo", "mongo::optimizer::cascades::Memo", False, MemoPrinter)
+        # Memo printer.
+        pp.add("Memo", "mongo::optimizer::cascades::Memo", False, MemoPrinter)
+    except gdb.error as gdberr:
+        print("Failed to add one or more ABT pretty printers, skipping: " + str(gdberr))
 
 
 def build_pretty_printer():
