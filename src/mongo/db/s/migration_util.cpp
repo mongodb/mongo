@@ -93,13 +93,10 @@ MONGO_FAIL_POINT_DEFINE(hangInRefreshFilteringMetadataUntilSuccessInterruptible)
 MONGO_FAIL_POINT_DEFINE(hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInPersistMigrateCommitDecisionInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInPersistMigrateCommitDecisionThenSimulateErrorUninterruptible);
-MONGO_FAIL_POINT_DEFINE(hangInPersistMigrateAbortDecisionInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInPersistMigrateAbortDecisionThenSimulateErrorUninterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInDeleteRangeDeletionOnRecipientInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInDeleteRangeDeletionOnRecipientThenSimulateErrorUninterruptible);
-MONGO_FAIL_POINT_DEFINE(hangInDeleteRangeDeletionLocallyInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInDeleteRangeDeletionLocallyThenSimulateErrorUninterruptible);
-MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionOnRecipientInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionOnRecipientThenSimulateErrorUninterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionLocallyInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible);
@@ -845,7 +842,6 @@ void persistAbortDecision(OperationContext* opCtx,
                           const MigrationCoordinatorDocument& migrationDoc) {
     invariant(migrationDoc.getDecision() && *migrationDoc.getDecision() == DecisionEnum::kAborted);
 
-    hangInPersistMigrateAbortDecisionInterruptible.pauseWhileSet(opCtx);
     try {
         PersistentTaskStore<MigrationCoordinatorDocument> store(
             NamespaceString::kMigrationCoordinatorsNamespace);
@@ -891,7 +887,6 @@ void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
 void deleteRangeDeletionTaskLocally(OperationContext* opCtx,
                                     const UUID& deletionTaskId,
                                     const WriteConcernOptions& writeConcern) {
-    hangInDeleteRangeDeletionLocallyInterruptible.pauseWhileSet(opCtx);
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     store.remove(opCtx, BSON(RangeDeletionTask::kIdFieldName << deletionTaskId), writeConcern);
 
@@ -917,8 +912,6 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
 
     retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
         opCtx, "ready remote range deletion", [&](OperationContext* newOpCtx) {
-            hangInReadyRangeDeletionOnRecipientInterruptible.pauseWhileSet(newOpCtx);
-
             try {
                 sendWriteCommandToRecipient(
                     newOpCtx,
