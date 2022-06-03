@@ -63,8 +63,10 @@ protected:
 };
 
 TEST_F(ConfigIndexTest, CompatibleIndexAlreadyExists) {
-    createIndexOnConfigCollection(
-        operationContext(), ShardType::ConfigNS, BSON("host" << 1), /*unique*/ true)
+    createIndexOnConfigCollection(operationContext(),
+                                  NamespaceString::kConfigsvrShardsNamespace,
+                                  BSON("host" << 1),
+                                  /*unique*/ true)
         .transitional_ignore();
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
@@ -77,15 +79,18 @@ TEST_F(ConfigIndexTest, CompatibleIndexAlreadyExists) {
                  << "host_1")};
 
 
-    auto foundShardsIndexes = assertGet(getIndexes(operationContext(), ShardType::ConfigNS));
+    auto foundShardsIndexes =
+        assertGet(getIndexes(operationContext(), NamespaceString::kConfigsvrShardsNamespace));
     assertBSONObjsSame(expectedShardsIndexes, foundShardsIndexes);
 }
 
 TEST_F(ConfigIndexTest, IncompatibleIndexAlreadyExists) {
     // Make the index non-unique even though its supposed to be unique, make sure initialization
     // fails
-    createIndexOnConfigCollection(
-        operationContext(), ShardType::ConfigNS, BSON("host" << 1), /*unique*/ false)
+    createIndexOnConfigCollection(operationContext(),
+                                  NamespaceString::kConfigsvrShardsNamespace,
+                                  BSON("host" << 1),
+                                  /*unique*/ false)
         .transitional_ignore();
 
     ASSERT_EQUALS(ErrorCodes::IndexKeySpecsConflict,

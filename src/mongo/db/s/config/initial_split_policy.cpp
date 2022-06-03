@@ -138,7 +138,7 @@ StringMap<std::vector<ShardId>> buildTagsToShardIdsMap(OperationContext* opCtx,
         configServer->exhaustiveFindOnConfig(opCtx,
                                              ReadPreferenceSetting(ReadPreference::Nearest),
                                              repl::ReadConcernLevel::kMajorityReadConcern,
-                                             ShardType::ConfigNS,
+                                             NamespaceString::kConfigsvrShardsNamespace,
                                              BSONObj(),
                                              BSONObj(),
                                              boost::none));

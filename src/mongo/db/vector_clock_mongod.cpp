@@ -201,7 +201,7 @@ void VectorClockMongoD::onInitialDataAvailable(OperationContext* opCtx,
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         const auto maxTopologyTime{[&opCtx]() -> boost::optional<Timestamp> {
             DBDirectClient client{opCtx};
-            FindCommandRequest findRequest{ShardType::ConfigNS};
+            FindCommandRequest findRequest{NamespaceString::kConfigsvrShardsNamespace};
             findRequest.setSort(BSON(ShardType::topologyTime << -1));
             findRequest.setLimit(1);
             auto cursor{client.find(std::move(findRequest))};

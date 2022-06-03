@@ -167,7 +167,6 @@ const NamespaceString NamespaceString::kCompactStructuredEncryptionCoordinatorNa
 const NamespaceString NamespaceString::kClusterParametersNamespace(NamespaceString::kConfigDb,
                                                                    "clusterParameters");
 
-// TODO (SERVER-66431): replace all usages of ShardType::ConfigNS by kConfigsvrShardsNamespace
 const NamespaceString NamespaceString::kConfigsvrShardsNamespace(NamespaceString::kConfigDb,
                                                                  "shards");
 

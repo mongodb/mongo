@@ -209,7 +209,7 @@ void ConfigServerHealthObserver::_runSmokeReadShardsCommand(std::shared_ptr<Chec
     }();
 
     BSONObjBuilder findCmdBuilder;
-    FindCommandRequest findCommand(ShardType::ConfigNS);
+    FindCommandRequest findCommand(NamespaceString::kConfigsvrShardsNamespace);
     findCommand.setReadConcern(readConcernObj);
     findCommand.setLimit(1);
     findCommand.setSingleBatch(true);
@@ -221,15 +221,16 @@ void ConfigServerHealthObserver::_runSmokeReadShardsCommand(std::shared_ptr<Chec
     StatusWith<Shard::CommandResponse> findOneShardResponse{ErrorCodes::HostUnreachable,
                                                             "Config server read was not run"};
     try {
-        findOneShardResponse = Grid::get(ctx->opCtx.get())
-                                   ->shardRegistry()
-                                   ->getConfigShard()
-                                   ->runCommand(ctx->opCtx.get(),
-                                                readPref,
-                                                ShardType::ConfigNS.db().toString(),
-                                                findCmdBuilder.done(),
-                                                kServerRequestTimeout,
-                                                Shard::RetryPolicy::kNoRetry);
+        findOneShardResponse =
+            Grid::get(ctx->opCtx.get())
+                ->shardRegistry()
+                ->getConfigShard()
+                ->runCommand(ctx->opCtx.get(),
+                             readPref,
+                             NamespaceString::kConfigsvrShardsNamespace.db().toString(),
+                             findCmdBuilder.done(),
+                             kServerRequestTimeout,
+                             Shard::RetryPolicy::kNoRetry);
     } catch (const DBException& exc) {
         findOneShardResponse = StatusWith<Shard::CommandResponse>(exc.toStatus());
     }

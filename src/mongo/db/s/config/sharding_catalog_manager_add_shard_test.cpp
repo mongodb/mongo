@@ -190,7 +190,7 @@ protected:
             operationContext(),
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             repl::ReadConcernLevel::kLocalReadConcern,
-            ShardType::ConfigNS,
+            NamespaceString::kConfigsvrShardsNamespace,
             BSONObj(),
             BSONObj(),
             boost::none));
@@ -543,7 +543,7 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
     // Add a pre-existing shard so when generating a name for the new shard it will have to go
     // higher than the existing one.
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
-                                                    ShardType::ConfigNS,
+                                                    NamespaceString::kConfigsvrShardsNamespace,
                                                     existingShard.toBSON(),
                                                     ShardingCatalogClient::kMajorityWriteConcern));
     assertShardExists(existingShard);
@@ -1209,7 +1209,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
 
     // Make sure the shard already exists.
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
-                                                    ShardType::ConfigNS,
+                                                    NamespaceString::kConfigsvrShardsNamespace,
                                                     existingShard.toBSON(),
                                                     ShardingCatalogClient::kMajorityWriteConcern));
     assertShardExists(existingShard);
@@ -1318,7 +1318,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
 
     // Make sure the shard already exists.
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
-                                                    ShardType::ConfigNS,
+                                                    NamespaceString::kConfigsvrShardsNamespace,
                                                     existingShard.toBSON(),
                                                     ShardingCatalogClient::kMajorityWriteConcern));
     assertShardExists(existingShard);

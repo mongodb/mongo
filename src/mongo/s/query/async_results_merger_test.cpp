@@ -1687,7 +1687,8 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkFo
     cursors.push_back(makeRemoteCursor(
         kTestShardIds[2],
         kTestShardHosts[2],
-        CursorResponse(ShardType::ConfigNS, 789, {}, boost::none, pbrtConfigCursor)));
+        CursorResponse(
+            NamespaceString::kConfigsvrShardsNamespace, 789, {}, boost::none, pbrtConfigCursor)));
     params.setRemotes(std::move(cursors));
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
@@ -1715,8 +1716,11 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkFo
     pbrtConfigCursor = makePostBatchResumeToken(Timestamp(1, 2));
     scheduleNetworkResponse({kTestNss, CursorId(123), {}, boost::none, pbrtFirstCursor});
     scheduleNetworkResponse({kTestNss, CursorId(456), {}, boost::none, pbrtSecondCursor});
-    scheduleNetworkResponse(
-        {ShardType::ConfigNS, CursorId(789), {}, boost::none, pbrtConfigCursor});
+    scheduleNetworkResponse({NamespaceString::kConfigsvrShardsNamespace,
+                             CursorId(789),
+                             {},
+                             boost::none,
+                             pbrtConfigCursor});
 
     // The high water mark has not advanced from its previous value.
     ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), initialHighWaterMark);
@@ -1734,8 +1738,11 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkFo
         configEvent.addField(BSON("$sortKey" << BSON_ARRAY(pbrtConfigCursor)).firstElement());
     scheduleNetworkResponse({kTestNss, CursorId(123), {}, boost::none, pbrtFirstCursor});
     scheduleNetworkResponse({kTestNss, CursorId(456), {}, boost::none, pbrtSecondCursor});
-    scheduleNetworkResponse(
-        {ShardType::ConfigNS, CursorId(789), {configEvent}, boost::none, pbrtConfigCursor});
+    scheduleNetworkResponse({NamespaceString::kConfigsvrShardsNamespace,
+                             CursorId(789),
+                             {configEvent},
+                             boost::none,
+                             pbrtConfigCursor});
 
     // The config cursor has a lower sort key than the other shards, so we can retrieve the event.
     ASSERT_TRUE(arm->ready());
@@ -1750,8 +1757,11 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkFo
     // event, it does not advance the ARM's high water mark sort key.
     scheduleNetworkResponse({kTestNss, CursorId(123), {}, boost::none, pbrtFirstCursor});
     scheduleNetworkResponse({kTestNss, CursorId(456), {}, boost::none, pbrtSecondCursor});
-    scheduleNetworkResponse(
-        {ShardType::ConfigNS, CursorId(789), {}, boost::none, pbrtConfigCursor});
+    scheduleNetworkResponse({NamespaceString::kConfigsvrShardsNamespace,
+                             CursorId(789),
+                             {},
+                             boost::none,
+                             pbrtConfigCursor});
     ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), initialHighWaterMark);
     ASSERT_FALSE(arm->ready());
 
@@ -1762,8 +1772,11 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkFo
     pbrtConfigCursor = makePostBatchResumeToken(Timestamp(1, 12));
     scheduleNetworkResponse({kTestNss, CursorId(123), {}, boost::none, pbrtFirstCursor});
     scheduleNetworkResponse({kTestNss, CursorId(456), {}, boost::none, pbrtSecondCursor});
-    scheduleNetworkResponse(
-        {ShardType::ConfigNS, CursorId(789), {}, boost::none, pbrtConfigCursor});
+    scheduleNetworkResponse({NamespaceString::kConfigsvrShardsNamespace,
+                             CursorId(789),
+                             {},
+                             boost::none,
+                             pbrtConfigCursor});
     ASSERT_BSONOBJ_GT(arm->getHighWaterMark(), initialHighWaterMark);
     ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), pbrtConfigCursor);
     ASSERT_FALSE(arm->ready());

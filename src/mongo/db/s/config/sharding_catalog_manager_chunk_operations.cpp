@@ -995,7 +995,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                             repl::ReadConcernLevel::kLocalReadConcern,
-                                            ShardType::ConfigNS,
+                                            NamespaceString::kConfigsvrShardsNamespace,
                                             BSON(ShardType::name(toShard.toString())),
                                             {},
                                             boost::none));

@@ -109,7 +109,7 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
     const auto& configShard = Grid::get(expCtx->opCtx)->shardRegistry()->getConfigShard();
     // Pipeline: {$changeStream: {startAtOperationTime: [now], allowToRunOnConfigDB: true}}
     AggregateCommandRequest aggReq(
-        ShardType::ConfigNS,
+        NamespaceString::kConfigsvrShardsNamespace,
         {BSON(DocumentSourceChangeStream::kStageName
               << BSON(DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName
                       << startMonitoringAtTime
@@ -1196,7 +1196,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
 
         // For $changeStream, we must open an extra cursor on the 'config.shards' collection, so
         // that we can monitor for the addition of new shards inline with real events.
-        if (hasChangeStream && expCtx->ns.db() != ShardType::ConfigNS.db()) {
+        if (hasChangeStream && expCtx->ns.db() != NamespaceString::kConfigsvrShardsNamespace.db()) {
             cursors.emplace_back(openChangeStreamNewShardMonitor(expCtx, shardRegistryReloadTime));
         }
     }

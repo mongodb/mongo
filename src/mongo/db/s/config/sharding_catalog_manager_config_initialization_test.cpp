@@ -317,7 +317,8 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
     auto foundLocksIndexes = assertGet(getIndexes(operationContext(), LocksType::ConfigNS));
     assertBSONObjsSame(expectedLocksIndexes, foundLocksIndexes);
 
-    auto foundShardsIndexes = assertGet(getIndexes(operationContext(), ShardType::ConfigNS));
+    auto foundShardsIndexes =
+        assertGet(getIndexes(operationContext(), NamespaceString::kConfigsvrShardsNamespace));
     assertBSONObjsSame(expectedShardsIndexes, foundShardsIndexes);
 
     auto foundTagsIndexes = assertGet(getIndexes(operationContext(), TagsType::ConfigNS));

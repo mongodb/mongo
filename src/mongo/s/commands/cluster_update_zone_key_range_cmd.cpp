@@ -102,7 +102,8 @@ public:
 
         // Fallback on permissions to directly modify the shard config.
         if (!as->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(ShardType::ConfigNS), ActionType::find)) {
+                ResourcePattern::forExactNamespace(NamespaceString::kConfigsvrShardsNamespace),
+                ActionType::find)) {
             return {ErrorCodes::Unauthorized, "Unauthorized"};
         }
 

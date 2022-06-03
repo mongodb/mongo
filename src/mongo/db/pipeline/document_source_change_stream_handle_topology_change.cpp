@@ -82,9 +82,9 @@ bool isShardConfigEvent(const Document& eventDoc) {
     // Check whether this event occurred on the config.shards collection.
     auto nsObj = eventDoc[DocumentSourceChangeStream::kNamespaceField];
     const bool isConfigDotShardsEvent = nsObj["db"_sd].getType() == BSONType::String &&
-        nsObj["db"_sd].getStringData() == ShardType::ConfigNS.db() &&
+        nsObj["db"_sd].getStringData() == NamespaceString::kConfigsvrShardsNamespace.db() &&
         nsObj["coll"_sd].getType() == BSONType::String &&
-        nsObj["coll"_sd].getStringData() == ShardType::ConfigNS.coll();
+        nsObj["coll"_sd].getStringData() == NamespaceString::kConfigsvrShardsNamespace.coll();
 
     // If it isn't from config.shards, treat it as a normal user event.
     if (!isConfigDotShardsEvent) {

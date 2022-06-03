@@ -249,7 +249,7 @@ TEST_F(RemoveShardFromZoneTest, RemoveZoneFromShardShouldErrorIfShardDocIsMalfor
                                  << "z"));
 
     insertToConfigCollection(
-        operationContext(), ShardType::ConfigNS, invalidShardDoc);
+        operationContext(), NamespaceString::kConfigsvrShardsNamespace, invalidShardDoc);
 
 
     auto status =

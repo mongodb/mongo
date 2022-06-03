@@ -596,7 +596,8 @@ TEST_F(AssignKeyRangeWithOneRangeFixture,
     shard.setHost("b:1234");
     shard.setTags({"y"});
 
-    ASSERT_OK(insertToConfigCollection(operationContext(), ShardType::ConfigNS, shard.toBSON()));
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString::kConfigsvrShardsNamespace, shard.toBSON()));
 
     ASSERT_THROWS_CODE(
         ShardingCatalogManager::get(operationContext())

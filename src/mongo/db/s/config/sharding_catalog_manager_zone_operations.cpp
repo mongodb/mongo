@@ -217,7 +217,7 @@ Status ShardingCatalogManager::addShardToZone(OperationContext* opCtx,
 
     auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
-        ShardType::ConfigNS,
+        NamespaceString::kConfigsvrShardsNamespace,
         BSON(ShardType::name(shardName)),
         BSON("$addToSet" << BSON(ShardType::tags() << zoneName)),
         false,
@@ -241,7 +241,7 @@ Status ShardingCatalogManager::removeShardFromZone(OperationContext* opCtx,
     Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kZoneOpLock);
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    const NamespaceString shardNS(ShardType::ConfigNS);
+    const NamespaceString shardNS(NamespaceString::kConfigsvrShardsNamespace);
 
     //
     // Check whether the shard even exist in the first place.
@@ -287,7 +287,7 @@ Status ShardingCatalogManager::removeShardFromZone(OperationContext* opCtx,
 
     auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
-        ShardType::ConfigNS,
+        NamespaceString::kConfigsvrShardsNamespace,
         BSON(ShardType::name(shardName)),
         BSON("$pull" << BSON(ShardType::tags() << zoneName)),
         false,
@@ -322,7 +322,7 @@ void ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
                                        opCtx,
                                        kConfigPrimarySelector,
                                        repl::ReadConcernLevel::kLocalReadConcern,
-                                       ShardType::ConfigNS,
+                                       NamespaceString::kConfigsvrShardsNamespace,
                                        BSON(ShardType::tags() << zoneName),
                                        BSONObj(),
                                        1))

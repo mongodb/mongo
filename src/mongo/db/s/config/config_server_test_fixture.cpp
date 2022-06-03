@@ -292,7 +292,7 @@ StatusWith<BSONObj> ConfigServerTestFixture::findOneOnConfigCollection(Operation
 }
 
 void ConfigServerTestFixture::setupShards(const std::vector<ShardType>& shards) {
-    const NamespaceString shardNS(ShardType::ConfigNS);
+    const NamespaceString shardNS(NamespaceString::kConfigsvrShardsNamespace);
     for (const auto& shard : shards) {
         ASSERT_OK(insertToConfigCollection(operationContext(), shardNS, shard.toBSON()));
     }
@@ -300,8 +300,8 @@ void ConfigServerTestFixture::setupShards(const std::vector<ShardType>& shards) 
 
 StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* opCtx,
                                                            const std::string& shardId) {
-    auto doc =
-        findOneOnConfigCollection(opCtx, ShardType::ConfigNS, BSON(ShardType::name(shardId)));
+    auto doc = findOneOnConfigCollection(
+        opCtx, NamespaceString::kConfigsvrShardsNamespace, BSON(ShardType::name(shardId)));
     if (!doc.isOK()) {
         if (doc.getStatus() == ErrorCodes::NoMatchingDocument) {
             return {ErrorCodes::ShardNotFound,
@@ -323,8 +323,8 @@ void ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
     if (!dbDoc.isOK()) {
         // If the database is not setup, choose the first available shard as primary to implicitly
         // create the db
-        auto swShardDoc =
-            findOneOnConfigCollection(operationContext(), ShardType::ConfigNS, BSONObj());
+        auto swShardDoc = findOneOnConfigCollection(
+            operationContext(), NamespaceString::kConfigsvrShardsNamespace, BSONObj());
         invariant(swShardDoc.isOK(),
                   "At least one shard should be setup when initializing a collection");
         auto shard = uassertStatusOK(ShardType::fromBSON(swShardDoc.getValue()));

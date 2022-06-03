@@ -122,10 +122,14 @@ protected:
 
 TEST_F(BalancerChunkSelectionTest, TagRangesOverlap) {
     // Set up two shards in the metadata.
-    ASSERT_OK(catalogClient()->insertConfigDocument(
-        operationContext(), ShardType::ConfigNS, kShard0, kMajorityWriteConcern));
-    ASSERT_OK(catalogClient()->insertConfigDocument(
-        operationContext(), ShardType::ConfigNS, kShard1, kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    NamespaceString::kConfigsvrShardsNamespace,
+                                                    kShard0,
+                                                    kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    NamespaceString::kConfigsvrShardsNamespace,
+                                                    kShard1,
+                                                    kMajorityWriteConcern));
 
     // Set up a database and a sharded collection in the metadata.
     const auto collUUID = UUID::gen();
@@ -178,11 +182,11 @@ TEST_F(BalancerChunkSelectionTest, TagRangeMaxNotAlignedWithChunkMax) {
         "featureFlagBalanceAccordingToDataSize", false};
     // Set up two shards in the metadata.
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
-                                                    ShardType::ConfigNS,
+                                                    NamespaceString::kConfigsvrShardsNamespace,
                                                     appendTags(kShard0, {"A"}),
                                                     kMajorityWriteConcern));
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
-                                                    ShardType::ConfigNS,
+                                                    NamespaceString::kConfigsvrShardsNamespace,
                                                     appendTags(kShard1, {"A"}),
                                                     kMajorityWriteConcern));
 
@@ -237,11 +241,11 @@ TEST_F(BalancerChunkSelectionTest, TagRangeMaxNotAlignedWithChunkMax) {
 TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCanBeAutoSplitted) {
     // Set up two shards in the metadata, each one with its own tag
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
-                                                    ShardType::ConfigNS,
+                                                    NamespaceString::kConfigsvrShardsNamespace,
                                                     appendTags(kShard0, {"A"}),
                                                     kMajorityWriteConcern));
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
-                                                    ShardType::ConfigNS,
+                                                    NamespaceString::kConfigsvrShardsNamespace,
                                                     appendTags(kShard1, {"B"}),
                                                     kMajorityWriteConcern));
 
@@ -287,10 +291,14 @@ TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCanBeBalanced) {
     RAIIServerParameterControllerForTest featureFlagBalanceAccordingToDataSize{
         "featureFlagBalanceAccordingToDataSize", false};
     // Set up two shards in the metadata.
-    ASSERT_OK(catalogClient()->insertConfigDocument(
-        operationContext(), ShardType::ConfigNS, kShard0, kMajorityWriteConcern));
-    ASSERT_OK(catalogClient()->insertConfigDocument(
-        operationContext(), ShardType::ConfigNS, kShard1, kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    NamespaceString::kConfigsvrShardsNamespace,
+                                                    kShard0,
+                                                    kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    NamespaceString::kConfigsvrShardsNamespace,
+                                                    kShard1,
+                                                    kMajorityWriteConcern));
 
     // Set up a database and a sharded collection in the metadata.
     const auto collUUID = UUID::gen();

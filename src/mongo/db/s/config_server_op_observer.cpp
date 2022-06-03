@@ -96,7 +96,8 @@ void ConfigServerOpObserver::_onReplicationRollback(OperationContext* opCtx,
         ClusterIdentityLoader::get(opCtx)->discardCachedClusterId();
     }
 
-    if (rbInfo.rollbackNamespaces.find(ShardType::ConfigNS) != rbInfo.rollbackNamespaces.end()) {
+    if (rbInfo.rollbackNamespaces.find(NamespaceString::kConfigsvrShardsNamespace) !=
+        rbInfo.rollbackNamespaces.end()) {
         // If some entries were rollbacked from config.shards we might need to discard some tick
         // points from the TopologyTimeTicker
         const auto lastApplied = repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime();
@@ -110,7 +111,7 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
                                        std::vector<InsertStatement>::const_iterator begin,
                                        std::vector<InsertStatement>::const_iterator end,
                                        bool fromMigrate) {
-    if (nss != ShardType::ConfigNS) {
+    if (nss != NamespaceString::kConfigsvrShardsNamespace) {
         return;
     }
 
@@ -137,7 +138,7 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void ConfigServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
-    if (args.nss != ShardType::ConfigNS) {
+    if (args.nss != NamespaceString::kConfigsvrShardsNamespace) {
         return;
     }
 

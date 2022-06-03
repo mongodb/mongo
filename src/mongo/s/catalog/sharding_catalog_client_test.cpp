@@ -318,7 +318,7 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
         ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  ShardType::ConfigNS);
+                  NamespaceString::kConfigsvrShardsNamespace);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
         ASSERT_FALSE(query->getLimit().is_initialized());

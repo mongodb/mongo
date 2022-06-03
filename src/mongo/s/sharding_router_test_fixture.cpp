@@ -252,12 +252,12 @@ void ShardingTestFixture::setupShards(const std::vector<ShardType>& shards) {
 void ShardingTestFixture::expectGetShards(const std::vector<ShardType>& shards) {
     onFindCommand([this, &shards](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss, ShardType::ConfigNS);
+        ASSERT_EQ(nss, NamespaceString::kConfigsvrShardsNamespace);
 
         // If there is no '$db', append it.
         auto cmd = OpMsgRequest::fromDBAndBody(nss.db(), request.cmdObj).body;
         auto query = query_request_helper::makeFromFindCommandForTests(cmd, nss);
-        ASSERT_EQ(*query->getNamespaceOrUUID().nss(), ShardType::ConfigNS);
+        ASSERT_EQ(*query->getNamespaceOrUUID().nss(), NamespaceString::kConfigsvrShardsNamespace);
 
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());

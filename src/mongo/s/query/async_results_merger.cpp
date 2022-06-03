@@ -643,7 +643,7 @@ bool AsyncResultsMerger::_checkHighWaterMarkEligibility(WithLock,
                                                         const CursorResponse& response) {
     // If the cursor is not on the "config.shards" namespace, then it is a normal shard cursor.
     // These cursors are always eligible to provide a high water mark resume token.
-    if (remote.cursorNss != ShardType::ConfigNS) {
+    if (remote.cursorNss != NamespaceString::kConfigsvrShardsNamespace) {
         return true;
     }
 

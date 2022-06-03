@@ -57,9 +57,6 @@ public:
         kShardAware,
     };
 
-    // Name of the shards collection in the config server.
-    static const NamespaceString ConfigNS;
-
     // Field names and types in the shards collection type.
     static const BSONField<std::string> name;
     static const BSONField<std::string> host;

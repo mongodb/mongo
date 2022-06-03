@@ -762,7 +762,7 @@ StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientImpl::
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               kConfigReadSelector,
                                               readConcern,
-                                              ShardType::ConfigNS,
+                                              NamespaceString::kConfigsvrShardsNamespace,
                                               BSONObj(),     // no query filter
                                               BSONObj(),     // no sort
                                               boost::none);  // no limit

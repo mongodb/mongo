@@ -436,7 +436,7 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
     }
 
     result = createIndexOnConfigCollection(
-        opCtx, ShardType::ConfigNS, BSON(ShardType::host() << 1), unique);
+        opCtx, NamespaceString::kConfigsvrShardsNamespace, BSON(ShardType::host() << 1), unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create host_1 index on config db");
     }
@@ -548,7 +548,7 @@ StatusWith<bool> ShardingCatalogManager::_isShardRequiredByZoneStillInUse(
         configShard->exhaustiveFindOnConfig(opCtx,
                                             readPref,
                                             repl::ReadConcernLevel::kLocalReadConcern,
-                                            ShardType::ConfigNS,
+                                            NamespaceString::kConfigsvrShardsNamespace,
                                             BSON(ShardType::tags() << zoneName),
                                             BSONObj(),
                                             2);

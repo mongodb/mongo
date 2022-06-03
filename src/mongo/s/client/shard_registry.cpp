@@ -457,7 +457,7 @@ void ShardRegistry::updateReplicaSetOnConfigServer(ServiceContext* serviceContex
 
     auto swWasUpdated = grid->catalogClient()->updateConfigDocument(
         opCtx.get(),
-        ShardType::ConfigNS,
+        NamespaceString::kConfigsvrShardsNamespace,
         BSON(ShardType::name(s->getId().toString())),
         BSON("$set" << BSON(ShardType::host(connStr.toString()))),
         false,
