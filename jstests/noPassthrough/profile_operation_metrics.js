@@ -1,12 +1,10 @@
 /**
  * Tests that resource consumption metrics are reported in the profiler.
  *
- * TODO: SERVER-66644 Re-enable this test by removing the `__TEMPORARILY_DISABLED__` tag.
  * @tags: [
  *   requires_capped,
  *   requires_replication,
  *   requires_wiredtiger,
- *   __TEMPORARILY_DISABLED__
  * ]
  */
 (function() {
@@ -1049,7 +1047,8 @@ const operations = [
         name: 'groupStage',
         command: (db) => {
             // There should be 10 distinct values for 'a'.
-            let cur = db[collName].aggregate([{$group: {_id: "$a", count: {$sum: 1}}}]);
+            let cur = db[collName].aggregate([{$group: {_id: "$a", count: {$sum: 1}}}],
+                                             {allowDiskUse: false});
             assert.eq(cur.itcount(), 10);
         },
         profileFilter: {op: 'command', 'command.aggregate': collName},
