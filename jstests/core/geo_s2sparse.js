@@ -2,7 +2,7 @@
 // All V2 2dsphere indices are sparse in the geo fields.
 //
 // @tags: [
-//     # TODO(SERVER_60823): remove incompatible_with_gcov
+//     # TODO(SERVER-60823): remove incompatible_with_gcov
 //     incompatible_with_gcov,
 // ]
 

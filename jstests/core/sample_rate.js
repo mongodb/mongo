@@ -1,7 +1,7 @@
 /**
  * Test the $sampleRate match expression.
  * @tags: [
- *     # TODO(SERVER_60823): remove incompatible_with_gcov
+ *     # TODO(SERVER-60823): remove incompatible_with_gcov
  *     incompatible_with_gcov,
  * ]
  */
