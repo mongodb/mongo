@@ -51,7 +51,7 @@ int RouterSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
     // parent transaction session so they have the same last check-out time as the parent's.
     catalog->scanParentSessions([&](const ObservableSession& session) {
         const auto sessionId = session.getSessionId();
-        invariant(!getParentSessionId(sessionId));
+        invariant(isParentSessionId(sessionId));
         if (session.getLastCheckout() < possiblyExpired) {
             possiblyExpiredLogicalSessionIds.insert(session.getSessionId());
         }

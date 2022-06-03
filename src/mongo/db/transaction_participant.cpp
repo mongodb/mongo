@@ -619,7 +619,7 @@ const LogicalSessionId& TransactionParticipant::Observer::_sessionId() const {
 }
 
 bool TransactionParticipant::Observer::_isInternalSession() const {
-    return getParentSessionId(_sessionId()).has_value();
+    return isChildSession(_sessionId());
 }
 
 bool TransactionParticipant::Observer::_isInternalSessionForRetryableWrite() const {
@@ -2931,13 +2931,14 @@ void TransactionParticipant::Participant::_refreshActiveTransactionParticipantsF
                                 << "transaction number " << *childLsid.getTxnNumber(),
                             *childLsid.getTxnNumber() == *activeRetryableWriteTxnNumber);
                         auto sessionCatalog = SessionCatalog::get(opCtx);
-                        sessionCatalog->createSessionIfDoesNotExist(childLsid);
                         sessionCatalog->scanSession(
-                            childLsid, [&](const ObservableSession& osession) {
+                            childLsid,
+                            [&](const ObservableSession& osession) {
                                 auto childTxnParticipant =
                                     TransactionParticipant::get(opCtx, osession.get());
                                 childTxnParticipants.push_back(childTxnParticipant);
-                            });
+                            },
+                            SessionCatalog::ScanSessionCreateSession::kYes);
                     }
                 });
             } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {

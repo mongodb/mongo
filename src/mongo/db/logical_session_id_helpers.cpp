@@ -89,6 +89,11 @@ bool isParentSessionId(const LogicalSessionId& sessionId) {
     return !sessionId.getTxnUUID();
 }
 
+bool isChildSession(const LogicalSessionId& sessionId) {
+    // All child sessions must have a txnUUID.
+    return bool(sessionId.getTxnUUID());
+}
+
 boost::optional<LogicalSessionId> getParentSessionId(const LogicalSessionId& sessionId) {
     if (sessionId.getTxnUUID()) {
         return LogicalSessionId{sessionId.getId(), sessionId.getUid()};

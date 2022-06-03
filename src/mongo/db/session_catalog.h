@@ -103,7 +103,10 @@ public:
      * Iterates through the SessionCatalog and applies 'workerFn' to each Session. This locks the
      * SessionCatalog.
      */
-    void scanSession(const LogicalSessionId& lsid, const ScanSessionsCallbackFn& workerFn);
+    enum class ScanSessionCreateSession { kYes, kNo };
+    void scanSession(const LogicalSessionId& lsid,
+                     const ScanSessionsCallbackFn& workerFn,
+                     ScanSessionCreateSession createSession = ScanSessionCreateSession::kNo);
     void scanSessions(const SessionKiller::Matcher& matcher,
                       const ScanSessionsCallbackFn& workerFn);
 
@@ -135,11 +138,6 @@ public:
      */
     size_t size() const;
 
-    /**
-     * Creates the session runtime info for 'lsid' if it doesn't exist.
-     */
-    void createSessionIfDoesNotExist(const LogicalSessionId& lsid);
-
 private:
     /**
      * Tracks the runtime info for transaction sessions that corresponds to the same logical
@@ -149,7 +147,7 @@ private:
     struct SessionRuntimeInfo {
         SessionRuntimeInfo(LogicalSessionId lsid) : parentSession(std::move(lsid)) {
             // Can only create a SessionRuntimeInfo with a parent transaction session id.
-            invariant(!getParentSessionId(lsid));
+            invariant(isParentSessionId(lsid));
         }
 
         Session* getSession(WithLock, const LogicalSessionId& lsid);

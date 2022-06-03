@@ -140,7 +140,7 @@ LogicalSessionIdSet removeExpiredTransactionSessionsNotInUseFromMemory(
     // parent transaction session so they have the same last check-out time as the the parent's.
     catalog->scanParentSessions([&](const ObservableSession& session) {
         const auto sessionId = session.getSessionId();
-        invariant(!getParentSessionId(sessionId));
+        invariant(isParentSessionId(sessionId));
         if (session.getLastCheckout() < possiblyExpired) {
             possiblyExpiredLogicalSessionIds.insert(sessionId);
         }
@@ -154,7 +154,7 @@ LogicalSessionIdSet removeExpiredTransactionSessionsNotInUseFromMemory(
     // longer in use from the in-memory catalog.
     LogicalSessionIdSet expiredTransactionSessionIdsStillInUse;
     for (const auto& expiredLogicalSessionId : expiredLogicalSessionIds) {
-        invariant(!getParentSessionId(expiredLogicalSessionId));
+        invariant(isParentSessionId(expiredLogicalSessionId));
 
         // Scan all the transaction sessions for this logical session at once so reaping can be done
         // atomically.

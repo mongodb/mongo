@@ -383,7 +383,7 @@ TransactionCoordinatorService::getAllRemovalFuturesForCoordinatorsForInternalTra
                         const TxnNumberAndRetryCounter txnNumberAndRetryCounter,
                         const std::shared_ptr<TransactionCoordinator> transactionCoordinator) {
         TransactionCoordinator::Step step = transactionCoordinator->getStep();
-        if (step > TransactionCoordinator::Step::kInactive && getParentSessionId(lsid)) {
+        if (step > TransactionCoordinator::Step::kInactive && isChildSession(lsid)) {
             return true;
         }
         return false;
