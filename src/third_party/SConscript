@@ -14,7 +14,6 @@ Import([
 ])
 
 snappySuffix = '-1.1.7'
-zlibSuffix = '-1.2.11'
 pcreSuffix = "-8.42"
 icuSuffix = '-57.1'
 timelibSuffix = '-2021.06'
@@ -112,7 +111,7 @@ if not use_system_version_of_library('valgrind'):
 
 if not use_system_version_of_library('zlib'):
     thirdPartyEnvironmentModifications['zlib'] = {
-        'CPPPATH': ['#/src/third_party/zlib' + zlibSuffix],
+        'CPPPATH': ['#/src/third_party/zlib'],
     }
 
 if not use_system_version_of_library('zstd'):
@@ -409,9 +408,9 @@ if use_system_version_of_library("zlib"):
 else:
     zlibEnv = zlibEnv.Clone()
     zlibEnv.InjectThirdParty(libraries=['zlib'])
-    zlibEnv.SConscript('zlib' + zlibSuffix + '/SConscript', exports={'env': zlibEnv})
+    zlibEnv.SConscript('zlib' + '/SConscript', exports={'env': zlibEnv})
     zlibEnv = zlibEnv.Clone(LIBDEPS_INTERFACE=[
-        'zlib' + zlibSuffix + '/zlib',
+        'zlib/zlib',
     ])
 
 zlibEnv.ShimLibrary(name="zlib", )

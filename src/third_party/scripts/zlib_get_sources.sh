@@ -8,11 +8,11 @@ set -o errexit
 # This script is designed to run on most unix-like OSes
 #
 
-VERSION=1.2.11
+VERSION=1.2.12
 NAME=zlib
 TARBALL=${NAME}-${VERSION}.tar.gz
 TARBALL_DEST_DIR=${NAME}-${VERSION}
-DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/${NAME}-${VERSION}
+DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/${NAME}
 
 echo ${DEST_DIR}
 

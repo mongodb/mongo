@@ -53,7 +53,7 @@ a notice will be included in
 | [variant]                  | BSL-1.0           | 1.4.0             |                      |                ✗                |
 | [wiredtiger]               |                   | <sup>\[<a href="#note_wt" id="ref_wt">2</a>]</sup> | ✗ |  ✗                |
 | [yaml-cpp]                 | MIT               | 0.6.2             |                      |                ✗                |
-| [Zlib]                     | Zlib              | 1.2.11            |          ✗           |                ✗                |
+| [Zlib]                     | Zlib              | 1.2.12            |          ✗           |                ✗                |
 | [Zstandard]                | BSD-3-Clause      | 1.5.2             |          ✗           |                ✗                |
 
 [abseil-cpp]: https://github.com/abseil/abseil-cpp

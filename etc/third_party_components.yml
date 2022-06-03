@@ -123,7 +123,7 @@ components:
     open_hub_url: N/A
     release_monitoring_id: 4844
     local_directory_path: src/third_party/snappy-1.1.7
-    team_owner: "Execution"
+    team_owner: "Storage Execution"
     upgrade_suppression: TODO SERVER-47281
     # TODO - bad version data
 
@@ -132,7 +132,7 @@ components:
     open_hub_url: https://www.openhub.net/p/google-perftools
     release_monitoring_id: 1238
     local_directory_path: src/third_party/gperftools
-    team_owner: "Execution"
+    team_owner: "Storage Execution"
     # TODO - fix the version number in Black Duck
 
   "ICU for C/C++ (ICU4C)":
@@ -149,7 +149,7 @@ components:
     open_hub_url: N/A
     release_monitoring_id: -1
     local_directory_path: src/third_party/IntelRDFPMathLib20U1
-    team_owner: "Execution"
+    team_owner: "Storage Execution"
     # Note: IntelRDFPMathLib exists in Black Duck, but not OpenHub
 
   jbeder/yaml-cpp:
@@ -284,7 +284,7 @@ components:
     open_hub_url: https://www.openhub.net/p/smhasher
     release_monitoring_id: -1
     local_directory_path: src/third_party/murmurhash3
-    team_owner: "Execution"
+    team_owner: "Storage Execution"
 
   "Snowball Stemming Algorithms":
     homepage_url: https://snowballstem.org/
@@ -336,12 +336,12 @@ components:
     homepage_url: https://www.zlib.net/
     open_hub_url: https://www.openhub.net/p/zlib
     release_monitoring_id: 5303
-    local_directory_path: src/third_party/zlib-1.2.11
-    team_owner: "Execution"
+    local_directory_path: src/third_party/zlib-1.2.12
+    team_owner: "Storage Execution"
 
   zstd:
     homepage_url: http://www.zstd.net/
     open_hub_url: https://www.openhub.net/p/zstd
     release_monitoring_id: 12083
     local_directory_path: src/third_party/zstandard
-    team_owner: "Execution"
+    team_owner: "Storage Execution"
