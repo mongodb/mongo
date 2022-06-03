@@ -101,7 +101,15 @@ Status dropUnfinishedIndexes(OperationContext* opCtx, Collection* collection) {
             WriteUnitOfWork wuow(opCtx);
             // There are no concurrent users of the index while --repair is running, so it is OK to
             // pass in a nullptr for the index 'ident', promising that the index is not in use.
-            catalog::removeIndex(opCtx, indexName, collection, nullptr /*ident */);
+            catalog::removeIndex(
+                opCtx,
+                indexName,
+                collection,
+                nullptr /*ident */,
+                // Unfinished indexes do not need two-phase drop because the incomplete index will
+                // never be recovered. This is an optimization that will return disk space to the
+                // user more quickly.
+                catalog::DataRemoval::kImmediate);
             wuow.commit();
 
             StorageRepairObserver::get(opCtx->getServiceContext())

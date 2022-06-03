@@ -607,7 +607,14 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
                 // to pass in a nullptr for the index 'ident', promising that the index is not in
                 // use.
                 catalog::removeIndex(
-                    opCtx, indexNames[i], collection.getWritableCollection(), nullptr /* ident */);
+                    opCtx,
+                    indexNames[i],
+                    collection.getWritableCollection(),
+                    nullptr /* ident */,
+                    // Unfinished or partially dropped indexes do not need two-phase drop b/c the
+                    // incomplete index will never be recovered. This is an optimization that will
+                    // return disk space to the user more quickly.
+                    catalog::DataRemoval::kImmediate);
             }
         }
 

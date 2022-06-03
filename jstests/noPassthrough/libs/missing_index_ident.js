@@ -77,17 +77,10 @@ const MissingIndexIdent = class {
 
         // Since the index build was not yet completed at the recovery timestamp, its ident will
         // be dropped.
-        checkLog.containsJson(conn, 22206, {
+        checkLog.containsJson(conn, 6361201, {
             index: 'a_1',
             namespace: coll.getFullName(),
             ident: ident,
-            commitTimestamp: {$timestamp: {t: 0, i: 0}},
-        });
-
-        // The oldest timestamp moving forward will cause the ident reaper to drop the ident.
-        checkLog.containsJson(conn, 22237, {
-            ident: ident,
-            dropTimestamp: {$timestamp: {t: 0, i: 0}},
         });
     }
 };

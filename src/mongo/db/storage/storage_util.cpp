@@ -87,7 +87,8 @@ auto removeEmptyDirectory =
 void removeIndex(OperationContext* opCtx,
                  StringData indexName,
                  Collection* collection,
-                 std::shared_ptr<Ident> ident) {
+                 std::shared_ptr<Ident> ident,
+                 DataRemoval dataRemoval) {
     auto durableCatalog = DurableCatalog::get(opCtx);
 
     // If a nullptr was passed in for 'ident', then there is no in-memory state. In that case,
@@ -118,12 +119,13 @@ void removeIndex(OperationContext* opCtx,
                                      uuid = collection->uuid(),
                                      nss = collection->ns(),
                                      indexNameStr = indexName.toString(),
-                                     ident](boost::optional<Timestamp> commitTimestamp) {
+                                     ident,
+                                     dataRemoval](boost::optional<Timestamp> commitTimestamp) {
         StorageEngine::DropIdentCallback onDrop = [svcCtx, storageEngine, nss] {
             removeEmptyDirectory(svcCtx, storageEngine, nss);
         };
 
-        if (storageEngine->supportsPendingDrops()) {
+        if (storageEngine->supportsPendingDrops() && dataRemoval == DataRemoval::kTwoPhase) {
             if (!commitTimestamp) {
                 // Standalone mode will not provide a timestamp.
                 commitTimestamp = Timestamp::min();
@@ -137,6 +139,11 @@ void removeIndex(OperationContext* opCtx,
                   "commitTimestamp"_attr = commitTimestamp);
             storageEngine->addDropPendingIdent(*commitTimestamp, ident, std::move(onDrop));
         } else {
+            LOGV2(6361201,
+                  "Completing drop for index table immediately",
+                  "ident"_attr = ident->getIdent(),
+                  "index"_attr = indexNameStr,
+                  logAttrs(nss));
             // Intentionally ignoring failure here. Since we've removed the metadata pointing to
             // the collection, we should never see it again anyway.
             storageEngine->getEngine()

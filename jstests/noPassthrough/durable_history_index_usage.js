@@ -111,10 +111,9 @@ replTest.start(
 const checkLogs = function() {
     // The index build was not yet completed at the recovery timestamp, it will be dropped and
     // rebuilt.
-    checkLog.containsJson(primary(), 22206, {
+    checkLog.containsJson(primary(), 6361201, {
         index: "a_1",
         namespace: coll().getFullName(),
-        commitTimestamp: {$timestamp: {t: 0, i: 0}},
     });
 
     // Index build restarting.

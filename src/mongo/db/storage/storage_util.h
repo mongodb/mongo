@@ -42,11 +42,23 @@ class NamespaceString;
 namespace catalog {
 
 /**
+ * Indicates whether the data drop (the data table) should occur immediately or be two-phased, which
+ * delays data removal to support older PIT reads or rollback.
+ */
+enum class DataRemoval {
+    kImmediate,
+    kTwoPhase,
+};
+
+/**
  * Performs two-phase index drop.
  *
  * Passthrough to DurableCatalog::removeIndex to execute the first phase of drop by removing the
  * index catalog entry, then registers an onCommit hook to schedule the second phase of drop to
- * delete the index data.
+ * delete the index data. The 'dataRemoval' field can be used to specify whether the second phase of
+ * drop, table data deletion, should run immediately or delayed: immediate deletion should only be
+ * used for incomplete indexes, where the index build is the only accessor and the data will not be
+ * needed for earlier points in time.
  *
  * Uses 'ident' shared_ptr to ensure that the second phase of drop (data table drop) will not
  * execute until no users of the index (shared owners) remain. 'ident' is allowed to be a nullptr,
@@ -56,7 +68,8 @@ namespace catalog {
 void removeIndex(OperationContext* opCtx,
                  StringData indexName,
                  Collection* collection,
-                 std::shared_ptr<Ident> ident);
+                 std::shared_ptr<Ident> ident,
+                 DataRemoval dataRemoval = DataRemoval::kTwoPhase);
 
 /**
  * Performs two-phase collection drop.
