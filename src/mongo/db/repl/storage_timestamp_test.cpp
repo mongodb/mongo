@@ -1079,6 +1079,7 @@ TEST_F(StorageTimestampTest, SecondaryAtomicApplyOps) {
     NamespaceString nss("unittests.insertToUpsert");
     create(nss);
 
+    Lock::GlobalWrite lk{_opCtx};  // avoid global lock upgrade during applyOps.
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
 
     // Reserve a timestamp before the inserts should happen.
@@ -1128,6 +1129,7 @@ TEST_F(StorageTimestampTest, SecondaryAtomicApplyOpsWCEToNonAtomic) {
     NamespaceString nss("unitteTsts.insertToUpsert");
     create(nss);
 
+    Lock::GlobalWrite lk{_opCtx};  // avoid global lock upgrade during applyOps.
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
 
     const LogicalTime preInsertTimestamp = _clock->tickClusterTime(1);
@@ -1260,6 +1262,7 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollectionBetweenInserts) {
 
     {
         create(nss1);
+        Lock::GlobalWrite lk{_opCtx};  // avoid global lock upgrade during applyOps.
         AutoGetCollection autoColl(_opCtx, nss1, LockMode::MODE_IX);
 
         ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss2));
@@ -3436,7 +3439,7 @@ public:
         txnParticipant.stashTransactionResources(_opCtx);
 
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             const auto& coll = autoColl.getCollection();
             assertDocumentAtTimestamp(coll, presentTs, BSONObj());
             assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
@@ -3644,7 +3647,7 @@ TEST_F(MultiDocumentTransactionTest, CommitPreparedMultiOplogEntryTransaction) {
     const auto prepareFilter = BSON("ts" << prepareEntryTs);
     const auto commitFilter = BSON("ts" << commitEntryTs);
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
         const auto& coll = autoColl.getCollection();
         assertDocumentAtTimestamp(coll, presentTs, BSONObj());
         assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
@@ -3685,7 +3688,7 @@ TEST_F(MultiDocumentTransactionTest, CommitPreparedMultiOplogEntryTransaction) {
 
     txnParticipant.stashTransactionResources(_opCtx);
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
         const auto& coll = autoColl.getCollection();
         assertDocumentAtTimestamp(coll, presentTs, BSONObj());
         assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
@@ -3922,7 +3925,7 @@ TEST_F(MultiDocumentTransactionTest, PreparedMultiDocumentTransaction) {
     logTimestamps();
 
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
         const auto& coll = autoColl.getCollection();
         assertDocumentAtTimestamp(coll, prepareTs, BSONObj());
         assertDocumentAtTimestamp(coll, commitEntryTs, BSONObj());
@@ -4018,7 +4021,7 @@ TEST_F(MultiDocumentTransactionTest, AbortedPreparedMultiDocumentTransaction) {
     logTimestamps();
 
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
         const auto& coll = autoColl.getCollection();
         assertDocumentAtTimestamp(coll, prepareTs, BSONObj());
         assertDocumentAtTimestamp(coll, abortEntryTs, BSONObj());
