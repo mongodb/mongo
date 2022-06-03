@@ -1,5 +1,7 @@
 /**
  * Test the autosplitter when a collection has very low cardinality
+ *
+ * @tags: [bf25011]
  */
 
 (function() {

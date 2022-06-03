@@ -357,3 +357,24 @@ buildvariants:
   - name: jsCore
   - name: jsCore_txns
   - name: unittest_shell_hang_analyzer_gen
+
+# Temporary variant to stress a component and gather more data.
+- <<: *enterprise-rhel-80-64-bit-dynamic-required-template
+  name: enterprise-rhel-80-64-bit-dynamic-stress-initialsyncid  # For BF-25011
+  display_name: "~ Shared Library Enterprise RHEL 8.0 (initialSyncId stress test)"
+  cron: "0 */1 * * *" # Every hour starting at midnight
+  expansions:
+    <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
+    max_sub_suites: 10
+    # Set a low target time to run only 1 test per generated Evergreen task. Increase timeout.
+    target_resmoke_time: 1
+    idle_timeout_factor: 10000
+    exec_timeout_factor: 10000
+    # Repeat each test for 1 hour.
+    test_flags: --repeatTestsSecs=3600 --includeWithAnyTags=bf25011
+
+  tasks:
+    - name: compile_test_and_package_parallel_core_stream_TG
+      distros:
+        - rhel80-xlarge
+    - name: .sharding

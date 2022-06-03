@@ -2,7 +2,7 @@
  * Tests that the coordinateCommitTransaction command falls back to recovering the decision from
  * the local participant.
  *
- * @tags: [uses_transactions, uses_prepare_transaction, uses_multi_shard_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, uses_multi_shard_transaction, bf25011]
  */
 (function() {
 "use strict";

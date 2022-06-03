@@ -3,6 +3,7 @@
  *
  * @tags: [
  *  requires_fcv_60,
+ *  bf25011,
  * ]
  */
 

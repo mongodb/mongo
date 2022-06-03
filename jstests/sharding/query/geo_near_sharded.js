@@ -1,4 +1,6 @@
 // SERVER-7906
+// @tags: [bf25011]
+
 (function() {
 'use strict';
 

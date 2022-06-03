@@ -6,6 +6,7 @@
 // @tags: [
 //   requires_majority_read_concern,
 //   uses_change_streams,
+//   bf25011,
 //   # TODO SERVER-30784: Remove 'multiversion_incompatible' tag and
 //   # 'throwChangeStreamTopologyChangeExceptionToClient'.
 //   multiversion_incompatible
