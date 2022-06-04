@@ -582,18 +582,6 @@ void removeProjectSimpleBelowGroupRecursive(QuerySolutionNode* solnRoot) {
         }
     }
 }
-}  // namespace
-
-// static
-std::unique_ptr<QuerySolution> QueryPlannerAnalysis::removeProjectSimpleBelowGroup(
-    std::unique_ptr<QuerySolution> soln) {
-    auto root = soln->extractRoot();
-
-    removeProjectSimpleBelowGroupRecursive(root.get());
-
-    soln->setRoot(std::move(root));
-    return soln;
-}
 
 // Checks if the foreign collection is eligible for the hash join algorithm. We conservatively
 // choose the hash join algorithm for cases when the hash table is unlikely to spill data.
@@ -607,13 +595,36 @@ bool isEligibleForHashJoin(const SecondaryCollectionInfo& foreignCollInfo) {
         internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin.load();
 }
 
+// Determines whether 'index' is eligible for executing the right side of a pushed down $lookup over
+// 'foreignField'.
+bool isIndexEligibleForRightSideOfLookupPushdown(const IndexEntry& index,
+                                                 const CollatorInterface* collator,
+                                                 const std::string& foreignField) {
+    return (index.type == INDEX_BTREE || index.type == INDEX_HASHED) &&
+        index.keyPattern.firstElement().fieldName() == foreignField && !index.filterExpr &&
+        !index.sparse && CollatorInterface::collatorsMatch(collator, index.collator);
+}
+}  // namespace
+
 // static
-void QueryPlannerAnalysis::determineLookupStrategy(
-    EqLookupNode* eqLookupNode,
+std::unique_ptr<QuerySolution> QueryPlannerAnalysis::removeProjectSimpleBelowGroup(
+    std::unique_ptr<QuerySolution> soln) {
+    auto root = soln->extractRoot();
+
+    removeProjectSimpleBelowGroupRecursive(root.get());
+
+    soln->setRoot(std::move(root));
+    return soln;
+}
+
+// static
+std::pair<EqLookupNode::LookupStrategy, boost::optional<IndexEntry>>
+QueryPlannerAnalysis::determineLookupStrategy(
+    const std::string& foreignCollName,
+    const std::string& foreignField,
     const std::map<NamespaceString, SecondaryCollectionInfo>& collectionsInfo,
     bool allowDiskUse,
     const CollatorInterface* collator) {
-    const auto& foreignCollName = eqLookupNode->foreignCollection;
     auto foreignCollItr = collectionsInfo.find(NamespaceString(foreignCollName));
     tassert(5842600,
             str::stream() << "Expected collection info, but found none; target collection: "
@@ -641,11 +652,7 @@ void QueryPlannerAnalysis::determineLookupStrategy(
             });
 
         for (const auto& index : indexes) {
-            if ((index.type == INDEX_BTREE || index.type == INDEX_HASHED) &&
-                index.keyPattern.firstElement().fieldName() ==
-                    eqLookupNode->joinFieldForeign.fullPath() &&
-                !index.filterExpr && !index.sparse &&
-                CollatorInterface::collatorsMatch(collator, index.collator)) {
+            if (isIndexEligibleForRightSideOfLookupPushdown(index, collator, foreignField)) {
                 return index;
             }
         }
@@ -654,14 +661,13 @@ void QueryPlannerAnalysis::determineLookupStrategy(
     }();
 
     if (!foreignCollItr->second.exists) {
-        eqLookupNode->lookupStrategy = EqLookupNode::LookupStrategy::kNonExistentForeignCollection;
+        return {EqLookupNode::LookupStrategy::kNonExistentForeignCollection, boost::none};
     } else if (foreignIndex) {
-        eqLookupNode->lookupStrategy = EqLookupNode::LookupStrategy::kIndexedLoopJoin;
-        eqLookupNode->idxEntry = foreignIndex;
+        return {EqLookupNode::LookupStrategy::kIndexedLoopJoin, std::move(foreignIndex)};
     } else if (allowDiskUse && isEligibleForHashJoin(foreignCollItr->second)) {
-        eqLookupNode->lookupStrategy = EqLookupNode::LookupStrategy::kHashJoin;
+        return {EqLookupNode::LookupStrategy::kHashJoin, boost::none};
     } else {
-        eqLookupNode->lookupStrategy = EqLookupNode::LookupStrategy::kNestedLoopJoin;
+        return {EqLookupNode::LookupStrategy::kNestedLoopJoin, boost::none};
     }
 }
 

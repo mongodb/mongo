@@ -124,16 +124,20 @@ public:
         std::unique_ptr<QuerySolution> soln);
 
     /**
-     * For the provided 'eqLookupNode', determines what join algorithm should be used to execute it
-     * and marks the node accordingly. In particular:
+     * For the provided 'foreignCollName' and 'foreignFieldName' corresponding to an EqLookupNode,
+     * returns what join algorithm should be used to execute it. In particular:
+     * - An empty array is produced for each document if the foreign collection does not exist.
      * - An indexed nested loop join is chosen if an index on the foreign collection can be used to
-     * answer the join predicate.
+     * answer the join predicate. Also returns which index on the foreign collection should be
+     * used to answer the predicate.
      * - A hash join is chosen if disk use is allowed and if the foreign collection is sufficiently
      * small.
      * - A nested loop join is chosen in all other cases.
      */
-    static void determineLookupStrategy(
-        EqLookupNode* eqLookupNode,
+    static std::pair<EqLookupNode::LookupStrategy, boost::optional<IndexEntry>>
+    determineLookupStrategy(
+        const std::string& foreignCollName,
+        const std::string& foreignField,
         const std::map<NamespaceString, SecondaryCollectionInfo>& collectionsInfo,
         bool allowDiskUse,
         const CollatorInterface* collator);

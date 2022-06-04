@@ -1362,8 +1362,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 }
 
 /**
- * The 'query' might contain parts of aggregation pipeline. For now, we plan those separately
- * and later attach the agg portion of the plan to the solution(s) for the "find" part of the query.
+ * The 'query' might contain parts of aggregation pipeline. For now, we plan those separately and
+ * later attach the agg portion of the plan to the solution(s) for the "find" part of the query.
  */
 std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
     const CanonicalQuery& query,
@@ -1391,17 +1391,21 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             tassert(6369000,
                     "This $lookup stage should be compatible with SBE",
                     lookupStage->sbeCompatible());
+            auto [strategy, idxEntry] = QueryPlannerAnalysis::determineLookupStrategy(
+                lookupStage->getFromNs().toString(),
+                lookupStage->getForeignField()->fullPath(),
+                secondaryCollInfos,
+                query.getExpCtx()->allowDiskUse,
+                query.getCollator());
             auto eqLookupNode =
                 std::make_unique<EqLookupNode>(std::move(solnForAgg),
                                                lookupStage->getFromNs().toString(),
                                                lookupStage->getLocalField()->fullPath(),
                                                lookupStage->getForeignField()->fullPath(),
                                                lookupStage->getAsField().fullPath(),
+                                               strategy,
+                                               std::move(idxEntry),
                                                innerStage->isLastSource() /* shouldProduceBson */);
-            QueryPlannerAnalysis::determineLookupStrategy(eqLookupNode.get(),
-                                                          secondaryCollInfos,
-                                                          query.getExpCtx()->allowDiskUse,
-                                                          query.getCollator());
             solnForAgg = std::move(eqLookupNode);
             continue;
         }

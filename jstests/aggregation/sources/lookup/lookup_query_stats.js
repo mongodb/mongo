@@ -22,7 +22,8 @@ load("jstests/libs/sbe_explain_helpers.js");  // For getSbePlanStages and
                                               // getQueryInfoAtTopLevelOrFirstStage.
 
 const isSBELookupEnabled = checkSBEEnabled(db, ["featureFlagSBELookupPushdown"]);
-
+const isSBELookupNLJEnabled =
+    checkSBEEnabled(db, ["featureFlagSBELookupPushdown", "featureFlagSbeFull"]);
 const testDB = db.getSiblingDB("lookup_query_stats");
 testDB.dropDatabase();
 
@@ -87,7 +88,14 @@ let getCurrentQueryExecutorStats = function() {
 let checkExplainOutputForVerLevel = function(
     explainOutput, expected, verbosityLevel, expectedQueryPlan) {
     const lkpStages = getAggPlanStages(explainOutput, "$lookup");
-    if (isSBELookupEnabled) {
+
+    // Only make SBE specific assertions when we know that our $lookup has been pushed down.
+    // More precisely, $lookup pushdown must be enabled, and we must have NLJ pushed down
+    // enabled or be targeting a different $lookup strategy.
+    if (isSBELookupEnabled &&
+        (isSBELookupNLJEnabled ||
+         (expectedQueryPlan.hasOwnProperty("strategy") &&
+          expectedQueryPlan.strategy !== "NestedLoopJoin"))) {
         // If the SBE lookup is enabled, the $lookup stage is pushed down to the SBE and it's
         // not visible in 'stages' field of the explain output. Instead, 'queryPlan.stage' must be
         // "EQ_LOOKUP".
@@ -202,7 +210,7 @@ let testQueryExecutorStatsWithCollectionScan = function() {
     // There is no index in the collection.
     assert.eq(0, curScannedKeys);
 
-    if (isSBELookupEnabled) {
+    if (isSBELookupNLJEnabled) {
         checkExplainOutputForAllVerbosityLevels(
             localColl,
             fromColl,

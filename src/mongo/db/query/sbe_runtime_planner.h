@@ -45,13 +45,13 @@ namespace mongo::sbe {
  * index pointing to the winning plan within this vector.
  */
 struct CandidatePlans {
-    std::vector<plan_ranker::CandidatePlan> plans;
-    size_t winnerIdx;
-
     auto& winner() {
         invariant(winnerIdx < plans.size());
         return plans[winnerIdx];
     }
+
+    std::vector<plan_ranker::CandidatePlan> plans;
+    size_t winnerIdx;
 };
 
 /**

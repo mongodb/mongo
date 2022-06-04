@@ -1389,9 +1389,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
         if (extractAndAttachPipelineStages) {
             extractAndAttachPipelineStages(canonicalQuery.get());
         }
-
-        // TODO SERVER-65960: Optionally refactor this logic once we have a mechanism to reattach
-        // pipeline stages.
         // Use SBE if we find any $group/$lookup stages eligible for execution in SBE or if SBE
         // is fully enabled. Otherwise, fallback to the classic engine.
         if (canonicalQuery->pipeline().empty() &&

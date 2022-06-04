@@ -1478,12 +1478,16 @@ struct EqLookupNode : public QuerySolutionNode {
                  const FieldPath& joinFieldLocal,
                  const FieldPath& joinFieldForeign,
                  const FieldPath& joinField,
+                 EqLookupNode::LookupStrategy lookupStrategy,
+                 boost::optional<IndexEntry> idxEntry,
                  bool shouldProduceBson)
         : QuerySolutionNode(std::move(child)),
           foreignCollection(foreignCollection),
           joinFieldLocal(joinFieldLocal),
           joinFieldForeign(joinFieldForeign),
           joinField(joinField),
+          lookupStrategy(lookupStrategy),
+          idxEntry(std::move(idxEntry)),
           shouldProduceBson(shouldProduceBson) {}
 
     StageType getType() const override {

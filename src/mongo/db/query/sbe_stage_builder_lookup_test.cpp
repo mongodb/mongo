@@ -120,9 +120,14 @@ public:
 
         // Construct logical query solution.
         auto foreignCollName = _foreignNss.toString();
-        auto lookupNode = std::make_unique<EqLookupNode>(
-            std::move(localScanNode), foreignCollName, localKey, foreignKey, asKey, true);
-        lookupNode->lookupStrategy = strategy;
+        auto lookupNode = std::make_unique<EqLookupNode>(std::move(localScanNode),
+                                                         foreignCollName,
+                                                         localKey,
+                                                         foreignKey,
+                                                         asKey,
+                                                         strategy,
+                                                         boost::none /* idxEntry */,
+                                                         true /* shouldProduceBson */);
         auto solution = makeQuerySolution(std::move(lookupNode));
 
         // Convert logical solution into the physical SBE plan.
