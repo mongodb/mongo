@@ -853,6 +853,10 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
             !source.isSystemDotViews() && !target.isSystemDotViews());
 
     uassert(ErrorCodes::IllegalOperation,
+            "renaming system.js collection or renaming to system.js is not allowed",
+            !source.isSystemDotJavascript() && !target.isSystemDotJavascript());
+
+    uassert(ErrorCodes::IllegalOperation,
             "Renaming system.buckets collections is not allowed",
             !source.isTimeseriesBucketsCollection());
 }
@@ -885,6 +889,11 @@ Status renameCollection(OperationContext* opCtx,
         return Status(
             ErrorCodes::IllegalOperation,
             "renaming system.views collection or renaming to system.views is not allowed");
+    }
+
+    if (source.isSystemDotJavascript() || target.isSystemDotJavascript()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "renaming system.js collection or renaming to system.js is not allowed");
     }
 
     StringData dropTargetMsg = options.dropTarget ? "yes"_sd : "no"_sd;

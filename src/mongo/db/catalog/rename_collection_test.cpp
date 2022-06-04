@@ -1109,4 +1109,42 @@ TEST_F(RenameCollectionTest,
                   renameCollectionForApplyOps(_opCtx.get(), dbName, boost::none, cmd, {}));
 }
 
+TEST_F(RenameCollectionTest, FailRenameCollectionFromSystemJavascript) {
+    NamespaceString sourceNss("foo", NamespaceString::kSystemDotJavascriptCollectionName);
+    NamespaceString targetNss("foo.bar");
+
+    _createCollection(_opCtx.get(), sourceNss);
+
+    auto status = renameCollection(_opCtx.get(), sourceNss, targetNss, {});
+
+    ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
+    ASSERT_STRING_SEARCH_REGEX(status.reason(), "renaming system.js.*not allowed");
+
+    // Used for sharded rename.
+    ASSERT_THROWS_CODE_AND_WHAT(
+        validateNamespacesForRenameCollection(_opCtx.get(), sourceNss, targetNss),
+        AssertionException,
+        ErrorCodes::IllegalOperation,
+        status.reason());
+}
+
+TEST_F(RenameCollectionTest, FailRenameCollectionToSystemJavascript) {
+    NamespaceString sourceNss("foo.bar");
+    NamespaceString targetNss("foo", NamespaceString::kSystemDotJavascriptCollectionName);
+
+    _createCollection(_opCtx.get(), sourceNss);
+
+    auto status = renameCollection(_opCtx.get(), sourceNss, targetNss, {});
+
+    ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
+    ASSERT_STRING_SEARCH_REGEX(status.reason(), "renaming to system.js.*not allowed");
+
+    // Used for sharded rename.
+    ASSERT_THROWS_CODE_AND_WHAT(
+        validateNamespacesForRenameCollection(_opCtx.get(), sourceNss, targetNss),
+        AssertionException,
+        ErrorCodes::IllegalOperation,
+        status.reason());
+}
+
 }  // namespace
