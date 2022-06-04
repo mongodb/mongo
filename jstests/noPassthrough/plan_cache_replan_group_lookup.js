@@ -164,17 +164,29 @@ function dropLookupForeignColl() {
 }
 
 const lookupPushdownEnabled = checkSBEEnabled(db, ["featureFlagSBELookupPushdown"]);
+const lookupPushdownNLJEnabled =
+    checkSBEEnabled(db, ["featureFlagSBELookupPushdown", "featureFlagSbeFull"]);
 function verifyCorrectLookupAlgorithmUsed(targetJoinAlgorithm, pipeline, aggOptions = {}) {
     if (!lookupPushdownEnabled) {
         return;
     }
+
+    if (!lookupPushdownNLJEnabled && targetJoinAlgorithm === "NestedLoopJoin") {
+        targetJoinAlgorithm = "Classic";
+    }
+
     const explain = coll.explain().aggregate(pipeline, aggOptions);
     const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
 
-    // Verify via explain that $lookup was lowered and appropriate $lookup algorithm was chosen.
-    assert.eq(
-        eqLookupNodes.length, 1, "expected at least one EQ_LOOKUP node; got " + tojson(explain));
-    assert.eq(eqLookupNodes[0].strategy, targetJoinAlgorithm);
+    if (targetJoinAlgorithm === "Classic") {
+        assert.eq(eqLookupNodes.length, 0, "expected no EQ_LOOKUP nodes; got " + tojson(explain));
+    } else {
+        // Verify via explain that $lookup was lowered and appropriate $lookup algorithm was chosen.
+        assert.eq(eqLookupNodes.length,
+                  1,
+                  "expected at least one EQ_LOOKUP node; got " + tojson(explain));
+        assert.eq(eqLookupNodes[0].strategy, targetJoinAlgorithm);
+    }
 }
 
 // NLJ.

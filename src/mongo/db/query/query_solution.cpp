@@ -1622,6 +1622,8 @@ QuerySolutionNode* EqLookupNode::clone() const {
                                        joinFieldLocal,
                                        joinFieldForeign,
                                        joinField,
+                                       lookupStrategy,
+                                       idxEntry,
                                        shouldProduceBson);
     return copy.release();
 }

@@ -87,15 +87,15 @@ function runTest(coll, from, expectedErrorCode) {
 /**
  * Run tests on single node.
  */
-const standalone = MongoRunner.runMongod();
+const standalone = MongoRunner.runMongod(
+    {setParameter: {internalLookupStageIntermediateDocumentMaxSizeBytes: 30 * 1024 * 1024}});
 const db = standalone.getDB("test");
-
-assert.commandWorked(db.adminCommand(
-    {setParameter: 1, internalLookupStageIntermediateDocumentMaxSizeBytes: 30 * 1024 * 1024}));
 
 db.lookUp.drop();
 const expectedErrorCode =
-    (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) ? ErrorCodes.ExceededMemoryLimit : 4568;
+    (checkSBEEnabled(db, ["featureFlagSBELookupPushdown", "featureFlagSbeFull"]))
+    ? ErrorCodes.ExceededMemoryLimit
+    : 4568;
 runTest(db.lookUp, db.from, expectedErrorCode);
 
 MongoRunner.stopMongod(standalone);
