@@ -1,6 +1,5 @@
 /**
  * @tags: [
- *     requires_fastcount,
  *     operations_longer_than_stepdown_interval_in_txns,
  * ]
  */
@@ -73,5 +72,5 @@ for (let i = 0; i < count; ++i) {
 assert.commandWorked(t.insert(toInsert));
 doc = t.findOne({_id: 1});
 assert.eq(5, doc.a);
-assert.eq(count, t.count(), "bad count");
+assert.eq(count, t.countDocuments({}), "bad count");
 })();
