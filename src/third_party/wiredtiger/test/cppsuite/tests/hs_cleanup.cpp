@@ -69,7 +69,7 @@ class hs_cleanup : public test {
             auto ret = cursor->next(cursor.get());
             if (ret != 0) {
                 if (ret == WT_NOTFOUND) {
-                    cursor->reset(cursor.get());
+                    testutil_check(cursor->reset(cursor.get()));
                     continue;
                 }
                 if (ret == WT_ROLLBACK) {

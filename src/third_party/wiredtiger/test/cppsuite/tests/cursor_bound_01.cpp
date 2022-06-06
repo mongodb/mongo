@@ -226,7 +226,7 @@ class cursor_bound_01 : public test {
 
         auto set_random_bounds = random_generator::instance().generate_integer(0, 3);
         if (set_random_bounds == NO_BOUNDS)
-            range_cursor->bound(range_cursor.get(), "action=clear");
+            testutil_check(range_cursor->bound(range_cursor.get(), "action=clear"));
 
         if (set_random_bounds == LOWER_BOUND_SET || set_random_bounds == ALL_BOUNDS_SET) {
             /* Reverse case. */

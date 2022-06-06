@@ -97,7 +97,7 @@ class burst_inserts : public test {
                 tc->txn.try_begin();
                 auto key = tc->pad_string(std::to_string(start_key + added_count), tc->key_size);
                 cc.write_cursor->set_key(cc.write_cursor.get(), key.c_str());
-                cc.write_cursor->search(cc.write_cursor.get());
+                testutil_assert(cc.write_cursor->search(cc.write_cursor.get()) == WT_NOTFOUND);
 
                 /* A return value of true implies the insert was successful. */
                 auto value =
@@ -113,7 +113,7 @@ class burst_inserts : public test {
                 int ret = 0;
                 if ((ret = cc.read_cursor->next(cc.read_cursor.get())) != 0) {
                     if (ret == WT_NOTFOUND) {
-                        cc.read_cursor->reset(cc.read_cursor.get());
+                        testutil_check(cc.read_cursor->reset(cc.read_cursor.get()));
                     } else if (ret == WT_ROLLBACK) {
                         tc->txn.rollback();
                         added_count = 0;
