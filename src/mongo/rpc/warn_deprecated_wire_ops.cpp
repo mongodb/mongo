@@ -69,7 +69,8 @@ void warnDeprecation(Client& client, StringData op) {
 
     LOGV2_DEBUG(5578800,
                 (*bumpedSeverity)(clientKey).toInt(),
-                "Deprecated operation requested. For more details see "
+                "Deprecated operation requested. The client driver may require an upgrade in order "
+                "to ensure compatibility with future server versions. For more details see "
                 "https://dochub.mongodb.org/core/legacy-opcode-compatibility",
                 "op"_attr = op,
                 "clientInfo"_attr = clientInfo);
