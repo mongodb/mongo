@@ -384,6 +384,10 @@ __wt_update_obsolete_check(
             if (upd->start_ts != WT_TS_NONE && upd->start_ts >= oldest && upd->start_ts < stable)
                 ++upd_unstable;
         }
+
+        /* Cannot truncate the updates if we need to remove the updates from the history store. */
+        if (F_ISSET(upd, WT_UPDATE_TO_DELETE_FROM_HS))
+            first = NULL;
     }
 
     /*
