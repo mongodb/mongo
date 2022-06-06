@@ -544,6 +544,12 @@ class BasicServerlessTest {
 }
 
 BasicServerlessTest.kConfigSplitDonorsNS = "config.tenantSplitDonors";
+BasicServerlessTest.DonorState = {
+    kUninitialized: "uninitialized",
+    kBlocking: "blocking",
+    kCommitted: "committed",
+    kAborted: "aborted"
+};
 
 function findSplitOperation(primary, migrationId) {
     const donorsCollection = primary.getCollection(BasicServerlessTest.kConfigSplitDonorsNS);

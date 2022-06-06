@@ -61,6 +61,8 @@ public:
 
     ThreadPool::Limits getThreadPoolLimits() const override;
 
+    void abortAllSplits(OperationContext* opCtx);
+
 protected:
     // Instance conflict check not yet implemented.
     void checkIfConflictsWithOtherInstances(

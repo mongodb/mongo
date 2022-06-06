@@ -50,13 +50,13 @@ function makeShardSplitTest() {
         let commitUUID = UUID();
         let res = adminDB.runCommand(test.makeCommitShardSplitCmd(commitUUID));
         assert.neq(res.code,
-                   6057900,
+                   ErrorCodes.IllegalOperation,
                    `commitShardSplitCmd shouldn't reject when featureFlagShardSplit is enabled`);
 
         test.removeRecipientNodesFromDonor();
         res = adminDB.runCommand(test.makeForgetShardSplitCmd(commitUUID));
         assert.neq(res.code,
-                   6057900,
+                   ErrorCodes.IllegalOperation,
                    `forgetShardSplit shouldn't reject when featureFlagShardSplit is enabled`);
 
         test.waitForGarbageCollection(commitUUID, tenantIds);
@@ -64,22 +64,22 @@ function makeShardSplitTest() {
         let abortUUID = UUID();
         res = adminDB.runCommand(test.makeAbortShardSplitCmd(abortUUID));
         assert.neq(res.code,
-                   6057902,
+                   ErrorCodes.IllegalOperation,
                    `abortShardSplitCmd shouldn't reject when featureFlagShardSplit is enabled`);
 
         assert.commandWorked(adminDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
 
         assert.commandFailedWithCode(
             adminDB.runCommand(test.makeCommitShardSplitCmd(UUID())),
-            6057900,
+            ErrorCodes.IllegalOperation,
             `commitShardSplitCmd should reject when featureFlagShardSplit is disabled`);
         assert.commandFailedWithCode(
             adminDB.runCommand(test.makeAbortShardSplitCmd(UUID())),
-            6057902,
+            ErrorCodes.IllegalOperation,
             `abortShardSplitCmd should reject when featureFlagShardSplit is disabled`);
         assert.commandFailedWithCode(
             adminDB.runCommand(test.makeForgetShardSplitCmd(UUID())),
-            6236600,
+            ErrorCodes.IllegalOperation,
             `forgetShardSplit should reject when featureFlagShardSplit is disabled`);
 
         // shut down replica set

@@ -50,8 +50,8 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
-            uassert(6057900,
-                    "Feature \"shard split\" not supported",
+            uassert(ErrorCodes::IllegalOperation,
+                    "Feature 'shard split' not supported",
                     repl::feature_flags::gShardSplit.isEnabled(
                         serverGlobalParams.featureCompatibility));
             uassert(ErrorCodes::IllegalOperation,
@@ -138,8 +138,8 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(6057902,
-                    "Feature \"shard split\" not supported",
+            uassert(ErrorCodes::IllegalOperation,
+                    "Feature 'shard split' not supported",
                     repl::feature_flags::gShardSplit.isEnabled(
                         serverGlobalParams.featureCompatibility));
             uassert(ErrorCodes::CommandNotSupported,
@@ -215,8 +215,8 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(6236600,
-                    "feature \"shard split\" not supported",
+            uassert(ErrorCodes::IllegalOperation,
+                    "Feature 'shard split' not supported",
                     repl::feature_flags::gShardSplit.isEnabled(
                         serverGlobalParams.featureCompatibility));
             uassert(ErrorCodes::CommandNotSupported,

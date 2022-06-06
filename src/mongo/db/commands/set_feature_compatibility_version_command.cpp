@@ -51,6 +51,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_settings.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
@@ -77,6 +78,7 @@
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
@@ -532,7 +534,7 @@ private:
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase1.toBSON({}))));
         }
 
-        _cancelTenantMigrations(opCtx);
+        _cancelServerlessMigrations(opCtx);
 
         {
             // Take the FCV full transition lock in S mode to create a barrier for operations taking
@@ -608,7 +610,7 @@ private:
                 Balancer::get(opCtx)->applyLegacyChunkSizeConstraintsOnClusterData(opCtx);
         }
 
-        _cancelTenantMigrations(opCtx);
+        _cancelServerlessMigrations(opCtx);
 
         {
             // Take the FCV full transition lock in S mode to create a barrier for operations taking
@@ -797,21 +799,29 @@ private:
     }
 
     /**
-     * Kills all tenant migrations active on this node, for both donors and recipients.
+     * Abort all serverless migrations active on this node, for both donors and recipients.
      * Called after reaching an upgrading or downgrading state.
      */
-    void _cancelTenantMigrations(OperationContext* opCtx) {
+    void _cancelServerlessMigrations(OperationContext* opCtx) {
         invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
         if (serverGlobalParams.clusterRole == ClusterRole::None) {
             auto donorService = checked_cast<TenantMigrationDonorService*>(
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                     ->lookupServiceByName(TenantMigrationDonorService::kServiceName));
             donorService->abortAllMigrations(opCtx);
+
             auto recipientService = checked_cast<repl::TenantMigrationRecipientService*>(
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                     ->lookupServiceByName(repl::TenantMigrationRecipientService::
                                               kTenantMigrationRecipientServiceName));
             recipientService->abortAllMigrations(opCtx);
+
+            if (getGlobalReplSettings().isServerless()) {
+                auto splitDonorService = checked_cast<ShardSplitDonorService*>(
+                    repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                        ->lookupServiceByName(ShardSplitDonorService::kServiceName));
+                splitDonorService->abortAllSplits(opCtx);
+            }
         }
     }
 

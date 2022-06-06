@@ -226,8 +226,8 @@ void ShardSplitDonorService::checkIfConflictsWithOtherInstances(
             isGarbageCollectable;
 
         uassert(ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "Can't start a concurent shard split operation against"
-                              << " migrationId:" << existingTypedInstance->getId(),
+                str::stream() << "Can't start a concurent shard split operation, currently running"
+                              << " migrationId: " << existingTypedInstance->getId(),
                 existingIsAborted);
     }
 }
@@ -238,6 +238,16 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ShardSplitDonorService::cons
         _serviceContext,
         this,
         ShardSplitDonorDocument::parse(IDLParserErrorContext("donorStateDoc"), initialState));
+}
+
+void ShardSplitDonorService::abortAllSplits(OperationContext* opCtx) {
+    LOGV2(8423361, "Aborting all active shard split operations.");
+    auto instances = getAllInstances(opCtx);
+    for (auto& instance : instances) {
+        auto typedInstance =
+            checked_pointer_cast<ShardSplitDonorService::DonorStateMachine>(instance);
+        typedInstance->tryAbort();
+    }
 }
 
 ExecutorFuture<void> ShardSplitDonorService::_createStateDocumentTTLIndex(
@@ -334,6 +344,13 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
         stdx::lock_guard<Latch> lg(_mutex);
         _abortSource = CancellationSource(primaryToken);
         if (_abortRequested || _stateDoc.getState() == ShardSplitDonorStateEnum::kAborted) {
+            _abortSource->cancel();
+        }
+
+        // We must abort the migration if we try to start or resume while upgrading or downgrading.
+        // (Generic FCV reference): This FCV check should exist across LTS binary versions.
+        if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
+            LOGV2(8423360, "Aborting shard split since donor is upgrading or downgrading.");
             _abortSource->cancel();
         }
 
