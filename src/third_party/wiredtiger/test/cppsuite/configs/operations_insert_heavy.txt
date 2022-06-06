@@ -1,11 +1,6 @@
 # Used as a stress test for the framework.
 duration_seconds=300,
 cache_size_mb=2000,
-checkpoint_manager=
-(
-    enabled=true,
-    op_rate=20s
-),
 timestamp_manager=
 (
     enabled=true,
@@ -13,8 +8,12 @@ timestamp_manager=
     op_rate=1s,
     stable_lag=10
 ),
-workload_generator=
+workload_manager=
 (
+    checkpoint_config=
+    (
+        op_rate=20s,
+    ),
     populate_config=
     (
         collection_count=100,
@@ -39,7 +38,7 @@ workload_generator=
     ),
 ),
 # Tracking is currently disabled as verification can't handle rollbacks.
-workload_tracking=
+operation_tracker=
 (
     enabled=false,
     op_rate=30s

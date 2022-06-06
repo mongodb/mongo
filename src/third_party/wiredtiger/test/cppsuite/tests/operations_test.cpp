@@ -40,6 +40,6 @@ class operations_test : public test {
     public:
     operations_test(const test_args &args) : test(args)
     {
-        init_tracking();
+        init_operation_tracker();
     }
 };

@@ -7,12 +7,7 @@ statistics_config=
     type=all,
     enable_logging=true
 ),
-checkpoint_manager=
-(
-    enabled=true,
-    op_rate=20s
-),
-runtime_monitor=
+metrics_monitor=
 (
     cache_hs_insert=
     (
@@ -47,8 +42,12 @@ timestamp_manager=
     op_rate=1s,
     stable_lag=5
 ),
-workload_generator=
+workload_manager=
 (
+    checkpoint_config=
+    (
+        op_rate=20s,
+    ),
     populate_config=
     (
         collection_count=10,
@@ -67,7 +66,7 @@ workload_generator=
         value_size=10000
     )
 ),
-workload_tracking=
+operation_tracker=
 (
     enabled=true,
     op_rate=30s

@@ -26,14 +26,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef WORKLOAD_VALIDATION_H
-#define WORKLOAD_VALIDATION_H
+#ifndef VALIDATOR_H
+#define VALIDATOR_H
 
 #include <map>
 #include <string>
 #include <vector>
 
-#include "src/main/database_model.h"
+#include "src/main/database.h"
 
 namespace test_harness {
 struct key_state {
@@ -43,10 +43,8 @@ struct key_state {
     key_value_t value;
 };
 typedef std::map<key_value_t, key_state> validation_collection;
-/*
- * Class that can validate database state and collection data.
- */
-class workload_validation {
+/* Class that defines a basic validation algorithm. */
+class validator {
     public:
     /*
      * Validate the on disk data against what has been tracked during the test. This is done by
@@ -73,9 +71,7 @@ class workload_validation {
     void update_data_model(const tracking_operation &operation, validation_collection &collection,
       const uint64_t collection_id, const char *key, const char *value);
 
-    /*
-     * Compare the tracked operations against what has been saved on disk.
-     */
+    /* Compare the tracked operations against what has been saved on disk. */
     void verify_collection(
       scoped_session &session, const uint64_t collection_id, validation_collection &collection);
 

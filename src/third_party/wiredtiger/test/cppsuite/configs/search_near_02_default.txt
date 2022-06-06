@@ -10,7 +10,7 @@ timestamp_manager=
     # checks.
     oldest_lag=10,
 ),
-workload_generator=
+workload_manager=
 (
     populate_config=
     (

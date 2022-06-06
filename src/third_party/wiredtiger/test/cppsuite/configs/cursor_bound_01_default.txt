@@ -16,7 +16,7 @@ timestamp_manager=
     # checks.
     oldest_lag=50,
 ),
-workload_generator=
+workload_manager=
 (
     populate_config=
     (
@@ -52,7 +52,7 @@ workload_generator=
         thread_count=5
     )
 ),
-workload_tracking=
+operation_tracker=
 (
     enabled=false,
 )

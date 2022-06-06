@@ -13,7 +13,7 @@ timestamp_manager=
 (
     stable_lag=60,
 ),
-workload_generator=
+workload_manager=
 (
     populate_config=
     (

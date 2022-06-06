@@ -26,17 +26,16 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "api_const.h"
+#include "constants.h"
 
 /* Define all constants related to WiredTiger APIs and testing. */
 namespace test_harness {
 
 /* Component names. */
-const std::string CHECKPOINT_MANAGER = "checkpoint_manager";
-const std::string RUNTIME_MONITOR = "runtime_monitor";
+const std::string OPERATION_TRACKER = "operation_tracker";
+const std::string METRICS_MONITOR = "metrics_monitor";
 const std::string TIMESTAMP_MANAGER = "timestamp_manager";
-const std::string WORKLOAD_GENERATOR = "workload_generator";
-const std::string WORKLOAD_TRACKING = "workload_tracking";
+const std::string WORKLOAD_MANAGER = "workload_manager";
 
 /* Configuration API consts. */
 const std::string CACHE_HS_INSERT = "cache_hs_insert";
@@ -44,6 +43,7 @@ const std::string CACHE_MAX_WAIT_MS = "cache_max_wait_ms";
 const std::string CACHE_SIZE_MB = "cache_size_mb";
 const std::string CC_PAGES_REMOVED = "cc_pages_removed";
 const std::string COLLECTION_COUNT = "collection_count";
+const std::string CHECKPOINT_OP_CONFIG = "checkpoint_config";
 const std::string COMPRESSION_ENABLED = "compression_enabled";
 const std::string CUSTOM_OP_CONFIG = "custom_config";
 const std::string DURATION_SECONDS = "duration_seconds";

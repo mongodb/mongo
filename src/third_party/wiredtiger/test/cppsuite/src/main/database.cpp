@@ -26,32 +26,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "database_model.h"
+#include "database.h"
 
-#include "src/common/api_const.h"
+#include "collection.h"
+#include "src/common/constants.h"
 #include "src/common/random_generator.h"
 #include "src/storage/connection_manager.h"
 
 namespace test_harness {
-/* collection class implementation */
-collection::collection(const uint64_t id, const uint64_t key_count, const std::string &name)
-    : name(name), id(id), _key_count(key_count)
-{
-}
-
-uint64_t
-collection::get_key_count() const
-{
-    return (_key_count);
-}
-
-void
-collection::increase_key_count(uint64_t increment)
-{
-    _key_count += increment;
-}
-
-/* database class implementation */
 std::string
 database::build_collection_name(const uint64_t id)
 {
@@ -65,7 +47,7 @@ database::add_collection(uint64_t key_count)
     if (_session.get() == nullptr)
         _session = connection_manager::instance().create_session();
     if (_collection_create_config.empty())
-        testutil_die(EINVAL, "database_model: no collection create config specified!");
+        testutil_die(EINVAL, "database: no collection create config specified!");
     uint64_t next_id = _next_collection_id++;
     std::string collection_name = build_collection_name(next_id);
     /* FIX-ME-Test-Framework: This will get removed when we split the model up. */
@@ -73,7 +55,7 @@ database::add_collection(uint64_t key_count)
       std::forward_as_tuple(next_id, key_count, collection_name));
     testutil_check(
       _session->create(_session.get(), collection_name.c_str(), _collection_create_config.c_str()));
-    _tracking->save_schema_operation(
+    _operation_tracker->save_schema_operation(
       tracking_operation::CREATE_COLLECTION, next_id, _tsm->get_next_ts());
 }
 
@@ -136,10 +118,10 @@ database::set_timestamp_manager(timestamp_manager *tsm)
 }
 
 void
-database::set_workload_tracking(workload_tracking *tracking)
+database::set_operation_tracker(operation_tracker *op_tracker)
 {
-    testutil_assert(_tracking == nullptr);
-    _tracking = tracking;
+    testutil_assert(_operation_tracker == nullptr);
+    _operation_tracker = op_tracker;
 }
 
 void

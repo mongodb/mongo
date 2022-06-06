@@ -1,18 +1,13 @@
 # Used as a stress test for the framework.
 duration_seconds=14400,
 cache_size_mb=2000,
-checkpoint_manager=
-(
-    enabled=true,
-    op_rate=60s
-),
 timestamp_manager=
 (
     enabled=true,
     oldest_lag=10,
     stable_lag=10
 ),
-workload_generator=
+workload_manager=
 (
     populate_config=
     (
@@ -31,7 +26,7 @@ workload_generator=
         value_size=20000
     )
 ),
-workload_tracking=
+operation_tracker=
 (
     enabled=false,
 )

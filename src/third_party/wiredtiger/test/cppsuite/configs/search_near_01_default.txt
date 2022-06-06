@@ -11,7 +11,7 @@ timestamp_manager=
 (
     enabled=false,
 ),
-workload_generator=
+workload_manager=
 (
     populate_config=
     (

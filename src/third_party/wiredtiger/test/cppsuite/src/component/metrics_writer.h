@@ -26,8 +26,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PERF_PLOTTER_H
-#define PERF_PLOTTER_H
+#ifndef METRICS_WRITER_H
+#define METRICS_WRITER_H
 
 #include <fstream>
 #include <mutex>
@@ -35,25 +35,21 @@
 #include <vector>
 
 namespace test_harness {
-/*
- * Singleton class owning the perf plot json, provides access to add statistics, and a central call
- * point to output the file.
- */
-class perf_plotter {
+/* Singleton class that can write statistics to a file. */
+class metrics_writer {
     public:
-    static perf_plotter &instance();
+    static metrics_writer &instance();
 
     public:
     /* No copies of the singleton allowed. */
-    perf_plotter(perf_plotter const &) = delete;
-    perf_plotter &operator=(perf_plotter const &) = delete;
+    metrics_writer(metrics_writer const &) = delete;
+    metrics_writer &operator=(metrics_writer const &) = delete;
 
-    /* Anyone can get the perf_plotter and add a statistic to it. */
     void add_stat(const std::string &stat_string);
     void output_perf_file(const std::string &test_name);
 
     private:
-    perf_plotter();
+    metrics_writer();
     std::vector<std::string> _stats;
     std::mutex _stat_mutex;
 };
