@@ -596,6 +596,88 @@ let projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
 assert.neq(null, projStage, explain);
 assertTransformByShape({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
 
+// Asserts that, if group pushdown is enabled, we can remove a redundant projection stage before a
+// group.
+function assertProjectionCanBeRemovedBeforeGroup(pipeline) {
+    assertPipelineIfGroupPushdown(
+        // The projection and group should both be pushed down, and we expect to optimize away the
+        // projection after realizing that it will not affect the output of the group.
+        function() {
+            explain = coll.explain().aggregate(pipeline);
+            assertPipelineDoesNotUseAggregation(
+                {pipeline: pipeline, expectedStages: ["COLLSCAN", "GROUP"]});
+        },
+        // If group pushdown is not enabled we still expect the projection to be pushed down.
+        function() {
+            explain = coll.explain().aggregate(pipeline);
+            assertPipelineUsesAggregation({
+                pipeline: pipeline,
+                expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "$group"],
+            });
+        });
+}
+
+// Asserts that a projection stage is not optimized out of a pipeline with a projection and a group
+// stage.
+function assertProjectionIsNotRemoved(pipeline) {
+    assertPipelineIfGroupPushdown(
+        // The projection and group should both be pushed down, and we expect NOT to optimize away
+        // the projection.
+        function() {
+            explain = coll.explain().aggregate(pipeline);
+            assertPipelineDoesNotUseAggregation(
+                {pipeline: pipeline, expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "GROUP"]});
+        },
+        // If group pushdown is not enabled we still expect the projection to be pushed down.
+        function() {
+            explain = coll.explain().aggregate(pipeline);
+            assertPipelineUsesAggregation({
+                pipeline: pipeline,
+                expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "$group"],
+            });
+        });
+}
+
+// Test that an inclusion projection is optimized away if it is redundant/unnecessary.
+assertProjectionCanBeRemovedBeforeGroup(
+    [{$project: {a: 1, b: 1}}, {$group: {_id: "$a", s: {$sum: "$b"}}}]);
+
+// TODO SERVER-66061 Test the same thing for an inclusion projection with a dotted path.
+// assertProjectionCanBeRemovedBeforeGroup(
+//     [{$project: {'a.b': 1, 'b.c': 1}}, {$group: {_id: "$a.b", s: {$sum: "$b.c"}}}]);
+
+// Test that an inclusion projection is NOT optimized away if it is NOT redundant. This one fails to
+// include a dependency of the $group and so will have an impact on the query results.
+assertProjectionIsNotRemoved([{$project: {a: 1}}, {$group: {_id: "$a", s: {$sum: "$b"}}}]);
+// TODO SERVER-66061 Analyze similar cases with dotted paths. For now, our ananlysis is limited to
+// PROJECTION_SIMPLE which is not used for any dotted paths.
+
+// TODO SERVER-66061 This one could be removed, but is left for future work.
+assertProjectionIsNotRemoved(
+    [{$project: {a: 1, b: 1}}, {$group: {_id: "$a.b", s: {$sum: "$b.c"}}}]);
+
+// Spinoff on the one above: Without supporting this kind of prefixing analysis, we can confuse
+// ourselves with our dependency analysis. If the $group depends on both "path" and "path.subpath"
+// then it will generate a $project on only "path" to express its dependency set. We then fail to
+// optimize that out.
+pipeline = [{$group: {_id: "$a.b", s: {$first: "$a"}}}];
+assertPipelineIfGroupPushdown(
+    // The group should be pushed down, and we expect NOT to have any projection.
+    // TODO SERVER-66061 we should consider fixing this.
+    function() {
+        explain = coll.explain().aggregate(pipeline);
+        assertPipelineDoesNotUseAggregation(
+            {pipeline: pipeline, expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "GROUP"]});
+    },
+    // If group pushdown is not enabled we do expect a projection to be pushed down.
+    function() {
+        explain = coll.explain().aggregate(pipeline);
+        assertPipelineUsesAggregation({
+            pipeline: pipeline,
+            expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "$group"],
+        });
+    });
+
 // We generate a projection stage from dependency analysis, even if the pipeline begins with an
 // exclusion projection.
 pipeline = [{$project: {c: 0}}, {$group: {_id: "$a", b: {$sum: "$b"}}}];
@@ -634,7 +716,7 @@ pipeline = [{$project: {x: {$add: ["$a", 1]}}}];
 assertPipelineDoesNotUseAggregation(
     {pipeline: pipeline, expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT"]});
 
-pipeline = [{$project: {a: {$add: ["$a", 1]}}}, {$group: {_id: "$a", s: {$sum: "b"}}}];
+pipeline = [{$project: {a: {$add: ["$a", 1]}}}, {$group: {_id: "$a", s: {$sum: "$b"}}}];
 assertPipelineIfGroupPushdown(
     // Test that a computed projection at the front of the pipeline is pushed down when there's a
     // finite dependency set. Additionally, the group pushdown shouldn't erase the computed

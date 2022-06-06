@@ -584,11 +584,11 @@ void encodeKeyForProj(const projection_ast::Projection* proj, StringBuilder* key
         return;
     }
 
-    std::vector<std::string> requiredFields = proj->getRequiredFields();
+    std::set<std::string> requiredFields = proj->getRequiredFields();
 
     // If the only requirement is that $sortKey be included with some value, we just act as if the
     // entire document is needed.
-    if (requiredFields.size() == 1 && requiredFields.front() == "$sortKey") {
+    if (requiredFields.size() == 1 && *requiredFields.begin() == "$sortKey") {
         return;
     }
 
@@ -597,7 +597,6 @@ void encodeKeyForProj(const projection_ast::Projection* proj, StringBuilder* key
     *keyBuilder << kEncodeProjectionSection;
 
     // Encode the fields required by the projection in order.
-    std::sort(requiredFields.begin(), requiredFields.end());
     bool isFirst = true;
     for (auto&& requiredField : requiredFields) {
         invariant(!requiredField.empty());

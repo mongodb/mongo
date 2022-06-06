@@ -49,8 +49,8 @@ struct DepsAnalysisData {
         fieldDependencyTracker.fields.insert(fieldName);
     }
 
-    std::vector<std::string> requiredFields() const {
-        return {fieldDependencyTracker.fields.begin(), fieldDependencyTracker.fields.end()};
+    std::set<std::string> requiredFields() const {
+        return fieldDependencyTracker.fields;
     }
 };
 
