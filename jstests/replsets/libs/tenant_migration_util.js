@@ -246,6 +246,8 @@ var TenantMigrationUtil = (function() {
                 jsTestLog(`Error running runTenantMigrationCommand. Command: ${
                     tojson(localCmdObj)}, Error: ${tojson(e)}`);
 
+                // If res is defined, return true to exit assert.soon and return res to the caller.
+                // Otherwise rethrow e to propagate it to the caller.
                 if (res)
                     return true;
 
