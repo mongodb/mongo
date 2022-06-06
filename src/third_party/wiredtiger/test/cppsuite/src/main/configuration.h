@@ -58,7 +58,7 @@ split_string(const std::string &str, const char delim)
 
 class configuration {
     public:
-    configuration(const std::string &test_config_name, const std::string &config);
+    explicit configuration(const std::string &test_config_name, const std::string &config);
     explicit configuration(const WT_CONFIG_ITEM &nested);
 
     ~configuration();
@@ -71,19 +71,16 @@ class configuration {
      * component, the optional forms of the functions can be used. In this case a default value must
      * be passed and it will be set to that value.
      */
+    std::string get_string(const std::string &key);
+    std::string get_optional_string(const std::string &key, const std::string &def);
     bool get_bool(const std::string &key);
     bool get_optional_bool(const std::string &key, const bool def);
     int64_t get_int(const std::string &key);
     int64_t get_optional_int(const std::string &key, const int64_t def);
     configuration *get_subconfig(const std::string &key);
     configuration *get_optional_subconfig(const std::string &key);
-    std::string get_string(const std::string &key);
-    std::string get_optional_string(const std::string &key, const std::string &def);
     std::vector<std::string> get_list(const std::string &key);
     std::vector<std::string> get_optional_list(const std::string &key);
-
-    /* Get the sleep time from the configuration in ms. */
-    uint64_t get_throttle_ms();
 
     private:
     enum class types { BOOL, INT, LIST, STRING, STRUCT };

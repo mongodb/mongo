@@ -26,47 +26,28 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef METRICS_MONITOR_H
-#define METRICS_MONITOR_H
+#ifndef THROTTLE_H
+#define THROTTLE_H
 
-#include <memory>
 #include <string>
-#include <vector>
 
-#include "src/main/configuration.h"
-#include "src/main/database.h"
-#include "src/storage/scoped_cursor.h"
-#include "src/storage/scoped_session.h"
-#include "statistics/statistics.h"
+#include "configuration.h"
 
 namespace test_harness {
-
-/*
- * The statistics monitor class is designed to track various statistics or other runtime signals
- * relevant to the given workload.
- */
-class metrics_monitor : public component {
+class throttle {
     public:
-    static void get_stat(scoped_cursor &, int, int64_t *);
+    explicit throttle(const std::string &throttle_rate);
 
-    public:
-    metrics_monitor(const std::string &test_name, configuration *config, database &database);
-    virtual ~metrics_monitor() = default;
+    /* Use optional and default to 1s per op in case something doesn't define this. */
+    explicit throttle(configuration *config);
 
-    /* Delete the copy constructor and the assignment operator. */
-    metrics_monitor(const metrics_monitor &) = delete;
-    metrics_monitor &operator=(const metrics_monitor &) = delete;
+    /* Default to a second per operation. */
+    throttle();
 
-    void load() override final;
-    void do_work() override final;
-    void finish() override final;
+    void sleep();
 
     private:
-    scoped_session _session;
-    scoped_cursor _cursor;
-    const std::string _test_name;
-    std::vector<std::unique_ptr<statistics>> _stats;
-    database &_database;
+    uint64_t _ms = 1000;
 };
 } // namespace test_harness
 

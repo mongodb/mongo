@@ -26,7 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "scoped_cursor.h"
+#include "scoped_types.h"
 
 extern "C" {
 #include "test_util.h"
@@ -99,5 +99,72 @@ WT_CURSOR *
 scoped_cursor::get()
 {
     return (_cursor);
+}
+
+/* scoped_session implementation */
+scoped_session::scoped_session(WT_CONNECTION *conn)
+{
+    reinit(conn);
+}
+
+scoped_session::~scoped_session()
+{
+    if (_session != nullptr) {
+        testutil_check(_session->close(_session, nullptr));
+        _session = nullptr;
+    }
+}
+
+scoped_session::scoped_session(scoped_session &&other)
+{
+    std::swap(_session, other._session);
+}
+
+/*
+ * Implement move assignment by move constructing a temporary and swapping its internals with the
+ * current session. This means that the currently held WT_SESSION will get destroyed as the
+ * temporary falls out of the scope and we will steal the one that we're move assigning from.
+ */
+scoped_session &
+scoped_session::operator=(scoped_session &&other)
+{
+    scoped_session tmp(std::move(other));
+    std::swap(_session, tmp._session);
+    return (*this);
+}
+
+void
+scoped_session::reinit(WT_CONNECTION *conn)
+{
+    if (_session != nullptr) {
+        testutil_check(_session->close(_session, nullptr));
+        _session = nullptr;
+    }
+    if (conn != nullptr)
+        testutil_check(conn->open_session(conn, nullptr, nullptr, &_session));
+}
+
+WT_SESSION &
+scoped_session::operator*()
+{
+    return (*_session);
+}
+
+WT_SESSION *
+scoped_session::operator->()
+{
+    return (_session);
+}
+
+WT_SESSION *
+scoped_session::get()
+{
+    return (_session);
+}
+
+scoped_cursor
+scoped_session::open_scoped_cursor(const std::string &uri, const std::string &cfg)
+{
+    return (scoped_cursor(_session, uri, cfg));
 }
 } // namespace test_harness

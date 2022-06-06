@@ -26,8 +26,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef SCOPED_SESSION_H
-#define SCOPED_SESSION_H
+#ifndef SCOPED_TYPES_H
+#define SCOPED_TYPES_H
 
 /* Following definitions are required in order to use printing format specifiers in C++. */
 #ifndef __STDC_LIMIT_MACROS
@@ -39,13 +39,36 @@
 
 #include <string>
 
-#include "scoped_cursor.h"
-
 extern "C" {
 #include "wiredtiger.h"
 }
 
 namespace test_harness {
+class scoped_cursor {
+    public:
+    scoped_cursor() = default;
+    explicit scoped_cursor(WT_SESSION *session, const std::string &uri, const std::string &cfg);
+
+    /* Moving is ok but copying is not. */
+    scoped_cursor(scoped_cursor &&other);
+
+    ~scoped_cursor();
+
+    scoped_cursor &operator=(scoped_cursor &&other);
+    scoped_cursor(const scoped_cursor &) = delete;
+    scoped_cursor &operator=(const scoped_cursor &) = delete;
+
+    void reinit(WT_SESSION *session, const std::string &uri, const std::string &cfg);
+
+    WT_CURSOR &operator*();
+    WT_CURSOR *operator->();
+
+    WT_CURSOR *get();
+
+    private:
+    WT_CURSOR *_cursor = nullptr;
+};
+
 class scoped_session {
     public:
     scoped_session() = default;

@@ -26,33 +26,41 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef DATABASE_SIZE_H
-#define DATABASE_SIZE_H
-
-#include <string>
-#include "src/main/configuration.h"
-#include "src/main/database.h"
-#include "src/storage/scoped_cursor.h"
-#include "statistics.h"
+#include "perf_plotter.h"
 
 namespace test_harness {
+void
+perf_plotter::add_stat(const std::string &stat_string)
+{
+    std::lock_guard<std::mutex> lg(_stat_mutex);
+    _stats.push_back(stat_string);
+}
 
-class database_size : public statistics {
-    public:
-    database_size(configuration &config, const std::string &name, database &database);
-    virtual ~database_size() = default;
+void
+perf_plotter::output_perf_file(const std::string &test_name)
+{
+    std::ofstream perf_file;
+    std::string stat_info = "[{\"info\":{\"test_name\": \"" + test_name + "\"},\"metrics\": [";
 
-    /* Don't need the stat cursor for these. */
-    void check(scoped_cursor &) override final;
-    std::string get_value_str(scoped_cursor &) override final;
+    perf_file.open(test_name + ".json");
 
-    private:
-    size_t get_db_size() const;
-    const std::vector<std::string> get_file_names() const;
+    for (const auto &stat : _stats)
+        stat_info += stat + ",";
 
-    private:
-    database &_database;
-};
+    /* Remove last extra comma. */
+    if (stat_info.back() == ',')
+        stat_info.pop_back();
+
+    perf_file << stat_info << "]}]";
+    perf_file.close();
+}
+
+perf_plotter &
+perf_plotter::instance()
+{
+    static perf_plotter _instance;
+    return (_instance);
+}
+
+perf_plotter::perf_plotter() {}
 } // namespace test_harness
-
-#endif

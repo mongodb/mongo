@@ -26,20 +26,20 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/common/constants.h"
+#include "src/common/api_const.h"
 #include "src/common/random_generator.h"
-#include "src/component/operation_tracker.h"
+#include "src/component/workload_tracking.h"
 #include "src/main/test.h"
 
 using namespace test_harness;
 
 /* Defines what data is written to the tracking table for use in custom validation. */
-class operation_tracker_cache_resize : public operation_tracker {
+class tracking_table_cache_resize : public workload_tracking {
 
     public:
-    operation_tracker_cache_resize(
+    tracking_table_cache_resize(
       configuration *config, const bool use_compression, timestamp_manager &tsm)
-        : operation_tracker(config, use_compression, tsm)
+        : workload_tracking(config, use_compression, tsm)
     {
     }
 
@@ -63,13 +63,12 @@ class cache_resize : public test {
     public:
     cache_resize(const test_args &args) : test(args)
     {
-        init_operation_tracker(
-          new operation_tracker_cache_resize(_config->get_subconfig(OPERATION_TRACKER),
-            _config->get_bool(COMPRESSION_ENABLED), *_timestamp_manager));
+        init_tracking(new tracking_table_cache_resize(_config->get_subconfig(WORKLOAD_TRACKING),
+          _config->get_bool(COMPRESSION_ENABLED), *_timestamp_manager));
     }
 
     void
-    custom_operation(thread_worker *tc) override final
+    custom_operation(thread_context *tc) override final
     {
         WT_CONNECTION *conn = connection_manager::instance().get_connection();
         WT_CONNECTION_IMPL *conn_impl = (WT_CONNECTION_IMPL *)conn;
@@ -106,26 +105,26 @@ class cache_resize : public test {
             uint64_t txn_id = ((WT_SESSION_IMPL *)tc->session.get())->txn->id;
 
             /* Save the change of cache size in the tracking table. */
-            tc->txn.begin();
-            int ret = tc->op_tracker->save_operation(txn_id, tracking_operation::CUSTOM,
+            tc->transaction.begin();
+            int ret = tc->tracking->save_operation(txn_id, tracking_operation::CUSTOM,
               collection_id, key, value, tc->tsm->get_next_ts(), tc->op_track_cursor);
 
             if (ret == 0)
-                testutil_assert(tc->txn.commit());
+                testutil_assert(tc->transaction.commit());
             else {
                 /* Due to the cache pressure, it is possible to fail when saving the operation. */
                 testutil_assert(ret == WT_ROLLBACK);
                 logger::log_msg(LOG_WARN,
                   "The cache size reconfiguration could not be saved in the tracking table, ret: " +
                     std::to_string(ret));
-                tc->txn.rollback();
+                tc->transaction.rollback();
             }
             increase_cache = !increase_cache;
         }
     }
 
     void
-    insert_operation(thread_worker *tc) override final
+    insert_operation(thread_context *tc) override final
     {
         const uint64_t collection_count = tc->db.get_collection_count();
         testutil_assert(collection_count > 0);
@@ -143,22 +142,22 @@ class cache_resize : public test {
             /* Take into account the value size given in the test configuration file. */
             const std::string value = std::to_string(cache_size);
 
-            tc->txn.try_begin();
+            tc->transaction.try_begin();
             if (!tc->insert(cursor, coll.id, key, value)) {
-                tc->txn.rollback();
-            } else if (tc->txn.can_commit()) {
+                tc->transaction.rollback();
+            } else if (tc->transaction.can_commit()) {
                 /*
                  * The transaction can fit in the current cache size and is ready to be committed.
                  * This means the tracking table will contain a new record to represent this
                  * transaction which will be used during the validation stage.
                  */
-                testutil_assert(tc->txn.commit());
+                testutil_assert(tc->transaction.commit());
             }
         }
 
         /* Make sure the last transaction is rolled back now the work is finished. */
-        if (tc->txn.active())
-            tc->txn.rollback();
+        if (tc->transaction.active())
+            tc->transaction.rollback();
     }
 
     void

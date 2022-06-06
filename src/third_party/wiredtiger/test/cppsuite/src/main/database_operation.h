@@ -29,8 +29,8 @@
 #ifndef DATABASE_OPERATION_H
 #define DATABASE_OPERATION_H
 
-#include "database.h"
-#include "thread_worker.h"
+#include "database_model.h"
+#include "thread_context.h"
 
 namespace test_harness {
 class database_operation {
@@ -45,25 +45,22 @@ class database_operation {
      * defined by the configuration.
      */
     virtual void populate(database &database, timestamp_manager *tsm, configuration *config,
-      operation_tracker *op_tracker);
-
-    /* Performs a checkpoint periodically. */
-    virtual void checkpoint_operation(thread_worker *tc);
+      workload_tracking *tracking);
 
     /* Custom operation without a default implementation. */
-    virtual void custom_operation(thread_worker *tc);
+    virtual void custom_operation(thread_context *tc);
 
     /* Basic insert operation that adds a new key every rate tick. */
-    virtual void insert_operation(thread_worker *tc);
+    virtual void insert_operation(thread_context *tc);
 
     /* Basic read operation that chooses a random collection and walks a cursor. */
-    virtual void read_operation(thread_worker *tc);
+    virtual void read_operation(thread_context *tc);
 
     /* Basic remove operation that chooses a random key and deletes it. */
-    virtual void remove_operation(thread_worker *tc);
+    virtual void remove_operation(thread_context *tc);
 
     /* Basic update operation that chooses a random key and updates it. */
-    virtual void update_operation(thread_worker *tc);
+    virtual void update_operation(thread_context *tc);
 
     virtual void validate(const std::string &operation_table_name,
       const std::string &schema_table_name, const std::vector<uint64_t> &known_collection_ids);

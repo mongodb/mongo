@@ -28,19 +28,20 @@
 
 #include "test.h"
 
-#include "src/common/constants.h"
+#include "src/common/api_const.h"
 #include "src/common/logger.h"
-#include "src/component/metrics_writer.h"
+#include "src/component/perf_plotter.h"
 
 namespace test_harness {
 test::test(const test_args &args) : _args(args)
 {
     _config = new configuration(args.test_name, args.test_config);
-    _metrics_monitor =
-      new metrics_monitor(args.test_name, _config->get_subconfig(METRICS_MONITOR), _database);
+    _checkpoint_manager = new checkpoint_manager(_config->get_subconfig(CHECKPOINT_MANAGER));
+    _runtime_monitor =
+      new runtime_monitor(args.test_name, _config->get_subconfig(RUNTIME_MONITOR), _database);
     _timestamp_manager = new timestamp_manager(_config->get_subconfig(TIMESTAMP_MANAGER));
-    _workload_manager = new workload_manager(
-      _config->get_subconfig(WORKLOAD_MANAGER), this, _timestamp_manager, _database);
+    _workload_generator = new workload_generator(
+      _config->get_subconfig(WORKLOAD_GENERATOR), this, _timestamp_manager, _database);
     _thread_manager = new thread_manager();
 
     _database.set_timestamp_manager(_timestamp_manager);
@@ -51,38 +52,40 @@ test::test(const test_args &args) : _args(args)
      * Ordering is not important here, any dependencies between components should be resolved
      * internally by the components.
      */
-    _components = {_workload_manager, _timestamp_manager, _metrics_monitor};
+    _components = {_workload_generator, _timestamp_manager, _runtime_monitor, _checkpoint_manager};
 }
 
 void
-test::init_operation_tracker(operation_tracker *op_tracker)
+test::init_tracking(workload_tracking *tracking)
 {
-    delete _operation_tracker;
-    if (op_tracker == nullptr) {
+    delete _workload_tracking;
+    if (tracking == nullptr) {
         /* Fallback to default behavior. */
-        op_tracker = new operation_tracker(_config->get_subconfig(OPERATION_TRACKER),
+        tracking = new workload_tracking(_config->get_subconfig(WORKLOAD_TRACKING),
           _config->get_bool(COMPRESSION_ENABLED), *_timestamp_manager);
     }
-    _operation_tracker = op_tracker;
-    _workload_manager->set_operation_tracker(_operation_tracker);
-    _database.set_operation_tracker(_operation_tracker);
-    _components.push_back(_operation_tracker);
+    _workload_tracking = tracking;
+    _workload_generator->set_workload_tracking(_workload_tracking);
+    _database.set_workload_tracking(_workload_tracking);
+    _components.push_back(_workload_tracking);
 }
 
 test::~test()
 {
     delete _config;
-    delete _metrics_monitor;
+    delete _checkpoint_manager;
+    delete _runtime_monitor;
     delete _timestamp_manager;
     delete _thread_manager;
-    delete _workload_manager;
-    delete _operation_tracker;
+    delete _workload_generator;
+    delete _workload_tracking;
     _config = nullptr;
-    _metrics_monitor = nullptr;
+    _checkpoint_manager = nullptr;
+    _runtime_monitor = nullptr;
     _timestamp_manager = nullptr;
     _thread_manager = nullptr;
-    _workload_manager = nullptr;
-    _operation_tracker = nullptr;
+    _workload_generator = nullptr;
+    _workload_tracking = nullptr;
 
     _components.clear();
 }
@@ -131,8 +134,12 @@ test::run()
     /* Add the user supplied wiredtiger open config. */
     db_create_config += _args.wt_open_config;
 
-    /* Create connection. */
-    connection_manager::instance().create(db_create_config, DEFAULT_DIR);
+    /*
+     * Set up the test environment. A smart pointer is used here so that the connection can
+     * automatically be closed by the scoped_connection's destructor when the test finishes and the
+     * pointer goes out of scope.
+     */
+    _scoped_conn = std::make_shared<scoped_connection>(db_create_config);
 
     /* Initiate the load stage of each component. */
     for (const auto &it : _components)
@@ -143,7 +150,7 @@ test::run()
         _thread_manager->add_thread(&component::run, it);
 
     /* The initial population phase needs to be finished before starting the actual test. */
-    while (_workload_manager->enabled() && !_workload_manager->db_populated())
+    while (_workload_generator->enabled() && !_workload_generator->db_populated())
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     /* The test will run for the duration as defined in the config. */
@@ -168,15 +175,15 @@ test::run()
         it->finish();
 
     /* Validation stage. */
-    if (_operation_tracker->enabled()) {
-        std::unique_ptr<configuration> tracking_config(_config->get_subconfig(OPERATION_TRACKER));
-        this->validate(_operation_tracker->get_operation_table_name(),
-          _operation_tracker->get_schema_table_name(),
-          _workload_manager->get_database().get_collection_ids());
+    if (_workload_tracking->enabled()) {
+        std::unique_ptr<configuration> tracking_config(_config->get_subconfig(WORKLOAD_TRACKING));
+        this->validate(_workload_tracking->get_operation_table_name(),
+          _workload_tracking->get_schema_table_name(),
+          _workload_generator->get_database().get_collection_ids());
     }
 
     /* Log perf stats. */
-    metrics_writer::instance().output_perf_file(_args.test_name);
+    perf_plotter::instance().output_perf_file(_args.test_name);
 
     logger::log_msg(LOG_INFO, "SUCCESS");
 }

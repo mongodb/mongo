@@ -26,47 +26,40 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef COLLECTION_H
-#define COLLECTION_H
+#include "op_tracker.h"
 
-#include <atomic>
-#include <string>
+#include "perf_plotter.h"
 
 namespace test_harness {
+op_tracker::op_tracker(const std::string id, const std::string &test_name)
+    : _id(id), _test_name(test_name), _it_count(0), _total_time_taken(0)
+{
+}
 
-/* A collection is made of mapped key value objects. */
-class collection {
-    public:
-    collection(const uint64_t id, const uint64_t key_count, const std::string &name);
+void
+op_tracker::append_stats()
+{
+    uint64_t avg = (uint64_t)_total_time_taken / _it_count;
+    std::string stat = "{\"name\":\"" + _id + "\",\"value\":" + std::to_string(avg) + "}";
+    perf_plotter::instance().add_stat(stat);
+}
 
-    /* Copies aren't allowed. */
-    collection(const collection &) = delete;
-    collection &operator=(const collection &) = delete;
+template <typename T>
+auto
+op_tracker::track(T lambda)
+{
+    auto _start_time = std::chrono::steady_clock::now();
+    int ret = lambda();
+    auto _end_time = std::chrono::steady_clock::now();
+    _total_time_taken += (_end_time - _start_time).count();
+    _it_count += 1;
 
-    uint64_t get_key_count() const;
+    return ret;
+}
 
-    /*
-     * Adding new keys should generally be singly threaded per collection. If two threads both
-     * attempt to add keys using the incrementing id pattern they'd frequently conflict.
-     *
-     * The usage pattern is:
-     *   1. Call get_key_count to get the number of keys already existing. Add keys with id's equal
-     *      to and greater than this value.
-     *   2. Once the transaction has successfully committed then call increase_key_count() with the
-     *      number of added keys.
-     *
-     * The set of keys should always be contiguous such that other threads calling get_key_count
-     * will always know that the keys in existence are 0 -> _key_count - 1.
-     */
-    void increase_key_count(uint64_t increment);
-
-    public:
-    const std::string name;
-    const uint64_t id;
-
-    private:
-    std::atomic<uint64_t> _key_count{0};
-};
-} // namespace test_harness
-
-#endif
+op_tracker::~op_tracker()
+{
+    if (_it_count != 0)
+        append_stats();
+}
+}; // namespace test_harness

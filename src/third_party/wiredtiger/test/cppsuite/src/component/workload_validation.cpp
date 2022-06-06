@@ -26,7 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "validator.h"
+#include "workload_validation.h"
 
 #include <algorithm>
 
@@ -35,8 +35,8 @@
 
 namespace test_harness {
 void
-validator::validate(const std::string &operation_table_name, const std::string &schema_table_name,
-  const std::vector<uint64_t> &known_collection_ids)
+workload_validation::validate(const std::string &operation_table_name,
+  const std::string &schema_table_name, const std::vector<uint64_t> &known_collection_ids)
 {
     WT_DECL_RET;
     wt_timestamp_t tracked_timestamp;
@@ -160,7 +160,7 @@ validator::validate(const std::string &operation_table_name, const std::string &
 }
 
 void
-validator::parse_schema_tracking_table(scoped_session &session,
+workload_validation::parse_schema_tracking_table(scoped_session &session,
   const std::string &tracking_table_name, std::vector<uint64_t> &created_collections,
   std::vector<uint64_t> &deleted_collections)
 {
@@ -195,8 +195,9 @@ validator::parse_schema_tracking_table(scoped_session &session,
 }
 
 void
-validator::update_data_model(const tracking_operation &operation, validation_collection &collection,
-  const uint64_t collection_id, const char *key, const char *value)
+workload_validation::update_data_model(const tracking_operation &operation,
+  validation_collection &collection, const uint64_t collection_id, const char *key,
+  const char *value)
 {
     if (operation == tracking_operation::DELETE_KEY) {
         /* Search for the key validating that it exists. */
@@ -221,7 +222,7 @@ validator::update_data_model(const tracking_operation &operation, validation_col
 }
 
 void
-validator::verify_collection(
+workload_validation::verify_collection(
   scoped_session &session, const uint64_t collection_id, validation_collection &collection)
 {
     /* Check the collection exists on disk. */
@@ -237,7 +238,7 @@ validator::verify_collection(
 }
 
 bool
-validator::verify_collection_file_state(
+workload_validation::verify_collection_file_state(
   scoped_session &session, const uint64_t collection_id, bool exists) const
 {
     /*
@@ -252,7 +253,7 @@ validator::verify_collection_file_state(
 }
 
 void
-validator::verify_key_value(scoped_session &session, const uint64_t collection_id,
+workload_validation::verify_key_value(scoped_session &session, const uint64_t collection_id,
   const std::string &key, const key_state &key_state)
 {
     WT_DECL_RET;

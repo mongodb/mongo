@@ -30,7 +30,7 @@
 
 #include <sstream>
 
-#include "src/common/constants.h"
+#include "src/common/api_const.h"
 #include "src/common/logger.h"
 #include "src/common/random_generator.h"
 #include "src/storage/connection_manager.h"

@@ -5,7 +5,7 @@
 
 duration_seconds=10,
 cache_size_mb=1000,
-workload_manager=
+workload_generator=
 (
     populate_config=
     (
@@ -18,7 +18,7 @@ workload_manager=
         thread_count=1
     )
 ),
-metrics_monitor=
+runtime_monitor=
 (
     cache_hs_insert=
     (

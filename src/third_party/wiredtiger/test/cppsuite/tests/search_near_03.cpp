@@ -26,7 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/common/constants.h"
+#include "src/common/api_const.h"
 #include "src/common/random_generator.h"
 #include "src/main/test.h"
 
@@ -48,7 +48,7 @@ class search_near_03 : public test {
     public:
     search_near_03(const test_args &args) : test(args)
     {
-        init_operation_tracker();
+        init_tracking();
     }
 
     /*
@@ -63,7 +63,7 @@ class search_near_03 : public test {
      */
     static bool
     perform_unique_index_insertions(
-      thread_worker *tc, scoped_cursor &cursor, collection &coll, std::string &prefix_key)
+      thread_context *tc, scoped_cursor &cursor, collection &coll, std::string &prefix_key)
     {
         std::string ret_key;
         const char *key_tmp;
@@ -101,7 +101,7 @@ class search_near_03 : public test {
     }
 
     static void
-    populate_worker(thread_worker *tc)
+    populate_worker(thread_context *tc)
     {
         logger::log_msg(LOG_INFO, "Populate with thread id: " + std::to_string(tc->id));
 
@@ -117,16 +117,16 @@ class search_near_03 : public test {
         scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
         cursor->reconfigure(cursor.get(), "prefix_search=true");
         for (uint64_t count = 0; count < tc->key_count; ++count) {
-            tc->txn.begin();
+            tc->transaction.begin();
             /*
              * Generate the prefix key, and append a random generated key string based on the key
              * size configuration.
              */
             prefix_key = random_generator::instance().generate_random_string(tc->key_size);
             if (perform_unique_index_insertions(tc, cursor, coll, prefix_key)) {
-                tc->txn.commit();
+                tc->transaction.commit();
             } else {
-                tc->txn.rollback();
+                tc->transaction.rollback();
                 ++rollback_retries;
                 if (count > 0)
                     --count;
@@ -144,10 +144,10 @@ class search_near_03 : public test {
 
     void
     populate(database &database, timestamp_manager *tsm, configuration *config,
-      operation_tracker *op_tracker) override final
+      workload_tracking *tracking) override final
     {
         uint64_t collection_count, key_count, key_size;
-        std::vector<thread_worker *> workers;
+        std::vector<thread_context *> workers;
         thread_manager tm;
 
         /* Validate our config. */
@@ -173,8 +173,8 @@ class search_near_03 : public test {
 
         /* Spawn a populate thread for each collection in the database. */
         for (uint64_t i = 0; i < collection_count; ++i) {
-            thread_worker *tc = new thread_worker(i, thread_type::INSERT, config,
-              connection_manager::instance().create_session(), tsm, op_tracker, database);
+            thread_context *tc = new thread_context(i, thread_type::INSERT, config,
+              connection_manager::instance().create_session(), tsm, tracking, database);
             workers.push_back(tc);
             tm.add_thread(populate_worker, tc);
         }
@@ -217,7 +217,7 @@ class search_near_03 : public test {
     }
 
     void
-    insert_operation(thread_worker *tc) override final
+    insert_operation(thread_context *tc) override final
     {
         std::map<uint64_t, scoped_cursor> cursors;
         std::string prefix_key;
@@ -241,7 +241,7 @@ class search_near_03 : public test {
 
             /* Do a second lookup now that we know it exists. */
             auto &cursor = cursors[coll.id];
-            tc->txn.begin();
+            tc->transaction.begin();
             /*
              * Grab a random existing prefix and perform unique index insertion. We expect it to
              * fail to insert, because it should already exist.
@@ -256,12 +256,12 @@ class search_near_03 : public test {
                 ".");
             testutil_assert(!perform_unique_index_insertions(tc, cursor, coll, prefix_key));
             testutil_check(cursor->reset(cursor.get()));
-            tc->txn.rollback();
+            tc->transaction.rollback();
         }
     }
 
     void
-    read_operation(thread_worker *tc) override final
+    read_operation(thread_context *tc) override final
     {
         uint64_t key_count = 0;
         int ret = 0;
@@ -271,7 +271,7 @@ class search_near_03 : public test {
          * Each read thread will count the number of keys in each collection, and will double check
          * if the size of the table hasn't changed.
          */
-        tc->txn.begin();
+        tc->transaction.begin();
         while (tc->running()) {
             for (int i = 0; i < tc->db.get_collection_count(); i++) {
                 collection &coll = tc->db.get_collection(i);
@@ -296,6 +296,6 @@ class search_near_03 : public test {
             }
             key_count = 0;
         }
-        tc->txn.rollback();
+        tc->transaction.rollback();
     }
 };

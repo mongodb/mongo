@@ -26,47 +26,36 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef SCOPED_CURSOR_H
-#define SCOPED_CURSOR_H
-
-/* Following definitions are required in order to use printing format specifiers in C++. */
-#ifndef __STDC_LIMIT_MACROS
-#define __STDC_LIMIT_MACROS
-#endif
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
-#endif
+#ifndef OP_TRACKER_H
+#define OP_TRACKER_H
 
 #include <string>
 
-extern "C" {
-#include "wiredtiger.h"
-}
-
 namespace test_harness {
-class scoped_cursor {
+
+/*
+ * Class that tracks the performance of given operations and appends the stats to the perf file.
+ */
+class op_tracker {
     public:
-    scoped_cursor() = default;
-    scoped_cursor(WT_SESSION *session, const std::string &uri, const std::string &cfg);
+    explicit op_tracker(const std::string id, const std::string &test_name);
+    virtual ~op_tracker();
 
-    /* Moving is ok but copying is not. */
-    scoped_cursor(scoped_cursor &&other);
+    /* Calculates the average time and appends the stat to the perf file. */
+    void append_stats();
 
-    ~scoped_cursor();
-
-    scoped_cursor &operator=(scoped_cursor &&other);
-    scoped_cursor(const scoped_cursor &) = delete;
-    scoped_cursor &operator=(const scoped_cursor &) = delete;
-
-    void reinit(WT_SESSION *session, const std::string &uri, const std::string &cfg);
-
-    WT_CURSOR &operator*();
-    WT_CURSOR *operator->();
-
-    WT_CURSOR *get();
+    /*
+     * Does timing for a given operation and keeps track of how many operations have been executed
+     * as well as total time taken.
+     */
+    template <typename T> auto track(T lambda);
 
     private:
-    WT_CURSOR *_cursor = nullptr;
+    std::string _id;
+    std::string _test_name;
+    int _it_count;
+    uint64_t _total_time_taken;
 };
 } // namespace test_harness
+
 #endif

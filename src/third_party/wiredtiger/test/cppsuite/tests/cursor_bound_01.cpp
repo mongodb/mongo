@@ -26,7 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/common/constants.h"
+#include "src/common/api_const.h"
 #include "src/common/random_generator.h"
 #include "src/main/test.h"
 
@@ -99,7 +99,7 @@ class cursor_bound_01 : public test {
     {
         /* Track reverse_collator value as it is required for the custom comparator. */
         _reverse_collator_enabled = _config->get_bool(REVERSE_COLLATOR);
-        init_operation_tracker();
+        init_tracking();
     }
 
     bool
@@ -219,7 +219,7 @@ class cursor_bound_01 : public test {
      * inclusive configuration is also randomly set as well.
      */
     std::pair<bound, bound>
-    set_random_bounds(thread_worker *tc, scoped_cursor &range_cursor)
+    set_random_bounds(thread_context *tc, scoped_cursor &range_cursor)
     {
         int ret;
         bound lower_bound, upper_bound;
@@ -459,7 +459,7 @@ class cursor_bound_01 : public test {
     }
 
     void
-    insert_operation(thread_worker *tc) override final
+    insert_operation(thread_context *tc) override final
     {
         /* Each insert operation will insert new keys in the collections. */
         logger::log_msg(
@@ -470,24 +470,24 @@ class cursor_bound_01 : public test {
 
             collection &coll = tc->db.get_random_collection();
             scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
-            tc->txn.begin();
+            tc->transaction.begin();
 
-            while (tc->txn.active() && tc->running()) {
+            while (tc->transaction.active() && tc->running()) {
 
                 /* Generate a random key. */
                 auto key = random_generator::instance().generate_random_string(tc->key_size);
                 auto value = random_generator::instance().generate_random_string(tc->value_size);
                 /* Insert a key/value pair. */
                 if (tc->insert(cursor, coll.id, key, value)) {
-                    if (tc->txn.can_commit()) {
+                    if (tc->transaction.can_commit()) {
                         /* We are not checking the result of commit as it is not necessary. */
-                        if (tc->txn.commit())
+                        if (tc->transaction.commit())
                             rollback_retries = 0;
                         else
                             ++rollback_retries;
                     }
                 } else {
-                    tc->txn.rollback();
+                    tc->transaction.rollback();
                     ++rollback_retries;
                 }
                 testutil_assert(rollback_retries < MAX_ROLLBACKS);
@@ -497,8 +497,8 @@ class cursor_bound_01 : public test {
             }
 
             /* Rollback any transaction that could not commit before the end of the test. */
-            if (tc->txn.active())
-                tc->txn.rollback();
+            if (tc->transaction.active())
+                tc->transaction.rollback();
 
             /* Reset our cursor to avoid pinning content. */
             testutil_check(cursor->reset(cursor.get()));
@@ -506,7 +506,7 @@ class cursor_bound_01 : public test {
     }
 
     void
-    update_operation(thread_worker *tc) override final
+    update_operation(thread_context *tc) override final
     {
         /* Each update operation will update existing keys in the collections. */
         logger::log_msg(
@@ -519,9 +519,9 @@ class cursor_bound_01 : public test {
             scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
             scoped_cursor rnd_cursor =
               tc->session.open_scoped_cursor(coll.name, "next_random=true");
-            tc->txn.begin();
+            tc->transaction.begin();
 
-            while (tc->txn.active() && tc->running()) {
+            while (tc->transaction.active() && tc->running()) {
                 int ret = rnd_cursor->next(rnd_cursor.get());
 
                 /* It is possible not to find anything if the collection is empty. */
@@ -531,7 +531,7 @@ class cursor_bound_01 : public test {
                      * If we cannot find any record, finish the current transaction as we might be
                      * able to see new records after starting a new one.
                      */
-                    WT_IGNORE_RET_BOOL(tc->txn.commit());
+                    WT_IGNORE_RET_BOOL(tc->transaction.commit());
                     continue;
                 }
 
@@ -541,15 +541,15 @@ class cursor_bound_01 : public test {
                 /* Update the found key with a randomized value. */
                 auto value = random_generator::instance().generate_random_string(tc->value_size);
                 if (tc->update(cursor, coll.id, key, value)) {
-                    if (tc->txn.can_commit()) {
+                    if (tc->transaction.can_commit()) {
                         /* We are not checking the result of commit as it is not necessary. */
-                        if (tc->txn.commit())
+                        if (tc->transaction.commit())
                             rollback_retries = 0;
                         else
                             ++rollback_retries;
                     }
                 } else {
-                    tc->txn.rollback();
+                    tc->transaction.rollback();
                     ++rollback_retries;
                 }
                 testutil_assert(rollback_retries < MAX_ROLLBACKS);
@@ -559,8 +559,8 @@ class cursor_bound_01 : public test {
             }
 
             /* Rollback any transaction that could not commit before the end of the test. */
-            if (tc->txn.active())
-                tc->txn.rollback();
+            if (tc->transaction.active())
+                tc->transaction.rollback();
 
             /* Reset our cursor to avoid pinning content. */
             testutil_check(cursor->reset(cursor.get()));
@@ -568,7 +568,7 @@ class cursor_bound_01 : public test {
     }
 
     void
-    read_operation(thread_worker *tc) override final
+    read_operation(thread_context *tc) override final
     {
         /*
          * Each read operation will perform search nears with a range bounded cursor and a normal
@@ -610,10 +610,10 @@ class cursor_bound_01 : public test {
              * The oldest timestamp might move ahead and the reading timestamp might become invalid.
              * To tackle this issue, we round the timestamp to the oldest timestamp value.
              */
-            tc->txn.begin(
+            tc->transaction.begin(
               "roundup_timestamps=(read=true),read_timestamp=" + tc->tsm->decimal_to_hex(ts));
 
-            while (tc->txn.active() && tc->running()) {
+            while (tc->transaction.active() && tc->running()) {
                 /* Generate a random string. */
                 auto key_size = random_generator::instance().generate_integer(
                   static_cast<int64_t>(1), tc->key_size);
@@ -629,19 +629,19 @@ class cursor_bound_01 : public test {
                 validate_bound_search_near(
                   ret, exact, range_cursor, normal_cursor, srch_key, lower_bound, upper_bound);
 
-                tc->txn.add_op();
-                tc->txn.try_rollback();
+                tc->transaction.add_op();
+                tc->transaction.try_rollback();
                 tc->sleep();
             }
             testutil_check(range_cursor->reset(range_cursor.get()));
         }
         /* Roll back the last transaction if still active now the work is finished. */
-        if (tc->txn.active())
-            tc->txn.rollback();
+        if (tc->transaction.active())
+            tc->transaction.rollback();
     }
 
     void
-    custom_operation(thread_worker *tc) override final
+    custom_operation(thread_context *tc) override final
     {
         /*
          * Each custom operation will use the range bounded cursor to traverse through existing keys
@@ -682,20 +682,20 @@ class cursor_bound_01 : public test {
              * The oldest timestamp might move ahead and the reading timestamp might become invalid.
              * To tackle this issue, we round the timestamp to the oldest timestamp value.
              */
-            tc->txn.begin(
+            tc->transaction.begin(
               "roundup_timestamps=(read=true),read_timestamp=" + tc->tsm->decimal_to_hex(ts));
-            while (tc->txn.active() && tc->running()) {
+            while (tc->transaction.active() && tc->running()) {
 
                 cursor_traversal(range_cursor, normal_cursor, lower_bound, upper_bound, true);
                 cursor_traversal(range_cursor, normal_cursor, lower_bound, upper_bound, false);
-                tc->txn.add_op();
-                tc->txn.try_rollback();
+                tc->transaction.add_op();
+                tc->transaction.try_rollback();
                 tc->sleep();
             }
             testutil_check(range_cursor->reset(range_cursor.get()));
         }
         /* Roll back the last transaction if still active now the work is finished. */
-        if (tc->txn.active())
-            tc->txn.rollback();
+        if (tc->transaction.active())
+            tc->transaction.rollback();
     }
 };

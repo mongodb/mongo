@@ -26,23 +26,54 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "collection.h"
+#include "throttle.h"
+
+#include <thread>
+
+#include "src/common/api_const.h"
+
+extern "C" {
+#include "test_util.h"
+}
 
 namespace test_harness {
-collection::collection(const uint64_t id, const uint64_t key_count, const std::string &name)
-    : name(name), id(id), _key_count(key_count)
+throttle::throttle(const std::string &throttle_rate)
 {
+    std::string magnitude;
+    uint64_t multiplier = 0;
+    /*
+     * Find the ms, s, or m in the string. Searching for "ms" first as the following two searches
+     * would match as well.
+     */
+    size_t pos = throttle_rate.find("ms");
+    if (pos != std::string::npos)
+        multiplier = 1;
+    else {
+        pos = throttle_rate.find("s");
+        if (pos != std::string::npos)
+            multiplier = 1000;
+        else {
+            pos = throttle_rate.find("m");
+            if (pos != std::string::npos)
+                multiplier = 60 * 1000;
+            else
+                testutil_die(-1, "no rate specifier given");
+        }
+    }
+    magnitude = throttle_rate.substr(0, pos);
+    /* This will throw if it can't cast, which is fine. */
+    _ms = std::stoi(magnitude) * multiplier;
 }
 
-uint64_t
-collection::get_key_count() const
-{
-    return (_key_count);
-}
+/* Use optional and default to 1s per op in case something doesn't define this. */
+throttle::throttle(configuration *config) : throttle(config->get_optional_string(OP_RATE, "1s")) {}
+
+/* Default to a second per operation. */
+throttle::throttle() : throttle("1s") {}
 
 void
-collection::increase_key_count(uint64_t increment)
+throttle::sleep()
 {
-    _key_count += increment;
+    std::this_thread::sleep_for(std::chrono::milliseconds(_ms));
 }
 } // namespace test_harness

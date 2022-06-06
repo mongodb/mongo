@@ -26,12 +26,11 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef OPERATION_TRACKER_H
-#define OPERATION_TRACKER_H
+#ifndef WORKLOAD_TRACKING_H
+#define WORKLOAD_TRACKING_H
 
 #include "component.h"
-#include "src/storage/scoped_cursor.h"
-#include "src/storage/scoped_session.h"
+#include "src/storage/scoped_types.h"
 #include "timestamp_manager.h"
 
 /*
@@ -56,10 +55,10 @@ namespace test_harness {
 enum class tracking_operation { CREATE_COLLECTION, CUSTOM, DELETE_COLLECTION, DELETE_KEY, INSERT };
 
 /* Class used to track operations performed on collections */
-class operation_tracker : public component {
+class workload_tracking : public component {
     public:
-    operation_tracker(configuration *_config, const bool use_compression, timestamp_manager &tsm);
-    virtual ~operation_tracker() = default;
+    workload_tracking(configuration *_config, const bool use_compression, timestamp_manager &tsm);
+    virtual ~workload_tracking() = default;
 
     const std::string &get_schema_table_name() const;
     const std::string &get_operation_table_name() const;

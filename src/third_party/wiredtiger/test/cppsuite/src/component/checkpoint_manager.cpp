@@ -26,41 +26,38 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "metrics_writer.h"
+#include "checkpoint_manager.h"
+
+#include "src/common/api_const.h"
+#include "src/common/logger.h"
+#include "src/main/configuration.h"
+#include "src/storage/connection_manager.h"
+
+extern "C" {
+#include "test_util.h"
+}
 
 namespace test_harness {
-void
-metrics_writer::add_stat(const std::string &stat_string)
+checkpoint_manager::checkpoint_manager(configuration *configuration)
+    : component(CHECKPOINT_MANAGER, configuration)
 {
-    std::lock_guard<std::mutex> lg(_stat_mutex);
-    _stats.push_back(stat_string);
 }
 
 void
-metrics_writer::output_perf_file(const std::string &test_name)
+checkpoint_manager::load()
 {
-    std::ofstream perf_file;
-    std::string stat_info = "[{\"info\":{\"test_name\": \"" + test_name + "\"},\"metrics\": [";
+    /* Load the general component things. */
+    component::load();
 
-    perf_file.open(test_name + ".json");
-
-    for (const auto &stat : _stats)
-        stat_info += stat + ",";
-
-    /* Remove last extra comma. */
-    if (stat_info.back() == ',')
-        stat_info.pop_back();
-
-    perf_file << stat_info << "]}]";
-    perf_file.close();
+    /* Create session that we'll use for checkpointing. */
+    if (_enabled)
+        _session = connection_manager::instance().create_session();
 }
 
-metrics_writer &
-metrics_writer::instance()
+void
+checkpoint_manager::do_work()
 {
-    static metrics_writer _instance;
-    return (_instance);
+    logger::log_msg(LOG_INFO, "Running checkpoint");
+    testutil_check(_session->checkpoint(_session.get(), nullptr));
 }
-
-metrics_writer::metrics_writer() {}
 } // namespace test_harness

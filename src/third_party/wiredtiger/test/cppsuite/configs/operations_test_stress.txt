@@ -2,7 +2,12 @@
 duration_seconds=1500,
 cache_size_mb=1000,
 compression_enabled=true,
-metrics_monitor=
+checkpoint_manager=
+(
+    enabled=true,
+    op_rate=30s
+),
+runtime_monitor=
 (
     stat_db_size=
     (
@@ -22,12 +27,8 @@ timestamp_manager=
     op_rate=1s,
     stable_lag=10
 ),
-workload_manager=
+workload_generator=
 (
-    checkpoint_config=
-    (
-        op_rate=30s,
-    ),
     populate_config=
     (
         collection_count=500,
@@ -65,9 +66,9 @@ workload_manager=
         value_size=10000
     )
 ),
-operation_tracker=
+workload_tracking=
 (
-    # FIXME-WT-8640 Enable the tracker again once we have moved to a different host or modified the
+    # FIXME-WT-8640 Enable the tracking again once we have moved to a different host or modified the
     # workload.
     enabled=false,
     # Run after checkpoint most of the time.

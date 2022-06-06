@@ -9,7 +9,12 @@ statistics_config=
     type=all,
     enable_logging=true
 ),
-metrics_monitor=
+checkpoint_manager=
+(
+    enabled=true,
+    op_rate=60s
+),
+runtime_monitor=
 (
     # Seems to insert around 477K records. Give it +-20K margin.
     cache_hs_insert=
@@ -46,12 +51,8 @@ timestamp_manager=
     oldest_lag=2,
     stable_lag=5
 ),
-workload_manager=
+workload_generator=
 (
-    checkpoint_config=
-    (
-        op_rate=60s,
-    ),
     populate_config=
     (
         collection_count=10,
@@ -76,7 +77,7 @@ workload_manager=
         value_size=100000
     )
 ),
-operation_tracker=
+workload_tracking=
 (
     enabled=true,
     op_rate=20s

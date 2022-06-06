@@ -26,30 +26,66 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef OPERATION_CONFIGURATION_H
-#define OPERATION_CONFIGURATION_H
+#ifndef WORKLOAD_GENERATOR_H
+#define WORKLOAD_GENERATOR_H
 
 #include <functional>
 
-#include "configuration.h"
-#include "database_operation.h"
-#include "thread_worker.h"
+#include "src/common/thread_manager.h"
+#include "src/main/configuration.h"
+#include "src/main/database_operation.h"
+#include "src/main/thread_context.h"
 
 namespace test_harness {
 /*
  * Helper class to enable scalable operation types in the database_operation.
  */
-class operation_configuration {
+class operation_config {
     public:
-    operation_configuration(configuration *config, thread_type type);
+    explicit operation_config(configuration *config, thread_type type);
 
     /* Returns a function pointer to the member function of the supplied database operation. */
-    std::function<void(thread_worker *)> get_func(database_operation *dbo);
+    std::function<void(thread_context *)> get_func(database_operation *dbo);
 
     public:
     configuration *config;
     const thread_type type;
     const int64_t thread_count;
 };
+
+/*
+ * Class that can execute operations based on a given configuration.
+ */
+class workload_generator : public component {
+    public:
+    explicit workload_generator(configuration *configuration, database_operation *db_operation,
+      timestamp_manager *timestamp_manager, database &database);
+
+    ~workload_generator();
+
+    /* Delete the copy constructor and the assignment operator. */
+    workload_generator(const workload_generator &) = delete;
+    workload_generator &operator=(const workload_generator &) = delete;
+
+    /* Do the work of the main part of the workload. */
+    void run() override final;
+    void finish() override final;
+
+    database &get_database();
+    bool db_populated() const;
+
+    /* Set the tracking component. */
+    void set_workload_tracking(workload_tracking *tracking);
+
+    private:
+    database &_database;
+    database_operation *_database_operation = nullptr;
+    thread_manager _thread_manager;
+    timestamp_manager *_timestamp_manager = nullptr;
+    workload_tracking *_tracking = nullptr;
+    std::vector<thread_context *> _workers;
+    bool _db_populated = false;
+};
 } // namespace test_harness
+
 #endif

@@ -26,27 +26,28 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef CACHE_LIMIT_H
-#define CACHE_LIMIT_H
+#ifndef CHECKPOINT_MANAGER_H
+#define CHECKPOINT_MANAGER_H
 
-#include <string>
+#include "component.h"
 
-#include "src/main/configuration.h"
-#include "src/storage/scoped_cursor.h"
-#include "statistics.h"
+#include "src/storage/scoped_types.h"
 
 namespace test_harness {
-
-class cache_limit : public statistics {
+class checkpoint_manager : public component {
     public:
-    cache_limit(configuration &config, const std::string &name);
-    virtual ~cache_limit() = default;
+    explicit checkpoint_manager(configuration *configuration);
+    virtual ~checkpoint_manager() = default;
 
-    void check(scoped_cursor &cursor) override final;
-    std::string get_value_str(scoped_cursor &cursor) override final;
+    /* Delete the copy constructor and the assignment operator. */
+    checkpoint_manager(const checkpoint_manager &) = delete;
+    checkpoint_manager &operator=(const checkpoint_manager &) = delete;
+
+    void load() override final;
+    void do_work() override final;
 
     private:
-    double get_cache_value(scoped_cursor &cursor);
+    scoped_session _session;
 };
 } // namespace test_harness
 

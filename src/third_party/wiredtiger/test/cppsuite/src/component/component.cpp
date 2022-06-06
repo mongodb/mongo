@@ -28,9 +28,7 @@
 
 #include "component.h"
 
-#include <thread>
-
-#include "src/common/constants.h"
+#include "src/common/api_const.h"
 #include "src/common/logger.h"
 
 namespace test_harness {
@@ -48,13 +46,9 @@ component::load()
 {
     logger::log_msg(LOG_INFO, "Loading component: " + _name);
     _enabled = _config->get_optional_bool(ENABLED, true);
+    _throttle = throttle(_config);
     /* If we're not enabled we shouldn't be running. */
     _running = _enabled;
-
-    if (!_enabled)
-        return;
-
-    _sleep_time_ms = _config->get_throttle_ms();
 }
 
 void
@@ -63,7 +57,7 @@ component::run()
     logger::log_msg(LOG_INFO, "Running component: " + _name);
     while (_enabled && _running) {
         do_work();
-        std::this_thread::sleep_for(std::chrono::milliseconds(_sleep_time_ms));
+        _throttle.sleep();
     }
 }
 

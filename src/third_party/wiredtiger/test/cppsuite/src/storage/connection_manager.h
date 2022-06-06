@@ -39,7 +39,7 @@
 
 #include <mutex>
 
-#include "scoped_session.h"
+#include "scoped_types.h"
 
 namespace test_harness {
 /*
