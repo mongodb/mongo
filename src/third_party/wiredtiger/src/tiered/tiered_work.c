@@ -95,6 +95,46 @@ __wt_tiered_pop_work(
 }
 
 /*
+ * __wt_tiered_flush_work_wait --
+ *     Wait for all flush work units in the work queue to be processed.
+ */
+int
+__wt_tiered_flush_work_wait(WT_SESSION_IMPL *session, uint32_t timeout)
+{
+    struct timespec now, start;
+    WT_CONNECTION_IMPL *conn;
+    WT_TIERED_WORK_UNIT *entry;
+    bool done, found;
+
+    conn = S2C(session);
+    __wt_epoch(session, &start);
+    now = start;
+    done = found = false;
+
+    while (!done) {
+        found = false;
+        __wt_spin_lock(session, &conn->tiered_lock);
+        TAILQ_FOREACH (entry, &conn->tieredqh, q) {
+            if (FLD_ISSET(entry->type, WT_TIERED_WORK_FLUSH))
+                found = true;
+            break;
+        }
+        __wt_spin_unlock(session, &conn->tiered_lock);
+        if (found) {
+            __wt_cond_signal(session, conn->tiered_cond);
+            __wt_sleep(0, 10 * WT_THOUSAND);
+            __wt_epoch(session, &now);
+        }
+        /* We are done if we don't find any work units or exceed the timeout. */
+        done = !found || (WT_TIMEDIFF_SEC(now, start) > timeout);
+    }
+    if (!found)
+        WT_RET(__wt_msg(
+          session, "tiered_flush_work_wait: timed out after %" PRIu32 " seconds", timeout));
+    return (0);
+}
+
+/*
  * __wt_tiered_get_flush_finish --
  *     Get the first flush_finish work unit from the queue. The id information cannot change between
  *     our caller and here. The caller is responsible for freeing the work unit.

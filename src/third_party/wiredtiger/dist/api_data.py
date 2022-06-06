@@ -1756,6 +1756,9 @@ methods = {
 'WT_CONNECTION.add_extractor' : Method([]),
 'WT_CONNECTION.add_storage_source' : Method([]),
 'WT_CONNECTION.close' : Method([
+    Config('final_flush', 'false', r'''
+        wait for final flush_tier to copy objects''',
+        type='boolean', undoc=True),
     Config('leak_memory', 'false', r'''
         don't free memory during close''',
         type='boolean'),

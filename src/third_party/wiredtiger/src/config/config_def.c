@@ -3,7 +3,7 @@
 #include "wt_internal.h"
 
 static const WT_CONFIG_CHECK confchk_WT_CONNECTION_close[] = {
-  {"leak_memory", "boolean", NULL, NULL, NULL, 0},
+  {"final_flush", "boolean", NULL, NULL, NULL, 0}, {"leak_memory", "boolean", NULL, NULL, NULL, 0},
   {"use_timestamp", "boolean", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_WT_CONNECTION_debug_info[] = {
@@ -1170,7 +1170,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
   {"WT_CONNECTION.add_compressor", "", NULL, 0}, {"WT_CONNECTION.add_data_source", "", NULL, 0},
   {"WT_CONNECTION.add_encryptor", "", NULL, 0}, {"WT_CONNECTION.add_extractor", "", NULL, 0},
   {"WT_CONNECTION.add_storage_source", "", NULL, 0},
-  {"WT_CONNECTION.close", "leak_memory=false,use_timestamp=true", confchk_WT_CONNECTION_close, 2},
+  {"WT_CONNECTION.close", "final_flush=false,leak_memory=false,use_timestamp=true",
+    confchk_WT_CONNECTION_close, 3},
   {"WT_CONNECTION.debug_info",
     "cache=false,cursors=false,handles=false,log=false,sessions=false"
     ",txn=false",
