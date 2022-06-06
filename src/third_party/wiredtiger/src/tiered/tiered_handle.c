@@ -401,6 +401,29 @@ err:
 }
 
 /*
+ * __tiered_cleanup_tiers --
+ *     Cleanup and dereference all tiers.
+ */
+static void
+__tiered_cleanup_tiers(WT_SESSION_IMPL *session, WT_TIERED *tiered, bool final)
+{
+    uint32_t i;
+
+    for (i = 0; i < WT_TIERED_MAX_TIERS; i++) {
+        /*
+         * Do not use tier's dhandle if it's a final cleanup, it may be invalid.
+         * __wt_conn_dhandle_discard is responsible for the proper destruction of all the dhandles.
+         */
+        if (tiered->tiers[i].tier != NULL && !final)
+            WT_WITH_DHANDLE(session, tiered->tiers[i].tier, __wt_cursor_dhandle_decr_use(session));
+
+        tiered->tiers[i].tier = NULL;
+        tiered->tiers[i].flags = 0;
+        __wt_free(session, tiered->tiers[i].name);
+    }
+}
+
+/*
  * __tiered_update_dhandles --
  *     Update the dhandle list for a tiered structure after object switching.
  */
@@ -433,13 +456,7 @@ err:
     __wt_verbose(session, WT_VERB_TIERED, "UPDATE_DH: DONE ret %d", ret);
     if (ret != 0) {
         /* Need to undo our dhandles. Close and dereference all. */
-        for (i = 0; i < WT_TIERED_MAX_TIERS; ++i) {
-            if (tiered->tiers[i].tier != NULL)
-                (void)__wt_atomic_subi32(&tiered->tiers[i].tier->session_inuse, 1);
-            __wt_free(session, tiered->tiers[i].name);
-            tiered->tiers[i].tier = NULL;
-            tiered->tiers[i].name = NULL;
-        }
+        __tiered_cleanup_tiers(session, tiered, false);
     }
     return (ret);
 }
@@ -792,12 +809,33 @@ __wt_tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
+ * __tiered_cleanup --
+ *     Cleanup a tiered data handle.
+ */
+static void
+__tiered_cleanup(WT_SESSION_IMPL *session, WT_TIERED *tiered, bool final)
+{
+    /* Cleanup and dereference all tiers.  */
+    __tiered_cleanup_tiers(session, tiered, final);
+
+    /* Cleanup other fields in tiered structure. */
+    __wt_free(session, tiered->key_format);
+    __wt_free(session, tiered->value_format);
+    __wt_free(session, tiered->obj_config);
+    tiered->current_id = tiered->next_id = tiered->oldest_id = 0;
+    tiered->flags = 0;
+    tiered->bstorage = NULL;
+}
+
+/*
  * __wt_tiered_close --
  *     Close a tiered data handle.
  */
 int
-__wt_tiered_close(WT_SESSION_IMPL *session)
+__wt_tiered_close(WT_SESSION_IMPL *session, WT_TIERED *tiered, bool final)
 {
+    __tiered_cleanup(session, tiered, final);
+
     return (__wt_btree_close(session));
 }
 
@@ -806,24 +844,10 @@ __wt_tiered_close(WT_SESSION_IMPL *session)
  *     Discard a tiered data handle.
  */
 int
-__wt_tiered_discard(WT_SESSION_IMPL *session, WT_TIERED *tiered)
+__wt_tiered_discard(WT_SESSION_IMPL *session, WT_TIERED *tiered, bool final)
 {
-    uint32_t i;
-
-    __wt_free(session, tiered->key_format);
-    __wt_free(session, tiered->value_format);
-    __wt_free(session, tiered->obj_config);
+    __tiered_cleanup(session, tiered, final);
     __wt_verbose(session, WT_VERB_TIERED, "%s", "TIERED_CLOSE: called");
-    /*
-     * For the moment we don't have anything to return. But all the callers currently expect a real
-     * return value from a close function. And this may become more complex later. During connection
-     * close the other dhandles may be closed and freed before this dhandle. So just free the names.
-     */
-    for (i = 0; i < WT_TIERED_MAX_TIERS; i++) {
-        if (tiered->tiers[i].name != NULL)
-            __wt_free(session, tiered->tiers[i].name);
-    }
-
     return (__wt_btree_discard(session));
 }
 
