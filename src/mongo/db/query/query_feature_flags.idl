@@ -155,4 +155,4 @@ feature_flags:
     featureFlagSbeFull:
       description: "Feature flag to enable using SBE for a larger number of queries"
       cpp_varname: gFeatureFlagSbeFull
-      default: false
+      default: true 
