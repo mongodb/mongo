@@ -1073,6 +1073,10 @@ protected:
         soln->setRoot(std::move(root));
 
         auto execTree = buildExecutableTree(*soln);
+        sbe::DebugPrinter p;
+
+        std::cout << p.print(*execTree.first.get()) << std::endl;
+
         auto result = makeResult();
         result->emplace(std::move(execTree), std::move(soln));
 
