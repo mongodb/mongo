@@ -1163,7 +1163,7 @@ bool isCoveredNullQuery(const CanonicalQuery& query,
         // Note that it is not possible to project onto dotted paths of _id here, since they may be
         // null or missing, and the index cannot differentiate between the two cases, so we would
         // still need a FETCH stage.
-        return projFields.size() == 1 && projFields[0] == "_id";
+        return projFields.size() == 1 && *projFields.begin() == "_id";
     }
 
     return false;

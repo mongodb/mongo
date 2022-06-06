@@ -180,8 +180,7 @@ std::pair<DepsTracker, DepsTracker> computeDeps(const QueryPlannerParams& params
         outputDeps.needWholeDocument = true;
         return {std::move(filterDeps), std::move(outputDeps)};
     }
-    auto projectionFields = query.getProj()->getRequiredFields();
-    outputDeps.fields.insert(projectionFields.begin(), projectionFields.end());
+    outputDeps.fields = query.getProj()->getRequiredFields();
     if (auto sortPattern = query.getSortPattern()) {
         sortPattern->addDependencies(&outputDeps);
     }

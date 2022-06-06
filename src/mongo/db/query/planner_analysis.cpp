@@ -33,6 +33,7 @@
 #include <set>
 #include <vector>
 
+#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/index/expression_params.h"
@@ -322,9 +323,9 @@ void geoSkipValidationOn(const std::set<StringData>& twoDSphereFields,
 /**
  * If any field is missing from the list of fields the projection wants, we are not covered.
  */
-auto providesAllFields(const vector<std::string>& fields, const QuerySolutionNode& solnRoot) {
-    for (size_t i = 0; i < fields.size(); ++i) {
-        if (!solnRoot.hasField(fields[i]))
+auto providesAllFields(const std::set<std::string>& fields, const QuerySolutionNode& solnRoot) {
+    for (auto&& field : fields) {
+        if (!solnRoot.hasField(field))
             return false;
     }
     return true;
@@ -540,6 +541,20 @@ bool canUseSimpleSort(const QuerySolutionNode& solnRoot,
         !(plannerParams.options & QueryPlannerParams::PRESERVE_RECORD_ID);
 }
 
+/**
+ * Returns true if 'setS' is a non-strict subset of 'setT'.
+ *
+ * The types of the sets are permitted to be different to allow checking something with compatible
+ * but different types e.g. std::set<std::string> and StringDataUnorderedMap.
+ */
+template <typename SetL, typename SetR>
+bool isSubset(const SetL& setL, const SetR& setR) {
+    return setL.size() <= setR.size() &&
+        std::all_of(setL.begin(), setL.end(), [&setR](auto&& lElem) {
+               return setR.find(lElem) != setR.end();
+           });
+}
+
 void removeProjectSimpleBelowGroupRecursive(QuerySolutionNode* solnRoot) {
     if (solnRoot == nullptr) {
         return;
@@ -562,19 +577,16 @@ void removeProjectSimpleBelowGroupRecursive(QuerySolutionNode* solnRoot) {
             // projection, it would have type PROJECTION_DEFAULT.
             return;
         }
-
         // Check to see if the projectNode's field set is a super set of the groupNodes.
-        auto projectNode = static_cast<ProjectionNodeSimple*>(projectNodeCandidate);
-        auto projectFields = projectNode->proj.getRequiredFields();
-        if (!std::any_of(projectFields.begin(), projectFields.end(), [groupNode](auto&& fld) {
-                return groupNode->requiredFields.contains(fld);
-            })) {
+        if (!isSubset(groupNode->requiredFields,
+                      checked_cast<ProjectionNodeSimple*>(projectNodeCandidate)
+                          ->proj.getRequiredFields())) {
             // The dependency set of the GROUP stage is wider than the projectNode field set.
             return;
-        };
+        }
 
         // Attach the projectNode's child to the groupNode's child.
-        groupNode->children[0] = std::move(projectNode->children[0]);
+        groupNode->children[0] = std::move(projectNodeCandidate->children[0]);
     } else {
         // Keep traversing the tree in search of a GROUP stage.
         for (size_t i = 0; i < solnRoot->children.size(); ++i) {
