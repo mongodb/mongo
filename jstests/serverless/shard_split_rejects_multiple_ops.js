@@ -23,6 +23,8 @@ function commitShardSplitConcurrently() {
     const donorPrimary = test.donor.getPrimary();
 
     let fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterBlocking");
+    let fpAfterDecision =
+        configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterDecision");
 
     const operation = test.createSplitOperation(tenantIds);
     const splitThread = operation.commitAsync();
@@ -41,20 +43,9 @@ function commitShardSplitConcurrently() {
 
     fp.off();
 
-    splitThread.join();
-
-    // fails because there is an ongoing shard split that's about to complete.
-    assert.commandFailedWithCode(donorPrimary.adminCommand({
-        commitShardSplit: 1,
-        migrationId: UUID(),
-        tenantIds: ["tenant8", "tenant9"],
-        recipientTagName: test.recipientTagName,
-        recipientSetName: test.recipientSetName
-    }),
-                                 117);  // ConflictingOperationInProgress
-
-    const forgetCmdObj = {forgetShardSplit: 1, migrationId: operation.migrationId};
-    assert.commandWorked(test.getDonorPrimary().adminCommand(forgetCmdObj));
+    // blocks before processing any `forgetShardSplit` command.
+    fpAfterDecision.wait();
+    let forgetThread = operation.forgetAsync();
 
     // fails because the commitShardSplit hasn't be garbage collected yet.
     assert.commandFailedWithCode(donorPrimary.adminCommand({
@@ -65,6 +56,9 @@ function commitShardSplitConcurrently() {
         recipientSetName: test.recipientSetName
     }),
                                  117);  // ConflictingOperationInProgress
+    fpAfterDecision.off();
+    splitThread.join();
+    forgetThread.join();
 
     test.cleanupSuccesfulCommitted(operation.migrationId, tenantIds);
 
@@ -81,39 +75,5 @@ function commitShardSplitConcurrently() {
     test.stop();
 }
 
-function commitShardSplitAfterAbort() {
-    const test = new BasicServerlessTest({
-        recipientTagName,
-        recipientSetName,
-        nodeOptions: {
-            // Set a short timeout to test that the operation times out waiting for replication
-            setParameter: "shardSplitTimeoutMS=2000"
-        }
-    });
-    test.addRecipientNodes();
-
-    const migrationId = UUID();
-    const admin = test.donor.getPrimary().getDB("admin");
-    let fp = configureFailPoint(admin, "pauseShardSplitAfterBlocking");
-
-    assert.commandFailed(admin.runCommand(
-        {commitShardSplit: 1, migrationId, recipientTagName, recipientSetName, tenantIds}));
-
-    fp.wait();
-
-    // fails because the commitShardSplit hasn't be garbage collected yet.
-    assert.commandFailedWithCode(admin.runCommand({
-        commitShardSplit: 1,
-        migrationId: UUID(),
-        tenantIds: tenantIds,
-        recipientTagName: test.recipientTagName,
-        recipientSetName: test.recipientSetName
-    }),
-                                 117);  // ConflictingOperationInProgress
-
-    test.stop();
-}
-
 commitShardSplitConcurrently();
-commitShardSplitAfterAbort();
 })();

@@ -2,13 +2,9 @@ load("jstests/replsets/rslib.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
 
-const runForgetShardSplitAsync = function(rstArgs, migrationIdString) {
-    load("jstests/replsets/rslib.js");
-
-    const donorRst = createRst(rstArgs, true);
-    const admin = donorRst.getPrimary().getDB("admin");
-
-    return admin.runCommand({forgetShardSplit: 1, migrationId: UUID(migrationIdString)});
+const runForgetShardSplitAsync = function(primaryHost, migrationIdString) {
+    const primary = new Mongo(primaryHost);
+    return primary.adminCommand({forgetShardSplit: 1, migrationId: UUID(migrationIdString)});
 };
 
 const runAbortShardSplitAsync = function(rstArgs, migrationIdString) {
@@ -162,11 +158,11 @@ class ShardSplitOperation {
     forgetAsync() {
         jsTestLog("Running forgetShardSplit command asynchronously");
 
-        const donorRstArgs = createRstArgs(this.donorSet);
+        const primary = this.basicServerlessTest.getDonorPrimary();
         const migrationIdString = extractUUIDFromObject(this.migrationId);
 
         const forgetMigrationThread =
-            new Thread(runForgetShardSplitAsync, donorRstArgs, migrationIdString);
+            new Thread(runForgetShardSplitAsync, primary.host, migrationIdString);
 
         forgetMigrationThread.start();
 
