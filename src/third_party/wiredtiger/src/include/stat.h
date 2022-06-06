@@ -769,6 +769,8 @@ struct __wt_connection_stats {
     int64_t session_table_compact_timeout;
     int64_t session_table_create_fail;
     int64_t session_table_create_success;
+    int64_t session_table_create_import_fail;
+    int64_t session_table_create_import_success;
     int64_t session_table_drop_fail;
     int64_t session_table_drop_success;
     int64_t session_table_rename_fail;
