@@ -37,17 +37,17 @@ using namespace test_harness;
  * pre-existing data. It may not trigger a cleanup on the data file but should result in data
  * getting cleaned up from the history store.
  *
- * This is then tracked using the associated statistic which can be found in the runtime_monitor.
+ * This is then tracked using the associated statistic which can be found in the metrics_monitor.
  */
 class hs_cleanup : public test {
     public:
     hs_cleanup(const test_args &args) : test(args)
     {
-        init_tracking();
+        init_operation_tracker();
     }
 
     void
-    update_operation(thread_context *tc) override final
+    update_operation(thread_worker *tc) override final
     {
         logger::log_msg(
           LOG_INFO, type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.");
@@ -78,8 +78,8 @@ class hs_cleanup : public test {
                      * call can happen outside the context of a transaction. Assert that we are in
                      * one if we got a rollback.
                      */
-                    testutil_check(tc->transaction.can_rollback());
-                    tc->transaction.rollback();
+                    testutil_check(tc->txn.can_rollback());
+                    tc->txn.rollback();
                     continue;
                 }
                 testutil_die(ret, "Unexpected error returned from cursor->next()");
@@ -88,7 +88,7 @@ class hs_cleanup : public test {
             testutil_check(cursor->get_key(cursor.get(), &key_tmp));
 
             /* Start a transaction if possible. */
-            tc->transaction.try_begin();
+            tc->txn.try_begin();
 
             /*
              * The retrieved key needs to be passed inside the update function. However, the update
@@ -98,20 +98,20 @@ class hs_cleanup : public test {
             std::string value =
               random_generator::instance().generate_pseudo_random_string(tc->value_size);
             if (tc->update(cursor, coll.id, key_tmp, value)) {
-                if (tc->transaction.can_commit()) {
-                    if (tc->transaction.commit())
+                if (tc->txn.can_commit()) {
+                    if (tc->txn.commit())
                         rollback_retries = 0;
                     else
                         ++rollback_retries;
                 }
             } else {
-                tc->transaction.rollback();
+                tc->txn.rollback();
                 ++rollback_retries;
             }
             testutil_assert(rollback_retries < MAX_ROLLBACKS);
         }
         /* Ensure our last transaction is resolved. */
-        if (tc->transaction.active())
-            tc->transaction.rollback();
+        if (tc->txn.active())
+            tc->txn.rollback();
     }
 };

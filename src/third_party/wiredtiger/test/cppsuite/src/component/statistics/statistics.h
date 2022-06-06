@@ -26,21 +26,20 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef RUNTIME_MONITOR_H
-#define RUNTIME_MONITOR_H
+#ifndef STATISTICS_H
+#define STATISTICS_H
 
-#include <memory>
+#include <string>
 
 #include "src/main/configuration.h"
-#include "src/main/database_model.h"
-#include "src/storage/scoped_types.h"
+#include "src/storage/scoped_cursor.h"
 
 namespace test_harness {
 
 class statistics {
     public:
     statistics() = default;
-    explicit statistics(configuration &config, const std::string &stat_name, int stat_field);
+    statistics(configuration &config, const std::string &stat_name, int stat_field);
     virtual ~statistics() = default;
 
     /* Check that the statistics are within bounds. */
@@ -66,67 +65,6 @@ class statistics {
     bool postrun;
     bool runtime;
     bool save;
-};
-
-class cache_limit_statistic : public statistics {
-    public:
-    explicit cache_limit_statistic(configuration &config, const std::string &name);
-    virtual ~cache_limit_statistic() = default;
-
-    void check(scoped_cursor &cursor) override final;
-    std::string get_value_str(scoped_cursor &cursor) override final;
-
-    private:
-    double get_cache_value(scoped_cursor &cursor);
-};
-
-class db_size_statistic : public statistics {
-    public:
-    explicit db_size_statistic(configuration &config, const std::string &name, database &database);
-    virtual ~db_size_statistic() = default;
-
-    /* Don't need the stat cursor for these. */
-    void check(scoped_cursor &) override final;
-    std::string get_value_str(scoped_cursor &) override final;
-
-    private:
-    size_t get_db_size() const;
-    const std::vector<std::string> get_file_names() const;
-
-    private:
-    database &_database;
-};
-
-/*
- * The runtime monitor class is designed to track various statistics or other runtime signals
- * relevant to the given workload.
- */
-class runtime_monitor : public component {
-    public:
-    static void get_stat(scoped_cursor &, int, int64_t *);
-
-    public:
-    explicit runtime_monitor(
-      const std::string &test_name, configuration *config, database &database);
-    virtual ~runtime_monitor() = default;
-
-    /* Delete the copy constructor and the assignment operator. */
-    runtime_monitor(const runtime_monitor &) = delete;
-    runtime_monitor &operator=(const runtime_monitor &) = delete;
-
-    void load() override final;
-    void do_work() override final;
-    void finish() override final;
-
-    private:
-    void append_stats();
-
-    private:
-    scoped_session _session;
-    scoped_cursor _cursor;
-    const std::string _test_name;
-    std::vector<std::unique_ptr<statistics>> _stats;
-    database &_database;
 };
 } // namespace test_harness
 

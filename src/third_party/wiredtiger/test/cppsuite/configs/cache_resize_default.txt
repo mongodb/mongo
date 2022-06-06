@@ -12,7 +12,7 @@ timestamp_manager=
     # We don't need the timestamp manager to update the timestamps in this test.
     enabled=false,
 ),
-workload_generator=
+workload_manager=
 (
     custom_config=
     (
@@ -32,7 +32,7 @@ workload_generator=
         collection_count=1
     ),
 ),
-workload_tracking=
+operation_tracker=
 (
     # Timestamp, transaction id,
     tracking_key_format=QQ,

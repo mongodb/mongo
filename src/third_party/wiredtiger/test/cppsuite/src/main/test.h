@@ -32,19 +32,12 @@
 #include <string>
 
 #include "database_operation.h"
-#include "src/component/checkpoint_manager.h"
-#include "src/component/runtime_monitor.h"
-#include "src/component/workload_generator.h"
+#include "src/component/metrics_monitor.h"
+#include "src/component/workload_manager.h"
 #include "src/storage/connection_manager.h"
-#include "src/storage/scoped_connection.h"
 
 namespace test_harness {
-class test_args {
-    public:
-    test_args(const std::string &config, const std::string &name, const std::string &wt_open_config)
-        : test_config(config), test_name(name), wt_open_config(wt_open_config)
-    {
-    }
+struct test_args {
     const std::string test_config;
     const std::string test_name;
     const std::string wt_open_config;
@@ -62,36 +55,25 @@ class test : public database_operation {
     test(const test &) = delete;
     test &operator=(const test &) = delete;
 
-    /* Initialize the tracking component and its dependencies. */
-    void init_tracking(workload_tracking *tracking = nullptr);
+    /* Initialize the operation tracker component and its dependencies. */
+    void init_operation_tracker(operation_tracker *op_tracker = nullptr);
 
     /*
      * The primary run function that most tests will be able to utilize without much other code.
      */
     virtual void run();
 
-    /*
-     * Getters for all the major components, used if a test wants more control over the test
-     * program.
-     */
-    workload_generator *get_workload_generator();
-    runtime_monitor *get_runtime_monitor();
-    timestamp_manager *get_timestamp_manager();
-    thread_manager *get_thread_manager();
-
     protected:
     const test_args &_args;
     configuration *_config;
     timestamp_manager *_timestamp_manager = nullptr;
-    workload_tracking *_workload_tracking = nullptr;
+    operation_tracker *_operation_tracker = nullptr;
 
     private:
     std::vector<component *> _components;
-    checkpoint_manager *_checkpoint_manager = nullptr;
-    runtime_monitor *_runtime_monitor = nullptr;
+    metrics_monitor *_metrics_monitor = nullptr;
     thread_manager *_thread_manager = nullptr;
-    workload_generator *_workload_generator = nullptr;
-    std::shared_ptr<scoped_connection> _scoped_conn;
+    workload_manager *_workload_manager = nullptr;
     database _database;
 };
 } // namespace test_harness

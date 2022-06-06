@@ -35,6 +35,12 @@ extern "C" {
 }
 
 namespace test_harness {
+
+connection_manager::~connection_manager()
+{
+    close();
+}
+
 connection_manager &
 connection_manager::instance()
 {

@@ -26,31 +26,37 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef SCOPED_CONNECTION_H
-#define SCOPED_CONNECTION_H
-
-/* Following definitions are required in order to use printing format specifiers in C++. */
-#ifndef __STDC_LIMIT_MACROS
-#define __STDC_LIMIT_MACROS
-#endif
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
-#endif
+#ifndef EXECUTION_TIMER_H
+#define EXECUTION_TIMER_H
 
 #include <string>
 
-extern "C" {
-#include "test_util.h"
-}
-
 namespace test_harness {
 
-class scoped_connection {
+/*
+ * Class that measures the average execution time of a given function and adds the stats to the
+ * statistics writer when destroyed.
+ */
+class execution_timer {
     public:
-    explicit scoped_connection(
-      const std::string &db_conn_config, const std::string &home = DEFAULT_DIR);
-    ~scoped_connection();
-};
+    execution_timer(const std::string id, const std::string &test_name);
+    virtual ~execution_timer();
 
+    /* Calculates the average time and appends the stat to the perf file. */
+    void append_stats();
+
+    /*
+     * Does timing for a given operation and keeps track of how many operations have been executed
+     * as well as total time taken.
+     */
+    template <typename T> auto track(T lambda);
+
+    private:
+    std::string _id;
+    std::string _test_name;
+    int _it_count;
+    uint64_t _total_time_taken;
+};
 } // namespace test_harness
+
 #endif

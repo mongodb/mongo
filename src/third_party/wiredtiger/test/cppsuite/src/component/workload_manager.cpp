@@ -26,95 +26,72 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "workload_generator.h"
+#include "workload_manager.h"
 
-#include "src/common/api_const.h"
+#include "src/common/constants.h"
 #include "src/common/logger.h"
+#include "src/main/operation_configuration.h"
 #include "src/storage/connection_manager.h"
 
 namespace test_harness {
-/* operation_config class implementation */
-operation_config::operation_config(configuration *config, thread_type type)
-    : config(config), type(type), thread_count(config->get_int(THREAD_COUNT))
-{
-}
-
-std::function<void(thread_context *)>
-operation_config::get_func(database_operation *dbo)
-{
-    switch (type) {
-    case thread_type::CUSTOM:
-        return (std::bind(&database_operation::custom_operation, dbo, std::placeholders::_1));
-    case thread_type::INSERT:
-        return (std::bind(&database_operation::insert_operation, dbo, std::placeholders::_1));
-    case thread_type::READ:
-        return (std::bind(&database_operation::read_operation, dbo, std::placeholders::_1));
-    case thread_type::REMOVE:
-        return (std::bind(&database_operation::remove_operation, dbo, std::placeholders::_1));
-    case thread_type::UPDATE:
-        return (std::bind(&database_operation::update_operation, dbo, std::placeholders::_1));
-    default:
-        /* This may cause a separate testutil_die in type_string but that should be okay. */
-        testutil_die(EINVAL, "unexpected thread_type: %s", type_string(type).c_str());
-    }
-}
-
-/* workload_generator class implementation */
-workload_generator::workload_generator(configuration *configuration,
-  database_operation *db_operation, timestamp_manager *timestamp_manager, database &database)
-    : component(WORKLOAD_GENERATOR, configuration), _database(database),
+workload_manager::workload_manager(configuration *configuration, database_operation *db_operation,
+  timestamp_manager *timestamp_manager, database &database)
+    : component(WORKLOAD_MANAGER, configuration), _database(database),
       _database_operation(db_operation), _timestamp_manager(timestamp_manager)
 {
 }
 
-workload_generator::~workload_generator()
+workload_manager::~workload_manager()
 {
     for (auto &it : _workers)
         delete it;
 }
 
 void
-workload_generator::set_workload_tracking(workload_tracking *tracking)
+workload_manager::set_operation_tracker(operation_tracker *op_tracker)
 {
-    testutil_assert(_tracking == nullptr);
-    _tracking = tracking;
+    testutil_assert(_operation_tracker == nullptr);
+    _operation_tracker = op_tracker;
 }
 
 void
-workload_generator::run()
+workload_manager::run()
 {
     configuration *populate_config;
-    std::vector<operation_config> operation_configs;
+    std::vector<operation_configuration> operation_configs;
     uint64_t thread_id = 0;
 
     /* Retrieve useful parameters from the test configuration. */
+    operation_configs.push_back(operation_configuration(
+      _config->get_subconfig(CHECKPOINT_OP_CONFIG), thread_type::CHECKPOINT));
     operation_configs.push_back(
-      operation_config(_config->get_subconfig(CUSTOM_OP_CONFIG), thread_type::CUSTOM));
+      operation_configuration(_config->get_subconfig(CUSTOM_OP_CONFIG), thread_type::CUSTOM));
     operation_configs.push_back(
-      operation_config(_config->get_subconfig(INSERT_OP_CONFIG), thread_type::INSERT));
+      operation_configuration(_config->get_subconfig(INSERT_OP_CONFIG), thread_type::INSERT));
     operation_configs.push_back(
-      operation_config(_config->get_subconfig(READ_OP_CONFIG), thread_type::READ));
+      operation_configuration(_config->get_subconfig(READ_OP_CONFIG), thread_type::READ));
     operation_configs.push_back(
-      operation_config(_config->get_subconfig(REMOVE_OP_CONFIG), thread_type::REMOVE));
+      operation_configuration(_config->get_subconfig(REMOVE_OP_CONFIG), thread_type::REMOVE));
     operation_configs.push_back(
-      operation_config(_config->get_subconfig(UPDATE_OP_CONFIG), thread_type::UPDATE));
+      operation_configuration(_config->get_subconfig(UPDATE_OP_CONFIG), thread_type::UPDATE));
     populate_config = _config->get_subconfig(POPULATE_CONFIG);
 
     /* Populate the database. */
-    _database_operation->populate(_database, _timestamp_manager, populate_config, _tracking);
+    _database_operation->populate(
+      _database, _timestamp_manager, populate_config, _operation_tracker);
     _db_populated = true;
     delete populate_config;
 
-    /* Generate threads to execute read operations on the collections. */
+    /* Generate threads to execute the different operations on the collections. */
     for (auto &it : operation_configs) {
         if (it.thread_count != 0)
             logger::log_msg(LOG_INFO,
-              "Workload_generator: Creating " + std::to_string(it.thread_count) + " " +
+              "workload_manager: Creating " + std::to_string(it.thread_count) + " " +
                 type_string(it.type) + " threads.");
         for (size_t i = 0; i < it.thread_count && _running; ++i) {
-            thread_context *tc = new thread_context(thread_id++, it.type, it.config,
-              connection_manager::instance().create_session(), _timestamp_manager, _tracking,
-              _database);
+            thread_worker *tc = new thread_worker(thread_id++, it.type, it.config,
+              connection_manager::instance().create_session(), _timestamp_manager,
+              _operation_tracker, _database);
             _workers.push_back(tc);
             _thread_manager.add_thread(it.get_func(_database_operation), tc);
         }
@@ -133,7 +110,7 @@ workload_generator::run()
 }
 
 void
-workload_generator::finish()
+workload_manager::finish()
 {
     component::finish();
     for (const auto &it : _workers)
@@ -143,13 +120,13 @@ workload_generator::finish()
 }
 
 database &
-workload_generator::get_database()
+workload_manager::get_database()
 {
     return (_database);
 }
 
 bool
-workload_generator::db_populated() const
+workload_manager::db_populated() const
 {
     return (_db_populated);
 }

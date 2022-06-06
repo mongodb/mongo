@@ -33,12 +33,11 @@
  * test_template.cpp and create_script.sh.
  */
 
-#include "src/common/api_const.h"
+#include "src/common/constants.h"
 #include "src/common/logger.h"
 #include "src/common/random_generator.h"
 #include "src/common/thread_manager.h"
 #include "src/storage/connection_manager.h"
-#include "src/storage/scoped_connection.h"
 
 extern "C" {
 #include "wiredtiger.h"
@@ -100,11 +99,9 @@ main(int argc, char *argv[])
     /* Create a connection, set the cache size and specify the home directory. */
     const std::string conn_config = CONNECTION_CREATE + ",cache_size=500MB";
     const std::string home_dir = std::string(DEFAULT_DIR) + '_' + progname;
-    /*
-     * A smart pointer is used here so that the connection can automatically be closed by the
-     * scoped_connection's destructor when the test finishes and the pointer goes out of scope.
-     */
-    std::unique_ptr<scoped_connection> scoped_conn(new scoped_connection(conn_config, home_dir));
+
+    /* Create connection. */
+    connection_manager::instance().create(conn_config, home_dir);
     WT_CONNECTION *conn = connection_manager::instance().get_connection();
 
     /* Open different sessions. */

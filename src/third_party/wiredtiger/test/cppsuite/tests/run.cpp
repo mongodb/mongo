@@ -124,7 +124,8 @@ run_test(const std::string &test_name, const std::string &config, const std::str
     int error_code = 0;
 
     test_harness::logger::log_msg(LOG_TRACE, "Configuration\t:" + config);
-    test_harness::test_args args(config, test_name, wt_open_config);
+    test_harness::test_args args = {
+      .test_config = config, .test_name = test_name, .wt_open_config = wt_open_config};
 
     if (test_name == "bounded_cursor_perf")
         bounded_cursor_perf(args).run();
@@ -244,6 +245,13 @@ main(int argc, char *argv[])
                     current_cfg = cfg;
 
                 error_code = run_test(current_test_name, current_cfg, wt_open_config);
+                /*
+                 * The connection is usually closed using the destructor of the connection manager.
+                 * Because it is a singleton and we are executing all tests, we are not going
+                 * through its destructor between each test, we need to close the connection
+                 * manually before starting the next test.
+                 */
+                connection_manager::instance().close();
                 if (error_code != 0)
                     break;
             }

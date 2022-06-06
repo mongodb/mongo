@@ -26,68 +26,35 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "component.h"
-
-#include <thread>
+#include "operation_configuration.h"
 
 #include "src/common/constants.h"
-#include "src/common/logger.h"
 
 namespace test_harness {
-component::component(const std::string &name, configuration *config) : _config(config), _name(name)
+operation_configuration::operation_configuration(configuration *config, thread_type type)
+    : config(config), type(type), thread_count(config->get_int(THREAD_COUNT))
 {
 }
 
-component::~component()
+std::function<void(thread_worker *)>
+operation_configuration::get_func(database_operation *dbo)
 {
-    delete _config;
-}
-
-void
-component::load()
-{
-    logger::log_msg(LOG_INFO, "Loading component: " + _name);
-    _enabled = _config->get_optional_bool(ENABLED, true);
-    /* If we're not enabled we shouldn't be running. */
-    _running = _enabled;
-
-    if (!_enabled)
-        return;
-
-    _sleep_time_ms = _config->get_throttle_ms();
-}
-
-void
-component::run()
-{
-    logger::log_msg(LOG_INFO, "Running component: " + _name);
-    while (_enabled && _running) {
-        do_work();
-        std::this_thread::sleep_for(std::chrono::milliseconds(_sleep_time_ms));
+    switch (type) {
+    case thread_type::CHECKPOINT:
+        return (std::bind(&database_operation::checkpoint_operation, dbo, std::placeholders::_1));
+    case thread_type::CUSTOM:
+        return (std::bind(&database_operation::custom_operation, dbo, std::placeholders::_1));
+    case thread_type::INSERT:
+        return (std::bind(&database_operation::insert_operation, dbo, std::placeholders::_1));
+    case thread_type::READ:
+        return (std::bind(&database_operation::read_operation, dbo, std::placeholders::_1));
+    case thread_type::REMOVE:
+        return (std::bind(&database_operation::remove_operation, dbo, std::placeholders::_1));
+    case thread_type::UPDATE:
+        return (std::bind(&database_operation::update_operation, dbo, std::placeholders::_1));
+    default:
+        /* This may cause a separate testutil_die in type_string but that should be okay. */
+        testutil_die(EINVAL, "unexpected thread_type: %s", type_string(type).c_str());
     }
-}
-
-void
-component::do_work()
-{
-    /* Not implemented. */
-}
-
-bool
-component::enabled() const
-{
-    return (_enabled);
-}
-
-void
-component::end_run()
-{
-    _running = false;
-}
-
-void
-component::finish()
-{
-    logger::log_msg(LOG_INFO, "Running finish stage of component: " + _name);
 }
 } // namespace test_harness

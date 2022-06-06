@@ -26,68 +26,50 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "component.h"
+#ifndef WORKLOAD_MANAGER_H
+#define WORKLOAD_MANAGER_H
 
-#include <thread>
+#include <functional>
 
-#include "src/common/constants.h"
-#include "src/common/logger.h"
+#include "src/common/thread_manager.h"
+#include "src/main/configuration.h"
+#include "src/main/database_operation.h"
+#include "src/main/thread_worker.h"
 
 namespace test_harness {
-component::component(const std::string &name, configuration *config) : _config(config), _name(name)
-{
-}
+/*
+ * Class that can execute operations based on a given configuration.
+ */
+class workload_manager : public component {
+    public:
+    workload_manager(configuration *configuration, database_operation *db_operation,
+      timestamp_manager *timestamp_manager, database &database);
 
-component::~component()
-{
-    delete _config;
-}
+    ~workload_manager();
 
-void
-component::load()
-{
-    logger::log_msg(LOG_INFO, "Loading component: " + _name);
-    _enabled = _config->get_optional_bool(ENABLED, true);
-    /* If we're not enabled we shouldn't be running. */
-    _running = _enabled;
+    /* Delete the copy constructor and the assignment operator. */
+    workload_manager(const workload_manager &) = delete;
+    workload_manager &operator=(const workload_manager &) = delete;
 
-    if (!_enabled)
-        return;
+    /* Do the work of the main part of the workload. */
+    void run() override final;
+    void finish() override final;
 
-    _sleep_time_ms = _config->get_throttle_ms();
-}
+    database &get_database();
+    bool db_populated() const;
 
-void
-component::run()
-{
-    logger::log_msg(LOG_INFO, "Running component: " + _name);
-    while (_enabled && _running) {
-        do_work();
-        std::this_thread::sleep_for(std::chrono::milliseconds(_sleep_time_ms));
-    }
-}
+    /* Set the tracking component. */
+    void set_operation_tracker(operation_tracker *op_tracker);
 
-void
-component::do_work()
-{
-    /* Not implemented. */
-}
-
-bool
-component::enabled() const
-{
-    return (_enabled);
-}
-
-void
-component::end_run()
-{
-    _running = false;
-}
-
-void
-component::finish()
-{
-    logger::log_msg(LOG_INFO, "Running finish stage of component: " + _name);
-}
+    private:
+    database &_database;
+    database_operation *_database_operation = nullptr;
+    thread_manager _thread_manager;
+    timestamp_manager *_timestamp_manager = nullptr;
+    operation_tracker *_operation_tracker = nullptr;
+    std::vector<thread_worker *> _workers;
+    bool _db_populated = false;
+};
 } // namespace test_harness
+
+#endif

@@ -4,7 +4,7 @@
 
 duration_seconds=1800,
 cache_size_mb=1000,
-workload_generator=
+workload_manager=
 (
     populate_config=
     (

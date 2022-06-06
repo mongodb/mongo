@@ -26,19 +26,18 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <iostream>
-
-#include "src/common/api_const.h"
+#include "src/common/constants.h"
+#include "src/common/logger.h"
 #include "src/main/test.h"
 
 namespace test_harness {
 /* Defines what data is written to the tracking table for use in custom validation. */
-class tracking_table_template : public workload_tracking {
+class operation_tracker_template : public operation_tracker {
 
     public:
-    tracking_table_template(
+    operation_tracker_template(
       configuration *config, const bool use_compression, timestamp_manager &tsm)
-        : workload_tracking(config, use_compression, tsm)
+        : operation_tracker(config, use_compression, tsm)
     {
     }
 
@@ -48,7 +47,7 @@ class tracking_table_template : public workload_tracking {
       wt_timestamp_t ts, scoped_cursor &op_track_cursor) override final
     {
         /* You can replace this call to define your own tracking table contents. */
-        workload_tracking::set_tracking_cursor(
+        operation_tracker::set_tracking_cursor(
           txn_id, operation, collection_id, key, value, ts, op_track_cursor);
     }
 };
@@ -61,8 +60,9 @@ class test_template : public test {
     public:
     test_template(const test_args &args) : test(args)
     {
-        init_tracking(new tracking_table_template(_config->get_subconfig(WORKLOAD_TRACKING),
-          _config->get_bool(COMPRESSION_ENABLED), *_timestamp_manager));
+        init_operation_tracker(
+          new operation_tracker_template(_config->get_subconfig(OPERATION_TRACKER),
+            _config->get_bool(COMPRESSION_ENABLED), *_timestamp_manager));
     }
 
     void
@@ -73,45 +73,51 @@ class test_template : public test {
     }
 
     void
-    populate(database &, timestamp_manager *, configuration *, workload_tracking *) override final
+    populate(database &, timestamp_manager *, configuration *, operation_tracker *) override final
     {
-        std::cout << "populate: nothing done." << std::endl;
+        logger::log_msg(LOG_WARN, "populate: nothing done");
     }
 
     void
-    custom_operation(thread_context *) override final
+    checkpoint_operation(thread_worker *) override final
     {
-        std::cout << "custom_operation: nothing done." << std::endl;
+        logger::log_msg(LOG_WARN, "checkpoint_operation: nothing done");
     }
 
     void
-    insert_operation(thread_context *) override final
+    custom_operation(thread_worker *) override final
     {
-        std::cout << "insert_operation: nothing done." << std::endl;
+        logger::log_msg(LOG_WARN, "custom_operation: nothing done");
     }
 
     void
-    read_operation(thread_context *) override final
+    insert_operation(thread_worker *) override final
     {
-        std::cout << "read_operation: nothing done." << std::endl;
+        logger::log_msg(LOG_WARN, "insert_operation: nothing done");
     }
 
     void
-    remove_operation(thread_context *) override final
+    read_operation(thread_worker *) override final
     {
-        std::cout << "remove_operation: nothing done." << std::endl;
+        logger::log_msg(LOG_WARN, "read_operation: nothing done");
     }
 
     void
-    update_operation(thread_context *) override final
+    remove_operation(thread_worker *) override final
     {
-        std::cout << "update_operation: nothing done." << std::endl;
+        logger::log_msg(LOG_WARN, "remove_operation: nothing done");
+    }
+
+    void
+    update_operation(thread_worker *) override final
+    {
+        logger::log_msg(LOG_WARN, "update_operation: nothing done");
     }
 
     void
     validate(const std::string &, const std::string &, const std::vector<uint64_t> &) override final
     {
-        std::cout << "validate: nothing done." << std::endl;
+        logger::log_msg(LOG_WARN, "validate: nothing done");
     }
 };
 

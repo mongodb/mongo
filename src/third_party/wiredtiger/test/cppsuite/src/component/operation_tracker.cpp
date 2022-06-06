@@ -26,16 +26,16 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "workload_tracking.h"
+#include "operation_tracker.h"
 
-#include "src/common/api_const.h"
+#include "src/common/constants.h"
 #include "src/common/logger.h"
 #include "src/storage/connection_manager.h"
 
 namespace test_harness {
-workload_tracking::workload_tracking(
+operation_tracker::operation_tracker(
   configuration *_config, const bool use_compression, timestamp_manager &tsm)
-    : component(WORKLOAD_TRACKING, _config), _operation_table_name(TABLE_OPERATION_TRACKING),
+    : component(OPERATION_TRACKER, _config), _operation_table_name(TABLE_OPERATION_TRACKING),
       _schema_table_config(SCHEMA_TRACKING_TABLE_CONFIG), _schema_table_name(TABLE_SCHEMA_TRACKING),
       _use_compression(use_compression), _tsm(tsm)
 {
@@ -44,19 +44,19 @@ workload_tracking::workload_tracking(
 }
 
 const std::string &
-workload_tracking::get_schema_table_name() const
+operation_tracker::get_schema_table_name() const
 {
     return (_schema_table_name);
 }
 
 const std::string &
-workload_tracking::get_operation_table_name() const
+operation_tracker::get_operation_table_name() const
 {
     return (_operation_table_name);
 }
 
 void
-workload_tracking::load()
+operation_tracker::load()
 {
     component::load();
 
@@ -85,7 +85,7 @@ workload_tracking::load()
 }
 
 void
-workload_tracking::do_work()
+operation_tracker::do_work()
 {
     WT_DECL_RET;
     wt_timestamp_t ts, oldest_ts;
@@ -172,7 +172,7 @@ workload_tracking::do_work()
 }
 
 void
-workload_tracking::save_schema_operation(
+operation_tracker::save_schema_operation(
   const tracking_operation &operation, const uint64_t &collection_id, wt_timestamp_t ts)
 {
     std::string error_message;
@@ -193,7 +193,7 @@ workload_tracking::save_schema_operation(
 }
 
 int
-workload_tracking::save_operation(const uint64_t txn_id, const tracking_operation &operation,
+operation_tracker::save_operation(const uint64_t txn_id, const tracking_operation &operation,
   const uint64_t &collection_id, const std::string &key, const std::string &value,
   wt_timestamp_t ts, scoped_cursor &op_track_cursor)
 {
@@ -218,7 +218,7 @@ workload_tracking::save_operation(const uint64_t txn_id, const tracking_operatio
 
 /* Note that the transaction id is not used in the default implementation of the tracking table. */
 void
-workload_tracking::set_tracking_cursor(const uint64_t txn_id, const tracking_operation &operation,
+operation_tracker::set_tracking_cursor(const uint64_t txn_id, const tracking_operation &operation,
   const uint64_t &collection_id, const std::string &key, const std::string &value,
   wt_timestamp_t ts, scoped_cursor &op_track_cursor)
 {
