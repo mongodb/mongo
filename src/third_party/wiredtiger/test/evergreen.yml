@@ -168,7 +168,7 @@ functions:
             mkdir -p cmake_build
             cd cmake_build
             $CMAKE -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_clang.cmake -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1 \
-              -DHAVE_DIAGNOSTIC=1 ${NON_BARRIER_DIAGNOSTIC_YIELDS|} -DCMAKE_BUILD_TYPE=ASan \
+              -DENABLE_STRICT=1 DHAVE_DIAGNOSTIC=1 ${NON_BARRIER_DIAGNOSTIC_YIELDS|} -DCMAKE_BUILD_TYPE=ASan \
               -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 ${configure_python_setting|} \
               -G "${cmake_generator|Ninja}" ../.
           fi
@@ -191,7 +191,7 @@ functions:
             # CC is set to the system default "clang" binary here as a workaround to mongo toolchains not supporting ASAN on Ubuntu PPC.
             $CMAKE -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1 \
               -DHAVE_DIAGNOSTIC=1 ${NON_BARRIER_DIAGNOSTIC_YIELDS|} -DCMAKE_BUILD_TYPE=ASan \
-              -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 ${configure_python_setting|} \
+              -DENABLE_STRICT=1 -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 ${configure_python_setting|} \
               -G "${cmake_generator|Ninja}" ../.
           fi
     - *make_wiredtiger
@@ -2491,6 +2491,7 @@ tasks:
           posix_configure_flags:
             -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
             -DHAVE_DIAGNOSTIC=1
+            -DENABLE_STRICT=1 
             -DWITH_PIC=1
             -DCMAKE_BUILD_TYPE=ASan
             -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1
@@ -2753,6 +2754,7 @@ tasks:
             -DCMAKE_C_FLAGS="-ggdb"
             -DENABLE_PYTHON=1
             -DWITH_PIC=1
+            -DENABLE_STRICT=1
       - command: shell.exec
         params:
           working_dir: "wiredtiger/bench/workgen/runner"
@@ -2788,6 +2790,7 @@ tasks:
           posix_configure_flags:
             -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
             -DHAVE_DIAGNOSTIC=1
+            -DENABLE_STRICT=1
             -DWITH_PIC=1
             -DHAVE_BUILTIN_EXTENSION_LZ4=1
             -DHAVE_BUILTIN_EXTENSION_SNAPPY=1
