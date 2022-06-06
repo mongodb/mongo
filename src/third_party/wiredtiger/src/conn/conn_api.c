@@ -2207,7 +2207,7 @@ __wt_verbose_dump_sessions(WT_SESSION_IMPL *session, bool show_cursors)
                         WT_ERR(__wt_buf_catfmt(session, buf, ", OVERWRITE"));
                     WT_ERR(__wt_msg(session, "  %s", (const char *)buf->data));
                 }
-                WT_ERR(__wt_msg(session, "  Flags: 0x%" PRIx32, cursor->flags));
+                WT_ERR(__wt_msg(session, "  Flags: 0x%" PRIx64, cursor->flags));
                 WT_ERR(__wt_msg(session, "  Key_format: %s, Value_format: %s",
                   cursor->key_format == NULL ? "EMPTY" : cursor->key_format,
                   cursor->value_format == NULL ? "EMPTY" : cursor->value_format));

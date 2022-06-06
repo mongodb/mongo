@@ -8,8 +8,6 @@ set(ENABLE_STATIC ON CACHE BOOL "" FORCE)
 set(ENABLE_SHARED OFF CACHE BOOL "" FORCE)
 set(WITH_PIC ON CACHE BOOL "" FORCE)
 
-# Compile as C code .
-add_compile_options(/TC)
 # Inline expansion.
 add_compile_options(/Ob1)
 # Enable string pooling.

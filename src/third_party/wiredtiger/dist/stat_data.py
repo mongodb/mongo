@@ -338,6 +338,7 @@ conn_stats = [
     CursorStat('cursor_reopen', 'cursors reused from cache'),
     CursorStat('cursor_reserve', 'cursor reserve calls'),
     CursorStat('cursor_reset', 'cursor reset calls'),
+    CursorStat('cursor_bounds_reset', 'cursor bounds cleared from reset'),
     CursorStat('cursor_restart', 'cursor operation restarted'),
     CursorStat('cursor_search', 'cursor search calls'),
     CursorStat('cursor_search_hs', 'cursor search history store calls'),
@@ -749,6 +750,7 @@ dsrc_stats = [
     CursorStat('cursor_reopen', 'cache cursors reuse count'),
     CursorStat('cursor_reserve', 'reserve calls'),
     CursorStat('cursor_reset', 'reset calls'),
+    CursorStat('cursor_bounds_reset', 'cursor bounds cleared from reset'),
     CursorStat('cursor_restart', 'operation restarted'),
     CursorStat('cursor_search', 'search calls'),
     CursorStat('cursor_search_hs', 'search history store calls'),
@@ -878,6 +880,32 @@ conn_dsrc_stats = [
     CursorStat('cursor_reposition_failed', 'Total number of times cursor fails to temporarily release pinned page to encourage eviction of hot or large page'),
     CursorStat('cursor_search_near_prefix_fast_paths', 'Total number of times a search near has exited due to prefix config'),
     CursorStat('cursor_skip_hs_cur_position', 'Total number of entries skipped to position the history store cursor'),
+
+    ##########################################
+    # Cursor API error statistics
+    ##########################################
+    CursorStat('cursor_bound_error', 'cursor bound calls that return an error'),
+    CursorStat('cursor_cache_error', 'cursor cache calls that return an error'),
+    CursorStat('cursor_close_error', 'cursor close calls that return an error'),
+    CursorStat('cursor_compare_error', 'cursor compare calls that return an error'),
+    CursorStat('cursor_equals_error', 'cursor equals calls that return an error'),
+    CursorStat('cursor_get_key_error', 'cursor get key calls that return an error'),
+    CursorStat('cursor_get_value_error', 'cursor get key calls that return an error'),
+    CursorStat('cursor_insert_check_error', 'cursor insert check calls that return an error'),
+    CursorStat('cursor_insert_error', 'cursor insert calls that return an error'),
+    CursorStat('cursor_largest_key_error', 'cursor largest key calls that return an error'),
+    CursorStat('cursor_modify_error', 'cursor modify calls that return an error'),
+    CursorStat('cursor_next_error', 'cursor next calls that return an error'),
+    CursorStat('cursor_next_random_error', 'cursor random next calls that return an error'),
+    CursorStat('cursor_prev_error', 'cursor prev calls that return an error'),
+    CursorStat('cursor_reconfigure_error', 'cursor reconfigure calls that return an error'),
+    CursorStat('cursor_reset_error', 'cursor reset calls that return an error'),
+    CursorStat('cursor_reserve_error', 'cursor reserve calls that return an error'),
+    CursorStat('cursor_reopen_error', 'cursor reopen calls that return an error'),
+    CursorStat('cursor_remove_error', 'cursor remove calls that return an error'),
+    CursorStat('cursor_search_near_error', 'cursor search near calls that return an error'),
+    CursorStat('cursor_search_error', 'cursor search calls that return an error'),
+    CursorStat('cursor_update_error', 'cursor update calls that return an error'),
 
     ##########################################
     # Checkpoint cleanup statistics

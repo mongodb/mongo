@@ -26,9 +26,11 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "test_harness/test.h"
-#include "test_harness/util/api_const.h"
-#include "test_harness/workload/random_generator.h"
+#include "src/common/api_const.h"
+#include "src/common/random_generator.h"
+#include "src/main/test.h"
+
+using namespace test_harness;
 
 /*
  * In this test, we want to verify the usage of the cursor bound API and check that the cursor
@@ -43,8 +45,6 @@
  * random bounds set. Both next() and prev() calls with bounds set is verified against the
  * default cursor next() and prev() calls.
  */
-namespace test_harness {
-
 class cursor_bound_01 : public test {
     /* Class helper to represent the lower and uppers bounds for the range cursor. */
     class bound {
@@ -605,7 +605,7 @@ class cursor_bound_01 : public test {
             }
 
             scoped_cursor normal_cursor = tc->session.open_scoped_cursor(coll.name);
-            wt_timestamp_t ts = tc->tsm->get_random_ts();
+            wt_timestamp_t ts = tc->tsm->get_valid_read_ts();
             /*
              * The oldest timestamp might move ahead and the reading timestamp might become invalid.
              * To tackle this issue, we round the timestamp to the oldest timestamp value.
@@ -677,7 +677,7 @@ class cursor_bound_01 : public test {
             }
 
             scoped_cursor normal_cursor = tc->session.open_scoped_cursor(coll.name);
-            wt_timestamp_t ts = tc->tsm->get_random_ts();
+            wt_timestamp_t ts = tc->tsm->get_valid_read_ts();
             /*
              * The oldest timestamp might move ahead and the reading timestamp might become invalid.
              * To tackle this issue, we round the timestamp to the oldest timestamp value.
@@ -699,5 +699,3 @@ class cursor_bound_01 : public test {
             tc->transaction.rollback();
     }
 };
-
-} // namespace test_harness

@@ -44,6 +44,7 @@
  * Emulate <sys/stat.h>
  */
 #define mkdir(path, mode) _mkdir(path)
+#define S_ISDIR(mode) ((mode & _S_IFDIR) == _S_IFDIR)
 
 /*
  * Emulate <sys/time.h>

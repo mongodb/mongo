@@ -26,9 +26,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "test_harness/test.h"
-#include "test_harness/util/api_const.h"
-#include "test_harness/workload/random_generator.h"
+#include "src/common/api_const.h"
+#include "src/common/random_generator.h"
+#include "src/main/test.h"
 
 using namespace test_harness;
 
@@ -39,16 +39,16 @@ using namespace test_harness;
  *  - M threads will execute search_near calls with prefix enabled using random prefixes as well.
  * Each search_near call with prefix enabled is verified using the default search_near.
  */
-class search_near_02 : public test_harness::test {
+class search_near_02 : public test {
     public:
-    search_near_02(const test_harness::test_args &args) : test(args)
+    search_near_02(const test_args &args) : test(args)
     {
         init_tracking();
     }
 
     void
-    populate(test_harness::database &database, test_harness::timestamp_manager *,
-      test_harness::configuration *config, test_harness::workload_tracking *) override final
+    populate(database &database, timestamp_manager *, configuration *config,
+      workload_tracking *) override final
     {
         /*
          * The populate phase only creates empty collections. The number of collections is defined
@@ -66,7 +66,7 @@ class search_near_02 : public test_harness::test {
     }
 
     void
-    insert_operation(test_harness::thread_context *tc) override final
+    insert_operation(thread_context *tc) override final
     {
         /* Each insert operation will insert new keys in the collections. */
         logger::log_msg(
@@ -145,7 +145,7 @@ class search_near_02 : public test_harness::test {
     }
 
     void
-    read_operation(test_harness::thread_context *tc) override final
+    read_operation(thread_context *tc) override final
     {
         /*
          * Each read operation performs search_near calls with and without prefix enabled on random
@@ -176,7 +176,7 @@ class search_near_02 : public test_harness::test {
 
             auto &cursor_prefix = cursors[coll.id];
 
-            wt_timestamp_t ts = tc->tsm->get_random_ts();
+            wt_timestamp_t ts = tc->tsm->get_valid_read_ts();
             /*
              * The oldest timestamp might move ahead and the reading timestamp might become invalid.
              * To tackle this issue, we round the timestamp to the oldest timestamp value.

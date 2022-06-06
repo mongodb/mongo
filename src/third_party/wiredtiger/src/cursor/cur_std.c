@@ -367,7 +367,7 @@ __wt_cursor_set_raw_value(WT_CURSOR *cursor, WT_ITEM *value)
  *     WT_CURSOR->get_key worker function.
  */
 int
-__wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
+__wt_cursor_get_keyv(WT_CURSOR *cursor, uint64_t flags, va_list ap)
 {
     WT_DECL_RET;
     WT_ITEM *key;
@@ -407,7 +407,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
     }
 
 err:
-    API_END_RET(session, ret);
+    API_END_RET_STAT(session, ret, cursor_get_key);
 }
 
 /*
@@ -415,7 +415,7 @@ err:
  *     WT_CURSOR->set_key default implementation.
  */
 int
-__wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
+__wt_cursor_set_keyv(WT_CURSOR *cursor, uint64_t flags, va_list ap)
 {
     WT_DECL_RET;
     WT_ITEM *buf, *item, tmp;
@@ -546,7 +546,7 @@ __wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap)
         ret = __wt_struct_unpackv(session, cursor->value.data, cursor->value.size, fmt, ap);
 
 err:
-    API_END_RET(session, ret);
+    API_END_RET_STAT(session, ret, cursor_get_value);
 }
 
 /*
@@ -677,7 +677,8 @@ __wt_cursor_cache(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
     WT_STAT_CONN_INCR_ATOMIC(session, cursor_cached_count);
     WT_STAT_DATA_DECR(session, cursor_open_count);
     F_SET(cursor, WT_CURSTD_CACHED);
-    return (ret);
+
+    API_RET_STAT(session, ret, cursor_cache);
 }
 
 /*
@@ -786,8 +787,7 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, uint64_t hash_v
     WT_CURSOR *cursor;
     WT_CURSOR_BTREE *cbt;
     WT_DECL_RET;
-    uint64_t bucket;
-    uint32_t overwrite_flag;
+    uint64_t bucket, overwrite_flag;
     bool have_config;
 
     if (!F_ISSET(session, WT_SESSION_CACHE_CURSORS))
@@ -928,6 +928,9 @@ __wt_cursor_close(WT_CURSOR *cursor)
     __wt_buf_free(session, &cursor->key);
     __wt_buf_free(session, &cursor->value);
 
+    __wt_buf_free(session, &cursor->lower_bound);
+    __wt_buf_free(session, &cursor->upper_bound);
+
     __wt_free(session, cursor->internal_uri);
     __wt_free(session, cursor->uri);
     __wt_overwrite_and_free(session, cursor);
@@ -950,7 +953,7 @@ __wt_cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
     *equalp = (cmp == 0) ? 1 : 0;
 
 err:
-    API_END_RET(session, ret);
+    API_END_RET_STAT(session, ret, cursor_equals);
 }
 
 /*
@@ -990,7 +993,7 @@ __cursor_modify(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
     ret = cursor->update(cursor);
 
 err:
-    API_END_RET(session, ret);
+    API_END_RET_STAT(session, ret, cursor_modify);
 }
 
 /*
@@ -1110,7 +1113,7 @@ __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
     WT_ERR(__cursor_config_debug(cursor, cfg));
 
 err:
-    API_END_RET(session, ret);
+    API_END_RET_STAT(session, ret, cursor_reconfigure);
 }
 
 /*
@@ -1154,7 +1157,7 @@ err:
     __wt_scr_free(session, &key);
     if (ret != 0)
         WT_TRET(cursor->reset(cursor));
-    API_END_RET(session, ret);
+    API_END_RET_STAT(session, ret, cursor_largest_key);
 }
 
 /*
@@ -1166,24 +1169,108 @@ __wt_cursor_bound(WT_CURSOR *cursor, const char *config)
 {
     WT_CONFIG_ITEM cval;
     WT_DECL_RET;
+    WT_ITEM key;
     WT_SESSION_IMPL *session;
+    int exact;
+    bool inclusive;
+
+    exact = 0;
+    inclusive = false;
+
     CURSOR_API_CALL_CONF(cursor, session, bound, config, cfg, NULL);
 
     WT_ERR(__wt_config_gets(session, cfg, "action", &cval));
     if (WT_STRING_MATCH("set", cval.str, cval.len)) {
+        WT_ERR(__wt_config_gets(session, cfg, "inclusive", &cval));
+        inclusive = cval.val != 0;
+
         /* Check that bound is set with action set configuration. */
         WT_ERR(__wt_config_gets(session, cfg, "bound", &cval));
         if (cval.len == 0)
             WT_ERR_MSG(session, EINVAL, "setting bounds must require the bound configuration set");
+
+        /* The cursor must have a key set to place the lower or upper bound. */
+        WT_ERR(__cursor_checkkey(cursor));
+        if (WT_STRING_MATCH("upper", cval.str, cval.len)) {
+            /*
+             * If the lower bounds are set, make sure that the upper bound is greater than the lower
+             * bound.
+             */
+            WT_ERR(__wt_cursor_get_raw_key(cursor, &key));
+            if (F_ISSET(cursor, WT_CURSTD_BOUND_LOWER)) {
+                WT_ERR(__wt_compare(
+                  session, CUR2BT(cursor)->collator, &key, &cursor->lower_bound, &exact));
+                if (exact < 0)
+                    WT_ERR_MSG(session, EINVAL, "The provided cursor bounds are overlapping");
+                /*
+                 * If the lower bound and upper bound are equal, both inclusive flags must be
+                 * specified.
+                 */
+                if (exact == 0 && (!F_ISSET(cursor, WT_CURSTD_BOUND_LOWER_INCLUSIVE) || !inclusive))
+                    WT_ERR_MSG(
+                      session, EINVAL, "The provided cursor bounds are equal but not inclusive");
+            }
+            /* Copy the key over to the upper bound item and set upper bound and inclusive flags. */
+            F_SET(cursor, WT_CURSTD_BOUND_UPPER);
+            if (inclusive)
+                F_SET(cursor, WT_CURSTD_BOUND_UPPER_INCLUSIVE);
+            else
+                F_CLR(cursor, WT_CURSTD_BOUND_UPPER_INCLUSIVE);
+            WT_ERR(__wt_buf_set(session, &cursor->upper_bound, key.data, key.size));
+        } else if (WT_STRING_MATCH("lower", cval.str, cval.len)) {
+            /*
+             * If the upper bounds are set, make sure that the lower bound is less than the upper
+             * bound.
+             */
+            WT_ERR(__wt_cursor_get_raw_key(cursor, &key));
+            if (F_ISSET(cursor, WT_CURSTD_BOUND_UPPER)) {
+                WT_ERR(__wt_compare(
+                  session, CUR2BT(cursor)->collator, &key, &cursor->upper_bound, &exact));
+                if (exact > 0)
+                    WT_ERR_MSG(session, EINVAL, "The provided cursor bounds are overlapping");
+                /*
+                 * If the lower bound and upper bound are equal, both inclusive flags must be
+                 * specified.
+                 */
+                if (exact == 0 && (!F_ISSET(cursor, WT_CURSTD_BOUND_UPPER_INCLUSIVE) || !inclusive))
+                    WT_ERR_MSG(
+                      session, EINVAL, "The provided cursor bounds are equal but not inclusive");
+            }
+            /* Copy the key over to the lower bound item and set upper bound and inclusive flags. */
+            F_SET(cursor, WT_CURSTD_BOUND_LOWER);
+            if (inclusive)
+                F_SET(cursor, WT_CURSTD_BOUND_LOWER_INCLUSIVE);
+            else
+                F_CLR(cursor, WT_CURSTD_BOUND_LOWER_INCLUSIVE);
+            WT_ERR(__wt_buf_set(session, &cursor->lower_bound, key.data, key.size));
+        } else
+            WT_ERR_MSG(session, EINVAL,
+              "setting bounds only accepts \"upper\" or \"lower\" as the configuration");
+
     } else if (WT_STRING_MATCH("clear", cval.str, cval.len)) {
-        /* Inclusive should not be supplied from the application the action clear configuration. */
+        /* Inclusive should not be supplied from the application with action clear configuration. */
         if (__wt_config_getones(session, config, "inclusive", &cval) != WT_NOTFOUND)
             WT_ERR_MSG(session, EINVAL,
               "clearing bounds is not compatible with the inclusive configuration");
-    }
 
+        /*
+         * Check if there is a lower or upper specified bound config. If there are no specified
+         * bounds, both the upper and lower bound will be cleared.
+         */
+        WT_ERR(__wt_config_gets(session, cfg, "bound", &cval));
+        if (cval.len == 0 || WT_STRING_MATCH("upper", cval.str, cval.len)) {
+            F_CLR(cursor, WT_CURSTD_BOUND_UPPER | WT_CURSTD_BOUND_UPPER_INCLUSIVE);
+            __wt_buf_free(session, &cursor->upper_bound);
+            WT_CLEAR(cursor->upper_bound);
+        }
+        if (cval.len == 0 || WT_STRING_MATCH("lower", cval.str, cval.len)) {
+            F_CLR(cursor, WT_CURSTD_BOUND_LOWER | WT_CURSTD_BOUND_LOWER_INCLUSIVE);
+            __wt_buf_free(session, &cursor->lower_bound);
+            WT_CLEAR(cursor->lower_bound);
+        }
+    }
 err:
-    API_END_RET(session, ret);
+    API_END_RET_STAT(session, ret, cursor_bound);
 }
 
 /*
@@ -1286,7 +1373,7 @@ __wt_cursor_init(
      */
     WT_RET(__wt_config_gets_def(session, cfg, "dump", 0, &cval));
     if (cval.len != 0 && owner == NULL) {
-        uint32_t dump_flag;
+        uint64_t dump_flag;
         if (WT_STRING_MATCH("json", cval.str, cval.len))
             dump_flag = WT_CURSTD_DUMP_JSON;
         else if (WT_STRING_MATCH("print", cval.str, cval.len))

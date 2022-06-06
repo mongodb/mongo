@@ -20,7 +20,7 @@ __curversion_set_key(WT_CURSOR *cursor, ...)
     WT_CURSOR_VERSION *version_cursor;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    uint32_t flags;
+    uint64_t flags;
     va_list ap;
 
     session = CUR2S(cursor);
@@ -51,7 +51,7 @@ __curversion_get_key(WT_CURSOR *cursor, ...)
     WT_CURSOR *file_cursor;
     WT_CURSOR_VERSION *version_cursor;
     WT_DECL_RET;
-    uint32_t flags;
+    uint64_t flags;
     va_list ap;
 
     version_cursor = (WT_CURSOR_VERSION *)cursor;
@@ -162,8 +162,7 @@ __curversion_next_int(WT_CURSOR *cursor)
     WT_TIME_WINDOW *twp;
     WT_UPDATE *first, *next_upd, *upd, *tombstone;
     wt_timestamp_t durable_start_ts, durable_stop_ts, stop_ts;
-    uint64_t stop_txn, hs_upd_type;
-    uint32_t raw;
+    uint64_t stop_txn, hs_upd_type, raw;
     uint8_t *p, version_prepare_state;
     bool upd_found;
 

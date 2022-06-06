@@ -30,25 +30,34 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 # test_cursor_bound01.py
-#    Basic cursor bound API validation
+#    Basic cursor bound API validation.
 class test_cursor_bound01(wttest.WiredTigerTestCase):
     file_name = 'test_cursor_bound01'
 
     types = [
-        ('file', dict(uri='file:', use_index = False)),
-        ('table', dict(uri='table:', use_index = False)),
-        ('lsm', dict(uri='lsm:', use_index = False)),
-        ('index', dict(uri='table:', use_index = True)), 
+        ('file', dict(uri='file:', use_index = False, use_colgroup = False)),
+        ('table', dict(uri='table:', use_index = False, use_colgroup = False)),
+        ('lsm', dict(uri='lsm:', use_index = False, use_colgroup = False)),
+        ('colgroup', dict(uri='table:', use_index = False, use_colgroup = False)),
+        #FIXME: Turn on once index cursor bound implementation is done.
+        #('index', dict(uri='table:', use_index = True)), 
     ]
-
     scenarios = make_scenarios(types)
 
     def test_bound_api(self):
         uri = self.uri + self.file_name
         create_params = 'value_format=S,key_format=i'
-        if self.use_index:
+        if self.use_index or self.use_colgroup:
             create_params += ",columns=(k,v)"
+        if self.use_colgroup:
+            create_params += ',colgroups=(g0)'
         self.session.create(uri, create_params)
+        # Add in column group.
+        if self.use_colgroup:
+            create_params = 'columns=(v),'
+            suburi = 'colgroup:table0:g0'
+            self.session.create(suburi, create_params)
+
         cursor = None
         if self.use_index:
             # Test Index Cursors bound API support.
@@ -69,7 +78,9 @@ class test_cursor_bound01(wttest.WiredTigerTestCase):
             '/Invalid argument/')
 
         # Check that bound configuration works properly.
+        cursor.set_key(0)
         cursor.bound("bound=lower")
+        cursor.set_key(10)
         cursor.bound("bound=upper")
 
         # Clear and inclusive configuration are not compatible with each other. 
