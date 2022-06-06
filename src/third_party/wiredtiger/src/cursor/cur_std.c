@@ -407,7 +407,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint64_t flags, va_list ap)
     }
 
 err:
-    API_END_RET_STAT(session, ret, cursor_get_key);
+    API_END_RET(session, ret);
 }
 
 /*
@@ -546,7 +546,7 @@ __wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap)
         ret = __wt_struct_unpackv(session, cursor->value.data, cursor->value.size, fmt, ap);
 
 err:
-    API_END_RET_STAT(session, ret, cursor_get_value);
+    API_END_RET(session, ret);
 }
 
 /*
@@ -677,8 +677,7 @@ __wt_cursor_cache(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
     WT_STAT_CONN_INCR_ATOMIC(session, cursor_cached_count);
     WT_STAT_DATA_DECR(session, cursor_open_count);
     F_SET(cursor, WT_CURSTD_CACHED);
-
-    API_RET_STAT(session, ret, cursor_cache);
+    return (ret);
 }
 
 /*
@@ -953,7 +952,7 @@ __wt_cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
     *equalp = (cmp == 0) ? 1 : 0;
 
 err:
-    API_END_RET_STAT(session, ret, cursor_equals);
+    API_END_RET(session, ret);
 }
 
 /*
@@ -993,7 +992,7 @@ __cursor_modify(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
     ret = cursor->update(cursor);
 
 err:
-    API_END_RET_STAT(session, ret, cursor_modify);
+    API_END_RET(session, ret);
 }
 
 /*
@@ -1113,7 +1112,7 @@ __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
     WT_ERR(__cursor_config_debug(cursor, cfg));
 
 err:
-    API_END_RET_STAT(session, ret, cursor_reconfigure);
+    API_END_RET(session, ret);
 }
 
 /*
@@ -1157,7 +1156,7 @@ err:
     __wt_scr_free(session, &key);
     if (ret != 0)
         WT_TRET(cursor->reset(cursor));
-    API_END_RET_STAT(session, ret, cursor_largest_key);
+    API_END_RET(session, ret);
 }
 
 /*
@@ -1270,7 +1269,7 @@ __wt_cursor_bound(WT_CURSOR *cursor, const char *config)
         }
     }
 err:
-    API_END_RET_STAT(session, ret, cursor_bound);
+    API_END_RET(session, ret);
 }
 
 /*
