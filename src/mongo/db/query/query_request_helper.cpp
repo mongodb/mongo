@@ -94,11 +94,6 @@ Status validateFindCommandRequest(const FindCommandRequest& findCommand) {
         }
     }
 
-    if ((findCommand.getLimit() || findCommand.getBatchSize()) && findCommand.getNtoreturn()) {
-        return Status(ErrorCodes::BadValue,
-                      "'limit' or 'batchSize' fields can not be set with 'ntoreturn' field.");
-    }
-
     if (query_request_helper::getTailableMode(findCommand) != TailableModeEnum::kNormal) {
         // Tailable cursors cannot have any sort other than {$natural: 1}.
         const BSONObj expectedSort = BSON(query_request_helper::kNaturalSortField << 1);
@@ -236,9 +231,6 @@ void validateCursorResponse(const BSONObj& outputAsBson) {
 
 StatusWith<BSONObj> asAggregationCommand(const FindCommandRequest& findCommand) {
     BSONObjBuilder aggregationBuilder;
-
-    // The find command will translate away ntoreturn above this layer.
-    tassert(5746106, "ntoreturn should not be set in the findCommand", !findCommand.getNtoreturn());
 
     // First, check if this query has options that are not supported in aggregation.
     if (!findCommand.getMin().isEmpty()) {

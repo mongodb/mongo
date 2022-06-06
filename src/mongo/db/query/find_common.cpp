@@ -67,9 +67,6 @@ const size_t FindCommon::kInitReplyBufferSize = 32768;
 
 bool FindCommon::enoughForFirstBatch(const FindCommandRequest& findCommand, long long numDocs) {
     auto batchSize = findCommand.getBatchSize();
-    tassert(5746104,
-            "ntoreturn on the find command should not be set",
-            findCommand.getNtoreturn() == boost::none);
     if (!batchSize) {
         // We enforce a default batch size for the initial find if no batch size is specified.
         return numDocs >= query_request_helper::kDefaultBatchSize;

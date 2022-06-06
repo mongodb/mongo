@@ -75,44 +75,6 @@ MONGO_FAIL_POINT_DEFINE(allowExternalReadsForReverseOplogScanRule);
 
 const auto kTermField = "term"_sd;
 
-// Older client code before FCV 5.1 could still send 'ntoreturn' to mean a 'limit' or 'batchSize'.
-// This helper translates an 'ntoreturn' to an appropriate combination of 'limit', 'singleBatch',
-// and 'batchSize'. The translation rules are as follows: when 'ntoreturn' < 0 we have 'singleBatch'
-// semantics so we set 'limit= -ntoreturn' and 'singleBatch=true' flag to 'true'. When 'ntoreturn'
-// == 1 this is a limit-1 case so we set the 'limit' accordingly. Lastly when 'ntoreturn' > 1, it's
-// interpreted as a 'batchSize'. When the cluster is fully upgraded to v5.1 'ntoreturn' should no
-// longer be used on incoming requests.
-//
-// This helper can be removed when we no longer have to interoperate with 5.0 or older nodes.
-// longer have to interoperate with 5.0 or older nodes.
-std::unique_ptr<FindCommandRequest> translateNtoReturnToLimitOrBatchSize(
-    std::unique_ptr<FindCommandRequest> findCmd) {
-    const auto& fcvState = serverGlobalParams.featureCompatibility;
-    uassert(5746102,
-            "the ntoreturn find command parameter is not supported when FCV >= 5.1",
-            !(fcvState.isVersionInitialized() &&
-              fcvState.isGreaterThanOrEqualTo(
-                  multiversion::FeatureCompatibilityVersion::kVersion_5_1) &&
-              findCmd->getNtoreturn()));
-
-    const auto ntoreturn = findCmd->getNtoreturn().get_value_or(0);
-    if (ntoreturn) {
-        if (ntoreturn < 0) {
-            uassert(5746100,
-                    "bad ntoreturn value in query",
-                    ntoreturn != std::numeric_limits<int>::min());
-            findCmd->setLimit(-ntoreturn);
-            findCmd->setSingleBatch(true);
-        } else if (ntoreturn == 1) {
-            findCmd->setLimit(1);
-        } else {
-            findCmd->setBatchSize(ntoreturn);
-        }
-    }
-    findCmd->setNtoreturn(boost::none);
-    return findCmd;
-}
-
 // Parses the command object to a FindCommandRequest. If the client request did not specify any
 // runtime constants, make them available to the query here.
 std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(OperationContext* opCtx,
@@ -129,7 +91,7 @@ std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(Operation
         processFLEFindD(opCtx, findCommand->getNamespaceOrUUID().nss().get(), findCommand.get());
     }
 
-    return translateNtoReturnToLimitOrBatchSize(std::move(findCommand));
+    return findCommand;
 }
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(

@@ -52,20 +52,6 @@ using unittest::assertGet;
 
 static const NamespaceString testns("testdb.testcoll");
 
-TEST(QueryRequestTest, LimitWithNToReturn) {
-    FindCommandRequest findCommand(testns);
-    findCommand.setLimit(1);
-    findCommand.setNtoreturn(0);
-    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
-}
-
-TEST(QueryRequestTest, BatchSizeWithNToReturn) {
-    FindCommandRequest findCommand(testns);
-    findCommand.setBatchSize(0);
-    findCommand.setNtoreturn(0);
-    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
-}
-
 TEST(QueryRequestTest, NegativeSkip) {
     FindCommandRequest findCommand(testns);
     ASSERT_THROWS_CODE(findCommand.setSkip(-1), DBException, 51024);
@@ -114,23 +100,6 @@ TEST(QueryRequestTest, ZeroBatchSize) {
 TEST(QueryRequestTest, PositiveBatchSize) {
     FindCommandRequest findCommand(testns);
     findCommand.setBatchSize(1);
-    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
-}
-
-TEST(QueryRequestTest, NegativeNToReturn) {
-    FindCommandRequest findCommand(testns);
-    ASSERT_THROWS_CODE(findCommand.setNtoreturn(-1), DBException, 51024);
-}
-
-TEST(QueryRequestTest, ZeroNToReturn) {
-    FindCommandRequest findCommand(testns);
-    findCommand.setNtoreturn(0);
-    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
-}
-
-TEST(QueryRequestTest, PositiveNToReturn) {
-    FindCommandRequest findCommand(testns);
-    findCommand.setNtoreturn(1);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
@@ -1105,12 +1074,16 @@ TEST(QueryRequestTest, ParseCommandForbidExhaust) {
         query_request_helper::makeFromFindCommandForTests(cmdObj), DBException, 40415);
 }
 
-TEST(QueryRequestTest, ParseCommandIsFromFindCommand) {
-    BSONObj cmdObj = fromjson("{find: 'testns', '$db': 'test'}");
-    unique_ptr<FindCommandRequest> findCommand(
-        query_request_helper::makeFromFindCommandForTests(cmdObj));
-
-    ASSERT_FALSE(findCommand->getNtoreturn());
+// Older versions of the server supported an "ntoreturn" parameter to the find command, which was
+// used for upconversion of legacy OP_QUERY to a find command. Now that OP_QUERY is no longer
+// supported, the "ntoreturn" parameter is not supported either, and should be rejected during
+// parsing.
+TEST(QueryRequestTest, NToReturnParamFailsToParse) {
+    BSONObj cmdObj = fromjson("{find: 'testns', '$db': 'test', ntoreturn: 5}");
+    ASSERT_THROWS_CODE_AND_WHAT(query_request_helper::makeFromFindCommandForTests(cmdObj),
+                                DBException,
+                                40415,
+                                "BSON field 'FindCommandRequest.ntoreturn' is an unknown field.");
 }
 
 TEST(QueryRequestTest, ParseCommandAwaitDataButNotTailable) {
@@ -1142,7 +1115,6 @@ TEST(QueryRequestTest, DefaultQueryParametersCorrect) {
     ASSERT_FALSE(findCommand->getLimit());
 
     ASSERT_FALSE(findCommand->getSingleBatch());
-    ASSERT_FALSE(findCommand->getNtoreturn());
     ASSERT_EQUALS(0, findCommand->getMaxTimeMS().value_or(0));
     ASSERT_EQUALS(false, findCommand->getReturnKey());
     ASSERT_EQUALS(false, findCommand->getShowRecordId());

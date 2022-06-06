@@ -870,10 +870,6 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
     *blockingSortOut = false;
 
     const FindCommandRequest& findCommand = query.getFindCommandRequest();
-    tassert(5746105,
-            "ntoreturn on the find command should not be set",
-            findCommand.getNtoreturn() == boost::none);
-
     const BSONObj& sortObj = findCommand.getSort();
 
     if (sortObj.isEmpty()) {
