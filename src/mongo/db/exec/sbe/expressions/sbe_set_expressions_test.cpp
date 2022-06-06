@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 namespace mongo::sbe {
 
@@ -52,14 +53,22 @@ protected:
         ASSERT_EQUALS(tag, sbe::value::TypeTags::Nothing);
         ASSERT_EQUALS(val, 0);
     }
+
+    void runAndAssertBoolean(const vm::CodeFragment* compiledExpr, bool expected) {
+        auto [tag, val] = runCompiledExpression(compiledExpr);
+        value::ValueGuard guard(tag, val);
+
+        ASSERT(tag == value::TypeTags::Boolean);
+        ASSERT_EQUALS(value::bitcastTo<bool>(val), expected);
+    }
 };
 
 TEST_F(SBEBuiltinSetOpTest, ComputesSetUnion) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setUnionExpr = sbe::makeE<sbe::EFunction>(
-        "setUnion", sbe::makeEs(makeE<EVariable>(arrSlot1), makeE<EVariable>(arrSlot2)));
+    auto setUnionExpr = stage_builder::makeFunction(
+        "setUnion", stage_builder::makeVariable(arrSlot1), stage_builder::makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setUnionExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
@@ -83,8 +92,8 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetUnion) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setUnionExpr = sbe::makeE<sbe::EFunction>(
-        "setUnion", sbe::makeEs(makeE<EVariable>(arrSlot1), makeE<EVariable>(arrSlot2)));
+    auto setUnionExpr = stage_builder::makeFunction(
+        "setUnion", stage_builder::makeVariable(arrSlot1), stage_builder::makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setUnionExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
@@ -97,8 +106,9 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetIntersection) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setIntersectionExpr = sbe::makeE<sbe::EFunction>(
-        "setIntersection", sbe::makeEs(makeE<EVariable>(arrSlot1), makeE<EVariable>(arrSlot2)));
+    auto setIntersectionExpr = stage_builder::makeFunction("setIntersection",
+                                                           stage_builder::makeVariable(arrSlot1),
+                                                           stage_builder::makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setIntersectionExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
@@ -123,8 +133,9 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetIntersection) {
     value::OwnedValueAccessor slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setIntersectionExpr = sbe::makeE<sbe::EFunction>(
-        "setIntersection", sbe::makeEs(makeE<EVariable>(arrSlot1), makeE<EVariable>(arrSlot2)));
+    auto setIntersectionExpr = stage_builder::makeFunction("setIntersection",
+                                                           stage_builder::makeVariable(arrSlot1),
+                                                           stage_builder::makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setIntersectionExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
@@ -138,8 +149,9 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetDifference) {
     value::OwnedValueAccessor slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setDiffExpr = sbe::makeE<sbe::EFunction>(
-        "setDifference", sbe::makeEs(makeE<EVariable>(arrSlot1), makeE<EVariable>(arrSlot2)));
+    auto setDiffExpr = stage_builder::makeFunction("setDifference",
+                                                   stage_builder::makeVariable(arrSlot1),
+                                                   stage_builder::makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setDiffExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
@@ -170,13 +182,49 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetDifference) {
     value::OwnedValueAccessor slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setDiffExpr = sbe::makeE<sbe::EFunction>(
-        "setDifference", sbe::makeEs(makeE<EVariable>(arrSlot1), makeE<EVariable>(arrSlot2)));
+    auto setDiffExpr = stage_builder::makeFunction("setDifference",
+                                                   stage_builder::makeVariable(arrSlot1),
+                                                   stage_builder::makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setDiffExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
     slotAccessor1.reset(arrTag1, arrVal1);
     slotAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(125));
+    runAndAssertNothing(compiledExpr.get());
+}
+
+TEST_F(SBEBuiltinSetOpTest, ComputesSetEquals) {
+    value::OwnedValueAccessor slotAccessor1, slotAccessor2;
+    auto arrSlot1 = bindAccessor(&slotAccessor1);
+    auto arrSlot2 = bindAccessor(&slotAccessor2);
+    auto setEqualsExpr = stage_builder::makeFunction(
+        "setEquals", stage_builder::makeVariable(arrSlot1), stage_builder::makeVariable(arrSlot2));
+    auto compiledExpr = compileExpression(*setEqualsExpr);
+
+    auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
+    slotAccessor1.reset(arrTag1, arrVal1);
+    auto [arrTag2, arrVal2] = makeArray(BSON_ARRAY(3 << 2 << 3 << 1));
+    slotAccessor2.reset(arrTag2, arrVal2);
+    runAndAssertBoolean(compiledExpr.get(), true);
+
+    std::tie(arrTag1, arrVal1) = makeArray(BSON_ARRAY(1 << 2 << 3));
+    slotAccessor1.reset(arrTag1, arrVal1);
+    std::tie(arrTag2, arrVal2) = value::makeNewArray();
+    slotAccessor2.reset(arrTag2, arrVal2);
+    runAndAssertBoolean(compiledExpr.get(), false);
+}
+
+TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetEquals) {
+    value::OwnedValueAccessor slotAccessor1, slotAccessor2;
+    auto arrSlot1 = bindAccessor(&slotAccessor1);
+    auto arrSlot2 = bindAccessor(&slotAccessor2);
+    auto setEqualsExpr = stage_builder::makeFunction(
+        "setEquals", stage_builder::makeVariable(arrSlot1), stage_builder::makeVariable(arrSlot2));
+    auto compiledExpr = compileExpression(*setEqualsExpr);
+
+    auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
+    slotAccessor1.reset(arrTag1, arrVal1);
+    slotAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(189));
     runAndAssertNothing(compiledExpr.get());
 }
 }  // namespace mongo::sbe

@@ -566,9 +566,11 @@ enum class Builtin : uint8_t {
     setUnion,
     setIntersection,
     setDifference,
+    setEquals,
     collSetUnion,
     collSetIntersection,
     collSetDifference,
+    collSetEquals,
     runJsPredicate,
     regexCompile,  // compile <pattern, options> into value::pcreRegex
     regexFind,
@@ -1170,9 +1172,11 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinSetUnion(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinSetIntersection(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinSetDifference(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinSetEquals(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinCollSetUnion(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinCollSetIntersection(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinCollSetDifference(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinCollSetEquals(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinRunJsPredicate(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinRegexCompile(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinRegexFind(ArityType arity);

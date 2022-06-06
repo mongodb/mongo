@@ -3420,6 +3420,19 @@ std::tuple<bool, value::TypeTags, value::Value> setIntersection(
     return {true, resTag, resVal};
 }
 
+value::ValueSetType valueToSetHelper(const value::TypeTags& tag,
+                                     const value::Value& value,
+                                     const CollatorInterface* collator) {
+    value::ValueSetType setValues(0, value::ValueHash(collator), value::ValueEq(collator));
+    auto firstSetIter = value::ArrayEnumerator(tag, value);
+    while (!firstSetIter.atEnd()) {
+        auto [elTag, elVal] = firstSetIter.getViewOfValue();
+        setValues.insert({elTag, elVal});
+        firstSetIter.advance();
+    }
+    return setValues;
+}
+
 std::tuple<bool, value::TypeTags, value::Value> setDifference(
     value::TypeTags lhsTag,
     value::Value lhsVal,
@@ -3430,13 +3443,7 @@ std::tuple<bool, value::TypeTags, value::Value> setDifference(
     value::ValueGuard resGuard{resTag, resVal};
     auto resView = value::getArraySetView(resVal);
 
-    value::ValueSetType setValuesSecondArg(0, value::ValueHash(collator), value::ValueEq(collator));
-    auto rhsIter = value::ArrayEnumerator(rhsTag, rhsVal);
-    while (!rhsIter.atEnd()) {
-        auto [elTag, elVal] = rhsIter.getViewOfValue();
-        setValuesSecondArg.insert({elTag, elVal});
-        rhsIter.advance();
-    }
+    auto setValuesSecondArg = valueToSetHelper(rhsTag, rhsVal, collator);
 
     auto lhsIter = value::ArrayEnumerator(lhsTag, lhsVal);
     while (!lhsIter.atEnd()) {
@@ -3450,6 +3457,22 @@ std::tuple<bool, value::TypeTags, value::Value> setDifference(
 
     resGuard.reset();
     return {true, resTag, resVal};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> setEquals(
+    const std::vector<value::TypeTags>& argTags,
+    const std::vector<value::Value>& argVals,
+    const CollatorInterface* collator = nullptr) {
+    auto setValuesFirstArg = valueToSetHelper(argTags[0], argVals[0], collator);
+
+    for (size_t idx = 1; idx < argVals.size(); ++idx) {
+        auto setValuesOtherArg = valueToSetHelper(argTags[idx], argVals[idx], collator);
+        if (setValuesFirstArg != setValuesOtherArg) {
+            return {false, value::TypeTags::Boolean, false};
+        }
+    }
+
+    return {false, value::TypeTags::Boolean, true};
 }
 }  // namespace
 
@@ -3554,6 +3577,30 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetDifferen
     return setDifference(lhsTag, lhsVal, rhsTag, rhsVal, value::getCollatorView(collVal));
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetEquals(ArityType arity) {
+    invariant(arity >= 3);
+
+    auto [_, collTag, collVal] = getFromStack(0);
+    if (collTag != value::TypeTags::collator) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    std::vector<value::TypeTags> argTags;
+    std::vector<value::Value> argVals;
+
+    for (size_t idx = 1; idx < arity; ++idx) {
+        auto [owned, tag, val] = getFromStack(idx);
+        if (!value::isArray(tag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+
+        argTags.push_back(tag);
+        argVals.push_back(val);
+    }
+
+    return setEquals(argTags, argVals, value::getCollatorView(collVal));
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetDifference(ArityType arity) {
     invariant(arity == 2);
 
@@ -3565,6 +3612,25 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetDifference(A
     }
 
     return setDifference(lhsTag, lhsVal, rhsTag, rhsVal);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetEquals(ArityType arity) {
+    invariant(arity >= 2);
+
+    std::vector<value::TypeTags> argTags;
+    std::vector<value::Value> argVals;
+
+    for (size_t idx = 0; idx < arity; ++idx) {
+        auto [_, tag, val] = getFromStack(idx);
+        if (!value::isArray(tag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+
+        argTags.push_back(tag);
+        argVals.push_back(val);
+    }
+
+    return setEquals(argTags, argVals);
 }
 
 namespace {
@@ -4568,12 +4634,16 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinSetIntersection(arity);
         case Builtin::setDifference:
             return builtinSetDifference(arity);
+        case Builtin::setEquals:
+            return builtinSetEquals(arity);
         case Builtin::collSetUnion:
             return builtinCollSetUnion(arity);
         case Builtin::collSetIntersection:
             return builtinCollSetIntersection(arity);
         case Builtin::collSetDifference:
             return builtinCollSetDifference(arity);
+        case Builtin::collSetEquals:
+            return builtinCollSetEquals(arity);
         case Builtin::runJsPredicate:
             return builtinRunJsPredicate(arity);
         case Builtin::regexCompile:
