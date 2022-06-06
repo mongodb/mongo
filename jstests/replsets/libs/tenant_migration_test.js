@@ -343,6 +343,10 @@ function TenantMigrationTest({
         donorNodes = donorNodes || donorRst.nodes;
         recipientNodes = recipientNodes || recipientRst.nodes;
 
+        if (typeof migrationId === "string") {
+            migrationId = UUID(migrationId);
+        }
+
         donorNodes.forEach(node => {
             const configDonorsColl = node.getCollection(TenantMigrationTest.kConfigDonorsNS);
             assert.soon(() => 0 === configDonorsColl.count({_id: migrationId}), tojson(node));
