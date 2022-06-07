@@ -98,6 +98,29 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionOKTest) {
     future.default_timed_get();
 }
 
+TEST_F(SessionsCollectionShardedTest, CheckReadConcern) {
+    // Set up routing table for the logical sessions collection.
+    loadRoutingTableWithTwoChunksAndTwoShardsImpl(NamespaceString::kLogicalSessionsNamespace,
+                                                  BSON("_id" << 1));
+    auto future = launchAsync([&] {
+        auto notInsertedRecord = makeRecord();
+        LogicalSessionIdSet lsids{notInsertedRecord.getId()};
+
+        _collection.findRemovedSessions(operationContext(), lsids);
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        BSONObj obj = request.cmdObj;
+        auto readConcern = obj.getObjectField("readConcern");
+        ASSERT_FALSE(readConcern.isEmpty());
+        auto level = readConcern.getStringField("level");
+        ASSERT_EQ(level, "local");
+
+        return CursorResponse().toBSONAsInitialResponse();
+    });
+
+    future.default_timed_get();
+}
 
 TEST_F(SessionsCollectionShardedTest, RefreshOneSessionStatusErrTest) {
     // Set up routing table for the logical sessions collection.
