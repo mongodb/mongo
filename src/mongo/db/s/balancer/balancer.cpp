@@ -1011,7 +1011,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
 
     int numChunksProcessed = 0;
     for (const auto& [migrateInfo, futureStatus] : rebalanceMigrationsAndResponses) {
-        auto status = futureStatus.getNoThrow();
+        auto status = futureStatus.getNoThrow(opCtx);
         if (status.isOK()) {
             ++numChunksProcessed;
             continue;
@@ -1048,7 +1048,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
     }
 
     for (const auto& [migrateInfo, futureStatus] : defragmentationMigrationsAndResponses) {
-        auto status = futureStatus.getNoThrow();
+        auto status = futureStatus.getNoThrow(opCtx);
         if (status.isOK()) {
             ++numChunksProcessed;
         }
