@@ -86,7 +86,7 @@ var runCase = function(opts) {
         // Confirm number of chunks for this stage.
         var numChunks = getNumberChunks(coll.getFullName());
         assert.lte(numChunks,
-                   stage.expectedNumChunks,
+                   stage.expectedNumChunks + 1,  // (SERVER-67017) pad some slack
                    'in ' + coll.getFullName() + ' expected ' + stage.expectedNumChunks +
                        ' chunks for stage ' + stageNum + ', but found ' + numChunks + '\nopts: ' +
                        tojson(opts) + '\nchunks:\n' + s.getChunksString(coll.getFullName()));
