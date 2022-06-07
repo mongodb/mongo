@@ -209,65 +209,9 @@ const auto kIdProjection = BSON(SessionTxnRecord::kSessionIdFieldName << 1);
 const auto kSortById = BSON(SessionTxnRecord::kSessionIdFieldName << 1);
 const auto kLastWriteDateFieldName = SessionTxnRecord::kLastWriteDateFieldName;
 
-/**
- * Removes the the config.transactions and the config.image_collection entries for the transaction
- * sessions in 'expiredTransactionSessionIdsNotInUse' that are safe to reap. Returns the number
- * of transaction sessions whose entries were removed.
- */
-int removeSessionsTransactionRecords(
-    OperationContext* opCtx,
-    SessionsCollection& sessionsCollection,
-    const LogicalSessionIdSet& expiredTransactionSessionIdsNotInUse) {
-    if (expiredTransactionSessionIdsNotInUse.empty()) {
-        return 0;
-    }
-
-    // From the expired transaction session ids that are no longer in use, find the ones that are
-    // safe to reap.
-    LogicalSessionIdSet transactionSessionIdsToReap;
-    {
-        LogicalSessionIdSet possiblyExpiredLogicalSessionIds;
-        LogicalSessionIdMap<LogicalSessionIdSet>
-            transactionSessionIdsToReapIfLogicalSessionsExpired;
-
-        for (const auto& transactionSessionId : expiredTransactionSessionIdsNotInUse) {
-            if (isInternalSessionForRetryableWrite(transactionSessionId)) {
-                // It is safe to reap an internal transaction session for retryable write if it
-                // its transaction record has already expired since by design internal transaction
-                // sessions for retryable write are never reused and reaping them would not
-                // interrupt operations on other transaction sessions for the logical sessions that
-                // they correspond to.
-                transactionSessionIdsToReap.insert(transactionSessionId);
-            } else {
-                // It not safe to reap an internal transaction session for non-retryable write until
-                // the logical session that it corresponds to has expired, even if its transaction
-                // record has already expired. The reason is that each internal transaction session
-                // for non-retryable write is kept in the internal session pool and is reusable
-                // as long as the logical session that its correspond to has not expired and so
-                // reaping it would interrupt any operation that is running on it. The same applies
-                // to a parent transaction session since reaping it would interrupt all operations
-                // on that logical session.
-                auto logicalSessionId = castToParentSessionId(transactionSessionId);
-                possiblyExpiredLogicalSessionIds.insert(logicalSessionId);
-                transactionSessionIdsToReapIfLogicalSessionsExpired[logicalSessionId].insert(
-                    transactionSessionId);
-            }
-        }
-
-        if (!transactionSessionIdsToReapIfLogicalSessionsExpired.empty()) {
-            auto expiredLogicalSessionIds =
-                sessionsCollection.findRemovedSessions(opCtx, possiblyExpiredLogicalSessionIds);
-            for (const auto& [logicalSessionId, transactionSessionIds] :
-                 transactionSessionIdsToReapIfLogicalSessionsExpired) {
-                if (expiredLogicalSessionIds.find(logicalSessionId) !=
-                    expiredLogicalSessionIds.end()) {
-                    transactionSessionIdsToReap.insert(transactionSessionIds.begin(),
-                                                       transactionSessionIds.end());
-                }
-            }
-        }
-    }
-
+template <typename SessionContainer>
+int removeSessionsTransactionRecordsFromDisk(OperationContext* opCtx,
+                                             const SessionContainer& transactionSessionIdsToReap) {
     if (transactionSessionIdsToReap.empty()) {
         return 0;
     }
@@ -324,6 +268,68 @@ int removeSessionsTransactionRecords(
 }
 
 /**
+ * Removes the the config.transactions and the config.image_collection entries for the transaction
+ * sessions in 'expiredTransactionSessionIdsNotInUse' that are safe to reap. Returns the number
+ * of transaction sessions whose entries were removed.
+ */
+int removeSessionsTransactionRecordsIfExpired(
+    OperationContext* opCtx,
+    SessionsCollection& sessionsCollection,
+    const LogicalSessionIdSet& expiredTransactionSessionIdsNotInUse) {
+    if (expiredTransactionSessionIdsNotInUse.empty()) {
+        return 0;
+    }
+
+    // From the expired transaction session ids that are no longer in use, find the ones that are
+    // safe to reap.
+    LogicalSessionIdSet transactionSessionIdsToReap;
+    {
+        LogicalSessionIdSet possiblyExpiredLogicalSessionIds;
+        LogicalSessionIdMap<LogicalSessionIdSet>
+            transactionSessionIdsToReapIfLogicalSessionsExpired;
+
+        for (const auto& transactionSessionId : expiredTransactionSessionIdsNotInUse) {
+            if (isInternalSessionForRetryableWrite(transactionSessionId)) {
+                // It is safe to reap an internal transaction session for retryable write if it
+                // its transaction record has already expired since by design internal transaction
+                // sessions for retryable write are never reused and reaping them would not
+                // interrupt operations on other transaction sessions for the logical sessions that
+                // they correspond to.
+                transactionSessionIdsToReap.insert(transactionSessionId);
+            } else {
+                // It not safe to reap an internal transaction session for non-retryable write until
+                // the logical session that it corresponds to has expired, even if its transaction
+                // record has already expired. The reason is that each internal transaction session
+                // for non-retryable write is kept in the internal session pool and is reusable
+                // as long as the logical session that its correspond to has not expired and so
+                // reaping it would interrupt any operation that is running on it. The same applies
+                // to a parent transaction session since reaping it would interrupt all operations
+                // on that logical session.
+                auto logicalSessionId = castToParentSessionId(transactionSessionId);
+                possiblyExpiredLogicalSessionIds.insert(logicalSessionId);
+                transactionSessionIdsToReapIfLogicalSessionsExpired[logicalSessionId].insert(
+                    transactionSessionId);
+            }
+        }
+
+        if (!transactionSessionIdsToReapIfLogicalSessionsExpired.empty()) {
+            auto expiredLogicalSessionIds =
+                sessionsCollection.findRemovedSessions(opCtx, possiblyExpiredLogicalSessionIds);
+            for (const auto& [logicalSessionId, transactionSessionIds] :
+                 transactionSessionIdsToReapIfLogicalSessionsExpired) {
+                if (expiredLogicalSessionIds.find(logicalSessionId) !=
+                    expiredLogicalSessionIds.end()) {
+                    transactionSessionIdsToReap.insert(transactionSessionIds.begin(),
+                                                       transactionSessionIds.end());
+                }
+            }
+        }
+    }
+
+    return removeSessionsTransactionRecordsFromDisk(opCtx, transactionSessionIdsToReap);
+}
+
+/**
  * Removes the transaction sessions that are expired and not in use from the on-disk catalog (i.e.
  * the config.transactions collection and the config.image_collection collection). Returns the
  * number of transaction sessions whose entries were removed.
@@ -341,10 +347,6 @@ int removeExpiredTransactionSessionsFromDisk(
     findRequest.setProjection(kIdProjection);
     auto cursor = client.find(std::move(findRequest));
 
-    // The max batch size is chosen so that a single batch won't exceed the 16MB BSON object size
-    // limit.
-    const int kMaxBatchSize = 10'000;
-
     LogicalSessionIdSet expiredTransactionSessionIdsNotInUse;
     int numReaped = 0;
     while (cursor->more()) {
@@ -358,13 +360,14 @@ int removeExpiredTransactionSessionsFromDisk(
         }
 
         expiredTransactionSessionIdsNotInUse.insert(transactionSessionId);
-        if (expiredTransactionSessionIdsNotInUse.size() > kMaxBatchSize) {
-            numReaped += removeSessionsTransactionRecords(
+        if (expiredTransactionSessionIdsNotInUse.size() >
+            MongoDSessionCatalog::kMaxSessionDeletionBatchSize) {
+            numReaped += removeSessionsTransactionRecordsIfExpired(
                 opCtx, sessionsCollection, expiredTransactionSessionIdsNotInUse);
             expiredTransactionSessionIdsNotInUse.clear();
         }
     }
-    numReaped += removeSessionsTransactionRecords(
+    numReaped += removeSessionsTransactionRecordsIfExpired(
         opCtx, sessionsCollection, expiredTransactionSessionIdsNotInUse);
 
     return numReaped;
@@ -620,6 +623,22 @@ int MongoDSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
 
     return removeExpiredTransactionSessionsFromDisk(
         opCtx, sessionsCollection, possiblyExpired, expiredTransactionSessionIdsStillInUse);
+}
+
+int MongoDSessionCatalog::removeSessionsTransactionRecords(
+    OperationContext* opCtx, const std::vector<LogicalSessionId>& transactionSessionIdsToRemove) {
+    std::vector<LogicalSessionId> nextLsidBatch;
+    int numReaped = 0;
+    for (const auto& transactionSessionIdToRemove : transactionSessionIdsToRemove) {
+        nextLsidBatch.push_back(transactionSessionIdToRemove);
+        if (nextLsidBatch.size() > MongoDSessionCatalog::kMaxSessionDeletionBatchSize) {
+            numReaped += removeSessionsTransactionRecordsFromDisk(opCtx, nextLsidBatch);
+            nextLsidBatch.clear();
+        }
+    }
+    numReaped += removeSessionsTransactionRecordsFromDisk(opCtx, nextLsidBatch);
+
+    return numReaped;
 }
 
 MongoDOperationContextSession::MongoDOperationContextSession(OperationContext* opCtx)

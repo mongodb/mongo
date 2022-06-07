@@ -319,7 +319,7 @@ void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
                                      Session* session,
                                      boost::optional<KillToken> killToken,
                                      boost::optional<TxnNumber> clientTxnNumberStarted) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::unique_lock<Latch> ul(_mutex);
 
     // Make sure we have exactly the same session on the map and that it is still associated with an
     // operation context (meaning checked-out)
@@ -329,6 +329,8 @@ void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
         dassert(killToken->lsidToKill == session->getSessionId());
     }
 
+    ServiceContext* service = sri->checkoutOpCtx->getServiceContext();
+
     sri->checkoutOpCtx = nullptr;
     sri->availableCondVar.notify_all();
 
@@ -337,16 +339,22 @@ void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
         --sri->killsRequested;
     }
 
+    std::vector<LogicalSessionId> eagerlyReapedSessions;
     if (clientTxnNumberStarted.has_value()) {
         // Since the given txnNumber successfully started, we know any child sessions with older
         // txnNumbers can be discarded. This needed to wait until a transaction started because that
         // can fail, e.g. if the active transaction is prepared.
         auto numReaped = stdx::erase_if(sri->childSessions, [&](auto&& it) {
-            ObservableSession osession(lg, sri, &it.second);
+            ObservableSession osession(ul, sri, &it.second);
             if (it.first.getTxnNumber() && *it.first.getTxnNumber() < *clientTxnNumberStarted) {
                 osession.markForReap(ObservableSession::ReapMode::kExclusive);
             }
-            return osession._shouldBeReaped();
+
+            bool willReap = osession._shouldBeReaped();
+            if (willReap) {
+                eagerlyReapedSessions.push_back(std::move(it.first));
+            }
+            return willReap;
         });
 
         LOGV2_DEBUG(6685200,
@@ -356,6 +364,13 @@ void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
                     "clientTxnNumber"_attr = *clientTxnNumberStarted,
                     "childSessionsRemaining"_attr = sri->childSessions.size(),
                     "numReaped"_attr = numReaped);
+    }
+
+    invariant(ul);
+    ul.unlock();
+
+    if (eagerlyReapedSessions.size() && _onEagerlyReapedSessionsFn) {
+        (*_onEagerlyReapedSessionsFn)(service, std::move(eagerlyReapedSessions));
     }
 }
 

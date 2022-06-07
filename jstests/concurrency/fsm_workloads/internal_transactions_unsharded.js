@@ -75,6 +75,11 @@ var $config = extendWorkload($config, function($config, $super) {
     // during setup() and restores the original value during teardown().
     $config.data.originalStoreFindAndModifyImagesInSideCollection = {};
 
+    // The reap threshold is overriden to get coverage for when it schedules reaps during an active
+    // workload.
+    $config.data.originalInternalSessionReapThreshold = {};
+    $config.data.overrideReapThreshold = true;
+
     // This workload supports setting the 'transactionLifetimeLimitSeconds' to 45 seconds
     // (configurable) during setup() and restoring the original value during teardown().
     $config.data.lowerTransactionLifetimeLimitSeconds = false;
@@ -474,6 +479,28 @@ var $config = extendWorkload($config, function($config, $super) {
         assert.commandWorked(bulk.execute());
     };
 
+    $config.data.overrideInternalTransactionsReapThreshold =
+        function overrideInternalTransactionsReapThreshold(cluster) {
+        const newThreshold = this.generateRandomInt(0, 4);
+        print("Setting internalSessionsReapThreshold to " + newThreshold);
+        cluster.executeOnMongodNodes((db) => {
+            const res = assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalSessionsReapThreshold: newThreshold}));
+            this.originalInternalSessionReapThreshold[db.getMongo().host] = res.was;
+        });
+    };
+
+    $config.data.restoreInternalTransactionsReapThreshold =
+        function restoreInternalTransactionsReapThreshold(cluster) {
+        cluster.executeOnMongodNodes((db) => {
+            assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                internalSessionsReapThreshold:
+                    this.originalInternalSessionReapThreshold[db.getMongo().host]
+            }));
+        });
+    };
+
     $config.data.overrideStoreFindAndModifyImagesInSideCollection =
         function overrideStoreFindAndModifyImagesInSideCollection(cluster) {
         // Store the findAndModify images in the oplog half of the time.
@@ -529,6 +556,9 @@ var $config = extendWorkload($config, function($config, $super) {
                 this.insertInitialDocuments(db, collName, tid);
             }
         }
+        if (this.overrideReapThreshold) {
+            this.overrideInternalTransactionsReapThreshold(cluster);
+        }
         this.overrideStoreFindAndModifyImagesInSideCollection(cluster);
         if (this.lowerTransactionLifetimeLimitSeconds) {
             this.overrideTransactionLifetimeLimit(cluster);
@@ -536,6 +566,9 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
+        if (this.overrideReapThreshold) {
+            this.restoreInternalTransactionsReapThreshold(cluster);
+        }
         this.restoreStoreFindAndModifyImagesInSideCollection(cluster);
         if (this.lowerTransactionLifetimeLimitSeconds) {
             this.restoreTransactionLifetimeLimit(cluster);
