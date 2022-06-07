@@ -34,6 +34,8 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
@@ -113,10 +115,21 @@ void SetUserWriteBlockModeCoordinator::_enterPhase(Phase newPhase) {
         "oldPhase"_attr = SetUserWriteBlockModeCoordinatorPhase_serializer(_doc.getPhase()));
 
     auto opCtx = cc().makeOperationContext();
-    PersistentTaskStore<StateDoc> store(NamespaceString::kConfigsvrCoordinatorsNamespace);
 
     if (_doc.getPhase() == Phase::kUnset) {
-        store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcernShardingTimeout);
+        PersistentTaskStore<StateDoc> store(NamespaceString::kConfigsvrCoordinatorsNamespace);
+        try {
+            store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcernNoTimeout);
+        } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+            // A series of step-up and step-down events can cause a node to try and insert the
+            // document when it has already been persisted locally, but we must still wait for
+            // majority commit.
+            const auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
+            const auto lastLocalOpTime = replCoord->getMyLastAppliedOpTime();
+            WaitForMajorityService::get(opCtx->getServiceContext())
+                .waitUntilMajority(lastLocalOpTime, opCtx.get()->getCancellationToken())
+                .get(opCtx.get());
+        }
     } else {
         _updateStateDocument(opCtx.get(), newDoc);
     }

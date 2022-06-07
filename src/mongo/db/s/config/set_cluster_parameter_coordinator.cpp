@@ -36,6 +36,8 @@
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
@@ -89,15 +91,23 @@ void SetClusterParameterCoordinator::_enterPhase(Phase newPhase) {
                 "oldPhase"_attr = SetClusterParameterCoordinatorPhase_serializer(_doc.getPhase()));
 
     auto opCtx = cc().makeOperationContext();
-    PersistentTaskStore<StateDoc> store(NamespaceString::kConfigsvrCoordinatorsNamespace);
 
     if (_doc.getPhase() == Phase::kUnset) {
-        store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcernShardingTimeout);
+        PersistentTaskStore<StateDoc> store(NamespaceString::kConfigsvrCoordinatorsNamespace);
+        try {
+            store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcernNoTimeout);
+        } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+            // A series of step-up and step-down events can cause a node to try and insert the
+            // document when it has already been persisted locally, but we must still wait for
+            // majority commit.
+            const auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
+            const auto lastLocalOpTime = replCoord->getMyLastAppliedOpTime();
+            WaitForMajorityService::get(opCtx->getServiceContext())
+                .waitUntilMajority(lastLocalOpTime, opCtx.get()->getCancellationToken())
+                .get(opCtx.get());
+        }
     } else {
-        store.update(opCtx.get(),
-                     BSON(StateDoc::kIdFieldName << _coordId.toBSON()),
-                     newDoc.toBSON(),
-                     WriteConcerns::kMajorityWriteConcernNoTimeout);
+        _updateStateDocument(opCtx.get(), newDoc);
     }
 
     _doc = std::move(newDoc);
