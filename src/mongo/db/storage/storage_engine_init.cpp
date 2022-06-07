@@ -96,7 +96,9 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
         LOGV2_FATAL_NOTRACE(50922,
                             "An incomplete repair has been detected! This is likely because a "
                             "repair operation unexpectedly failed before completing. MongoDB will "
-                            "not start up again without --repair.");
+                            "not start up again without --repair."
+                            "You can delete file '_repair_incomplete' in dbPath"
+                            "if you want to skip the repair forcibly, but we don't recommend that！");
     }
 
     if (auto existingStorageEngine = StorageEngineMetadata::getStorageEngineForPath(dbpath)) {
