@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -256,7 +257,12 @@ void ReshardingOplogFetcher::_ensureCollection(Client* client,
         AutoGetDb autoDb(opCtx, nss.db(), LockMode::MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         auto db = autoDb.ensureDbExists(opCtx);
-        db->createCollection(opCtx, nss);
+
+        // This oplog-like collection will benefit from clustering by _id to reduce storage overhead
+        // and improve _id query efficiency.
+        CollectionOptions options;
+        options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+        db->createCollection(opCtx, nss, options);
         wuow.commit();
     });
 }
