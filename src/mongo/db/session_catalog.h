@@ -60,6 +60,9 @@ class SessionCatalog {
     friend class OperationContextSession;
 
 public:
+    using OnEagerlyReapedSessionsFn =
+        unique_function<void(ServiceContext*, std::vector<LogicalSessionId>)>;
+
     class ScopedCheckedOutSession;
     class SessionToKill;
 
@@ -138,6 +141,15 @@ public:
      */
     size_t size() const;
 
+    /**
+     * Registers a callback to run when sessions are "eagerly" reaped from the catalog, ie without
+     * waiting for a logical session cache refresh.
+     */
+    void setOnEagerlyReapedSessionsFn(OnEagerlyReapedSessionsFn fn) {
+        invariant(!_onEagerlyReapedSessionsFn);
+        _onEagerlyReapedSessionsFn = std::move(fn);
+    }
+
 private:
     /**
      * Tracks the runtime info for transaction sessions that corresponds to the same logical
@@ -209,6 +221,11 @@ private:
                          Session* session,
                          boost::optional<KillToken> killToken,
                          boost::optional<TxnNumber> clientTxnNumberStarted);
+
+    // Called when sessions are reaped from memory "eagerly" ie directly by the SessionCatalog
+    // without waiting for a logical session cache refresh. Note this is set at process startup
+    // before multi-threading is enabled, so no synchronization is necessary.
+    boost::optional<OnEagerlyReapedSessionsFn> _onEagerlyReapedSessionsFn;
 
     // Protects the state below
     mutable Mutex _mutex =

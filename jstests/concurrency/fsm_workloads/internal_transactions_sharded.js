@@ -105,6 +105,9 @@ var $config = extendWorkload($config, function($config, $super) {
             }
         }
 
+        if (this.overrideReapThreshold) {
+            this.overrideInternalTransactionsReapThreshold(cluster);
+        }
         this.overrideStoreFindAndModifyImagesInSideCollection(cluster);
         if (this.lowerTransactionLifetimeLimitSeconds) {
             this.overrideTransactionLifetimeLimit(cluster);

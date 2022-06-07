@@ -26,6 +26,10 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.currentShardKeyIndex = -1;
     $config.data.reshardingCount = 0;
 
+    // TODO SERVER-67076: Investigate segfault in resharding image collection agg stage with
+    // concurrent reaps.
+    $config.data.overrideReapThreshold = false;
+
     $config.data.getQueryForDocument = function getQueryForDocument(doc) {
         // The query for a write command against a sharded collection must contain the shard key.
         const query = $super.data.getQueryForDocument.apply(this, arguments);
