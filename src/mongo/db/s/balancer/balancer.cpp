@@ -1087,8 +1087,7 @@ SharedSemiFuture<void> Balancer::applyLegacyChunkSizeConstraintsOnClusterData(
             0,
             boost::none /*defragmentCollection*/,
             boost::none /*enableAutoSplitter*/);
-    } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>&) {
-        // TODO SERVER-66915 replace caught error code with NamespaceNotSharded
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
         // config.system.collections does not appear in config.collections; continue.
     }
 
