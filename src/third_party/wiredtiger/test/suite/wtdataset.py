@@ -64,19 +64,21 @@ class BaseDataSet(object):
     def fill(self):
         self.store_range(1, self.rows)
 
-    def postfill(self):
+    def postfill_create(self):
         pass
 
     @classmethod
     def is_lsm(cls):
         return False
 
-    def populate(self):
+    def populate(self, create=True):
         self.testcase.pr('populate: ' + self.uri + ' with '
                          + str(self.rows) + ' rows')
-        self.create()
+        if create:
+            self.create()
         self.fill()
-        self.postfill()
+        if create:
+            self.postfill_create()
 
     # Create a key for a Simple or Complex data set.
     @staticmethod
@@ -261,7 +263,7 @@ class ComplexDataSet(BaseDataSet):
             session.create('index:' + tablepart + index[0],
                            ',columns=(' + index[1] + '),' + self.config)
 
-    def postfill(self):
+    def postfill_create(self):
         # add some indices after filling the table
         tablepart = self.uri.split(":")[1] + ':'
         session = self.testcase.session
