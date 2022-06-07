@@ -1042,7 +1042,11 @@ protected:
 
             ixScan->bounds.fields.push_back(std::move(oil));
             ixScan->queryCollator = _cq->getCollator();
-            return ixScan;
+
+            auto limit = std::make_unique<LimitNode>();
+            limit->limit = 1;
+            limit->children.push_back(std::move(ixScan));
+            return limit;
         }();
 
         // IDHack plans always include a FETCH by convention. A covered IDHack probably isn't a
@@ -1059,11 +1063,14 @@ protected:
 
         if (const auto* projection = _cq->getProj(); projection) {
             invariant(_cq->root());
+            std::cout << "XOXO Projection  " << std::endl;
 
             if (projection->isSimple()) {
+                std::cout << "XOXO Projection simple  " << std::endl;
                 root = std::make_unique<ProjectionNodeSimple>(
                     std::move(root), *_cq->root(), *projection);
             } else {
+                std::cout << "XOXO Projection !simple  " << std::endl;
                 root = std::make_unique<ProjectionNodeDefault>(
                     std::move(root), *_cq->root(), *projection);
             }
@@ -1073,6 +1080,10 @@ protected:
         soln->setRoot(std::move(root));
 
         auto execTree = buildExecutableTree(*soln);
+        sbe::DebugPrinter p;
+
+        std::cout << p.print(*execTree.first.get()) << std::endl;
+
         auto result = makeResult();
         result->emplace(std::move(execTree), std::move(soln));
 

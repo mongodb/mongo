@@ -156,3 +156,4 @@ feature_flags:
       description: "Feature flag to enable using SBE for a larger number of queries"
       cpp_varname: gFeatureFlagSbeFull
       default: true 
+      version: 6.0
