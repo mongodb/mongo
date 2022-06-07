@@ -6334,7 +6334,6 @@ tasks:
   - *kill_processes
   - *cleanup_environment
   - *set_up_venv
-  - func: "fetch packages"
   - func: "set up remote credentials"
     vars:
       private_key_file: ~/.ssh/kitchen.pem
