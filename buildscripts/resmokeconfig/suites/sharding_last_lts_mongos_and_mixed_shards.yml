@@ -37,5 +37,4 @@ executor:
         TestData:
           mongosBinVersion: 'last-lts'
           shardMixedBinVersions: 'last-lts'
-          skipCheckingUUIDsConsistentAcrossCluster: true
       nodb: ''
