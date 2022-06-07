@@ -982,6 +982,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
     // 1. Ensure any data which might have been left orphaned in the range being moved has been
     // deleted.
+    const auto rangeDeletionWaitDeadline =
+        outerOpCtx->getServiceContext()->getFastClockSource()->now() +
+        Milliseconds(receiveChunkWaitForRangeDeleterTimeoutMS.load());
+
     while (migrationutil::checkForConflictingDeletions(
         outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
         uassert(ErrorCodes::ResumableRangeDeleterDisabled,
@@ -1007,6 +1011,11 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
             _setStateFail(redact(status.toString()));
             return;
         }
+
+        uassert(ErrorCodes::ExceededTimeLimit,
+                "Exceeded deadline waiting for overlapping range deletion to finish",
+                outerOpCtx->getServiceContext()->getFastClockSource()->now() <
+                    rangeDeletionWaitDeadline);
 
         // If the filtering metadata was cleared while the range deletion task was ongoing, then
         // 'waitForClean' would return immediately even though there really is an ongoing range
