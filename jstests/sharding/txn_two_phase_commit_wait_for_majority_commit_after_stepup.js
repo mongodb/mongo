@@ -104,7 +104,7 @@ stopServerReplication([coordPrimary, coordSecondary]);
 // Induce the coordinator primary to step down.
 
 // The amount of time the node has to wait before becoming primary again.
-const stepDownSecs = 1;
+const stepDownSecs = 2;
 assert.commandWorked(coordPrimary.adminCommand({replSetStepDown: stepDownSecs, force: true}));
 
 failPoint.off();
