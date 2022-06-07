@@ -46,9 +46,9 @@ var $config = extendWorkload($config, function($config, $super) {
 
     // The number of documents assigned to a thread when the workload starts.
     $config.data.partitionSize = 200;
-    // The batch size for the find command to look up the documents assigned to a thread. Use a
-    // large batch size so that a getMore command is never needed since getMore is not retryable and
-    // so running it is not allowed in the suites with stepdown/kill/terminate.
+    // The batch size for the find command used for looking up the documents assigned to a thread.
+    // Use a large batch size so that a getMore command is never needed since getMore is not
+    // retryable after network errors.
     $config.data.batchSizeForDocsLookUp = 1000;
     // The counter values for the documents assigned to a thread. The map is populated during
     // the init state and is updated after every write in the other states. Used to verify that
@@ -190,6 +190,17 @@ var $config = extendWorkload($config, function($config, $super) {
         return {_id: doc._id, tid: this.tid};
     };
 
+    /**
+     * Returns true if 'res' contains an acceptable error for the aggregate command used to look up
+     * a random document.
+     */
+    $config.data.isAcceptableAggregateCmdError = function isAcceptableAggregateCmdError(res) {
+        // The aggregate command is expected to involve running getMore commands which are not
+        // retryable after network errors.
+        return TestData.runningWithShardStepdowns && res &&
+            (res.code == ErrorCodes.QueryPlanKilled);
+    };
+
     $config.data.getRandomDocument = function getRandomDocument(db, collName) {
         const aggregateCmdObj = {
             aggregate: collName,
@@ -210,7 +221,19 @@ var $config = extendWorkload($config, function($config, $super) {
         while (numTries < numDocs) {
             print("Finding a random document " +
                   tojsononeline({aggregateCmdObj, numTries, numDocs}));
-            const aggRes = assert.commandWorked(db.runCommand(aggregateCmdObj));
+            let aggRes;
+            assert.soon(() => {
+                try {
+                    aggRes = db.runCommand(aggregateCmdObj);
+                    assert.commandWorked(aggRes);
+                    return true;
+                } catch (e) {
+                    if (this.isAcceptableAggregateCmdError(aggRes)) {
+                        return false;
+                    }
+                    throw e;
+                }
+            });
             const doc = aggRes.cursor.firstBatch[0];
             print("Found a random document " +
                   tojsononeline({doc, isDirty: this.isDirtyDocument(doc)}));
@@ -608,8 +631,6 @@ var $config = extendWorkload($config, function($config, $super) {
         // "snapshot").
         fsm.forceRunningOutsideTransaction(this);
 
-        // Run the find command with batch size equal to the number of documents + 1 to avoid
-        // running getMore commands as getMore's are not retryable upon network errors.
         const numDocsExpected = Object.keys(this.expectedCounters).length;
         const findCmdObj = {
             find: collName,

@@ -43,6 +43,12 @@ var $config = extendWorkload($config, function($config, $super) {
         return doc;
     };
 
+    $config.data.isAcceptableAggregateCmdError = function isAcceptableAggregateCmdError(res) {
+        // The aggregate command is expected to involve running getMore commands which are not
+        // retryable after a collection rename (done by resharding).
+        return res && (res.code == ErrorCodes.QueryPlanKilled);
+    };
+
     $config.data.isAcceptableRetryError = function isAcceptableRetryError(res) {
         // This workload does in-place resharding so a retry that is sent
         // reshardingMinimumOperationDurationMillis after resharding completes is expected to fail
