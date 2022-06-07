@@ -88,6 +88,7 @@ variables:
     jstestfuzz_num_generated_files: 35
     large_distro_name: windows-vsCurrent-large
     test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
+    external_auth_jobs_max: 1
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -801,6 +802,7 @@ buildvariants:
     push_name: windows
     push_arch: x86_64-enterprise
     test_flags: *windows_common_test_excludes
+    external_auth_jobs_max: 1
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -872,6 +874,7 @@ buildvariants:
       --runAllFeatureFlagTests
       --excludeWithAnyTags=incompatible_with_windows_tls
       --excludeWithAnyTags=incompatible_with_shard_merge
+    external_auth_jobs_max: 1
   tasks:
   - name: cqf
   - name: cqf_parallel
