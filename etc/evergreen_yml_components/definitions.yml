@@ -131,7 +131,7 @@ variables:
       resmoke_args: --help
       resmoke_jobs_max: 1
   - func: "send benchmark results"
-  - func: "analyze benchmark results"
+#  - func: "analyze benchmark results"
     vars:
       suite: benchmark_suite
 
@@ -3306,7 +3306,7 @@ tasks:
       exec_timeout_secs: 14400  # 4 hour timeout.
       resmoke_jobs_max: 1
   - func: "send benchmark results"
-  - func: "analyze benchmark results"
+#  - func: "analyze benchmark results"
     vars:
       suite: benchmarks
 
@@ -3320,7 +3320,7 @@ tasks:
       suite: benchmarks_sharding
       resmoke_jobs_max: 1
   - func: "send benchmark results"
-  - func: "analyze benchmark results"
+#  - func: "analyze benchmark results"
 
 # Disabled under SERVER-64949.
 # - <<: *benchmark_template
