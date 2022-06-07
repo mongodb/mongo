@@ -176,7 +176,9 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
             invariant(db);
             Lock::CollectionLock collLock(opCtx, nss, MODE_X);
             auto catalog = CollectionCatalog::get(opCtx);
-            WriteUnitOfWork wunit(opCtx);
+            // TODO SERVER-63789 Uncomment WriteUnitOfWork declaration below when we
+            // make file import async.
+            // WriteUnitOfWork wunit(opCtx);
             AutoStatsTracker statsTracker(opCtx,
                                           nss,
                                           Top::LockType::NotLocked,
@@ -216,8 +218,9 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
                 makeCountsChange(ownedCollection->getRecordStore(), collectionMetadata));
 
             CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, std::move(ownedCollection));
-            wunit.commit();
-
+            // TODO SERVER-63789 Uncomment wunit.commit() call below when we
+            // make file copy/import async.
+            // wunit.commit();
             LOGV2(6114300,
                   "Imported donor collection",
                   "ns"_attr = nss,
@@ -237,25 +240,23 @@ void cloneFile(OperationContext* opCtx, const BSONObj& metadataDoc) {
         makeReplWriterPool(tenantApplierThreadCount, "TenantMigrationFileClonerWriter"_sd);
 
     ON_BLOCK_EXIT([&] {
-        if (client) {
-            client->shutdownAndDisallowReconnect();
-        }
+        client->shutdownAndDisallowReconnect();
+
         writerPool->shutdown();
         writerPool->join();
     });
 
     auto fileName = metadataDoc["filename"].str();
     auto migrationId = UUID(uassertStatusOK(UUID::parse(metadataDoc[kMigrationIdFieldName])));
-    auto backupId = UUID(uassertStatusOK(UUID::parse(metadataDoc[kBackupIdFieldName])));
-    auto remoteDbpath = metadataDoc["remoteDbpath"].str();
-    size_t fileSize = std::max(0ll, metadataDoc["fileSize"].safeNumberLong());
-    auto relativePath = _getPathRelativeTo(fileName, metadataDoc[kDonorDbPathFieldName].str());
     LOGV2_DEBUG(6113320,
                 1,
                 "Cloning file",
                 "migrationId"_attr = migrationId,
-                "metadata"_attr = metadataDoc,
-                "destinationRelativePath"_attr = relativePath);
+                "metadata"_attr = metadataDoc);
+    auto backupId = UUID(uassertStatusOK(UUID::parse(metadataDoc[kBackupIdFieldName])));
+    auto remoteDbpath = metadataDoc["remoteDbpath"].str();
+    size_t fileSize = std::max(0ll, metadataDoc["fileSize"].safeNumberLong());
+    auto relativePath = _getPathRelativeTo(fileName, metadataDoc[kDonorDbPathFieldName].str());
     invariant(!relativePath.empty());
 
     // Connect the client.
