@@ -100,7 +100,7 @@ public:
     }
 
     Status getRoleDescriptionsForDB(OperationContext*,
-                                    const StringData,
+                                    const DatabaseName&,
                                     PrivilegeFormat,
                                     AuthenticationRestrictionsFormat,
                                     bool,

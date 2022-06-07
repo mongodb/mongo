@@ -610,8 +610,13 @@ public:
      *                                 contain a $ should be checked explicitly.
      * @return if db is an allowed database name
      */
-    static bool validDBName(StringData dbString,
+    static bool validDBName(StringData dbName,
                             DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Disallow);
+
+    static bool validDBName(const DatabaseName& dbName,
+                            DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Disallow) {
+        return validDBName(dbName.db(), behavior);
+    }
 
     /**
      * Takes a fully qualified namespace (ie dbname.collectionName), and returns true if

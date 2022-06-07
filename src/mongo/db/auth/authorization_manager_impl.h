@@ -91,7 +91,7 @@ public:
                                   BSONObj* result) override;
 
     Status getRoleDescriptionsForDB(OperationContext* opCtx,
-                                    StringData dbname,
+                                    const DatabaseName& dbname,
                                     PrivilegeFormat privilegeFormat,
                                     AuthenticationRestrictionsFormat,
                                     bool showBuiltinRoles,

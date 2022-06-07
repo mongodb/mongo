@@ -42,6 +42,7 @@
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -161,7 +162,7 @@ public:
      * contain a "warnings" array, with std::string messages describing inconsistencies.
      */
     virtual Status getRoleDescriptionsForDB(OperationContext* opCtx,
-                                            StringData dbname,
+                                            const DatabaseName& dbname,
                                             PrivilegeFormat showPrivileges,
                                             AuthenticationRestrictionsFormat,
                                             bool showBuiltinRoles,
