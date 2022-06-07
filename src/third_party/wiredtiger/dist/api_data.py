@@ -566,6 +566,12 @@ connection_runtime_config = [
             operation. This allows memory sanitizers to detect inappropriate references to
             memory owned by cursors.''',
             type='boolean'),
+        Config('cursor_reposition', 'false', r'''
+            if true, for the operations with snapshot isolation the cursor temporarily releases the
+            page that requires force eviction, then repositions back to the page for further
+            operations. A page release encourages eviction of hot or large pages, which is more
+            likely to succeed without a cursor keeping the page pinned.''',
+            type='boolean'),
         Config('eviction', 'false', r'''
             if true, modify internal algorithms to change skew to force history store eviction
             to happen more aggressively. This includes but is not limited to not skewing newest,

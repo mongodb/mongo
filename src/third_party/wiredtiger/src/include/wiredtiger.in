@@ -2193,6 +2193,11 @@ struct __wt_connection {
 	 * make a copy of any data returned by a cursor operation and return the copy instead.  The
 	 * copy is freed on the next cursor operation.  This allows memory sanitizers to detect
 	 * inappropriate references to memory owned by cursors., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;cursor_reposition, if true\, for the operations with
+	 * snapshot isolation the cursor temporarily releases the page that requires force
+	 * eviction\, then repositions back to the page for further operations.  A page release
+	 * encourages eviction of hot or large pages\, which is more likely to succeed without a
+	 * cursor keeping the page pinned., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;eviction, if true\, modify internal algorithms to change
 	 * skew to force history store eviction to happen more aggressively.  This includes but is
 	 * not limited to not skewing newest\, not favoring leaf pages\, and modifying the eviction
@@ -2918,22 +2923,26 @@ struct __wt_connection {
  * next cursor operation.  This allows memory sanitizers to detect inappropriate references to
  * memory owned by cursors., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * eviction, if true\, modify internal algorithms to change skew to force history store eviction to
- * happen more aggressively.  This includes but is not limited to not skewing newest\, not favoring
- * leaf pages\, and modifying the eviction score mechanism., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;flush_checkpoint, if true\, call a system wide checkpoint
- * immediately after a flush_tier completes to force objects out to disk so that a flush_tier can
- * work single-threaded., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * log_retention, adjust log removal to retain at least this number of log files\, ignored if set to
- * 0. (Warning: this option can remove log files required for recovery if no checkpoints have yet
- * been done and the number of log files exceeds the configured value.  As WiredTiger cannot detect
- * the difference between a system that has not yet checkpointed and one that will never
- * checkpoint\, it might discard log files before any checkpoint is done.)., an integer between 0
- * and 1024; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact, if true\, reallocation of
- * memory will only provide the exact amount requested.  This will help with spotting memory
- * allocation issues more easily., a boolean flag; default \c false.}
+ * cursor_reposition, if true\, for the operations with snapshot isolation the cursor temporarily
+ * releases the page that requires force eviction\, then repositions back to the page for further
+ * operations.  A page release encourages eviction of hot or large pages\, which is more likely to
+ * succeed without a cursor keeping the page pinned., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;eviction, if true\, modify internal algorithms to change skew to
+ * force history store eviction to happen more aggressively.  This includes but is not limited to
+ * not skewing newest\, not favoring leaf pages\, and modifying the eviction score mechanism., a
+ * boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;flush_checkpoint, if true\, call
+ * a system wide checkpoint immediately after a flush_tier completes to force objects out to disk so
+ * that a flush_tier can work single-threaded., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_retention, adjust log removal to retain at least this number
+ * of log files\, ignored if set to 0. (Warning: this option can remove log files required for
+ * recovery if no checkpoints have yet been done and the number of log files exceeds the configured
+ * value.  As WiredTiger cannot detect the difference between a system that has not yet checkpointed
+ * and one that will never checkpoint\, it might discard log files before any checkpoint is done.).,
+ * an integer between 0 and 1024; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact, if
+ * true\, reallocation of memory will only provide the exact amount requested.  This will help with
+ * spotting memory allocation issues more easily., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a WT_ROLLBACK error from a transaction
  * operation about every Nth operation to simulate a collision., an integer between 0 and 10M;
  * default \c 0.}
