@@ -634,8 +634,7 @@ void ShardingCatalogManager::configureCollectionBalancing(
                                                                      false /* multi */),
                                 txnNumber);
                             const auto numDocsModified = UpdateOp::parseResponse(res).getN();
-                            // TODO SERVER-66915 replace error code with NamespaceNotSharded
-                            uassert(ErrorCodes::ConflictingOperationInProgress,
+                            uassert(ErrorCodes::NamespaceNotSharded,
                                     str::stream() << "Expected to match one doc for query " << query
                                                   << " but matched " << numDocsModified,
                                     numDocsModified == 1);

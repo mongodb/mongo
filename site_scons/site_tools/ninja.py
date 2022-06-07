@@ -30,6 +30,7 @@ import shlex
 import tempfile
 import textwrap
 
+from collections import OrderedDict
 from glob import glob
 from os.path import join as joinpath
 from os.path import splitext
@@ -707,7 +708,8 @@ class NinjaState:
 
             if generated_source_files:
                 generated_sources_alias = "_ninja_generated_sources"
-                ninja.build(
+                ninja_sorted_build(
+                    ninja,
                     outputs=generated_sources_alias,
                     rule="phony",
                     implicit=generated_source_files,
@@ -786,7 +788,8 @@ class NinjaState:
                 )
 
                 if remaining_outputs:
-                    ninja.build(
+                    ninja_sorted_build(
+                        ninja,
                         outputs=sorted(remaining_outputs),
                         rule="phony",
                         implicit=first_output,
@@ -808,7 +811,7 @@ class NinjaState:
             if "inputs" in build:
                 build["inputs"].sort()
 
-            ninja.build(**build)
+            ninja_sorted_build(ninja, **build)
 
         template_builds = {'rule': "TEMPLATE"}
         for template_builder in template_builders:
@@ -828,7 +831,7 @@ class NinjaState:
                 template_builds[agg_key] = new_val
 
         if template_builds.get("outputs", []):
-            ninja.build(**template_builds)
+            ninja_sorted_build(ninja, **template_builds)
 
         # We have to glob the SCons files here to teach the ninja file
         # how to regenerate itself. We'll never see ourselves in the
@@ -853,8 +856,9 @@ class NinjaState:
             self.env['NINJA_REGENERATE_DEPS'],
         )
 
-        ninja.build(
-            ninja_in_file_path,
+        ninja_sorted_build(
+            ninja,
+            outputs=ninja_in_file_path,
             rule="REGENERATE",
             variables={
                 "self": ninja_file_path,
@@ -864,8 +868,9 @@ class NinjaState:
         # This sets up a dependency edge between build.ninja.in and build.ninja
         # without actually taking any action to transform one into the other
         # because we write both files ourselves later.
-        ninja.build(
-            ninja_file_path,
+        ninja_sorted_build(
+            ninja,
+            outputs=ninja_file_path,
             rule="NOOP",
             inputs=[ninja_in_file_path],
             implicit=[__file__],
@@ -874,8 +879,9 @@ class NinjaState:
         # If we ever change the name/s of the rules that include
         # compile commands (i.e. something like CC) we will need to
         # update this build to reflect that complete list.
-        ninja.build(
-            "compile_commands.json",
+        ninja_sorted_build(
+            ninja,
+            outputs="compile_commands.json",
             rule="CMD",
             pool="console",
             implicit=[ninja_file],
@@ -887,8 +893,9 @@ class NinjaState:
             order_only=[generated_sources_alias],
         )
 
-        ninja.build(
-            "compiledb",
+        ninja_sorted_build(
+            ninja,
+            outputs="compiledb",
             rule="phony",
             implicit=["compile_commands.json"],
         )
@@ -957,9 +964,27 @@ def get_comstr(env, action, targets, sources):
     return action.genstring(targets, sources, env)
 
 
+def ninja_recursive_sorted_dict(build):
+    sorted_dict = OrderedDict()
+    for key, val in sorted(build.items()):
+        if isinstance(val, dict):
+            sorted_dict[key] = ninja_recursive_sorted_dict(val)
+        elif isinstance(val, list) and key in ('inputs', 'outputs', 'implicit', 'order_only',
+                                               'implicit_outputs'):
+            sorted_dict[key] = sorted(val)
+        else:
+            sorted_dict[key] = val
+    return sorted_dict
+
+
+def ninja_sorted_build(ninja, **build):
+    sorted_dict = ninja_recursive_sorted_dict(build)
+    ninja.build(**sorted_dict)
+
+
 def get_command_env(env, target, source):
     """
-    Return a string that sets the enrivonment for any environment variables that
+    Return a string that sets the environment for any environment variables that
     differ between the OS environment and the SCons command ENV.
 
     It will be compatible with the default shell of the operating system.
@@ -981,7 +1006,7 @@ def get_command_env(env, target, source):
 
     windows = env["PLATFORM"] == "win32"
     command_env = ""
-    for key, value in scons_specified_env.items():
+    for key, value in sorted(scons_specified_env.items()):
         # Ensure that the ENV values are all strings:
         if is_List(value):
             # If the value is a list, then we assume it is a

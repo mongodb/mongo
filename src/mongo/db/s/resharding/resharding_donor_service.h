@@ -32,7 +32,6 @@
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 
@@ -208,12 +207,6 @@ private:
 
     // Removes the local donor document from disk.
     void _removeDonorDocument(const CancellationToken& stepdownToken, bool aborted);
-
-    // Accesses the ReshardingMetrics module for this donor's underlying mongod process.
-    ReshardingMetrics* _metrics() const;
-
-    // Starts the metrics subsystem for this donor's underlying mongod process.
-    void _startMetrics();
 
     // Initializes the _abortSource and generates a token from it to return back the caller. If an
     // abort was reported prior to the initialization, automatically cancels the _abortSource before

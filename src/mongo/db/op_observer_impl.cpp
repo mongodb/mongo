@@ -271,6 +271,9 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                            StmtId stmtId,
                            bool fromMigrate,
                            const boost::optional<BSONObj>& deletedDoc) {
+    // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
+    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
+        oplogEntry->setTid(nss.tenantId());
     oplogEntry->setNss(nss);
     oplogEntry->setUuid(uuid);
     oplogEntry->setDestinedRecipient(destinedRecipientDecoration(opCtx));

@@ -48,10 +48,10 @@ class bounded_cursor_perf : public test {
     {
         std::string lower_bound(1, ('0' - 1));
         cursor->set_key(cursor.get(), lower_bound.c_str());
-        cursor->bound(cursor.get(), "bound=lower");
+        testutil_check(cursor->bound(cursor.get(), "bound=lower"));
         std::string upper_bound(1, ('9' + 1));
         cursor->set_key(cursor.get(), upper_bound.c_str());
-        cursor->bound(cursor.get(), "bound=upper");
+        testutil_check(cursor->bound(cursor.get(), "bound=upper"));
     }
 
     void

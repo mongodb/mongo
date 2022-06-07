@@ -33,7 +33,6 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -123,35 +122,22 @@ public:
             CollectionShardingState::appendInfoForServerStatus(opCtx, &result);
         }
 
-        // The serverStatus command is run before the FCV is initialized so we ignore it when
-        // checking whether the resharding feature is enabled here.
-        if (resharding::gFeatureFlagResharding.isEnabledAndIgnoreFCV()) {
-            if (feature_flags::gFeatureFlagShardingDataTransformMetrics.isEnabledAndIgnoreFCV()) {
-                // TODO PM-2664: Switch over to using data transform metrics when they have feature
-                // parity with resharding metrics.
-                reportDataTransformMetrics(opCtx, &result);
-            } else {
-                reportReshardingMetrics(opCtx, &result);
-            }
-        }
+        reportDataTransformMetrics(opCtx, &result);
 
         return result.obj();
-    }
-
-    void reportReshardingMetrics(OperationContext* opCtx, BSONObjBuilder* bob) const {
-        auto metrics = ReshardingMetrics::get(opCtx->getServiceContext());
-        if (!metrics->wasReshardingEverAttempted()) {
-            return;
-        }
-        BSONObjBuilder subObjBuilder(bob->subobjStart("resharding"));
-        metrics->serializeCumulativeOpMetrics(&subObjBuilder);
     }
 
     void reportDataTransformMetrics(OperationContext* opCtx, BSONObjBuilder* bob) const {
         auto sCtx = opCtx->getServiceContext();
         using Metrics = ShardingDataTransformCumulativeMetrics;
-        Metrics::getForResharding(sCtx)->reportForServerStatus(bob);
-        Metrics::getForGlobalIndexes(sCtx)->reportForServerStatus(bob);
+
+        // The serverStatus command is run before the FCV is initialized so we ignore it when
+        // checking whether the resharding feature is enabled here.
+        if (resharding::gFeatureFlagResharding.isEnabledAndIgnoreFCV()) {
+            Metrics::getForResharding(sCtx)->reportForServerStatus(bob);
+            // TODO SERVER-67049: move this into a separate feature flag check for global indexes.
+            Metrics::getForGlobalIndexes(sCtx)->reportForServerStatus(bob);
+        }
     }
 
 } shardingStatisticsServerStatus;

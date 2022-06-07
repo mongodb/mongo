@@ -271,8 +271,6 @@ private:
         const CancellationToken& abortToken,
         const CancelableOperationContextFactory& factory);
 
-    ReshardingMetrics* _metrics() const;
-
     ExecutorFuture<void> _startMetrics(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& abortToken);

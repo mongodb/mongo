@@ -270,6 +270,10 @@ ReplOperation MutableOplogEntry::makeDeleteOperation(const NamespaceString& nss,
                                                      const BSONObj& docToDelete) {
     ReplOperation op;
     op.setOpType(OpTypeEnum::kDelete);
+
+    // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
+    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
+        op.setTid(nss.tenantId());
     op.setNss(nss);
     op.setUuid(uuid);
     op.setObject(docToDelete.getOwned());

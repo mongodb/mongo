@@ -2731,9 +2731,7 @@ public:
 class ExpressionSetEquals final : public ExpressionVariadic<ExpressionSetEquals> {
 public:
     explicit ExpressionSetEquals(ExpressionContext* const expCtx)
-        : ExpressionVariadic<ExpressionSetEquals>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionVariadic<ExpressionSetEquals>(expCtx) {}
     ExpressionSetEquals(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionVariadic<ExpressionSetEquals>(expCtx, std::move(children)) {}
 

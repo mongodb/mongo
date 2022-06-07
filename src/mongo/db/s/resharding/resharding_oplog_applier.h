@@ -48,7 +48,6 @@
 
 namespace mongo {
 
-class ReshardingMetrics;
 class ServiceContext;
 
 /**
@@ -67,16 +66,11 @@ class ReshardingOplogApplier {
 public:
     class Env {
     public:
-        Env(ServiceContext* service,
-            ReshardingMetrics* metrics,
-            ReshardingOplogApplierMetrics* applierMetrics)
-            : _service(service), _metrics(metrics), _applierMetrics(applierMetrics) {}
+        Env(ServiceContext* service, ReshardingOplogApplierMetrics* applierMetrics)
+            : _service(service), _applierMetrics(applierMetrics) {}
 
         ServiceContext* service() const {
             return _service;
-        }
-        ReshardingMetrics* metrics() const {
-            return _metrics;
         }
 
         ReshardingOplogApplierMetrics* applierMetrics() {
@@ -85,7 +79,6 @@ public:
 
     private:
         ServiceContext* _service;
-        ReshardingMetrics* _metrics;
         ReshardingOplogApplierMetrics* _applierMetrics;
     };
 

@@ -46,40 +46,40 @@ const runCommitShardSplitAsync = function(rstArgs,
 
 const runShardSplitCommand = function(
     replicaSet, cmdObj, retryOnRetryableErrors, enableDonorStartMigrationFsync) {
-    const primary = replicaSet.getPrimary();
-
     let res;
     assert.soon(() => {
         try {
+            const primary = replicaSet.getPrimary();
             if (enableDonorStartMigrationFsync) {
                 replicaSet.awaitLastOpCommitted();
                 assert.commandWorked(primary.adminCommand({fsync: 1}));
             }
-            res = primary.adminCommand(cmdObj);
 
-            if (!res.ok) {
-                // If retry is enabled and the command failed with a NotPrimary error, continue
-                // looping.
-                const cmdName = Object.keys(cmdObj)[0];
-                if (retryOnRetryableErrors && isRetryableError(res.code)) {
-                    jsTestLog(`runShardSplitCommand retryable error. Command: ${
-                        tojson(cmdObj)}, reply: ${tojson(res)}`);
-                    primary = replicaSet.getPrimary();
-                    return false;
-                }
-                jsTestLog(`runShardSplitCommand fatal error. Command: ${tojson(cmdObj)}, reply: ${
-                    tojson(res)}`);
-                return true;
-            }
+            // Note: assert.commandWorked() considers command responses with embedded
+            // writeErrors and WriteConcernErrors as a failure even if the command returned
+            // "ok: 1". And, admin commands(like, donorStartMigration)
+            // doesn't generate writeConcernErros or WriteErrors. So, it's safe to wrap up
+            // run() with assert.commandWorked() here. However, in few scenarios, like
+            // Mongo.prototype.recordRerouteDueToTenantMigration(), it's not safe to wrap up
+            // run() with commandWorked() as retrying on retryable writeConcernErrors can
+            // cause the retry attempt to fail with writeErrors.
+            res = undefined;
+            res = primary.adminCommand(cmdObj);
+            assert.commandWorked(res);
             return true;
         } catch (e) {
             if (retryOnRetryableErrors && isRetryableError(e)) {
                 jsTestLog(`runShardSplitCommand retryable error. Command: ${
                     tojson(cmdObj)}, reply: ${tojson(res)}`);
+
                 return false;
             }
-            jsTestLog(`runShardSplitCommand fatal error. Command: ${tojson(cmdObj)}, reply: ${
-                tojson(res)}`);
+
+            // If res is defined, return true to exit assert.soon and return res to the caller.
+            // Otherwise rethrow e to propagate it to the caller.
+            if (res)
+                return true;
+
             throw e;
         }
     }, "failed to retry commitShardSplit", 10 * 1000, 1 * 1000);

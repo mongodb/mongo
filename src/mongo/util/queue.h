@@ -107,6 +107,11 @@ public:
         }
     }
 
+    void pushBlocking(const T& t) {
+        std::vector<T> vec{t};
+        pushAllBlocking(vec.begin(), vec.end());
+    }
+
     bool empty() const {
         stdx::lock_guard<Latch> lk(_lock);
         return _queue.empty();

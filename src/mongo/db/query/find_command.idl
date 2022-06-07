@@ -128,12 +128,6 @@ commands:
         optional: true
         validator: { gte: 0 }
         unstable: false
-      ntoreturn:
-        description: "Deprecated. Should use batchSize."
-        type: safeInt64
-        optional: true
-        validator: { gte: 0 }
-        unstable: true
       singleBatch:
         description: "Determines whether to close the cursor after the first batch."
         type: optionalBool

@@ -41,7 +41,6 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 #include "mongo/s/chunk_manager.h"
 
@@ -61,7 +60,6 @@ public:
                                     size_t myStashIdx,
                                     ShardId donorShardId,
                                     ChunkManager sourceChunkMgr,
-                                    ReshardingMetrics* metrics,
                                     ReshardingOplogApplierMetrics* applierMetrics);
 
     const NamespaceString& getOutputNss() const {
@@ -121,7 +119,6 @@ private:
     // The chunk manager for the source namespace and original shard key.
     const ChunkManager _sourceChunkMgr;
 
-    ReshardingMetrics* _metrics;
     ReshardingOplogApplierMetrics* _applierMetrics;
 };
 

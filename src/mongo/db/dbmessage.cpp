@@ -65,14 +65,6 @@ const char* DbMessage::getns() const {
     return _nsStart;
 }
 
-int DbMessage::getQueryNToReturn() const {
-    verify(messageShouldHaveNs());
-    const char* p = _nsStart + _nsLen + 1;
-    checkRead<int>(p, 2);
-
-    return ConstDataView(p).read<LittleEndian<int32_t>>(sizeof(int32_t));
-}
-
 int DbMessage::pullInt() {
     return readAndAdvance<int32_t>();
 }

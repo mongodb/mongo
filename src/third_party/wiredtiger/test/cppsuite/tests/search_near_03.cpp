@@ -88,7 +88,7 @@ class search_near_03 : public test {
         ret = cursor->search_near(cursor.get(), &exact_prefix);
         testutil_assert(ret == 0 || ret == WT_NOTFOUND);
         if (ret == 0) {
-            cursor->get_key(cursor.get(), &key_tmp);
+            testutil_check(cursor->get_key(cursor.get(), &key_tmp));
             ret_key = get_prefix_from_key(std::string(key_tmp));
             testutil_assert(exact_prefix == 1);
             testutil_assert(prefix_key == ret_key);
@@ -115,7 +115,7 @@ class search_near_03 : public test {
          */
         collection &coll = tc->db.get_collection(tc->id);
         scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
-        cursor->reconfigure(cursor.get(), "prefix_search=true");
+        testutil_check(cursor->reconfigure(cursor.get(), "prefix_search=true"));
         for (uint64_t count = 0; count < tc->key_count; ++count) {
             tc->txn.begin();
             /*
@@ -208,7 +208,7 @@ class search_near_03 : public test {
                   "Unexpected error %d returned from cursor->next()", ret);
                 if (ret == WT_NOTFOUND)
                     continue;
-                cursor->get_key(cursor.get(), &key_tmp);
+                testutil_check(cursor->get_key(cursor.get(), &key_tmp));
                 prefixes.push_back(std::string(key_tmp));
             }
             prefixes_map.push_back(prefixes);
@@ -235,7 +235,7 @@ class search_near_03 : public test {
             collection &coll = tc->db.get_random_collection();
             if (cursors.find(coll.id) == cursors.end()) {
                 scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
-                cursor->reconfigure(cursor.get(), "prefix_search=true");
+                testutil_check(cursor->reconfigure(cursor.get(), "prefix_search=true"));
                 cursors.emplace(coll.id, std::move(cursor));
             }
 

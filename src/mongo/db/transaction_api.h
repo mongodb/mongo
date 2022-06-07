@@ -138,9 +138,9 @@ public:
     virtual bool supportsClientTransactionContext() const = 0;
 
     /**
-     * Returns if the client is safe to use within an operation with a shard or database version.
+     * Returns if the client is eligible to run cluster operations.
      */
-    virtual bool canRunInShardedOperations() const = 0;
+    virtual bool runsClusterOperations() const = 0;
 };
 
 using Callback =
@@ -226,10 +226,9 @@ public:
                                              const Message& request) const = 0;
 
     /**
-     * Returns if a client with these behaviors is safe to use within an operation with a shard or
-     * database version.
+     * Returns if the client is eligible to run cluster operations.
      */
-    virtual bool canRunInShardedOperations() const = 0;
+    virtual bool runsClusterOperations() const = 0;
 };
 
 /**
@@ -245,10 +244,7 @@ public:
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) const override;
 
-    bool canRunInShardedOperations() const {
-        // Commands are run directly on the local service entry point, so if the caller is in an
-        // operation that requires shard versions, spawned commands won't include shard versions and
-        // won't obey sharding protocols.
+    bool runsClusterOperations() const {
         return false;
     }
 };
@@ -286,8 +282,8 @@ public:
         return true;
     }
 
-    virtual bool canRunInShardedOperations() const override {
-        return _behaviors->canRunInShardedOperations();
+    virtual bool runsClusterOperations() const override {
+        return _behaviors->runsClusterOperations();
     }
 
 private:

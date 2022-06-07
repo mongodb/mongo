@@ -489,9 +489,18 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
                                          const std::string& commandName,
                                          boost::optional<ErrorCodes::Error> code,
                                          boost::optional<ErrorCodes::Error> wcCode,
-                                         bool isInternalClient) {
-    auto errorLabels = getErrorLabels(
-        opCtx, sessionOptions, commandName, code, wcCode, isInternalClient, false /* isMongos */);
+                                         bool isInternalClient,
+                                         const repl::OpTime& lastOpBeforeRun,
+                                         const repl::OpTime& lastOpAfterRun) {
+    auto errorLabels = getErrorLabels(opCtx,
+                                      sessionOptions,
+                                      commandName,
+                                      code,
+                                      wcCode,
+                                      isInternalClient,
+                                      false /* isMongos */,
+                                      lastOpBeforeRun,
+                                      lastOpAfterRun);
     commandBodyFieldsBob->appendElements(errorLabels);
 
     const auto isNotPrimaryError =
@@ -519,6 +528,34 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
     BSONObjBuilder topologyVersionBuilder(commandBodyFieldsBob->subobjStart("topologyVersion"));
     topologyVersion.serialize(&topologyVersionBuilder);
 }
+
+class RunCommandOpTimes {
+public:
+    RunCommandOpTimes(OperationContext* opCtx) : _lastOpBeforeRun(getLastOp(opCtx)) {}
+
+    void onCommandFinished(OperationContext* opCtx) {
+        if (!_lastOpAfterRun.isNull()) {
+            return;
+        }
+        _lastOpAfterRun = getLastOp(opCtx);
+    }
+
+    const repl::OpTime& getLastOpBeforeRun() const {
+        return _lastOpBeforeRun;
+    }
+
+    const repl::OpTime& getLastOpAfterRun() const {
+        return _lastOpAfterRun;
+    }
+
+private:
+    repl::OpTime getLastOp(OperationContext* opCtx) {
+        return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    }
+
+    repl::OpTime _lastOpBeforeRun;
+    repl::OpTime _lastOpAfterRun;
+};
 
 class ExecCommandDatabase {
 public:
@@ -567,6 +604,31 @@ public:
     }
     const LogicalTime& getStartOperationTime() const {
         return _startOperationTime;
+    }
+
+    void onCommandFinished() {
+        if (!_runCommandOpTimes) {
+            return;
+        }
+        _runCommandOpTimes->onCommandFinished(_execContext->getOpCtx());
+    }
+
+    const boost::optional<RunCommandOpTimes>& getRunCommandOpTimes() {
+        return _runCommandOpTimes;
+    }
+
+    repl::OpTime getLastOpBeforeRun() {
+        if (!_runCommandOpTimes) {
+            return repl::OpTime{};
+        }
+        return _runCommandOpTimes->getLastOpBeforeRun();
+    }
+
+    repl::OpTime getLastOpAfterRun() {
+        if (!_runCommandOpTimes) {
+            return repl::OpTime{};
+        }
+        return _runCommandOpTimes->getLastOpAfterRun();
     }
 
     bool isHello() const {
@@ -638,6 +700,7 @@ private:
     std::shared_ptr<CommandInvocation> _invocation;
     LogicalTime _startOperationTime;
     OperationSessionInfoFromClient _sessionOptions;
+    boost::optional<RunCommandOpTimes> _runCommandOpTimes;
     boost::optional<ResourceConsumption::ScopedMetricsCollector> _scopedMetrics;
     boost::optional<ImpersonationSessionGuard> _impersonationSessionGuard;
     boost::optional<auth::SecurityTokenAuthenticationGuard> _tokenAuthorizationSessionGuard;
@@ -725,7 +788,6 @@ private:
 
     // Allows changing the write concern while running the command and resetting on destruction.
     const WriteConcernOptions _oldWriteConcern;
-    boost::optional<repl::OpTime> _lastOpBeforeRun;
     boost::optional<WriteConcernOptions> _extractedWriteConcern;
 };
 
@@ -1101,6 +1163,7 @@ void RunCommandImpl::_epilogue() {
     auto command = execContext->getCommand();
     auto replyBuilder = execContext->getReplyBuilder();
     auto& behaviors = *execContext->behaviors;
+    _ecd->onCommandFinished();
 
     // This fail point blocks all commands which are running on the specified namespace, or which
     // are present in the given list of commands, or which match a given comment. If no namespace,
@@ -1161,7 +1224,9 @@ void RunCommandImpl::_epilogue() {
                                             command->getName(),
                                             code,
                                             wcCode,
-                                            _isInternalClient());
+                                            _isInternalClient(),
+                                            _ecd->getLastOpBeforeRun(),
+                                            _ecd->getLastOpAfterRun());
     }
 
     auto commandBodyBob = replyBuilder->getBodyBuilder();
@@ -1211,12 +1276,14 @@ void RunCommandAndWaitForWriteConcern::_waitForWriteConcern(BSONObjBuilder& bb) 
     }
 
     CurOp::get(opCtx)->debug().writeConcern.emplace(opCtx->getWriteConcern());
-    _execContext->behaviors->waitForWriteConcern(opCtx, invocation, _lastOpBeforeRun.get(), bb);
+    _execContext->behaviors->waitForWriteConcern(
+        opCtx, invocation, repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(), bb);
 }
 
 Future<void> RunCommandAndWaitForWriteConcern::_runImpl() {
     _setup();
     return _runCommandWithFailPoint().onCompletion([this](Status status) mutable {
+        _ecd->onCommandFinished();
         if (status.isOK()) {
             return _checkWriteConcern();
         } else {
@@ -1230,8 +1297,6 @@ void RunCommandAndWaitForWriteConcern::_setup() {
     OperationContext* opCtx = _execContext->getOpCtx();
     const Command* command = invocation->definition();
     const OpMsgRequest& request = _execContext->getRequest();
-
-    _lastOpBeforeRun.emplace(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp());
 
     if (command->getLogicalOp() == LogicalOp::opGetMore) {
         // WriteConcern will be set up during command processing, it must not be specified on
@@ -1673,6 +1738,7 @@ Future<void> ExecCommandDatabase::_commandExec() {
     }
 
     auto runCommand = [&] {
+        _runCommandOpTimes.emplace(opCtx);
         if (getInvocation()->supportsWriteConcern() ||
             getInvocation()->definition()->getLogicalOp() == LogicalOp::opGetMore) {
             // getMore operations inherit a WriteConcern from their originating cursor. For example,
@@ -1806,6 +1872,7 @@ void ExecCommandDatabase::_handleFailure(Status status) {
     auto command = _execContext->getCommand();
     auto replyBuilder = _execContext->getReplyBuilder();
     const auto& behaviors = *_execContext->behaviors;
+    onCommandFinished();
 
     // Append the error labels for transient transaction errors.
     auto response = _extraFieldsBuilder.asTempObj();
@@ -1819,7 +1886,9 @@ void ExecCommandDatabase::_handleFailure(Status status) {
                                         command->getName(),
                                         status.code(),
                                         wcCode,
-                                        _isInternalClient());
+                                        _isInternalClient(),
+                                        getLastOpBeforeRun(),
+                                        getLastOpAfterRun());
 
     BSONObjBuilder metadataBob;
     behaviors.appendReplyMetadata(opCtx, request, &metadataBob);

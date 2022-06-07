@@ -344,32 +344,6 @@ TEST_F(SessionCatalogTest, ScanSession) {
     });
 }
 
-TEST_F(SessionCatalogTestWithDefaultOpCtx, GetHighestTxnNumberWithChildSessions) {
-    auto parentLsid = makeLogicalSessionIdForTest();
-    auto childLsid0 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, 1);
-    auto childLsid1 = makeLogicalSessionIdWithTxnUUIDForTest(parentLsid);
-    auto childLsid2 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, 5);
-    auto childLsid3 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, 3);
-    auto childLsid4 = makeLogicalSessionIdWithTxnUUIDForTest(parentLsid);
-    std::vector<LogicalSessionId> lsids{
-        parentLsid, childLsid0, childLsid1, childLsid2, childLsid3, childLsid4};
-
-    createSession(parentLsid);
-    catalog()->scanSession(parentLsid, [](const ObservableSession& session) {
-        ASSERT_EQ(session.getHighestTxnNumberWithChildSessions(),
-                  TxnNumber{kUninitializedTxnNumber});
-    });
-
-    for (const auto& lsid : lsids) {
-        createSession(lsid);
-    }
-    for (const auto& lsid : lsids) {
-        catalog()->scanSession(lsid, [](const ObservableSession& session) {
-            ASSERT_EQ(session.getHighestTxnNumberWithChildSessions(), TxnNumber{5});
-        });
-    }
-}
-
 TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsForReapWhenSessionIsIdle) {
     auto parentLsid = makeLogicalSessionIdForTest();
     auto childLsid0 = makeLogicalSessionIdWithTxnUUIDForTest(parentLsid);

@@ -43,7 +43,6 @@
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_data_replication.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
@@ -235,11 +234,6 @@ public:
         return _controller.get();
     }
 
-    ReshardingMetrics* metrics() {
-        auto serviceContext = getServiceContext();
-        return ReshardingMetrics::get(serviceContext);
-    }
-
     BSONObj newShardKeyPattern() {
         return BSON("newKey" << 1);
     }
@@ -262,6 +256,7 @@ public:
                                      sourceUUID,
                                      constructTemporaryReshardingNss(sourceNss.db(), sourceUUID),
                                      newShardKeyPattern());
+        commonMetadata.setStartTime(getServiceContext()->getFastClockSource()->now());
 
         doc.setCommonReshardingMetadata(std::move(commonMetadata));
         return doc;
@@ -511,7 +506,6 @@ DEATH_TEST_REGEX_F(ReshardingRecipientServiceTest, CommitFn, "4457001.*tripwire"
 }
 
 TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort) {
-    auto metrics = ReshardingRecipientServiceTest::metrics();
     for (bool isAlsoDonor : {false, true}) {
         LOGV2(5551107,
               "Running case",
@@ -571,11 +565,6 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
             ASSERT_FALSE(bool(coll));
         }
     }
-
-    BSONObjBuilder result;
-    metrics->serializeCumulativeOpMetrics(&result);
-
-    ASSERT_EQ(result.obj().getField("countReshardingFailures").numberLong(), 2);
 }
 
 TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenDone) {
@@ -707,8 +696,6 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardColle
 }
 
 TEST_F(ReshardingRecipientServiceTest, TruncatesXLErrorOnRecipientDocument) {
-    auto metrics = ReshardingRecipientServiceTest::metrics();
-
     for (bool isAlsoDonor : {false, true}) {
         LOGV2(5568600,
               "Running case",
@@ -761,14 +748,9 @@ TEST_F(ReshardingRecipientServiceTest, TruncatesXLErrorOnRecipientDocument) {
         recipient->abort(false);
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
     }
-    BSONObjBuilder result;
-    metrics->serializeCumulativeOpMetrics(&result);
-
-    ASSERT_EQ(result.obj().getField("countReshardingFailures").numberLong(), 2);
 }
 
 TEST_F(ReshardingRecipientServiceTest, MetricsSuccessfullyShutDownOnUserCancelation) {
-    auto metrics = ReshardingRecipientServiceTest::metrics();
     auto doc = makeStateDocument(false);
     auto opCtx = makeOperationContext();
     RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
@@ -781,11 +763,6 @@ TEST_F(ReshardingRecipientServiceTest, MetricsSuccessfullyShutDownOnUserCancelat
 
     recipient->abort(true);
     ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
-    BSONObjBuilder result;
-    metrics->serializeCumulativeOpMetrics(&result);
-    BSONObj obj = result.obj();
-    ASSERT_EQ(obj.getField("countReshardingCanceled").numberLong(), 1);
-    ASSERT_EQ(obj.getField("countReshardingFailures").numberLong(), 0);
 }
 
 TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
@@ -883,8 +860,9 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
                                   MongoProcessInterface::CurrentOpConnectionsMode::kExcludeIdle,
                                   MongoProcessInterface::CurrentOpSessionsMode::kExcludeIdle)
                               .get();
-            ASSERT_EQ(currOp.getField("documentsCopied").Long(), 1L);
-            ASSERT_EQ(currOp.getField("bytesCopied").Long(), (long)reshardedDoc.objsize());
+
+            ASSERT_EQ(currOp.getField("documentsCopied").numberLong(), 1L);
+            ASSERT_EQ(currOp.getField("bytesCopied").numberLong(), (long)reshardedDoc.objsize());
             ASSERT_EQ(currOp.getStringField("recipientState"),
                       RecipientState_serializer(RecipientStateEnum::kApplying));
         } else if (state == RecipientStateEnum::kDone) {
@@ -893,11 +871,12 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
                                   MongoProcessInterface::CurrentOpConnectionsMode::kExcludeIdle,
                                   MongoProcessInterface::CurrentOpSessionsMode::kExcludeIdle)
                               .get();
-            ASSERT_EQ(currOp.getField("documentsCopied").Long(), 1L);
-            ASSERT_EQ(currOp.getField("bytesCopied").Long(), (long)reshardedDoc.objsize());
-            ASSERT_EQ(currOp.getField("oplogEntriesFetched").Long(),
+
+            ASSERT_EQ(currOp.getField("documentsCopied").numberLong(), 1L);
+            ASSERT_EQ(currOp.getField("bytesCopied").numberLong(), (long)reshardedDoc.objsize());
+            ASSERT_EQ(currOp.getField("oplogEntriesFetched").numberLong(),
                       (long)(1 * doc.getDonorShards().size()));
-            ASSERT_EQ(currOp.getField("oplogEntriesApplied").Long(),
+            ASSERT_EQ(currOp.getField("oplogEntriesApplied").numberLong(),
                       oplogEntriesAppliedOnEachDonor * doc.getDonorShards().size());
             ASSERT_EQ(currOp.getStringField("recipientState"),
                       RecipientState_serializer(RecipientStateEnum::kStrictConsistency));
@@ -922,9 +901,6 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
 }
 
 TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUpWithMissingProgressDoc) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagShardingDataTransformMetrics", true);
-
     auto doc = makeStateDocument(false);
     auto instanceId =
         BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());

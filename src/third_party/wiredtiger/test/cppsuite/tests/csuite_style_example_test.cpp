@@ -79,7 +79,7 @@ read_op(WT_CURSOR *cursor, int key_size)
     while (do_reads) {
         key = random_generator::instance().generate_random_string(key_size);
         cursor->set_key(cursor, key.c_str());
-        cursor->search(cursor);
+        WT_IGNORE_RET(cursor->search(cursor));
     }
 }
 

@@ -11,7 +11,6 @@
 'use strict';
 
 load("jstests/libs/discover_topology.js");
-load("jstests/libs/feature_flag_util.js");  // For isEnabled.
 load("jstests/sharding/libs/resharding_test_fixture.js");
 
 const kNamespace = "reshardingDb.coll";
@@ -94,13 +93,6 @@ reshardingTest.withReshardingInBackground(  //
 const mongos = inputCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 
-if (FeatureFlagUtil.isEnabled(mongos.getDB('admin'), "ShardingDataTransformMetrics")) {
-    // Skip test as format is slightly different. Delete this once we rewrite it to as a cpp test.
-    jsTestLog("Skipping as featureFlagShardingDataTransformMetrics is enabled");
-    reshardingTest.teardown();
-    return;
-}
-
 // There's one terminating "no-op" oplog entry from each donor marking the
 // boundary between the cloning phase and the applying phase. So there's a
 // baseline of 2 fetches/applies on each recipient (one "no-op" for each donor).
@@ -108,17 +100,17 @@ if (FeatureFlagUtil.isEnabled(mongos.getDB('admin'), "ShardingDataTransformMetri
 // oplogEntry applies for those late inserts.
 [{
     shardName: recipientShardNames[0],
-    documents: 2,
+    documents: 2,  // These are the no-op final oplog entries, one from each source shard.
     fetched: 2,
     applied: 2,
-    opcounters: {insert: 2, update: 0, delete: 0}
+    opcounters: {insert: 0, update: 0, delete: 0}
 },
  {
      shardName: recipientShardNames[1],
      documents: 2,
      fetched: 12,
      applied: 12,
-     opcounters: {insert: 12, update: 0, delete: 0}
+     opcounters: {insert: 10, update: 0, delete: 0}
  },
 ].forEach(e => {
     const mongo = new Mongo(topology.shards[e.shardName].primary);
@@ -132,20 +124,17 @@ if (FeatureFlagUtil.isEnabled(mongos.getDB('admin'), "ShardingDataTransformMetri
 
     jsTest.log(`Resharding stats for ${mongo}: ${tojson(sub)}`);
 
-    verifyDict(sub, {
-        "documentsCopied": e.documents,
+    verifyDict(sub.active, {
+        "documentsProcessed": e.documents,
         "oplogEntriesFetched": e.fetched,
         "oplogEntriesApplied": e.applied,
-    });
-
-    verifyDict(sub.opcounters, {
-        "insert": e.opcounters.insert,
-        "update": e.opcounters.update,
-        "delete": e.opcounters.delete,
+        "insertsApplied": e.opcounters.insert,
+        "updatesApplied": e.opcounters.update,
+        "deletesApplied": e.opcounters.delete,
     });
 
     // bytesCopied is harder to pin down but it should be >0.
-    assert.betweenIn(1, sub['bytesCopied'], 1024, 'bytesCopied');
+    assert.betweenIn(1, sub.active['bytesWritten'], 1024, 'bytesWritten');
 });
 
 reshardingTest.teardown();

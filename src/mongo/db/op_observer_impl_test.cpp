@@ -776,6 +776,34 @@ TEST_F(OpObserverTest, SingleStatementUpdateTestIncludesTenantId) {
     ASSERT_EQ(uuid, *entry.getUuid());
 }
 
+TEST_F(OpObserverTest, SingleStatementDeleteTestIncludesTenantId) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    auto opCtx = cc().makeOperationContext();
+    const NamespaceString nss(TenantId(OID::gen()), "testDB", "testColl");
+    auto uuid = UUID::gen();
+
+    OplogDeleteEntryArgs deleteEntryArgs;
+    WriteUnitOfWork wuow(opCtx.get());
+    AutoGetCollection locks(opCtx.get(), nss, LockMode::MODE_IX);
+
+    OpObserverRegistry opObserver;
+    opObserver.addObserver(std::make_unique<OpObserverImpl>());
+    // This test does not call `OpObserver::aboutToDelete`. That method has the side-effect
+    // of setting of `documentKey` on the delete for sharding purposes.
+    // `OpObserverImpl::onDelete` asserts its existence.
+    documentKeyDecoration(opCtx.get()).emplace(BSON("_id" << 0), boost::none);
+    opObserver.onDelete(opCtx.get(), nss, uuid, kUninitializedStmtId, deleteEntryArgs);
+    wuow.commit();
+
+    auto oplogEntryObj = getSingleOplogEntry(opCtx.get());
+    const repl::OplogEntry& entry = assertGet(repl::OplogEntry::parse(oplogEntryObj));
+
+    ASSERT(nss.tenantId().has_value());
+    ASSERT_EQ(*nss.tenantId(), *entry.getTid());
+    ASSERT_EQ(nss, entry.getNss());
+    ASSERT_EQ(uuid, *entry.getUuid());
+}
+
 /**
  * Test fixture for testing OpObserver behavior specific to the SessionCatalog.
  */
@@ -1752,6 +1780,50 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
                                                            << "d"
                                                            << "ns" << nss2.toString() << "ui"
                                                            << uuid2 << "o" << BSON("_id" << 1))));
+    ASSERT_BSONOBJ_EQ(oExpected, o);
+    ASSERT_FALSE(oplogEntry.hasField("prepare"));
+    ASSERT_FALSE(oplogEntry.getBoolField("prepare"));
+}
+
+TEST_F(OpObserverTransactionTest, TransactionalDeleteTestIncludesTenantId) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    const NamespaceString nss1(TenantId(OID::gen()), "testDB", "testColl");
+    const NamespaceString nss2(TenantId(OID::gen()), "testDB2", "testColl2");
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "delete");
+
+    WriteUnitOfWork wuow(opCtx());
+    AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
+    AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
+    opObserver().aboutToDelete(opCtx(),
+                               nss1,
+                               uuid1,
+                               BSON("_id" << 0 << "data"
+                                          << "x"));
+    opObserver().onDelete(opCtx(), nss1, uuid1, 0, {});
+    opObserver().aboutToDelete(opCtx(),
+                               nss2,
+                               uuid2,
+                               BSON("_id" << 1 << "data"
+                                          << "y"));
+    opObserver().onDelete(opCtx(), nss2, uuid2, 0, {});
+    auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
+    opObserver().onUnpreparedTransactionCommit(opCtx(), &txnOps, 0);
+    auto oplogEntry = getSingleOplogEntry(opCtx());
+    checkCommonFields(oplogEntry);
+    auto o = oplogEntry.getObjectField("o");
+    auto oExpected = BSON("applyOps" << BSON_ARRAY(
+                              BSON("op"
+                                   << "d"
+                                   << "tid" << nss1.tenantId().get() << "ns" << nss1.toString()
+                                   << "ui" << uuid1 << "o" << BSON("_id" << 0))
+                              << BSON("op"
+                                      << "d"
+                                      << "tid" << nss2.tenantId().get() << "ns" << nss2.toString()
+                                      << "ui" << uuid2 << "o" << BSON("_id" << 1))));
     ASSERT_BSONOBJ_EQ(oExpected, o);
     ASSERT_FALSE(oplogEntry.hasField("prepare"));
     ASSERT_FALSE(oplogEntry.getBoolField("prepare"));
@@ -2844,7 +2916,6 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) 
         opCtx->getServiceContext()->getOpObserver()->onInserts(
             opCtx, _nssWithTid, _uuid, insert.begin(), insert.end(), false);
     }
-    // TODO: SERVER-62766 add support for onDelete
     // (1) Delete
     {
         documentKeyDecoration(opCtx).emplace(BSON("_id" << 1), boost::none);
@@ -2891,12 +2962,16 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) 
                innerEntry.getObject().woCompare(BSON("_id" << 0 << "data"
                                                            << "x")));
     }
-    // TODO: SERVER-62766 add support for onDelete
+
     {
         const auto innerEntry = innerEntries[1];
         ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
         ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kDelete);
         ASSERT(innerEntry.getNss() == _nssWithTid);
+        ASSERT(innerEntry.getNss().tenantId().has_value());
+        ASSERT(*innerEntry.getNss().tenantId() == *_nssWithTid.tenantId());
+        ASSERT(innerEntry.getTid().has_value());
+        ASSERT(*innerEntry.getTid() == *_nssWithTid.tenantId());
         ASSERT(0 == innerEntry.getObject().woCompare(BSON("_id" << 1)));
     }
 

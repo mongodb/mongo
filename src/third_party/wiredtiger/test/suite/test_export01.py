@@ -36,7 +36,7 @@
 from helper import copy_wiredtiger_home
 from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
-import os, wttest
+import os, shutil, wttest
 
 class test_export01(TieredConfigMixin, wttest.WiredTigerTestCase):
     dir = 'backup.dir'
@@ -89,7 +89,7 @@ class test_export01(TieredConfigMixin, wttest.WiredTigerTestCase):
         self.assertFalse(os.path.isfile("WiredTiger.export"))
         
         # The export file should exist in the backup directory.
-        self.assertTrue(os.path.isfile(self.dir + "/WiredTiger.export"))
+        self.assertTrue(os.path.isfile(os.path.join(self.dir, "WiredTiger.export")))
 
     def test_export_restart(self):
         uri_a = self.type + "exporta"
@@ -116,7 +116,10 @@ class test_export01(TieredConfigMixin, wttest.WiredTigerTestCase):
 
         # Open a special backup cursor for export operation.
         main_cursor = self.session.open_cursor('backup:export', None, None)
-
+        
+        # Copy the file so that we have more information if WT-9203 ever happens again.
+        shutil.copyfile('WiredTiger.export', 'WiredTiger.export.original')
+        
         # Copy the main database to another directory, including the WiredTiger.export file.
         os.mkdir(self.dir)
         copy_wiredtiger_home(self, '.', self.dir)
@@ -142,16 +145,20 @@ class test_export01(TieredConfigMixin, wttest.WiredTigerTestCase):
         self.session.drop(uri_b)
 
         # Open an export cursor on the database copy.
+        wt_export_path = os.path.join(self.dir, "WiredTiger.export")
         export_cursor = self.session.open_cursor('backup:export', None, None)
-        self.assertTrue(os.path.isfile(self.dir + "/WiredTiger.export"))
 
+        # Copy the file so that we have more information if WT-9203 ever happens again.
+        shutil.copyfile(wt_export_path, os.path.join(self.dir, "WiredTiger.export.backup"))
+
+        self.assertTrue(os.path.isfile(wt_export_path))
+        
         # The information for the third table should exist in the WiredTiger.export file
         # but the information for the second table should not exist in the file.
-        with open(self.dir + "/WiredTiger.export", "r") as export_file:
+        with open(wt_export_path, "r") as export_file:
             export_file_string = export_file.read()
             self.assertFalse("exportb" in export_file_string)
             self.assertTrue("exportc" in export_file_string)
-            export_file.close()
 
         export_cursor.close()
 

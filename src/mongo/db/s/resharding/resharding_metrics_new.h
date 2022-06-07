@@ -42,6 +42,42 @@ class ReshardingMetricsNew : public ShardingDataTransformInstanceMetrics {
 public:
     using State = stdx::variant<CoordinatorStateEnum, RecipientStateEnum, DonorStateEnum>;
 
+    class DonorState {
+    public:
+        using MetricsType = ShardingDataTransformCumulativeMetrics::DonorStateEnum;
+
+        explicit DonorState(DonorStateEnum enumVal);
+        MetricsType toMetrics() const;
+        DonorStateEnum getState() const;
+
+    private:
+        const DonorStateEnum _enumVal;
+    };
+
+    class RecipientState {
+    public:
+        using MetricsType = ShardingDataTransformCumulativeMetrics::RecipientStateEnum;
+
+        explicit RecipientState(RecipientStateEnum enumVal);
+        MetricsType toMetrics() const;
+        RecipientStateEnum getState() const;
+
+    private:
+        RecipientStateEnum _enumVal;
+    };
+
+    class CoordinatorState {
+    public:
+        using MetricsType = ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum;
+
+        explicit CoordinatorState(CoordinatorStateEnum enumVal);
+        MetricsType toMetrics() const;
+        CoordinatorStateEnum getState() const;
+
+    private:
+        CoordinatorStateEnum _enumVal;
+    };
+
     ReshardingMetricsNew(UUID instanceId,
                          BSONObj shardKey,
                          NamespaceString nss,
@@ -82,6 +118,26 @@ public:
             document,
             serviceContext->getFastClockSource(),
             ShardingDataTransformCumulativeMetrics::getForResharding(serviceContext));
+    }
+
+    template <typename T>
+    void onStateTransition(T before, boost::none_t after) {
+        getCumulativeMetrics()->onStateTransition<typename T::MetricsType>(before.toMetrics(),
+                                                                           after);
+    }
+
+    template <typename T>
+    void onStateTransition(boost::none_t before, T after) {
+        setState(after.getState());
+        getCumulativeMetrics()->onStateTransition<typename T::MetricsType>(before,
+                                                                           after.toMetrics());
+    }
+
+    template <typename T>
+    void onStateTransition(T before, T after) {
+        setState(after.getState());
+        getCumulativeMetrics()->onStateTransition<typename T::MetricsType>(before.toMetrics(),
+                                                                           after.toMetrics());
     }
 
     template <typename T>

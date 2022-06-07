@@ -52,7 +52,6 @@ class TaskExecutor;
 
 class OperationContext;
 class MongoProcessInterface;
-class ReshardingMetrics;
 class ReshardingMetricsNew;
 class ServiceContext;
 
@@ -62,25 +61,7 @@ class ServiceContext;
  */
 class ReshardingCollectionCloner {
 public:
-    class Env {
-    public:
-        explicit Env(ReshardingMetrics* metrics, ReshardingMetricsNew* metricsNew)
-            : _metrics(metrics), _metricsNew(metricsNew) {}
-
-        ReshardingMetrics* metrics() const {
-            return _metrics;
-        }
-
-        ReshardingMetricsNew* metricsNew() const {
-            return _metricsNew;
-        }
-
-    private:
-        ReshardingMetrics* const _metrics;
-        ReshardingMetricsNew* const _metricsNew;
-    };
-
-    ReshardingCollectionCloner(std::unique_ptr<Env> env,
+    ReshardingCollectionCloner(ReshardingMetricsNew* metrics,
                                ShardKeyPattern newShardKeyPattern,
                                NamespaceString sourceNss,
                                const UUID& sourceUUID,
@@ -118,7 +99,7 @@ private:
 
     std::unique_ptr<Pipeline, PipelineDeleter> _restartPipeline(OperationContext* opCtx);
 
-    const std::unique_ptr<Env> _env;
+    ReshardingMetricsNew* _metrics;
     const ShardKeyPattern _newShardKeyPattern;
     const NamespaceString _sourceNss;
     const UUID _sourceUUID;

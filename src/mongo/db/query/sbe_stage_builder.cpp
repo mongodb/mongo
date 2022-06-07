@@ -1635,16 +1635,19 @@ SlotBasedStageBuilder::buildProjectionSimple(const QuerySolutionNode* root,
     const auto childResult = outputs.get(kResult);
 
     outputs.set(kResult, _slotIdGenerator.generate());
-    inputStage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(inputStage),
-                                                   outputs.get(kResult),
-                                                   childResult,
-                                                   sbe::MakeBsonObjStage::FieldBehavior::keep,
-                                                   pn->proj.getRequiredFields(),
-                                                   std::vector<std::string>{},
-                                                   sbe::value::SlotVector{},
-                                                   true,
-                                                   false,
-                                                   root->nodeId());
+    inputStage = sbe::makeS<sbe::MakeBsonObjStage>(
+        std::move(inputStage),
+        outputs.get(kResult),
+        childResult,
+        sbe::MakeBsonObjStage::FieldBehavior::keep,
+        // TODO SERVER-67039 take a set instead of a vector here.
+        std::vector<std::string>{pn->proj.getRequiredFields().begin(),
+                                 pn->proj.getRequiredFields().end()},
+        std::vector<std::string>{},
+        sbe::value::SlotVector{},
+        true,
+        false,
+        root->nodeId());
 
     return {std::move(inputStage), std::move(outputs)};
 }

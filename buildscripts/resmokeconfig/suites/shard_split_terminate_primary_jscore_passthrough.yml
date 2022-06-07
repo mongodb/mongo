@@ -83,7 +83,6 @@ selector:
   - jstests/core/explain_multi_plan.js
   - jstests/core/explain_uuid.js
   - jstests/core/field_name_validation.js
-  - jstests/core/insert1.js
   - jstests/core/noop_writes.js
   - jstests/core/profile_findandmodify.js
   - jstests/core/sortl.js

@@ -57,6 +57,7 @@
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/reply_interface.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/stdx/future.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/cancellation.h"
@@ -682,7 +683,7 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
             "Transaction API does not currently support use within operations with shard or "
             "database versions without using router commands",
             !OperationShardingState::isComingFromRouter(opCtx) ||
-                _txnClient->canRunInShardedOperations());
+                _txnClient->runsClusterOperations());
 
     stdx::lock_guard<Latch> lg(_mutex);
 
@@ -710,6 +711,11 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
                         {true} /* startTransaction */);
         _execContext = ExecutionContext::kClientSession;
     } else if (!clientInMultiDocumentTransaction) {
+        uassert(6648100,
+                "Cross-shard internal transactions are not supported when run under a retryable "
+                "write directly on a shard.",
+                !_txnClient->runsClusterOperations() || isMongos());
+
         _setSessionInfo(lg,
                         makeLogicalSessionIdWithTxnNumberAndUUID(*clientSession, *clientTxnNumber),
                         0 /* txnNumber */,
@@ -724,6 +730,11 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
         // case always uses a client that runs commands against the local process service entry
         // point, which we verify with this invariant.
         invariant(_txnClient->supportsClientTransactionContext());
+
+        uassert(6648101,
+                "Cross-shard internal transactions are not supported when run under a client "
+                "transaction directly on a shard.",
+                !_txnClient->runsClusterOperations() || isMongos());
 
         _setSessionInfo(lg, *clientSession, *clientTxnNumber, boost::none /* startTransaction */);
         _execContext = ExecutionContext::kClientTransaction;

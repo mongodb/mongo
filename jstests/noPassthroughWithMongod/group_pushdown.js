@@ -295,6 +295,19 @@ assertGroupPushdown(coll,
                     [{$group: {_id: {"i": "$item"}, s: {$sum: "$price"}}}],
                     [{_id: {i: "a"}, s: 15}, {_id: {i: "b"}, s: 30}, {_id: {i: "c"}, s: 5}]);
 
+// Test that we can push down a $group and a projection.
+assertGroupPushdown(
+    coll,
+    [{$project: {_id: 0, item: 1, price: 1}}, {$group: {_id: {i: "$item"}, s: {$sum: "$price"}}}],
+    [{_id: {i: "a"}, s: 15}, {_id: {i: "b"}, s: 30}, {_id: {i: "c"}, s: 5}]);
+
+// Test that the results are as expected if the projection comes first and removes a field that the
+// $group stage needs.
+assertGroupPushdown(
+    coll,
+    [{$project: {_id: 0, item: 1}}, {$group: {_id: {i: "$item"}, s: {$sum: "$price"}}}],
+    [{_id: {i: "a"}, s: 0}, {_id: {i: "b"}, s: 0}, {_id: {i: "c"}, s: 0}]);
+
 // Run a group with spilling on and check that $group is pushed down.
 assertGroupPushdown(coll,
                     [{$group: {_id: "$item", s: {$sum: "$price"}}}],

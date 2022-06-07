@@ -73,14 +73,16 @@ if (t.exists()) {
     assert.isnull(t.exists());
 }
 
-// Tests that _id field can be a number.
-// This test contains 100,000 inserts which will get grouped together by the passthrough and
-// create a very slow transaction in slow variants.
+// Tests that _id field can be a number and handling of bulk write results over
+// multiple batches in the legacy shell. See SERVER-12763.
+// This test contains a large number of inserts which will get grouped together by the
+// passthrough and create a very slow transaction in slow variants.
 // See SERVER-53447 and operations_longer_than_stepdown_interval_in_txns tag.
 t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 let toInsert = [];
-const count = 100 * 1000;
+// This needs to be larger than Bulk.maxNumberOfDocsInBatch defined in bulk_api.js.
+const count = 2 * 1000;
 for (let i = 0; i < count; ++i) {
     toInsert.push({_id: i, a: 5});
 }

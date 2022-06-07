@@ -72,10 +72,6 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
     const ProjectionPolicies& projectionPolicies,
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline) {
-    tassert(5746107,
-            "ntoreturn should not be set on the findCommand",
-            findCommand->getNtoreturn() == boost::none);
-
     auto status = query_request_helper::validateFindCommandRequest(*findCommand);
     if (!status.isOK()) {
         return status;

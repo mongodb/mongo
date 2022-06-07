@@ -42,9 +42,6 @@ namespace resharding_metrics {
 
 namespace {
 void onCriticalSectionErrorThrows(OperationContext* opCtx, const StaleConfigInfo& info) {
-    if (!ShardingDataTransformMetrics::isEnabled()) {
-        return;
-    }
     const auto& operationType = info.getDuringOperationType();
     if (!operationType) {
         return;

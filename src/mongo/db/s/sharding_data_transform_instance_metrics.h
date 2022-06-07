@@ -66,20 +66,10 @@ public:
     Date_t getStartTimestamp() const;
     const UUID& getInstanceId() const;
 
-    template <typename T>
-    void onStateTransition(T before, boost::none_t after) {
-        _cumulativeMetrics->onStateTransition<T>(before, after);
-    }
-
-    template <typename T>
-    void onStateTransition(boost::none_t before, T after) {
-        _cumulativeMetrics->onStateTransition<T>(before, after);
-    }
-
-    template <typename T>
-    void onStateTransition(T before, T after) {
-        _cumulativeMetrics->onStateTransition<T>(before, after);
-    }
+    void onStarted();
+    void onSuccess();
+    void onFailure();
+    void onCanceled();
 
     void onCopyingBegin();
     void onCopyingEnd();
@@ -106,6 +96,7 @@ public:
     void onLocalInsertDuringOplogFetching(Milliseconds elapsed);
     void onBatchRetrievedDuringOplogApplying(Milliseconds elapsed);
     void onOplogEntriesApplied(int64_t numEntries);
+    void restoreOplogEntriesApplied(int64_t numEntries);
     void onCloningTotalRemoteBatchRetrieval(Milliseconds elapsed);
     void onOplogLocalBatchApplied(Milliseconds elapsed);
     void onWriteToStashedCollections();
@@ -121,6 +112,8 @@ public:
     Seconds getApplyingElapsedTimeSecs() const;
     Seconds getCriticalSectionElapsedTimeSecs() const;
 
+    void setLastOpEndingChunkImbalance(int64_t imbalanceCount);
+
 protected:
     void restoreCopyingBegin(Date_t date);
     void restoreCopyingEnd(Date_t date);
@@ -133,6 +126,8 @@ protected:
                           int64_t updatesApplied,
                           int64_t deletesApplied,
                           int64_t writesToStashCollections);
+
+    ShardingDataTransformCumulativeMetrics* getCumulativeMetrics();
 
     const UUID _instanceId;
     const BSONObj _originalCommand;

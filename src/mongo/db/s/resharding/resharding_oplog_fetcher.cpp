@@ -39,12 +39,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
@@ -256,7 +256,12 @@ void ReshardingOplogFetcher::_ensureCollection(Client* client,
         AutoGetDb autoDb(opCtx, nss.db(), LockMode::MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         auto db = autoDb.ensureDbExists(opCtx);
-        db->createCollection(opCtx, nss);
+
+        // This oplog-like collection will benefit from clustering by _id to reduce storage overhead
+        // and improve _id query efficiency.
+        CollectionOptions options;
+        options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+        db->createCollection(opCtx, nss, options);
         wuow.commit();
     });
 }
@@ -321,10 +326,8 @@ bool ReshardingOplogFetcher::consume(Client* client,
         [this, &batchesProcessed, &moreToCome, &opCtxRaii, &batchFetchTimer, factory](
             const std::vector<BSONObj>& batch,
             const boost::optional<BSONObj>& postBatchResumeToken) {
-            if (ShardingDataTransformMetrics::isEnabled()) {
-                _env->metricsNew()->onOplogEntriesFetched(batch.size(),
-                                                          Milliseconds(batchFetchTimer.millis()));
-            }
+            _env->metricsNew()->onOplogEntriesFetched(batch.size(),
+                                                      Milliseconds(batchFetchTimer.millis()));
 
             ThreadClient client(fmt::format("ReshardingFetcher-{}-{}",
                                             _reshardingUUID.toString(),
@@ -351,14 +354,10 @@ bool ReshardingOplogFetcher::consume(Client* client,
                 uassertStatusOK(toWriteTo->insertDocument(opCtx, InsertStatement{doc}, nullptr));
                 wuow.commit();
 
-                if (ShardingDataTransformMetrics::isEnabled()) {
-                    _env->metricsNew()->onLocalInsertDuringOplogFetching(
-                        Milliseconds(insertTimer.millis()));
-                }
+                _env->metricsNew()->onLocalInsertDuringOplogFetching(
+                    Milliseconds(insertTimer.millis()));
 
                 ++_numOplogEntriesCopied;
-
-                _env->metrics()->onOplogEntriesFetched(1);
 
                 auto [p, f] = makePromiseFuture<void>();
                 {
@@ -403,10 +402,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
 
                     // Also include synthetic oplog in the fetched count so it can match up with the
                     // total oplog applied count in the end.
-                    _env->metrics()->onOplogEntriesFetched(1);
-                    if (ShardingDataTransformMetrics::isEnabled()) {
-                        _env->metricsNew()->onOplogEntriesFetched(1, Milliseconds(0));
-                    }
+                    _env->metricsNew()->onOplogEntriesFetched(1, Milliseconds(0));
 
                     auto [p, f] = makePromiseFuture<void>();
                     {

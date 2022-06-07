@@ -543,7 +543,14 @@ private:
             // 'invalidate'. Place the value on the cache and return the necessary promises to
             // signal (those which are waiting for time < time at the store).
             auto& result = sw.getValue();
+            const auto timeOfOldestPromise = inProgressLookup.getTimeOldestPromise(ul);
             auto promisesToSet = inProgressLookup.getPromisesLessThanOrEqualToTime(ul, result.t);
+            tassert(6493100,
+                    str::stream() << "Time monotonicity violation: lookup time "
+                                  << result.t.toString()
+                                  << " which is less than the earliest expected timeInStore "
+                                  << timeOfOldestPromise.toString() << ".",
+                    !promisesToSet.empty());
 
             auto valueHandleToSet = [&] {
                 if (result.v) {

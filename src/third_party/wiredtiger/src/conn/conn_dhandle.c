@@ -139,7 +139,7 @@ err:
  *     Destroy a data handle.
  */
 static int
-__conn_dhandle_destroy(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
+__conn_dhandle_destroy(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, bool final)
 {
     WT_DECL_RET;
 
@@ -151,7 +151,8 @@ __conn_dhandle_destroy(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
         ret = __wt_schema_close_table(session, (WT_TABLE *)dhandle);
         break;
     case WT_DHANDLE_TYPE_TIERED:
-        WT_WITH_DHANDLE(session, dhandle, ret = __wt_tiered_discard(session, (WT_TIERED *)dhandle));
+        WT_WITH_DHANDLE(
+          session, dhandle, ret = __wt_tiered_discard(session, (WT_TIERED *)dhandle, final));
         break;
     case WT_DHANDLE_TYPE_TIERED_TREE:
         ret = __wt_tiered_tree_close(session, (WT_TIERED_TREE *)dhandle);
@@ -244,7 +245,7 @@ __wt_conn_dhandle_alloc(WT_SESSION_IMPL *session, const char *uri, const char *c
     return (0);
 
 err:
-    WT_TRET(__conn_dhandle_destroy(session, dhandle));
+    WT_TRET(__conn_dhandle_destroy(session, dhandle, false));
     return (ret);
 }
 
@@ -404,7 +405,7 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead)
         WT_TRET(__wt_schema_close_table(session, (WT_TABLE *)dhandle));
         break;
     case WT_DHANDLE_TYPE_TIERED:
-        WT_TRET(__wt_tiered_close(session));
+        WT_TRET(__wt_tiered_close(session, (WT_TIERED *)dhandle, final));
         F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
         break;
     case WT_DHANDLE_TYPE_TIERED_TREE:
@@ -893,7 +894,7 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, bool final, bool mark
      * After successfully removing the handle, clean it up.
      */
     if (ret == 0 || final) {
-        WT_TRET(__conn_dhandle_destroy(session, dhandle));
+        WT_TRET(__conn_dhandle_destroy(session, dhandle, final));
         session->dhandle = NULL;
     }
 

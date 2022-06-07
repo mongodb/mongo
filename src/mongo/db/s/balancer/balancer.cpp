@@ -1014,7 +1014,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
 
     int numChunksProcessed = 0;
     for (const auto& [migrateInfo, futureStatus] : rebalanceMigrationsAndResponses) {
-        auto status = futureStatus.getNoThrow();
+        auto status = futureStatus.getNoThrow(opCtx);
         if (status.isOK()) {
             ++numChunksProcessed;
             continue;
@@ -1051,7 +1051,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
     }
 
     for (const auto& [migrateInfo, futureStatus] : defragmentationMigrationsAndResponses) {
-        auto status = futureStatus.getNoThrow();
+        auto status = futureStatus.getNoThrow(opCtx);
         if (status.isOK()) {
             ++numChunksProcessed;
         }
@@ -1087,8 +1087,7 @@ SharedSemiFuture<void> Balancer::applyLegacyChunkSizeConstraintsOnClusterData(
             0,
             boost::none /*defragmentCollection*/,
             boost::none /*enableAutoSplitter*/);
-    } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>&) {
-        // TODO SERVER-66915 replace caught error code with NamespaceNotSharded
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
         // config.system.collections does not appear in config.collections; continue.
     }
 

@@ -37,7 +37,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_new.h"
 #include "mongo/db/s/resharding_test_commands_gen.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
@@ -80,21 +79,13 @@ public:
                 }
             };
 
-            ReshardingMetrics metrics(opCtx->getServiceContext());
-            metrics.onStart(ReshardingMetrics::Role::kRecipient,
-                            opCtx->getServiceContext()->getFastClockSource()->now());
-            metrics.setRecipientState(RecipientStateEnum::kCloning);
-
-            std::unique_ptr<ReshardingMetricsNew> metricsNew;
-            if (ShardingDataTransformMetrics::isEnabled()) {
-                metricsNew = ReshardingMetricsNew::makeInstance(
-                    request().getUuid(),
-                    request().getShardKey(),
-                    ns(),
-                    ReshardingMetricsNew::Role::kRecipient,
-                    opCtx->getServiceContext()->getFastClockSource()->now(),
-                    opCtx->getServiceContext());
-            }
+            auto metrics = ReshardingMetricsNew::makeInstance(
+                request().getUuid(),
+                request().getShardKey(),
+                ns(),
+                ReshardingMetricsNew::Role::kRecipient,
+                opCtx->getServiceContext()->getFastClockSource()->now(),
+                opCtx->getServiceContext());
 
             auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
             hookList->addHook(
@@ -106,14 +97,13 @@ public:
                     "TestReshardCloneCollectionNetwork", nullptr, std::move(hookList)));
             executor->startup();
 
-            ReshardingCollectionCloner cloner(
-                std::make_unique<ReshardingCollectionCloner::Env>(&metrics, metricsNew.get()),
-                ShardKeyPattern(request().getShardKey()),
-                ns(),
-                request().getUuid(),
-                request().getShardId(),
-                request().getAtClusterTime(),
-                request().getOutputNs());
+            ReshardingCollectionCloner cloner(metrics.get(),
+                                              ShardKeyPattern(request().getShardKey()),
+                                              ns(),
+                                              request().getUuid(),
+                                              request().getShardId(),
+                                              request().getAtClusterTime(),
+                                              request().getOutputNs());
 
             std::shared_ptr<ThreadPool> cancelableOperationContextPool = [] {
                 ThreadPool::Options options;

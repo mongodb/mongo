@@ -90,6 +90,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/initialize_snmp.h"
+#include "mongo/db/internal_transactions_reap_service.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/json.h"
 #include "mongo/db/keys_collection_client_direct.h"
@@ -157,6 +158,7 @@
 #include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_mongod.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/session_killer.h"
 #include "mongo/db/startup_recovery.h"
 #include "mongo/db/startup_warnings_mongod.h"
@@ -1532,6 +1534,8 @@ int mongod_main(int argc, char* argv[]) {
     setUpReplication(service);
     setUpObservers(service);
     service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(service));
+    SessionCatalog::get(service)->setOnEagerlyReapedSessionsFn(
+        InternalTransactionsReapService::onEagerlyReapedSessions);
 
     ErrorExtraInfo::invariantHaveAllParsers();
 

@@ -154,6 +154,7 @@ public:
                                      sourceUUID,
                                      constructTemporaryReshardingNss(sourceNss.db(), sourceUUID),
                                      BSON("newKey" << 1));
+        commonMetadata.setStartTime(getServiceContext()->getFastClockSource()->now());
 
         doc.setCommonReshardingMetadata(std::move(commonMetadata));
         return doc;
@@ -736,22 +737,11 @@ TEST_F(ReshardingDonorServiceTest, RestoreMetricsOnKBlockingWrites) {
     };
     doc.setMutableState(makeDonorCtx());
 
-    auto makeMetricsTimeInterval = [&](const Date_t startTime) {
-        ReshardingMetricsTimeInterval timeInterval;
-        timeInterval.setStart(startTime);
-        return timeInterval;
-    };
-
-    auto timeNow = Date_t::now();
-    auto opTimeDurationSecs = 60;
-    auto critSecDurationSecs = 10;
-
-    ReshardingDonorMetrics reshardingDonorMetrics;
-    reshardingDonorMetrics.setOperationRuntime(
-        makeMetricsTimeInterval(timeNow - Seconds(opTimeDurationSecs)));
-    reshardingDonorMetrics.setCriticalSection(
-        makeMetricsTimeInterval(timeNow - Seconds(critSecDurationSecs)));
-    doc.setMetrics(reshardingDonorMetrics);
+    auto timeNow = getServiceContext()->getFastClockSource()->now();
+    const auto opTimeDurationSecs = 60;
+    auto commonMetadata = doc.getCommonReshardingMetadata();
+    commonMetadata.setStartTime(timeNow - Seconds(opTimeDurationSecs));
+    doc.setCommonReshardingMetadata(std::move(commonMetadata));
 
     createSourceCollection(opCtx.get(), doc);
     DonorStateMachine::insertStateDocument(opCtx.get(), doc);
@@ -779,7 +769,6 @@ TEST_F(ReshardingDonorServiceTest, RestoreMetricsOnKBlockingWrites) {
     ASSERT_EQ(currOp.getStringField("donorState"),
               DonorState_serializer(DonorStateEnum::kBlockingWrites));
     ASSERT_GTE(currOp.getField("totalOperationTimeElapsedSecs").Long(), opTimeDurationSecs);
-    ASSERT_GTE(currOp.getField("totalCriticalSectionTimeElapsedSecs").Long(), critSecDurationSecs);
 
     stateTransitionsGuard.unset(kDoneState);
     ASSERT_OK(donor->getCompletionFuture().getNoThrow());

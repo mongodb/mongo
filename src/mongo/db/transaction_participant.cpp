@@ -333,19 +333,16 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
 
 /**
  * Returns the highest txnNumber in the given session that has corresponding internal sessions as
- * found in the session catalog and the config.transactions collection.
+ * found in the config.transactions collection.
  */
 TxnNumber fetchHighestTxnNumberWithInternalSessions(OperationContext* opCtx,
-                                                    const LogicalSessionId& parentLsid,
-                                                    TxnNumber cachedHighestTxnNumber) {
+                                                    const LogicalSessionId& parentLsid) {
+    TxnNumber highestTxnNumber = kUninitializedTxnNumber;
     try {
         performReadWithNoTimestampDBDirectClient(opCtx, [&](DBDirectClient* client) {
             FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
-            findRequest.setFilter(BSON(SessionTxnRecord::kParentSessionIdFieldName
-                                       << parentLsid.toBSON()
-                                       << (SessionTxnRecord::kSessionIdFieldName + "." +
-                                           LogicalSessionId::kTxnNumberFieldName)
-                                       << BSON("$gte" << cachedHighestTxnNumber)));
+            findRequest.setFilter(
+                BSON(SessionTxnRecord::kParentSessionIdFieldName << parentLsid.toBSON()));
             findRequest.setSort(BSON((SessionTxnRecord::kSessionIdFieldName + "." +
                                       LogicalSessionId::kTxnNumberFieldName)
                                      << -1));
@@ -359,9 +356,14 @@ TxnNumber fetchHighestTxnNumberWithInternalSessions(OperationContext* opCtx,
                 const auto doc = cursor->next();
                 const auto childLsid = LogicalSessionId::parse(
                     IDLParserErrorContext("LogicalSessionId"), doc.getObjectField("_id"));
-                cachedHighestTxnNumber =
-                    std::max(cachedHighestTxnNumber, *childLsid.getTxnNumber());
+
                 invariant(!cursor->more());
+                // All config.transactions entries with the parentLsid field should have a txnNumber
+                // in their sessionId, but users may manually modify that collection so we can't
+                // assume that.
+                if (childLsid.getTxnNumber().has_value()) {
+                    highestTxnNumber = *childLsid.getTxnNumber();
+                }
             }
         });
     } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
@@ -369,7 +371,7 @@ TxnNumber fetchHighestTxnNumberWithInternalSessions(OperationContext* opCtx,
         throw;
     }
 
-    return cachedHighestTxnNumber;
+    return highestTxnNumber;
 }
 
 void updateSessionEntry(OperationContext* opCtx,
@@ -2861,8 +2863,7 @@ void TransactionParticipant::Participant::_refreshSelfFromStorageIfNeeded(Operat
     if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
             serverGlobalParams.featureCompatibility) &&
         !_isInternalSession()) {
-        const auto txnNumber = fetchHighestTxnNumberWithInternalSessions(
-            opCtx, _sessionId(), _session()->getCachedHighestTxnNumberWithChildSessions());
+        const auto txnNumber = fetchHighestTxnNumberWithInternalSessions(opCtx, _sessionId());
         if (txnNumber > o().activeTxnNumberAndRetryCounter.getTxnNumber()) {
             _setNewTxnNumberAndRetryCounter(opCtx, {txnNumber, kUninitializedTxnRetryCounter});
         }

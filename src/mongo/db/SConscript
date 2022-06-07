@@ -826,6 +826,7 @@ env.Library(
 env.Library(
     target='transaction',
     source=[
+        'internal_transactions_reap_service.cpp',
         'retryable_writes_stats.cpp',
         'server_transactions_metrics.cpp',
         'session_catalog_mongod.cpp',
@@ -833,6 +834,7 @@ env.Library(
         'transaction_metrics_observer.cpp',
         'transaction_participant.cpp',
         'transaction_participant_resource_yielder.cpp',
+        'internal_transactions_reap_service.idl',
         'session_txn_record.idl',
         'transaction_participant.idl',
         'transactions_stats.idl',
@@ -850,6 +852,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/index/index_access_method',
+        '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/s/sharding_router_api',
@@ -2709,6 +2712,7 @@ if wiredtiger:
             'index_builds_coordinator_mongod_test.cpp',
             'index_builds_coordinator_test.cpp',
             'internal_session_pool_test.cpp',
+            'internal_transactions_reap_service_test.cpp',
             'keypattern_test.cpp',
             'keys_collection_document_test.cpp',
             'logical_session_cache_test.cpp',

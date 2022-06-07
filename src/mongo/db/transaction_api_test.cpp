@@ -181,7 +181,7 @@ public:
         return true;
     }
 
-    virtual bool canRunInShardedOperations() const override {
+    virtual bool runsClusterOperations() const override {
         return false;
     }
 
@@ -402,6 +402,32 @@ private:
     txn_api::details::MockTransactionClient* _mockClient{nullptr};
     MockResourceYielder* _resourceYielder{nullptr};
     std::unique_ptr<txn_api::SyncTransactionWithRetries> _txnWithRetries;
+};
+
+class MockClusterOperationTransactionClient : public txn_api::TransactionClient {
+public:
+    virtual void injectHooks(std::unique_ptr<txn_api::details::TxnMetadataHooks> hooks) {}
+
+    virtual SemiFuture<BSONObj> runCommand(StringData dbName, BSONObj cmd) const {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual SemiFuture<BatchedCommandResponse> runCRUDOp(const BatchedCommandRequest& cmd,
+                                                         std::vector<StmtId> stmtIds) const {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual SemiFuture<std::vector<BSONObj>> exhaustiveFind(const FindCommandRequest& cmd) const {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual bool supportsClientTransactionContext() const {
+        return true;
+    }
+
+    virtual bool runsClusterOperations() const override {
+        return true;
+    }
 };
 
 TEST_F(TxnAPITest, OwnSession_AttachesTxnMetadata) {
@@ -1909,38 +1935,48 @@ TEST_F(TxnAPITest, CannotBeUsedWithinShardedOperationsIfClientDoesNotSupportIt) 
         resetTxnWithRetries(), DBException, ErrorCodes::duplicateCodeForTest(6638800));
 }
 
-class MockShardedOperationTransactionClient : public txn_api::TransactionClient {
-public:
-    virtual void injectHooks(std::unique_ptr<txn_api::details::TxnMetadataHooks> hooks) {}
-
-    virtual SemiFuture<BSONObj> runCommand(StringData dbName, BSONObj cmd) const {
-        MONGO_UNREACHABLE;
-    }
-
-    virtual SemiFuture<BatchedCommandResponse> runCRUDOp(const BatchedCommandRequest& cmd,
-                                                         std::vector<StmtId> stmtIds) const {
-        MONGO_UNREACHABLE;
-    }
-
-    virtual SemiFuture<std::vector<BSONObj>> exhaustiveFind(const FindCommandRequest& cmd) const {
-        MONGO_UNREACHABLE;
-    }
-
-    virtual bool supportsClientTransactionContext() const {
-        MONGO_UNREACHABLE;
-    }
-
-    virtual bool canRunInShardedOperations() const override {
-        return true;
-    }
-};
-
 TEST_F(TxnAPITest, CanBeUsedWithinShardedOperationsIfClientSupportsIt) {
     OperationShardingState::setShardRole(
         opCtx(), NamespaceString("foo.bar"), ChunkVersion(), boost::none);
 
     // Should not throw.
-    resetTxnWithRetriesWithClient(std::make_unique<MockShardedOperationTransactionClient>());
+    resetTxnWithRetriesWithClient(std::make_unique<MockClusterOperationTransactionClient>());
+}
+
+TEST_F(TxnAPITest, DoNotAllowCrossShardTransactionsOnShardWhenInClientTransaction) {
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    opCtx()->setTxnNumber(5);
+    opCtx()->setInMultiDocumentTransaction();
+    ASSERT_THROWS_CODE(
+        resetTxnWithRetriesWithClient(std::make_unique<MockClusterOperationTransactionClient>()),
+        DBException,
+        6648101);
+}
+
+TEST_F(TxnAPITest, DoNotAllowCrossShardTransactionsOnShardWhenInRetryableWrite) {
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    opCtx()->setTxnNumber(5);
+    ASSERT_THROWS_CODE(
+        resetTxnWithRetriesWithClient(std::make_unique<MockClusterOperationTransactionClient>()),
+        DBException,
+        6648100);
+}
+
+TEST_F(TxnAPITest, AllowCrossShardTransactionsOnMongosWhenInRetryableWrite) {
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    opCtx()->setTxnNumber(5);
+    setMongos(true);
+    resetTxnWithRetriesWithClient(std::make_unique<MockClusterOperationTransactionClient>());
+    setMongos(false);
+}
+
+TEST_F(TxnAPITest, AllowCrossShardTransactionsOnMongosWhenInClientTransaction) {
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    opCtx()->setTxnNumber(5);
+    opCtx()->setInMultiDocumentTransaction();
+    setMongos(true);
+    resetTxnWithRetriesWithClient(std::make_unique<MockClusterOperationTransactionClient>());
+    setMongos(false);
 }
 
 }  // namespace

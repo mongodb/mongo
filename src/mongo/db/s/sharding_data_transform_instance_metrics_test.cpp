@@ -371,6 +371,21 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientReportsRemainingTime) 
     ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"), 0);
 }
 
+TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientRestoreAppliedOplogEntries) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("oplogEntriesApplied"), 0);
+
+    metrics->restoreOplogEntriesApplied(120);
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("oplogEntriesApplied"), 120);
+
+    metrics->restoreOplogEntriesApplied(30);
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("oplogEntriesApplied"), 30);
+}
+
 TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsCopyingTime) {
     runTimeReportTest(
         "CurrentOpReportsCopyingTime",

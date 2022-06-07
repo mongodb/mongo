@@ -818,8 +818,11 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
     WT_CONFIG_ITEM cval;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
+    bool is_import;
 
     session = (WT_SESSION_IMPL *)wt_session;
+    is_import = session->import_list != NULL ||
+      (__wt_config_getones(session, config, "import.enabled", &cval) == 0 && cval.val != 0);
     SESSION_API_CALL(session, create, config, cfg);
     WT_UNUSED(cfg);
 
@@ -853,6 +856,13 @@ err:
         WT_STAT_CONN_INCR(session, session_table_create_fail);
     else
         WT_STAT_CONN_INCR(session, session_table_create_success);
+
+    if (is_import) {
+        if (ret != 0)
+            WT_STAT_CONN_INCR(session, session_table_create_import_fail);
+        else
+            WT_STAT_CONN_INCR(session, session_table_create_import_success);
+    }
     API_END_RET_NOTFOUND_MAP(session, ret);
 }
 

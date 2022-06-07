@@ -350,6 +350,10 @@ void ShardingDataTransformInstanceMetrics::onOplogEntriesApplied(int64_t numEntr
     _cumulativeMetrics->onOplogEntriesApplied(numEntries);
 }
 
+void ShardingDataTransformInstanceMetrics::restoreOplogEntriesApplied(int64_t numEntries) {
+    _oplogEntriesApplied.store(numEntries);
+}
+
 void ShardingDataTransformInstanceMetrics::onWriteDuringCriticalSection() {
     _writesDuringCriticalSection.addAndFetch(1);
     _cumulativeMetrics->onWriteDuringCriticalSection();
@@ -406,6 +410,31 @@ void ShardingDataTransformInstanceMetrics::onCloningTotalRemoteBatchRetrieval(
 
 void ShardingDataTransformInstanceMetrics::onOplogLocalBatchApplied(Milliseconds elapsed) {
     _cumulativeMetrics->onOplogLocalBatchApplied(elapsed);
+}
+
+ShardingDataTransformCumulativeMetrics*
+ShardingDataTransformInstanceMetrics::getCumulativeMetrics() {
+    return _cumulativeMetrics;
+}
+
+void ShardingDataTransformInstanceMetrics::onStarted() {
+    _cumulativeMetrics->onStarted();
+}
+
+void ShardingDataTransformInstanceMetrics::onSuccess() {
+    _cumulativeMetrics->onSuccess();
+}
+
+void ShardingDataTransformInstanceMetrics::onFailure() {
+    _cumulativeMetrics->onFailure();
+}
+
+void ShardingDataTransformInstanceMetrics::onCanceled() {
+    _cumulativeMetrics->onCanceled();
+}
+
+void ShardingDataTransformInstanceMetrics::setLastOpEndingChunkImbalance(int64_t imbalanceCount) {
+    _cumulativeMetrics->setLastOpEndingChunkImbalance(imbalanceCount);
 }
 
 }  // namespace mongo

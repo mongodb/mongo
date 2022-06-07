@@ -51,7 +51,6 @@
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_state.h"
@@ -184,39 +183,8 @@ public:
     }
 };
 
-ShardingDataTransformCumulativeMetrics::DonorStateEnum toMetricsState(DonorStateEnum enumVal) {
-    using MetricsEnum = ShardingDataTransformCumulativeMetrics::DonorStateEnum;
-
-    switch (enumVal) {
-        case DonorStateEnum::kUnused:
-            return MetricsEnum::kUnused;
-
-        case DonorStateEnum::kPreparingToDonate:
-            return MetricsEnum::kPreparingToDonate;
-
-        case DonorStateEnum::kDonatingInitialData:
-            return MetricsEnum::kDonatingInitialData;
-
-        case DonorStateEnum::kDonatingOplogEntries:
-            return MetricsEnum::kDonatingOplogEntries;
-
-        case DonorStateEnum::kPreparingToBlockWrites:
-            return MetricsEnum::kPreparingToBlockWrites;
-
-        case DonorStateEnum::kError:
-            return MetricsEnum::kError;
-
-        case DonorStateEnum::kBlockingWrites:
-            return MetricsEnum::kBlockingWrites;
-
-        case DonorStateEnum::kDone:
-            return MetricsEnum::kDone;
-        default:
-            invariant(false,
-                      str::stream() << "Unexpected resharding coordinator state: "
-                                    << DonorState_serializer(enumVal));
-            MONGO_UNREACHABLE;
-    }
+ReshardingMetricsNew::DonorState toMetricsState(DonorStateEnum state) {
+    return ReshardingMetricsNew::DonorState(state);
 }
 
 }  // namespace
@@ -241,9 +209,7 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
     std::unique_ptr<DonorStateMachineExternalState> externalState)
     : repl::PrimaryOnlyService::TypedInstance<DonorStateMachine>(),
       _donorService(donorService),
-      _metricsNew{ShardingDataTransformMetrics::isEnabled()
-                      ? ReshardingMetricsNew::initializeFrom(donorDoc, getGlobalServiceContext())
-                      : nullptr},
+      _metricsNew{ReshardingMetricsNew::initializeFrom(donorDoc, getGlobalServiceContext())},
       _metadata{donorDoc.getCommonReshardingMetadata()},
       _recipientShardIds{donorDoc.getRecipientShards()},
       _donorCtx{donorDoc.getMutableState()},
@@ -267,9 +233,7 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
       }()) {
     invariant(_externalState);
 
-    if (ShardingDataTransformMetrics::isEnabled()) {
-        _metricsNew->onStateTransition(boost::none, toMetricsState(_donorCtx.getState()));
-    }
+    _metricsNew->onStateTransition(boost::none, toMetricsState(_donorCtx.getState()));
 }
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockingWritesOrErrored(
@@ -421,10 +385,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                            _critSecReason,
                            ShardingCatalogClient::kLocalWriteConcern);
 
-                   _metrics()->leaveCriticalSection(getCurrentTime());
-                   if (ShardingDataTransformMetrics::isEnabled()) {
-                       _metricsNew->onCriticalSectionEnd();
-                   }
+                   _metricsNew->onCriticalSectionEnd();
                }
 
                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
@@ -466,13 +427,7 @@ Status ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(
         ensureFulfilledPromise(lk, _completionPromise, statusForPromise);
     }
 
-    if (stepdownToken.isCanceled()) {
-        _metrics()->onStepDown(ReshardingMetrics::Role::kDonor);
-    }
-
-    if (ShardingDataTransformMetrics::isEnabled()) {
-        _metricsNew->onStateTransition(toMetricsState(_donorCtx.getState()), boost::none);
-    }
+    _metricsNew->onStateTransition(toMetricsState(_donorCtx.getState()), boost::none);
 
     return status;
 }
@@ -485,7 +440,6 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
     _cancelableOpCtxFactory.emplace(abortToken, _markKilledExecutor);
 
     return ExecutorFuture(**executor)
-        .then([this] { _startMetrics(); })
         .then([this, executor, abortToken] {
             return _runUntilBlockingWritesOrErrored(executor, abortToken);
         })
@@ -539,16 +493,7 @@ void ReshardingDonorService::DonorStateMachine::interrupt(Status status) {}
 boost::optional<BSONObj> ReshardingDonorService::DonorStateMachine::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-    if (ShardingDataTransformMetrics::isEnabled()) {
-        return _metricsNew->reportForCurrentOp();
-    }
-
-    ReshardingMetrics::ReporterOptions options(ReshardingMetrics::Role::kDonor,
-                                               _metadata.getReshardingUUID(),
-                                               _metadata.getSourceNss(),
-                                               _metadata.getReshardingKey().toBSON(),
-                                               false);
-    return _metrics()->reportForCurrentOp(options);
+    return _metricsNew->reportForCurrentOp();
 }
 
 void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
@@ -576,16 +521,10 @@ void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
 }
 
 void ReshardingDonorService::DonorStateMachine::onWriteDuringCriticalSection() {
-    if (!ShardingDataTransformMetrics::isEnabled()) {
-        return;
-    }
     _metricsNew->onWriteDuringCriticalSection();
 }
 
 void ReshardingDonorService::DonorStateMachine::onReadDuringCriticalSection() {
-    if (!ShardingDataTransformMetrics::isEnabled()) {
-        return;
-    }
     _metricsNew->onReadDuringCriticalSection();
 }
 
@@ -751,10 +690,7 @@ void ReshardingDonorService::DonorStateMachine::
                 _critSecReason,
                 ShardingCatalogClient::kLocalWriteConcern);
 
-        _metrics()->enterCriticalSection(getCurrentTime());
-        if (ShardingDataTransformMetrics::isEnabled()) {
-            _metricsNew->onCriticalSectionBegin();
-        }
+        _metricsNew->onCriticalSectionBegin();
     }
 
     {
@@ -891,11 +827,8 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(DonorShardConte
     auto newState = newDonorCtx.getState();
 
     _updateDonorDocument(std::move(newDonorCtx));
-    _metrics()->setDonorState(newState);
 
-    if (ShardingDataTransformMetrics::isEnabled()) {
-        _metricsNew->onStateTransition(toMetricsState(oldState), toMetricsState(newState));
-    }
+    _metricsNew->onStateTransition(toMetricsState(oldState), toMetricsState(newState));
 
     LOGV2_INFO(5279505,
                "Transitioned resharding donor state",
@@ -1076,14 +1009,6 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
 
         opCtx->recoveryUnit()->onCommit([this, stepdownToken, aborted](boost::optional<Timestamp>) {
             stdx::lock_guard<Latch> lk(_mutex);
-
-            if (!stepdownToken.isCanceled()) {
-                _metrics()->onCompletion(ReshardingMetrics::Role::kDonor,
-                                         aborted ? ReshardingOperationStatusEnum::kFailure
-                                                 : ReshardingOperationStatusEnum::kSuccess,
-                                         getCurrentTime());
-            }
-
             _completionPromise.emplaceValue();
         });
 
@@ -1096,19 +1021,6 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
 
         wuow.commit();
     });
-}
-
-ReshardingMetrics* ReshardingDonorService::DonorStateMachine::_metrics() const {
-    return ReshardingMetrics::get(cc().getServiceContext());
-}
-
-void ReshardingDonorService::DonorStateMachine::_startMetrics() {
-    auto donorState = _donorCtx.getState();
-    if (donorState > DonorStateEnum::kPreparingToDonate) {
-        _metrics()->onStepUp(donorState, _donorMetricsToRestore);
-    } else {
-        _metrics()->onStart(ReshardingMetrics::Role::kDonor, getCurrentTime());
-    }
 }
 
 CancellationToken ReshardingDonorService::DonorStateMachine::_initAbortSource(

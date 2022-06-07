@@ -349,20 +349,16 @@ void ShardingDataTransformCumulativeMetrics::onStarted() {
     _countStarted.fetchAndAdd(1);
 }
 
-void ShardingDataTransformCumulativeMetrics::onCompletion(ReshardingOperationStatusEnum status) {
-    switch (status) {
-        case ReshardingOperationStatusEnum::kSuccess:
-            _countSucceeded.fetchAndAdd(1);
-            break;
-        case ReshardingOperationStatusEnum::kFailure:
-            _countFailed.fetchAndAdd(1);
-            break;
-        case ReshardingOperationStatusEnum::kCanceled:
-            _countCancelled.fetchAndAdd(1);
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
+void ShardingDataTransformCumulativeMetrics::onSuccess() {
+    _countSucceeded.fetchAndAdd(1);
+}
+
+void ShardingDataTransformCumulativeMetrics::onFailure() {
+    _countFailed.fetchAndAdd(1);
+}
+
+void ShardingDataTransformCumulativeMetrics::onCanceled() {
+    _countCancelled.fetchAndAdd(1);
 }
 
 void ShardingDataTransformCumulativeMetrics::setLastOpEndingChunkImbalance(int64_t imbalanceCount) {

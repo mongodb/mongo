@@ -656,7 +656,7 @@ Status OplogFetcher::_createNewCursor(bool initialFind) {
             _nss,
             _makeFindQueryFilter(),
             _makeFindQuerySettings(maxTimeMs),
-            0 /* nToReturn */,
+            0 /* limit */,
             0 /* nToSkip */,
             nullptr /* fieldsToReturn */,
             QueryOption_CursorTailable | QueryOption_AwaitData |

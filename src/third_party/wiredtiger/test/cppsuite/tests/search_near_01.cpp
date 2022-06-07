@@ -167,7 +167,7 @@ class search_near_01 : public test {
                     for (uint64_t k = 0; k < ALPHABET.size(); ++k) {
                         std::string key = {ALPHABET.at(i), ALPHABET.at(j), ALPHABET.at(k)};
                         evict_cursor->set_key(evict_cursor.get(), key.c_str());
-                        evict_cursor->search_near(evict_cursor.get(), &cmpp);
+                        testutil_check(evict_cursor->search_near(evict_cursor.get(), &cmpp));
                         testutil_check(evict_cursor->reset(evict_cursor.get()));
                     }
                 }
@@ -186,7 +186,7 @@ class search_near_01 : public test {
         int cmpp = 0;
 
         scoped_cursor cursor = tc->session.open_scoped_cursor(collection_name);
-        cursor->reconfigure(cursor.get(), "prefix_search=true");
+        testutil_check(cursor->reconfigure(cursor.get(), "prefix_search=true"));
         /* Generate search prefix key of random length between a -> zzz. */
         srch_key = random_generator::instance().generate_random_string(
           srchkey_len, characters_type::ALPHABET);

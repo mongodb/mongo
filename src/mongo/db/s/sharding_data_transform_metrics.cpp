@@ -47,9 +47,4 @@ StringData ShardingDataTransformMetrics::getRoleName(Role role) {
     return it->second;
 }
 
-bool ShardingDataTransformMetrics::isEnabled() {
-    return feature_flags::gFeatureFlagShardingDataTransformMetrics.isEnabled(
-        serverGlobalParams.featureCompatibility);
-}
-
 }  // namespace mongo

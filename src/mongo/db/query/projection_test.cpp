@@ -117,8 +117,9 @@ TEST(QueryProjectionTest, MakeSingleFieldInclusion) {
     ASSERT_FALSE(proj.requiresDocument());
     const auto& fields = proj.getRequiredFields();
     ASSERT_EQUALS(fields.size(), 2U);
-    ASSERT_EQUALS(fields[0], "_id");
-    ASSERT_EQUALS(fields[1], "a");
+    auto fieldsIt = fields.begin();
+    ASSERT_EQUALS(*fieldsIt++, "_id");
+    ASSERT_EQUALS(*fieldsIt++, "a");
 }
 
 TEST(QueryProjectionTest, MakeSingleFieldInclusionNoId) {
@@ -126,7 +127,7 @@ TEST(QueryProjectionTest, MakeSingleFieldInclusionNoId) {
     ASSERT_FALSE(proj.requiresDocument());
     const auto& fields = proj.getRequiredFields();
     ASSERT_EQUALS(fields.size(), 1U);
-    ASSERT_EQUALS(fields[0], "a");
+    ASSERT_EQUALS(*fields.begin(), "a");
 }
 
 TEST(QueryProjectionTest, MakeSingleFieldId) {
@@ -134,7 +135,7 @@ TEST(QueryProjectionTest, MakeSingleFieldId) {
     ASSERT_FALSE(proj.requiresDocument());
     const auto& fields = proj.getRequiredFields();
     ASSERT_EQUALS(fields.size(), 1U);
-    ASSERT_EQUALS(fields[0], "_id");
+    ASSERT_EQUALS(*fields.begin(), "_id");
 }
 
 TEST(QueryProjectionTest, MakeSingleFieldNoIdBoolean) {
@@ -142,7 +143,7 @@ TEST(QueryProjectionTest, MakeSingleFieldNoIdBoolean) {
     ASSERT_FALSE(proj.requiresDocument());
     const auto& fields = proj.getRequiredFields();
     ASSERT_EQUALS(fields.size(), 1U);
-    ASSERT_EQUALS(fields[0], "a");
+    ASSERT_EQUALS(*fields.begin(), "a");
 }
 
 TEST(QueryProjectionTest, MakeSingleFieldFalseIdBoolean) {
@@ -150,7 +151,7 @@ TEST(QueryProjectionTest, MakeSingleFieldFalseIdBoolean) {
     ASSERT_FALSE(proj.requiresDocument());
     const auto& fields = proj.getRequiredFields();
     ASSERT_EQUALS(fields.size(), 1U);
-    ASSERT_EQUALS(fields[0], "a");
+    ASSERT_EQUALS(*fields.begin(), "a");
 }
 
 //
@@ -504,7 +505,7 @@ TEST(QueryProjectionTest, ProjectionWithExpressionIsNotSimple) {
 
     const auto& fields = proj.getRequiredFields();
     ASSERT_EQ(fields.size(), 1);
-    ASSERT_EQ(fields[0], "_id");
+    ASSERT_EQ(*fields.begin(), "_id");
 }
 
 TEST(QueryProjectionTest, ProjectionWithTopLevelExpressionConstantDoesNotRequireField) {
@@ -513,8 +514,9 @@ TEST(QueryProjectionTest, ProjectionWithTopLevelExpressionConstantDoesNotRequire
 
     const auto& fields = proj.getRequiredFields();
     ASSERT_EQ(fields.size(), 2);
-    ASSERT_EQ(fields[0], "_id");
-    ASSERT_EQ(fields[1], "b");
+    auto fieldsIt = fields.begin();
+    ASSERT_EQ(*fieldsIt++, "_id");
+    ASSERT_EQ(*fieldsIt++, "b");
 }
 
 TEST(QueryProjectionTest, ProjectionWithROOTNeedsWholeDocument) {
@@ -530,8 +532,9 @@ TEST(QueryProjectionTest, ProjectionWithFieldPathExpressionDoesNotNeedWholeDocum
 
     const auto& fields = proj.getRequiredFields();
     ASSERT_EQ(fields.size(), 2);
-    ASSERT_EQ(fields[0], "b");
-    ASSERT_EQ(fields[1], "c");
+    auto fieldsIt = fields.begin();
+    ASSERT_EQ(*fieldsIt++, "b");
+    ASSERT_EQ(*fieldsIt++, "c");
 }
 
 TEST(QueryProjectionTest, AssignmentToDottedPathRequiresFirstComponent) {
@@ -541,7 +544,7 @@ TEST(QueryProjectionTest, AssignmentToDottedPathRequiresFirstComponent) {
 
     const auto& fields = proj.getRequiredFields();
     ASSERT_EQ(fields.size(), 1);
-    ASSERT_EQ(fields[0], "a");
+    ASSERT_EQ(*fields.begin(), "a");
 }
 
 }  // namespace

@@ -42,10 +42,6 @@ feature_flags:
     cpp_varname: feature_flags::gBalanceAccordingToDataSize
     default: true
     version: 6.1
-  featureFlagShardingDataTransformMetrics:
-      description: Feature flag for enabling the new metrics for global indexes and resharding.
-      cpp_varname: feature_flags::gFeatureFlagShardingDataTransformMetrics
-      default: false
   featureFlagOrphanTracking:
     description: "Feature flag for enabling orphan tracking during migrations and range deletions"
     cpp_varname: feature_flags::gOrphanTracking

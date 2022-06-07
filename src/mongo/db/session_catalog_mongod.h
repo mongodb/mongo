@@ -39,6 +39,10 @@ class MongoDSessionCatalog {
 public:
     static const std::string kConfigTxnsPartialIndexName;
 
+    // The max batch size is chosen so that a single batch won't exceed the 16MB BSON object size
+    // limit.
+    static const int kMaxSessionDeletionBatchSize = 10'000;
+
     /**
      * Returns the specification for the partial index on config.transactions used to support
      * retryable transactions.
@@ -83,6 +87,12 @@ public:
     static int reapSessionsOlderThan(OperationContext* opCtx,
                                      SessionsCollection& sessionsCollection,
                                      Date_t possiblyExpired);
+
+    /**
+     * Deletes the given session ids from config.transactions and config.image_collection.
+     */
+    static int removeSessionsTransactionRecords(OperationContext* opCtx,
+                                                const std::vector<LogicalSessionId>& lsidsToRemove);
 };
 
 /**

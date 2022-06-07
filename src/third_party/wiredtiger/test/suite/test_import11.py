@@ -34,6 +34,7 @@ import glob, os, random, re, shutil, string
 import wiredtiger, wttest
 from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
+from wiredtiger import stat
 
 # Shared base class used by import tests.
 class test_import_base(TieredConfigMixin, wttest.WiredTigerTestCase):
@@ -112,6 +113,15 @@ class test_import11(test_import_base):
     tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = make_scenarios(tiered_storage_sources)
 
+    def conn_config(self):
+        return self.tiered_conn_config() + ',statistics=(all)'
+
+    def get_stat(self, stat):
+        stat_cursor = self.session.open_cursor('statistics:')
+        val = stat_cursor[stat][2]
+        stat_cursor.close()
+        return val
+
     def create_and_populate(self, uri):
         self.session.create(uri, self.create_config)
 
@@ -175,16 +185,22 @@ class test_import11(test_import_base):
             # Test we cannot use the file_metadata with a tiered table.
             invalid_config = 'import=(enabled,repair=false,file_metadata=(' + table_config + '))'
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.session.create(self.uri_a, invalid_config), msg)
+            failed_imports = self.get_stat(stat.conn.session_table_create_import_fail)
+            self.assertTrue(failed_imports == 1)
 
             # Test we cannot use the file_metadata with a tiered table and an export file.
             invalid_config = 'import=(enabled,repair=false,file_metadata=(' + table_config + '),metadata_file="WiredTiger.export")'
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.session.create(self.uri_a, invalid_config), msg)
+            failed_imports = self.get_stat(stat.conn.session_table_create_import_fail)
+            self.assertTrue(failed_imports == 2)
 
             msg = "/Invalid argument/"
 
             # Test importing a tiered table with no import configuration.
             invalid_config = 'import=(enabled,repair=false)'
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.session.create(self.uri_a, invalid_config), msg)
+            failed_imports = self.get_stat(stat.conn.session_table_create_import_fail)
+            self.assertTrue(failed_imports == 3)
 
         import_config = 'import=(enabled,repair=false,metadata_file="WiredTiger.export")'
 
@@ -192,8 +208,16 @@ class test_import11(test_import_base):
         self.session.create(self.uri_a, import_config)
         self.checkpoint_and_flush_tier()
 
+        # Check the number of files imported after doing an import operation.
+        files_imported_prev = self.get_stat(stat.conn.session_table_create_import_success)
+        self.assertTrue(files_imported_prev == 1)
+
         self.session.create(self.uri_b, import_config)
         self.checkpoint_and_flush_tier()
+
+        # Check the number of files imported has increased after doing another import operation.
+        files_imported = self.get_stat(stat.conn.session_table_create_import_success)
+        self.assertTrue(files_imported == files_imported_prev + 1)
 
         # Remove WiredTiger.export file.
         export_file_path = os.path.join('IMPORT_DB', 'WiredTiger.export')

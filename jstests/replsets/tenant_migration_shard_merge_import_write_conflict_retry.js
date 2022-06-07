@@ -34,21 +34,15 @@ if (!TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
     return;
 }
 
-if (TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
-    // TODO SERVER-63789: Re-enable this test for Shard Merge
-    tenantMigrationTest.stop();
-    jsTestLog("Temporarily skipping Shard Merge test, dependent on SERVER-63789.");
-    return;
-}
-
 const kDataDir =
     `${recipientPrimary.dbpath}/migrationTmpFiles.${extractUUIDFromObject(migrationId)}`;
 assert.eq(runNonMongoProgram("mkdir", "-p", kDataDir), 0);
 
+const dbName = "myDatabase";
+
 (function() {
 jsTestLog("Generate test data");
 
-const dbName = "myDatabase";
 const db = donorPrimary.getDB(dbName);
 const collection = db["myCollection"];
 const capped = db["myCappedCollection"];
@@ -69,7 +63,6 @@ configureFailPoint(
     recipientPrimary, "WTWriteConflictExceptionForImportCollection", {} /* data */, {times: 1});
 configureFailPoint(
     recipientPrimary, "WTWriteConflictExceptionForImportIndex", {} /* data */, {times: 1});
-configureFailPoint(recipientPrimary, "skipDeleteTempDBPath");
 
 jsTestLog("Run migration");
 // The old multitenant migrations won't copy myDatabase since it doesn't start with testTenantId,

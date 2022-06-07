@@ -527,7 +527,7 @@ var _bulk_api_module = (function() {
 
         // Set max byte size
         var maxBatchSizeBytes = 1024 * 1024 * 16;
-        var maxNumberOfDocsInBatch = (TestData && TestData.disableBatchWrites) ? 1 : 1000;
+        var maxNumberOfDocsInBatch = 1000;
         var idFieldOverhead = Object.bsonsize({_id: ObjectId()}) - Object.bsonsize({});
         var writeConcern = null;
         var letParams = null;

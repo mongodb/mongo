@@ -26,6 +26,25 @@ longTermSupportReleases:
   - "5.0"
   - "6.0"
 
+# List of stable MongoDB versions since 2.0 that have been EOL'd. This does not
+# include developer builds (ex: 4.1), but does include rapid releases.
+eolVersions:
+  - "2.0"
+  - "2.2"
+  - "2.4"
+  - "2.6"
+  - "3.0" # 2018-02
+  - "3.2" # 2018-09
+  - "3.4" # 2020-01
+  - "3.6" # 2021-04
+  - "4.0" # 2022-04
+# - "4.2" # 2023-04
+# - "4.4" # 2024-02
+# - "5.0" # 2024-10
+  - "5.1" # 2022-01
+  - "5.2" # 2022-04
+# - "5.3" # TBD
+
 # Optional.
 # Using this special override extends FCV constant generation down to the previous value of
 # lastLTS. This is intended to ease the transition to a new lastLTS by extending the lifetime

@@ -485,7 +485,7 @@ public:
     CurlHandle(CurlHandle&& other) = default;
 
     ~CurlHandle() {
-        if (!_success && _poolHandle.get() != nullptr) {
+        if (!_finished && _poolHandle.get() != nullptr) {
             _poolHandle->indicateFailure(
                 Status(ErrorCodes::HostUnreachable, "unknown curl handle failure"));
         }
@@ -503,12 +503,20 @@ public:
         // use it.
         _poolHandle->indicateUsed();
 
-        _success = true;
+        _finished = true;
+    }
+
+    void indicateFailure(const Status& status) {
+        if (_poolHandle.get() != nullptr) {
+            _poolHandle->indicateFailure(status);
+        }
+
+        _finished = true;
     }
 
 private:
     executor::ConnectionPool::ConnectionHandle _poolHandle;
-    bool _success = false;
+    bool _finished = false;
 
     // Owned by _poolHandle
     CURL* _handle;
@@ -609,11 +617,14 @@ public:
             uassertStatusOK(swHandle.getStatus());
 
             CurlHandle handle(std::move(swHandle.getValue()));
-            auto reply = request(handle.get(), method, url, cdr);
-
-            // indidicateFailure will be called if indicateSuccess is not called.
-            handle.indicateSuccess();
-            return reply;
+            try {
+                auto reply = request(handle.get(), method, url, cdr);
+                handle.indicateSuccess();
+                return reply;
+            } catch (DBException& e) {
+                handle.indicateFailure(e.toStatus());
+                throw;
+            }
         } else {
             // Make a request with a non-pooled handle. This is needed during server startup when
             // thread spawning is not allowed which is required by the thread pool.
