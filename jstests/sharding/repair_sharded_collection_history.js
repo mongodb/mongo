@@ -1,9 +1,3 @@
-/**
- * This test can be enabled in the multiversion suites when SERVER-62065 is released in 4.2
- *
- * @tags: [backport_required_multiversion]
- */
-
 (function() {
 'use strict';
 
