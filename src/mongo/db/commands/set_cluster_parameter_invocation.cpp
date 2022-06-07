@@ -51,11 +51,29 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
                                            const WriteConcernOptions& writeConcern) {
 
     BSONObj cmdParamObj = cmd.getCommandParameter();
-    BSONElement commandElement = cmdParamObj.firstElement();
-    StringData parameterName = commandElement.fieldName();
-
+    StringData parameterName = cmdParamObj.firstElement().fieldName();
     ServerParameter* serverParameter = _sps->get(parameterName);
 
+    auto [query, update] =
+        normalizeParameter(opCtx, cmdParamObj, paramTime, serverParameter, parameterName);
+
+    BSONObjBuilder oldValueBob;
+    serverParameter->append(opCtx, oldValueBob, parameterName.toString());
+    audit::logSetClusterParameter(opCtx->getClient(), oldValueBob.obj(), update);
+
+    LOGV2_DEBUG(
+        6432603, 2, "Updating cluster parameter on-disk", "clusterParameter"_attr = parameterName);
+
+    return uassertStatusOK(_dbService.updateParameterOnDisk(opCtx, query, update, writeConcern));
+}
+
+std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
+    OperationContext* opCtx,
+    BSONObj cmdParamObj,
+    const boost::optional<Timestamp>& paramTime,
+    ServerParameter* sp,
+    StringData parameterName) {
+    BSONElement commandElement = cmdParamObj.firstElement();
     uassert(ErrorCodes::IllegalOperation,
             "Cluster parameter value must be an object",
             BSONType::Object == commandElement.type());
@@ -69,16 +87,9 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
     BSONObj query = BSON("_id" << parameterName);
     BSONObj update = updateBuilder.obj();
 
-    uassertStatusOK(serverParameter->validate(update));
+    uassertStatusOK(sp->validate(update));
 
-    BSONObjBuilder oldValueBob;
-    serverParameter->append(opCtx, oldValueBob, parameterName.toString());
-    audit::logSetClusterParameter(opCtx->getClient(), oldValueBob.obj(), update);
-
-    LOGV2_DEBUG(
-        6432603, 2, "Updating cluster parameter on-disk", "clusterParameter"_attr = parameterName);
-
-    return uassertStatusOK(_dbService.updateParameterOnDisk(opCtx, query, update, writeConcern));
+    return {query, update};
 }
 
 Timestamp ClusterParameterDBClientService::getUpdateClusterTime(OperationContext* opCtx) {

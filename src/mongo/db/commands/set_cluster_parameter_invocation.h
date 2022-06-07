@@ -71,14 +71,22 @@ private:
 
 class SetClusterParameterInvocation {
 public:
-    SetClusterParameterInvocation(std::unique_ptr<ServerParameterService> serverParmeterService,
+    SetClusterParameterInvocation(std::unique_ptr<ServerParameterService> serverParameterService,
                                   DBClientService& dbClientService)
-        : _sps(std::move(serverParmeterService)), _dbService(dbClientService) {}
+        : _sps(std::move(serverParameterService)), _dbService(dbClientService) {}
 
     bool invoke(OperationContext*,
                 const SetClusterParameter&,
                 boost::optional<Timestamp>,
                 const WriteConcernOptions&);
+
+    // Validate new parameter passed to setClusterParameter and generate the query and update fields
+    // for the on-disk update.
+    std::pair<BSONObj, BSONObj> normalizeParameter(OperationContext* opCtx,
+                                                   BSONObj cmdParamObj,
+                                                   const boost::optional<Timestamp>& paramTime,
+                                                   ServerParameter* sp,
+                                                   StringData parameterName);
 
 private:
     std::unique_ptr<ServerParameterService> _sps;
