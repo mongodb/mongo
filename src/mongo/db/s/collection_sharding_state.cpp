@@ -157,6 +157,10 @@ std::vector<NamespaceString> CollectionShardingState::getCollectionNames(Operati
     return collectionsMap->getCollectionNames();
 }
 
+void CollectionShardingState::clearFilteringMetadata_DoNotUseIt(OperationContext* opCtx) {
+    clearFilteringMetadata(opCtx);
+}
+
 void CollectionShardingStateFactory::set(ServiceContext* service,
                                          std::unique_ptr<CollectionShardingStateFactory> factory) {
     auto& collectionsMap = CollectionShardingStateMap::get(service);
