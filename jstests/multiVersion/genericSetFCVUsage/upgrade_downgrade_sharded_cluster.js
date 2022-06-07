@@ -14,25 +14,17 @@
 'use strict';
 
 load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster
+load("jstests/libs/feature_flag_util.js");
 
 const dbName = jsTestName();
 
-// TODO SERVER-57417 remove feature flag check once enabled
-const orphansTrackingFeatureFlagEnabled = TestData.setParameters.featureFlagOrphanTracking;
+var orphansTrackingFeatureFlagEnabled;
 
-//==========//
-// TODO SERVER-64400 remove code delimited with //==========// once 6.0 branches out
 const kRangeDeletionNs = "config.rangeDeletions";
 const testOrphansTrackingNS = dbName + '.testOrphansTracking';
 const numOrphanedDocs = 10;
-if (orphansTrackingFeatureFlagEnabled) {
-    TestData.skipCheckOrphans = true;
-}
-//==========//
 
 function setupClusterAndDatabase(binVersion) {
-    // TODO SERVER-64400 remove params related with no-more-autosplitter once 6.0 branches out
-    const params = orphansTrackingFeatureFlagEnabled ? {disableResumableRangeDeleter: true} : {};
     const st = new ShardingTest({
         mongos: 1,
         config: 1,
@@ -42,10 +34,10 @@ function setupClusterAndDatabase(binVersion) {
             configOptions: {binVersion: binVersion},
             rsOptions: {
                 binVersion: binVersion,
-                setParameter: params,
+                setParameter: {disableResumableRangeDeleter: true},
             },
             rs: {nodes: 2},
-            enableBalancer: orphansTrackingFeatureFlagEnabled ? false : true
+            enableBalancer: false
         }
     });
     st.configRS.awaitReplication();
@@ -53,9 +45,11 @@ function setupClusterAndDatabase(binVersion) {
     assert.commandWorked(
         st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
-    // TODO SERVER-57417 remove feature flag check once enabled
+    orphansTrackingFeatureFlagEnabled =
+        FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'), "OrphanTracking");
+
     if (orphansTrackingFeatureFlagEnabled) {
-        // TODO SERVER-64400 remove this scope once 6.0 branches out
+        TestData.skipCheckOrphans = true;
         // - Shard collection (one big chunk on shard0)
         // - Insert data in range [0, MaxKey)
         // - Split chunk at 0
@@ -110,20 +104,16 @@ function checkClusterAfterBinaryUpgrade() {
 
 function checkClusterAfterFCVUpgrade(fcv) {
     checkConfigAndShardsFCV(fcv);
-    // TODO SERVER-57417 remove feature flag check once enabled
+    assert(orphansTrackingFeatureFlagEnabled != undefined);
     if (orphansTrackingFeatureFlagEnabled) {
-        // TODO SERVER-64400 remove this scope once 6.0 branches out
-        // Check that orphans counter has been populated
         var doc = st.shard0.getCollection(kRangeDeletionNs).findOne({nss: testOrphansTrackingNS});
         assert.eq(numOrphanedDocs, doc.numOrphanDocs);
     }
 }
 
 function checkClusterAfterFCVDowngrade() {
-    // TODO SERVER-57417 remove feature flag check once enabled
+    assert(orphansTrackingFeatureFlagEnabled != undefined);
     if (orphansTrackingFeatureFlagEnabled) {
-        // TODO SERVER-64400 remove this scope once 6.0 branches out
-        // Check that orphans counter has been unset
         var doc = st.shard0.getCollection(kRangeDeletionNs).findOne({nss: testOrphansTrackingNS});
         assert.eq(undefined, doc.numOrphanDocs);
     }
