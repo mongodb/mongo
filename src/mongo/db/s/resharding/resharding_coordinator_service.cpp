@@ -1718,9 +1718,22 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
             _startCommitMonitor(executor);
 
             LOGV2(5391602, "Resharding operation waiting for an okay to enter critical section");
-            return future_util::withCancellation(_canEnterCritical.getFuture(),
-                                                 _ctHolder->getAbortToken())
+
+            // The _reshardingCoordinatorObserver->awaitAllRecipientsInStrictConsistency() future is
+            // used for reporting recipient shard errors encountered during the Applying phase and
+            // in turn aborting the resharding operation.
+            // For all other cases, the _canEnterCritical.getFuture() resolves first and the
+            // operation can then proceed to entering the critical section depending on the status
+            // returned.
+            return future_util::withCancellation(
+                       whenAny(
+                           _canEnterCritical.getFuture().thenRunOn(**executor),
+                           _reshardingCoordinatorObserver->awaitAllRecipientsInStrictConsistency()
+                               .thenRunOn(**executor)
+                               .ignoreValue()),
+                       _ctHolder->getAbortToken())
                 .thenRunOn(**executor)
+                .then([](auto result) { return result.result; })
                 .onCompletion([this](Status status) {
                     _ctHolder->cancelCommitMonitor();
                     if (status.isOK()) {
