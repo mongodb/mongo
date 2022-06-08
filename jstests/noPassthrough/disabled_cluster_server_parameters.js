@@ -3,6 +3,9 @@
  * is false.
  *
  * @tags: [
+ *   # Requires all nodes to be running the latest binary.
+ *   requires_fcv_60,
+ *   featureFlagClusterWideConfig,
  *   does_not_support_stepdowns,
  *   requires_replication,
  *   requires_sharding

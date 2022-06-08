@@ -175,6 +175,8 @@ protected:
     }
 
     void expectClusterParametersRequest(const HostAndPort& target) {
+        if (!gFeatureFlagClusterWideConfig.isEnabled(serverGlobalParams.featureCompatibility))
+            return;
         auto clusterParameterDocs = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
             operationContext(),
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),

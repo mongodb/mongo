@@ -388,6 +388,30 @@ public:
                             !isBlockingUserWrites);
                 }
 
+                // TODO (SERVER-65572): Remove setClusterParameter serialization and collection
+                // drop after this is backported to 6.0.
+                if (!gFeatureFlagClusterWideConfig.isEnabledOnVersion(requestedVersion)) {
+                    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                        uassert(ErrorCodes::CannotDowngrade,
+                                "Cannot downgrade while cluster server parameter is being set",
+                                ConfigsvrCoordinatorService::getService(opCtx)
+                                    ->areAllCoordinatorsOfTypeFinished(
+                                        opCtx, ConfigsvrCoordinatorTypeEnum::kSetClusterParameter));
+                    }
+
+                    DropReply dropReply;
+                    const auto dropStatus = dropCollection(
+                        opCtx,
+                        NamespaceString::kClusterParametersNamespace,
+                        &dropReply,
+                        DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+                    uassert(
+                        dropStatus.code(),
+                        str::stream() << "Failed to drop the cluster server parameters collection"
+                                      << causedBy(dropStatus.reason()),
+                        dropStatus.isOK() || dropStatus.code() == ErrorCodes::NamespaceNotFound);
+                }
+
                 FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                     opCtx,
                     actualVersion,

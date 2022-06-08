@@ -62,6 +62,12 @@ public:
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
             const auto coordinatorCompletionFuture = [&]() -> SharedSemiFuture<void> {
+                FixedFCVRegion fcvRegion(opCtx);
+                uassert(ErrorCodes::IllegalOperation,
+                        "featureFlagClusterWideConfig not enabled",
+                        gFeatureFlagClusterWideConfig.isEnabled(
+                            serverGlobalParams.featureCompatibility));
+
                 // Validate parameter before creating coordinator.
                 {
                     BSONObj cmdParamObj = request().getCommandParameter();
