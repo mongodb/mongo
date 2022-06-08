@@ -661,51 +661,51 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(WithLock lk,
 
 std::tuple<StatusWith<ReplSetConfig>, bool> ReplicationCoordinatorImpl::_resolveConfigToApply(
     const ReplSetConfig& config) {
+    if (!_settings.isServerless() || !config.isSplitConfig()) {
+        return {config, false};
+    }
+
     stdx::unique_lock<Latch> lk(_mutex);
-    if (config.isSplitConfig()) {
-        if (!_rsConfig.isInitialized()) {
-            // Unlock the lock because isSelf performs network I/O.
-            lk.unlock();
+    if (!_rsConfig.isInitialized()) {
+        // Unlock the lock because isSelf performs network I/O.
+        lk.unlock();
 
-            // If this node is listed in the members of incoming config, accept the config.
-            const auto foundSelfInMembers =
-                std::any_of(config.membersBegin(),
-                            config.membersEnd(),
-                            [externalState = _externalState.get()](const MemberConfig& config) {
-                                return externalState->isSelf(config.getHostAndPort(),
-                                                             getGlobalServiceContext());
-                            });
+        // If this node is listed in the members of incoming config, accept the config.
+        const auto foundSelfInMembers = std::any_of(
+            config.membersBegin(),
+            config.membersEnd(),
+            [externalState = _externalState.get()](const MemberConfig& config) {
+                return externalState->isSelf(config.getHostAndPort(), getGlobalServiceContext());
+            });
 
-            if (foundSelfInMembers) {
-                return {config, false};
-            }
+        if (foundSelfInMembers) {
+            return {config, false};
+        }
 
-            return {Status(ErrorCodes::NotYetInitialized,
-                           "Cannot apply a split config if the current config is uninitialized"),
+        return {Status(ErrorCodes::NotYetInitialized,
+                       "Cannot apply a split config if the current config is uninitialized"),
+                false};
+    }
+
+    auto recipientConfig = config.getRecipientConfig();
+    const auto& selfMember = _rsConfig.getMemberAt(_selfIndex);
+    if (recipientConfig->findMemberByHostAndPort(selfMember.getHostAndPort())) {
+        if (selfMember.getNumVotes() > 0) {
+            return {Status(ErrorCodes::BadValue, "Cannot apply recipient config to a voting node"),
                     false};
         }
 
-        auto recipientConfig = config.getRecipientConfig();
-        const auto& selfMember = _rsConfig.getMemberAt(_selfIndex);
-        if (recipientConfig->findMemberByHostAndPort(selfMember.getHostAndPort())) {
-            if (selfMember.getNumVotes() > 0) {
-                return {
-                    Status(ErrorCodes::BadValue, "Cannot apply recipient config to a voting node"),
+        if (_rsConfig.getReplSetName() == recipientConfig->getReplSetName()) {
+            return {Status(ErrorCodes::InvalidReplicaSetConfig,
+                           "Cannot apply recipient config since current config and recipient "
+                           "config have the same set name."),
                     false};
-            }
-
-            if (_rsConfig.getReplSetName() == recipientConfig->getReplSetName()) {
-                return {Status(ErrorCodes::InvalidReplicaSetConfig,
-                               "Cannot apply recipient config since current config and recipient "
-                               "config have the same set name."),
-                        false};
-            }
-
-            auto mutableConfig = recipientConfig->getMutable();
-            mutableConfig.setConfigVersion(1);
-            mutableConfig.setConfigTerm(1);
-            return {ReplSetConfig(std::move(mutableConfig)), true};
         }
+
+        auto mutableConfig = recipientConfig->getMutable();
+        mutableConfig.setConfigVersion(1);
+        mutableConfig.setConfigTerm(1);
+        return {ReplSetConfig(std::move(mutableConfig)), true};
     }
 
     return {config, false};

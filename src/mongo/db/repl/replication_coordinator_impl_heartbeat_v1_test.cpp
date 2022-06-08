@@ -58,6 +58,7 @@ namespace {
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
+using InNetworkGuard = NetworkInterfaceMock::InNetworkGuard;
 
 TEST(ReplSetHeartbeatArgs, AcceptsUnknownField) {
     ReplSetHeartbeatArgsV1 hbArgs;
@@ -116,7 +117,8 @@ protected:
 
     void processResponseFromPrimary(const ReplSetConfig& config,
                                     long long version = -2,
-                                    long long term = OpTime::kInitialTerm);
+                                    long long term = OpTime::kInitialTerm,
+                                    const HostAndPort& target = HostAndPort{"h1", 1});
 };
 
 void ReplCoordHBV1Test::assertMemberState(const MemberState expected, std::string msg) {
@@ -160,13 +162,14 @@ ReplCoordHBV1Test::performSyncToFinishReconfigHeartbeat() {
 
 void ReplCoordHBV1Test::processResponseFromPrimary(const ReplSetConfig& config,
                                                    long long version,
-                                                   long long term) {
+                                                   long long term,
+                                                   const HostAndPort& target) {
     NetworkInterfaceMock* net = getNet();
     const Date_t startDate = getNet()->now();
 
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
     const RemoteCommandRequest& request = noi->getRequest();
-    ASSERT_EQUALS(HostAndPort("h1", 1), request.target);
+    ASSERT_EQUALS(target, request.target);
     ReplSetHeartbeatArgsV1 hbArgs;
     ASSERT_OK(hbArgs.initialize(request.cmdObj));
     ASSERT_EQUALS("mySet", hbArgs.getSetName());
@@ -262,6 +265,85 @@ TEST_F(ReplCoordHBV1Test,
     ASSERT_EQUALS(3, storedConfig.getNumMembers());
     ASSERT_EQUALS("mySet", storedConfig.getReplSetName());
     exitNetwork();
+
+    ASSERT_TRUE(getExternalState()->threadsStarted());
+}
+
+TEST_F(ReplCoordHBV1Test, RejectSplitConfigWhenNotInServerlessMode) {
+    auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kDefault,
+                                                              logv2::LogSeverity::Debug(3)};
+
+    // Start up with three nodes, and assume the role of "node2" as a secondary. Notably, the local
+    // node is NOT started in serverless mode. "node2" is configured as having no votes, no
+    // priority, so that we can pass validation for accepting a split config.
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "protocolVersion" << 1 << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345"
+                                                        << "votes" << 0 << "priority" << 0)
+                                          << BSON("_id" << 3 << "host"
+                                                        << "node3:12345"))),
+                       HostAndPort("node2", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    getReplCoord()->updateTerm_forTest(1, nullptr);
+    ASSERT_EQ(getReplCoord()->getTerm(), 1);
+    // respond to initial heartbeat requests
+    for (int j = 0; j < 2; ++j) {
+        replyToReceivedHeartbeatV1();
+    }
+
+    // Verify that there are no further heartbeat requests, since the heartbeat requests should be
+    // scheduled for the future.
+    {
+        InNetworkGuard guard(getNet());
+        assertMemberState(MemberState::RS_SECONDARY);
+        ASSERT_FALSE(getNet()->hasReadyRequests());
+    }
+
+    ReplSetConfig splitConfig =
+        assertMakeRSConfig(BSON("_id"
+                                << "mySet"
+                                << "version" << 3 << "term" << 1 << "protocolVersion" << 1
+                                << "members"
+                                << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                         << "node1:12345")
+                                              << BSON("_id" << 2 << "host"
+                                                            << "node2:12345")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "node3:12345"))
+                                << "recipientConfig"
+                                << BSON("_id"
+                                        << "recipientSet"
+                                        << "version" << 1 << "term" << 1 << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "node1:12345")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "node2:12345")
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "node3:12345")))));
+
+    // Accept a heartbeat from `node1` which has a split config. The split config lists this node
+    // ("node2") in the recipient member list, but a node started not in serverless mode should not
+    // accept and install the recipient config.
+    receiveHeartbeatFrom(splitConfig, 1, HostAndPort("node1", 12345));
+
+    {
+        InNetworkGuard guard(getNet());
+        processResponseFromPrimary(splitConfig, 2, 1, HostAndPort{"node1", 12345});
+        assertMemberState(MemberState::RS_SECONDARY);
+        OperationContextNoop opCtx;
+        auto storedConfig = ReplSetConfig::parse(
+            unittest::assertGet(getExternalState()->loadLocalConfigDocument(&opCtx)));
+        ASSERT_OK(storedConfig.validate());
+
+        // Verify that the recipient config was not accepted. A successfully applied splitConfig
+        // will install at version and term {1, 1}.
+        ASSERT_EQUALS(ConfigVersionAndTerm(3, 1), storedConfig.getConfigVersionAndTerm());
+        ASSERT_EQUALS("mySet", storedConfig.getReplSetName());
+    }
 
     ASSERT_TRUE(getExternalState()->threadsStarted());
 }
@@ -556,6 +638,10 @@ TEST_F(
 class ReplCoordHBV1SplitConfigTest : public ReplCoordHBV1Test {
 public:
     void startUp(const std::string& hostAndPort) {
+        ReplSettings settings;
+        settings.setServerlessMode();
+        init(settings);
+
         BSONObj configBson =
             BSON("_id" << _donorSetName << "version" << _configVersion << "term" << _configTerm
                        << "members" << _members << "protocolVersion" << 1);
@@ -740,7 +826,6 @@ TEST_F(ReplCoordHBV1SplitConfigTest, RecipientNodeApplyConfig) {
     validateNextRequest("", _recipientSetName, 1, 1);
 }
 
-using InNetworkGuard = NetworkInterfaceMock::InNetworkGuard;
 TEST_F(ReplCoordHBV1SplitConfigTest, RejectMismatchedSetNameInHeartbeatResponse) {
     startUp(_recipientSecondaryNode);
 
@@ -813,9 +898,9 @@ TEST_F(ReplCoordHBV1SplitConfigTest, RecipientNodeNonZeroVotes) {
     getNet()->runReadyNetworkOperations();
 
     // The node rejected the config as it's a voting node and its version has not changed.
-    ASSERT_EQ(getReplCoord()->getConfigVersion(), _configVersion);
-    ASSERT_EQ(getReplCoord()->getConfigTerm(), _configTerm);
-    ASSERT_EQ(getReplCoord()->getSettings().ourSetName(), _donorSetName);
+    auto config = getReplCoord()->getConfig();
+    ASSERT_EQ(config.getConfigVersionAndTerm(), ConfigVersionAndTerm(_configVersion, _configTerm));
+    ASSERT_EQ(config.getReplSetName(), _donorSetName);
 }
 
 class ReplCoordHBV1ReconfigTest : public ReplCoordHBV1Test {
