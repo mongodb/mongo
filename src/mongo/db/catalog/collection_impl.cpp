@@ -2166,8 +2166,9 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
               str::stream() << "index " << imd.nameStringData()
                             << " is already in current metadata: " << _metadata->toBSON());
 
-    if (getTimeseriesOptions() && feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV() &&
-        serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest() &&
+    if (getTimeseriesOptions() &&
+        feature_flags::gTimeseriesMetricIndexes.isEnabled(
+            serverGlobalParams.featureCompatibility) &&
         timeseries::doesBucketsIndexIncludeMeasurement(
             opCtx, ns(), *getTimeseriesOptions(), spec->infoObj())) {
         invariant(_metadata->timeseriesBucketsMayHaveMixedSchemaData);

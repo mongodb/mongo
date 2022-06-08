@@ -83,12 +83,12 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
     std::vector<mongo::BSONObj> indexes;
     for (const auto& origIndex : origIndexes) {
         BSONObjBuilder builder;
-        bool isBucketsIndexSpecCompatibleForDowngrade = true;
+        bool includeOriginalSpec = false;
         for (const auto& elem : origIndex) {
             if (elem.fieldNameStringData() == IndexDescriptor::kPartialFilterExprFieldName) {
-                if (feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV() &&
-                    serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest()) {
-                    isBucketsIndexSpecCompatibleForDowngrade = false;
+                if (feature_flags::gTimeseriesMetricIndexes.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    includeOriginalSpec = true;
                 } else {
                     uasserted(ErrorCodes::InvalidOptions,
                               "Partial indexes are not supported on time-series collections");
@@ -195,11 +195,11 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                                       << " Command request: " << redact(origCmd.toBSON({})),
                         bucketsIndexSpecWithStatus.isOK());
 
-                if (!timeseries::isBucketsIndexSpecCompatibleForDowngrade(
+                if (timeseries::shouldIncludeOriginalSpec(
                         options,
                         BSON(NewIndexSpec::kKeyFieldName
                              << bucketsIndexSpecWithStatus.getValue()))) {
-                    isBucketsIndexSpecCompatibleForDowngrade = false;
+                    includeOriginalSpec = true;
                 }
 
                 builder.append(NewIndexSpec::kKeyFieldName,
@@ -212,12 +212,11 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
             builder.append(elem);
         }
 
-        if (feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV() &&
-            !isBucketsIndexSpecCompatibleForDowngrade) {
+        if (feature_flags::gTimeseriesMetricIndexes.isEnabled(
+                serverGlobalParams.featureCompatibility) &&
+            includeOriginalSpec) {
             // Store the original user index definition on the transformed index definition for the
-            // time-series buckets collection if this is a newly supported index type on time-series
-            // collections. This is to avoid any additional downgrade steps for index types already
-            // supported in 5.0.
+            // time-series buckets collection.
             builder.appendObject(IndexDescriptor::kOriginalSpecFieldName, origIndex.objdata());
         }
 
