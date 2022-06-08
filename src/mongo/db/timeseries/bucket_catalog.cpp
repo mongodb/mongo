@@ -34,11 +34,17 @@
 #include <algorithm>
 #include <boost/iterator/transform_iterator.hpp>
 
+#include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/bucket_compression.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/fail_point.h"
@@ -270,6 +276,11 @@ void BucketCatalog::ExecutionStatsController::incNumMeasurementsCommitted(long l
     _globalStats->numMeasurementsCommitted.fetchAndAddRelaxed(increment);
 }
 
+void BucketCatalog::ExecutionStatsController::incNumBucketsReopened(long long increment) {
+    _collectionStats->numBucketsReopened.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketsReopened.fetchAndAddRelaxed(increment);
+}
+
 class BucketCatalog::Bucket {
 public:
     friend class BucketCatalog;
@@ -406,11 +417,6 @@ private:
     // The metadata of the data that this bucket contains.
     BucketMetadata _metadata;
 
-    // Extra metadata combinations that are supported without normalizing the metadata object.
-    static constexpr std::size_t kNumFieldOrderCombinationsWithoutNormalizing = 1;
-    boost::container::static_vector<BSONObj, kNumFieldOrderCombinationsWithoutNormalizing>
-        _nonNormalizedKeyMetadatas;
-
     // Top-level field names of the measurements that have been inserted into the bucket.
     StringSet _fieldNames;
 
@@ -426,9 +432,6 @@ private:
     // The reference schema for measurements in this bucket. May reflect schema of uncommitted
     // measurements.
     timeseries::Schema _schema;
-
-    // The latest time that has been inserted into the bucket.
-    Date_t _latestTime;
 
     // The total size in bytes of the bucket's BSON serialization, including measurements to be
     // inserted.
@@ -597,6 +600,115 @@ BucketCatalog& BucketCatalog::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
+Status BucketCatalog::reopenBucket(OperationContext* opCtx,
+                                   const CollectionPtr& coll,
+                                   const BSONObj& bucketDoc) {
+    const NamespaceString ns = coll->ns().getTimeseriesViewNamespace();
+    const boost::optional<TimeseriesOptions> options = coll->getTimeseriesOptions();
+    invariant(options,
+              str::stream() << "Attempting to reopen a bucket for a non-timeseries collection: "
+                            << ns);
+
+    BSONElement bucketIdElem = bucketDoc.getField(timeseries::kBucketIdFieldName);
+    if (bucketIdElem.eoo() || bucketIdElem.type() != BSONType::jstOID) {
+        return {ErrorCodes::BadValue,
+                str::stream() << timeseries::kBucketIdFieldName
+                              << " is missing or not an ObjectId"};
+    }
+
+    // Validate the bucket document against the schema.
+    auto result = coll->checkValidation(opCtx, bucketDoc);
+    if (result.first != Collection::SchemaValidationResult::kPass) {
+        return result.second;
+    }
+
+    BSONElement metadata;
+    auto metaFieldName = options->getMetaField();
+    if (metaFieldName) {
+        metadata = bucketDoc.getField(*metaFieldName);
+    }
+
+    // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
+    // bucket to a stripe by hashing the BucketKey.
+    auto key = BucketKey{ns, BucketMetadata{metadata, coll->getDefaultCollator()}};
+    auto stripeNumber = _getStripeNumber(key);
+
+    auto bucketId = bucketIdElem.OID();
+    std::unique_ptr<Bucket> bucket = std::make_unique<Bucket>(bucketId, stripeNumber);
+
+    // Initialize the remaining member variables from the bucket document.
+    bucket->_ns = ns;
+    bucket->_metadata = key.metadata;
+    bucket->_timeField = options->getTimeField().toString();
+    bucket->_size = bucketDoc.objsize();
+    bucket->_minTime = bucketDoc.getObjectField(timeseries::kBucketControlFieldName)
+                           .getObjectField(timeseries::kBucketControlMinFieldName)
+                           .getField(options->getTimeField())
+                           .Date();
+
+    // Populate the top-level data field names.
+    const BSONObj& dataObj = bucketDoc.getObjectField(timeseries::kBucketDataFieldName);
+    for (const BSONElement& dataElem : dataObj) {
+        bucket->_fieldNames.insert(dataElem.fieldName());
+    }
+
+    auto swMinMax = timeseries::generateMinMaxFromBucketDoc(bucketDoc, coll->getDefaultCollator());
+    if (!swMinMax.isOK()) {
+        return swMinMax.getStatus();
+    }
+    bucket->_minmax = std::move(swMinMax.getValue());
+
+    auto swSchema = timeseries::generateSchemaFromBucketDoc(bucketDoc, coll->getDefaultCollator());
+    if (!swSchema.isOK()) {
+        return swSchema.getStatus();
+    }
+    bucket->_schema = std::move(swSchema.getValue());
+
+    uint32_t numMeasurements = 0;
+    const bool isCompressed = timeseries::isCompressedBucket(bucketDoc);
+    const BSONElement timeColumnElem = dataObj.getField(options->getTimeField());
+
+    if (isCompressed && timeColumnElem.type() == BSONType::BinData) {
+        BSONColumn storage{timeColumnElem};
+        numMeasurements = storage.size();
+    } else {
+        numMeasurements = timeColumnElem.Obj().nFields();
+    }
+
+    bucket->_numMeasurements = numMeasurements;
+    bucket->_numCommittedMeasurements = numMeasurements;
+
+    auto isBucketFull = [](Bucket* bucket) -> bool {
+        if (bucket->_numMeasurements >= static_cast<std::uint64_t>(gTimeseriesBucketMaxCount)) {
+            return true;
+        }
+        if (bucket->_size >= static_cast<std::uint64_t>(gTimeseriesBucketMaxSize)) {
+            return true;
+        }
+        return false;
+    };
+
+    bucket->_full = isBucketFull(bucket.get());
+
+    ExecutionStatsController stats = _getExecutionStats(ns);
+    stats.incNumBucketsReopened();
+
+    // Register the reopened bucket with the catalog.
+    auto& stripe = _stripes[stripeNumber];
+    stdx::lock_guard stripeLock{stripe.mutex};
+
+    ClosedBuckets closedBuckets;
+    _expireIdleBuckets(&stripe, stripeLock, stats, &closedBuckets);
+
+    auto [it, inserted] = stripe.allBuckets.try_emplace(bucketId, std::move(bucket));
+    tassert(6668200, "Expected bucket to be inserted", inserted);
+    Bucket* unownedBucket = it->second.get();
+    stripe.openBuckets[key] = unownedBucket;
+    _initializeBucketState(bucketId);
+
+    return Status::OK();
+}
+
 BSONObj BucketCatalog::getMetadata(const BucketHandle& handle) const {
     auto const& stripe = _stripes[handle.stripe];
     stdx::lock_guard stripeLock{stripe.mutex};
@@ -698,9 +810,6 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(
 
     bucket->_numMeasurements++;
     bucket->_size += sizeToBeAdded;
-    if (time > bucket->_latestTime) {
-        bucket->_latestTime = time;
-    }
     if (bucket->_ns.isEmpty()) {
         // The namespace and metadata only need to be set if this bucket was newly created.
         bucket->_ns = ns;
@@ -904,6 +1013,11 @@ void BucketCatalog::_appendExecutionStatsToBuilder(const ExecutionStats* stats,
     builder->appendNumber("numMeasurementsCommitted", measurementsCommitted);
     if (commits) {
         builder->appendNumber("avgNumMeasurementsPerCommit", measurementsCommitted / commits);
+    }
+
+    if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        builder->appendNumber("numBucketsReopened", stats->numBucketsReopened.load());
     }
 }
 

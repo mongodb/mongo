@@ -70,6 +70,7 @@ class BucketCatalog {
         AtomicWord<long long> numCommits;
         AtomicWord<long long> numWaits;
         AtomicWord<long long> numMeasurementsCommitted;
+        AtomicWord<long long> numBucketsReopened;
     };
 
     class ExecutionStatsController {
@@ -90,6 +91,7 @@ class BucketCatalog {
         void incNumCommits(long long increment = 1);
         void incNumWaits(long long increment = 1);
         void incNumMeasurementsCommitted(long long increment = 1);
+        void incNumBucketsReopened(long long increment = 1);
 
     private:
         std::shared_ptr<ExecutionStats> _collectionStats;
@@ -228,6 +230,13 @@ public:
 
     BucketCatalog(const BucketCatalog&) = delete;
     BucketCatalog operator=(const BucketCatalog&) = delete;
+
+    /**
+     * Reopens a closed bucket into the catalog given the bucket document.
+     */
+    Status reopenBucket(OperationContext* opCtx,
+                        const CollectionPtr& coll,
+                        const BSONObj& bucketDoc);
 
     /**
      * Returns the metadata for the given bucket in the following format:
