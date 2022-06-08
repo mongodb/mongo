@@ -111,27 +111,25 @@ st.forEachConfigServer((conn) => {
     });
 });
 
-let waitForBalancerToRun = function() {
-    let lastRoundNumber =
-        assert.commandWorked(sessionAdminDB.runCommand({balancerStatus: 1})).numBalancerRounds;
+function runBalancer() {
     st.startBalancer();
 
-    assert.soon(function() {
-        let res = assert.commandWorked(sessionAdminDB.runCommand({balancerStatus: 1}));
-        return res.mode == "full" && res.numBalancerRounds - lastRoundNumber > 1;
-    });
+    // Let the balancer run until balanced.
+    st.printShardingStatus(true);
+    st.awaitBalance('range', 'test');
+    st.printShardingStatus(true);
 
     st.stopBalancer();
-};
+}
 
-waitForBalancerToRun();
+runBalancer();
 
 chunk = findChunksUtil.findOneChunkByNs(sessionConfigDB, 'test.range', {min: {x: 0}});
 assert.eq(st.shard0.shardName, chunk.shard);
 
 assert.commandWorked(sessionAdminDB.runCommand({clearJumboFlag: 'test.range', find: {x: 0}}));
 
-waitForBalancerToRun();
+runBalancer();
 
 chunk = findChunksUtil.findOneChunkByNs(sessionConfigDB, 'test.range', {min: {x: 0}});
 assert.eq(st.shard1.shardName, chunk.shard);
