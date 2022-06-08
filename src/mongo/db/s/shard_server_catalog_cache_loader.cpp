@@ -644,7 +644,14 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_runSecond
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion) {
 
+    Timer t;
     forcePrimaryCollectionRefreshAndWaitForReplication(opCtx, nss);
+    LOGV2_FOR_CATALOG_REFRESH(5965800,
+                              2,
+                              "Cache loader on secondary successfully waited for primary refresh "
+                              "and replication of collection",
+                              "namespace"_attr = nss,
+                              "durationMillis"_attr = Milliseconds(t.millis()));
 
     // Read the local metadata.
 
@@ -773,7 +780,14 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
 
 StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_runSecondaryGetDatabase(
     OperationContext* opCtx, StringData dbName) {
+    Timer t;
     forcePrimaryDatabaseRefreshAndWaitForReplication(opCtx, dbName);
+    LOGV2_FOR_CATALOG_REFRESH(5965801,
+                              2,
+                              "Cache loader on secondary successfully waited for primary refresh "
+                              "and replication of database",
+                              "db"_attr = dbName,
+                              "durationMillis"_attr = Milliseconds(t.millis()));
     return readShardDatabasesEntry(opCtx, dbName);
 }
 
