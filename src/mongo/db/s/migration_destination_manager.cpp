@@ -841,15 +841,20 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
                     }
                     return toInsert;
                 }());
+                {
+                    // Disable the schema validation for opCtx for performInserts()
+                    DisableDocumentValidation documentValidationDisabler(opCtx);
 
-                const WriteResult reply = performInserts(opCtx, insertOp, true);
+                    const WriteResult reply = performInserts(opCtx, insertOp, true);
 
-                for (unsigned long i = 0; i < reply.results.size(); ++i) {
-                    uassertStatusOKWithContext(
-                        reply.results[i],
-                        str::stream() << "Insert of " << insertOp.getDocuments()[i] << " failed.");
+                    for (unsigned long i = 0; i < reply.results.size(); ++i) {
+                        uassertStatusOKWithContext(reply.results[i],
+                                                   str::stream()
+                                                       << "Insert of " << insertOp.getDocuments()[i]
+                                                       << " failed.");
+                    }
+                    // Revert to the original validation settings for opCtx
                 }
-
                 {
                     stdx::lock_guard<Latch> statsLock(_mutex);
                     _numCloned += batchNumCloned;
@@ -1057,6 +1062,8 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
     invariant(lastOpApplied);
 
     bool didAnything = false;
+
+    DisableDocumentValidation documentValidationDisabler(opCtx);
 
     // Deleted documents
     if (xfer["deleted"].isABSONObj()) {

@@ -136,6 +136,8 @@ all:
     test_file: jstests/core/exhaust.js
   - ticket: SERVER-63141
     test_file: jstests/aggregation/lookup_let_optimization.js
+  - ticket: SERVER-62272
+    test_file: jstests/sharding/chunk_migration_with_schema_validation.js
 
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
