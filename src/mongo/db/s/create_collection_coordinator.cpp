@@ -461,7 +461,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                         ->releaseRecoverableCriticalSection(
                             opCtx,
                             nss(),
-                            _getCriticalSectionReason(),
+                            _critSecReason,
                             ShardingCatalogClient::kMajorityWriteConcern);
 
                     _result = createCollectionResponseOpt;
@@ -474,10 +474,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 // presence of a stepdown.
                 RecoverableCriticalSectionService::get(opCtx)
                     ->acquireRecoverableCriticalSectionBlockWrites(
-                        opCtx,
-                        nss(),
-                        _getCriticalSectionReason(),
-                        ShardingCatalogClient::kMajorityWriteConcern);
+                        opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
                 if (!_firstExecution) {
                     auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
@@ -517,7 +514,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                         ->promoteRecoverableCriticalSectionToBlockAlsoReads(
                             opCtx,
                             nss(),
-                            _getCriticalSectionReason(),
+                            _critSecReason,
                             ShardingCatalogClient::kMajorityWriteConcern);
 
                     _doc = _updateSession(opCtx, _doc);
@@ -535,10 +532,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 
                 // End of the critical section, from now on, read and writes are permitted.
                 RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
-                    opCtx,
-                    nss(),
-                    _getCriticalSectionReason(),
-                    ShardingCatalogClient::kMajorityWriteConcern);
+                    opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
                 // Slow path. Create chunks (which might incur in an index scan) and commit must be
                 // done outside of the critical section to prevent writes from stalling in unsharded
@@ -566,10 +560,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
 
                 RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
-                    opCtx,
-                    nss(),
-                    _getCriticalSectionReason(),
-                    ShardingCatalogClient::kMajorityWriteConcern);
+                    opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
             }
             return status;
         });
@@ -951,33 +942,5 @@ void CreateCollectionCoordinator::_enterPhase(Phase newPhase) {
         _doc = std::move(newDoc);
     }
 }
-
-const BSONObj CreateCollectionCoordinatorDocumentPre60Compatible::kPre60IncompatibleFields =
-    BSON(CreateCollectionRequest::kCollectionUUIDFieldName
-         << 1 << CreateCollectionRequest::kImplicitlyCreateIndexFieldName << 1
-         << CreateCollectionRequest::kEnforceUniquenessCheckFieldName << 1);
-
-void CreateCollectionCoordinatorDocumentPre60Compatible::serialize(BSONObjBuilder* builder) const {
-    BSONObjBuilder internalBuilder;
-    CreateCollectionCoordinatorDocument::serialize(&internalBuilder);
-    internalBuilder.asTempObj().filterFieldsUndotted(builder, kPre60IncompatibleFields, false);
-}
-
-BSONObj CreateCollectionCoordinatorDocumentPre60Compatible::toBSON() const {
-    BSONObjBuilder builder;
-    serialize(&builder);
-    return builder.obj();
-}
-
-CreateCollectionCoordinatorPre60Compatible::CreateCollectionCoordinatorPre60Compatible(
-    ShardingDDLCoordinatorService* service, const BSONObj& initialState)
-    : CreateCollectionCoordinator(service, initialState),
-      _critSecReason(
-          BSON("command"
-               << "createCollection"
-               << "ns" << nss().toString() << "request"
-               << _request.toBSON().filterFieldsUndotted(
-                      CreateCollectionCoordinatorDocumentPre60Compatible::kPre60IncompatibleFields,
-                      false))) {}
 
 }  // namespace mongo

@@ -147,16 +147,6 @@ private:
      */
     void _logEndCreateCollection(OperationContext* opCtx);
 
-    /**
-     * Returns the BSONObj used as critical section reason
-     *
-     * TODO SERVER-64720 remove this function, directly access _critSecReason
-     *
-     */
-    virtual const BSONObj& _getCriticalSectionReason() const {
-        return _critSecReason;
-    };
-
     const BSONObj _critSecReason;
 
     // The shard key of the collection, static for the duration of the coordinator and reflects the
@@ -175,34 +165,6 @@ private:
     std::unique_ptr<InitialSplitPolicy> _splitPolicy;
     boost::optional<InitialSplitPolicy::ShardCollectionConfig> _initialChunks;
     boost::optional<bool> _collectionEmpty;
-};
-
-class CreateCollectionCoordinatorDocumentPre60Compatible final
-    : public CreateCollectionCoordinatorDocument {
-    // TODO SERVER-64720 remove once 6.0 becomes last LTS
-public:
-    using CreateCollectionCoordinatorDocument::CreateCollectionCoordinatorDocument;
-
-    static const BSONObj kPre60IncompatibleFields;
-    void serialize(BSONObjBuilder* builder) const;
-    BSONObj toBSON() const;
-};
-
-class CreateCollectionCoordinatorPre60Compatible final : public CreateCollectionCoordinator {
-    // TODO SERVER-64720 remove once 6.0 becomes last LTS
-public:
-    using CreateCollectionCoordinator::CreateCollectionCoordinator;
-    using CoordDoc = CreateCollectionCoordinatorDocumentPre60Compatible;
-
-    CreateCollectionCoordinatorPre60Compatible(ShardingDDLCoordinatorService* service,
-                                               const BSONObj& initialState);
-
-    virtual const BSONObj& _getCriticalSectionReason() const override {
-        return _critSecReason;
-    };
-
-private:
-    const BSONObj _critSecReason;
 };
 
 }  // namespace mongo
