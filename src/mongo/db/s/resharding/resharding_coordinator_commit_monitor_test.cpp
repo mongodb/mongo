@@ -40,7 +40,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_coordinator_commit_monitor.h"
-#include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
@@ -109,7 +109,7 @@ private:
     boost::optional<Callback> _runOnMockingNextResponse;
 
     ShardingDataTransformCumulativeMetrics _cumulativeMetrics{"dummyForTest"};
-    std::shared_ptr<ReshardingMetricsNew> _metrics;
+    std::shared_ptr<ReshardingMetrics> _metrics;
 };
 
 auto makeExecutor() {
@@ -151,7 +151,7 @@ void CoordinatorCommitMonitorTest::setUp() {
     _cancellationSource = std::make_unique<CancellationSource>();
 
     auto clockSource = getServiceContext()->getFastClockSource();
-    _metrics = std::make_shared<ReshardingMetricsNew>(
+    _metrics = std::make_shared<ReshardingMetrics>(
         UUID::gen(),
         BSON("y" << 1),
         _ns,

@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-class ReshardingMetricsNew : public ShardingDataTransformInstanceMetrics {
+class ReshardingMetrics : public ShardingDataTransformInstanceMetrics {
 public:
     using State = stdx::variant<CoordinatorStateEnum, RecipientStateEnum, DonorStateEnum>;
 
@@ -78,24 +78,24 @@ public:
         CoordinatorStateEnum _enumVal;
     };
 
-    ReshardingMetricsNew(UUID instanceId,
-                         BSONObj shardKey,
-                         NamespaceString nss,
-                         Role role,
-                         Date_t startTime,
-                         ClockSource* clockSource,
-                         ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
-    ReshardingMetricsNew(const CommonReshardingMetadata& metadata,
-                         Role role,
-                         ClockSource* clockSource,
-                         ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
+    ReshardingMetrics(UUID instanceId,
+                      BSONObj shardKey,
+                      NamespaceString nss,
+                      Role role,
+                      Date_t startTime,
+                      ClockSource* clockSource,
+                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
+    ReshardingMetrics(const CommonReshardingMetadata& metadata,
+                      Role role,
+                      ClockSource* clockSource,
+                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
 
-    static std::unique_ptr<ReshardingMetricsNew> makeInstance(UUID instanceId,
-                                                              BSONObj shardKey,
-                                                              NamespaceString nss,
-                                                              Role role,
-                                                              Date_t startTime,
-                                                              ServiceContext* serviceContext);
+    static std::unique_ptr<ReshardingMetrics> makeInstance(UUID instanceId,
+                                                           BSONObj shardKey,
+                                                           NamespaceString nss,
+                                                           Role role,
+                                                           Date_t startTime,
+                                                           ServiceContext* serviceContext);
 
     template <typename T>
     static auto initializeFrom(const T& document,
@@ -103,10 +103,10 @@ public:
                                ShardingDataTransformCumulativeMetrics* cumulativeMetrics) {
         static_assert(resharding_metrics::isStateDocument<T>);
         auto result =
-            std::make_unique<ReshardingMetricsNew>(document.getCommonReshardingMetadata(),
-                                                   resharding_metrics::getRoleForStateDocument<T>(),
-                                                   clockSource,
-                                                   cumulativeMetrics);
+            std::make_unique<ReshardingMetrics>(document.getCommonReshardingMetadata(),
+                                                resharding_metrics::getRoleForStateDocument<T>(),
+                                                clockSource,
+                                                cumulativeMetrics);
         result->setState(resharding_metrics::getState(document));
         result->restoreRoleSpecificFields(document);
         return result;

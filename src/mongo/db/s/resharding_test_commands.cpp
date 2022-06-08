@@ -37,7 +37,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
-#include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding_test_commands_gen.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -79,11 +79,11 @@ public:
                 }
             };
 
-            auto metrics = ReshardingMetricsNew::makeInstance(
+            auto metrics = ReshardingMetrics::makeInstance(
                 request().getUuid(),
                 request().getShardKey(),
                 ns(),
-                ReshardingMetricsNew::Role::kRecipient,
+                ReshardingMetrics::Role::kRecipient,
                 opCtx->getServiceContext()->getFastClockSource()->now(),
                 opCtx->getServiceContext());
 

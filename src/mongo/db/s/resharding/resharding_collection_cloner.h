@@ -52,7 +52,7 @@ class TaskExecutor;
 
 class OperationContext;
 class MongoProcessInterface;
-class ReshardingMetricsNew;
+class ReshardingMetrics;
 class ServiceContext;
 
 /**
@@ -61,7 +61,7 @@ class ServiceContext;
  */
 class ReshardingCollectionCloner {
 public:
-    ReshardingCollectionCloner(ReshardingMetricsNew* metrics,
+    ReshardingCollectionCloner(ReshardingMetrics* metrics,
                                ShardKeyPattern newShardKeyPattern,
                                NamespaceString sourceNss,
                                const UUID& sourceUUID,
@@ -99,7 +99,7 @@ private:
 
     std::unique_ptr<Pipeline, PipelineDeleter> _restartPipeline(OperationContext* opCtx);
 
-    ReshardingMetricsNew* _metrics;
+    ReshardingMetrics* _metrics;
     const ShardKeyPattern _newShardKeyPattern;
     const NamespaceString _sourceNss;
     const UUID _sourceUUID;

@@ -26,15 +26,15 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/exec/document_value/document.h"
 
 
 namespace mongo {
 namespace {
 
-inline ReshardingMetricsNew::State getDefaultState(ReshardingMetricsNew::Role role) {
-    using Role = ReshardingMetricsNew::Role;
+inline ReshardingMetrics::State getDefaultState(ReshardingMetrics::Role role) {
+    using Role = ReshardingMetrics::Role;
     switch (role) {
         case Role::kCoordinator:
             return CoordinatorStateEnum::kUnused;
@@ -70,14 +70,13 @@ Date_t readStartTime(const CommonReshardingMetadata& metadata, ClockSource* fall
 
 }  // namespace
 
-ReshardingMetricsNew::ReshardingMetricsNew(
-    UUID instanceId,
-    BSONObj shardKey,
-    NamespaceString nss,
-    Role role,
-    Date_t startTime,
-    ClockSource* clockSource,
-    ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
+ReshardingMetrics::ReshardingMetrics(UUID instanceId,
+                                     BSONObj shardKey,
+                                     NamespaceString nss,
+                                     Role role,
+                                     Date_t startTime,
+                                     ClockSource* clockSource,
+                                     ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
     : ShardingDataTransformInstanceMetrics{std::move(instanceId),
                                            createOriginalCommand(nss, std::move(shardKey)),
                                            nss,
@@ -87,44 +86,42 @@ ReshardingMetricsNew::ReshardingMetricsNew(
                                            cumulativeMetrics},
       _state{getDefaultState(role)} {}
 
-ReshardingMetricsNew::ReshardingMetricsNew(
-    const CommonReshardingMetadata& metadata,
-    Role role,
-    ClockSource* clockSource,
-    ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
-    : ReshardingMetricsNew{metadata.getReshardingUUID(),
-                           metadata.getReshardingKey().toBSON(),
-                           metadata.getSourceNss(),
-                           role,
-                           readStartTime(metadata, clockSource),
-                           clockSource,
-                           cumulativeMetrics} {}
+ReshardingMetrics::ReshardingMetrics(const CommonReshardingMetadata& metadata,
+                                     Role role,
+                                     ClockSource* clockSource,
+                                     ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
+    : ReshardingMetrics{metadata.getReshardingUUID(),
+                        metadata.getReshardingKey().toBSON(),
+                        metadata.getSourceNss(),
+                        role,
+                        readStartTime(metadata, clockSource),
+                        clockSource,
+                        cumulativeMetrics} {}
 
-std::string ReshardingMetricsNew::createOperationDescription() const noexcept {
+std::string ReshardingMetrics::createOperationDescription() const noexcept {
     return fmt::format("ReshardingMetrics{}Service {}",
                        ShardingDataTransformMetrics::getRoleName(_role),
                        _instanceId.toString());
 }
 
-std::unique_ptr<ReshardingMetricsNew> ReshardingMetricsNew::makeInstance(
-    UUID instanceId,
-    BSONObj shardKey,
-    NamespaceString nss,
-    Role role,
-    Date_t startTime,
-    ServiceContext* serviceContext) {
+std::unique_ptr<ReshardingMetrics> ReshardingMetrics::makeInstance(UUID instanceId,
+                                                                   BSONObj shardKey,
+                                                                   NamespaceString nss,
+                                                                   Role role,
+                                                                   Date_t startTime,
+                                                                   ServiceContext* serviceContext) {
     auto cumulativeMetrics =
         ShardingDataTransformCumulativeMetrics::getForResharding(serviceContext);
-    return std::make_unique<ReshardingMetricsNew>(instanceId,
-                                                  createOriginalCommand(nss, std::move(shardKey)),
-                                                  std::move(nss),
-                                                  role,
-                                                  startTime,
-                                                  serviceContext->getFastClockSource(),
-                                                  cumulativeMetrics);
+    return std::make_unique<ReshardingMetrics>(instanceId,
+                                               createOriginalCommand(nss, std::move(shardKey)),
+                                               std::move(nss),
+                                               role,
+                                               startTime,
+                                               serviceContext->getFastClockSource(),
+                                               cumulativeMetrics);
 }
 
-StringData ReshardingMetricsNew::getStateString() const noexcept {
+StringData ReshardingMetrics::getStateString() const noexcept {
     return stdx::visit(
         visit_helper::Overloaded{
             [](CoordinatorStateEnum state) { return CoordinatorState_serializer(state); },
@@ -133,7 +130,7 @@ StringData ReshardingMetricsNew::getStateString() const noexcept {
         _state.load());
 }
 
-void ReshardingMetricsNew::accumulateFrom(const ReshardingOplogApplierProgress& progressDoc) {
+void ReshardingMetrics::accumulateFrom(const ReshardingOplogApplierProgress& progressDoc) {
     invariant(_role == Role::kRecipient);
 
     accumulateValues(progressDoc.getInsertsApplied(),
@@ -142,7 +139,7 @@ void ReshardingMetricsNew::accumulateFrom(const ReshardingOplogApplierProgress& 
                      progressDoc.getWritesToStashCollections());
 }
 
-void ReshardingMetricsNew::restoreRecipientSpecificFields(
+void ReshardingMetrics::restoreRecipientSpecificFields(
     const ReshardingRecipientDocument& document) {
     auto metrics = document.getMetrics();
     if (!metrics) {
@@ -161,14 +158,14 @@ void ReshardingMetricsNew::restoreRecipientSpecificFields(
     restorePhaseDurationFields(document);
 }
 
-void ReshardingMetricsNew::restoreCoordinatorSpecificFields(
+void ReshardingMetrics::restoreCoordinatorSpecificFields(
     const ReshardingCoordinatorDocument& document) {
     restorePhaseDurationFields(document);
 }
 
-ReshardingMetricsNew::DonorState::DonorState(DonorStateEnum enumVal) : _enumVal(enumVal) {}
+ReshardingMetrics::DonorState::DonorState(DonorStateEnum enumVal) : _enumVal(enumVal) {}
 
-ShardingDataTransformCumulativeMetrics::DonorStateEnum ReshardingMetricsNew::DonorState::toMetrics()
+ShardingDataTransformCumulativeMetrics::DonorStateEnum ReshardingMetrics::DonorState::toMetrics()
     const {
     using MetricsEnum = ShardingDataTransformCumulativeMetrics::DonorStateEnum;
 
@@ -204,15 +201,14 @@ ShardingDataTransformCumulativeMetrics::DonorStateEnum ReshardingMetricsNew::Don
     }
 }
 
-DonorStateEnum ReshardingMetricsNew::DonorState::getState() const {
+DonorStateEnum ReshardingMetrics::DonorState::getState() const {
     return _enumVal;
 }
 
-ReshardingMetricsNew::RecipientState::RecipientState(RecipientStateEnum enumVal)
-    : _enumVal(enumVal) {}
+ReshardingMetrics::RecipientState::RecipientState(RecipientStateEnum enumVal) : _enumVal(enumVal) {}
 
 ShardingDataTransformCumulativeMetrics::RecipientStateEnum
-ReshardingMetricsNew::RecipientState::toMetrics() const {
+ReshardingMetrics::RecipientState::toMetrics() const {
     using MetricsEnum = ShardingDataTransformCumulativeMetrics::RecipientStateEnum;
 
     switch (_enumVal) {
@@ -248,15 +244,15 @@ ReshardingMetricsNew::RecipientState::toMetrics() const {
     }
 }
 
-RecipientStateEnum ReshardingMetricsNew::RecipientState::getState() const {
+RecipientStateEnum ReshardingMetrics::RecipientState::getState() const {
     return _enumVal;
 }
 
-ReshardingMetricsNew::CoordinatorState::CoordinatorState(CoordinatorStateEnum enumVal)
+ReshardingMetrics::CoordinatorState::CoordinatorState(CoordinatorStateEnum enumVal)
     : _enumVal(enumVal) {}
 
 ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum
-ReshardingMetricsNew::CoordinatorState::toMetrics() const {
+ReshardingMetrics::CoordinatorState::toMetrics() const {
     switch (_enumVal) {
         case CoordinatorStateEnum::kUnused:
             return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kUnused;
@@ -292,7 +288,7 @@ ReshardingMetricsNew::CoordinatorState::toMetrics() const {
     }
 }
 
-CoordinatorStateEnum ReshardingMetricsNew::CoordinatorState::getState() const {
+CoordinatorStateEnum ReshardingMetrics::CoordinatorState::getState() const {
     return _enumVal;
 }
 

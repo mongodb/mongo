@@ -33,7 +33,7 @@
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/s/resharding/resharding_data_replication.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
-#include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
@@ -163,9 +163,9 @@ public:
         return _metadata;
     }
 
-    inline const ReshardingMetricsNew& getMetrics() const {
-        invariant(_metricsNew);
-        return *_metricsNew;
+    inline const ReshardingMetrics& getMetrics() const {
+        invariant(_metrics);
+        return *_metrics;
     }
 
     boost::optional<BSONObj> reportForCurrentOp(
@@ -289,7 +289,7 @@ private:
     // The primary-only service instance corresponding to the recipient instance. Not owned.
     const ReshardingRecipientService* const _recipientService;
 
-    std::unique_ptr<ReshardingMetricsNew> _metricsNew;
+    std::unique_ptr<ReshardingMetrics> _metrics;
     ReshardingApplierMetricsMap _applierMetricsMap;
 
     // The in-memory representation of the immutable portion of the document in

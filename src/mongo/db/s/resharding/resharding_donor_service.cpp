@@ -183,8 +183,8 @@ public:
     }
 };
 
-ReshardingMetricsNew::DonorState toMetricsState(DonorStateEnum state) {
-    return ReshardingMetricsNew::DonorState(state);
+ReshardingMetrics::DonorState toMetricsState(DonorStateEnum state) {
+    return ReshardingMetrics::DonorState(state);
 }
 
 }  // namespace
@@ -209,7 +209,7 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
     std::unique_ptr<DonorStateMachineExternalState> externalState)
     : repl::PrimaryOnlyService::TypedInstance<DonorStateMachine>(),
       _donorService(donorService),
-      _metricsNew{ReshardingMetricsNew::initializeFrom(donorDoc, getGlobalServiceContext())},
+      _metrics{ReshardingMetrics::initializeFrom(donorDoc, getGlobalServiceContext())},
       _metadata{donorDoc.getCommonReshardingMetadata()},
       _recipientShardIds{donorDoc.getRecipientShards()},
       _donorCtx{donorDoc.getMutableState()},
@@ -233,7 +233,7 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
       }()) {
     invariant(_externalState);
 
-    _metricsNew->onStateTransition(boost::none, toMetricsState(_donorCtx.getState()));
+    _metrics->onStateTransition(boost::none, toMetricsState(_donorCtx.getState()));
 }
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockingWritesOrErrored(
@@ -385,7 +385,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                            _critSecReason,
                            ShardingCatalogClient::kLocalWriteConcern);
 
-                   _metricsNew->onCriticalSectionEnd();
+                   _metrics->onCriticalSectionEnd();
                }
 
                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
@@ -427,7 +427,7 @@ Status ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(
         ensureFulfilledPromise(lk, _completionPromise, statusForPromise);
     }
 
-    _metricsNew->onStateTransition(toMetricsState(_donorCtx.getState()), boost::none);
+    _metrics->onStateTransition(toMetricsState(_donorCtx.getState()), boost::none);
 
     return status;
 }
@@ -493,7 +493,7 @@ void ReshardingDonorService::DonorStateMachine::interrupt(Status status) {}
 boost::optional<BSONObj> ReshardingDonorService::DonorStateMachine::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-    return _metricsNew->reportForCurrentOp();
+    return _metrics->reportForCurrentOp();
 }
 
 void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
@@ -521,11 +521,11 @@ void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
 }
 
 void ReshardingDonorService::DonorStateMachine::onWriteDuringCriticalSection() {
-    _metricsNew->onWriteDuringCriticalSection();
+    _metrics->onWriteDuringCriticalSection();
 }
 
 void ReshardingDonorService::DonorStateMachine::onReadDuringCriticalSection() {
-    _metricsNew->onReadDuringCriticalSection();
+    _metrics->onReadDuringCriticalSection();
 }
 
 SharedSemiFuture<void> ReshardingDonorService::DonorStateMachine::awaitCriticalSectionAcquired() {
@@ -690,7 +690,7 @@ void ReshardingDonorService::DonorStateMachine::
                 _critSecReason,
                 ShardingCatalogClient::kLocalWriteConcern);
 
-        _metricsNew->onCriticalSectionBegin();
+        _metrics->onCriticalSectionBegin();
     }
 
     {
@@ -828,7 +828,7 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(DonorShardConte
 
     _updateDonorDocument(std::move(newDonorCtx));
 
-    _metricsNew->onStateTransition(toMetricsState(oldState), toMetricsState(newState));
+    _metrics->onStateTransition(toMetricsState(oldState), toMetricsState(newState));
 
     LOGV2_INFO(5279505,
                "Transitioned resharding donor state",

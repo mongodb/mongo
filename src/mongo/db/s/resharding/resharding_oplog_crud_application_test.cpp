@@ -47,7 +47,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
-#include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_state.h"
@@ -112,15 +112,15 @@ public:
                         CollectionMetadata(makeChunkManagerForOutputCollection(), _myDonorId));
             }
 
-            _metricsNew =
-                ReshardingMetricsNew::makeInstance(_sourceUUID,
-                                                   BSON(_newShardKey << 1),
-                                                   _outputNss,
-                                                   ShardingDataTransformMetrics::Role::kRecipient,
-                                                   serviceContext->getFastClockSource()->now(),
-                                                   serviceContext);
+            _metrics =
+                ReshardingMetrics::makeInstance(_sourceUUID,
+                                                BSON(_newShardKey << 1),
+                                                _outputNss,
+                                                ShardingDataTransformMetrics::Role::kRecipient,
+                                                serviceContext->getFastClockSource()->now(),
+                                                serviceContext);
             _oplogApplierMetrics =
-                std::make_unique<ReshardingOplogApplierMetrics>(_metricsNew.get(), boost::none);
+                std::make_unique<ReshardingOplogApplierMetrics>(_metrics.get(), boost::none);
             _applier = std::make_unique<ReshardingOplogApplicationRules>(
                 _outputNss,
                 std::vector<NamespaceString>{_myStashNss, _otherStashNss},
@@ -341,7 +341,7 @@ private:
         getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
 
     std::unique_ptr<ReshardingOplogApplicationRules> _applier;
-    std::unique_ptr<ReshardingMetricsNew> _metricsNew;
+    std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingOplogApplierMetrics> _oplogApplierMetrics;
 };
 

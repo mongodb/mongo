@@ -32,7 +32,7 @@
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
-#include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 
 namespace mongo {
@@ -218,7 +218,7 @@ private:
     // The primary-only service instance corresponding to the donor instance. Not owned.
     const ReshardingDonorService* const _donorService;
 
-    std::unique_ptr<ReshardingMetricsNew> _metricsNew;
+    std::unique_ptr<ReshardingMetrics> _metrics;
 
     // The in-memory representation of the immutable portion of the document in
     // config.localReshardingOperations.donor.

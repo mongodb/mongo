@@ -34,8 +34,8 @@
 namespace mongo {
 
 ReshardingOplogApplierMetrics::ReshardingOplogApplierMetrics(
-    ReshardingMetricsNew* metricsNew, boost::optional<ReshardingOplogApplierProgress> progressDoc)
-    : _metricsNew(metricsNew) {
+    ReshardingMetrics* metrics, boost::optional<ReshardingOplogApplierProgress> progressDoc)
+    : _metrics(metrics) {
     if (progressDoc) {
         _insertsApplied = progressDoc->getInsertsApplied();
         _updatesApplied = progressDoc->getUpdatesApplied();
@@ -46,35 +46,35 @@ ReshardingOplogApplierMetrics::ReshardingOplogApplierMetrics(
 
 void ReshardingOplogApplierMetrics::onInsertApplied() {
     _insertsApplied++;
-    _metricsNew->onInsertApplied();
+    _metrics->onInsertApplied();
 }
 
 void ReshardingOplogApplierMetrics::onUpdateApplied() {
     _updatesApplied++;
-    _metricsNew->onUpdateApplied();
+    _metrics->onUpdateApplied();
 }
 
 void ReshardingOplogApplierMetrics::onDeleteApplied() {
     _deletesApplied++;
-    _metricsNew->onDeleteApplied();
+    _metrics->onDeleteApplied();
 }
 
 void ReshardingOplogApplierMetrics::onBatchRetrievedDuringOplogApplying(Milliseconds elapsed) {
-    _metricsNew->onBatchRetrievedDuringOplogApplying(elapsed);
+    _metrics->onBatchRetrievedDuringOplogApplying(elapsed);
 }
 
 void ReshardingOplogApplierMetrics::onOplogLocalBatchApplied(Milliseconds elapsed) {
-    _metricsNew->onOplogLocalBatchApplied(elapsed);
+    _metrics->onOplogLocalBatchApplied(elapsed);
 }
 
 void ReshardingOplogApplierMetrics::onOplogEntriesApplied(int64_t numEntries) {
     _oplogEntriesApplied += numEntries;
-    _metricsNew->onOplogEntriesApplied(numEntries);
+    _metrics->onOplogEntriesApplied(numEntries);
 }
 
 void ReshardingOplogApplierMetrics::onWriteToStashCollections() {
     _writesToStashCollections++;
-    _metricsNew->onWriteToStashedCollections();
+    _metrics->onWriteToStashedCollections();
 }
 
 int64_t ReshardingOplogApplierMetrics::getInsertsApplied() const {

@@ -158,13 +158,12 @@ public:
 
         _cm = createChunkManagerForOriginalColl();
 
-        _metrics =
-            ReshardingMetricsNew::makeInstance(kCrudUUID,
-                                               BSON("y" << 1),
-                                               kCrudNs,
-                                               ReshardingMetricsNew::Role::kRecipient,
-                                               getServiceContext()->getFastClockSource()->now(),
-                                               getServiceContext());
+        _metrics = ReshardingMetrics::makeInstance(kCrudUUID,
+                                                   BSON("y" << 1),
+                                                   kCrudNs,
+                                                   ReshardingMetrics::Role::kRecipient,
+                                                   getServiceContext()->getFastClockSource()->now(),
+                                                   getServiceContext());
         _applierMetrics =
             std::make_unique<ReshardingOplogApplierMetrics>(_metrics.get(), boost::none);
 
@@ -363,7 +362,7 @@ protected:
     boost::optional<ChunkManager> _cm;
 
     const ReshardingSourceId _sourceId{UUID::gen(), kMyShardId};
-    std::unique_ptr<ReshardingMetricsNew> _metrics;
+    std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingOplogApplierMetrics> _applierMetrics;
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;

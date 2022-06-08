@@ -85,13 +85,12 @@ protected:
         TransactionCoordinatorService::get(operationContext())
             ->onShardingInitialization(operationContext(), true);
 
-        _metrics =
-            ReshardingMetricsNew::makeInstance(_originalUUID,
-                                               _newShardKey.toBSON(),
-                                               _originalNss,
-                                               ReshardingMetricsNew::Role::kCoordinator,
-                                               getServiceContext()->getFastClockSource()->now(),
-                                               getServiceContext());
+        _metrics = ReshardingMetrics::makeInstance(_originalUUID,
+                                                   _newShardKey.toBSON(),
+                                                   _originalNss,
+                                                   ReshardingMetrics::Role::kCoordinator,
+                                                   getServiceContext()->getFastClockSource()->now(),
+                                                   getServiceContext());
     }
 
     void tearDown() override {
@@ -723,7 +722,7 @@ protected:
     ShardKeyPattern _oldShardKey = ShardKeyPattern(BSON("oldSK" << 1));
     ShardKeyPattern _newShardKey = ShardKeyPattern(BSON("newSK" << 1));
 
-    std::unique_ptr<ReshardingMetricsNew> _metrics;
+    std::unique_ptr<ReshardingMetrics> _metrics;
 
     const std::vector<ChunkRange> _oldChunkRanges = {
         ChunkRange(_oldShardKey.getKeyPattern().globalMin(), BSON("oldSK" << 12345)),

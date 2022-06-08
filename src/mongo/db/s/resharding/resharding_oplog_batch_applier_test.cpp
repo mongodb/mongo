@@ -46,7 +46,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
-#include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_oplog_batch_applier.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
@@ -111,15 +111,15 @@ public:
                     opCtx.get(), nss, CollectionOptions{});
             }
 
-            _metricsNew =
-                ReshardingMetricsNew::makeInstance(UUID::gen(),
-                                                   BSON("y" << 1),
-                                                   _outputNss,
-                                                   ShardingDataTransformMetrics::Role::kRecipient,
-                                                   serviceContext->getFastClockSource()->now(),
-                                                   serviceContext);
+            _metrics =
+                ReshardingMetrics::makeInstance(UUID::gen(),
+                                                BSON("y" << 1),
+                                                _outputNss,
+                                                ShardingDataTransformMetrics::Role::kRecipient,
+                                                serviceContext->getFastClockSource()->now(),
+                                                serviceContext);
             _applierMetrics =
-                std::make_unique<ReshardingOplogApplierMetrics>(_metricsNew.get(), boost::none);
+                std::make_unique<ReshardingOplogApplierMetrics>(_metrics.get(), boost::none);
             _crudApplication = std::make_unique<ReshardingOplogApplicationRules>(
                 _outputNss,
                 std::vector<NamespaceString>{_myStashNss, _otherStashNss},
@@ -362,7 +362,7 @@ private:
         getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
     const NamespaceString _myOplogBufferNss = getLocalOplogBufferNamespace(_sourceUUID, _myDonorId);
 
-    std::unique_ptr<ReshardingMetricsNew> _metricsNew;
+    std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingOplogApplierMetrics> _applierMetrics;
 
     std::unique_ptr<ReshardingOplogApplicationRules> _crudApplication;

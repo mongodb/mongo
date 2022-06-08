@@ -33,7 +33,7 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
-#include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -55,28 +55,28 @@ void cleanupSourceConfigCollections(OperationContext* opCtx,
                                     const ReshardingCoordinatorDocument& coordinatorDoc);
 
 void writeDecisionPersistedState(OperationContext* opCtx,
-                                 ReshardingMetricsNew* metrics,
+                                 ReshardingMetrics* metrics,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
                                  OID newCollectionEpoch,
                                  Timestamp newCollectionTimestamp);
 
 void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
-                                          ReshardingMetricsNew* metrics,
+                                          ReshardingMetrics* metrics,
                                           const ReshardingCoordinatorDocument& coordinatorDoc);
 
 void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
-                                           ReshardingMetricsNew* metrics,
+                                           ReshardingMetrics* metrics,
                                            const ReshardingCoordinatorDocument& coordinatorDoc,
                                            std::vector<ChunkType> initialChunks,
                                            std::vector<BSONObj> zones);
 
 void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
     OperationContext* opCtx,
-    ReshardingMetricsNew* metrics,
+    ReshardingMetrics* metrics,
     const ReshardingCoordinatorDocument& coordinatorDoc);
 
 void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
-                                             ReshardingMetricsNew* metrics,
+                                             ReshardingMetrics* metrics,
                                              const ReshardingCoordinatorDocument& coordinatorDoc,
                                              boost::optional<Status> abortReason = boost::none);
 }  // namespace resharding
@@ -513,7 +513,7 @@ private:
     // The primary-only service instance corresponding to the coordinator instance. Not owned.
     const ReshardingCoordinatorService* const _coordinatorService;
 
-    std::shared_ptr<ReshardingMetricsNew> _metricsNew;
+    std::shared_ptr<ReshardingMetrics> _metrics;
 
     // The in-memory representation of the immutable portion of the document in
     // config.reshardingOperations.

@@ -81,12 +81,12 @@ void ensureFulfilledPromise(SharedPromise<void>& sp, Status error) {
 }  // namespace
 
 std::unique_ptr<ReshardingCollectionCloner> ReshardingDataReplication::_makeCollectionCloner(
-    ReshardingMetricsNew* metricsNew,
+    ReshardingMetrics* metrics,
     const CommonReshardingMetadata& metadata,
     const ShardId& myShardId,
     Timestamp cloneTimestamp) {
     return std::make_unique<ReshardingCollectionCloner>(
-        metricsNew,
+        metrics,
         ShardKeyPattern{metadata.getReshardingKey()},
         metadata.getSourceNss(),
         metadata.getSourceUUID(),
@@ -112,7 +112,7 @@ std::vector<std::unique_ptr<ReshardingTxnCloner>> ReshardingDataReplication::_ma
 
 std::vector<std::unique_ptr<ReshardingOplogFetcher>> ReshardingDataReplication::_makeOplogFetchers(
     OperationContext* opCtx,
-    ReshardingMetricsNew* metricsNew,
+    ReshardingMetrics* metrics,
     const CommonReshardingMetadata& metadata,
     const std::vector<DonorShardFetchTimestamp>& donorShards,
     const ShardId& myShardId) {
@@ -128,7 +128,7 @@ std::vector<std::unique_ptr<ReshardingOplogFetcher>> ReshardingDataReplication::
         invariant((idToResumeFrom >= ReshardingDonorOplogId{minFetchTimestamp, minFetchTimestamp}));
 
         oplogFetchers.emplace_back(std::make_unique<ReshardingOplogFetcher>(
-            std::make_unique<ReshardingOplogFetcher::Env>(opCtx->getServiceContext(), metricsNew),
+            std::make_unique<ReshardingOplogFetcher::Env>(opCtx->getServiceContext(), metrics),
             metadata.getReshardingUUID(),
             metadata.getSourceUUID(),
             // The recipient fetches oplog entries from the donor starting from the largest _id
@@ -206,7 +206,7 @@ std::vector<std::unique_ptr<ReshardingOplogApplier>> ReshardingDataReplication::
 
 std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::make(
     OperationContext* opCtx,
-    ReshardingMetricsNew* metricsNew,
+    ReshardingMetrics* metrics,
     ReshardingApplierMetricsMap* applierMetricsMap,
     CommonReshardingMetadata metadata,
     const std::vector<DonorShardFetchTimestamp>& donorShards,
@@ -218,11 +218,11 @@ std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::m
     std::vector<std::unique_ptr<ReshardingTxnCloner>> txnCloners;
 
     if (!cloningDone) {
-        collectionCloner = _makeCollectionCloner(metricsNew, metadata, myShardId, cloneTimestamp);
+        collectionCloner = _makeCollectionCloner(metrics, metadata, myShardId, cloneTimestamp);
         txnCloners = _makeTxnCloners(metadata, donorShards);
     }
 
-    auto oplogFetchers = _makeOplogFetchers(opCtx, metricsNew, metadata, donorShards, myShardId);
+    auto oplogFetchers = _makeOplogFetchers(opCtx, metrics, metadata, donorShards, myShardId);
 
     auto oplogFetcherExecutor = _makeOplogFetcherExecutor(donorShards.size());
 

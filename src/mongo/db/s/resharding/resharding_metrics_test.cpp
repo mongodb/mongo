@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
@@ -49,16 +49,16 @@ const auto kShardKey = BSON("newKey" << 1);
 class ReshardingMetricsTest : public ShardingDataTransformMetricsTestFixture {
 
 public:
-    std::unique_ptr<ReshardingMetricsNew> createInstanceMetrics(ClockSource* clockSource,
-                                                                UUID instanceId = UUID::gen(),
-                                                                Role role = Role::kDonor) {
-        return std::make_unique<ReshardingMetricsNew>(instanceId,
-                                                      BSON("y" << 1),
-                                                      kTestNamespace,
-                                                      role,
-                                                      clockSource->now(),
-                                                      clockSource,
-                                                      &_cumulativeMetrics);
+    std::unique_ptr<ReshardingMetrics> createInstanceMetrics(ClockSource* clockSource,
+                                                             UUID instanceId = UUID::gen(),
+                                                             Role role = Role::kDonor) {
+        return std::make_unique<ReshardingMetrics>(instanceId,
+                                                   BSON("y" << 1),
+                                                   kTestNamespace,
+                                                   role,
+                                                   clockSource->now(),
+                                                   clockSource,
+                                                   &_cumulativeMetrics);
     }
 
     const UUID& getSourceCollectionId() {
@@ -69,7 +69,7 @@ public:
     template <typename T>
     BSONObj getReportFromStateDocument(T document) {
         auto metrics =
-            ReshardingMetricsNew::initializeFrom(document, getClockSource(), &_cumulativeMetrics);
+            ReshardingMetrics::initializeFrom(document, getClockSource(), &_cumulativeMetrics);
         return metrics->reportForCurrentOp();
     }
 
@@ -169,7 +169,7 @@ public:
         doc.setMetrics(metricsDoc);
 
         auto metrics =
-            ReshardingMetricsNew::initializeFrom(doc, getClockSource(), &_cumulativeMetrics);
+            ReshardingMetrics::initializeFrom(doc, getClockSource(), &_cumulativeMetrics);
 
         clock->advance(kInterval);
         auto report = metrics->reportForCurrentOp();

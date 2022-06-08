@@ -140,7 +140,7 @@ private:
 public:
     static std::unique_ptr<ReshardingDataReplicationInterface> make(
         OperationContext* opCtx,
-        ReshardingMetricsNew* metricsNew,
+        ReshardingMetrics* metrics,
         ReshardingApplierMetricsMap* applierMetricsMap,
         CommonReshardingMetadata metadata,
         const std::vector<DonorShardFetchTimestamp>& donorShards,
@@ -196,7 +196,7 @@ public:
 
 private:
     static std::unique_ptr<ReshardingCollectionCloner> _makeCollectionCloner(
-        ReshardingMetricsNew* metricsNew,
+        ReshardingMetrics* metrics,
         const CommonReshardingMetadata& metadata,
         const ShardId& myShardId,
         Timestamp cloneTimestamp);
@@ -207,7 +207,7 @@ private:
 
     static std::vector<std::unique_ptr<ReshardingOplogFetcher>> _makeOplogFetchers(
         OperationContext* opCtx,
-        ReshardingMetricsNew* metricsNew,
+        ReshardingMetrics* metrics,
         const CommonReshardingMetadata& metadata,
         const std::vector<DonorShardFetchTimestamp>& donorShards,
         const ShardId& myShardId);
