@@ -240,29 +240,14 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
             policy, matchExpr, "can't handle string comparison with a non-default collation"_sd);
     }
 
-    // We must avoid mapping predicates on the meta field onto the control field. These should be
-    // mapped to the meta field instead.
-    //
-    // You might think these were handled earlier, by splitting the match expression into a
-    // metadata-only part, and measurement/time-only part. However, splitting a $match into two
-    // sequential $matches only works when splitting a conjunction. A predicate like
-    // {$or: [ {a: 5}, {meta.b: 5} ]} cannot be split, and can't be metadata-only, so we have to
-    // handle it here.
+    // This function only handles time and measurement predicates--not metadata.
     if (bucketSpec.metaField() &&
         (matchExprPath == bucketSpec.metaField().get() ||
          expression::isPathPrefixOf(bucketSpec.metaField().get(), matchExprPath))) {
-
-        if (haveComputedMetaField)
-            return handleIneligible(policy, matchExpr, "can't handle a computed meta field");
-
-        if (!includeMetaField)
-            return handleIneligible(policy, matchExpr, "cannot handle an excluded meta field");
-
-        auto result = matchExpr->shallowClone();
-        expression::applyRenamesToExpression(
-            result.get(),
-            {{bucketSpec.metaField().get(), timeseries::kBucketMetaFieldName.toString()}});
-        return result;
+        tasserted(
+            6707200,
+            str::stream() << "createComparisonPredicate() does not handle metadata predicates: "
+                          << matchExpr);
     }
 
     // We must avoid mapping predicates on fields computed via $addFields or a computed $project.
@@ -455,6 +440,33 @@ std::unique_ptr<MatchExpression> BucketSpec::createPredicatesOnBucketLevelField(
     IneligiblePredicatePolicy policy) {
 
     tassert(5916304, "BucketSpec::createPredicatesOnBucketLevelField nullptr", matchExpr);
+
+    // If we have a leaf predicate on a meta field, we can map it to the bucket's meta field.
+    // This includes comparisons such as $eq and $lte, as well as other non-comparison predicates
+    // such as $exists, $mod, or $elemMatch.
+    //
+    // Metadata predicates are partially handled earlier, by splitting the match expression into a
+    // metadata-only part, and measurement/time-only part. However, splitting a $match into two
+    // sequential $matches only works when splitting a conjunction. A predicate like
+    // {$or: [ {a: 5}, {meta.b: 5} ]} can't be split, and can't be metadata-only, so we have to
+    // handle it here.
+    const auto matchExprPath = matchExpr->path();
+    if (!matchExprPath.empty() && bucketSpec.metaField() &&
+        (matchExprPath == bucketSpec.metaField().get() ||
+         expression::isPathPrefixOf(bucketSpec.metaField().get(), matchExprPath))) {
+
+        if (haveComputedMetaField)
+            return handleIneligible(policy, matchExpr, "can't handle a computed meta field");
+
+        if (!includeMetaField)
+            return handleIneligible(policy, matchExpr, "cannot handle an excluded meta field");
+
+        auto result = matchExpr->shallowClone();
+        expression::applyRenamesToExpression(
+            result.get(),
+            {{bucketSpec.metaField().get(), timeseries::kBucketMetaFieldName.toString()}});
+        return result;
+    }
 
     if (matchExpr->matchType() == MatchExpression::AND) {
         auto nextAnd = static_cast<const AndMatchExpression*>(matchExpr);
