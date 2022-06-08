@@ -1428,11 +1428,14 @@ var ReplSetTest = function(opts) {
         // Set the FCV to 'last-lts'/'last-continuous' if we are running a mixed version replica
         // set. If this is a config server, the FCV will be set as part of ShardingTest.
         // versions are supported with the useRandomBinVersionsWithinReplicaSet option.
-        let setLastLTSFCV = (lastLTSBinVersionWasSpecifiedForSomeNode ||
-                             jsTest.options().useRandomBinVersionsWithinReplicaSet) &&
+        let setLastLTSFCV =
+            (lastLTSBinVersionWasSpecifiedForSomeNode ||
+             jsTest.options().useRandomBinVersionsWithinReplicaSet === "last-lts") &&
             !self.isConfigServer;
-        let setLastContinuousFCV = !setLastLTSFCV &&
-            lastContinuousBinVersionWasSpecifiedForSomeNode && !self.isConfigServer;
+        let setLastContinuousFCV =
+            (lastContinuousBinVersionWasSpecifiedForSomeNode ||
+             jsTest.options().useRandomBinVersionsWithinReplicaSet === "last-continuous") &&
+            !self.isConfigServer;
 
         if ((setLastLTSFCV || setLastContinuousFCV) &&
             jsTest.options().replSetFeatureCompatibilityVersion) {
@@ -1448,8 +1451,14 @@ var ReplSetTest = function(opts) {
             asCluster(self.nodes, function setFCV() {
                 let fcv = setLastLTSFCV ? lastLTSFCV : lastContinuousFCV;
                 print("Setting feature compatibility version for replica set to '" + fcv + "'");
-                assert.commandWorked(
-                    self.getPrimary().adminCommand({setFeatureCompatibilityVersion: fcv}));
+
+                // We are only able to call 'setFeatureCompatibilityVersion' to transition from
+                // last-lts to last-continuous with 'fromConfigServer: true'.
+                const cmd = {
+                    setFeatureCompatibilityVersion: fcv,
+                    fromConfigServer: true,
+                };
+                assert.commandWorked(self.getPrimary().adminCommand(cmd));
                 checkFCV(self.getPrimary().getDB("admin"), fcv);
 
                 // The server has a practice of adding a reconfig as part of upgrade/downgrade logic

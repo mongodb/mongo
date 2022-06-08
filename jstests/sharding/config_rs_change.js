@@ -1,6 +1,10 @@
 // Tests that mongos can be given a connection string for the config servers that doesn't exactly
 // match the replset config on the config servers, and that it can successfully update it's view
 // of the config replset config during startup.
+//
+// The test is explicitly setting the FCV to lastLTS, which is incompatible with implicit
+// multiversion testing against lastContinuous.
+// @tags: [multiversion_incompatible]
 
 var configRS = new ReplSetTest({name: "configRS", nodes: 1, useHostName: true});
 configRS.startSet({configsvr: '', journal: "", storageEngine: 'wiredTiger'});
