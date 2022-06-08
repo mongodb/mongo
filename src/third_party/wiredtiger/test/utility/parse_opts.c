@@ -49,10 +49,13 @@ testutil_parse_opts(int argc, char *const *argv, TEST_OPTS *opts)
 
     testutil_print_command_line(argc, argv);
 
-    while ((ch = __wt_getopt(opts->progname, argc, argv, "A:b:dh:n:o:pR:T:t:vW:")) != EOF)
+    while ((ch = __wt_getopt(opts->progname, argc, argv, "A:Bb:dh:n:o:pR:T:t:vW:")) != EOF)
         switch (ch) {
         case 'A': /* Number of append threads */
             opts->n_append_threads = (uint64_t)atoll(__wt_optarg);
+            break;
+        case 'B': /* Use tiered storage objects and buckets. */
+            opts->tiered = true;
             break;
         case 'b': /* Build directory */
             opts->build_dir = dstrdup(__wt_optarg);
