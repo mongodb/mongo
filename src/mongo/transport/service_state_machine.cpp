@@ -522,7 +522,7 @@ void ServiceStateMachine::Impl::cleanupExhaustResources() noexcept try {
     if (!_inExhaust) {
         return;
     }
-    auto request = OpMsgRequest::parse(_inMessage);
+    auto request = OpMsgRequest::parse(_inMessage, Client::getCurrent());
     // Clean up cursor for exhaust getMore request.
     if (request.getCommandName() == "getMore"_sd) {
         auto cursorId = request.body["getMore"].Long();

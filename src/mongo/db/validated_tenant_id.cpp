@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,44 +27,51 @@
  *    it in the license file.
  */
 
-#include "mongo/db/multitenancy.h"
+#include "mongo/db/validated_tenant_id.h"
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/security_token.h"
 #include "mongo/db/multitenancy_gen.h"
-#include "mongo/db/tenant_id.h"
-#include "mongo/logv2/log.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
 
 namespace mongo {
 
-// Holds the tenantId for the operation if it was provided in the request on the $tenant field only
-// if the tenantId was not also provided in the security token.
-const auto dollarTenantDecoration =
-    OperationContext::declareDecoration<boost::optional<mongo::TenantId>>();
+ValidatedTenantId::ValidatedTenantId(const OpMsg& opMsg, Client& client) {
+    auto dollarTenantElem = opMsg.body["$tenant"];
+    uassert(ErrorCodes::InvalidOptions,
+            "Multitenancy not enabled, cannot set $tenant in command body",
+            !dollarTenantElem || (dollarTenantElem && gMultitenancySupport));
 
-boost::optional<TenantId> getActiveTenant(OperationContext* opCtx) {
-    auto token = auth::getSecurityToken(opCtx);
-    if (!token) {
-        return dollarTenantDecoration(opCtx);
+    if (!gMultitenancySupport) {
+        return;
     }
 
-    invariant(!dollarTenantDecoration(opCtx));
-    return token->getAuthenticatedUser().getTenant();
-}
+    // TODO SERVER-66822: Re-enable this uassert.
+    // uassert(ErrorCodes::Unauthorized,
+    //         "Multitenancy is enabled, $tenant id or securityToken is required.",
+    //         dollarTenantElem || opMsg.securityToken.nFields() > 0);
 
-void setDollarTenantOnOpCtx(OperationContext* opCtx, const OpMsg& opMsg) {
-    if (!opMsg.validatedTenant || !opMsg.validatedTenant->tenantId()) {
+    uassert(6545800,
+            str::stream() << "Cannot pass $tenant id if also passing securityToken, "
+                          << opMsg.securityToken.toString() << ", " << dollarTenantElem.toString(),
+            !(dollarTenantElem && opMsg.securityToken.nFields() > 0));
+
+    if (dollarTenantElem) {
+        uassert(ErrorCodes::Unauthorized,
+                "'$tenant' may only be specified with the useTenant action type",
+                AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), ActionType::useTenant));
+        _tenant = TenantId::parseFromBSON(dollarTenantElem);
         return;
     }
 
     if (opMsg.securityToken.nFields() > 0) {
-        return;
+        auto verifiedToken = auth::verifySecurityToken(opMsg.securityToken);
+        _tenant = verifiedToken.getAuthenticatedUser().getTenant();
     }
+}
 
-    dollarTenantDecoration(opCtx) = opMsg.validatedTenant->tenantId();
+ValidatedTenantId::ValidatedTenantId(const DatabaseName& dbName) {
+    _tenant = dbName.tenantId();
 }
 
 }  // namespace mongo

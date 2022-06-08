@@ -54,7 +54,14 @@ BSONObj makeSecurityToken(const UserName& userName) {
     return auth::signSecurityToken(BSON(authUserFieldName << authUser));
 }
 
-class SecurityTokenMetadataTest : public LockerNoopServiceContextTest {};
+class SecurityTokenMetadataTest : public LockerNoopServiceContextTest {
+protected:
+    void setUp() final {
+        client = getServiceContext()->makeClient("test");
+    }
+
+    ServiceContext::UniqueClient client;
+};
 
 TEST_F(SecurityTokenMetadataTest, SecurityTokenNotAccepted) {
     const auto kPingBody = BSON(kPingFieldName << 1);
@@ -82,7 +89,12 @@ TEST_F(SecurityTokenMetadataTest, BasicSuccess) {
     auto opCtx = makeOperationContext();
     ASSERT(auth::getSecurityToken(opCtx.get()) == boost::none);
 
-    auth::readSecurityTokenMetadata(opCtx.get(), msg.securityToken);
+    msg.parseValidatedTenant(*client.get());
+    ASSERT(msg.validatedTenant);
+    ASSERT(msg.validatedTenant->tenantId());
+    ASSERT_EQ(msg.validatedTenant->tenantId().get(), kTenantId);
+
+    auth::setSecurityToken(opCtx.get(), msg);
     auto token = auth::getSecurityToken(opCtx.get());
     ASSERT(token != boost::none);
 

@@ -37,14 +37,13 @@
 namespace mongo {
 
 /**
- * Parses the tenantId from the '$tenant' field in the request if it exists and
- * "multitenancySupport" is enabled. Then, sets the parsed tenantId on the opCtx.
- */
-void parseDollarTenantFromRequest(OperationContext* opCtx, const OpMsg& request);
-
-/**
- * Extract the active TenantId for this operation.
+ * Extract the active TenantId for this OperationContext.
  */
 boost::optional<TenantId> getActiveTenant(OperationContext* opCtx);
+
+/**
+ * Set the dollar TenantId on this OperationContext.
+ */
+void setDollarTenantOnOpCtx(OperationContext* opCtx, const OpMsg& opMsg);
 
 }  // namespace mongo

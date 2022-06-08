@@ -654,6 +654,14 @@ private:
         CommandHelpers::uassertShouldAttemptParse(opCtx, command, request);
         _startOperationTime = getClientOperationTime(opCtx);
 
+        rpc::readRequestMetadata(opCtx, request, command->requiresAuth());
+        uassert(ErrorCodes::Unauthorized,
+                str::stream() << "Command " << command->getName()
+                              << " is not supported in multitenancy mode",
+                command->allowedWithSecurityToken() ||
+                    auth::getSecurityToken(opCtx) == boost::none);
+        _tokenAuthorizationSessionGuard.emplace(opCtx);
+
         _invocation = command->parse(opCtx, request);
         CommandInvocation::set(opCtx, _invocation);
 
@@ -1429,13 +1437,6 @@ void ExecCommandDatabase::_initiateCommand() {
         }
     });
 
-    rpc::readRequestMetadata(opCtx, request, command->requiresAuth());
-    uassert(ErrorCodes::Unauthorized,
-            str::stream() << "Command " << command->getName()
-                          << " is not supported in multitenancy mode",
-            command->allowedWithSecurityToken() || auth::getSecurityToken(opCtx) == boost::none);
-    _tokenAuthorizationSessionGuard.emplace(opCtx);
-
     rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -1950,10 +1951,11 @@ void curOpCommandSetup(OperationContext* opCtx, const OpMsgRequest& request) {
 
 Future<void> parseCommand(std::shared_ptr<HandleRequest::ExecutionContext> execContext) try {
     const auto& msg = execContext->getMessage();
-    auto opMsgReq = rpc::opMsgRequestFromAnyProtocol(msg);
+    auto client = execContext->getOpCtx()->getClient();
+    auto opMsgReq = rpc::opMsgRequestFromAnyProtocol(msg, client);
+
     if (msg.operation() == dbQuery) {
-        checkAllowedOpQueryCommand(*(execContext->getOpCtx()->getClient()),
-                                   opMsgReq.getCommandName());
+        checkAllowedOpQueryCommand(*client, opMsgReq.getCommandName());
     }
     execContext->setRequest(opMsgReq);
     return Status::OK();

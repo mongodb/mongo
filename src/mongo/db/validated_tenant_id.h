@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,49 +29,35 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/auth/security_token_gen.h"
-#include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/tenant_id.h"
 
 namespace mongo {
-namespace auth {
 
-class SecurityTokenAuthenticationGuard {
+class Client;
+struct OpMsg;
+
+class ValidatedTenantId {
 public:
-    SecurityTokenAuthenticationGuard() = delete;
-    SecurityTokenAuthenticationGuard(OperationContext* opCtx);
-    ~SecurityTokenAuthenticationGuard();
+    ValidatedTenantId(const ValidatedTenantId& validatedTenant) = default;
+
+    /**
+     * Constructs a ValidatedTenantId by parsing tenant from $tenant or security token of opMsg
+     * and validating it with the auth module.
+     */
+    ValidatedTenantId(const OpMsg& opMsg, Client& client);
+
+    /**
+     * Constructs a ValidatedTenantId by treating the tenantId on DatabaseName as validated.
+     */
+    ValidatedTenantId(const DatabaseName& dbName);
+
+    const boost::optional<TenantId>& tenantId() const {
+        return _tenant;
+    }
 
 private:
-    Client* _client;
+    boost::optional<TenantId> _tenant = boost::none;
 };
 
-/**
- * Takes an unsigned security token as input and applies
- * the temporary signature algorithm to extend it into a full SecurityToken.
- */
-BSONObj signSecurityToken(BSONObj obj);
-
-/**
- * Verify the contents of the provided security token
- * using the temporary signing algorithm,
- */
-SecurityToken verifySecurityToken(BSONObj obj);
-
-/**
- * Parse the validated SecurityToken from the OpMsg and place it as a decoration
- * on OperationContext.
- */
-void setSecurityToken(OperationContext* opCtx, const OpMsg& opMsg);
-
-/**
- * Retrieve the Security Token associated with this operation context
- */
-using MaybeSecurityToken = boost::optional<SecurityToken>;
-MaybeSecurityToken getSecurityToken(OperationContext* opCtx);
-
-}  // namespace auth
 }  // namespace mongo

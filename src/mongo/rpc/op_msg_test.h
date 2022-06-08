@@ -131,6 +131,10 @@ public:
         return OpMsg::parseOwned(done());
     }
 
+    OpMsg parse(Client* client) {
+        return OpMsg::parseOwned(done(), client);
+    }
+
     OpMsgBytes&& addToSize(int32_t extra) && {
         updateSize(extra);
         return std::move(*this);

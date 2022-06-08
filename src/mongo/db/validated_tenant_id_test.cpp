@@ -27,38 +27,42 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
+#include "mongo/rpc/op_msg_test.h"
+
 #include "mongo/platform/basic.h"
 
-#include "mongo/bson/oid.h"
+#include "mongo/base/static_assert.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/security_token.h"
-#include "mongo/db/multitenancy.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/logv2/log.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/hex.h"
 
 namespace mongo {
 
-/**
- * Encapsulation thwarting helper for authorizing a user without
- * having to set up any externalstate mocks or transport layers.
- */
 class AuthorizationSessionImplTestHelper {
 public:
     /**
      * Synthesize a user with the useTenant privilege and add them to the authorization session.
      */
-    static void grantUseTenant(OperationContext* opCtx) {
+    static void grantUseTenant(Client& client) {
         User user(UserName("useTenant", "admin"));
         user.setPrivileges(
             {Privilege(ResourcePattern::forClusterResource(), ActionType::useTenant)});
-        auto* as =
-            dynamic_cast<AuthorizationSessionImpl*>(AuthorizationSession::get(opCtx->getClient()));
+        auto* as = dynamic_cast<AuthorizationSessionImpl*>(AuthorizationSession::get(client));
         if (as->_authenticatedUser != boost::none) {
-            as->logoutAllDatabases(opCtx->getClient(), "AuthorizationSessionImplTestHelper"_sd);
+            as->logoutAllDatabases(&client, "AuthorizationSessionImplTestHelper"_sd);
         }
         as->_authenticatedUser = std::move(user);
         as->_authenticationMode = AuthorizationSession::AuthenticationMode::kConnection;
@@ -66,9 +70,8 @@ public:
     }
 };
 
-namespace {
-
-class DollarTenantDecorationTest : public ScopedGlobalServiceContextForTest, public unittest::Test {
+class ValidatedTenantIdTestFixture : public mongo::ScopedGlobalServiceContextForTest,
+                                     public unittest::Test {
 protected:
     void setUp() final {
         auto authzManagerState = std::make_unique<AuthzManagerExternalStateMock>();
@@ -78,8 +81,6 @@ protected:
         AuthorizationManager::set(getServiceContext(), std::move(authzManager));
 
         client = getServiceContext()->makeClient("test");
-        opCtxPtr = getServiceContext()->makeOperationContext(client.get());
-        opCtx = opCtxPtr.get();
     }
 
     BSONObj makeSecurityToken(const UserName& userName) {
@@ -90,78 +91,86 @@ protected:
     }
 
     ServiceContext::UniqueClient client;
-    ServiceContext::UniqueOperationContext opCtxPtr;
-    OperationContext* opCtx;
 };
 
-TEST_F(DollarTenantDecorationTest, ParseDollarTenantFromRequestSecurityTokenAlreadySet) {
-    gMultitenancySupport = true;
-
-    // Ensure the security token is set on the opCtx.
-    const auto kTenantId = TenantId(OID::gen());
-    auto token = makeSecurityToken(UserName("user", "admin", kTenantId));
-    auth::readSecurityTokenMetadata(opCtx, token);
-    ASSERT(getActiveTenant(opCtx));
-    ASSERT_EQ(*getActiveTenant(opCtx), kTenantId);
-
-    // Grant authorization to set $tenant.
-    AuthorizationSessionImplTestHelper::grantUseTenant(opCtx);
-
-    // The dollarTenantDecoration should not be set because the security token is already set.
-    const auto kTenantParameter = OID::gen();
-    auto opMsgRequest = OpMsgRequest::fromDBAndBody("test", BSON("$tenant" << kTenantParameter));
-    ASSERT_THROWS_CODE(
-        parseDollarTenantFromRequest(opCtx, opMsgRequest), AssertionException, 6223901);
-
-    // getActiveTenant should still return the tenantId in the security token.
-    ASSERT(getActiveTenant(opCtx));
-    ASSERT_EQ(*getActiveTenant(opCtx), kTenantId);
-}
-
-TEST_F(DollarTenantDecorationTest, ParseDollarTenantFromRequestUnauthorized) {
-    gMultitenancySupport = true;
-    const auto kOid = OID::gen();
-
-    // We are not authenticated at all.
-    auto opMsgRequest = OpMsgRequest::fromDBAndBody("test", BSON("$tenant" << kOid));
-    ASSERT_THROWS_CODE(parseDollarTenantFromRequest(opCtx, opMsgRequest),
-                       AssertionException,
-                       ErrorCodes::Unauthorized);
-    ASSERT(!getActiveTenant(opCtx));
-}
-
-TEST_F(DollarTenantDecorationTest, ParseDollarTenantMultitenancySupportDisabled) {
+TEST_F(ValidatedTenantIdTestFixture, MultitenancySupportOffWithoutTenantOK) {
     gMultitenancySupport = false;
-    const auto kOid = OID::gen();
+    auto body = fromjson("{$db: 'foo'}");
+    OpMsg msg({body});
 
-    // Grant authorization to set $tenant.
-    AuthorizationSessionImplTestHelper::grantUseTenant(opCtx);
-
-    // TenantId is passed as the '$tenant' parameter. "multitenancySupport" is disabled, so we
-    // should throw when attempting to set this tenantId on the opCtx.
-    auto opMsgRequestParameter = OpMsgRequest::fromDBAndBody("test", BSON("$tenant" << kOid));
-    ASSERT_THROWS_CODE(parseDollarTenantFromRequest(opCtx, opMsgRequestParameter),
-                       AssertionException,
-                       ErrorCodes::InvalidOptions);
-    ASSERT(!getActiveTenant(opCtx));
+    ValidatedTenantId validatedTenant(msg, *(client.get()));
+    ASSERT_TRUE(validatedTenant.tenantId() == boost::none);
 }
 
-TEST_F(DollarTenantDecorationTest, ParseDollarTenantFromRequestSuccess) {
+TEST_F(ValidatedTenantIdTestFixture, MultitenancySupportWithTenantOK) {
     gMultitenancySupport = true;
-    const auto kOid = OID::gen();
 
-    // Grant authorization to set $tenant.
-    AuthorizationSessionImplTestHelper::grantUseTenant(opCtx);
+    auto kOid = OID::gen();
+    auto body = BSON("ping" << 1 << "$tenant" << kOid);
+    OpMsg msg({body});
 
-    // The tenantId should be successfully set because "multitenancySupport" is enabled and we're
-    // authorized.
-    auto opMsgRequest = OpMsgRequest::fromDBAndBody("test", BSON("$tenant" << kOid));
-    parseDollarTenantFromRequest(opCtx, opMsgRequest);
-
-    auto tenantId = getActiveTenant(opCtx);
-    ASSERT(tenantId);
-    ASSERT_EQ(tenantId->toString(), kOid.toString());
+    AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
+    ValidatedTenantId validatedTenant(msg, *(client.get()));
+    ASSERT(validatedTenant.tenantId() == TenantId(kOid));
 }
 
-}  // namespace
+TEST_F(ValidatedTenantIdTestFixture, MultitenancySupportWithSecurityTokenOK) {
+    gMultitenancySupport = true;
+
+    const auto kTenantId = TenantId(OID::gen());
+    auto body = BSON("ping" << 1);
+    auto token = makeSecurityToken(UserName("user", "admin", kTenantId));
+    OpMsg msg({body, token});
+
+    ValidatedTenantId validatedTenant(msg, *(client.get()));
+    ASSERT(validatedTenant.tenantId() == kTenantId);
+}
+
+TEST_F(ValidatedTenantIdTestFixture, MultitenancySupportOffWithTenantNOK) {
+    gMultitenancySupport = false;
+
+    auto kOid = OID::gen();
+    auto body = BSON("ping" << 1 << "$tenant" << kOid);
+    OpMsg msg({body});
+
+    AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
+    ASSERT_THROWS_CODE(
+        ValidatedTenantId(msg, *(client.get())), DBException, ErrorCodes::InvalidOptions);
+}
+
+TEST_F(ValidatedTenantIdTestFixture, MultitenancySupportWithTenantNOK) {
+    gMultitenancySupport = true;
+
+    auto kOid = OID::gen();
+    auto body = BSON("ping" << 1 << "$tenant" << kOid);
+    OpMsg msg({body});
+
+    ASSERT_THROWS_CODE(
+        ValidatedTenantId(msg, *(client.get())), DBException, ErrorCodes::Unauthorized);
+}
+
+// TODO SERVER-66822: Re-enable this test case.
+// TEST_F(ValidatedTenantIdTestFixture, MultitenancySupportWithoutTenantAndSecurityTokenNOK) {
+//     gMultitenancySupport = true;
+
+//     auto body = BSON("ping" << 1);
+//     OpMsg msg({body});
+
+//     AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
+//     ASSERT_THROWS_CODE(
+//         ValidatedTenantId(msg, *(client.get())), DBException, ErrorCodes::Unauthorized);
+// }
+
+TEST_F(ValidatedTenantIdTestFixture, MultitenancySupportWithTenantAndSecurityTokenNOK) {
+    gMultitenancySupport = true;
+
+    auto kOid = OID::gen();
+    auto body = BSON("ping" << 1 << "$tenant" << kOid);
+    auto token = makeSecurityToken(UserName("user", "admin", TenantId(kOid)));
+    OpMsg msg({body, token});
+
+    AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
+    ASSERT_THROWS_CODE(ValidatedTenantId(msg, *(client.get())), DBException, 6545800);
+}
+
 }  // namespace mongo

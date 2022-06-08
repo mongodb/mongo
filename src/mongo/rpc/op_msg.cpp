@@ -132,7 +132,7 @@ void OpMsg::appendChecksum(Message* message) {
 #endif
 }
 
-OpMsg OpMsg::parse(const Message& message) try {
+OpMsg OpMsg::parse(const Message& message, Client* client) try {
     // It is the caller's responsibility to call the correct parser for a given message type.
     invariant(!message.empty());
     invariant(message.operation() == dbMsg);
@@ -228,7 +228,9 @@ OpMsg OpMsg::parse(const Message& message) try {
                 *checksum == calculateChecksum(message));
     }
 #endif
-
+    if (client != nullptr) {
+        msg.parseValidatedTenant(*client);
+    }
     return msg;
 } catch (const DBException& ex) {
     LOGV2_DEBUG(
@@ -240,6 +242,10 @@ OpMsg OpMsg::parse(const Message& message) try {
         "hexdump_message_singleData_view2ptr_message_size"_attr =
             redact(hexdump(message.singleData().view2ptr(), message.size())));
     throw;
+}
+
+void OpMsg::parseValidatedTenant(Client& client) {
+    validatedTenant = ValidatedTenantId(*this, client);
 }
 
 namespace {

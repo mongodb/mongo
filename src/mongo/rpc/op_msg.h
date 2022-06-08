@@ -30,12 +30,14 @@
 #pragma once
 
 #include <algorithm>
+#include <boost/optional.hpp>
 #include <string>
 #include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/validated_tenant_id.h"
 #include "mongo/rpc/message.h"
 
 namespace mongo {
@@ -120,16 +122,18 @@ struct OpMsg {
     /**
      * Parses and returns an OpMsg containing unowned BSON.
      */
-    static OpMsg parse(const Message& message);
+    static OpMsg parse(const Message& message, Client* client = nullptr);
 
     /**
      * Parses and returns an OpMsg containing owned BSON.
      */
-    static OpMsg parseOwned(const Message& message) {
-        auto msg = parse(message);
+    static OpMsg parseOwned(const Message& message, Client* client = nullptr) {
+        auto msg = parse(message, client);
         msg.shareOwnershipWith(message.sharedBuffer());
         return msg;
     }
+
+    void parseValidatedTenant(Client& client);
 
     Message serialize() const;
 
@@ -159,6 +163,8 @@ struct OpMsg {
     BSONObj body;
     BSONObj securityToken;
     std::vector<DocumentSequence> sequences;
+    // The validated tenant id will not be serialized into the Message.
+    boost::optional<ValidatedTenantId> validatedTenant = boost::none;
 };
 
 /**
@@ -170,12 +176,12 @@ struct OpMsgRequest : public OpMsg {
     OpMsgRequest() = default;
     explicit OpMsgRequest(OpMsg&& generic) : OpMsg(std::move(generic)) {}
 
-    static OpMsgRequest parse(const Message& message) {
-        return OpMsgRequest(OpMsg::parse(message));
+    static OpMsgRequest parse(const Message& message, Client* client = nullptr) {
+        return OpMsgRequest(OpMsg::parse(message, client));
     }
 
-    static OpMsgRequest parseOwned(const Message& message) {
-        return OpMsgRequest(OpMsg::parseOwned(message));
+    static OpMsgRequest parseOwned(const Message& message, Client* client = nullptr) {
+        return OpMsgRequest(OpMsg::parseOwned(message, client));
     }
 
     static OpMsgRequest fromDBAndBody(StringData db,

@@ -129,15 +129,14 @@ SecurityToken verifySecurityToken(BSONObj obj) {
     return token;
 }
 
-void readSecurityTokenMetadata(OperationContext* opCtx, BSONObj securityToken) try {
-    if (securityToken.nFields() == 0) {
-        return;
+void setSecurityToken(OperationContext* opCtx, const OpMsg& opMsg) {
+    if (opMsg.validatedTenant && opMsg.securityToken.nFields() > 0) {
+        // Use the security token directly as it has been validated by ValdiatedTenantId
+        // constructor.
+        securityTokenDecoration(opCtx) =
+            SecurityToken::parse({"Security Token"}, opMsg.securityToken);
+        LOGV2_DEBUG(5838100, 4, "Accepted security token", "token"_attr = opMsg.securityToken);
     }
-
-    securityTokenDecoration(opCtx) = verifySecurityToken(securityToken);
-    LOGV2_DEBUG(5838100, 4, "Accepted security token", "token"_attr = securityToken);
-} catch (const DBException& ex) {
-    uassertStatusOK(ex.toStatus().withContext("Unable to parse Security Token from Metadata"));
 }
 
 MaybeSecurityToken getSecurityToken(OperationContext* opCtx) {
