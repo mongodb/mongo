@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/expression_where.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
@@ -242,6 +243,7 @@ public:
     void visit(const TextNoOpMatchExpression* expr) final {}
     void visit(const TwoDPtInAnnulusExpression* expr) final {}
     void visit(const WhereNoOpMatchExpression* expr) final {}
+    void visit(const EncryptedBetweenMatchExpression* expr) final {}
 
 private:
     void visitComparisonMatchExpression(const ComparisonMatchExpressionBase* expr) {

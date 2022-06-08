@@ -29,15 +29,22 @@
 
 /** Unit tests for MatchMatchExpression operator implementations in match_operators.{h,cpp}. */
 
+#include <memory>
+
 #include "mongo/unittest/unittest.h"
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -2258,6 +2265,62 @@ DEATH_TEST_REGEX(ComparisonMatchExpression,
 
     ASSERT_EQ(eq.numChildren(), 0);
     ASSERT_THROWS_CODE(eq.getChild(0), AssertionException, 6400209);
+}
+
+TEST(EncryptedBetweenMatchExpression, EqualWithoutCollator) {
+    BSONObj operand = BSON("a" << 5);
+    EncryptedBetweenMatchExpression eb1("a", operand["a"]);
+    EncryptedBetweenMatchExpression eb2("a", operand["a"]);
+    ASSERT(eb1.equivalent(&eb2));
+}
+
+
+TEST(EncryptedBetweenMatchExpression, UnequalWithoutCollator) {
+    BSONObj operand = BSON("a" << 5 << "b" << 10);
+    EncryptedBetweenMatchExpression eb1("a", operand["a"]);
+    EncryptedBetweenMatchExpression eb2("a", operand["b"]);
+    ASSERT_FALSE(eb1.equivalent(&eb2));
+}
+
+
+TEST(EncryptedBetweenMatchExpression, UnequalDueToPath) {
+    BSONObj operand = BSON("a" << 5 << "b" << 10);
+    EncryptedBetweenMatchExpression eb1("a", operand["a"]);
+    EncryptedBetweenMatchExpression eb2("b", operand["a"]);
+    ASSERT_FALSE(eb1.equivalent(&eb2));
+}
+
+TEST(EncryptedBetweenMatchExpression, UnequalDueToRhs) {
+    BSONObj operand = BSON("a" << 5 << "b" << 10);
+    EncryptedBetweenMatchExpression eb1("a", operand["a"]);
+    EncryptedBetweenMatchExpression eb2("a", operand["b"]);
+    ASSERT_FALSE(eb1.equivalent(&eb2));
+}
+
+TEST(EncryptedBetweenMatchExpression, CanSerializeToBSON) {
+    auto op = BSON("$encryptedBetween" << BSON_ARRAY(1 << 5));
+    EncryptedBetweenMatchExpression eb("a", op.firstElement());
+    BSONObjBuilder bob;
+    eb.serialize(&bob, true);
+    ASSERT_BSONOBJ_EQ(bob.obj(), BSON("a" << op));
+}
+
+TEST(EncryptedBetweenMatchExpression, CanSerializeToBSONInsideAnd) {
+    auto op = BSON("$encryptedBetween" << BSON_ARRAY(1 << 5));
+    auto eb = std::make_unique<EncryptedBetweenMatchExpression>("a", op.firstElement());
+    auto v = std::vector<std::unique_ptr<MatchExpression>>();
+    v.push_back(std::move(eb));
+    AndMatchExpression nd(std::move(v));
+    BSONObjBuilder bob;
+    nd.serialize(&bob, true);
+    ASSERT_BSONOBJ_EQ(bob.obj(), BSON("$and" << BSON_ARRAY(BSON("a" << op))));
+}
+
+TEST(EncryptedBetweenMatchExpression, ErrorsOnEvaluation) {
+    auto op = BSON("$encryptedBetween" << BSON_ARRAY(1 << 5));
+    auto obj = BSON("$encryptedBetween" << 2);
+    EncryptedBetweenMatchExpression eb("", op.firstElement());
+    ASSERT_THROWS_CODE(eb.matchesSingleElement(obj.firstElement()), AssertionException, 6762800);
 }
 
 }  // namespace mongo

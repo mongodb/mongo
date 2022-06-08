@@ -55,6 +55,7 @@ class InternalExprGTMatchExpression;
 class InternalExprGTEMatchExpression;
 class InternalExprLTMatchExpression;
 class InternalExprLTEMatchExpression;
+class EncryptedBetweenMatchExpression;
 class InternalSchemaAllElemMatchFromIndexMatchExpression;
 class InternalSchemaAllowedPropertiesMatchExpression;
 class InternalSchemaBinDataEncryptedTypeExpression;
@@ -162,6 +163,7 @@ public:
     virtual void visit(MaybeConstPtr<TypeMatchExpression> expr) = 0;
     virtual void visit(MaybeConstPtr<WhereMatchExpression> expr) = 0;
     virtual void visit(MaybeConstPtr<WhereNoOpMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<EncryptedBetweenMatchExpression> expr) = 0;
 };
 
 using MatchExpressionMutableVisitor = MatchExpressionVisitor<false>;

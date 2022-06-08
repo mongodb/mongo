@@ -1185,6 +1185,8 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void visit(const EncryptedBetweenMatchExpression* expr) final {}
+
 private:
     // Set of utilities responsible for appending various fields to build a descriptive error.
     void appendOperatorName(const MatchExpression& expr) {
@@ -1916,6 +1918,7 @@ public:
     void visit(const WhereNoOpMatchExpression* expr) final {
         MONGO_UNREACHABLE;
     }
+    void visit(const EncryptedBetweenMatchExpression* expr) final {}
 
 private:
     /**
@@ -2228,6 +2231,9 @@ public:
     }
     void visit(const WhereNoOpMatchExpression* expr) final {
         MONGO_UNREACHABLE;
+    }
+    void visit(const EncryptedBetweenMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
     }
 
 private:

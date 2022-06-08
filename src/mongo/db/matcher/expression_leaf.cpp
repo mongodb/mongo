@@ -877,4 +877,19 @@ bool BitTestMatchExpression::equivalent(const MatchExpression* other) const {
 
     return path() == realOther->path() && myBitPositions == otherBitPositions;
 }
+
+void EncryptedBetweenMatchExpression::debugString(StringBuilder& debug,
+                                                  int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
+    debug << path() << " " << kName;
+    debug << " " << rhs().toString(false);
+
+    MatchExpression::TagData* td = getTag();
+    if (td) {
+        debug << " ";
+        td->debugString(&debug);
+    }
+
+    debug << "\n";
+}
 }  // namespace mongo

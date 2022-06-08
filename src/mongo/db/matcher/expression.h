@@ -86,6 +86,7 @@ public:
         BITS_ALL_CLEAR,
         BITS_ANY_SET,
         BITS_ANY_CLEAR,
+        ENCRYPTED_BETWEEN,
 
         // Negations.
         NOT,
@@ -139,6 +140,7 @@ public:
         INTERNAL_SCHEMA_TYPE,
         INTERNAL_SCHEMA_UNIQUE_ITEMS,
         INTERNAL_SCHEMA_XOR,
+
     };
 
     /**

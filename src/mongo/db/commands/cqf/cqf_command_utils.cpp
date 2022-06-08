@@ -347,6 +347,10 @@ public:
         unsupportedExpression(expr);
     }
 
+    void visit(const EncryptedBetweenMatchExpression* expr) override {
+        unsupportedExpression(expr);
+    }
+
 private:
     void unsupportedExpression(const MatchExpression* expr) {
         _eligible = false;

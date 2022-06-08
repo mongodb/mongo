@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_path.h"
@@ -1050,6 +1051,70 @@ public:
 
     void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
         visitor->visit(this);
+    }
+};
+
+/**
+ * MatchExpression that represents a filter for a range of values. Similar semantics to the BETWEEN
+ * SQL operator. Used for encoding a range query against an encrypted field.
+ */
+class EncryptedBetweenMatchExpression final : public LeafMatchExpression {
+public:
+    static constexpr StringData kName = "$encryptedBetween"_sd;
+
+    EncryptedBetweenMatchExpression(StringData path,
+                                    BSONElement rhs,
+                                    clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : LeafMatchExpression(ENCRYPTED_BETWEEN, path, annotation) {
+        _backingBSON = BSON("" << rhs);
+    }
+
+
+    BSONElement rhs() const {
+        return _backingBSON.firstElement();
+    }
+
+    bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
+        // TODO: SERVER-67627 Implement runtime tag generation for $encryptedBetween.
+        uasserted(6762800, "Not implemented");
+    }
+
+    BSONObj getSerializedRightHandSide() const final {
+        return BSON(kName << _backingBSON.firstElement());
+    }
+
+    std::unique_ptr<MatchExpression> shallowClone() const final {
+        std::unique_ptr<EncryptedBetweenMatchExpression> e =
+            std::make_unique<EncryptedBetweenMatchExpression>(path(), rhs(), _errorAnnotation);
+        if (getTag()) {
+            e->setTag(getTag()->clone());
+        }
+        return e;
+    }
+
+    virtual bool equivalent(const MatchExpression* other) const {
+        if (matchType() != other->matchType()) {
+            return false;
+        }
+        auto otherCast = static_cast<const EncryptedBetweenMatchExpression*>(other);
+        return path() == otherCast->path() && rhs().binaryEqual(otherCast->rhs());
+    };
+
+    void debugString(StringBuilder& debug, int indentationLevel) const;
+
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+private:
+    BSONObj _backingBSON;
+
+    ExpressionOptimizerFunc getOptimizer() const final {
+        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
     }
 };
 
