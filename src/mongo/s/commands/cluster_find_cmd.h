@@ -87,6 +87,10 @@ public:
         return false;
     }
 
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
     std::string help() const override {
         return "query for documents";
     }

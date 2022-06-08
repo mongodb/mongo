@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,41 +27,14 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/write_concern_options.h"
+#include "mongo/base/init.h"
+#include "mongo/base/status.h"
 
 namespace mongo {
-
-/**
- * Returns true if the given command name can run as a retryable write.
- */
-bool isRetryableWriteCommand(StringData cmdName);
-
-/**
- * Returns true if the given cmd name is a transaction control command.  These are also the only
- * commands allowed to specify write concern in a transaction.
- */
-bool isTransactionCommand(StringData cmdName);
-
-/**
- * Throws if the given write concern is not allowed in a transaction.
- */
-void validateWriteConcernForTransaction(const WriteConcernOptions& wcResult, StringData cmdName);
-
-/**
- * Returns true if the given readConcern level is valid for use in a transaction.
- */
-bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLevel);
-
-/**
- * Throws if the given session options are invalid for the given command and target namespace.
- */
-void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions,
-                            StringData cmdName,
-                            const NamespaceString& nss,
-                            bool allowTransactionsOnConfigDatabase);
-
+namespace {
+MONGO_INITIALIZER_GENERAL(CoreOptions_Store,
+                          ("BeginStartupOptionStorage"),
+                          ("EndStartupOptionStorage"))
+(InitializerContext* context) {}
+}  // namespace
 }  // namespace mongo

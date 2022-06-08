@@ -317,6 +317,10 @@ public:
         return std::make_unique<Invocation>(this, opMsgRequest);
     }
 
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
     class Invocation final : public CommandInvocation {
     public:
         Invocation(Command* cmd, const OpMsgRequest& request)

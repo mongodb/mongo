@@ -511,6 +511,13 @@ public:
         return false;
     }
 
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
+    }
     class Invocation final : public InvocationBaseGen {
     public:
         Invocation(OperationContext* opCtx,
@@ -1386,6 +1393,15 @@ public:
     bool shouldAffectCommandCounter() const final {
         return false;
     }
+
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBaseGen {
     public:
         Invocation(OperationContext* opCtx,
@@ -1621,6 +1637,14 @@ public:
 
     bool shouldAffectCommandCounter() const final {
         return false;
+    }
+
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
     }
 
     class Invocation final : public InvocationBaseGen {

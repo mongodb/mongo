@@ -64,6 +64,10 @@ public:
                "directly. Participates in droping a collection.";
     }
 
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
     using Request = ShardsvrDropCollectionParticipant;
 
     class Invocation final : public InvocationBase {

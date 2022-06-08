@@ -807,6 +807,10 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
 } cmdCreateIndex;
 
 }  // namespace

@@ -448,6 +448,14 @@ public:
                                                   &bodyBuilder);
     }
 
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
     bool run(OperationContext* opCtx,
              const std::string& dbName,
              const BSONObj& cmdObj,

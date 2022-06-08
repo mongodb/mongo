@@ -603,6 +603,35 @@ public:
         return nullptr;
     }
 
+    /**
+     * Returns true if this command supports apply once semantic when retried.
+     */
+    virtual bool supportsRetryableWrite() const {
+        return false;
+    }
+
+    /**
+     * Returns true if sessions should be checked out when lsid and txnNumber is present in the
+     * request.
+     */
+    virtual bool shouldCheckoutSession() const {
+        return true;
+    }
+
+    /**
+     * Returns true if this is a command related to managing the lifecycle of a transaction.
+     */
+    virtual bool isTransactionCommand() const {
+        return false;
+    }
+
+    /**
+     * Returns true if this command can be run in a transaction.
+     */
+    virtual bool allowedInTransactions() const {
+        return false;
+    }
+
 private:
     // The full name of the command
     const std::string _name;

@@ -315,6 +315,7 @@ let testCases = {
             },
         }
     },
+    coordinateCommitTransaction: {skip: "unimplemented. Serves only as a stub."},
     count: {
         run: {
             sendsDbVersion: true,

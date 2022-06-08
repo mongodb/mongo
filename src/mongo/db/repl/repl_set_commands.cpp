@@ -528,6 +528,11 @@ public:
                "primary.)\n"
                "http://dochub.mongodb.org/core/replicasetcommands";
     }
+
+    bool shouldCheckoutSession() const final {
+        return false;
+    }
+
     CmdReplSetStepDown()
         : ReplSetCommand("replSetStepDown"),
           _stepDownCmdsWithForceExecutedMetric("commands.replSetStepDownWithForce.total",

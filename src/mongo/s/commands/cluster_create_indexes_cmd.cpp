@@ -78,6 +78,10 @@ public:
         return true;
     }
 
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
     bool runWithRequestParser(OperationContext* opCtx,
                               const std::string& dbName,
                               const BSONObj& cmdObj,

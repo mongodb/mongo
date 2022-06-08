@@ -134,6 +134,10 @@ public:
                                       hasTerm);
     }
 
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
     Status explain(OperationContext* opCtx,
                    const OpMsgRequest& request,
                    ExplainOptions::Verbosity verbosity,

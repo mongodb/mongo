@@ -207,6 +207,10 @@ public:
         return &::mongo::AggregateCommandRequest::kAuthorizationContract;
     }
 
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
 } pipelineCmd;
 
 }  // namespace

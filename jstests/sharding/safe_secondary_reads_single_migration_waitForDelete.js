@@ -150,6 +150,7 @@ let testCases = {
     connPoolSync: {skip: "does not return user data"},
     connectionStatus: {skip: "does not return user data"},
     convertToCapped: {skip: "primary only"},
+    coordinateCommitTransaction: {skip: "unimplemented. Serves only as a stub."},
     count: {
         setUp: function(mongosConn) {
             assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));

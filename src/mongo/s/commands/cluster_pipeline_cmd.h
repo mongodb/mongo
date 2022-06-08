@@ -190,6 +190,10 @@ public:
     const AuthorizationContract* getAuthorizationContract() const final {
         return &::mongo::AggregateCommandRequest::kAuthorizationContract;
     }
+
+    bool allowedInTransactions() const final {
+        return true;
+    }
 };
 
 }  // namespace

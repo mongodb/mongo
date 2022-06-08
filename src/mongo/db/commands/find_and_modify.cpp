@@ -280,6 +280,14 @@ public:
         CmdFindAndModify::_updateMetrics.collectMetrics(request);
     }
 
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;

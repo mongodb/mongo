@@ -1244,7 +1244,7 @@ Future<void> RunCommandImpl::_runImpl() {
 
 Future<void> RunCommandImpl::_runCommand() {
     auto shouldCheckoutSession = _ecd->getSessionOptions().getTxnNumber() &&
-        !shouldCommandSkipSessionCheckout(_ecd->getInvocation()->definition()->getName());
+        _ecd->getInvocation()->definition()->shouldCheckoutSession();
     if (shouldCheckoutSession) {
         return future_util::makeState<CheckoutSessionAndInvokeCommand>(_ecd).thenWithState(
             [](auto* path) { return path->run(); });
@@ -1309,7 +1309,7 @@ void RunCommandAndWaitForWriteConcern::_setup() {
         // server defaults.  So, warn if the operation has not specified writeConcern and is on
         // a shard/config server.
         if (!opCtx->getClient()->isInDirectClient() &&
-            (!opCtx->inMultiDocumentTransaction() || isTransactionCommand(command->getName()))) {
+            (!opCtx->inMultiDocumentTransaction() || command->isTransactionCommand())) {
             if (_isInternalClient()) {
                 // WriteConcern should always be explicitly specified by operations received
                 // from internal clients (ie. from a mongos or mongod), even if it is empty

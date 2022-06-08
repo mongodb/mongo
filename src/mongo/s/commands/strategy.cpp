@@ -712,7 +712,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
          (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient));
 
     if (supportsWriteConcern && !clientSuppliedWriteConcern &&
-        (!TransactionRouter::get(opCtx) || isTransactionCommand(_parc->_commandName)) &&
+        (!TransactionRouter::get(opCtx) || command->isTransactionCommand()) &&
         !opCtx->getClient()->isInDirectClient()) {
         if (isInternalClient) {
             uassert(

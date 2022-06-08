@@ -67,6 +67,8 @@ const BSONObj kOkReadOnlyFalseResponse = BSON("ok" << 1 << "readOnly" << false);
 const BSONObj kOkReadOnlyTrueResponse = BSON("ok" << 1 << "readOnly" << true);
 const BSONObj kNoSuchTransactionResponse =
     BSON("ok" << 0 << "code" << ErrorCodes::NoSuchTransaction);
+const BSONObj kDummyFindCmd = BSON("find"
+                                   << "dummy");
 
 class TransactionRouterTest : public ShardingTestFixture {
 protected:
@@ -468,7 +470,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
 
     auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -491,7 +493,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, FirstParticipantIsCoordinator) {
     ASSERT_FALSE(txnRouter.getCoordinatorId());
 
     {
-        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
         auto& participant = *txnRouter.getParticipant(shard1);
         ASSERT(participant.isCoordinator);
         ASSERT(txnRouter.getCoordinatorId());
@@ -499,7 +501,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, FirstParticipantIsCoordinator) {
     }
 
     {
-        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
         auto& participant = *txnRouter.getParticipant(shard2);
         ASSERT(!participant.isCoordinator);
         ASSERT(txnRouter.getCoordinatorId());
@@ -515,7 +517,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, FirstParticipantIsCoordinator) {
     ASSERT_FALSE(txnRouter.getCoordinatorId());
 
     {
-        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
         auto& participant = *txnRouter.getParticipant(shard2);
         ASSERT(participant.isCoordinator);
         ASSERT(txnRouter.getCoordinatorId());
@@ -536,7 +538,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, RecoveryShardDoesNotGetSetForRea
     ASSERT_FALSE(txnRouter.getRecoveryShardId());
 
     // The recovery shard is not set on scheduling requests.
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     ASSERT_FALSE(txnRouter.getRecoveryShardId());
 
     // The recovery shard is not set if a participant responds with ok but that it is read-only.
@@ -544,7 +546,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, RecoveryShardDoesNotGetSetForRea
     ASSERT_FALSE(txnRouter.getRecoveryShardId());
 
     // The recovery shard is not set even if more read-only participants respond.
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyTrueResponse);
     ASSERT_FALSE(txnRouter.getRecoveryShardId());
 
@@ -575,7 +577,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard1);
@@ -591,7 +593,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
 
     // Response to first statement says read-only.
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
@@ -614,12 +616,12 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     // Shard1's response says read-only.
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
     ASSERT_FALSE(txnRouter.getRecoveryShardId());
 
     // Shard2's response says not read-only.
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard2);
@@ -636,7 +638,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     // Shard1's response says not read-only.
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard1);
@@ -661,7 +663,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     // Shard1's response says not read-only.
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard1);
@@ -673,7 +675,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     // Shard2 responds, it doesn't matter whether it's read-only, just that it's a pending
     // participant.
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard1);
@@ -698,7 +700,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, RecoveryShardIsResetOnStartingNe
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     // Shard1's response says not read-only.
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard1);
@@ -1078,7 +1080,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
 
     TxnRecoveryToken recoveryToken;
@@ -1115,7 +1117,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
 
     TxnRecoveryToken recoveryToken;
@@ -1152,8 +1154,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
     txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyTrueResponse);
 
@@ -1203,8 +1205,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
     txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
 
@@ -1252,8 +1254,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
 
@@ -1409,8 +1411,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
             operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
         txnRouter.setDefaultAtClusterTime(operationContext());
 
-        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
         txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
         txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
 
@@ -1469,8 +1471,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
             operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
         txnRouter.setDefaultAtClusterTime(operationContext());
 
-        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
         txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
         txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
 
@@ -1717,8 +1719,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsClearsAllParticipa
 
     // Successfully start a transaction on two shards, selecting one as the coordinator.
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
 
     ASSERT(txnRouter.getCoordinatorId());
     ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
@@ -1736,10 +1738,10 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsClearsAllParticipa
     ASSERT_FALSE(txnRouter.getCoordinatorId());
 
     {
-        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
         ASSERT_TRUE(newCmd["startTransaction"].trueValue());
 
-        newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+        newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
         ASSERT_FALSE(newCmd["startTransaction"].trueValue());
     }
 
@@ -1749,10 +1751,10 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsClearsAllParticipa
 
     {
         // Shard1 should also attach startTransaction field again.
-        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
         ASSERT_TRUE(newCmd["startTransaction"].trueValue());
 
-        newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+        newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
         ASSERT_FALSE(newCmd["startTransaction"].trueValue());
     }
 }
@@ -1794,8 +1796,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, ParticipantsRememberStmtIdCreate
     // command.
 
     int initialStmtId = 0;
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
 
     ASSERT_EQ(txnRouter.getParticipant(shard1)->stmtIdCreatedAt, initialStmtId);
     ASSERT_EQ(txnRouter.getParticipant(shard2)->stmtIdCreatedAt, initialStmtId);
@@ -1805,7 +1807,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, ParticipantsRememberStmtIdCreate
         operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
 
     ShardId shard3("shard3");
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, kDummyFindCmd);
     ASSERT_EQ(txnRouter.getParticipant(shard3)->stmtIdCreatedAt, initialStmtId + 1);
 
     ASSERT_EQ(txnRouter.getParticipant(shard1)->stmtIdCreatedAt, initialStmtId);
@@ -1822,8 +1824,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, ParticipantsRememberStmtIdCreate
         operationContext(), txnNum2, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, {});
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
 
     ASSERT_EQ(txnRouter.getParticipant(shard3)->stmtIdCreatedAt, initialStmtId);
     ASSERT_EQ(txnRouter.getParticipant(shard2)->stmtIdCreatedAt, initialStmtId);
@@ -1832,7 +1834,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, ParticipantsRememberStmtIdCreate
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum2, TransactionRouter::TransactionActions::kContinue);
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     ASSERT_EQ(txnRouter.getParticipant(shard1)->stmtIdCreatedAt, initialStmtId + 1);
 }
 
@@ -1849,8 +1851,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     // Start a transaction on two shards, selecting one as the coordinator, but simulate a
     // re-targeting error from at least one of them.
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
 
     ASSERT(txnRouter.getCoordinatorId());
     ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
@@ -1867,7 +1869,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     {
         ASSERT_FALSE(txnRouter.getParticipant(shard2));
-        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
         ASSERT_TRUE(newCmd["startTransaction"].trueValue());
     }
 
@@ -1878,7 +1880,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     {
         // Shard1 has not started a transaction.
         ASSERT_FALSE(txnRouter.getParticipant(shard1));
-        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
         ASSERT_TRUE(newCmd["startTransaction"].trueValue());
     }
 }
@@ -1894,7 +1896,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnlyNewlyCreatedParticipantsClea
 
     // First statement successfully targets one shard, selecing it as the coordinator.
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
 
     ASSERT(txnRouter.getCoordinatorId());
     ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
@@ -1906,8 +1908,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnlyNewlyCreatedParticipantsClea
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, kDummyFindCmd);
 
     ASSERT(txnRouter.canContinueOnStaleShardOrDbError("find", kDummyStatus));
     auto future = launchAsync(
@@ -1917,13 +1919,16 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnlyNewlyCreatedParticipantsClea
 
     // Shards 2 and 3 must start a transaction, but shard 1 must not.
     ASSERT_FALSE(
-        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {})["startTransaction"]
+        txnRouter
+            .attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd)["startTransaction"]
             .trueValue());
     ASSERT_TRUE(
-        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {})["startTransaction"]
+        txnRouter
+            .attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd)["startTransaction"]
             .trueValue());
     ASSERT_TRUE(
-        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, {})["startTransaction"]
+        txnRouter
+            .attachTxnFieldsIfNeeded(operationContext(), shard3, kDummyFindCmd)["startTransaction"]
             .trueValue());
 }
 
@@ -2044,7 +2049,7 @@ TEST_F(TransactionRouterTest, AbortForSingleParticipant) {
 
     txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
 
     auto future = launchAsync([&] { return txnRouter.abortTransaction(operationContext()); });
 
@@ -2077,8 +2082,8 @@ TEST_F(TransactionRouterTest, AbortForMultipleParticipantsAllReturnSuccess) {
 
     txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
 
@@ -2120,9 +2125,9 @@ TEST_F(TransactionRouterTest, AbortForMultipleParticipantsSomeReturnNoSuchTransa
 
     txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
     txnRouter.processParticipantResponse(operationContext(), shard3, kOkReadOnlyFalseResponse);
@@ -2169,9 +2174,9 @@ TEST_F(TransactionRouterTest, AbortForMultipleParticipantsSomeReturnNetworkError
 
     txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
     txnRouter.processParticipantResponse(operationContext(), shard3, kOkReadOnlyFalseResponse);
@@ -2219,7 +2224,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnViewResolutionErrorClearsAllNe
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     // One shard is targeted by the first statement.
-    auto firstShardCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    auto firstShardCmd =
+        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     ASSERT_TRUE(firstShardCmd["startTransaction"].trueValue());
 
     ASSERT(txnRouter.getCoordinatorId());
@@ -2237,7 +2243,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnViewResolutionErrorClearsAllNe
     ASSERT_FALSE(txnRouter.getCoordinatorId());
 
     // The first shard is targeted by the retry and should have to start a transaction again.
-    firstShardCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    firstShardCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     ASSERT_TRUE(firstShardCmd["startTransaction"].trueValue());
 
     // Advance to a later client statement that targets a new shard.
@@ -2246,7 +2252,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnViewResolutionErrorClearsAllNe
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
 
-    auto secondShardCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    auto secondShardCmd =
+        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
     ASSERT_TRUE(secondShardCmd["startTransaction"].trueValue());
 
     // Simulate a view resolution error.
@@ -2256,9 +2263,9 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnViewResolutionErrorClearsAllNe
     future.default_timed_get();
 
     // Only the new participant shard was reset.
-    firstShardCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    firstShardCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     ASSERT_FALSE(firstShardCmd["startTransaction"].trueValue());
-    secondShardCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    secondShardCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
     ASSERT_TRUE(secondShardCmd["startTransaction"].trueValue());
 }
 
@@ -2292,7 +2299,7 @@ TEST_F(TransactionRouterTest, ImplicitAbortForSingleParticipant) {
 
     txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
 
     auto future = launchAsync(
         [&] { return txnRouter.implicitlyAbortTransaction(operationContext(), kDummyStatus); });
@@ -2325,8 +2332,8 @@ TEST_F(TransactionRouterTest, ImplicitAbortForMultipleParticipants) {
 
     txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
 
     auto future = launchAsync(
         [&] { return txnRouter.implicitlyAbortTransaction(operationContext(), kDummyStatus); });
@@ -2366,7 +2373,7 @@ TEST_F(TransactionRouterTest, ImplicitAbortIgnoresErrors) {
 
     txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
 
     auto future = launchAsync(
         [&] { return txnRouter.implicitlyAbortTransaction(operationContext(), kDummyStatus); });
@@ -2400,7 +2407,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, AbortPropagatesWriteConcern) {
     txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
 
     txnRouter.setDefaultAtClusterTime(opCtx);
-    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, kDummyFindCmd);
 
     auto future = launchAsync([&] { return txnRouter.abortTransaction(operationContext()); });
 
@@ -2424,7 +2431,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, ContinueOnlyOnStaleVersionOnFirs
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
 
     disableRouterRetriesFailPoint();
 
@@ -2439,10 +2446,10 @@ TEST_F(TransactionRouterTestWithDefaultSession, ContinueOnlyOnStaleVersionOnFirs
     txnRouter.onStaleShardOrDbError(operationContext(), "find", kStaleConfigStatus);
 
     // Readd the initial participant removed on onStaleShardOrDbError
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
 
     // Add another participant
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
 
     // Check that the transaction cannot continue on stale config with more than one participant
     ASSERT_FALSE(txnRouter.canContinueOnStaleShardOrDbError("update", kStaleConfigStatus));
@@ -2464,7 +2471,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, ContinueOnlyOnStaleVersionOnFirs
         operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
 
     // Cannot retry on a stale config error with one participant after the first statement.
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
 
     ASSERT_FALSE(txnRouter.canContinueOnStaleShardOrDbError("update", kStaleConfigStatus));
 }
@@ -2647,7 +2654,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     //
 
     txnRouter.setDefaultAtClusterTime(operationContext());
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
 
     ASSERT(txnRouter.canContinueOnSnapshotError());
     auto future = launchAsync([&] { txnRouter.onSnapshotError(operationContext(), kDummyStatus); });
@@ -2678,7 +2685,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     //
 
     txnRouter.setDefaultAtClusterTime(operationContext());
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
 
     ASSERT(txnRouter.canContinueOnSnapshotError());
     auto future = launchAsync([&] { txnRouter.onSnapshotError(operationContext(), kDummyStatus); });
@@ -2711,7 +2718,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     //
 
     txnRouter.setDefaultAtClusterTime(operationContext());
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
 
     ASSERT(txnRouter.canContinueOnSnapshotError());
     auto future = launchAsync([&] {
@@ -2741,8 +2748,8 @@ DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     // Add some participants to the list.
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
 
     // Simulate response from some participant not in the list.
     txnRouter.processParticipantResponse(operationContext(), shard3, kOkReadOnlyTrueResponse);
@@ -2758,7 +2765,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, BSON("ok" << 0));
     ASSERT(TransactionRouter::Participant::ReadOnly::kUnset ==
            txnRouter.getParticipant(shard1)->readOnly);
@@ -2774,7 +2781,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
 
     const auto participant = txnRouter.getParticipant(shard1);
@@ -2800,7 +2807,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
 
     const auto participant = txnRouter.getParticipant(shard1);
@@ -2826,7 +2833,7 @@ TEST_F(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
 
     // First response says readOnly: true.
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
@@ -2853,7 +2860,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
 
     // First response says readOnly: false.
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
@@ -2879,7 +2886,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
 
     // First response is an error.
     txnRouter.processParticipantResponse(operationContext(), shard1, BSON("ok" << 0));
@@ -2917,7 +2924,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
 
     txnRouter.setDefaultAtClusterTime(opCtx);
-    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, kDummyFindCmd);
 
     // Continue causes the _latestStmtId to be bumped.
     repl::ReadConcernArgs::get(opCtx) = repl::ReadConcernArgs();
@@ -2944,7 +2951,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
 
     txnRouter.setDefaultAtClusterTime(opCtx);
-    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, kDummyFindCmd);
 
     // Aborting will set the termination initiation state.
     auto future = launchAsync([&] { txnRouter.implicitlyAbortTransaction(opCtx, kDummyStatus); });
@@ -2967,7 +2974,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
 
     txnRouter.setDefaultAtClusterTime(opCtx);
-    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, kDummyFindCmd);
 
     // Process !readonly response to set participant state.
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
@@ -3236,7 +3243,7 @@ protected:
     //
 
     void explicitAbortInProgress() {
-        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
         txnRouter().processParticipantResponse(
             operationContext(), shard1, kOkReadOnlyFalseResponse);
 
@@ -3248,7 +3255,7 @@ protected:
     }
 
     void implicitAbortInProgress() {
-        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
         txnRouter().processParticipantResponse(
             operationContext(), shard1, kOkReadOnlyFalseResponse);
 
@@ -3261,7 +3268,7 @@ protected:
     }
 
     void runCommit(StatusWith<BSONObj> swRes, bool expectRetries = false) {
-        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
         txnRouter().processParticipantResponse(
             operationContext(), shard1, kOkReadOnlyFalseResponse);
 
@@ -3317,7 +3324,7 @@ protected:
     }
 
     void runSingleShardCommit() {
-        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
         txnRouter().processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
 
         startCapturingLogMessages();
@@ -3329,9 +3336,9 @@ protected:
     }
 
     void runReadOnlyCommit() {
-        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
         txnRouter().processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
-        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
         txnRouter().processParticipantResponse(operationContext(), shard2, kOkReadOnlyTrueResponse);
 
         startCapturingLogMessages();
@@ -3344,9 +3351,9 @@ protected:
     }
 
     void runSingleWriteShardCommit() {
-        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
         txnRouter().processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
-        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
         txnRouter().processParticipantResponse(
             operationContext(), shard2, kOkReadOnlyFalseResponse);
 
@@ -3359,10 +3366,10 @@ protected:
     }
 
     void runTwoPhaseCommit() {
-        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
         txnRouter().processParticipantResponse(
             operationContext(), shard1, kOkReadOnlyFalseResponse);
-        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
         txnRouter().processParticipantResponse(
             operationContext(), shard2, kOkReadOnlyFalseResponse);
 
@@ -3401,7 +3408,7 @@ protected:
 
     auto beginAndPauseCommit() {
         // Commit after targeting one shard so the commit has to do work and can be paused.
-        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
         txnRouter().processParticipantResponse(
             operationContext(), shard1, kOkReadOnlyFalseResponse);
         auto future = launchAsync(
@@ -4941,14 +4948,14 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalContactedParticipants) {
     beginTxnWithDefaultTxnNumber();
     ASSERT_EQUALS(0L, routerTxnMetrics()->getTotalContactedParticipants());
 
-    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     ASSERT_EQUALS(1L, routerTxnMetrics()->getTotalContactedParticipants());
 
     // Only increases for new participants.
-    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     ASSERT_EQUALS(1L, routerTxnMetrics()->getTotalContactedParticipants());
 
-    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
     ASSERT_EQUALS(2L, routerTxnMetrics()->getTotalContactedParticipants());
 
     // Is cumulative across transactions.
@@ -4956,7 +4963,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalContactedParticipants) {
         operationContext(), kTxnNumber + 1, TransactionRouter::TransactionActions::kStart);
     ASSERT_EQUALS(2L, routerTxnMetrics()->getTotalContactedParticipants());
 
-    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     ASSERT_EQUALS(3L, routerTxnMetrics()->getTotalContactedParticipants());
 }
 
@@ -4969,15 +4976,15 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalRequestsTargeted) {
     ASSERT_EQUALS(0L, routerTxnMetrics()->getTotalRequestsTargeted());
 
     // Increases each time transaction fields are attached.
-    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     txnRouter().processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT_EQUALS(1L, routerTxnMetrics()->getTotalRequestsTargeted());
 
-    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     txnRouter().processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT_EQUALS(2L, routerTxnMetrics()->getTotalRequestsTargeted());
 
-    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
     txnRouter().processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
     ASSERT_EQUALS(3L, routerTxnMetrics()->getTotalRequestsTargeted());
 }
@@ -5017,11 +5024,11 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalParticipantsAtCommit) {
     beginTxnWithDefaultTxnNumber();
     ASSERT_EQUALS(0L, routerTxnMetrics()->getTotalParticipantsAtCommit());
 
-    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     txnRouter().processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT_EQUALS(0L, routerTxnMetrics()->getTotalParticipantsAtCommit());
 
-    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
     txnRouter().processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
     ASSERT_EQUALS(0L, routerTxnMetrics()->getTotalParticipantsAtCommit());
 
@@ -5038,7 +5045,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalParticipantsAtCommit) {
     operationContext()->setTxnNumber(kTxnNumber + 1);
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 1, TransactionRouter::TransactionActions::kStart);
-    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     runCommit(kDummyOkRes);
     ASSERT_EQUALS(3L, routerTxnMetrics()->getTotalParticipantsAtCommit());
 }
@@ -5202,8 +5209,8 @@ TEST_F(TransactionRouterMetricsTest, ReportResourcesWithParticipantList) {
     clockSource->reset(startTime);
 
     beginTxnWithDefaultTxnNumber();
-    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
 
     auto state = txnRouter().reportState(operationContext(), true /* sessionIsActive */);
     auto transactionDocument = state.getObjectField("transaction");

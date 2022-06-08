@@ -172,6 +172,14 @@ public:
     BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return BasicCommand::AllowedOnSecondary::kNever;
     }
+
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
+    }
 };
 
 }  // namespace mongo

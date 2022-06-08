@@ -59,6 +59,14 @@ public:
         return true;
     }
 
+    bool isTransactionCommand() const final {
+        return true;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
     class PrepareTimestamp {
     public:
         PrepareTimestamp(Timestamp timestamp) : _timestamp(std::move(timestamp)) {}
@@ -381,6 +389,18 @@ public:
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
+    }
+
+    bool isTransactionCommand() const final {
+        return true;
+    }
+
+    bool shouldCheckoutSession() const final {
+        return false;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
     }
 
 } coordinateCommitTransactionCmd;
