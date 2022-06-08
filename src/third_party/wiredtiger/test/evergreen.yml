@@ -169,7 +169,7 @@ functions:
             cd cmake_build
             $CMAKE -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_clang.cmake -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1 \
               -DENABLE_STRICT=1 -DHAVE_DIAGNOSTIC=1 ${NON_BARRIER_DIAGNOSTIC_YIELDS|} -DCMAKE_BUILD_TYPE=ASan \
-              -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 ${configure_python_setting|} \
+              -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 -DHAVE_BUILTIN_EXTENSION_ZSTD=1 ${configure_python_setting|} \
               -G "${cmake_generator|Ninja}" ../.
           fi
     - *make_wiredtiger
@@ -749,9 +749,7 @@ variables:
     exec_timeout_secs: 25200
     commands:
       - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          posix_configure_flags: -DENABLE_STRICT=1 -DHAVE_DIAGNOSTIC=1 -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 -DHAVE_BUILTIN_EXTENSION_ZSTD=1
+      - func: "compile wiredtiger address sanitizer"
       - func: "format test script"
         vars:
           format_test_script_args: -R -t 360
@@ -2883,9 +2881,9 @@ tasks:
     exec_timeout_secs: 25200
     commands:
       - func: "get project"
-      - func: "compile wiredtiger"
+      - func: "compile wiredtiger address sanitizer"
         vars: 
-          posix_configure_flags: -DENABLE_STRICT=1 -DHAVE_DIAGNOSTIC=1 -DNON_BARRIER_DIAGNOSTIC_YIELDS=1 -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 -DHAVE_BUILTIN_EXTENSION_ZSTD=1
+          NON_BARRIER_DIAGNOSTIC_YIELDS: -DNON_BARRIER_DIAGNOSTIC_YIELDS=1
       - func: "format test script"
         vars:
           format_test_script_args: -R -t 360
