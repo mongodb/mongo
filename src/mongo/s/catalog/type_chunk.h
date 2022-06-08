@@ -221,7 +221,7 @@ public:
      * {min: <>, max: <>, shard: <>, uuid: <>, history: <>, jumbo: <>, lastmod: <>,
      * lastmodEpoch: <>, lastmodTimestamp: <>}
      */
-    static StatusWith<ChunkType> parseFromNetworkRequest(const BSONObj& source, bool requireUUID);
+    static StatusWith<ChunkType> parseFromNetworkRequest(const BSONObj& source);
 
     /**
      * Constructs a new ChunkType object from BSON with the following format:
@@ -261,15 +261,6 @@ public:
     /**
      * Getters and setters.
      */
-
-    // TODO (SERVER-60792): Get rid of this function once v6.0 branches out. Due to a missing
-    // addition of the UUID field in v5.0 BalanceChunkRequest, it can happen that the field is not
-    // set. Mark as "UNSAFE" to make it clear that this method is just intended to be used for this
-    // specific purpose.
-    bool hasCollectionUUID_UNSAFE() const {
-        return (bool)_collectionUUID;
-    }
-
     const UUID& getCollectionUUID() const {
         invariant(_collectionUUID);
         return *_collectionUUID;

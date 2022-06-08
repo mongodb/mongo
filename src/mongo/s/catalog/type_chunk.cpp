@@ -393,7 +393,7 @@ StatusWith<ChunkType> ChunkType::parseFromShardBSON(const BSONObj& source,
     return chunk;
 }
 
-StatusWith<ChunkType> ChunkType::parseFromNetworkRequest(const BSONObj& source, bool requireUUID) {
+StatusWith<ChunkType> ChunkType::parseFromNetworkRequest(const BSONObj& source) {
     // Parse history and shard.
     StatusWith<ChunkType> chunkStatus = _parseChunkBase(source);
     if (!chunkStatus.isOK()) {
@@ -413,14 +413,10 @@ StatusWith<ChunkType> ChunkType::parseFromNetworkRequest(const BSONObj& source, 
             }
             chunk._collectionUUID = swUUID.getValue();
         } else if (status == ErrorCodes::NoSuchKey) {
-            // Ignore NoSuchKey because before 5.0 chunks don't include a collectionUUID
+            return {ErrorCodes::FailedToParse, str::stream() << "There must be a UUID present"};
         } else {
             return status;
         }
-    }
-
-    if (requireUUID && !chunk._collectionUUID) {
-        return {ErrorCodes::FailedToParse, str::stream() << "There must be a UUID present"};
     }
 
     // Parse min and max.

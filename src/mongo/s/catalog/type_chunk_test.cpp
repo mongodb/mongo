@@ -269,7 +269,7 @@ TEST(ChunkType, NewAndOldChunkVersionFormat) {
              << BSON("v" << Timestamp(chunkVersion.toLong()) << "e" << chunkVersion.epoch() << "t"
                          << chunkVersion.getTimestamp())
              << ChunkType::shard("shard0001"));
-    StatusWith<ChunkType> chunkRes = ChunkType::parseFromNetworkRequest(objModOldCVFormat, true);
+    StatusWith<ChunkType> chunkRes = ChunkType::parseFromNetworkRequest(objModOldCVFormat);
 
     ASSERT_TRUE(chunkRes.isOK());
 
@@ -279,7 +279,7 @@ TEST(ChunkType, NewAndOldChunkVersionFormat) {
         << ChunkType::min(BSON("a" << 10 << "b" << 10)) << ChunkType::max(BSON("a" << 20))
         << "lastmod" << Timestamp(chunkVersion.toLong()) << "lastmodEpoch" << chunkVersion.epoch()
         << "lastmodTimestamp" << chunkVersion.getTimestamp() << ChunkType::shard("shard0001"));
-    chunkRes = ChunkType::parseFromNetworkRequest(objModNewCVFormat, true);
+    chunkRes = ChunkType::parseFromNetworkRequest(objModNewCVFormat);
     ASSERT_TRUE(chunkRes.isOK());
 }
 

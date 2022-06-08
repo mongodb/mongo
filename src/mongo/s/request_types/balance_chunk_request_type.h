@@ -52,10 +52,7 @@ public:
      * Parses the provided BSON content and if it is correct construct a request object with the
      * request parameters. If the '_id' field is missing in obj, ignore it.
      */
-    // TODO (SERVER-60792): Get rid of "requireUUID" once v6.0 branches out. Starting from v5.1, the
-    // collection UUID will always be present in the chunk.
-    static StatusWith<BalanceChunkRequest> parseFromConfigCommand(const BSONObj& obj,
-                                                                  bool requireUUID = true);
+    static StatusWith<BalanceChunkRequest> parseFromConfigCommand(const BSONObj& obj);
 
     /**
      * Produces a BSON object for the variant of the command, which requests the balancer to pick a
@@ -69,12 +66,6 @@ public:
 
     const NamespaceString& getNss() const {
         return _nss;
-    }
-
-    // TODO (SERVER-60792): Get rid of setCollectionUUID() once v6.0 branches out. Starting from
-    // v5.1, the collection UUID will always be present in the chunk.
-    void setCollectionUUID(UUID const& uuid) {
-        _chunk.setCollectionUUID(uuid);
     }
 
     const ChunkType& getChunk() const {

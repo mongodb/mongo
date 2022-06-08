@@ -56,8 +56,7 @@ BalanceChunkRequest::BalanceChunkRequest(ChunkType chunk,
                                          MigrationSecondaryThrottleOptions secondaryThrottle)
     : _chunk(std::move(chunk)), _secondaryThrottle(std::move(secondaryThrottle)) {}
 
-StatusWith<BalanceChunkRequest> BalanceChunkRequest::parseFromConfigCommand(const BSONObj& obj,
-                                                                            bool requireUUID) {
+StatusWith<BalanceChunkRequest> BalanceChunkRequest::parseFromConfigCommand(const BSONObj& obj) {
 
     NamespaceString nss;
     {
@@ -69,7 +68,7 @@ StatusWith<BalanceChunkRequest> BalanceChunkRequest::parseFromConfigCommand(cons
         nss = NamespaceString(ns);
     }
 
-    const auto chunkStatus = ChunkType::parseFromNetworkRequest(obj, requireUUID);
+    const auto chunkStatus = ChunkType::parseFromNetworkRequest(obj);
     if (!chunkStatus.isOK()) {
         return chunkStatus.getStatus();
     }
