@@ -22,10 +22,17 @@ Some administrative tasks can be accomplished using the following special
 cursor types that give access to data managed by WiredTiger:
 <table>
 @hrow{URI, Type, Notes}
-@row{<tt>backup:[query_id]</tt>,
-	backup cursor (optionally only returning block incremental ids if
-	<code>query_id</code> is appended),
+@row{<tt>backup:</tt>,
+	backup cursor,
 	key=<code>string</code>\, see @ref backup for details}
+@row{<tt>backup:query_id</tt>,
+	backup cursor that only returns block incremental ids,
+	key=<code>string</code>\, see @ref backup for details}
+@row{<tt>backup:export</tt>,
+	export cursor that generates a text file WiredTiger.export. The file contains metadata for all
+	objects in the database. It can be used in the import process as the value for
+	<code>metadata_file</code> configuration option,
+	key=<code>string</code>\, see @ref backup_export for details}
 @row{<code>log:</code>,
 	log cursor,
 	key=<code>(long fileID\, long offset\, int seqno)</code>\,<br>

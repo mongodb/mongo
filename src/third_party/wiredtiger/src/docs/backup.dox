@@ -240,6 +240,16 @@ An example of opening the backup data source for log-based incremental backup:
 
 @snippet ex_all.c incremental backup
 
+@section backup_export Export tables using backup cursor
+
+The URI \c backup:export can be used to generate \c WiredTiger.export - a text file that
+contains metadata for all objects in the database. The file can be specified as the value
+for \c metadata_file to import a table. See WT_SESSION::create for more details.
+The cursor operates like a normal backup cursor, it can be used to iterate over all files needed
+for a backup. The main difference is that ::wiredtiger_open will
+ignore \c WiredTiger.export, it will not try to start the system using the file or delete it.
+As with all backup cursors, there can only be one backup cursor of any type open at a time.
+
 @section backup_o_direct Backup and O_DIRECT
 
 Many Linux systems do not support mixing \c O_DIRECT and memory mapping
