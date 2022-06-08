@@ -59,6 +59,10 @@ namespace {
 void validateViewDefinitionBSON(OperationContext* opCtx,
                                 const BSONObj& viewDefinition,
                                 StringData dbName) {
+    // Internal callers should always pass in a valid 'dbName' against which to compare the
+    // 'viewDefinition'.
+    invariant(NamespaceString::validDBName(dbName));
+
     bool valid = true;
 
     for (const BSONElement& e : viewDefinition) {
@@ -120,7 +124,7 @@ Status DurableViewCatalog::onExternalInsert(OperationContext* opCtx,
                                             const BSONObj& doc,
                                             const NamespaceString& name) {
     try {
-        validateViewDefinitionBSON(opCtx, doc, name.toString());
+        validateViewDefinitionBSON(opCtx, doc, name.db());
     } catch (const DBException& e) {
         return e.toStatus();
     }
@@ -130,9 +134,6 @@ Status DurableViewCatalog::onExternalInsert(OperationContext* opCtx,
     NamespaceString viewOn(name.db(), doc.getStringField("viewOn"));
     BSONArray pipeline(doc.getObjectField("pipeline"));
     BSONObj collation(doc.getObjectField("collation"));
-    // Set updateDurableViewCatalog to false because the view has already been inserted into the
-    // durable view catalog.
-    const bool updateDurableViewCatalog = false;
 
     return catalog->createView(opCtx,
                                viewName,
@@ -140,7 +141,7 @@ Status DurableViewCatalog::onExternalInsert(OperationContext* opCtx,
                                pipeline,
                                collation,
                                view_catalog_helpers::validatePipeline,
-                               updateDurableViewCatalog);
+                               CollectionCatalog::ViewUpsertMode::kAlreadyDurableView);
 }
 
 void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,

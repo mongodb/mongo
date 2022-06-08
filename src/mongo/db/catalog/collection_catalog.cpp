@@ -475,8 +475,11 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
                                      const BSONArray& pipeline,
                                      const BSONObj& collation,
                                      const ViewsForDatabase::PipelineValidatorFn& pipelineValidator,
-                                     const bool updateDurableViewCatalog) const {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
+                                     const ViewUpsertMode insertViewMode) const {
+    // A view document direct write can occur via the oplog application path, which may only hold a
+    // lock on the collection being updated (the database views collection).
+    invariant(insertViewMode == ViewUpsertMode::kAlreadyDurableView ||
+              opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
@@ -514,7 +517,7 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
                                      pipelineValidator,
                                      std::move(collator.getValue()),
                                      ViewsForDatabase{viewsForDb},
-                                     ViewUpsertMode::kCreateView);
+                                     insertViewMode);
     }
 
     return result;
@@ -1412,8 +1415,11 @@ Status CollectionCatalog::_createOrUpdateView(
     const ViewsForDatabase::PipelineValidatorFn& pipelineValidator,
     std::unique_ptr<CollatorInterface> collator,
     ViewsForDatabase&& viewsForDb,
-    ViewUpsertMode mode) const {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
+    ViewUpsertMode insertViewMode) const {
+    // A view document direct write can occur via the oplog application path, which may only hold a
+    // lock on the collection being updated (the database views collection).
+    invariant(insertViewMode == ViewUpsertMode::kAlreadyDurableView ||
+              opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
@@ -1437,20 +1443,20 @@ Status CollectionCatalog::_createOrUpdateView(
     // If the view is already in the durable view catalog, we don't need to validate the graph. If
     // we need to update the durable view catalog, we need to check that the resulting dependency
     // graph is acyclic and within the maximum depth.
-    const bool viewGraphNeedsValidation = mode != ViewUpsertMode::kAlreadyDurableView;
+    const bool viewGraphNeedsValidation = insertViewMode != ViewUpsertMode::kAlreadyDurableView;
     Status graphStatus =
         viewsForDb.upsertIntoGraph(opCtx, view, pipelineValidator, viewGraphNeedsValidation);
     if (!graphStatus.isOK()) {
         return graphStatus;
     }
 
-    if (mode != ViewUpsertMode::kAlreadyDurableView) {
+    if (insertViewMode != ViewUpsertMode::kAlreadyDurableView) {
         viewsForDb.durable->upsert(opCtx, viewName, viewDef);
     }
 
     viewsForDb.valid = false;
     auto res = [&] {
-        switch (mode) {
+        switch (insertViewMode) {
             case ViewUpsertMode::kCreateView:
             case ViewUpsertMode::kAlreadyDurableView:
                 return viewsForDb.insert(opCtx, viewDef);

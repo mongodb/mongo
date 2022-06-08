@@ -115,6 +115,19 @@ public:
         }
     };
 
+    enum class ViewUpsertMode {
+        // Insert all data for that view into the view map, view graph, and durable view catalog.
+        kCreateView,
+
+        // Insert into the view map and view graph without reinserting the view into the durable
+        // view catalog. Skip view graph validation.
+        kAlreadyDurableView,
+
+        // Reload the view map, insert into the view graph (flagging it as needing refresh), and
+        // update the durable view catalog.
+        kUpdateView,
+    };
+
     static std::shared_ptr<const CollectionCatalog> get(ServiceContext* svcCtx);
     static std::shared_ptr<const CollectionCatalog> get(OperationContext* opCtx);
 
@@ -147,7 +160,8 @@ public:
      *
      * Must be in WriteUnitOfWork. View creation rolls back if the unit of work aborts.
      *
-     * Caller must ensure corresponding database exists.
+     * Caller must ensure corresponding database exists. Expects db.system.views MODE_X lock and
+     * view namespace MODE_IX lock (unless 'insertViewMode' is set to kAlreadyDurableView).
      */
     Status createView(OperationContext* opCtx,
                       const NamespaceString& viewName,
@@ -155,7 +169,7 @@ public:
                       const BSONArray& pipeline,
                       const BSONObj& collation,
                       const ViewsForDatabase::PipelineValidatorFn& pipelineValidator,
-                      bool updateDurableViewCatalog = true) const;
+                      ViewUpsertMode insertViewMode = ViewUpsertMode::kCreateView) const;
 
     /**
      * Drop the view named 'viewName'.
@@ -540,19 +554,6 @@ private:
      */
     void _replaceViewsForDatabase(StringData dbName, ViewsForDatabase&& views);
 
-    enum class ViewUpsertMode {
-        // Insert all data for that view into the view map, view graph, and durable view catalog.
-        kCreateView,
-
-        // Insert into the view map and view graph without reinserting the view into the durable
-        // view catalog. Skip view graph validation.
-        kAlreadyDurableView,
-
-        // Reload the view map, insert into the view graph (flagging it as needing refresh), and
-        // update the durable view catalog.
-        kUpdateView,
-    };
-
     /**
      * Helper to take care of shared functionality for 'createView(...)' and 'modifyView(...)'.
      */
@@ -563,7 +564,7 @@ private:
                                const ViewsForDatabase::PipelineValidatorFn& pipelineValidator,
                                std::unique_ptr<CollatorInterface> collator,
                                ViewsForDatabase&& viewsForDb,
-                               ViewUpsertMode mode) const;
+                               ViewUpsertMode insertViewMode) const;
 
     /**
      * Returns true if this CollectionCatalog instance is part of an ongoing batched catalog write.
