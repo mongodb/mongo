@@ -452,15 +452,6 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool readonly, bo
         return (0);
 
     /*
-     * If the transaction is a checkpoint cursor transaction, don't try to evict. Because eviction
-     * keeps the current transaction snapshot, and the snapshot in a checkpoint cursor transaction
-     * can be (and likely is) very old, we won't be able to see anything current to evict and won't
-     * be able to accomplish anything useful.
-     */
-    if (F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT))
-        return (0);
-
-    /*
      * If the current transaction is keeping the oldest ID pinned, it is in the middle of an
      * operation. This may prevent the oldest ID from moving forward, leading to deadlock, so only
      * evict what we can. Otherwise, we are at a transaction boundary and we can work harder to make

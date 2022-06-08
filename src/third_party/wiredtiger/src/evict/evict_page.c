@@ -692,9 +692,6 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
 
     WT_ASSERT(session, LF_ISSET(WT_REC_VISIBLE_ALL) || F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
 
-    /* We should not be trying to evict using a checkpoint-cursor transaction. */
-    WT_ASSERT(session, !F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT));
-
     /*
      * Reconcile the page. Force read-committed isolation level if we are using snapshots for
      * eviction workers or application threads.
