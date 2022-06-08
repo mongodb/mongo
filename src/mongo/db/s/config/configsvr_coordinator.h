@@ -81,7 +81,7 @@ protected:
         store.update(opCtx,
                      BSON(StateDoc::kIdFieldName << newDoc.getId().toBSON()),
                      newDoc.toBSON(),
-                     WriteConcerns::kMajorityWriteConcernShardingTimeout);
+                     WriteConcerns::kMajorityWriteConcernNoTimeout);
     }
 
     template <typename StateDoc>
