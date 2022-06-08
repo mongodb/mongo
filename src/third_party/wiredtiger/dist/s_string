@@ -45,9 +45,11 @@ check() {
 }
 
 # List of files to spellchk.
+# FIXME-WT-9433 Skip files in the test/cppsuite folder.
 l=`(cd .. &&
-    find bench examples ext src test -name '*.[chsy]' &&
-    find src -name '*.in' && find test -name '*.cxx' && find test -name '*.cpp')`
+    find bench examples ext src test -not -path "test/cppsuite/*" -name '*.[chsy]' &&
+    find src -name '*.in' &&
+    find test -not -path "test/cppsuite/*" -name '*.cpp')`
 
 usage()
 {
