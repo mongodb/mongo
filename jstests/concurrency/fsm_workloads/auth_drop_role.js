@@ -47,18 +47,25 @@ var $config = (function() {
 
             // Some test machines may hit high contention during these concurrency tests
             // allow for occaisional failure with retries.
-            for (var i = 3; i >= 0; --i) {
-                let dropResult = db.runCommand({dropRole: roleName, maxTimeMS: kMaxCmdTimeMs});
-
-                if (dropResult === true) {
-                    // Success
+            for (var i = 5; i >= 0; --i) {
+                let cmdResult;
+                try {
+                    cmdResult = db.runCommand({dropRole: roleName, maxTimeMS: kMaxCmdTimeMs});
+                    assert.commandWorked(cmdResult);
                     break;
-                } else if (i > 0) {
-                    // Failure, try again
-                    print("Retrying a dropRole() which resulted in: " + tojson(dropResult));
-                } else {
-                    // Out of do-overs, just die.
-                    assertAlways(dropResult);
+                } catch (e) {
+                    if (i > 0) {
+                        // Failure, try again
+                        print("Retrying dropRole(" + roleName + "), previous call resulted in " +
+                              tojson(cmdResult));
+                        if (cmdResult.code == ErrorCodes.SnapshotUnavailable) {
+                            // Give pending catalog changes a chance to catch up.
+                            sleep(5000);
+                        }
+                    } else {
+                        // Out of do-overs, just die.
+                        throw e;
+                    }
                 }
             }
 
