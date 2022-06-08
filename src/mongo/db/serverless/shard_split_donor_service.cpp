@@ -68,6 +68,9 @@ MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterMarkingStateGarbageCollectable);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeSplitConfigRemoval);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitRecipientCleanup);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeLeavingBlockingState);
+MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterUpdatingToCommittedState);
+MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeSendingStepUpToRecipients);
+MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterReceivingAbortCmd);
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
@@ -304,11 +307,14 @@ ShardSplitDonorService::DonorStateMachine::DonorStateMachine(
 
 void ShardSplitDonorService::DonorStateMachine::tryAbort() {
     LOGV2(6086502, "Received 'abortShardSplit' command.", "id"_attr = _migrationId);
-    stdx::lock_guard<Latch> lg(_mutex);
-    _abortRequested = true;
-    if (_abortSource) {
-        _abortSource->cancel();
+    {
+        stdx::lock_guard<Latch> lg(_mutex);
+        _abortRequested = true;
+        if (_abortSource) {
+            _abortSource->cancel();
+        }
     }
+    pauseShardSplitAfterReceivingAbortCmd.pauseWhileSet();
 }
 
 void ShardSplitDonorService::DonorStateMachine::tryForget() {
@@ -440,7 +446,12 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 return _applySplitConfigToDonor(executor, abortToken);
             })
             .then([this, executor, abortToken] {
-                return _waitForRecipientToAcceptSplitAndTriggerElection(executor, abortToken);
+                return _waitForRecipientToAcceptSplit(executor, abortToken);
+            })
+            .then([this, executor, primaryToken] {
+                // only cancel operations on stepdown from here out
+                _cancelableOpCtxFactory.emplace(primaryToken, _markKilledExecutor);
+                return _triggerElectionAndEnterCommitedState(executor, primaryToken);
             })
             // anchor ensures the instance will still exists even if the primary stepped down
             .onCompletion([this,
@@ -661,7 +672,7 @@ ExecutorFuture<void> sendStepUpToRecipient(const HostAndPort recipient,
     return AsyncTry([executor, recipient, token] {
                executor::RemoteCommandRequest request(
                    recipient, "admin", BSON("replSetStepUp" << 1 << "skipDryRun" << true), nullptr);
-
+               pauseShardSplitBeforeSendingStepUpToRecipients.pauseWhileSet();
                return executor->scheduleRemoteCommand(request, token)
                    .then([](const auto& response) {
                        return getStatusFromCommandResult(response.data);
@@ -676,10 +687,26 @@ ExecutorFuture<void> sendStepUpToRecipient(const HostAndPort recipient,
         .on(executor, token);
 }
 
-ExecutorFuture<void>
-ShardSplitDonorService::DonorStateMachine::_waitForRecipientToAcceptSplitAndTriggerElection(
+ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipientToAcceptSplit(
     const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken) {
+
     checkForTokenInterrupt(abortToken);
+    {
+        stdx::lock_guard<Latch> lg(_mutex);
+        if (_stateDoc.getState() > ShardSplitDonorStateEnum::kBlocking) {
+            return ExecutorFuture(**executor);
+        }
+    }
+
+    LOGV2(6142501, "Waiting for recipient to accept the split.", "id"_attr = _migrationId);
+
+    return ExecutorFuture(**executor).then([&]() { return _splitAcceptancePromise.getFuture(); });
+}
+
+ExecutorFuture<void>
+ShardSplitDonorService::DonorStateMachine::_triggerElectionAndEnterCommitedState(
+    const ScopedTaskExecutorPtr& executor, const CancellationToken& primaryToken) {
+    checkForTokenInterrupt(primaryToken);
 
     std::vector<HostAndPort> recipients;
     {
@@ -699,10 +726,7 @@ ShardSplitDonorService::DonorStateMachine::_waitForRecipientToAcceptSplitAndTrig
     auto remoteCommandExecutor =
         _splitAcceptanceTaskExecutorForTest ? *_splitAcceptanceTaskExecutorForTest : **executor;
 
-    LOGV2(6142501, "Waiting for recipient to accept the split.", "id"_attr = _migrationId);
-
     return ExecutorFuture(**executor)
-        .then([&]() { return _splitAcceptancePromise.getFuture(); })
         .then([this] {
             auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
             if (MONGO_unlikely(pauseShardSplitBeforeLeavingBlockingState.shouldFail())) {
@@ -723,7 +747,7 @@ ShardSplitDonorService::DonorStateMachine::_waitForRecipientToAcceptSplitAndTrig
                 uasserted(ErrorCodes::InternalError, "simulate a shard split error");
             }
         })
-        .then([this, recipients, abortToken, remoteCommandExecutor] {
+        .then([this, recipients, primaryToken, remoteCommandExecutor] {
             LOGV2(6493901,
                   "Triggering an election after recipient has accepted the split.",
                   "id"_attr = _migrationId);
@@ -733,14 +757,16 @@ ShardSplitDonorService::DonorStateMachine::_waitForRecipientToAcceptSplitAndTrig
             // succeed). Selecting a random node has a 2/3 chance to succeed for replSetStepUp. If
             // the first command fail, we know this node is the most out-of-date. Therefore we
             // select the next node and we know the first node selected will vote for the second.
-            return sendStepUpToRecipient(recipients[0], remoteCommandExecutor, abortToken)
-                .onCompletion([this, recipients, remoteCommandExecutor, abortToken](Status status) {
-                    if (status.isOK()) {
-                        return ExecutorFuture<void>(remoteCommandExecutor, status);
-                    }
+            return sendStepUpToRecipient(recipients[0], remoteCommandExecutor, primaryToken)
+                .onCompletion(
+                    [this, recipients, remoteCommandExecutor, primaryToken](Status status) {
+                        if (status.isOK()) {
+                            return ExecutorFuture<void>(remoteCommandExecutor, status);
+                        }
 
-                    return sendStepUpToRecipient(recipients[1], remoteCommandExecutor, abortToken);
-                })
+                        return sendStepUpToRecipient(
+                            recipients[1], remoteCommandExecutor, primaryToken);
+                    })
                 .onCompletion([this](Status replSetStepUpStatus) {
                     if (!replSetStepUpStatus.isOK()) {
                         LOGV2(6493904,
@@ -756,12 +782,15 @@ ShardSplitDonorService::DonorStateMachine::_waitForRecipientToAcceptSplitAndTrig
                 });
         })
         .thenRunOn(**executor)
-        .then([this, executor, abortToken]() {
+        .then([this, executor, primaryToken]() {
             LOGV2(6142503, "Entering 'committed' state.", "id"_attr = _stateDoc.getId());
+            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+            pauseShardSplitAfterUpdatingToCommittedState.pauseWhileSet(opCtx.get());
 
-            return _updateStateDocument(executor, abortToken, ShardSplitDonorStateEnum::kCommitted)
-                .then([this, executor, abortToken](repl::OpTime opTime) {
-                    return _waitForMajorityWriteConcern(executor, std::move(opTime), abortToken);
+            return _updateStateDocument(
+                       executor, primaryToken, ShardSplitDonorStateEnum::kCommitted)
+                .then([this, executor, primaryToken](repl::OpTime opTime) {
+                    return _waitForMajorityWriteConcern(executor, std::move(opTime), primaryToken);
                 });
         });
 }
