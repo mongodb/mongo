@@ -519,6 +519,10 @@ __txn_visible_all_id(WT_SESSION_IMPL *session, uint64_t id)
 
     txn = session->txn;
 
+    /* Make sure that checkpoint cursor transactions only read checkpoints. */
+    WT_ASSERT(
+      session, WT_READING_CHECKPOINT(session) == F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT));
+
     /*
      * When reading from a checkpoint, all readers use the same snapshot, so a transaction is
      * globally visible if it is visible in that snapshot. Note that this can cause things that were
@@ -567,6 +571,10 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t times
     /* Timestamp check. */
     if (timestamp == WT_TS_NONE)
         return (true);
+
+    /* Make sure that checkpoint cursor transactions only read checkpoints. */
+    WT_ASSERT(
+      session, WT_READING_CHECKPOINT(session) == F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT));
 
     /* When reading a checkpoint, use the checkpoint state instead of the current state. */
     if (WT_READING_CHECKPOINT(session))
