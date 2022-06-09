@@ -43,7 +43,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/security_token.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
@@ -245,14 +245,15 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
 
     stdx::lock_guard<Client> lk(*opCtx->getClient());
 
-    if (auto token = auth::getSecurityToken(opCtx)) {
+    auto validatedTenancyScope = auth::ValidatedTenancyScope::get(opCtx);
+    if (validatedTenancyScope && validatedTenancyScope->hasAuthenticatedUser()) {
         uassert(
             6161501,
             "Attempt to authorize via security token on connection with established authentication",
             _authenticationMode != AuthenticationMode::kConnection);
         uassert(6161502,
                 "Attempt to authorize a user other than that present in the security token",
-                token->getAuthenticatedUser() == userName);
+                validatedTenancyScope->authenticatedUser() == userName);
         validateSecurityTokenUserPrivileges(user->getPrivileges());
         _authenticationMode = AuthenticationMode::kSecurityToken;
     } else {

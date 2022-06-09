@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/transport/transport_layer.h"
@@ -73,7 +74,7 @@ struct RemoteCommandRequestBase {
     std::string dbname;
     BSONObj metadata{rpc::makeEmptyMetadata()};
     BSONObj cmdObj;
-    BSONObj securityToken;
+    boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope;
 
     // OperationContext is added to each request to allow OP_Command metadata attachment access to
     // the Client object. The OperationContext is only accessed on the thread that calls

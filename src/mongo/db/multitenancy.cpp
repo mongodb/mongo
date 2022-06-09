@@ -29,42 +29,17 @@
 
 #include "mongo/db/multitenancy.h"
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/security_token.h"
-#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/logv2/log.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
 
 namespace mongo {
 
-// Holds the tenantId for the operation if it was provided in the request on the $tenant field only
-// if the tenantId was not also provided in the security token.
-const auto dollarTenantDecoration =
-    OperationContext::declareDecoration<boost::optional<mongo::TenantId>>();
-
 boost::optional<TenantId> getActiveTenant(OperationContext* opCtx) {
-    auto token = auth::getSecurityToken(opCtx);
-    if (!token) {
-        return dollarTenantDecoration(opCtx);
+    if (auto token = auth::ValidatedTenancyScope::get(opCtx)) {
+        return token->tenantId();
     }
 
-    invariant(!dollarTenantDecoration(opCtx));
-    return token->getAuthenticatedUser().getTenant();
-}
-
-void setDollarTenantOnOpCtx(OperationContext* opCtx, const OpMsg& opMsg) {
-    if (!opMsg.validatedTenant || !opMsg.validatedTenant->tenantId()) {
-        return;
-    }
-
-    if (opMsg.securityToken.nFields() > 0) {
-        return;
-    }
-
-    dollarTenantDecoration(opCtx) = opMsg.validatedTenant->tenantId();
+    return boost::none;
 }
 
 }  // namespace mongo

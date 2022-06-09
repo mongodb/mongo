@@ -36,8 +36,8 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/validated_tenant_id.h"
 #include "mongo/rpc/message.h"
 
 namespace mongo {
@@ -133,8 +133,6 @@ struct OpMsg {
         return msg;
     }
 
-    void parseValidatedTenant(Client& client);
-
     Message serialize() const;
 
     /**
@@ -161,10 +159,16 @@ struct OpMsg {
     }
 
     BSONObj body;
-    BSONObj securityToken;
     std::vector<DocumentSequence> sequences;
-    // The validated tenant id will not be serialized into the Message.
-    boost::optional<ValidatedTenantId> validatedTenant = boost::none;
+
+    boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope = boost::none;
+
+    boost::optional<TenantId> getValidatedTenantId() const {
+        if (!validatedTenancyScope) {
+            return boost::none;
+        }
+        return validatedTenancyScope->tenantId();
+    }
 };
 
 /**

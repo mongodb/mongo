@@ -38,7 +38,8 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/auth/security_token.h"
+#include "mongo/db/auth/security_token_gen.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -806,13 +807,15 @@ protected:
         constexpr auto authUserFieldName = auth::SecurityToken::kAuthenticatedUserFieldName;
         auto authUser = userName.toBSON(true /* serialize token */);
         ASSERT_EQ(authUser["tenant"_sd].type(), jstOID);
-        return auth::signSecurityToken(BSON(authUserFieldName << authUser));
+        using VTS = auth::ValidatedTenancyScope;
+        return VTS(BSON(authUserFieldName << authUser), VTS::TokenForTestingTag{})
+            .getOriginalToken();
     }
 
     ServiceContext::UniqueClient client;
 };
 
-TEST_F(OpMsgWithAuth, ParseValidatedTenantIdFromSecurityToken) {
+TEST_F(OpMsgWithAuth, ParseValidatedTenancyScopeFromSecurityToken) {
     gMultitenancySupport = true;
 
     const auto kTenantId = TenantId(OID::gen());
@@ -837,11 +840,11 @@ TEST_F(OpMsgWithAuth, ParseValidatedTenantIdFromSecurityToken) {
 
     auto body = BSON("ping" << 1);
 
-    ASSERT(msg.validatedTenant);
-    ASSERT_EQ(msg.validatedTenant->tenantId().get(), kTenantId);
+    ASSERT(msg.validatedTenancyScope);
+    ASSERT_EQ(msg.validatedTenancyScope->tenantId(), kTenantId);
 }
 
-TEST_F(OpMsgWithAuth, ParseValidatedTenantIdFromDollarTenant) {
+TEST_F(OpMsgWithAuth, ParseValidatedTenancyScopeFromDollarTenant) {
     gMultitenancySupport = true;
     AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
 
@@ -862,11 +865,11 @@ TEST_F(OpMsgWithAuth, ParseValidatedTenantIdFromDollarTenant) {
         }
             .parse(client.get());
 
-    ASSERT(msg.validatedTenant);
-    ASSERT_EQ(msg.validatedTenant->tenantId().get(), kTenantId);
+    ASSERT(msg.validatedTenancyScope);
+    ASSERT_EQ(msg.validatedTenancyScope->tenantId(), kTenantId);
 }
 
-TEST_F(OpMsgWithAuth, ValidatedTenantIdShouldNotBeSerialized) {
+TEST_F(OpMsgWithAuth, ValidatedTenancyScopeShouldNotBeSerialized) {
     gMultitenancySupport = true;
     AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
 
@@ -885,7 +888,7 @@ TEST_F(OpMsgWithAuth, ValidatedTenantIdShouldNotBeSerialized) {
         },
     };
     auto msg = msgBytes.parse(client.get());
-    ASSERT(msg.validatedTenant);
+    ASSERT(msg.validatedTenancyScope);
 
     auto serializedMsg = msg.serialize();
     testSerializer(serializedMsg,

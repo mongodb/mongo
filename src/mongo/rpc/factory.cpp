@@ -62,11 +62,7 @@ OpMsgRequest opMsgRequestFromAnyProtocol(const Message& unownedMessage, Client* 
         case mongo::dbMsg:
             return OpMsgRequest::parseOwned(unownedMessage, client);
         case mongo::dbQuery: {
-            auto request = opMsgRequestFromLegacyRequest(unownedMessage);
-            if (client) {
-                request.parseValidatedTenant(*client);
-            }
-            return request;
+            return opMsgRequestFromLegacyRequest(unownedMessage);
         }
         default:
             uasserted(ErrorCodes::UnsupportedFormat,

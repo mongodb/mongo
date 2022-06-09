@@ -33,7 +33,7 @@
 #include <fmt/format.h>
 
 #include "mongo/config.h"
-#include "mongo/db/auth/security_token.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_tl.h"
@@ -71,9 +71,7 @@ Status appendMetadata(RemoteCommandRequestOnAny* request,
     if (!request->opCtx)
         return Status::OK();
 
-    if (auto securityToken = auth::getSecurityToken(request->opCtx)) {
-        request->securityToken = securityToken->toBSON();
-    }
+    request->validatedTenancyScope = auth::ValidatedTenancyScope::get(request->opCtx);
 
     return Status::OK();
 }

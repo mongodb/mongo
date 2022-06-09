@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,51 +27,40 @@
  *    it in the license file.
  */
 
-#pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/db/auth/security_token_authentication_guard.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/auth/security_token_gen.h"
-#include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
 namespace mongo {
 namespace auth {
 
-class SecurityTokenAuthenticationGuard {
-public:
-    SecurityTokenAuthenticationGuard() = delete;
-    SecurityTokenAuthenticationGuard(OperationContext* opCtx);
-    ~SecurityTokenAuthenticationGuard();
+SecurityTokenAuthenticationGuard::SecurityTokenAuthenticationGuard(
+    OperationContext* opCtx, const ValidatedTenancyScope& token) {
+    if (token.hasAuthenticatedUser()) {
+        const auto& userName = token.authenticatedUser();
+        auto* client = opCtx->getClient();
+        uassertStatusOK(AuthorizationSession::get(client)->addAndAuthorizeUser(opCtx, userName));
+        _client = client;
 
-private:
-    Client* _client;
-};
+        LOGV2_DEBUG(5838100,
+                    4,
+                    "Authenticated with security token",
+                    "token"_attr = token.getOriginalToken());
+    } else {
+        _client = nullptr;
+    }
+}
 
-/**
- * Takes an unsigned security token as input and applies
- * the temporary signature algorithm to extend it into a full SecurityToken.
- */
-BSONObj signSecurityToken(BSONObj obj);
-
-/**
- * Verify the contents of the provided security token
- * using the temporary signing algorithm,
- */
-SecurityToken verifySecurityToken(BSONObj obj);
-
-/**
- * Parse the validated SecurityToken from the OpMsg and place it as a decoration
- * on OperationContext.
- */
-void setSecurityToken(OperationContext* opCtx, const OpMsg& opMsg);
-
-/**
- * Retrieve the Security Token associated with this operation context
- */
-using MaybeSecurityToken = boost::optional<SecurityToken>;
-MaybeSecurityToken getSecurityToken(OperationContext* opCtx);
+SecurityTokenAuthenticationGuard::~SecurityTokenAuthenticationGuard() {
+    if (_client) {
+        // SecurityToken based users are "logged out" at the end of their request.
+        AuthorizationSession::get(_client)->logoutSecurityTokenUser(_client);
+    }
+}
 
 }  // namespace auth
 }  // namespace mongo

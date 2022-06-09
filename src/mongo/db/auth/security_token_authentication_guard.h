@@ -29,35 +29,27 @@
 
 #pragma once
 
-#include "mongo/db/database_name.h"
-#include "mongo/db/tenant_id.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
+namespace auth {
 
-class Client;
-struct OpMsg;
-
-class ValidatedTenantId {
+/**
+ * If ValidatedTenancyScope represents an AuthenticatedUser,
+ * that user will be authenticated against the client until this guard dies.
+ * This is used in ServiceEntryPoint to scope authentication to a single operation.
+ */
+class SecurityTokenAuthenticationGuard {
 public:
-    ValidatedTenantId(const ValidatedTenantId& validatedTenant) = default;
-
-    /**
-     * Constructs a ValidatedTenantId by parsing tenant from $tenant or security token of opMsg
-     * and validating it with the auth module.
-     */
-    ValidatedTenantId(const OpMsg& opMsg, Client& client);
-
-    /**
-     * Constructs a ValidatedTenantId by treating the tenantId on DatabaseName as validated.
-     */
-    ValidatedTenantId(const DatabaseName& dbName);
-
-    const boost::optional<TenantId>& tenantId() const {
-        return _tenant;
-    }
+    SecurityTokenAuthenticationGuard() = delete;
+    SecurityTokenAuthenticationGuard(OperationContext*, const ValidatedTenancyScope&);
+    ~SecurityTokenAuthenticationGuard();
 
 private:
-    boost::optional<TenantId> _tenant = boost::none;
+    Client* _client;
 };
 
+}  // namespace auth
 }  // namespace mongo

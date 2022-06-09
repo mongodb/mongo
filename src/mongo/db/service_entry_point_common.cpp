@@ -41,7 +41,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/impersonation_session.h"
 #include "mongo/db/auth/ldap_cumulative_operation_stats.h"
-#include "mongo/db/auth/security_token.h"
+#include "mongo/db/auth/security_token_authentication_guard.h"
 #include "mongo/db/client.h"
 #include "mongo/db/command_can_run_here.h"
 #include "mongo/db/commands.h"
@@ -655,13 +655,6 @@ private:
         _startOperationTime = getClientOperationTime(opCtx);
 
         rpc::readRequestMetadata(opCtx, request, command->requiresAuth());
-        uassert(ErrorCodes::Unauthorized,
-                str::stream() << "Command " << command->getName()
-                              << " is not supported in multitenancy mode",
-                command->allowedWithSecurityToken() ||
-                    auth::getSecurityToken(opCtx) == boost::none);
-        _tokenAuthorizationSessionGuard.emplace(opCtx);
-
         _invocation = command->parse(opCtx, request);
         CommandInvocation::set(opCtx, _invocation);
 
@@ -1413,6 +1406,14 @@ void ExecCommandDatabase::_initiateCommand() {
 
     Client* client = opCtx->getClient();
 
+    if (auto scope = request.validatedTenancyScope; scope && scope->hasAuthenticatedUser()) {
+        uassert(ErrorCodes::Unauthorized,
+                str::stream() << "Command " << command->getName()
+                              << " is not supported in multitenancy mode",
+                command->allowedWithSecurityToken());
+        _tokenAuthorizationSessionGuard.emplace(opCtx, request.validatedTenancyScope.get());
+    }
+
     if (isHello()) {
         // Preload generic ClientMetadata ahead of our first hello request. After the first
         // request, metaElement should always be empty.
@@ -1449,7 +1450,6 @@ void ExecCommandDatabase::_initiateCommand() {
 
     // Start authz contract tracking before we evaluate failpoints
     auto authzSession = AuthorizationSession::get(client);
-
     authzSession->startContractTracking();
 
     CommandHelpers::evaluateFailCommandFailPoint(opCtx, _invocation.get());

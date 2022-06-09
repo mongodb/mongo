@@ -84,7 +84,6 @@ env.Library(
     target='multitenancy',
     source=[
         'multitenancy.cpp',
-        'validated_tenant_id.cpp',
     ],
     LIBDEPS=[
         'multitenancy_params',
@@ -2746,7 +2745,6 @@ if wiredtiger:
             'ttl_test.cpp',
             'update_index_data_test.cpp',
             'user_write_block_mode_op_observer_test.cpp',
-            'validated_tenant_id_test.cpp',
             'vector_clock_mongod_test.cpp',
             'vector_clock_test.cpp',
             'wire_version_test.cpp',

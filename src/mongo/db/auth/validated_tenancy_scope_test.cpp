@@ -27,27 +27,17 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
-#include "mongo/rpc/op_msg_test.h"
-
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/static_assert.h"
-#include "mongo/bson/json.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/auth/security_token.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/auth/security_token_gen.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/logv2/log.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/hex.h"
 
 namespace mongo {
 
@@ -70,8 +60,11 @@ public:
     }
 };
 
-class ValidatedTenantIdTestFixture : public mongo::ScopedGlobalServiceContextForTest,
-                                     public unittest::Test {
+namespace auth {
+namespace {
+
+class ValidatedTenancyScopeTestFixture : public mongo::ScopedGlobalServiceContextForTest,
+                                         public unittest::Test {
 protected:
     void setUp() final {
         auto authzManagerState = std::make_unique<AuthzManagerExternalStateMock>();
@@ -87,90 +80,98 @@ protected:
         constexpr auto authUserFieldName = auth::SecurityToken::kAuthenticatedUserFieldName;
         auto authUser = userName.toBSON(true /* serialize token */);
         ASSERT_EQ(authUser["tenant"_sd].type(), jstOID);
-        return auth::signSecurityToken(BSON(authUserFieldName << authUser));
+        using VTS = auth::ValidatedTenancyScope;
+        return VTS(BSON(authUserFieldName << authUser), VTS::TokenForTestingTag{})
+            .getOriginalToken();
     }
 
     ServiceContext::UniqueClient client;
 };
 
-TEST_F(ValidatedTenantIdTestFixture, MultitenancySupportOffWithoutTenantOK) {
+TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportOffWithoutTenantOK) {
     gMultitenancySupport = false;
-    auto body = fromjson("{$db: 'foo'}");
-    OpMsg msg({body});
+    auto body = BSON("$db"
+                     << "foo");
 
-    ValidatedTenantId validatedTenant(msg, *(client.get()));
-    ASSERT_TRUE(validatedTenant.tenantId() == boost::none);
+    auto validated = ValidatedTenancyScope::create(client.get(), body, {});
+    ASSERT_TRUE(validated == boost::none);
 }
 
-TEST_F(ValidatedTenantIdTestFixture, MultitenancySupportWithTenantOK) {
+TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithTenantOK) {
     gMultitenancySupport = true;
 
     auto kOid = OID::gen();
     auto body = BSON("ping" << 1 << "$tenant" << kOid);
-    OpMsg msg({body});
 
     AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
-    ValidatedTenantId validatedTenant(msg, *(client.get()));
-    ASSERT(validatedTenant.tenantId() == TenantId(kOid));
+    auto validated = ValidatedTenancyScope::create(client.get(), body, {});
+    ASSERT_TRUE(validated != boost::none);
+    ASSERT_TRUE(validated->tenantId() == TenantId(kOid));
 }
 
-TEST_F(ValidatedTenantIdTestFixture, MultitenancySupportWithSecurityTokenOK) {
+TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithSecurityTokenOK) {
     gMultitenancySupport = true;
 
-    const auto kTenantId = TenantId(OID::gen());
+    const TenantId kTenantId(OID::gen());
     auto body = BSON("ping" << 1);
-    auto token = makeSecurityToken(UserName("user", "admin", kTenantId));
-    OpMsg msg({body, token});
+    UserName user("user", "admin", kTenantId);
+    auto token = makeSecurityToken(user);
 
-    ValidatedTenantId validatedTenant(msg, *(client.get()));
-    ASSERT(validatedTenant.tenantId() == kTenantId);
+    auto validated = ValidatedTenancyScope::create(client.get(), body, token);
+    ASSERT_TRUE(validated != boost::none);
+    ASSERT_TRUE(validated->tenantId() == kTenantId);
+    ASSERT_TRUE(validated->hasAuthenticatedUser());
+    ASSERT_TRUE(validated->authenticatedUser() == user);
 }
 
-TEST_F(ValidatedTenantIdTestFixture, MultitenancySupportOffWithTenantNOK) {
+TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportOffWithTenantNOK) {
     gMultitenancySupport = false;
 
     auto kOid = OID::gen();
     auto body = BSON("ping" << 1 << "$tenant" << kOid);
-    OpMsg msg({body});
 
     AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
-    ASSERT_THROWS_CODE(
-        ValidatedTenantId(msg, *(client.get())), DBException, ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(ValidatedTenancyScope(client.get(), TenantId(kOid)),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    ASSERT_TRUE(ValidatedTenancyScope::create(client.get(), body, {}) == boost::none);
 }
 
-TEST_F(ValidatedTenantIdTestFixture, MultitenancySupportWithTenantNOK) {
+TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithTenantNOK) {
     gMultitenancySupport = true;
 
     auto kOid = OID::gen();
     auto body = BSON("ping" << 1 << "$tenant" << kOid);
-    OpMsg msg({body});
 
     ASSERT_THROWS_CODE(
-        ValidatedTenantId(msg, *(client.get())), DBException, ErrorCodes::Unauthorized);
+        ValidatedTenancyScope(client.get(), TenantId(kOid)), DBException, ErrorCodes::Unauthorized);
+    ASSERT_THROWS_CODE(ValidatedTenancyScope::create(client.get(), body, {}),
+                       DBException,
+                       ErrorCodes::Unauthorized);
 }
 
 // TODO SERVER-66822: Re-enable this test case.
-// TEST_F(ValidatedTenantIdTestFixture, MultitenancySupportWithoutTenantAndSecurityTokenNOK) {
+// TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithoutTenantAndSecurityTokenNOK) {
 //     gMultitenancySupport = true;
-
 //     auto body = BSON("ping" << 1);
-//     OpMsg msg({body});
-
 //     AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
-//     ASSERT_THROWS_CODE(
-//         ValidatedTenantId(msg, *(client.get())), DBException, ErrorCodes::Unauthorized);
+//     ASSERT_THROWS_CODE(ValidatedTenancyScope::create(client.get(), body, {}), DBException,
+//     ErrorCodes::Unauthorized);
 // }
 
-TEST_F(ValidatedTenantIdTestFixture, MultitenancySupportWithTenantAndSecurityTokenNOK) {
+TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithTenantAndSecurityTokenNOK) {
     gMultitenancySupport = true;
 
     auto kOid = OID::gen();
     auto body = BSON("ping" << 1 << "$tenant" << kOid);
-    auto token = makeSecurityToken(UserName("user", "admin", TenantId(kOid)));
-    OpMsg msg({body, token});
+    UserName user("user", "admin", TenantId(kOid));
+    auto token = makeSecurityToken(user);
 
     AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
-    ASSERT_THROWS_CODE(ValidatedTenantId(msg, *(client.get())), DBException, 6545800);
+    ASSERT_THROWS_CODE(
+        ValidatedTenancyScope::create(client.get(), body, token), DBException, 6545800);
 }
 
+}  // namespace
+}  // namespace auth
 }  // namespace mongo

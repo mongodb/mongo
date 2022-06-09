@@ -48,7 +48,8 @@
 #include "mongo/base/shim.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/auth/security_token.h"
+#include "mongo/db/auth/security_token_gen.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/hasher.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
@@ -436,7 +437,9 @@ BSONObj _createSecurityToken(const BSONObj& args, void* data) {
 
     constexpr auto authUserFieldName = auth::SecurityToken::kAuthenticatedUserFieldName;
     auto authUser = args.firstElement().Obj();
-    return BSON("" << auth::signSecurityToken(BSON(authUserFieldName << authUser)));
+    using VTS = auth::ValidatedTenancyScope;
+    auto token = VTS(BSON(authUserFieldName << authUser), VTS::TokenForTestingTag{});
+    return BSON("" << token.getOriginalToken());
 }
 
 BSONObj replMonitorStats(const BSONObj& a, void* data) {

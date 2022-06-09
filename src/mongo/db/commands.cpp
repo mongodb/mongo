@@ -108,7 +108,8 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "command " << command->getName() << " requires authentication",
             !command->requiresAuth() || authzSession->isAuthenticated() ||
-                request.securityToken.nFields());
+                (request.validatedTenancyScope &&
+                 request.validatedTenancyScope->hasAuthenticatedUser()));
     return false;
 }
 

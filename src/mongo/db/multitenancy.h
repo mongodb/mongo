@@ -41,9 +41,4 @@ namespace mongo {
  */
 boost::optional<TenantId> getActiveTenant(OperationContext* opCtx);
 
-/**
- * Set the dollar TenantId on this OperationContext.
- */
-void setDollarTenantOnOpCtx(OperationContext* opCtx, const OpMsg& opMsg);
-
 }  // namespace mongo

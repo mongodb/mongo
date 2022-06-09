@@ -7,8 +7,9 @@ env = env.Clone()
 env.Library(
     target='security_token',
     source=[
-        'security_token.cpp',
+        'security_token_authentication_guard.cpp',
         'security_token.idl',
+        'validated_tenancy_scope.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -540,6 +541,7 @@ env.CppUnitTest(
         'sasl_scram_test.cpp',
         'security_key_test.cpp',
         'user_document_parser_test.cpp',
+        'validated_tenancy_scope_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

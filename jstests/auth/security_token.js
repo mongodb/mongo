@@ -85,9 +85,11 @@ function runTest(conn, enabled, rst = undefined) {
     // Test that no token equates to unauthenticated.
     assert.commandFailed(tokenDB.runCommand({features: 1}));
 
-    // Passing a security token with unknown fields will always fail.
+    // Passing a security token with unknown fields will fail at the client
+    // while trying to construct a signed security token.
+    const kIDLParserUnknownField = 40415;
     tokenConn._setSecurityToken({invalid: 1});
-    assert.commandFailed(tokenDB.runCommand({ping: 1}));
+    assert.throwsWithCode(() => tokenDB.runCommand({ping: 1}), kIDLParserUnknownField);
     assertNoTokensProcessedYet(conn);
 
     const [token, expect] = makeTokenAndExpect('user1', 'admin');

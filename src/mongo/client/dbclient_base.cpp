@@ -49,7 +49,7 @@
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/config.h"
 #include "mongo/db/api_parameters_gen.h"
-#include "mongo/db/auth/security_token.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
@@ -190,8 +190,8 @@ void appendMetadata(OperationContext* opCtx,
     request.body = bob.obj();
 
     if (opCtx) {
-        if (auto securityToken = auth::getSecurityToken(opCtx)) {
-            request.securityToken = securityToken->toBSON();
+        if (auto validatedTenancyScope = auth::ValidatedTenancyScope::get(opCtx)) {
+            request.validatedTenancyScope = validatedTenancyScope;
         }
     }
 }
