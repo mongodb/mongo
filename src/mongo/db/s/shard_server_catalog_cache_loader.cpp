@@ -651,7 +651,7 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_runSecond
                               "Cache loader on secondary successfully waited for primary refresh "
                               "and replication of collection",
                               "namespace"_attr = nss,
-                              "durationMillis"_attr = Milliseconds(t.millis()));
+                              "duration"_attr = Milliseconds(t.millis()));
 
     // Read the local metadata.
 
@@ -787,7 +787,7 @@ StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_runSecondaryGetDatabase
                               "Cache loader on secondary successfully waited for primary refresh "
                               "and replication of database",
                               "db"_attr = dbName,
-                              "durationMillis"_attr = Milliseconds(t.millis()));
+                              "duration"_attr = Milliseconds(t.millis()));
     return readShardDatabasesEntry(opCtx, dbName);
 }
 
