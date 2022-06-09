@@ -4874,18 +4874,44 @@ TEST_F(ShardTxnParticipantTest,
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
 }
 
-TEST_F(ShardTxnParticipantTest,
-       CannotRetryInProgressTransactionForRetryableWrite_ConflictingTransactionForRetryableWrite) {
+TEST_F(ShardTxnParticipantTest, CannotRetryInProgressRetryableTxn_ConflictingRetryableTxn) {
     const auto parentLsid = makeLogicalSessionIdForTest();
     const auto parentTxnNumber = *opCtx()->getTxnNumber();
 
     opCtx()->setLogicalSessionId(
         makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber));
-    auto sessionCheckout = checkOutSession();
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-    ASSERT_TRUE(txnParticipant.transactionIsInProgress());
-    OperationContextSession::checkIn(opCtx(), OperationContextSession::CheckInReason::kDone);
+    {
+        auto sessionCheckout = checkOutSession();
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT_TRUE(txnParticipant.transactionIsInProgress());
+    }
 
+    // The first conflicting transaction should abort the active one.
+    const auto firstConflictingLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runFunctionFromDifferentOpCtx([firstConflictingLsid](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(firstConflictingLsid);
+        newOpCtx->setTxnNumber(0);
+        newOpCtx->setInMultiDocumentTransaction();
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        txnParticipant.beginOrContinue(
+            newOpCtx, {0}, false /* autocommit */, true /* startTransaction */);
+        ASSERT_TRUE(txnParticipant.transactionIsInProgress());
+        txnParticipant.unstashTransactionResources(newOpCtx, "insert");
+        txnParticipant.stashTransactionResources(newOpCtx);
+    });
+
+    // Continuing the interrupted transaction should throw without aborting the new active
+    // transaction.
+    {
+        ASSERT_THROWS_CODE(checkOutSession(boost::none /* startNewTxn */),
+                           AssertionException,
+                           ErrorCodes::RetryableTransactionInProgress);
+    }
+
+    // A second conflicting transaction should throw and not abort the active one.
     runFunctionFromDifferentOpCtx([parentLsid, parentTxnNumber](OperationContext* newOpCtx) {
         newOpCtx->setLogicalSessionId(
             makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber));
@@ -4900,20 +4926,71 @@ TEST_F(ShardTxnParticipantTest,
                            ErrorCodes::RetryableTransactionInProgress);
     });
 
-    ASSERT_TRUE(txnParticipant.transactionIsInProgress());
+    // Verify the first conflicting txn is still open.
+    runFunctionFromDifferentOpCtx([firstConflictingLsid](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(firstConflictingLsid);
+        newOpCtx->setTxnNumber(0);
+        newOpCtx->setInMultiDocumentTransaction();
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        txnParticipant.beginOrContinue(
+            newOpCtx, {0}, false /* autocommit */, boost::none /* startTransaction */);
+        txnParticipant.unstashTransactionResources(newOpCtx, "insert");
+        ASSERT(txnParticipant.transactionIsInProgress());
+    });
 }
 
-TEST_F(ShardTxnParticipantTest,
-       CannotRetryInProgressTransactionForRetryableWrite_ConflictingRetryableWrite) {
+TEST_F(ShardTxnParticipantTest, CannotRetryInProgressRetryableTxn_ConflictingRetryableWrite) {
     const auto parentLsid = makeLogicalSessionIdForTest();
     const auto parentTxnNumber = *opCtx()->getTxnNumber();
 
     opCtx()->setLogicalSessionId(
         makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber));
-    auto sessionCheckout = checkOutSession();
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-    ASSERT_TRUE(txnParticipant.transactionIsInProgress());
-    OperationContextSession::checkIn(opCtx(), OperationContextSession::CheckInReason::kDone);
+    {
+        auto sessionCheckout = checkOutSession();
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT_TRUE(txnParticipant.transactionIsInProgress());
+    }
+
+    //
+    // The first conflicting retryable write should abort a conflicting retryable transaction.
+    //
+    runFunctionFromDifferentOpCtx([parentLsid, parentTxnNumber](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(parentLsid);
+        newOpCtx->setTxnNumber(parentTxnNumber);
+
+        // Shouldn't throw.
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        txnParticipant.beginOrContinue(newOpCtx,
+                                       {parentTxnNumber},
+                                       boost::none /* autocommit */,
+                                       boost::none /* startTransaction */);
+    });
+
+    // Continuing the interrupted transaction should throw because it was aborted. Note this does
+    // not throw RetryableTransactionInProgress because the retryable write that aborted the
+    // transaction completed.
+    {
+        auto sessionCheckout = checkOutSession(boost::none /* startNewTxn */);
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT_THROWS_CODE(txnParticipant.unstashTransactionResources(opCtx(), "insert"),
+                           AssertionException,
+                           ErrorCodes::NoSuchTransaction);
+    }
+
+    //
+    // The second conflicting retryable write should throw and not abort a conflicting retryable
+    // transaction.
+    //
+    {
+        auto sessionCheckout = checkOutSession();
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT_TRUE(txnParticipant.transactionIsInProgress());
+        txnParticipant.unstashTransactionResources(opCtx(), "insert");
+        txnParticipant.stashTransactionResources(opCtx());
+    }
 
     runFunctionFromDifferentOpCtx([parentLsid, parentTxnNumber](OperationContext* newOpCtx) {
         newOpCtx->setLogicalSessionId(parentLsid);
@@ -4929,7 +5006,290 @@ TEST_F(ShardTxnParticipantTest,
                            ErrorCodes::RetryableTransactionInProgress);
     });
 
-    ASSERT_TRUE(txnParticipant.transactionIsInProgress());
+    {
+        auto sessionCheckout = checkOutSession(boost::none /* startNewTxn */);
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        txnParticipant.beginOrContinue(
+            opCtx(), {parentTxnNumber}, false /* autocommit */, boost::none /* startTransaction */);
+        txnParticipant.unstashTransactionResources(opCtx(), "insert");
+        ASSERT_TRUE(txnParticipant.transactionIsInProgress());
+    }
+}
+
+TEST_F(ShardTxnParticipantTest, RetryableTransactionInProgressCounterResetsUponNewTxnNumber) {
+    const auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = *opCtx()->getTxnNumber();
+
+    opCtx()->setLogicalSessionId(
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber));
+    {
+        auto sessionCheckout = checkOutSession();
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT_TRUE(txnParticipant.transactionIsInProgress());
+    }
+
+    // The first conflicting transaction should abort the active one.
+    const auto firstConflictingLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runFunctionFromDifferentOpCtx([firstConflictingLsid](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(firstConflictingLsid);
+        newOpCtx->setTxnNumber(0);
+        newOpCtx->setInMultiDocumentTransaction();
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        txnParticipant.beginOrContinue(
+            newOpCtx, {0}, false /* autocommit */, true /* startTransaction */);
+        ASSERT(txnParticipant.transactionIsInProgress());
+        txnParticipant.unstashTransactionResources(newOpCtx, "insert");
+        txnParticipant.stashTransactionResources(newOpCtx);
+    });
+
+    // A second conflicting transaction should throw and not abort the active one.
+    runFunctionFromDifferentOpCtx([parentLsid, parentTxnNumber](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(
+            makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber));
+        newOpCtx->setTxnNumber(0);
+        newOpCtx->setInMultiDocumentTransaction();
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
+                               newOpCtx, {0}, false /* autocommit */, true /* startTransaction */),
+                           AssertionException,
+                           ErrorCodes::RetryableTransactionInProgress);
+    });
+
+    // Advance the txnNumber and verify the first new conflicting transaction does not throw
+    // RetryableTransactionInProgress.
+
+    parentTxnNumber += 1;
+    const auto higherChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runFunctionFromDifferentOpCtx([higherChildLsid](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(higherChildLsid);
+        newOpCtx->setTxnNumber(0);
+        newOpCtx->setInMultiDocumentTransaction();
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        txnParticipant.beginOrContinue(
+            newOpCtx, {0}, false /* autocommit */, true /* startTransaction */);
+        ASSERT(txnParticipant.transactionIsInProgress());
+    });
+
+    const auto higherFirstConflictingLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runFunctionFromDifferentOpCtx([higherFirstConflictingLsid](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(higherFirstConflictingLsid);
+        newOpCtx->setTxnNumber(0);
+        newOpCtx->setInMultiDocumentTransaction();
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        txnParticipant.beginOrContinue(
+            newOpCtx, {0}, false /* autocommit */, true /* startTransaction */);
+        ASSERT(txnParticipant.transactionIsInProgress());
+    });
+
+    // A second conflicting transaction should still throw and not abort the active one.
+    const auto higherSecondConflictingLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runFunctionFromDifferentOpCtx([higherSecondConflictingLsid](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(higherSecondConflictingLsid);
+        newOpCtx->setTxnNumber(0);
+        newOpCtx->setInMultiDocumentTransaction();
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
+                               newOpCtx, {0}, false /* autocommit */, true /* startTransaction */),
+                           AssertionException,
+                           ErrorCodes::RetryableTransactionInProgress);
+    });
+}
+
+TEST_F(ShardTxnParticipantTest, HigherTxnNumberAbortsLowerChildTransactions_RetryableTxn) {
+    const auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = *opCtx()->getTxnNumber();
+
+    opCtx()->setLogicalSessionId(
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber));
+    {
+        auto sessionCheckout = checkOutSession();
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT_TRUE(txnParticipant.transactionIsInProgress());
+    }
+
+    // Advance the txnNumber and verify the first new conflicting transaction does not throw
+    // RetryableTransactionInProgress.
+
+    parentTxnNumber += 1;
+
+    const auto higherChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runFunctionFromDifferentOpCtx([higherChildLsid](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(higherChildLsid);
+        newOpCtx->setTxnNumber(0);
+        newOpCtx->setInMultiDocumentTransaction();
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        txnParticipant.beginOrContinue(
+            newOpCtx, {0}, false /* autocommit */, true /* startTransaction */);
+        ASSERT(txnParticipant.transactionIsInProgress());
+    });
+}
+
+TEST_F(ShardTxnParticipantTest, HigherTxnNumberAbortsLowerChildTransactions_RetryableWrite) {
+    const auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = *opCtx()->getTxnNumber();
+
+    opCtx()->setLogicalSessionId(
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber));
+    {
+        auto sessionCheckout = checkOutSession();
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT_TRUE(txnParticipant.transactionIsInProgress());
+    }
+
+    // Advance the txnNumber and verify the first new conflicting transaction does not throw
+    // RetryableTransactionInProgress.
+
+    parentTxnNumber += 1;
+
+    runFunctionFromDifferentOpCtx([parentLsid, parentTxnNumber](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(parentLsid);
+        newOpCtx->setTxnNumber(parentTxnNumber);
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        txnParticipant.beginOrContinue(newOpCtx,
+                                       {parentTxnNumber},
+                                       boost::none /* autocommit */,
+                                       boost::none /* startTransaction */);
+    });
+}
+
+TEST_F(ShardTxnParticipantTest, HigherTxnNumberAbortsLowerChildTransactions_Transaction) {
+    const auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = *opCtx()->getTxnNumber();
+
+    opCtx()->setLogicalSessionId(
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber));
+    {
+        auto sessionCheckout = checkOutSession();
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT_TRUE(txnParticipant.transactionIsInProgress());
+    }
+
+    // Advance the txnNumber and verify the first new conflicting transaction does not throw
+    // RetryableTransactionInProgress.
+
+    parentTxnNumber += 1;
+
+    runFunctionFromDifferentOpCtx([parentLsid, parentTxnNumber](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(parentLsid);
+        newOpCtx->setTxnNumber(parentTxnNumber);
+        newOpCtx->setInMultiDocumentTransaction();
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        txnParticipant.beginOrContinue(newOpCtx,
+                                       *newOpCtx->getTxnNumber(),
+                                       false /* autocommit */,
+                                       true /* startTransaction */);
+        ASSERT(txnParticipant.transactionIsInProgress());
+    });
+}
+
+TEST_F(ShardTxnParticipantTest, HigherTxnNumberDoesNotAbortPreparedLowerChildTransaction) {
+    const auto parentLsid = makeLogicalSessionIdForTest();
+    const auto parentTxnNumber = *opCtx()->getTxnNumber();
+
+    // Start a prepared child transaction.
+    opCtx()->setLogicalSessionId(
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber));
+    {
+        auto sessionCheckout = checkOutSession();
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
+        txnParticipant.prepareTransaction(opCtx(), {});
+        ASSERT(txnParticipant.transactionIsPrepared());
+        txnParticipant.stashTransactionResources(opCtx());
+    }
+
+    // Advance the txnNumber and verify the first new conflicting transaction and retryable write
+    // throws RetryableTransactionInProgress.
+
+    const auto higherParentTxnNumber = parentTxnNumber + 1;
+
+    const auto higherChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, higherParentTxnNumber);
+    runFunctionFromDifferentOpCtx([higherChildLsid](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(higherChildLsid);
+        newOpCtx->setTxnNumber(0);
+        newOpCtx->setInMultiDocumentTransaction();
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
+                               newOpCtx, {0}, false /* autocommit */, true /* startTransaction */),
+                           AssertionException,
+                           ErrorCodes::RetryableTransactionInProgress);
+    });
+
+    runFunctionFromDifferentOpCtx([parentLsid, higherParentTxnNumber](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(parentLsid);
+        newOpCtx->setTxnNumber(higherParentTxnNumber);
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(newOpCtx,
+                                                          {higherParentTxnNumber},
+                                                          boost::none /* autocommit */,
+                                                          boost::none /* startTransaction */),
+                           AssertionException,
+                           ErrorCodes::RetryableTransactionInProgress);
+    });
+
+    // After the transaction leaves prepare a conflicting internal transaction can still abort an
+    // active transaction.
+
+    {
+        auto sessionCheckout = checkOutSession(boost::none /* startNewTxn */);
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        txnParticipant.beginOrContinue(
+            opCtx(), {parentTxnNumber}, false /* autocommit */, boost::none /* startTransaction */);
+        txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
+        txnParticipant.abortTransaction(opCtx());
+    }
+
+    runFunctionFromDifferentOpCtx([higherChildLsid](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(higherChildLsid);
+        newOpCtx->setTxnNumber(0);
+        newOpCtx->setInMultiDocumentTransaction();
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        txnParticipant.beginOrContinue(
+            newOpCtx, {0}, false /* autocommit */, true /* startTransaction */);
+        ASSERT(txnParticipant.transactionIsInProgress());
+    });
+
+    const auto higherConflictingChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, higherParentTxnNumber);
+    runFunctionFromDifferentOpCtx([higherConflictingChildLsid](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(higherConflictingChildLsid);
+        newOpCtx->setTxnNumber(0);
+        newOpCtx->setInMultiDocumentTransaction();
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        txnParticipant.beginOrContinue(
+            newOpCtx, {0}, false /* autocommit */, true /* startTransaction */);
+        ASSERT(txnParticipant.transactionIsInProgress());
+    });
 }
 
 TEST_F(ShardTxnParticipantTest,

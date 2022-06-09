@@ -83,9 +83,14 @@ function testBlockingRetry(retryFunc, testOpts = {
         commitCmdObj.commitTimestamp = preparedTxnRes.prepareTimestamp;
     }
 
-    // Retry and wait for it to block behind the internal transaction above.
-    const fp = configureFailPoint(
-        shard0Primary, "waitAfterNewStatementBlocksBehindOpenInternalTransactionForRetryableWrite");
+    let fp;
+    if (testOpts.prepareBeforeRetry) {
+        // A prepared transaction cannot be interrupted by a retry so retry and wait for it to block
+        // behind the internal transaction above.
+        fp = configureFailPoint(
+            shard0Primary,
+            "waitAfterNewStatementBlocksBehindOpenInternalTransactionForRetryableWrite");
+    }
     const retryThread = new Thread(retryFunc, {
         shard0RstArgs: createRstArgs(st.rs0),
         parentSessionUUIDString: extractUUIDFromObject(parentLsid.id),
@@ -97,18 +102,33 @@ function testBlockingRetry(retryFunc, testOpts = {
         stepDownPrimaryAfterBlockingRetry: testOpts.stepDownPrimaryAfterBlockingRetry
     });
     retryThread.start();
-    fp.wait();
-    fp.off();
+    if (testOpts.prepareBeforeRetry) {
+        // The retry should block behind the prepared transaction.
+        fp.wait();
+        fp.off();
+    } else {
+        // The retry should complete without blocking.
+        retryThread.join();
+    }
 
     if (testOpts.stepDownPrimaryAfterBlockingRetry) {
         stepDownShard0Primary();
     }
 
     // Commit or abort the internal transaction, and verify that the write statement executed
-    // exactly once despite the concurrent retry.
-    assert.commandWorked(
-        shard0TestDB.adminCommand(testOpts.abortAfterBlockingRetry ? abortCmdObj : commitCmdObj));
-    retryThread.join();
+    // exactly once despite the concurrent retry, whether or not the retry interrupted the original
+    // attempt.
+    if (testOpts.prepareBeforeRetry) {
+        assert.commandWorked(shard0TestDB.adminCommand(
+            testOpts.abortAfterBlockingRetry ? abortCmdObj : commitCmdObj));
+        retryThread.join();
+    } else {
+        // The retry should have interrupted the original attempt.
+        assert.commandFailedWithCode(
+            shard0TestDB.adminCommand(testOpts.abortAfterBlockingRetry ? abortCmdObj
+                                                                       : commitCmdObj),
+            ErrorCodes.NoSuchTransaction);
+    }
     assert.eq(shard0TestColl.count(docToInsert), 1);
 
     assert.commandWorked(mongosTestColl.remove({}));
