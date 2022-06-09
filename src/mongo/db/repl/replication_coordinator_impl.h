@@ -1719,9 +1719,6 @@ private:
     // Current ReplicaSet state.
     MemberState _memberState;  // (M)
 
-    // Used to signal threads waiting for changes to _memberState.
-    stdx::condition_variable _drainFinishedCond;  // (M)
-
     ReplicationCoordinator::ApplierState _applierState = ApplierState::Running;  // (M)
 
     // Used to signal threads waiting for changes to _rsConfigState.
