@@ -635,7 +635,7 @@ void ShardServerCatalogCacheLoader::_runSecondaryGetChunksSince(
                               "Cache loader on secondary successfully waited for primary refresh "
                               "and replication of collection",
                               "namespace"_attr = nss,
-                              "durationMillis"_attr = Milliseconds(t.millis()));
+                              "duration"_attr = Milliseconds(t.millis()));
 
     // Read the local metadata.
 
@@ -784,7 +784,7 @@ void ShardServerCatalogCacheLoader::_runSecondaryGetDatabase(
                               "Cache loader on secondary successfully waited for primary refresh "
                               "and replication of database",
                               "db"_attr = dbName,
-                              "durationMillis"_attr = Milliseconds(t.millis()));
+                              "duration"_attr = Milliseconds(t.millis()));
 
     // Read the local metadata.
     auto swDatabaseType = getPersistedDbMetadata(opCtx, dbName);
