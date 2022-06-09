@@ -35,12 +35,12 @@ if [ ! -z ${scons_cache_scope} ]; then
     set -o errexit
   fi
   echo "Shared Cache with setting: ${scons_cache_scope}"
-  SCONS_CACHE_MODE=${scons_cache_mode} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} IS_COMMIT_QUEUE=${is_commit_queue} buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
+  SCONS_CACHE_MODE=${scons_cache_mode} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} IS_COMMIT_QUEUE=${is_commit_queue} $python buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
 # Legacy Expansion generation
 else
   echo "Using legacy expansion generation"
   # Proceed with regular expansions generated
   # This script converts the generated version string into a sanitized version string for
   # use by scons and uploading artifacts as well as information about for the scons cache.
-  SCONS_CACHE_MODE=${scons_cache_mode} USE_SCONS_CACHE=${use_scons_cache} IS_PATCH=${is_patch} IS_COMMIT_QUEUE=${is_commit_queue} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+  SCONS_CACHE_MODE=${scons_cache_mode} USE_SCONS_CACHE=${use_scons_cache} IS_PATCH=${is_patch} IS_COMMIT_QUEUE=${is_commit_queue} $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
 fi

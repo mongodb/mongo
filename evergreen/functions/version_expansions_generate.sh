@@ -14,4 +14,5 @@ if [ "${is_patch}" = "true" ]; then
 fi
 echo "MONGO_VERSION = ${MONGO_VERSION}"
 
-MONGO_VERSION=${MONGO_VERSION} IS_PATCH=${is_patch} IS_COMMIT_QUEUE=${is_commit_queue} buildscripts/generate_version_expansions.py --out version_expansions.yml
+activate_venv
+MONGO_VERSION=${MONGO_VERSION} IS_PATCH=${is_patch} IS_COMMIT_QUEUE=${is_commit_queue} $python buildscripts/generate_version_expansions.py --out version_expansions.yml
