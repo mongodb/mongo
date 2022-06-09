@@ -6,7 +6,7 @@ cd src
 set -o errexit
 mongo_binary=dist-test/bin/mongo${exe}
 activate_venv
-bin_ver=$($python -c "import yaml; print(yaml.safe_load(open('compile_expansions.yml'))['version']);" | tr -d '[ \r\n]')
+bin_ver=$($python -c "import yaml; print(yaml.safe_load(open('version_expansions.yml'))['version']);" | tr -d '[ \r\n]')
 # Due to SERVER-23810, we cannot use $mongo_binary --quiet --nodb --eval "version();"
 mongo_ver=$($mongo_binary --version | perl -pe '/version v([^\"]*)/; $_ = $1;' | tr -d '[ \r\n]')
 # The versions must match

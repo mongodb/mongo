@@ -266,11 +266,16 @@ functions:
           set -o errexit
           set -o verbose
 
+          mkdir -p mongodb/bin
+
           /opt/mongodbtoolchain/v3/bin/virtualenv --python /opt/mongodbtoolchain/v3/bin/python3 "${workdir}/compile_venv"
           source "${workdir}/compile_venv/bin/activate"
 
           python -m pip install -r etc/pip/compile-requirements.txt
-
+    - command: expansions.write
+      params:
+         file: expansions.yml
+         redacted: true
     - command: shell.exec
       params:
         working_dir: src
@@ -278,10 +283,10 @@ functions:
           set -o errexit
           set -o verbose
 
-          mkdir -p mongodb/bin
+          source "${workdir}/compile_venv/bin/activate"
 
           # We get the raw version string (r1.2.3-45-gabcdef) from git
-          MONGO_VERSION=$(git describe --abbrev=7)
+          export MONGO_VERSION=$(git describe --abbrev=7)
 
           # If this is a patch build, we add the patch version id to the version string so we know
           # this build was a patch, and which evergreen task it came from
@@ -289,10 +294,25 @@ functions:
             MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
           fi
 
-          # This script converts the generated version string into a sanitized version string for
-          # use by scons and uploading artifacts as well as information about for the scons cache.
+          # This script handles sanitizing the version string for use during SCons build
+          # and when pushing artifacts up to S3.
+          IS_PATCH=${is_patch|false} IS_COMMIT_QUEUE=${is_commit_queue|false} \
+            buildscripts/generate_version_expansions.py --out version_expansions.yml
+    - command: expansions.update
+      params:
+        file: src/version_expansions.yml
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          # This script handles whether the SCons cache should be used
           source "${workdir}/compile_venv/bin/activate"
-          MONGO_VERSION=$MONGO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+          SCONS_CACHE_MODE=${scons_cache_mode|} USE_SCONS_CACHE=${use_scons_cache|false} \
+            IS_PATCH=${is_patch|false} IS_COMMIT_QUEUE=${is_commit_queue|false} \
+            python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
     - command: expansions.update
       params:
         file: src/compile_expansions.yml
