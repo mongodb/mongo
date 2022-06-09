@@ -62,10 +62,9 @@ platforms:
       username: admin
   - name: rhel62-x86-64
     driver:
-      # Use rhel 6.5 chef fails on previous versions.
-      image_id: ami-5b697332
+      image_id: ami-0a47672f6c7827dd2
     transport:
-      username: root
+      username: ec2-user
       instance_type: t2.small
   - name: rhel70-x86-64
     driver:

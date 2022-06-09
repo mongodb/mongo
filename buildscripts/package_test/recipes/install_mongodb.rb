@@ -21,12 +21,7 @@ if platform_family? 'rhel'
   end
 end
 
-if %w(6 7).include?(node['platform_version'][0]) and node['platform'] == 'redhat'
-
-  # RHEL 6 client
-  if node['platform'] == 'redhat' and node['platform_version'][0] == "6"
-    rhui_client_url = "http://boxes.10gen.com/build/rh-amazon-rhui-client-els-3.0.45-1.el6.noarch.rpm"
-  end
+if %w(7).include?(node['platform_version'][0]) and node['platform'] == 'redhat'
 
   # RHEL 7 client
   if node['platform'] == 'redhat' and node['platform_version'][0] == "7"
@@ -86,11 +81,21 @@ if platform_family? 'debian'
     end
   end
 
-  # the ubuntu 16.04 image does not have some dependencies installed by default
+  # the ubuntu image does not have some dependencies installed by default
   # and it is required for the install_compass script
-  execute 'install dependencies' do
-    command 'apt-get install -y python libsasl2-modules-gssapi-mit'
-    live_stream true
+  if node['platform'] == 'ubuntu' and node['platform_version'] == '20.04'
+    execute 'install dependencies ubuntu 20.04' do
+      command 'apt-get install -y python3 libsasl2-modules-gssapi-mit'
+      live_stream true
+    end
+    link '/usr/bin/python' do
+      to '/usr/bin/python3'
+    end
+  else
+    execute 'install dependencies' do
+      command 'apt-get install -y python libsasl2-modules-gssapi-mit'
+      live_stream true
+    end
   end
 
   # dpkg returns 1 if dependencies are not satisfied, which they will not be
