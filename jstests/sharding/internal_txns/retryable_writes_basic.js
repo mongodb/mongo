@@ -17,16 +17,22 @@ const transactionTest = new RetryableInternalTransactionTest();
 
 {
     jsTest.log("Test that non-internal transactions cannot be retried");
-    const lsid = {id: UUID()};
-    const testOptions = {expectRetryToSucceed: false};
-    transactionTest.runInsertUpdateDeleteTests(lsid, testOptions);
+    const makeSessionIdFunc = () => {
+        return {id: UUID()};
+    };
+    const expectRetryToSucceed = false;
+    transactionTest.runInsertUpdateDeleteTests(
+        {txnOptions: {makeSessionIdFunc}, expectRetryToSucceed});
 }
 
 {
     jsTest.log("Test that non-retryable internal transactions cannot be retried");
-    const lsid = {id: UUID(), txnUUID: UUID()};
-    const testOptions = {expectRetryToSucceed: false};
-    transactionTest.runInsertUpdateDeleteTests(lsid, testOptions);
+    const makeSessionIdFunc = () => {
+        return {id: UUID(), txnUUID: UUID()};
+    };
+    const expectRetryToSucceed = false;
+    transactionTest.runInsertUpdateDeleteTests(
+        {txnOptions: {makeSessionIdFunc}, expectRetryToSucceed});
 }
 
 {
