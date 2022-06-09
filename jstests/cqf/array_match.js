@@ -10,15 +10,17 @@ if (!checkCascadesOptimizerEnabled(db)) {
 const t = db.cqf_array_match;
 t.drop();
 
-assert.commandWorked(t.insert({a: 2, b: 1}));
-assert.commandWorked(t.insert({a: [2], b: 1}));
-assert.commandWorked(t.insert({a: [[2]], b: 1}));
+for (let i = 0; i < 10; i++) {
+    assert.commandWorked(t.insert({a: 2, b: 1}));
+    assert.commandWorked(t.insert({a: [2], b: 1}));
+    assert.commandWorked(t.insert({a: [[2]], b: 1}));
+}
 
 assert.commandWorked(t.createIndex({a: 1}));
 
 {
     const res = t.explain("executionStats").aggregate([{$match: {a: {$eq: [2]}}}]);
-    assert.eq(2, res.executionStats.nReturned);
+    assert.eq(20, res.executionStats.nReturned);
     assert.eq("PhysicalScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
 }
 
@@ -31,7 +33,7 @@ assert.commandWorked(bulk.execute());
 
 {
     const res = t.explain("executionStats").aggregate([{$match: {a: {$eq: [2]}}}]);
-    assert.eq(2, res.executionStats.nReturned);
+    assert.eq(20, res.executionStats.nReturned);
 
     const indexUnionNode = res.queryPlanner.winningPlan.optimizerPlan.child.child.leftChild.child;
     assert.eq("Union", indexUnionNode.nodeType);
@@ -46,7 +48,7 @@ assert.commandWorked(t.createIndex({b: 1, a: 1}));
 
 {
     const res = t.explain("executionStats").aggregate([{$match: {b: 1, a: {$eq: [2]}}}]);
-    assert.eq(2, res.executionStats.nReturned);
+    assert.eq(20, res.executionStats.nReturned);
 
     // Verify we still get index scan even if the field appears as second index field.
     const indexUnionNode = res.queryPlanner.winningPlan.optimizerPlan.child.child.leftChild.child;
