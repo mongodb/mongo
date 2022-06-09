@@ -93,10 +93,10 @@ using ABT = algebra::PolyValue<Blackhole,
                                ExpressionBinder>;
 
 template <typename Derived, size_t Arity>
-using Operator = algebra::OpSpecificArity<ABT, Derived, Arity>;
+using Operator = algebra::OpSpecificArity<ABT, Arity>;
 
 template <typename Derived, size_t Arity>
-using OperatorDynamic = algebra::OpSpecificDynamicArity<ABT, Derived, Arity>;
+using OperatorDynamic = algebra::OpSpecificDynamicArity<ABT, Arity>;
 
 template <typename Derived>
 using OperatorDynamicHomogenous = OperatorDynamic<Derived, 0>;

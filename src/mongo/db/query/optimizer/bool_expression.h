@@ -53,8 +53,8 @@ struct BoolExpr {
     using NodeVector = std::vector<Node>;
 
 
-    class Atom final : public algebra::OpSpecificArity<Node, Atom, 0> {
-        using Base = algebra::OpSpecificArity<Node, Atom, 0>;
+    class Atom final : public algebra::OpSpecificArity<Node, 0> {
+        using Base = algebra::OpSpecificArity<Node, 0>;
 
     public:
         Atom(T expr) : Base(), _expr(std::move(expr)) {}
@@ -74,8 +74,8 @@ struct BoolExpr {
         T _expr;
     };
 
-    class Conjunction final : public algebra::OpSpecificDynamicArity<Node, Conjunction, 0> {
-        using Base = algebra::OpSpecificDynamicArity<Node, Conjunction, 0>;
+    class Conjunction final : public algebra::OpSpecificDynamicArity<Node, 0> {
+        using Base = algebra::OpSpecificDynamicArity<Node, 0>;
 
     public:
         Conjunction(NodeVector children) : Base(std::move(children)) {
@@ -87,8 +87,8 @@ struct BoolExpr {
         }
     };
 
-    class Disjunction final : public algebra::OpSpecificDynamicArity<Node, Disjunction, 0> {
-        using Base = algebra::OpSpecificDynamicArity<Node, Disjunction, 0>;
+    class Disjunction final : public algebra::OpSpecificDynamicArity<Node, 0> {
+        using Base = algebra::OpSpecificDynamicArity<Node, 0>;
 
     public:
         Disjunction(NodeVector children) : Base(std::move(children)) {

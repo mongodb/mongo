@@ -44,41 +44,40 @@ using Tree = PolyValue<Leaf, BinaryNode, NaryNode, AtLeastBinaryNode>;
 /**
  * A leaf in the tree. Just contains data - in this case a double.
  */
-class Leaf : public OpSpecificArity<Tree, Leaf, 0> {
+class Leaf : public OpSpecificArity<Tree, 0> {
 public:
     Leaf(double x) : x(x) {}
+
     double x;
 };
 
 /**
  * An inner node in the tree with exactly two children.
  */
-class BinaryNode : public OpSpecificArity<Tree, BinaryNode, 2> {
+class BinaryNode : public OpSpecificArity<Tree, 2> {
 public:
     BinaryNode(Tree left, Tree right)
-        : OpSpecificArity<Tree, BinaryNode, 2>(std::move(left), std::move(right)) {}
+        : OpSpecificArity<Tree, 2>(std::move(left), std::move(right)) {}
 };
 
 /**
  * An inner node in the tree with any number of children, zero or greater.
  */
-class NaryNode : public OpSpecificDynamicArity<Tree, NaryNode, 0> {
+class NaryNode : public OpSpecificDynamicArity<Tree, 0> {
 public:
-    NaryNode(std::vector<Tree> children)
-        : OpSpecificDynamicArity<Tree, NaryNode, 0>(std::move(children)) {}
+    NaryNode(std::vector<Tree> children) : OpSpecificDynamicArity<Tree, 0>(std::move(children)) {}
 };
 
 /**
  * An inner node in the tree with 2 or more nodes.
  */
-class AtLeastBinaryNode : public OpSpecificDynamicArity<Tree, AtLeastBinaryNode, 2> {
+class AtLeastBinaryNode : public OpSpecificDynamicArity<Tree, 2> {
 public:
     /**
      * Notice the required number of nodes are given as separate arguments from the vector.
      */
     AtLeastBinaryNode(std::vector<Tree> children, Tree left, Tree right)
-        : OpSpecificDynamicArity<Tree, AtLeastBinaryNode, 2>(
-              std::move(children), std::move(left), std::move(right)) {}
+        : OpSpecificDynamicArity<Tree, 2>(std::move(children), std::move(left), std::move(right)) {}
 };
 
 /**
