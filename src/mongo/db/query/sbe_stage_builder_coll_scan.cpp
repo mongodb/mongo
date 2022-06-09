@@ -328,7 +328,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     // replica set initialization message. If this fails, then we throw
     // ErrorCodes::OplogQueryMinTsMissing. We avoid doing this check on the resumable branch of a
     // tailable scan; it only needs to be done once, when the initial branch is run.
-    if (csn->assertTsHasNotFallenOffOplog && !isTailableResumeBranch) {
+    if (csn->assertTsHasNotFallenOff && !isTailableResumeBranch) {
         invariant(csn->shouldTrackLatestOplogTimestamp);
 
         // There should always be a 'tsSlot' already allocated on the RuntimeEnvironment for the
@@ -388,7 +388,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                     makeBinaryOp(sbe::EPrimBinary::lessEq,
                                  makeVariable(minTsSlot),
                                  makeConstant(sbe::value::TypeTags::Timestamp,
-                                              csn->assertTsHasNotFallenOffOplog->asULL())),
+                                              csn->assertTsHasNotFallenOff->asULL())),
                     makeBinaryOp(
                         sbe::EPrimBinary::logicAnd,
                         makeBinaryOp(sbe::EPrimBinary::eq,

@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/commands/cqf/cqf_aggregate.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
@@ -752,8 +753,20 @@ Status runAggregate(OperationContext* opCtx,
                                   << " is not supported for a change stream",
                     !request.getCollectionUUID());
 
-            // Replace the execution namespace with that of the oplog.
+            // Replace the execution namespace with the oplog.
             nss = NamespaceString::kRsOplogNamespace;
+
+            // In case of serverless the change stream will be opened on the change collection. We
+            // should first check if the change collection for the particular tenant exists and then
+            // replace the namespace with the change collection.
+            if (ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive()) {
+                auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
+                uassert(ErrorCodes::ChangeStreamNotEnabled,
+                        "Change streams must be enabled before being used.",
+                        changeCollectionManager.hasChangeCollection(opCtx, origNss.tenantId()));
+
+                nss = NamespaceString::makeChangeCollectionNSS(origNss.tenantId());
+            }
 
             // Upgrade and wait for read concern if necessary.
             _adjustChangeStreamReadConcern(opCtx);

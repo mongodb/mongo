@@ -167,7 +167,7 @@ public:
         : DocumentSourceMock({}, expCtx), _collectionPtr(&_collection) {
         _filterExpr = BSON("ns" << kTestNs);
         _filter = MatchExpressionParser::parseAndNormalize(_filterExpr, pExpCtx);
-        _params.assertTsHasNotFallenOffOplog = Timestamp(0);
+        _params.assertTsHasNotFallenOff = Timestamp(0);
         _params.shouldTrackLatestOplogTimestamp = true;
         _params.minRecord = RecordIdBound(RecordId(0));
         _params.tailable = true;
@@ -178,7 +178,7 @@ public:
         _filterExpr = BSON("ns" << kTestNs << "ts" << BSON("$gte" << resumeToken.clusterTime));
         _filter = MatchExpressionParser::parseAndNormalize(_filterExpr, pExpCtx);
         _params.minRecord = RecordIdBound(RecordId(resumeToken.clusterTime.asLL()));
-        _params.assertTsHasNotFallenOffOplog = resumeToken.clusterTime;
+        _params.assertTsHasNotFallenOff = resumeToken.clusterTime;
     }
 
     void push_back(GetNextResult&& result) {

@@ -63,7 +63,12 @@ public:
      * Returns true if change collections are enabled for recording oplog entries, false
      * otherwise.
      */
-    static bool isChangeCollectionEnabled();
+    static bool isChangeCollectionsModeActive();
+
+    /**
+     * Returns true if the change collection is present for the specified tenant, false otherwise.
+     */
+    bool hasChangeCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId) const;
 
     /**
      * Creates a change collection for the specified tenant, if it doesn't exist. Returns Status::OK

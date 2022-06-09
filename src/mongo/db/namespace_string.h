@@ -314,6 +314,11 @@ public:
     static NamespaceString makeCollectionlessAggregateNSS(const DatabaseName& dbName);
 
     /**
+     * Constructs the change collection namespace for the specified tenant.
+     */
+    static NamespaceString makeChangeCollectionNSS(const boost::optional<TenantId>& tenantId);
+
+    /**
      * Constructs a NamespaceString representing a listCollections namespace. The format for this
      * namespace is "<dbName>.$cmd.listCollections".
      */
@@ -480,6 +485,11 @@ public:
      * Returns whether the specified namespace is <database>.enxcol_.<.+>.(esc|ecc|ecoc).
      */
     bool isFLE2StateCollection() const;
+
+    /**
+     * Returns true if the namespace is an oplog or a change collection, false otherwise.
+     */
+    bool isOplogOrChangeCollection() const;
 
     /**
      * Returns the time-series buckets namespace for this view.

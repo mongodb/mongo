@@ -286,6 +286,12 @@ NamespaceString NamespaceString::makeCollectionlessAggregateNSS(const DatabaseNa
     return nss;
 }
 
+NamespaceString NamespaceString::makeChangeCollectionNSS(
+    const boost::optional<TenantId>& tenantId) {
+    // TODO: SERVER-65950 create namespace for a particular tenant.
+    return NamespaceString{NamespaceString::kConfigDb, NamespaceString::kChangeCollectionName};
+}
+
 std::string NamespaceString::getSisterNS(StringData local) const {
     verify(local.size() && local[0] != '.');
     return db().toString() + "." + local.toString();
@@ -420,6 +426,10 @@ bool NamespaceString::isFLE2StateCollection() const {
     return coll().startsWith(fle2Prefix) &&
         (coll().endsWith(fle2EscSuffix) || coll().endsWith(fle2EccSuffix) ||
          coll().endsWith(fle2EcocSuffix));
+}
+
+bool NamespaceString::isOplogOrChangeCollection() const {
+    return isOplog() || isChangeCollection();
 }
 
 NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {

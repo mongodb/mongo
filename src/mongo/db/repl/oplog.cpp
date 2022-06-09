@@ -389,7 +389,7 @@ void _logOpsInner(OperationContext* opCtx,
     }
 
     // Insert the oplog records to the respective tenants change collections.
-    if (ChangeStreamChangeCollectionManager::isChangeCollectionEnabled()) {
+    if (ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive()) {
         ChangeStreamChangeCollectionManager::get(opCtx).insertDocumentsToChangeCollection(
             opCtx, *records, timestamps);
     }

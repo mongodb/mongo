@@ -46,7 +46,7 @@ namespace record_id_helpers {
  * Converts Timestamp to a RecordId in an unspecified manor that is safe to use as the key to
  * in a RecordStore.
  */
-StatusWith<RecordId> keyForOptime(const Timestamp& opTime);
+StatusWith<RecordId> keyForOptime(const Timestamp& opTime, KeyFormat keyFormat);
 
 /**
  * For clustered collections, converts various values into a RecordId.

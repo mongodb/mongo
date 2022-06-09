@@ -450,6 +450,16 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
 
     invariant(nss.db() == _name.db());
 
+    // Returns true if the supplied namespace 'nss' is a system collection that can be dropped,
+    // false otherwise.
+    auto isDroppableSystemCollection = [](const auto& nss) {
+        return nss.isHealthlog() || nss == NamespaceString::kLogicalSessionsNamespace ||
+            nss == NamespaceString::kKeysCollectionNamespace ||
+            nss.isTemporaryReshardingCollection() || nss.isTimeseriesBucketsCollection() ||
+            nss.isChangeStreamPreImagesCollection() ||
+            nss == NamespaceString::kConfigsvrRestoreNamespace || nss.isChangeCollection();
+    };
+
     if (nss.isSystem()) {
         if (nss.isSystemDotProfile()) {
             if (catalog->getDatabaseProfileLevel(_name) != 0)
@@ -463,11 +473,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
                                       << " when time-series collections are present.",
                         viewStats && viewStats->userTimeseries == 0);
             }
-        } else if (!(nss.isHealthlog() || nss == NamespaceString::kLogicalSessionsNamespace ||
-                     nss == NamespaceString::kKeysCollectionNamespace ||
-                     nss.isTemporaryReshardingCollection() || nss.isTimeseriesBucketsCollection() ||
-                     nss.isChangeStreamPreImagesCollection() ||
-                     nss == NamespaceString::kConfigsvrRestoreNamespace)) {
+        } else if (!isDroppableSystemCollection(nss)) {
             return Status(ErrorCodes::IllegalOperation,
                           str::stream() << "can't drop system collection " << nss);
         }

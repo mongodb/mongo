@@ -98,7 +98,7 @@ struct CollectionScanParams {
     bool tailable = false;
 
     // Assert that the specified timestamp has not fallen off the oplog on a forward scan.
-    boost::optional<Timestamp> assertTsHasNotFallenOffOplog = boost::none;
+    boost::optional<Timestamp> assertTsHasNotFallenOff = boost::none;
 
     // Should we keep track of the timestamp of the latest oplog entry we've seen? This information
     // is needed to merge cursors from the oplog in order of operation time when reading the oplog

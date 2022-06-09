@@ -48,11 +48,6 @@ namespace {
 const auto getChangeCollectionManager =
     ServiceContext::declareDecoration<boost::optional<ChangeStreamChangeCollectionManager>>();
 
-// TODO: SERVER-65950 create or update the change collection for a particular tenant.
-NamespaceString getTenantChangeCollectionNamespace(boost::optional<TenantId> tenantId) {
-    return NamespaceString{NamespaceString::kConfigDb, NamespaceString::kChangeCollectionName};
-}
-
 }  // namespace
 
 ChangeStreamChangeCollectionManager& ChangeStreamChangeCollectionManager::get(
@@ -69,10 +64,17 @@ void ChangeStreamChangeCollectionManager::create(ServiceContext* service) {
     getChangeCollectionManager(service).emplace(service);
 }
 
-bool ChangeStreamChangeCollectionManager::isChangeCollectionEnabled() {
+bool ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive() {
     return feature_flags::gFeatureFlagServerlessChangeStreams.isEnabled(
                serverGlobalParams.featureCompatibility) &&
         gMultitenancySupport;
+}
+
+bool ChangeStreamChangeCollectionManager::hasChangeCollection(
+    OperationContext* opCtx, boost::optional<TenantId> tenantId) const {
+    auto catalog = CollectionCatalog::get(opCtx);
+    return static_cast<bool>(catalog->lookupCollectionByNamespace(
+        opCtx, NamespaceString::makeChangeCollectionNSS(tenantId)));
 }
 
 Status ChangeStreamChangeCollectionManager::createChangeCollection(
@@ -83,8 +85,10 @@ Status ChangeStreamChangeCollectionManager::createChangeCollection(
     changeCollectionOptions.clusteredIndex.emplace(clustered_util::makeDefaultClusteredIdIndex());
     changeCollectionOptions.capped = true;
 
-    auto status = createCollection(
-        opCtx, getTenantChangeCollectionNamespace(tenantId), changeCollectionOptions, BSONObj());
+    auto status = createCollection(opCtx,
+                                   NamespaceString::makeChangeCollectionNSS(tenantId),
+                                   changeCollectionOptions,
+                                   BSONObj());
     if (status.code() == ErrorCodes::NamespaceExists) {
         return Status::OK();
     }
@@ -96,7 +100,7 @@ Status ChangeStreamChangeCollectionManager::dropChangeCollection(
     OperationContext* opCtx, boost::optional<TenantId> tenantId) {
     DropReply dropReply;
     return dropCollection(opCtx,
-                          getTenantChangeCollectionNamespace(tenantId),
+                          NamespaceString::makeChangeCollectionNSS(tenantId),
                           &dropReply,
                           DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
 }
@@ -137,7 +141,7 @@ void ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
         // 'AllowLockAcquisitionOnTimestampedUnitOfWork'.
         AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
         AutoGetCollection tenantChangeCollection(
-            opCtx, getTenantChangeCollectionNamespace(tenantId), LockMode::MODE_IX);
+            opCtx, NamespaceString::makeChangeCollectionNSS(tenantId), LockMode::MODE_IX);
 
         // The change collection does not exist for a particular tenant because either the change
         // collection is not enabled or is in the process of enablement. Ignore this insert for now.

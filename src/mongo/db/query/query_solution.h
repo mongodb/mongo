@@ -489,7 +489,7 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     bool shouldTrackLatestOplogTimestamp = false;
 
     // Assert that the specified timestamp has not fallen off the oplog.
-    boost::optional<Timestamp> assertTsHasNotFallenOffOplog = boost::none;
+    boost::optional<Timestamp> assertTsHasNotFallenOff = boost::none;
 
     int direction{1};
 

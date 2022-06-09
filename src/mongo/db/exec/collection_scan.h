@@ -117,7 +117,7 @@ private:
     /**
      * Asserts that the minimum timestamp in the query filter has not already fallen off the oplog.
      */
-    void assertTsHasNotFallenOffOplog(const Record& record);
+    void assertTsHasNotFallenOff(const Record& record);
 
     // WorkingSet is not owned by us.
     WorkingSet* _workingSet;

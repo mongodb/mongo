@@ -530,7 +530,7 @@ TEST(RecordStoreTestHarness, OplogVisibilityStandalone) {
                 rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp());
             ASSERT_OK(res.getStatus());
             id1 = res.getValue();
-            StatusWith<RecordId> expectedId = record_id_helpers::keyForOptime(ts);
+            StatusWith<RecordId> expectedId = record_id_helpers::keyForOptime(ts, KeyFormat::Long);
             ASSERT_OK(expectedId.getStatus());
             // RecordId should be extracted from 'ts' field when inserting into oplog namespace
             ASSERT(expectedId.getValue().compare(id1) == 0);
