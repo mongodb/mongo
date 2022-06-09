@@ -77,7 +77,7 @@ class PerClusterDataConsistencyHook(DataConsistencyHook):
                              cluster, cluster.get_driver_connection_url())
             hook_test_case = DynamicJSTestCase.create_after_test(
                 test.logger, test, self, self._js_filename, self._shell_options)
-            hook_test_case.configure(self.fixture)
+            hook_test_case.configure(cluster)
             hook_test_case.run_dynamic_test(test_report)
 
 
