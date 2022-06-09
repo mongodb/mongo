@@ -14,6 +14,7 @@
 'use strict';
 
 load('jstests/libs/chunk_manipulation_util.js');
+load('jstests/sharding/internal_txns/libs/fixture_helpers.js');
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
 function InternalTransactionChunkMigrationTest(storeFindAndModifyImagesInSideCollection = true) {
@@ -359,23 +360,25 @@ function InternalTransactionChunkMigrationTest(storeFindAndModifyImagesInSideCol
         testCase.setUpFunc();
 
         const lsid = getTransactionSessionId(txnType, testCase);
-        const txnNumber = getNextTxnNumber(txnType, testCase);
+        runTxnRetryOnLockTimeoutError(() => {
+            const txnNumber = getNextTxnNumber(txnType, testCase);
 
-        for (let i = 0; i < testCase.commands.length; i++) {
-            const command = testCase.commands[i];
-            const cmdObj = Object.assign({}, command.cmdObj, {lsid, txnNumber, autocommit: false});
-            if (i == 0) {
-                cmdObj.startTransaction = true;
+            for (let i = 0; i < testCase.commands.length; i++) {
+                const command = testCase.commands[i];
+                const cmdObj =
+                    Object.assign({}, command.cmdObj, {lsid, txnNumber, autocommit: false});
+                if (i == 0) {
+                    cmdObj.startTransaction = true;
+                }
+                const res = assert.commandWorked(st.s.getDB(testCase.dbName).runCommand(cmdObj));
+                command.checkResponseFunc(res);
             }
-            const res = assert.commandWorked(st.s.getDB(testCase.dbName).runCommand(cmdObj));
-            command.checkResponseFunc(res);
-        }
-
-        if (testCase.abortOnInitialTry) {
-            abortTransaction(lsid, txnNumber, testCase.isPreparedTxn);
-        } else {
-            commitTransaction(lsid, txnNumber);
-        }
+            if (testCase.abortOnInitialTry) {
+                abortTransaction(lsid, txnNumber, testCase.isPreparedTxn);
+            } else {
+                commitTransaction(lsid, txnNumber);
+            }
+        });
 
         testCase.checkDocsFunc(!testCase.abortOnInitialTry /* isTxnCommitted */);
     }
@@ -398,25 +401,28 @@ function InternalTransactionChunkMigrationTest(storeFindAndModifyImagesInSideCol
         const lsid = getTransactionSessionId(txnType, testCase);
         // Give the session a different txnUUID to simulate a retry from a different mongos.
         lsid.txnUUID = UUID();
-        const txnNumber = getNextTxnNumber(txnType, testCase);
+        runTxnRetryOnLockTimeoutError(() => {
+            const txnNumber = getNextTxnNumber(txnType, testCase);
 
-        for (let i = 0; i < testCase.commands.length; i++) {
-            const command = testCase.commands[i];
+            for (let i = 0; i < testCase.commands.length; i++) {
+                const command = testCase.commands[i];
 
-            if (!isRetryAfterAbort && command.cmdObj.stmtId == -1) {
-                // The transaction has already committed and the statement in this command
-                // is not retryable so do not retry it.
-                continue;
+                if (!isRetryAfterAbort && command.cmdObj.stmtId == -1) {
+                    // The transaction has already committed and the statement in this command
+                    // is not retryable so do not retry it.
+                    continue;
+                }
+
+                const cmdObj =
+                    Object.assign({}, command.cmdObj, {lsid, txnNumber, autocommit: false});
+                if (i == 0) {
+                    cmdObj.startTransaction = true;
+                }
+                const res = assert.commandWorked(st.s.getDB(testCase.dbName).runCommand(cmdObj));
+                command.checkResponseFunc(res);
             }
-
-            const cmdObj = Object.assign({}, command.cmdObj, {lsid, txnNumber, autocommit: false});
-            if (i == 0) {
-                cmdObj.startTransaction = true;
-            }
-            const res = assert.commandWorked(st.s.getDB(testCase.dbName).runCommand(cmdObj));
-            command.checkResponseFunc(res);
-        }
-        commitTransaction(lsid, txnNumber);
+            commitTransaction(lsid, txnNumber);
+        });
 
         testCase.checkDocsFunc(true /* isTxnCommitted */);
     }
