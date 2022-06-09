@@ -46,8 +46,7 @@ void setupSignalHandlers();
 /**
  * Starts the thread to handle asynchronous signals.
  *
- * This must be the first thread started from the main thread. Call this immediately after
- * initializeServerGlobalState().
+ * This must be the first thread started from the main thread.
  */
 void startSignalProcessingThread(LogFileStatus rotate = LogFileStatus::kNeedToRotateLogFile);
 

@@ -835,6 +835,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         }
     }
 
+    if (!initialize_server_global_state::writePidFile(serviceContext)) {
+        quickExit(EXIT_FAILURE);
+    }
+
     // Startup options are written to the audit log at the end of startup so that cluster server
     // parameters are guaranteed to have been initialized from disk at this point.
     audit::logStartupOptions(Client::getCurrent(), serverGlobalParams.parsedOpts);
@@ -842,7 +846,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     serviceContext->notifyStartupComplete();
 
 #ifndef _WIN32
-    mongo::signalForkSuccess();
+    initialize_server_global_state::signalForkSuccess();
 #else
     if (ntservice::shouldStartService()) {
         ntservice::reportStatus(SERVICE_RUNNING);
@@ -894,7 +898,7 @@ ExitCode initService() {
 
 MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {
-    mongo::forkServerOrDie();
+    initialize_server_global_state::forkServerOrDie();
 }
 
 #ifdef __linux__
@@ -1539,7 +1543,7 @@ int mongod_main(int argc, char* argv[]) {
     startupConfigActions(std::vector<std::string>(argv, argv + argc));
     cmdline_utils::censorArgvArray(argc, argv);
 
-    if (!initializeServerGlobalState(service))
+    if (!initialize_server_global_state::checkSocketPath())
         quickExit(EXIT_FAILURE);
 
     // There is no single-threaded guarantee beyond this point.
@@ -1547,7 +1551,7 @@ int mongod_main(int argc, char* argv[]) {
     LOGV2(5945603, "Multi threading initialized");
 
     // Per SERVER-7434, startSignalProcessingThread must run after any forks (i.e.
-    // initializeServerGlobalState) and before the creation of any other threads
+    // initialize_server_global_state::forkServerOrDie) and before the creation of any other threads
     startSignalProcessingThread();
 
     ReadWriteConcernDefaults::create(service, readWriteConcernDefaultsCacheLookupMongoD);
