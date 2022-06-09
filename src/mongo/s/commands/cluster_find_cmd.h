@@ -137,6 +137,8 @@ public:
                 const auto explainCmd =
                     ClusterExplain::wrapAsExplain(findCommand->toBSON(BSONObj()), verbosity);
 
+                Impl::checkCanRunHere(opCtx);
+
                 long long millisElapsed;
                 std::vector<AsyncRequestsSender::Response> shardResponses;
 
