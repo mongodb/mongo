@@ -1,5 +1,7 @@
 /**
  * Test the maxSize setting for the addShard command.
+ *
+ * @tags: [does_not_support_stepdowns]
  */
 (function() {
 'use strict';
@@ -18,13 +20,6 @@ var s = new ShardingTest({
             {setParameter: {internalQueryMaxBlockingSortMemoryUsageBytes: 32 * 1024 * 1024}}
     }
 });
-
-// TODO SERVER-66754 review tests disabled because expecting initial chunks split
-if (FeatureFlagUtil.isEnabled(s.configRS.getPrimary().getDB('admin'), 'NoMoreAutoSplitter')) {
-    jsTestLog("Skipping as featureFlagNoMoreAutoSplitter is enabled");
-    s.stop();
-    return;
-}
 
 var db = s.getDB("test");
 
@@ -49,7 +44,6 @@ while (inserted < (40 * 1024 * 1024)) {
 assert.commandWorked(bulk.execute());
 
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));
-assert.gt(findChunksUtil.countChunksForNs(s.config, "test.foo"), 10);
 
 var getShardSize = function(conn) {
     var listDatabases = conn.getDB('admin').runCommand({listDatabases: 1});

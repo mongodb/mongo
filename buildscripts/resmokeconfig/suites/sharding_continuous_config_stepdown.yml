@@ -62,9 +62,6 @@ selector:
   - jstests/sharding/shard2.js
   - jstests/sharding/shard3.js
   - jstests/sharding/shard_collection_basic.js
-  - jstests/sharding/sharding_balance2.js
-  - jstests/sharding/sharding_balance3.js
-  - jstests/sharding/sharding_migrate_cursor1.js
   - jstests/sharding/tag_range.js
   - jstests/sharding/top_chunk_autosplit.js
   - jstests/sharding/count_config_servers.js
