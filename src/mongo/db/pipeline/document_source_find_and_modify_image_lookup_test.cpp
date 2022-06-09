@@ -165,7 +165,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocMissing
     const auto stmtId = 1;
     const auto opTime = repl::OpTime(Timestamp(2, 1), 1);
     const auto oplogEntryBson = makeOplogEntry(opTime,
-                                               repl::OpTypeEnum::kNoop,
+                                               repl::OpTypeEnum::kUpdate,
                                                NamespaceString("test.foo"),
                                                UUID::gen(),
                                                BSON("a" << 1),
@@ -203,7 +203,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocHasDiff
     const auto ts = Timestamp(2, 1);
     const auto opTime = repl::OpTime(ts, 1);
     const auto oplogEntryBson = makeOplogEntry(opTime,
-                                               repl::OpTypeEnum::kNoop,
+                                               repl::OpTypeEnum::kUpdate,
                                                NamespaceString("test.foo"),
                                                UUID::gen(),
                                                BSON("a" << 1),
@@ -238,7 +238,6 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocHasDiff
     ASSERT_TRUE(imageLookup->getNext().isEOF());
     ASSERT_TRUE(imageLookup->getNext().isEOF());
 }
-
 
 TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIsFoundCrudOp) {
     std::vector<repl::RetryImageEnum> cases{repl::RetryImageEnum::kPreImage,
