@@ -994,6 +994,16 @@ TEST_F(ReshardingTxnClonerTest,
                                                                            retryableWriteTxnNumber);
     TxnNumber internalTxnTxnNumber = 1;
 
+    // Make two in progress transactions so the one started by resharding must block.
+    {
+        auto newClientOwned = getServiceContext()->makeClient("newClient");
+        AlternativeClientRegion acr(newClientOwned);
+        auto newOpCtx = cc().makeOperationContext();
+        makeInProgressTxn(newOpCtx.get(),
+                          makeLogicalSessionIdWithTxnNumberAndUUIDForTest(retryableWriteLsid,
+                                                                          retryableWriteTxnNumber),
+                          internalTxnTxnNumber);
+    }
     makeInProgressTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber);
     auto lastOplogTs = getLatestOplogTimestamp(operationContext());
 
@@ -1086,6 +1096,16 @@ TEST_F(ReshardingTxnClonerTest, CancelableWhileWaitingOnInProgressInternalTxnFor
                                                                            retryableWriteTxnNumber);
     TxnNumber internalTxnTxnNumber = 1;
 
+    // Make two in progress transactions so the one started by resharding must block.
+    {
+        auto newClientOwned = getServiceContext()->makeClient("newClient");
+        AlternativeClientRegion acr(newClientOwned);
+        auto newOpCtx = cc().makeOperationContext();
+        makeInProgressTxn(newOpCtx.get(),
+                          makeLogicalSessionIdWithTxnNumberAndUUIDForTest(retryableWriteLsid,
+                                                                          retryableWriteTxnNumber),
+                          internalTxnTxnNumber);
+    }
     makeInProgressTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber);
     ON_BLOCK_EXIT([&] { abortTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber); });
 

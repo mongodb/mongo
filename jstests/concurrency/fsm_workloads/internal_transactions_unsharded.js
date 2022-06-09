@@ -546,6 +546,12 @@ var $config = extendWorkload($config, function($config, $super) {
         });
     };
 
+    $config.data.killAllSessions = function killAllSessions(cluster) {
+        cluster.executeOnMongodNodes((db) => {
+            assert.commandWorked(db.adminCommand({killAllSessions: []}));
+        });
+    };
+
     $config.setup = function setup(db, collName, cluster) {
         assert.commandWorked(db.createCollection(collName, {writeConcern: {w: "majority"}}));
         if (this.insertInitialDocsOnSetUp) {
