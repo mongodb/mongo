@@ -108,7 +108,7 @@ variables:
 - &benchmark_template
   name: benchmark_template
   depends_on:
-  - name: compile_benchmarks
+  - name: compile_upload_benchmarks
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -2140,6 +2140,37 @@ tasks:
       task_compile_flags: >-
         PREFIX=dist-test
 
+- name: compile_upload_benchmarks
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - func: "scons compile"
+    vars:
+      targets: install-benchmarks
+      compiling_for_test: true
+  - command: archive.targz_pack
+    params:
+      target: "benchmarks.tgz"
+      source_dir: "src"
+      include:
+      - "./build/benchmarks.txt"
+      - "./build/**_bm"
+      - "./build/**_bm.gcno"
+      - "./build/**_bm.exe"
+      - "./build/**_bm.pdb"
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: benchmarks.tgz
+      remote_file: ${project}/${build_variant}/${revision}/benchmarks/${build_id}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/tar
+      display_name: Benchmarks
+
 - name: determine_patch_tests
   commands:
   - *f_expansions_write
@@ -2960,54 +2991,6 @@ tasks:
       binary: bash
       args:
       - "src/evergreen/crypt_run_tests.sh"
-
-- name: compile_benchmarks
-  tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
-  commands:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - *f_expansions_write
-  - *kill_processes
-  - *cleanup_environment
-  - func: "set up venv"
-  - func: "upload pip requirements"
-  - func: "get buildnumber"
-  - func: "f_expansions_write"
-  - func: "set up credentials"
-  - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
-  - func: "set up win mount script"
-  - func: "generate compile expansions"
-  # Then we load the generated version data into the agent so we can use it in task definitions
-  - func: "apply compile expansions"
-  - func: "scons compile"
-    vars:
-      targets: install-benchmarks
-      compiling_for_test: true
-  - func: "attach scons logs"
-  - func: "send scons cedar report"
-  - command: archive.targz_pack
-    params:
-      target: "benchmarks.tgz"
-      source_dir: "src"
-      include:
-      - "./build/benchmarks.txt"
-      - "./build/**_bm"
-      - "./build/**_bm.gcno"
-      - "./build/**_bm.exe"
-      - "./build/**_bm.pdb"
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: benchmarks.tgz
-      remote_file: ${project}/${build_variant}/${revision}/benchmarks/${build_id}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/tar
-      display_name: Benchmarks
 
 ## lint ##
 - name: lint_pylinters
@@ -7420,6 +7403,11 @@ task_groups:
   - compile_dist_test
 
 - <<: *compile_task_group_template
+  name: compile_upload_benchmarks_TG
+  tasks:
+  - compile_upload_benchmarks
+
+- <<: *compile_task_group_template
   name: compile_and_archive_dist_test_TG
   tasks:
   - compile_dist_test
@@ -7500,6 +7488,21 @@ task_groups:
   - compile_dbtest
   - run_dbtest
   - archive_dbtest
+  - compile_all
+  - package
+
+- <<: *compile_task_group_template
+  name: compile_test_benchmark_and_package_serial_TG
+  tasks:
+  - compile_dist_test
+  - archive_dist_test
+  - archive_dist_test_debug
+  - compile_unittests
+  - run_unittests
+  - compile_dbtest
+  - run_dbtest
+  - archive_dbtest
+  - compile_upload_benchmarks
   - compile_all
   - package
 

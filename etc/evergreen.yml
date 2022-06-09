@@ -2139,7 +2139,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     scons_cache_scope: shared
   tasks:
-  - name: compile_benchmarks
+  - name: compile_upload_benchmarks_TG
   - name: .benchmarks
 
 
@@ -2181,7 +2181,6 @@ buildvariants:
   - name: cqf
   - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG
-  - name: compile_benchmarks
   - name: .aggregation
   #  - name: .auth
   - name: audit
@@ -2221,7 +2220,7 @@ buildvariants:
   - name: .stitch
   - name: .shard_split
 # Disabling the following tests as they are not aware of feature flags.
-#  - name: .benchmarks
+#  - name: .benchmarks - building benchmarks is also disabled
 #  - name: unittest_shell_hang_analyzer_gen
 #  - name: server_discovery_and_monitoring_json_test_TG
 #  - name: server_selection_json_test_TG
@@ -2259,8 +2258,7 @@ buildvariants:
     separate_debug: off
     large_distro_name: rhel80-build
   tasks:
-  - name: compile_test_and_package_serial_TG
-  - name: compile_benchmarks
+  - name: compile_test_benchmark_and_package_serial_TG
   - name: .aggregation
   - name: .auth
   - name: audit
@@ -2338,7 +2336,6 @@ buildvariants:
   - name: cqf
   - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG
-  - name: compile_benchmarks
   - name: .aggregation
   - name: .auth
   - name: audit
@@ -2377,7 +2374,7 @@ buildvariants:
   - name: watchdog_wiredtiger
   - name: .shard_split
 # Disabling the following tests as they are not aware of feature flags.
-#  - name: .benchmarks
+#  - name: .benchmarks - building benchmarks is also disabled
 #  - name: server_discovery_and_monitoring_json_test_TG
 #  - name: server_selection_json_test_TG
 
@@ -2412,8 +2409,7 @@ buildvariants:
     separate_debug: off
     large_distro_name: rhel80-build
   tasks:
-  - name: compile_test_and_package_serial_TG
-  - name: compile_benchmarks
+  - name: compile_test_benchmark_and_package_serial_TG
   - name: .aggregation
   - name: .auth
   - name: audit
@@ -3005,7 +3001,7 @@ buildvariants:
   display_name: "~ Enterprise Windows (Benchmarks)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   tasks:
-  - name: compile_benchmarks
+  - name: compile_upload_benchmarks_TG
     distros:
     - windows-vsCurrent-large
   - name: .benchmarks !benchmarks_orphaned

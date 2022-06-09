@@ -51,8 +51,7 @@ buildvariants:
     separate_debug: off
     large_distro_name: rhel80-build
   tasks:
-  - name: compile_test_and_package_serial_TG
-  - name: compile_benchmarks
+  - name: compile_test_benchmark_and_package_serial_TG
   - name: .aggregation
   - name: .auth
   - name: audit
@@ -124,8 +123,7 @@ buildvariants:
     separate_debug: off
     large_distro_name: rhel80-build
   tasks:
-  - name: compile_test_and_package_serial_TG
-  - name: compile_benchmarks
+  - name: compile_test_benchmark_and_package_serial_TG
   - name: .aggregation
   - name: .auth
   - name: audit
