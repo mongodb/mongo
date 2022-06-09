@@ -191,8 +191,8 @@ private:
     AtomicWord<int64_t> _totalBatchRetrievedDuringCloneMillis{0};
     AtomicWord<int64_t> _oplogBatchApplied{0};
     AtomicWord<int64_t> _oplogBatchAppliedMillis{0};
-    AtomicWord<int64_t> _documentsProcessed{0};
-    AtomicWord<int64_t> _bytesWritten{0};
+    AtomicWord<int64_t> _documentsCopied{0};
+    AtomicWord<int64_t> _bytesCopied{0};
 
     AtomicWord<int64_t> _lastOpEndingChunkImbalance{0};
     AtomicWord<int64_t> _readsDuringCriticalSection{0};
