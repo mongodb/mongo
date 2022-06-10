@@ -111,7 +111,8 @@ public:
             auto& oss = OperationShardingState::get(opCtx);
 
             {
-                AutoGetCollection autoColl(opCtx, ns(), MODE_IS);
+                AutoGetCollection autoColl(
+                    opCtx, ns(), MODE_IS, AutoGetCollectionViewMode::kViewsPermitted);
 
                 // If the primary is in the critical section, secondaries must wait for the commit
                 // to finish on the primary in case a secondary's caller has an afterClusterTime
