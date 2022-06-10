@@ -1,15 +1,12 @@
 /**
  * Tests that tenant migrations that go through recipient rollback are recovered correctly.
  *
- * TODO SERVER-66034: Remove requires_fcv_61 tag.
- *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
- *   requires_fcv_61,
  *   serverless,
  * ]
  */
