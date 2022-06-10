@@ -345,7 +345,7 @@ __backup_add_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
             __wt_verbose(session, WT_VERB_BACKUP, "Free blk[%u] entry", i);
             break;
         }
-        __wt_verbose(session, WT_VERB_BACKUP, "Entry blk[%u] has flags 0x%" PRIx16, i, blk->flags);
+        __wt_verbose(session, WT_VERB_BACKUP, "Entry blk[%u] has flags 0x%" PRIx64, i, blk->flags);
     }
     /*
      * We didn't find an entry. This should not happen.

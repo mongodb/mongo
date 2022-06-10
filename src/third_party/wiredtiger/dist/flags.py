@@ -68,16 +68,13 @@ def flag_declare(name):
                     sys.exit(1)
 
                 # Calculate number of hex bytes, create format string
-                if end <= 32:
-                    fmt = "0x%%0%dxu" % ((start + max_flags + 3) / 4)
-                else:
-                    fmt = "0x%%0%dxull" % ((start + max_flags + 3) / 4)
+                fmt = "0x%%0%dxu" % ((start + max_flags + 3) / 4)
 
                 # Generate the flags starting from an offset set from the start value.
                 tfile.write(header)
                 v = 1 << start
                 for d in sorted(defines):
-                    tfile.write(re.sub("0x[01248]*ul*", fmt % v, d))
+                    tfile.write(re.sub("0x[01248u]*", fmt % v, d))
                     v = v * 2
                 tfile.write(line)
 
