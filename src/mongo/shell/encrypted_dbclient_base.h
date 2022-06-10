@@ -128,12 +128,13 @@ public:
     void trace(JSTracer* trc) final;
 
     std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
-                                         const ReadPreferenceSetting& readPref) final;
+                                         const ReadPreferenceSetting& readPref,
+                                         ExhaustMode exhaustMode) final;
 
     std::unique_ptr<DBClientCursor> query_DEPRECATED(
         const NamespaceStringOrUUID& nsOrUuid,
         const BSONObj& filter,
-        const Query& querySettings,
+        const client_deprecated::Query& querySettings,
         int limit,
         int nToSkip,
         const BSONObj* fieldsToReturn,

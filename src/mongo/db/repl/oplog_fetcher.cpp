@@ -269,7 +269,7 @@ BSONObj OplogFetcher::getFindQueryFilter_forTest() const {
     return _makeFindQueryFilter();
 }
 
-Query OplogFetcher::getFindQuerySettings_forTest(long long findTimeout) const {
+client_deprecated::Query OplogFetcher::getFindQuerySettings_forTest(long long findTimeout) const {
     return _makeFindQuerySettings(findTimeout);
 }
 
@@ -599,8 +599,8 @@ BSONObj OplogFetcher::_makeFindQueryFilter() const {
     return filterBob.obj();
 }
 
-Query OplogFetcher::_makeFindQuerySettings(long long findTimeout) const {
-    Query query = Query().maxTimeMS(findTimeout);
+client_deprecated::Query OplogFetcher::_makeFindQuerySettings(long long findTimeout) const {
+    auto query = client_deprecated::Query().maxTimeMS(findTimeout);
     if (_config.requestResumeToken) {
         query.hint(BSON("$natural" << 1)).requestResumeToken(true);
     }

@@ -1240,15 +1240,10 @@ TEST(OpMsg, ExhaustWithDBClientCursorBehavesCorrectly) {
     LOGV2(22635, "Finished document insertion.");
 
     // Open an exhaust cursor.
-    int batchSize = 2;
-    auto cursor = conn->query_DEPRECATED(nss,
-                                         BSONObj{},
-                                         Query().sort(BSON("_id" << 1)),
-                                         0,
-                                         0,
-                                         nullptr,
-                                         QueryOption_Exhaust,
-                                         batchSize);
+    FindCommandRequest findCmd{nss};
+    findCmd.setSort(BSON("_id" << 1));
+    findCmd.setBatchSize(2);
+    auto cursor = conn->find(std::move(findCmd), ReadPreferenceSetting{}, ExhaustMode::kOn);
 
     // Verify that the documents are returned properly. Exhaust cursors should still receive results
     // in batches, so we check that these batches correspond to the given specified batch size.

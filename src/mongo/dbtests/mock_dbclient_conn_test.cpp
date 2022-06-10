@@ -714,15 +714,8 @@ TEST(MockDBClientConnTest, SimulateCallAndRecvResponses) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server);
 
-    mongo::DBClientCursor cursor(&conn,
-                                 mongo::NamespaceStringOrUUID(nss),
-                                 BSONObj{},
-                                 Query(),
-                                 0,
-                                 0,
-                                 nullptr,
-                                 mongo::QueryOption_Exhaust,
-                                 0);
+    FindCommandRequest findCmd{nss};
+    mongo::DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
     cursor.setBatchSize(2);
 
     // Two batches from the initial find and getMore command.
@@ -787,8 +780,7 @@ TEST(MockDBClientConnTest, SimulateCallErrors) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server);
 
-    mongo::DBClientCursor cursor(
-        &conn, mongo::NamespaceStringOrUUID(nss), BSONObj{}, Query(), 0, 0, nullptr, 0, 0);
+    mongo::DBClientCursor cursor(&conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, false);
 
     // Test network exception and error response for the initial find.
     MockDBClientConnection::Responses callResponses = {
@@ -835,15 +827,8 @@ TEST(MockDBClientConnTest, SimulateRecvErrors) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server);
 
-    mongo::DBClientCursor cursor(&conn,
-                                 mongo::NamespaceStringOrUUID(nss),
-                                 BSONObj{},
-                                 Query(),
-                                 0,
-                                 0,
-                                 nullptr,
-                                 mongo::QueryOption_Exhaust,
-                                 0);
+    mongo::DBClientCursor cursor(
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
 
     runUntilExhaustRecv(&conn, &cursor);
 
@@ -884,15 +869,8 @@ TEST(MockDBClientConnTest, BlockingNetwork) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server);
 
-    mongo::DBClientCursor cursor(&conn,
-                                 mongo::NamespaceStringOrUUID(nss),
-                                 BSONObj{},
-                                 Query(),
-                                 0,
-                                 0,
-                                 nullptr,
-                                 mongo::QueryOption_Exhaust,
-                                 0);
+    mongo::DBClientCursor cursor(
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
     cursor.setBatchSize(1);
 
     mongo::stdx::thread cursorThread([&] {
@@ -946,15 +924,8 @@ TEST(MockDBClientConnTest, ShutdownServerBeforeCall) {
 
     ASSERT_OK(
         conn.connect(mongo::HostAndPort("localhost", 12345), mongo::StringData(), boost::none));
-    mongo::DBClientCursor cursor(&conn,
-                                 mongo::NamespaceStringOrUUID(nss),
-                                 BSONObj{},
-                                 Query(),
-                                 0,
-                                 0,
-                                 nullptr,
-                                 mongo::QueryOption_Exhaust,
-                                 0);
+    mongo::DBClientCursor cursor(
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
 
     // Shut down server before call.
     server.shutdown();
@@ -972,15 +943,8 @@ TEST(MockDBClientConnTest, ShutdownServerAfterCall) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server);
 
-    mongo::DBClientCursor cursor(&conn,
-                                 mongo::NamespaceStringOrUUID(nss),
-                                 BSONObj{},
-                                 Query(),
-                                 0,
-                                 0,
-                                 nullptr,
-                                 mongo::QueryOption_Exhaust,
-                                 0);
+    mongo::DBClientCursor cursor(
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
 
     mongo::stdx::thread cursorThread([&] {
         ASSERT_THROWS_CODE(cursor.init(), mongo::DBException, mongo::ErrorCodes::HostUnreachable);
@@ -1004,15 +968,8 @@ TEST(MockDBClientConnTest, ConnectionAutoReconnect) {
 
     ASSERT_OK(
         conn.connect(mongo::HostAndPort("localhost", 12345), mongo::StringData(), boost::none));
-    mongo::DBClientCursor cursor(&conn,
-                                 mongo::NamespaceStringOrUUID(nss),
-                                 BSONObj{},
-                                 Query(),
-                                 0,
-                                 0,
-                                 nullptr,
-                                 mongo::QueryOption_Exhaust,
-                                 0);
+    mongo::DBClientCursor cursor(
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
 
     server.shutdown();
 
@@ -1037,15 +994,8 @@ TEST(MockDBClientConnTest, ShutdownServerBeforeRecv) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server, autoReconnect);
 
-    mongo::DBClientCursor cursor(&conn,
-                                 mongo::NamespaceStringOrUUID(nss),
-                                 BSONObj{},
-                                 Query(),
-                                 0,
-                                 0,
-                                 nullptr,
-                                 mongo::QueryOption_Exhaust,
-                                 0);
+    mongo::DBClientCursor cursor(
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
 
     runUntilExhaustRecv(&conn, &cursor);
 
@@ -1063,15 +1013,8 @@ TEST(MockDBClientConnTest, ShutdownServerAfterRecv) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server);
 
-    mongo::DBClientCursor cursor(&conn,
-                                 mongo::NamespaceStringOrUUID(nss),
-                                 BSONObj{},
-                                 Query(),
-                                 0,
-                                 0,
-                                 nullptr,
-                                 mongo::QueryOption_Exhaust,
-                                 0);
+    mongo::DBClientCursor cursor(
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
 
     runUntilExhaustRecv(&conn, &cursor);
 

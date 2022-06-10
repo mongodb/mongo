@@ -148,10 +148,11 @@ void DBDirectClient::say(Message& toSend, bool isRetry, string* actualServer) {
 }
 
 std::unique_ptr<DBClientCursor> DBDirectClient::find(FindCommandRequest findRequest,
-                                                     const ReadPreferenceSetting& readPref) {
+                                                     const ReadPreferenceSetting& readPref,
+                                                     ExhaustMode exhaustMode) {
     invariant(!findRequest.getReadConcern(),
               "passing readConcern to DBDirectClient::find() is not supported");
-    return DBClientBase::find(std::move(findRequest), readPref);
+    return DBClientBase::find(std::move(findRequest), readPref, exhaustMode);
 }
 
 write_ops::FindAndModifyCommandReply DBDirectClient::findAndModify(

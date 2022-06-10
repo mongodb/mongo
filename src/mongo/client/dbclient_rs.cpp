@@ -107,8 +107,8 @@ const size_t MAX_RETRY = 3;
  *
  * @throws AssertionException if the read preference object is malformed
  */
-std::unique_ptr<ReadPreferenceSetting> _extractReadPref(const Query& querySettings,
-                                                        int queryOptions) {
+std::unique_ptr<ReadPreferenceSetting> _extractReadPref(
+    const client_deprecated::Query& querySettings, int queryOptions) {
     // Default read pref is primary only or secondary preferred with secondaryOK
     const auto defaultReadPref = queryOptions & QueryOption_SecondaryOk
         ? ReadPreference::SecondaryPreferred
@@ -538,7 +538,8 @@ void DBClientReplicaSet::remove(const string& ns,
 }
 
 std::unique_ptr<DBClientCursor> DBClientReplicaSet::find(FindCommandRequest findRequest,
-                                                         const ReadPreferenceSetting& readPref) {
+                                                         const ReadPreferenceSetting& readPref,
+                                                         ExhaustMode exhaustMode) {
     invariant(findRequest.getNamespaceOrUUID().nss());
     const std::string nss = findRequest.getNamespaceOrUUID().nss()->ns();
     if (_isSecondaryQuery(nss, findRequest.toBSON(BSONObj{}), readPref)) {
@@ -562,7 +563,8 @@ std::unique_ptr<DBClientCursor> DBClientReplicaSet::find(FindCommandRequest find
                     break;
                 }
 
-                std::unique_ptr<DBClientCursor> cursor = conn->find(findRequest, readPref);
+                std::unique_ptr<DBClientCursor> cursor =
+                    conn->find(findRequest, readPref, exhaustMode);
 
                 return checkSecondaryQueryResult(std::move(cursor));
             } catch (const DBException& ex) {
@@ -587,13 +589,13 @@ std::unique_ptr<DBClientCursor> DBClientReplicaSet::find(FindCommandRequest find
                 "dbclient_rs query to primary node",
                 "replicaSet"_attr = _getMonitor()->getName());
 
-    return checkPrimary()->find(std::move(findRequest), readPref);
+    return checkPrimary()->find(std::move(findRequest), readPref, exhaustMode);
 }
 
 unique_ptr<DBClientCursor> DBClientReplicaSet::query_DEPRECATED(
     const NamespaceStringOrUUID& nsOrUuid,
     const BSONObj& filter,
-    const Query& querySettings,
+    const client_deprecated::Query& querySettings,
     int limit,
     int nToSkip,
     const BSONObj* fieldsToReturn,
@@ -824,8 +826,8 @@ void DBClientReplicaSet::say(Message& toSend, bool isRetry, string* actualServer
         DbMessage dm(toSend);
         QueryMessage qm(dm);
 
-        shared_ptr<ReadPreferenceSetting> readPref(
-            _extractReadPref(Query::fromBSONDeprecated(qm.query), qm.queryOptions));
+        shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(
+            client_deprecated::Query::fromBSONDeprecated(qm.query), qm.queryOptions));
         if (_isSecondaryQuery(qm.ns, qm.query, *readPref)) {
             LOGV2_DEBUG(20141,
                         3,
@@ -990,8 +992,8 @@ bool DBClientReplicaSet::call(Message& toSend,
         QueryMessage qm(dm);
         ns = qm.ns;
 
-        shared_ptr<ReadPreferenceSetting> readPref(
-            _extractReadPref(Query::fromBSONDeprecated(qm.query), qm.queryOptions));
+        shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(
+            client_deprecated::Query::fromBSONDeprecated(qm.query), qm.queryOptions));
         if (_isSecondaryQuery(ns, qm.query, *readPref)) {
             LOGV2_DEBUG(
                 20145,

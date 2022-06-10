@@ -122,12 +122,13 @@ public:
     std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;
 
     std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
-                                         const ReadPreferenceSetting& readPref) override;
+                                         const ReadPreferenceSetting& /*unused*/,
+                                         ExhaustMode /*unused*/) override;
 
     std::unique_ptr<mongo::DBClientCursor> query_DEPRECATED(
         const NamespaceStringOrUUID& nsOrUuid,
         const BSONObj& filter = BSONObj{},
-        const Query& querySettings = Query(),
+        const client_deprecated::Query& querySettings = client_deprecated::Query(),
         int limit = 0,
         int nToSkip = 0,
         const mongo::BSONObj* fieldsToReturn = nullptr,

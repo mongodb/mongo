@@ -31,7 +31,7 @@
 
 #include <stack>
 
-#include "mongo/client/query.h"
+#include "mongo/client/client_deprecated.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -64,7 +64,7 @@ public:
     DBClientCursor(DBClientBase* client,
                    const NamespaceStringOrUUID& nsOrUuid,
                    const BSONObj& filter,
-                   const Query& querySettings,
+                   const client_deprecated::Query& querySettings,
                    int limit,
                    int nToSkip,
                    const BSONObj* fieldsToReturn,
@@ -83,7 +83,8 @@ public:
 
     DBClientCursor(DBClientBase* client,
                    FindCommandRequest findRequest,
-                   const ReadPreferenceSetting& readPref);
+                   const ReadPreferenceSetting& readPref,
+                   bool isExhaust);
 
     virtual ~DBClientCursor();
 
@@ -279,7 +280,7 @@ private:
     DBClientCursor(DBClientBase* client,
                    const NamespaceStringOrUUID& nsOrUuid,
                    const BSONObj& filter,
-                   const Query& querySettings,
+                   const client_deprecated::Query& querySettings,
                    long long cursorId,
                    int limit,
                    int nToSkip,
@@ -349,7 +350,7 @@ private:
     // OP_QUERY-inspired API. If the cursor was constructed using the 'FindCommandRequest'-based
     // API, these are initialized to their default values but never used.
     BSONObj _filter;
-    Query _querySettings;
+    client_deprecated::Query _querySettings;
     int _nToSkip = 0;
     const BSONObj* _fieldsToReturn = nullptr;
     boost::optional<BSONObj> _readConcernObj;

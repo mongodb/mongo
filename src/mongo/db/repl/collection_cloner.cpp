@@ -318,7 +318,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinished
 
 void CollectionCloner::runQuery() {
     // Non-resumable query.
-    Query query;
+    client_deprecated::Query query;
 
     if (_resumeToken) {
         // Resume the query from where we left off.

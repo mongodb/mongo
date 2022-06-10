@@ -68,7 +68,7 @@ Status AuthzManagerExternalStateMongod::query(
         FindCommandRequest findRequest{collectionName};
         findRequest.setFilter(filter);
         findRequest.setProjection(projection);
-        client.find(std::move(findRequest), ReadPreferenceSetting{}, resultProcessor);
+        client.find(std::move(findRequest), resultProcessor);
         return Status::OK();
     } catch (const DBException& e) {
         return e.toStatus();

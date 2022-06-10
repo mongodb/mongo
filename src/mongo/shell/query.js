@@ -91,11 +91,8 @@ DBQuery.prototype._checkModify = function() {
         throw Error("query already executed");
 };
 
-DBQuery.prototype._canUseCommandCursor = function() {
-    // We also forbid queries with the exhaust option from running as DBCommandCursor, because the
-    // DBCommandCursor does not support exhaust.
-    return (this._collection.getName().indexOf("$cmd") !== 0) &&
-        (this._options & DBQuery.Option.exhaust) === 0;
+DBQuery.prototype._isExhaustCursor = function() {
+    return (this._options & DBQuery.Option.exhaust) !== 0;
 };
 
 /**
@@ -120,7 +117,11 @@ DBQuery.prototype._exec = function() {
         assert.eq(0, this._numReturned);
         this._cursorSeen = 0;
 
-        if (this._canUseCommandCursor()) {
+        // We forbid queries with the exhaust option from running as 'DBCommandCursor', because
+        // 'DBCommandCursor' does not currently support exhaust.
+        //
+        // In the future, we could unify the shell's exhaust and non-exhaust code paths.
+        if (!this._isExhaustCursor()) {
             var canAttachReadPref = true;
             var findCmd = this._convertToCommand(canAttachReadPref);
             var cmdRes = this._db.runReadCommand(findCmd, null, this._options);

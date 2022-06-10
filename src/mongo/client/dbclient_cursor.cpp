@@ -27,13 +27,6 @@
  *    it in the license file.
  */
 
-/**
- * Connect to a Mongo database as a database, from C++.
- */
-
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/dbclient_cursor.h"
 
 #include <memory>
@@ -106,134 +99,19 @@ Message assembleFromFindCommandRequest(DBClientBase* client,
     return opMsgRequest.serialize();
 }
 
-/**
- * Initializes options based on the value of the 'options' bit vector.
- *
- * This contains flags such as tailable, exhaust, and noCursorTimeout.
- */
-void initFromInt(int options, FindCommandRequest* findCommand) {
-    bool tailable = (options & QueryOption_CursorTailable) != 0;
-    bool awaitData = (options & QueryOption_AwaitData) != 0;
-    if (awaitData) {
-        findCommand->setAwaitData(true);
-    }
-    if (tailable) {
-        findCommand->setTailable(true);
-    }
+std::unique_ptr<FindCommandRequest> fromLegacyQuery(NamespaceStringOrUUID nssOrUuid,
+                                                    const BSONObj& filter,
+                                                    const client_deprecated::Query& querySettings,
+                                                    const BSONObj& proj,
+                                                    int ntoskip,
+                                                    int queryOptions) {
+    auto findCommand = std::make_unique<FindCommandRequest>(std::move(nssOrUuid));
 
-    if ((options & QueryOption_NoCursorTimeout) != 0) {
-        findCommand->setNoCursorTimeout(true);
-    }
-    if ((options & QueryOption_PartialResults) != 0) {
-        findCommand->setAllowPartialResults(true);
-    }
-}
+    client_deprecated::initFindFromLegacyOptions(
+        querySettings.getFullSettingsDeprecated(), queryOptions, findCommand.get());
 
-/**
- * Fills out the 'findCommand' output parameter based on the contents of 'querySettings'. Here,
- * 'querySettings' has the same format as the "query" field of the no-longer-supported OP_QUERY wire
- * protocol message. It can look something like this for example:
- *
- *    {$query: ..., $hint: ..., $min: ..., $max: ...}
- *
- * Although the OP_QUERY wire protocol message is no longer ever sent over the wire by the internal
- * client, callers of the internal client may still specify the operation they want to perform using
- * an OP_QUERY-inspired format until DBClientCursor's legacy API is removed.
- */
-Status initFullQuery(const BSONObj& querySettings, FindCommandRequest* findCommand) {
-    for (auto&& e : querySettings) {
-        StringData name = e.fieldNameStringData();
+    findCommand->setFilter(filter.getOwned());
 
-        if (name == "$orderby" || name == "orderby") {
-            if (Object == e.type()) {
-                findCommand->setSort(e.embeddedObject().getOwned());
-            } else if (Array == e.type()) {
-                findCommand->setSort(e.embeddedObject());
-
-                // TODO: Is this ever used?  I don't think so.
-                // Quote:
-                // This is for languages whose "objects" are not well ordered (JSON is well
-                // ordered).
-                // [ { a : ... } , { b : ... } ] -> { a : ..., b : ... }
-                // note: this is slow, but that is ok as order will have very few pieces
-                BSONObjBuilder b;
-                char p[2] = "0";
-
-                while (1) {
-                    BSONObj j = findCommand->getSort().getObjectField(p);
-                    if (j.isEmpty()) {
-                        break;
-                    }
-                    BSONElement e = j.firstElement();
-                    if (e.eoo()) {
-                        return Status(ErrorCodes::BadValue, "bad order array");
-                    }
-                    if (!e.isNumber()) {
-                        return Status(ErrorCodes::BadValue, "bad order array [2]");
-                    }
-                    b.append(e);
-                    (*p)++;
-                    if (!(*p <= '9')) {
-                        return Status(ErrorCodes::BadValue, "too many ordering elements");
-                    }
-                }
-
-                findCommand->setSort(b.obj());
-            } else {
-                return Status(ErrorCodes::BadValue, "sort must be object or array");
-            }
-        } else if (name.startsWith("$")) {
-            name = name.substr(1);  // chop first char
-            if (name == "min") {
-                if (!e.isABSONObj()) {
-                    return Status(ErrorCodes::BadValue, "$min must be a BSONObj");
-                }
-                findCommand->setMin(e.embeddedObject().getOwned());
-            } else if (name == "max") {
-                if (!e.isABSONObj()) {
-                    return Status(ErrorCodes::BadValue, "$max must be a BSONObj");
-                }
-                findCommand->setMax(e.embeddedObject().getOwned());
-            } else if (name == "hint") {
-                if (e.isABSONObj()) {
-                    findCommand->setHint(e.embeddedObject().getOwned());
-                } else if (String == e.type()) {
-                    findCommand->setHint(e.wrap());
-                } else {
-                    return Status(ErrorCodes::BadValue,
-                                  "$hint must be either a string or nested object");
-                }
-            } else if (name == "returnKey") {
-                // Won't throw.
-                if (e.trueValue()) {
-                    findCommand->setReturnKey(true);
-                }
-            } else if (name == "showDiskLoc") {
-                // Won't throw.
-                if (e.trueValue()) {
-                    findCommand->setShowRecordId(true);
-                    query_request_helper::addShowRecordIdMetaProj(findCommand);
-                }
-            } else if (name == "maxTimeMS") {
-                StatusWith<int> maxTimeMS = parseMaxTimeMS(e);
-                if (!maxTimeMS.isOK()) {
-                    return maxTimeMS.getStatus();
-                }
-                findCommand->setMaxTimeMS(maxTimeMS.getValue());
-            }
-        }
-    }
-
-    return Status::OK();
-}
-
-
-Status initFindCommandRequest(int ntoskip,
-                              int queryOptions,
-                              const BSONObj& filter,
-                              const Query& querySettings,
-                              const BSONObj& proj,
-                              FindCommandRequest* findCommand) {
     if (!proj.isEmpty()) {
         findCommand->setProjection(proj.getOwned());
     }
@@ -241,57 +119,32 @@ Status initFindCommandRequest(int ntoskip,
         findCommand->setSkip(ntoskip);
     }
 
-    // Initialize flags passed as 'queryOptions' bit vector.
-    initFromInt(queryOptions, findCommand);
+    uassertStatusOK(query_request_helper::validateFindCommandRequest(*findCommand));
 
-    findCommand->setFilter(filter.getOwned());
-    Status status = initFullQuery(querySettings.getFullSettingsDeprecated(), findCommand);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    // It's not possible to specify readConcern in a legacy query message, so initialize it to
-    // an empty readConcern object, ie. equivalent to `readConcern: {}`.  This ensures that
-    // mongos passes this empty readConcern to shards.
-    findCommand->setReadConcern(BSONObj());
-
-    return query_request_helper::validateFindCommandRequest(*findCommand);
-}
-
-StatusWith<std::unique_ptr<FindCommandRequest>> fromLegacyQuery(NamespaceStringOrUUID nssOrUuid,
-                                                                const BSONObj& filter,
-                                                                const Query& querySettings,
-                                                                const BSONObj& proj,
-                                                                int ntoskip,
-                                                                int queryOptions) {
-    auto findCommand = std::make_unique<FindCommandRequest>(std::move(nssOrUuid));
-
-    Status status = initFindCommandRequest(
-        ntoskip, queryOptions, filter, querySettings, proj, findCommand.get());
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return std::move(findCommand);
+    return findCommand;
 }
 
 int queryOptionsFromFindCommand(const FindCommandRequest& findCmd,
-                                const ReadPreferenceSetting& readPref) {
+                                const ReadPreferenceSetting& readPref,
+                                bool isExhaust) {
     int queryOptions = 0;
     if (readPref.canRunOnSecondary()) {
-        queryOptions = queryOptions & QueryOption_SecondaryOk;
+        queryOptions = queryOptions | QueryOption_SecondaryOk;
     }
     if (findCmd.getTailable()) {
-        queryOptions = queryOptions & QueryOption_CursorTailable;
+        queryOptions = queryOptions | QueryOption_CursorTailable;
     }
     if (findCmd.getNoCursorTimeout()) {
-        queryOptions = queryOptions & QueryOption_NoCursorTimeout;
+        queryOptions = queryOptions | QueryOption_NoCursorTimeout;
     }
     if (findCmd.getAwaitData()) {
-        queryOptions = queryOptions & QueryOption_AwaitData;
+        queryOptions = queryOptions | QueryOption_AwaitData;
     }
     if (findCmd.getAllowPartialResults()) {
-        queryOptions = queryOptions & QueryOption_PartialResults;
+        queryOptions = queryOptions | QueryOption_PartialResults;
+    }
+    if (isExhaust) {
+        queryOptions = queryOptions | QueryOption_Exhaust;
     }
     return queryOptions;
 }
@@ -305,42 +158,28 @@ Message DBClientCursor::initFromLegacyRequest() {
                                        _fieldsToReturn ? *_fieldsToReturn : BSONObj(),
                                        _nToSkip,
                                        _opts);
-    // If there was a problem building the query request, report that.
-    uassertStatusOK(findCommand.getStatus());
 
     if (_limit) {
-        findCommand.getValue()->setLimit(_limit);
+        findCommand->setLimit(_limit);
     }
     if (_batchSize) {
-        findCommand.getValue()->setBatchSize(_batchSize);
+        findCommand->setBatchSize(_batchSize);
     }
 
     const BSONObj querySettings = _querySettings.getFullSettingsDeprecated();
-    if (querySettings.getBoolField("$readOnce")) {
-        // Legacy queries don't handle readOnce.
-        findCommand.getValue()->setReadOnce(true);
-    }
-    if (querySettings.getBoolField(FindCommandRequest::kRequestResumeTokenFieldName)) {
-        // Legacy queries don't handle requestResumeToken.
-        findCommand.getValue()->setRequestResumeToken(true);
-    }
-    if (querySettings.hasField(FindCommandRequest::kResumeAfterFieldName)) {
-        // Legacy queries don't handle resumeAfter.
-        findCommand.getValue()->setResumeAfter(
-            querySettings.getObjectField(FindCommandRequest::kResumeAfterFieldName));
-    }
-    if (auto replTerm = querySettings[FindCommandRequest::kTermFieldName]) {
-        // Legacy queries don't handle term.
-        findCommand.getValue()->setTerm(replTerm.numberLong());
-    }
-    // Legacy queries don't handle readConcern.
     // We prioritize the readConcern parsed from the query object over '_readConcernObj'.
-    if (auto readConcern = querySettings[repl::ReadConcernArgs::kReadConcernFieldName]) {
-        findCommand.getValue()->setReadConcern(readConcern.Obj());
-    } else if (_readConcernObj) {
-        findCommand.getValue()->setReadConcern(_readConcernObj);
+    if (!findCommand->getReadConcern()) {
+        if (_readConcernObj) {
+            findCommand->setReadConcern(_readConcernObj);
+        } else {
+            // If no readConcern was specified, initialize it to an empty readConcern object, ie.
+            // equivalent to `readConcern: {}`. This ensures that mongos passes this empty
+            // readConcern to shards.
+            findCommand->setReadConcern(BSONObj());
+        }
     }
-    BSONObj cmd = findCommand.getValue()->toBSON(BSONObj());
+
+    BSONObj cmd = findCommand->toBSON(BSONObj());
     if (auto readPref = querySettings["$readPreference"]) {
         // FindCommandRequest doesn't handle $readPreference.
         cmd = BSONObjBuilder(std::move(cmd)).append(readPref).obj();
@@ -593,7 +432,7 @@ void DBClientCursor::attach(AScopedConnection* conn) {
 DBClientCursor::DBClientCursor(DBClientBase* client,
                                const NamespaceStringOrUUID& nsOrUuid,
                                const BSONObj& filter,
-                               const Query& querySettings,
+                               const client_deprecated::Query& querySettings,
                                int limit,
                                int nToSkip,
                                const BSONObj* fieldsToReturn,
@@ -625,7 +464,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
     : DBClientCursor(client,
                      nsOrUuid,
                      BSONObj(),  // filter
-                     Query(),    // querySettings
+                     client_deprecated::Query(),
                      cursorId,
                      limit,
                      0,        // nToSkip
@@ -640,7 +479,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
 DBClientCursor::DBClientCursor(DBClientBase* client,
                                const NamespaceStringOrUUID& nsOrUuid,
                                const BSONObj& filter,
-                               const Query& querySettings,
+                               const client_deprecated::Query& querySettings,
                                long long cursorId,
                                int limit,
                                int nToSkip,
@@ -672,7 +511,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
 
 DBClientCursor::DBClientCursor(DBClientBase* client,
                                FindCommandRequest findRequest,
-                               const ReadPreferenceSetting& readPref)
+                               const ReadPreferenceSetting& readPref,
+                               bool isExhaust)
     : _client(client),
       _originalHost(_client->getServerAddress()),
       _nsOrUuid(findRequest.getNamespaceOrUUID()),
@@ -681,7 +521,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       _limit(findRequest.getLimit().value_or(0)),
       _findRequest(std::move(findRequest)),
       _readPref(readPref),
-      _opts(queryOptionsFromFindCommand(*_findRequest, _readPref)) {
+      _opts(queryOptionsFromFindCommand(*_findRequest, _readPref, isExhaust)) {
     // Internal clients should always pass an explicit readConcern. If the caller did not already
     // pass a readConcern than we must explicitly initialize an empty readConcern so that it ends up
     // in the serialized version of the find command which will be sent across the wire.

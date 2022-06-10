@@ -566,14 +566,15 @@ JS::Value EncryptedDBClientBase::getCollection() const {
 }
 
 std::unique_ptr<DBClientCursor> EncryptedDBClientBase::find(FindCommandRequest findRequest,
-                                                            const ReadPreferenceSetting& readPref) {
-    return _conn->find(std::move(findRequest), readPref);
+                                                            const ReadPreferenceSetting& readPref,
+                                                            ExhaustMode exhaustMode) {
+    return _conn->find(std::move(findRequest), readPref, exhaustMode);
 }
 
 std::unique_ptr<DBClientCursor> EncryptedDBClientBase::query_DEPRECATED(
     const NamespaceStringOrUUID& nsOrUuid,
     const BSONObj& filter,
-    const Query& querySettings,
+    const client_deprecated::Query& querySettings,
     int limit,
     int nToSkip,
     const BSONObj* fieldsToReturn,

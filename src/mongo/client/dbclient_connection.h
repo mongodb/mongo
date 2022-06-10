@@ -37,7 +37,6 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/index_spec.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/client/query.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/config.h"
 #include "mongo/db/dbmessage.h"
@@ -146,7 +145,7 @@ public:
     std::unique_ptr<DBClientCursor> query_DEPRECATED(
         const NamespaceStringOrUUID& nsOrUuid,
         const BSONObj& filter,
-        const Query& querySettings = Query(),
+        const client_deprecated::Query& querySettings = client_deprecated::Query(),
         int limit = 0,
         int nToSkip = 0,
         const BSONObj* fieldsToReturn = nullptr,
@@ -169,7 +168,7 @@ public:
         std::function<void(DBClientCursorBatchIterator&)>,
         const NamespaceStringOrUUID& nsOrUuid,
         const BSONObj& filter,
-        const Query& querySettings,
+        const client_deprecated::Query& querySettings,
         const BSONObj* fieldsToReturn,
         int queryOptions,
         int batchSize = 0,

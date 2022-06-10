@@ -57,6 +57,7 @@ typedef std::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
 */
 class DBClientReplicaSet : public DBClientBase {
 public:
+    using DBClientBase::find;
     using DBClientBase::query_DEPRECATED;
 
     /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet
@@ -89,13 +90,14 @@ public:
     // ----------- simple functions --------------
 
     std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
-                                         const ReadPreferenceSetting& readPref) override;
+                                         const ReadPreferenceSetting& readPref,
+                                         ExhaustMode exhaustMode) override;
 
     /** throws userassertion "no primary found" */
     std::unique_ptr<DBClientCursor> query_DEPRECATED(
         const NamespaceStringOrUUID& nsOrUuid,
         const BSONObj& filter,
-        const Query& querySettings,
+        const client_deprecated::Query& querySettings,
         int limit = 0,
         int nToSkip = 0,
         const BSONObj* fieldsToReturn = nullptr,

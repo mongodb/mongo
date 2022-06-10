@@ -480,9 +480,8 @@ void TenantCollectionCloner::runQuery() {
 
     auto query = _collectionOptions.clusteredIndex
         // RecordIds are _id values and has no separate _id index
-        ? Query().hint(BSON("$natural" << 1))
-        : Query().hint(BSON("_id" << 1));
-
+        ? client_deprecated::Query().hint(BSON("$natural" << 1))
+        : client_deprecated::Query().hint(BSON("_id" << 1));
 
     // Any errors that are thrown here (including NamespaceNotFound) will be handled on the stage
     // level.

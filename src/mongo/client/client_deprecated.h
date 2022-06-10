@@ -31,9 +31,16 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/query/find_command_gen.h"
 #include "mongo/rpc/message.h"
 
 namespace mongo {
+/**
+ * WARNING: Do not add new uses of anything in this namespace! This exists only to support code
+ * paths that still use an OP_QUERY-derived query representation. Additional callers should not be
+ * added because OP_QUERY is no longer supported by the shell or server.
+ */
+namespace client_deprecated {
 
 /**
  * Represents a subset of query settings, such as sort, hint, etc. It is only used in the context of
@@ -43,8 +50,6 @@ namespace mongo {
 class Query {
 public:
     static const BSONField<BSONObj> ReadPrefField;
-    static const BSONField<std::string> ReadPrefModeField;
-    static const BSONField<BSONArray> ReadPrefTagsField;
 
     /**
      * Creating a Query object from raw BSON is on its way out. Please don't add new callers under
@@ -84,8 +89,6 @@ public:
      */
     Query& readPref(ReadPreference pref, const BSONArray& tags);
 
-    BSONObj getFilter() const;
-
     /**
      * A temporary accessor that returns a reference to the internal BSON object. No new callers
      * should be introduced!
@@ -115,7 +118,6 @@ private:
      * @return true if this query has an orderby, hint, or some other field
      */
     bool isComplex(bool* hasDollar = nullptr) const;
-    static bool isComplex(const BSONObj& obj, bool* hasDollar = nullptr);
 
     void makeComplex();
     template <class T>
@@ -131,4 +133,15 @@ inline std::ostream& operator<<(std::ostream& s, const Query& q) {
     return s << q.getFullSettingsDeprecated().toString();
 }
 
+/**
+ * WARNING: This function exists only to support special code paths that use an OP_QUERY-style query
+ * representation (even though the OP_QUERY wire protocol message itself is no longer supported). Do
+ * not add new callers.
+ *
+ * Sets the relevant fields in 'findCommand' based on the 'bsonOptions' object and the 'options' bit
+ * vector. 'bsonOptions' is formatted like the query object of an OP_QUERY wire protocol message.
+ * Similarly, 'options' is a bit vector which is interpreted like the OP_QUERY flags field.
+ */
+void initFindFromLegacyOptions(BSONObj bsonOptions, int options, FindCommandRequest* findCommand);
+}  // namespace client_deprecated
 }  // namespace mongo

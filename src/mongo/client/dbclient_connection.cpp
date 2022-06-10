@@ -629,7 +629,7 @@ unsigned long long DBClientConnection::query_DEPRECATED(
     std::function<void(DBClientCursorBatchIterator&)> f,
     const NamespaceStringOrUUID& nsOrUuid,
     const BSONObj& filter,
-    const Query& querySettings,
+    const client_deprecated::Query& querySettings,
     const BSONObj* fieldsToReturn,
     int queryOptions,
     int batchSize,

@@ -32,8 +32,8 @@
 #include <string>
 #include <vector>
 
+#include "mongo/client/client_deprecated.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/client/query.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/rpc/unique_message.h"
@@ -174,7 +174,7 @@ public:
     mongo::BSONArray query(InstanceID id,
                            const NamespaceStringOrUUID& nsOrUuid,
                            const BSONObj& filter,
-                           const Query& querySettings,
+                           const client_deprecated::Query& querySettings,
                            int limit = 0,
                            int nToSkip = 0,
                            const mongo::BSONObj* fieldsToReturn = nullptr,

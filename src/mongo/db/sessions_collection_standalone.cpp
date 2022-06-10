@@ -31,7 +31,6 @@
 
 #include "mongo/db/sessions_collection_standalone.h"
 
-#include "mongo/client/query.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"

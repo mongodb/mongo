@@ -165,29 +165,20 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='client_query',
-    source=[
-        'query.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'read_preference',
-    ],
-)
-
 clientDriverEnv = env.Clone()
 clientDriverEnv.InjectThirdParty('asio')
 
 clientDriverEnv.Library(
     target='clientdriver_minimal',
     source=[
+        'client_api_version_parameters.idl',
+        'client_deprecated.cpp',
         'dbclient_base.cpp',
         'dbclient_cursor.cpp',
         'index_spec.cpp',
-        'client_api_version_parameters.idl',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/dbmessage',
         '$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper',
         '$BUILD_DIR/mongo/db/query/command_request_response',
@@ -196,8 +187,8 @@ clientDriverEnv.Library(
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/rpc',
         'authentication',
-        'client_query',
         'connection_string',
+        'read_preference',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/idl_parser',

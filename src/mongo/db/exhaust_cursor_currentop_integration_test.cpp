@@ -143,42 +143,49 @@ auto startExhaustQuery(
     int queryOptions = 0,
     Milliseconds awaitDataTimeoutMS = Milliseconds(5000),
     const boost::optional<repl::OpTime>& lastKnownCommittedOpTime = boost::none) {
-    queryOptions = queryOptions | QueryOption_Exhaust;
-    auto queryThread =
-        stdx::async(stdx::launch::async,
-                    [&queryCursor,
-                     queryConnection,
-                     queryOptions,
-                     awaitDataTimeoutMS,
-                     lastKnownCommittedOpTime] {
-                        const auto projSpec = BSON("_id" << 0 << "a" << 1);
-                        // Issue the initial 'find' with a batchSize of 2 and the exhaust flag set.
-                        // We then iterate through the first batch and confirm that the results are
-                        // as expected.
-                        queryCursor = queryConnection->query_DEPRECATED(
-                            testNSS, BSONObj{}, Query(), 0, 0, &projSpec, queryOptions, 2);
-                        for (int i = 0; i < 2; ++i) {
-                            ASSERT_BSONOBJ_EQ(queryCursor->nextSafe(), BSON("a" << i));
-                        }
-                        // Having exhausted the two results returned by the initial find, we set the
-                        // batchSize to 1 and issue a single getMore via DBClientCursor::more().
-                        // Because the 'exhaust' flag is set, the server will generate a series of
-                        // internal getMores and stream them back to the client until the cursor is
-                        // exhausted, without the client sending any further getMore requests. We
-                        // expect this request to hang at the
-                        // 'waitWithPinnedCursorDuringGetMoreBatch' failpoint.
-                        queryCursor->setBatchSize(1);
-                        if ((queryOptions & QueryOption_CursorTailable) &&
-                            (queryOptions & QueryOption_AwaitData)) {
-                            queryCursor->setAwaitDataTimeoutMS(awaitDataTimeoutMS);
-                            if (lastKnownCommittedOpTime) {
-                                auto term = lastKnownCommittedOpTime.get().getTerm();
-                                queryCursor->setCurrentTermAndLastCommittedOpTime(
-                                    term, lastKnownCommittedOpTime);
-                            }
-                        }
-                        ASSERT(queryCursor->more());
-                    });
+    auto queryThread = stdx::async(
+        stdx::launch::async,
+        [&queryCursor,
+         queryConnection,
+         queryOptions,
+         awaitDataTimeoutMS,
+         lastKnownCommittedOpTime] {
+            const auto projSpec = BSON("_id" << 0 << "a" << 1);
+            // Issue the initial 'find' with a batchSize of 2 and the exhaust flag set.
+            // We then iterate through the first batch and confirm that the results are
+            // as expected.
+            FindCommandRequest findCmd{testNSS};
+            findCmd.setProjection(projSpec);
+            findCmd.setBatchSize(2);
+            if (queryOptions & QueryOption_CursorTailable) {
+                findCmd.setTailable(true);
+            }
+            if (queryOptions & QueryOption_AwaitData) {
+                findCmd.setAwaitData(true);
+            }
+
+            queryCursor = queryConnection->find(findCmd, ReadPreferenceSetting{}, ExhaustMode::kOn);
+            for (int i = 0; i < 2; ++i) {
+                ASSERT_BSONOBJ_EQ(queryCursor->nextSafe(), BSON("a" << i));
+            }
+            // Having exhausted the two results returned by the initial find, we set the
+            // batchSize to 1 and issue a single getMore via DBClientCursor::more().
+            // Because the 'exhaust' flag is set, the server will generate a series of
+            // internal getMores and stream them back to the client until the cursor is
+            // exhausted, without the client sending any further getMore requests. We
+            // expect this request to hang at the
+            // 'waitWithPinnedCursorDuringGetMoreBatch' failpoint.
+            queryCursor->setBatchSize(1);
+            if (findCmd.getTailable() && findCmd.getAwaitData()) {
+                queryCursor->setAwaitDataTimeoutMS(awaitDataTimeoutMS);
+                if (lastKnownCommittedOpTime) {
+                    auto term = lastKnownCommittedOpTime.get().getTerm();
+                    queryCursor->setCurrentTermAndLastCommittedOpTime(term,
+                                                                      lastKnownCommittedOpTime);
+                }
+            }
+            ASSERT(queryCursor->more());
+        });
 
     // Wait until the parallel operation initializes its cursor.
     const auto startTime = clock->now();

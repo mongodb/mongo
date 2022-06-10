@@ -236,7 +236,7 @@ Status queryAuthzDocument(OperationContext* opCtx,
         FindCommandRequest findRequest{collectionName};
         findRequest.setFilter(query);
         findRequest.setProjection(projection);
-        client.find(std::move(findRequest), ReadPreferenceSetting{}, resultProcessor);
+        client.find(std::move(findRequest), resultProcessor);
         return Status::OK();
     } catch (const DBException& e) {
         return e.toStatus();

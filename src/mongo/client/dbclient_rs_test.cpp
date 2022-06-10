@@ -167,7 +167,7 @@ void assertWithBothQueryApis(DBClientReplicaSet& replConn,
         replConn.find(FindCommandRequest{nss}, ReadPreferenceSetting{readPref});
     assertionFunc(std::move(cursor));
 
-    Query readPrefHolder;
+    client_deprecated::Query readPrefHolder;
     readPrefHolder.readPref(readPref, BSONArray{});
     cursor = replConn.query_DEPRECATED(nss, BSONObj{}, readPrefHolder);
     assertionFunc(std::move(cursor));
@@ -186,7 +186,7 @@ void assertBothQueryApisThrow(DBClientReplicaSet& replConn,
     ASSERT_THROWS(replConn.find(FindCommandRequest{nss}, ReadPreferenceSetting{readPref}),
                   AssertionException);
 
-    Query readPrefHolder;
+    client_deprecated::Query readPrefHolder;
     readPrefHolder.readPref(readPref, BSONArray{});
     ASSERT_THROWS(replConn.query_DEPRECATED(nss, BSONObj{}, readPrefHolder), AssertionException);
 }

@@ -155,7 +155,7 @@ std::vector<RequestData> rebuildRequestsFromRecoveryInfo(
     DBDirectClient dbClient(opCtx);
     try {
         FindCommandRequest findRequest{MigrationType::ConfigNS};
-        dbClient.find(std::move(findRequest), ReadPreferenceSetting{}, documentProcessor);
+        dbClient.find(std::move(findRequest), documentProcessor);
     } catch (const DBException& e) {
         LOGV2_ERROR(5847215, "Failed to fetch requests to recover", "error"_attr = redact(e));
     }

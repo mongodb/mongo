@@ -321,7 +321,8 @@ public:
     DBClientConnectionForTest(int numInitFailures) : _initFailuresLeft(numInitFailures) {}
 
     std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
-                                         const ReadPreferenceSetting& readPref) override {
+                                         const ReadPreferenceSetting& readPref,
+                                         ExhaustMode exhaustMode) override {
         if (_initFailuresLeft > 0) {
             _initFailuresLeft--;
             LOGV2(21657,

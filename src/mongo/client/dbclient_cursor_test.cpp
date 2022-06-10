@@ -150,8 +150,8 @@ TEST_F(DBClientCursorTest, DBClientCursorCallsMetaDataReaderOncePerBatch) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(
-        &conn, NamespaceStringOrUUID(nss), BSONObj{}, Query(), 0, 0, nullptr, 0, 0);
+    FindCommandRequest findCmd{nss};
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
     cursor.setBatchSize(2);
 
     // Set up mock 'find' response.
@@ -197,15 +197,8 @@ TEST_F(DBClientCursorTest, DBClientCursorHandlesOpMsgExhaustCorrectly) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(&conn,
-                          NamespaceStringOrUUID(nss),
-                          BSONObj{},
-                          Query(),
-                          0,
-                          0,
-                          nullptr,
-                          QueryOption_Exhaust,
-                          0);
+    FindCommandRequest findCmd{nss};
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -268,15 +261,8 @@ TEST_F(DBClientCursorTest, DBClientCursorResendsGetMoreIfMoreToComeFlagIsOmitted
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(&conn,
-                          NamespaceStringOrUUID(nss),
-                          BSONObj{},
-                          Query(),
-                          0,
-                          0,
-                          nullptr,
-                          QueryOption_Exhaust,
-                          0);
+    FindCommandRequest findCmd{nss};
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -356,19 +342,11 @@ TEST_F(DBClientCursorTest, DBClientCursorResendsGetMoreIfMoreToComeFlagIsOmitted
 }
 
 TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionOnNonOKResponse) {
-
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(&conn,
-                          NamespaceStringOrUUID(nss),
-                          BSONObj{},
-                          Query(),
-                          0,
-                          0,
-                          nullptr,
-                          QueryOption_Exhaust,
-                          0);
+    FindCommandRequest findCmd{nss};
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -395,19 +373,11 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionOnNonOKResponse) {
 }
 
 TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionWhenMoreToComeFlagSetWithZeroCursorId) {
-
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(&conn,
-                          NamespaceStringOrUUID(nss),
-                          BSONObj{},
-                          Query(),
-                          0,
-                          0,
-                          nullptr,
-                          QueryOption_Exhaust,
-                          0);
+    FindCommandRequest findCmd{nss};
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -436,19 +406,12 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionWhenMoreToComeFlagSe
 }
 
 TEST_F(DBClientCursorTest, DBClientCursorPassesReadOnceFlag) {
-
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(&conn,
-                          NamespaceStringOrUUID(nss),
-                          BSONObj{},
-                          Query().readOnce(true),
-                          0,
-                          0,
-                          nullptr,
-                          /*QueryOption*/ 0,
-                          0);
+    FindCommandRequest findCmd{nss};
+    findCmd.setReadOnce(true);
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -473,15 +436,10 @@ TEST_F(DBClientCursorTest, DBClientCursorPassesResumeFields) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(&conn,
-                          NamespaceStringOrUUID(nss),
-                          BSONObj{},
-                          Query().requestResumeToken(true).resumeAfter(BSON("$recordId" << 5LL)),
-                          0,
-                          0,
-                          nullptr,
-                          /*QueryOption*/ 0,
-                          0);
+    FindCommandRequest findCmd{nss};
+    findCmd.setRequestResumeToken(true);
+    findCmd.setResumeAfter(BSON("$recordId" << 5LL));
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -514,15 +472,9 @@ TEST_F(DBClientCursorTest, DBClientCursorTailable) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(&conn,
-                          NamespaceStringOrUUID(nss),
-                          BSONObj{},
-                          Query(),
-                          0,
-                          0,
-                          nullptr,
-                          QueryOption_CursorTailable,
-                          0);
+    FindCommandRequest findCmd{nss};
+    findCmd.setTailable(true);
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -614,15 +566,10 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitData) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(&conn,
-                          NamespaceStringOrUUID(nss),
-                          BSONObj{},
-                          Query(),
-                          0,
-                          0,
-                          nullptr,
-                          QueryOption_CursorTailable | QueryOption_AwaitData,
-                          0);
+    FindCommandRequest findCmd{nss};
+    findCmd.setTailable(true);
+    findCmd.setAwaitData(true);
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -681,15 +628,10 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitDataExhaust) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(&conn,
-                          NamespaceStringOrUUID(nss),
-                          BSONObj{},
-                          Query(),
-                          0,
-                          0,
-                          nullptr,
-                          QueryOption_CursorTailable | QueryOption_AwaitData | QueryOption_Exhaust,
-                          0);
+    FindCommandRequest findCmd{nss};
+    findCmd.setTailable(true);
+    findCmd.setAwaitData(true);
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -835,15 +777,15 @@ TEST_F(DBClientCursorTest, DBClientCursorOplogQuery) {
     const long long maxTimeMS = 5000LL;
     const long long term = 5;
 
-    DBClientCursor cursor(&conn,
-                          NamespaceStringOrUUID(nss),
-                          filterObj,
-                          Query().readConcern(readConcernObj).maxTimeMS(maxTimeMS).term(term),
-                          0,
-                          0,
-                          nullptr,
-                          QueryOption_CursorTailable | QueryOption_AwaitData,
-                          0);
+    FindCommandRequest findCmd{nss};
+    findCmd.setFilter(filterObj);
+    findCmd.setReadConcern(readConcernObj);
+    findCmd.setMaxTimeMS(maxTimeMS);
+    findCmd.setTerm(term);
+    findCmd.setTailable(true);
+    findCmd.setAwaitData(true);
+
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.

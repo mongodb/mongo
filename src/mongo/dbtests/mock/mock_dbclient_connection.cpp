@@ -143,7 +143,9 @@ std::unique_ptr<DBClientCursor> MockDBClientConnection::bsonArrayToCursor(BSONAr
 }
 
 std::unique_ptr<DBClientCursor> MockDBClientConnection::find(
-    FindCommandRequest findRequest, const ReadPreferenceSetting& readPref) {
+    FindCommandRequest findRequest,
+    const ReadPreferenceSetting& /*unused*/,
+    ExhaustMode /*unused*/) {
     checkConnection();
     try {
         int nToSkip = nToSkipFromResumeAfter(findRequest.getResumeAfter());
@@ -161,7 +163,7 @@ std::unique_ptr<DBClientCursor> MockDBClientConnection::find(
 std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query_DEPRECATED(
     const NamespaceStringOrUUID& nsOrUuid,
     const BSONObj& filter,
-    const Query& querySettings,
+    const client_deprecated::Query& querySettings,
     int limit,
     int nToSkip,
     const BSONObj* fieldsToReturn,

@@ -171,9 +171,9 @@ TEST_F(DBDirectClientTest, ExhaustQuery) {
     ASSERT_FALSE(insertReply.getWriteErrors());
 
     // The query should work even though exhaust mode is requested.
-    int batchSize = 2;
-    auto cursor = client.query_DEPRECATED(
-        kNs, BSONObj{}, Query{}, 0 /*limit*/, 0 /*skip*/, nullptr, QueryOption_Exhaust, batchSize);
+    FindCommandRequest findCmd{kNs};
+    findCmd.setBatchSize(2);
+    auto cursor = client.find(std::move(findCmd), ReadPreferenceSetting{}, ExhaustMode::kOn);
     ASSERT_EQ(cursor->itcount(), numDocs);
 }
 

@@ -42,7 +42,6 @@ namespace mongo {
 
 class QueryMessage;
 class Status;
-class Query;
 template <typename T>
 class StatusWith;
 
