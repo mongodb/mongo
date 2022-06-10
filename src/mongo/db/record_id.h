@@ -311,11 +311,6 @@ public:
             int size;
             auto str = elem.binData(size);
             return RecordId(str, size);
-        } else if (elem.type() == BSONType::String) {
-            // Support old format for upgrades during resumable index builds.
-            // TODO SERVER-62369: Remove when we branch out 6.0.
-            auto str = hexblob::decode(elem.String());
-            return RecordId(str.c_str(), str.size());
         } else {
             uasserted(ErrorCodes::BadValue,
                       fmt::format("Could not deserialize RecordId with type {}", elem.type()));
