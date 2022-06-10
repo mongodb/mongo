@@ -49,18 +49,19 @@ class cursor_bound_01 : public test {
     /* Class helper to represent the lower and uppers bounds for the range cursor. */
     class bound {
         public:
-        bound()
+        bound() = default;
+        bound(uint64_t key_size_max, bool lower_bound, std::string key)
+            : _lower_bound(lower_bound), _key(key)
         {
-            clear();
-        };
-
-        bound(uint64_t key_size_max, bool lower_bound) : _lower_bound(lower_bound)
-        {
-            auto key_size =
-              random_generator::instance().generate_integer(static_cast<uint64_t>(1), key_size_max);
-            _key = random_generator::instance().generate_random_string(
-              key_size, characters_type::ALPHABET);
-            _inclusive = random_generator::instance().generate_integer(0, 1);
+            bool set_inclusive = random_generator::instance().generate_integer(0, 1);
+            // FIXME: Use random strings, once bounds are implemented properly.
+            // auto key_size =
+            //   random_generator::instance().generate_integer(static_cast<uint64_t>(1),
+            //   key_size_max);
+            // auto random_key = random_generator::instance().generate_random_string(
+            //   key_size, characters_type::ALPHABET);
+            // _key = random_key;
+            _inclusive = set_inclusive;
         }
 
         std::string
@@ -70,7 +71,7 @@ class cursor_bound_01 : public test {
               ",inclusive=" + std::string(_inclusive ? "true" : "false");
         }
 
-        const std::string &
+        std::string
         get_key() const
         {
             return _key;
@@ -80,14 +81,6 @@ class cursor_bound_01 : public test {
         get_inclusive() const
         {
             return _inclusive;
-        }
-
-        void
-        clear()
-        {
-            _key.clear();
-            _inclusive = false;
-            _lower_bound = false;
         }
 
         private:
@@ -172,27 +165,10 @@ class cursor_bound_01 : public test {
 
         if (normal_ret == WT_NOTFOUND)
             return;
-
-        const char *normal_key;
-        testutil_check(normal_cursor->get_key(normal_cursor.get(), &normal_key));
-        /*
-         * It is possible that there are no keys within the range. Therefore make sure that normal
-         * cursor returns a key that is outside of the range.
-         */
-        if (range_ret == WT_NOTFOUND) {
-            if (next) {
-                testutil_assert(!upper_key.empty());
-                testutil_assert(!custom_lexicographical_compare(normal_key, upper_key, true));
-            } else {
-                testutil_assert(!lower_key.empty());
-                testutil_assert(custom_lexicographical_compare(normal_key, lower_key, false));
-            }
-            return;
-        }
         testutil_assert(range_ret == 0 && normal_ret == 0);
 
         /* Retrieve the key the cursor is pointing at. */
-        const char *range_key;
+        const char *normal_key, *range_key;
         testutil_check(normal_cursor->get_key(normal_cursor.get(), &normal_key));
         testutil_check(range_cursor->get_key(range_cursor.get(), &range_key));
         testutil_assert(std::string(normal_key).compare(range_key) == 0);
@@ -253,39 +229,28 @@ class cursor_bound_01 : public test {
             testutil_check(range_cursor->bound(range_cursor.get(), "action=clear"));
 
         if (set_random_bounds == LOWER_BOUND_SET || set_random_bounds == ALL_BOUNDS_SET) {
-            lower_bound = bound(tc->key_size, true);
+            /* Reverse case. */
+            if (_reverse_collator_enabled)
+                lower_bound = bound(tc->key_size, true, std::string(tc->key_size, 'z'));
+            /* Normal case. */
+            else
+                lower_bound = bound(tc->key_size, true, "0");
             range_cursor->set_key(range_cursor.get(), lower_bound.get_key().c_str());
             ret = range_cursor->bound(range_cursor.get(), lower_bound.get_config().c_str());
             testutil_assert(ret == 0 || ret == EINVAL);
-
-            /*
-             * It is possible that the new lower bound overlaps with the upper bound. In that case,
-             * just clear the lower bound and continue with test.
-             */
-            if (ret == EINVAL)
-                lower_bound.clear();
         }
 
         if (set_random_bounds == UPPER_BOUND_SET || set_random_bounds == ALL_BOUNDS_SET) {
-            upper_bound = bound(tc->key_size, false);
+            /* Reverse case. */
+            if (_reverse_collator_enabled)
+                upper_bound = bound(tc->key_size, false, "0");
+            /* Normal case. */
+            else
+                upper_bound = bound(tc->key_size, false, std::string(tc->key_size, 'z'));
             range_cursor->set_key(range_cursor.get(), upper_bound.get_key().c_str());
             ret = range_cursor->bound(range_cursor.get(), upper_bound.get_config().c_str());
             testutil_assert(ret == 0 || ret == EINVAL);
-
-            /*
-             * It is possible that the new upper bound overlaps with the lower bound. In that case,
-             * just clear the upper bound and continue with test.
-             */
-            if (ret == EINVAL)
-                upper_bound.clear();
         }
-
-        /*
-         * It is possible that upper bound and lower bound both get EINVAL, in that case clear all
-         * bounds.
-         */
-        if (upper_bound.get_key().empty() && lower_bound.get_key().empty())
-            testutil_check(range_cursor->bound(range_cursor.get(), "action=clear"));
 
         return std::make_pair(lower_bound, upper_bound);
     }
@@ -613,34 +578,30 @@ class cursor_bound_01 : public test {
         logger::log_msg(
           LOG_INFO, type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.");
 
+        bound lower_bound, upper_bound;
         std::map<uint64_t, scoped_cursor> cursors;
-        /* Maintain the lower and upper bound for each cursor held in the cursors map. */
-        std::map<uint64_t, std::pair<bound, bound>> bounds;
+
         while (tc->running()) {
             /* Get a random collection to work on. */
             collection &coll = tc->db.get_random_collection();
 
             /* Find a cached cursor or create one if none exists. */
-            if (cursors.find(coll.id) == cursors.end()) {
-                bound lower_bound, upper_bound;
+            if (cursors.find(coll.id) == cursors.end())
                 cursors.emplace(coll.id, std::move(tc->session.open_scoped_cursor(coll.name)));
-                bounds.emplace(coll.id, std::move(std::make_pair(lower_bound, upper_bound)));
-            }
 
             /* Set random bounds on cached range cursor. */
             auto &range_cursor = cursors[coll.id];
-            auto &bound_pair = bounds[coll.id];
-            auto new_bound_pair = set_random_bounds(tc, range_cursor);
+            auto bound_pair = set_random_bounds(tc, range_cursor);
             /* Only update the bounds when the bounds have a key. */
-            if (!!new_bound_pair.first.get_key().empty())
-                bound_pair.first = new_bound_pair.first;
-            if (!new_bound_pair.second.get_key().empty())
-                bound_pair.second = new_bound_pair.second;
+            if (!bound_pair.first.get_key().empty())
+                lower_bound = bound_pair.first;
+            if (!bound_pair.second.get_key().empty())
+                upper_bound = bound_pair.second;
 
             /* Clear all bounds if both bounds don't have a key. */
-            if (new_bound_pair.first.get_key().empty() && new_bound_pair.second.get_key().empty()) {
-                bound_pair.first.clear();
-                bound_pair.second.clear();
+            if (bound_pair.first.get_key().empty() && bound_pair.second.get_key().empty()) {
+                lower_bound = bound_pair.first;
+                upper_bound = bound_pair.second;
             }
 
             scoped_cursor normal_cursor = tc->session.open_scoped_cursor(coll.name);
@@ -665,13 +626,14 @@ class cursor_bound_01 : public test {
                 testutil_assert(ret == 0 || ret == WT_NOTFOUND);
 
                 /* Verify the bound search_near result using the normal cursor. */
-                validate_bound_search_near(ret, exact, range_cursor, normal_cursor, srch_key,
-                  bound_pair.first, bound_pair.second);
+                validate_bound_search_near(
+                  ret, exact, range_cursor, normal_cursor, srch_key, lower_bound, upper_bound);
 
                 tc->txn.add_op();
                 tc->txn.try_rollback();
                 tc->sleep();
             }
+            testutil_check(range_cursor->reset(range_cursor.get()));
         }
         /* Roll back the last transaction if still active now the work is finished. */
         if (tc->txn.active())
@@ -690,33 +652,28 @@ class cursor_bound_01 : public test {
           LOG_INFO, type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.");
 
         std::map<uint64_t, scoped_cursor> cursors;
-        /* Maintain the lower and upper bound for each cursor held in the cursors map. */
-        std::map<uint64_t, std::pair<bound, bound>> bounds;
+        bound lower_bound, upper_bound;
         while (tc->running()) {
             /* Get a random collection to work on. */
             collection &coll = tc->db.get_random_collection();
 
             /* Find a cached cursor or create one if none exists. */
-            if (cursors.find(coll.id) == cursors.end()) {
-                bound lower_bound, upper_bound;
+            if (cursors.find(coll.id) == cursors.end())
                 cursors.emplace(coll.id, std::move(tc->session.open_scoped_cursor(coll.name)));
-                bounds.emplace(coll.id, std::move(std::make_pair(lower_bound, upper_bound)));
-            }
 
             /* Set random bounds on cached range cursor. */
             auto &range_cursor = cursors[coll.id];
-            auto &bound_pair = bounds[coll.id];
-            auto new_bound_pair = set_random_bounds(tc, range_cursor);
+            auto bound_pair = set_random_bounds(tc, range_cursor);
             /* Only update the bounds when the bounds have a key. */
-            if (!new_bound_pair.first.get_key().empty())
-                bound_pair.first = new_bound_pair.first;
-            if (!new_bound_pair.second.get_key().empty())
-                bound_pair.second = new_bound_pair.second;
+            if (!bound_pair.first.get_key().empty())
+                lower_bound = bound_pair.first;
+            if (!bound_pair.second.get_key().empty())
+                upper_bound = bound_pair.second;
 
-            /* Clear all bounds if both bounds don't have a key. */
-            if (new_bound_pair.first.get_key().empty() && new_bound_pair.second.get_key().empty()) {
-                bound_pair.first.clear();
-                bound_pair.second.clear();
+            /* Clear all bounds if both bounds doesn't have a key. */
+            if (bound_pair.first.get_key().empty() && bound_pair.second.get_key().empty()) {
+                lower_bound = bound_pair.first;
+                upper_bound = bound_pair.second;
             }
 
             scoped_cursor normal_cursor = tc->session.open_scoped_cursor(coll.name);
@@ -728,14 +685,14 @@ class cursor_bound_01 : public test {
             tc->txn.begin(
               "roundup_timestamps=(read=true),read_timestamp=" + tc->tsm->decimal_to_hex(ts));
             while (tc->txn.active() && tc->running()) {
-                cursor_traversal(
-                  range_cursor, normal_cursor, bound_pair.first, bound_pair.second, true);
-                cursor_traversal(
-                  range_cursor, normal_cursor, bound_pair.first, bound_pair.second, false);
+
+                cursor_traversal(range_cursor, normal_cursor, lower_bound, upper_bound, true);
+                cursor_traversal(range_cursor, normal_cursor, lower_bound, upper_bound, false);
                 tc->txn.add_op();
                 tc->txn.try_rollback();
                 tc->sleep();
             }
+            testutil_check(range_cursor->reset(range_cursor.get()));
         }
         /* Roll back the last transaction if still active now the work is finished. */
         if (tc->txn.active())
