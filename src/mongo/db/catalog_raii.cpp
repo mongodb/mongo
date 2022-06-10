@@ -596,4 +596,35 @@ AutoGetOplog::AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t
     _oplog = &_oplogInfo->getCollection();
 }
 
+
+AutoGetChangeCollection::AutoGetChangeCollection(OperationContext* opCtx,
+                                                 AutoGetChangeCollection::AccessMode mode,
+                                                 boost::optional<TenantId> tenantId,
+                                                 Date_t deadline) {
+    auto nss = NamespaceString::makeChangeCollectionNSS(tenantId);
+    if (mode == AccessMode::kWrite) {
+        // The global lock must already be held.
+        invariant(opCtx->lockState()->isWriteLocked());
+
+        // TODO SERVER-66715 avoid taking 'AutoGetCollection' and remove
+        // 'AllowLockAcquisitionOnTimestampedUnitOfWork'.
+        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+        _coll.emplace(
+            opCtx, nss, LockMode::MODE_IX, AutoGetCollectionViewMode::kViewsForbidden, deadline);
+    }
+}
+
+const Collection* AutoGetChangeCollection::operator->() const {
+    return _coll ? _coll->getCollection().get() : nullptr;
+}
+
+const CollectionPtr& AutoGetChangeCollection::operator*() const {
+    return _coll->getCollection();
+}
+
+AutoGetChangeCollection::operator bool() const {
+    return _coll && _coll->getCollection().get();
+}
+
+
 }  // namespace mongo

@@ -50,6 +50,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -347,6 +348,8 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
     boost::optional<AutoGetOplog> autoOplog;
     const CollectionPtr* collection;
 
+    bool shouldWriteToChangeCollections = false;
+
     auto nss = nsOrUUID.nss();
     if (nss && nss->isOplog()) {
         // Simplify locking rules for oplog collection.
@@ -355,6 +358,9 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
         if (!*collection) {
             return {ErrorCodes::NamespaceNotFound, "Oplog collection does not exist"};
         }
+
+        shouldWriteToChangeCollections =
+            ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive();
     } else {
         autoColl.emplace(opCtx, nsOrUUID, MODE_IX);
         auto collectionResult = getCollection(
@@ -371,6 +377,18 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
     if (!status.isOK()) {
         return status;
     }
+
+    // Insert oplog entries to change collections if we are running in the serverless and the 'nss'
+    // is 'local.oplog.rs'.
+    if (shouldWriteToChangeCollections) {
+        auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
+        status = changeCollectionManager.insertDocumentsToChangeCollection(
+            opCtx, begin, end, nullOpDebug);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
     wunit.commit();
 
     return Status::OK();

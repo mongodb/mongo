@@ -8,18 +8,20 @@
 (function() {
 "use strict";
 
-const replSetTest = new ReplSetTest({nodes: 1});
+const replSetTest = new ReplSetTest({nodes: 2});
 replSetTest.startSet({setParameter: "multitenancySupport=true"});
 replSetTest.initiate();
 
 const primary = replSetTest.getPrimary();
-const oplogColl = primary.getDB("local").oplog.rs;
-const changeColl = primary.getDB("config").system.change_collection;
+const secondary = replSetTest.getSecondary();
 const testDb = primary.getDB("test");
 
 // Verifies that the oplog and change collection entries are the same for the specified start and
 // end duration of the oplog timestamp.
-function verifyChangeCollectionEntries(startOplogTimestamp, endOplogTimestamp) {
+function verifyChangeCollectionEntries(connection, startOplogTimestamp, endOplogTimestamp) {
+    const oplogColl = connection.getDB("local").oplog.rs;
+    const changeColl = connection.getDB("config").system.change_collection;
+
     // Fetch all oplog and change collection entries for the duration: [startOplogTimestamp,
     // endOplogTimestamp].
     const oplogEntries =
@@ -69,6 +71,7 @@ function performWrites(coll) {
 
 // Test the change collection entries with the oplog by performing some basic writes.
 (function testBasicWritesInChangeCollection() {
+    const oplogColl = primary.getDB("local").oplog.rs;
     const startOplogTimestamp = oplogColl.find().toArray().at(-1).ts;
     assert(startOplogTimestamp != undefined);
 
@@ -79,11 +82,18 @@ function performWrites(coll) {
     assert(endOplogTimestamp !== undefined);
     assert(timestampCmp(endOplogTimestamp, startOplogTimestamp) > 0);
 
-    verifyChangeCollectionEntries(startOplogTimestamp, endOplogTimestamp);
+    // Wait for the replication to finish.
+    replSetTest.awaitReplication();
+
+    // Verify that the change collection entries are the same as the oplog in the primary and the
+    // secondary node.
+    verifyChangeCollectionEntries(primary, startOplogTimestamp, endOplogTimestamp);
+    verifyChangeCollectionEntries(secondary, startOplogTimestamp, endOplogTimestamp);
 })();
 
 // Test the change collection entries with the oplog by performing writes in a transaction.
 (function testWritesinChangeCollectionWithTrasactions() {
+    const oplogColl = primary.getDB("local").oplog.rs;
     const startOplogTimestamp = oplogColl.find().toArray().at(-1).ts;
     assert(startOplogTimestamp != undefined);
 
@@ -97,7 +107,13 @@ function performWrites(coll) {
     assert(endOplogTimestamp != undefined);
     assert(timestampCmp(endOplogTimestamp, startOplogTimestamp) > 0);
 
-    verifyChangeCollectionEntries(startOplogTimestamp, endOplogTimestamp);
+    // Wait for the replication to finish.
+    replSetTest.awaitReplication();
+
+    // Verify that the change collection entries are the same as the oplog in the primary and the
+    // secondary node for the applyOps.
+    verifyChangeCollectionEntries(primary, startOplogTimestamp, endOplogTimestamp);
+    verifyChangeCollectionEntries(secondary, startOplogTimestamp, endOplogTimestamp);
 })();
 
 replSetTest.stopSet();

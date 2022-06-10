@@ -261,6 +261,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',
+        '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/dbhelpers',
@@ -619,6 +620,7 @@ env.Library(
         'storage_interface',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
         '$BUILD_DIR/mongo/db/commands/mongod_fsync',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/storage/storage_control',

@@ -476,4 +476,31 @@ private:
     const CollectionPtr* _oplog;
 };
 
+/**
+ * A RAII-style class to acquire lock to a particular tenant's change collection.
+ *
+ * A change collection can be accessed in the following modes:
+ *   kWrite - This mode assumes that the global IX lock is already held before writing to the change
+ *            collection.
+ */
+class AutoGetChangeCollection {
+public:
+    enum class AccessMode { kWrite };
+
+    AutoGetChangeCollection(OperationContext* opCtx,
+                            AccessMode mode,
+                            boost::optional<TenantId> tenantId,
+                            Date_t deadline = Date_t::max());
+
+    AutoGetChangeCollection(const AutoGetChangeCollection&) = delete;
+    AutoGetChangeCollection& operator=(const AutoGetChangeCollection&) = delete;
+
+    const Collection* operator->() const;
+    const CollectionPtr& operator*() const;
+    explicit operator bool() const;
+
+private:
+    boost::optional<AutoGetCollection> _coll;
+};
+
 }  // namespace mongo
