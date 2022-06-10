@@ -2268,7 +2268,7 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     const WT_NAME_FLAG *ft;
-    uint64_t flags;
+    uint32_t flags;
 
     conn = S2C(session);
 
