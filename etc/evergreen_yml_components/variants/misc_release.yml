@@ -592,7 +592,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - debian11-large
-  - name: .aggfuzzer .common
+  - name: .aggfuzzer .common !.multiversion
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
