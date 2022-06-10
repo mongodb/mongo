@@ -22,7 +22,7 @@ const viewNss = `${dbName}.${collName}`;
 const bucketNss = `${dbName}.system.buckets.${collName}`;
 const controlTimeField = `control.min.${timeField}`;
 
-function runBasicTest(failPoint) {
+function runBasicTest() {
     const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
     const mongos = st.s0;
     const db = mongos.getDB(dbName);
@@ -36,14 +36,6 @@ function runBasicTest(failPoint) {
 
     assert.commandWorked(
         db.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
-
-    // Setting collModPrimaryDispatching failpoint to make sure the fallback logic of dispatching
-    // collMod command at primary shard works.
-    if (failPoint) {
-        const primary = st.getPrimaryShard(dbName);
-        assert.commandWorked(
-            primary.adminCommand({configureFailPoint: failPoint, mode: 'alwaysOn'}));
-    }
 
     // Updates for timeField and metaField are disabled.
     assert.commandFailedWithCode(db.runCommand({collMod: collName, timeseries: {timeField: 'x'}}),
@@ -74,23 +66,14 @@ function runBasicTest(failPoint) {
     assert.commandWorked(
         db.runCommand({collMod: collName, index: {name: indexName, hidden: false}}));
 
-    if (failPoint) {
-        // Granularity update disabled for sharded time-series collection, when we're using primary
-        // dispatching logic.
-        assert.commandFailedWithCode(
-            db.runCommand({collMod: collName, timeseries: {granularity: 'hours'}}),
-            ErrorCodes.NotImplemented);
-    } else {
-        // Granularity update works for sharded time-series collection, when we're using DDL
-        // coordinator logic.
-        const getGranularity = () => db.getSiblingDB('config')
-                                         .collections.findOne({_id: bucketNss})
-                                         .timeseriesFields.granularity;
-        assert.eq(getGranularity(), 'minutes');
-        assert.commandWorked(
-            db.runCommand({collMod: collName, timeseries: {granularity: 'hours'}}));
-        assert.eq(getGranularity(), 'hours');
-    }
+    // Granularity update works for sharded time-series collection, when we're using DDL
+    // coordinator logic.
+    const getGranularity = () => db.getSiblingDB('config')
+                                     .collections.findOne({_id: bucketNss})
+                                     .timeseriesFields.granularity;
+    assert.eq(getGranularity(), 'minutes');
+    assert.commandWorked(db.runCommand({collMod: collName, timeseries: {granularity: 'hours'}}));
+    assert.eq(getGranularity(), 'hours');
     st.stop();
 }
 
@@ -175,8 +158,6 @@ function runReadAfterWriteTest() {
     st.stop();
 }
 
-runBasicTest('collModPrimaryDispatching');
-runBasicTest('collModCoordinatorPre60Compatible');
 runBasicTest();
 
 runReadAfterWriteTest();

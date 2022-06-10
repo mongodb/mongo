@@ -406,17 +406,6 @@ public:
                     clearOrphanCountersFromRangeDeletionTasks(opCtx);
                 }
 
-                // TODO (SERVER-62325): Remove collMod draining mechanism after 6.0 branching.
-                if (actualVersion > requestedVersion &&
-                    requestedVersion < multiversion::FeatureCompatibilityVersion::kVersion_6_0) {
-                    // No more collMod coordinators will start because we have already switched
-                    // the FCV value to kDowngrading. Wait for the ongoing collMod coordinators to
-                    // finish.
-                    ShardingDDLCoordinatorService::getService(opCtx)
-                        ->waitForCoordinatorsOfGivenTypeToComplete(
-                            opCtx, DDLCoordinatorTypeEnum::kCollMod);
-                }
-
                 // TODO SERVER-65077: Remove FCV check once 6.0 is released
                 if (actualVersion > requestedVersion &&
                     !gFeatureFlagFLE2.isEnabledOnVersion(requestedVersion)) {

@@ -334,7 +334,6 @@ env.Library(
         'cluster_pipeline_cmd_d.cpp',
         'cluster_write_cmd_d.cpp',
         'collmod_coordinator_document.idl',
-        'collmod_coordinator_pre60_compatible.cpp',
         'collmod_coordinator.cpp',
         'compact_structured_encryption_data_coordinator.cpp',
         'compact_structured_encryption_data_coordinator.idl',
