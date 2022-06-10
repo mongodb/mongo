@@ -50,6 +50,28 @@ namespace {
 NamespaceString makeTimeseriesBucketsNamespace(const NamespaceString& nss) {
     return nss.isTimeseriesBucketsCollection() ? nss : nss.makeTimeseriesBucketsNamespace();
 }
+
+/**
+ * Converts the key field on time to 'control.min.$timeField' field. Depends on error checking from
+ * 'createBucketsSpecFromTimeseriesSpec()' which should be called before this function.
+ */
+BSONObj convertToTTLTimeField(const BSONObj& origKeyField, StringData timeField) {
+    BSONObjBuilder keyBuilder;
+    uassert(ErrorCodes::CannotCreateIndex,
+            str::stream() << "TTL indexes are single-field indexes, compound indexes do "
+                             "not support TTL. Index spec: "
+                          << origKeyField,
+            origKeyField.nFields() == 1);
+
+    const auto& firstElem = origKeyField.firstElement();
+    uassert(ErrorCodes::InvalidOptions,
+            "TTL indexes on non-time fields are not supported on time-series collections",
+            firstElem.fieldName() == timeField);
+
+    keyBuilder.appendAs(firstElem,
+                        str::stream() << timeseries::kControlMinFieldNamePrefix << timeField);
+    return keyBuilder.obj();
+}
 }  // namespace
 
 
@@ -83,7 +105,12 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
     std::vector<mongo::BSONObj> indexes;
     for (const auto& origIndex : origIndexes) {
         BSONObjBuilder builder;
+        BSONObj keyField;
+        BSONObj originalKeyField;
+        bool isTTLIndex = false;
+        bool hasPartialFilterOnMetaField = false;
         bool includeOriginalSpec = false;
+
         for (const auto& elem : origIndex) {
             if (elem.fieldNameStringData() == IndexDescriptor::kPartialFilterExprFieldName) {
                 if (feature_flags::gTimeseriesMetricIndexes.isEnabled(
@@ -135,7 +162,7 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                 // planner, this will be true.
                 bool assumeNoMixedSchemaData = true;
 
-                BSONObj bucketPred =
+                auto [hasMetricPred, bucketPred] =
                     BucketSpec::pushdownPredicate(expCtx,
                                                   options,
                                                   collationMatchesDefault,
@@ -144,6 +171,9 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                                                   includeMetaField,
                                                   assumeNoMixedSchemaData,
                                                   BucketSpec::IneligiblePredicatePolicy::kError);
+
+                hasPartialFilterOnMetaField = !hasMetricPred;
+
                 builder.append(IndexDescriptor::kPartialFilterExprFieldName, bucketPred);
                 continue;
             }
@@ -171,10 +201,10 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
             }
 
             if (elem.fieldNameStringData() == IndexDescriptor::kExpireAfterSecondsFieldName) {
-                uasserted(ErrorCodes::InvalidOptions,
-                          "TTL indexes are not supported on time-series collections");
+                isTTLIndex = true;
+                builder.append(elem);
+                continue;
             }
-
 
             if (elem.fieldNameStringData() == IndexDescriptor::kUniqueFieldName) {
                 uassert(ErrorCodes::InvalidOptions,
@@ -183,13 +213,16 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
             }
 
             if (elem.fieldNameStringData() == NewIndexSpec::kKeyFieldName) {
-                auto pluginName = IndexNames::findPluginName(elem.Obj());
+                originalKeyField = elem.Obj();
+
+                auto pluginName = IndexNames::findPluginName(originalKeyField);
                 uassert(ErrorCodes::InvalidOptions,
                         "Text indexes are not supported on time-series collections",
                         pluginName != IndexNames::TEXT);
 
                 auto bucketsIndexSpecWithStatus =
-                    timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(options, elem.Obj());
+                    timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(options,
+                                                                              originalKeyField);
                 uassert(ErrorCodes::CannotCreateIndex,
                         str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()
                                       << " Command request: " << redact(origCmd.toBSON({})),
@@ -201,9 +234,7 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                              << bucketsIndexSpecWithStatus.getValue()))) {
                     includeOriginalSpec = true;
                 }
-
-                builder.append(NewIndexSpec::kKeyFieldName,
-                               std::move(bucketsIndexSpecWithStatus.getValue()));
+                keyField = std::move(bucketsIndexSpecWithStatus.getValue());
                 continue;
             }
 
@@ -211,6 +242,19 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
             // through unchanged.
             builder.append(elem);
         }
+
+        if (isTTLIndex) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "TTL indexes are not supported on time-series collections",
+                    feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+                        serverGlobalParams.featureCompatibility));
+            uassert(ErrorCodes::InvalidOptions,
+                    "TTL indexes on time-series collections require a partialFilterExpression on "
+                    "the metaField",
+                    hasPartialFilterOnMetaField);
+            keyField = convertToTTLTimeField(originalKeyField, options.getTimeField());
+        }
+        builder.append(NewIndexSpec::kKeyFieldName, std::move(keyField));
 
         if (feature_flags::gTimeseriesMetricIndexes.isEnabled(
                 serverGlobalParams.featureCompatibility) &&

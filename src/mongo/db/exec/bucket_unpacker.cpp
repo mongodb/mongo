@@ -606,7 +606,7 @@ std::unique_ptr<MatchExpression> BucketSpec::createPredicatesOnBucketLevelField(
     return handleIneligible(policy, matchExpr, "can't handle this predicate");
 }
 
-BSONObj BucketSpec::pushdownPredicate(
+std::pair<bool, BSONObj> BucketSpec::pushdownPredicate(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const TimeseriesOptions& tsOptions,
     ExpressionContext::CollationMatchesDefault collationMatchesDefault,
@@ -666,7 +666,7 @@ BSONObj BucketSpec::pushdownPredicate(
         metaOnlyPredicate->serialize(&result);
     if (bucketMetricPredicate)
         bucketMetricPredicate->serialize(&result);
-    return result.obj();
+    return std::make_pair(bucketMetricPredicate.get(), result.obj());
 }
 
 class BucketUnpacker::UnpackingImpl {

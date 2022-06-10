@@ -167,8 +167,11 @@ public:
      *
      * When using IneligiblePredicatePolicy::kIgnore, if the predicate can't be pushed down, it
      * returns null. When using IneligiblePredicatePolicy::kError it raises a user error.
+     *
+     * Returns a boolean (alongside the bucket-level predicate) describing if the result contains
+     * a metric predicate.
      */
-    static BSONObj pushdownPredicate(
+    static std::pair<bool, BSONObj> pushdownPredicate(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const TimeseriesOptions& tsOptions,
         ExpressionContext::CollationMatchesDefault collationMatchesDefault,
