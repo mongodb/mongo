@@ -519,6 +519,11 @@ __txn_visible_all_id(WT_SESSION_IMPL *session, uint64_t id)
 
     txn = session->txn;
 
+    /* Make sure that checkpoint cursor transactions only read checkpoints, except for metadata. */
+    WT_ASSERT(session,
+      (session->dhandle != NULL && WT_IS_METADATA(session->dhandle)) ||
+        WT_READING_CHECKPOINT(session) == F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT));
+
     /*
      * When reading from a checkpoint, all readers use the same snapshot, so a transaction is
      * globally visible if it is visible in that snapshot. Note that this can cause things that were
@@ -528,8 +533,17 @@ __txn_visible_all_id(WT_SESSION_IMPL *session, uint64_t id)
      * was taken becomes not globally visible in the checkpoint) never happen as this violates basic
      * assumptions about visibility. (And, concretely, it can cause stale history store entries to
      * come back to life and produce wrong answers.)
+     *
+     * Note: we use the transaction to check this rather than testing WT_READING_CHECKPOINT because
+     * reading the metadata while working with a checkpoint cursor will borrow the transaction; it
+     * then ends up using it to read a non-checkpoint tree. This is believed to be ok because the
+     * metadata is always read-uncommitted, but we want to still use the checkpoint-cursor
+     * visibility logic. Using the regular visibility logic with a checkpoint cursor transaction can
+     * be logically invalid (it is possible that way for something to be globally visible but
+     * specifically invisible) and also can end up comparing transaction ids from different database
+     * opens.
      */
-    if (WT_READING_CHECKPOINT(session))
+    if (F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT))
         return (__wt_txn_visible_id_snapshot(
           id, txn->snap_min, txn->snap_max, txn->snapshot, txn->snapshot_count));
     oldest_id = __wt_txn_oldest_id(session);
@@ -568,8 +582,13 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t times
     if (timestamp == WT_TS_NONE)
         return (true);
 
+    /* Make sure that checkpoint cursor transactions only read checkpoints, except for metadata. */
+    WT_ASSERT(session,
+      (session->dhandle != NULL && WT_IS_METADATA(session->dhandle)) ||
+        WT_READING_CHECKPOINT(session) == F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT));
+
     /* When reading a checkpoint, use the checkpoint state instead of the current state. */
-    if (WT_READING_CHECKPOINT(session))
+    if (F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT))
         return (session->txn->checkpoint_oldest_timestamp != WT_TS_NONE &&
           timestamp <= session->txn->checkpoint_oldest_timestamp);
 
