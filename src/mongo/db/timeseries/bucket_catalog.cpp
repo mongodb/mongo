@@ -417,7 +417,7 @@ private:
     // The metadata of the data that this bucket contains.
     BucketMetadata _metadata;
 
-    // Top-level field names of the measurements that have been inserted into the bucket.
+    // Top-level hashed field names of the measurements that have been inserted into the bucket.
     StringSet _fieldNames;
 
     // Time field for the measurements that have been inserted into the bucket.
@@ -649,7 +649,8 @@ Status BucketCatalog::reopenBucket(OperationContext* opCtx,
     // Populate the top-level data field names.
     const BSONObj& dataObj = bucketDoc.getObjectField(timeseries::kBucketDataFieldName);
     for (const BSONElement& dataElem : dataObj) {
-        bucket->_fieldNames.insert(dataElem.fieldName());
+        auto hashedKey = StringSet::hasher().hashed_key(dataElem.fieldName());
+        bucket->_fieldNames.emplace(hashedKey);
     }
 
     auto swMinMax = timeseries::generateMinMaxFromBucketDoc(bucketDoc, coll->getDefaultCollator());
