@@ -550,15 +550,15 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         // 1) Drop all unfinished indexes.
         // 2) Start, but do not complete the index build process.
         WriteUnitOfWork wuow(opCtx);
-        auto indexCatalog = collection.getWritableCollection()->getIndexCatalog();
+        auto indexCatalog = collection.getWritableCollection(opCtx)->getIndexCatalog();
 
 
         for (size_t i = 0; i < indexNames.size(); i++) {
             auto descriptor = indexCatalog->findIndexByName(
                 opCtx, indexNames[i], IndexCatalog::InclusionPolicy::kReady);
             if (descriptor) {
-                Status s =
-                    indexCatalog->dropIndex(opCtx, collection.getWritableCollection(), descriptor);
+                Status s = indexCatalog->dropIndex(
+                    opCtx, collection.getWritableCollection(opCtx), descriptor);
                 if (!s.isOK()) {
                     return s;
                 }
@@ -598,7 +598,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
                     IndexCatalog::InclusionPolicy::kFrozen);
             if (descriptor) {
                 Status s = indexCatalog->dropUnfinishedIndex(
-                    opCtx, collection.getWritableCollection(), descriptor);
+                    opCtx, collection.getWritableCollection(opCtx), descriptor);
                 if (!s.isOK()) {
                     return s;
                 }
@@ -609,7 +609,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
                 catalog::removeIndex(
                     opCtx,
                     indexNames[i],
-                    collection.getWritableCollection(),
+                    collection.getWritableCollection(opCtx),
                     nullptr /* ident */,
                     // Unfinished or partially dropped indexes do not need two-phase drop b/c the
                     // incomplete index will never be recovered. This is an optimization that will
@@ -621,7 +621,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         // We need to initialize the collection to rebuild the indexes. The collection may already
         // be initialized when rebuilding indexes with rollback-via-refetch.
         if (!collection->isInitialized()) {
-            collection.getWritableCollection()->init(opCtx);
+            collection.getWritableCollection(opCtx)->init(opCtx);
         }
 
         auto dbName = nss.db().toString();
@@ -703,7 +703,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
 
     if (!collection->isInitialized()) {
         WriteUnitOfWork wuow(opCtx);
-        collection.getWritableCollection()->init(opCtx);
+        collection.getWritableCollection(opCtx)->init(opCtx);
         wuow.commit();
     }
 
@@ -1808,7 +1808,7 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
 
-    auto indexCatalog = collection.getWritableCollection()->getIndexCatalog();
+    auto indexCatalog = collection.getWritableCollection(opCtx)->getIndexCatalog();
     // Always run single phase index build for empty collection. And, will be coordinated using
     // createIndexes oplog entry.
     for (const auto& spec : specs) {
@@ -1821,7 +1821,7 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
         // timestamp.
         opObserver->onCreateIndex(opCtx, nss, collectionUUID, spec, fromMigrate);
         uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(
-            opCtx, collection.getWritableCollection(), spec));
+            opCtx, collection.getWritableCollection(opCtx), spec));
     }
 }
 

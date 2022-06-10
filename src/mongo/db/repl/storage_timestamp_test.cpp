@@ -162,7 +162,7 @@ Status createIndexFromSpec(OperationContext* opCtx,
     }
     WriteUnitOfWork wunit(opCtx);
     ASSERT_OK(indexer.commit(opCtx,
-                             collection.getWritableCollection(),
+                             collection.getWritableCollection(opCtx),
                              MultiIndexBlock::kNoopOnCreateEachFn,
                              MultiIndexBlock::kNoopOnCommitFn));
     LogicalTime indexTs = clock->tickClusterTime(1);
@@ -394,7 +394,7 @@ public:
             // Timestamping index completion. Primaries write an oplog entry.
             ASSERT_OK(
                 indexer.commit(_opCtx,
-                               coll.getWritableCollection(),
+                               coll.getWritableCollection(_opCtx),
                                [&](const BSONObj& indexSpec) {
                                    _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
                                        _opCtx, coll->ns(), coll->uuid(), indexSpec, false);
@@ -2787,7 +2787,7 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
         WriteUnitOfWork wuow(_opCtx);
         ASSERT_OK(
             indexer.commit(_opCtx,
-                           collection.getWritableCollection(),
+                           collection.getWritableCollection(_opCtx),
                            [&](const BSONObj& indexSpec) {
                                _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
                                    _opCtx, collection->ns(), collection->uuid(), indexSpec, false);

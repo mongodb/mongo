@@ -101,7 +101,7 @@ TEST_F(CollectionWriterTest, Commit) {
     {
         AutoGetCollection lock(operationContext(), kNss, MODE_X);
         WriteUnitOfWork wuow(operationContext());
-        auto writable = writer.getWritableCollection();
+        auto writable = writer.getWritableCollection(operationContext());
 
         // get() and getWritableCollection() should return the same instance
         ASSERT_EQ(writer.get().get(), writable);
@@ -128,7 +128,7 @@ TEST_F(CollectionWriterTest, Commit) {
     {
         AutoGetCollection lock(operationContext(), kNss, MODE_X);
         WriteUnitOfWork wuow(operationContext());
-        auto writable = writer.getWritableCollection();
+        auto writable = writer.getWritableCollection(operationContext());
 
         ASSERT_EQ(writer.get().get(), writable);
         ASSERT_EQ(writable, lookupCollectionFromCatalog().get());
@@ -153,7 +153,7 @@ TEST_F(CollectionWriterTest, Rollback) {
     {
         AutoGetCollection lock(operationContext(), kNss, MODE_X);
         WriteUnitOfWork wuow(operationContext());
-        auto writable = writer.getWritableCollection();
+        auto writable = writer.getWritableCollection(operationContext());
 
         ASSERT_EQ(writer.get().get(), writable);
         ASSERT_EQ(writable, lookupCollectionFromCatalog().get());
@@ -179,7 +179,7 @@ TEST_F(CollectionWriterTest, CommitAfterDestroy) {
             CollectionWriter writer(operationContext(), kNss);
 
             // Request a writable Collection and destroy CollectionWriter before WUOW commits
-            writable = writer.getWritableCollection();
+            writable = writer.getWritableCollection(operationContext());
         }
 
         wuow.commit();

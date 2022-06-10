@@ -164,7 +164,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
         }
         WriteUnitOfWork wunit(opCtx);
         ASSERT_OK(indexer.commit(opCtx,
-                                 collection.getWritableCollection(),
+                                 collection.getWritableCollection(opCtx),
                                  MultiIndexBlock::kNoopOnCreateEachFn,
                                  MultiIndexBlock::kNoopOnCommitFn));
         ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));

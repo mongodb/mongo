@@ -95,7 +95,8 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
                 UnreplicatedWritesBlock uwb(_opCtx.get());
                 // This enforces the buildIndexes setting in the replica set configuration.
                 CollectionWriter collWriter(_opCtx.get(), *_collection);
-                auto indexCatalog = collWriter.getWritableCollection()->getIndexCatalog();
+                auto indexCatalog =
+                    collWriter.getWritableCollection(_opCtx.get())->getIndexCatalog();
                 auto specs = indexCatalog->removeExistingIndexesNoChecks(
                     _opCtx.get(), collWriter.get(), secondaryIndexSpecs);
                 if (specs.size()) {

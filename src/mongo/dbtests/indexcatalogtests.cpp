@@ -205,7 +205,7 @@ public:
             CollectionWriter coll(&opCtx, autoColl);
 
             WriteUnitOfWork wuow(&opCtx);
-            coll.getWritableCollection()->updateTTLSetting(&opCtx, "x_1", 10);
+            coll.getWritableCollection(&opCtx)->updateTTLSetting(&opCtx, "x_1", 10);
             wuow.commit();
         }
 
@@ -219,8 +219,8 @@ public:
 
             // Notify the catalog of the change.
             WriteUnitOfWork wuow(&opCtx);
-            desc = coll.getWritableCollection()->getIndexCatalog()->refreshEntry(
-                &opCtx, coll.getWritableCollection(), desc, CreateIndexEntryFlags::kIsReady);
+            desc = coll.getWritableCollection(&opCtx)->getIndexCatalog()->refreshEntry(
+                &opCtx, coll.getWritableCollection(&opCtx), desc, CreateIndexEntryFlags::kIsReady);
             wuow.commit();
         }
 

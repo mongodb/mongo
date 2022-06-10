@@ -176,7 +176,7 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
         // If this is called from the repair path, the collection is already initialized.
         if (!collection->isInitialized()) {
             WriteUnitOfWork wuow(opCtx);
-            collection.getWritableCollection()->init(opCtx);
+            collection.getWritableCollection(opCtx)->init(opCtx);
             wuow.commit();
         }
     }
@@ -526,14 +526,14 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     auto opObserver = serviceContext->getOpObserver();
     auto isOplogDisabledForNamespace = replCoord->isOplogDisabledFor(opCtx, nss);
     if (dropOpTime.isNull() && isOplogDisabledForNamespace) {
-        _dropCollectionIndexes(opCtx, nss, collection.getWritableCollection());
+        _dropCollectionIndexes(opCtx, nss, collection.getWritableCollection(opCtx));
         opObserver->onDropCollection(opCtx,
                                      nss,
                                      uuid,
                                      numRecords,
                                      OpObserver::CollectionDropType::kOnePhase,
                                      markFromMigrate);
-        return _finishDropCollection(opCtx, nss, collection.getWritableCollection());
+        return _finishDropCollection(opCtx, nss, collection.getWritableCollection(opCtx));
     }
 
     // Replicated collections should be dropped in two phases.
@@ -542,7 +542,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     // storage engine and will no longer be visible at the catalog layer with 3.6-style
     // <db>.system.drop.* namespaces.
     if (serviceContext->getStorageEngine()->supportsPendingDrops()) {
-        _dropCollectionIndexes(opCtx, nss, collection.getWritableCollection());
+        _dropCollectionIndexes(opCtx, nss, collection.getWritableCollection(opCtx));
 
         auto commitTimestamp = opCtx->recoveryUnit()->getCommitTimestamp();
         LOGV2(20314,
@@ -578,7 +578,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
                       str::stream() << "OpTime is not null. OpTime: " << opTime.toString());
         }
 
-        return _finishDropCollection(opCtx, nss, collection.getWritableCollection());
+        return _finishDropCollection(opCtx, nss, collection.getWritableCollection(opCtx));
     }
 
     // Old two-phase drop: Replicated collections will be renamed with a special drop-pending
@@ -712,7 +712,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     // Set the namespace of 'collToRename' from within the CollectionCatalog. This is necessary
     // because the CollectionCatalog manages the necessary isolation for this Collection until the
     // WUOW commits.
-    auto writableCollection = collToRename.getWritableCollection();
+    auto writableCollection = collToRename.getWritableCollection(opCtx);
     Status status = writableCollection->rename(opCtx, toNss, stayTemp);
     if (!status.isOK())
         return status;

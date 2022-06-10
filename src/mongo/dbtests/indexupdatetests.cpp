@@ -100,7 +100,7 @@ protected:
             uassertStatusOK(indexer.insertAllDocumentsInCollection(_opCtx, collection().get()));
             WriteUnitOfWork wunit(_opCtx);
             ASSERT_OK(indexer.commit(_opCtx,
-                                     collection().getWritableCollection(),
+                                     collection().getWritableCollection(_opCtx),
                                      MultiIndexBlock::kNoopOnCreateEachFn,
                                      MultiIndexBlock::kNoopOnCommitFn));
             wunit.commit();
@@ -169,7 +169,7 @@ public:
 
         WriteUnitOfWork wunit(_opCtx);
         ASSERT_OK(indexer.commit(_opCtx,
-                                 coll.getWritableCollection(),
+                                 coll.getWritableCollection(_opCtx),
                                  MultiIndexBlock::kNoopOnCreateEachFn,
                                  MultiIndexBlock::kNoopOnCommitFn));
         wunit.commit();
@@ -250,8 +250,8 @@ public:
             {
                 WriteUnitOfWork wunit(_opCtx);
                 // Drop all indexes including id index.
-                coll.getWritableCollection()->getIndexCatalog()->dropAllIndexes(
-                    _opCtx, coll.getWritableCollection(), true, {});
+                coll.getWritableCollection(_opCtx)->getIndexCatalog()->dropAllIndexes(
+                    _opCtx, coll.getWritableCollection(_opCtx), true, {});
                 // Insert some documents.
                 int32_t nDocs = 1000;
                 OpDebug* const nullOpDebug = nullptr;
@@ -352,7 +352,7 @@ Status IndexBuildBase::createIndex(const BSONObj& indexSpec) {
     }
     WriteUnitOfWork wunit(_opCtx);
     ASSERT_OK(indexer.commit(_opCtx,
-                             collection().getWritableCollection(),
+                             collection().getWritableCollection(_opCtx),
                              MultiIndexBlock::kNoopOnCreateEachFn,
                              MultiIndexBlock::kNoopOnCommitFn));
     wunit.commit();

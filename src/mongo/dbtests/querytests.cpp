@@ -136,7 +136,7 @@ protected:
         {
             WriteUnitOfWork wunit(&_opCtx);
             uassertStatusOK(indexer.commit(&_opCtx,
-                                           collection.getWritableCollection(),
+                                           collection.getWritableCollection(&_opCtx),
                                            MultiIndexBlock::kNoopOnCreateEachFn,
                                            MultiIndexBlock::kNoopOnCommitFn));
             wunit.commit();

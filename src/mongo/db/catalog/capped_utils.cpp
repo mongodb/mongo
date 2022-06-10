@@ -97,7 +97,7 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
 
     WriteUnitOfWork wuow(opCtx);
 
-    auto writableCollection = collection.getWritableCollection();
+    auto writableCollection = collection.getWritableCollection(opCtx);
     Status status = writableCollection->truncate(opCtx);
     if (!status.isOK()) {
         return status;

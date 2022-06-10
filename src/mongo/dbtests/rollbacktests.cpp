@@ -86,7 +86,7 @@ Status renameCollection(OperationContext* opCtx,
 }
 Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) {
     CollectionWriter coll(opCtx, nss);
-    return coll.getWritableCollection()->truncate(opCtx);
+    return coll.getWritableCollection(opCtx)->truncate(opCtx);
 }
 
 void insertRecord(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& data) {
@@ -146,10 +146,11 @@ size_t getNumIndexEntries(OperationContext* opCtx,
 
 void dropIndex(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
     CollectionWriter coll(opCtx, nss);
-    auto desc = coll.getWritableCollection()->getIndexCatalog()->findIndexByName(opCtx, idxName);
+    auto desc =
+        coll.getWritableCollection(opCtx)->getIndexCatalog()->findIndexByName(opCtx, idxName);
     ASSERT(desc);
-    ASSERT_OK(coll.getWritableCollection()->getIndexCatalog()->dropIndex(
-        opCtx, coll.getWritableCollection(), desc));
+    ASSERT_OK(coll.getWritableCollection(opCtx)->getIndexCatalog()->dropIndex(
+        opCtx, coll.getWritableCollection(opCtx), desc));
 }
 }  // namespace
 
@@ -499,9 +500,9 @@ public:
 
         {
             WriteUnitOfWork uow(&opCtx);
-            IndexCatalog* catalog = coll.getWritableCollection()->getIndexCatalog();
-            ASSERT_OK(
-                catalog->createIndexOnEmptyCollection(&opCtx, coll.getWritableCollection(), spec));
+            IndexCatalog* catalog = coll.getWritableCollection(&opCtx)->getIndexCatalog();
+            ASSERT_OK(catalog->createIndexOnEmptyCollection(
+                &opCtx, coll.getWritableCollection(&opCtx), spec));
             insertRecord(&opCtx, nss, BSON("a" << 1));
             insertRecord(&opCtx, nss, BSON("a" << 2));
             insertRecord(&opCtx, nss, BSON("a" << 3));
@@ -539,9 +540,9 @@ public:
 
         {
             WriteUnitOfWork uow(&opCtx);
-            IndexCatalog* catalog = coll.getWritableCollection()->getIndexCatalog();
-            ASSERT_OK(
-                catalog->createIndexOnEmptyCollection(&opCtx, coll.getWritableCollection(), spec));
+            IndexCatalog* catalog = coll.getWritableCollection(&opCtx)->getIndexCatalog();
+            ASSERT_OK(catalog->createIndexOnEmptyCollection(
+                &opCtx, coll.getWritableCollection(&opCtx), spec));
             insertRecord(&opCtx, nss, BSON("a" << 1));
             insertRecord(&opCtx, nss, BSON("a" << 2));
             insertRecord(&opCtx, nss, BSON("a" << 3));
@@ -594,10 +595,10 @@ public:
 
         {
             WriteUnitOfWork uow(&opCtx);
-            IndexCatalog* catalog = coll.getWritableCollection()->getIndexCatalog();
+            IndexCatalog* catalog = coll.getWritableCollection(&opCtx)->getIndexCatalog();
 
-            ASSERT_OK(
-                catalog->createIndexOnEmptyCollection(&opCtx, coll.getWritableCollection(), spec));
+            ASSERT_OK(catalog->createIndexOnEmptyCollection(
+                &opCtx, coll.getWritableCollection(&opCtx), spec));
             insertRecord(&opCtx, nss, BSON("a" << 1));
             insertRecord(&opCtx, nss, BSON("a" << 2));
             insertRecord(&opCtx, nss, BSON("a" << 3));
@@ -649,7 +650,7 @@ public:
             ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, false));
             ASSERT(collectionExists(&opCtx, &ctx, nss.ns()));
             CollectionWriter coll(&opCtx, nss);
-            auto writableColl = coll.getWritableCollection();
+            auto writableColl = coll.getWritableCollection(&opCtx);
             IndexCatalog* catalog = writableColl->getIndexCatalog();
 
             ASSERT_OK(catalog->createIndexOnEmptyCollection(&opCtx, writableColl, specA));

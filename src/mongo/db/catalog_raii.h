@@ -386,7 +386,7 @@ public:
 
     // Returns writable Collection, any previous Collection that has been returned may be
     // invalidated.
-    Collection* getWritableCollection();
+    Collection* getWritableCollection(OperationContext* opCtx);
 
 private:
     // If this class is instantiated with the constructors that take UUID or nss we need somewhere
@@ -397,7 +397,6 @@ private:
     const CollectionPtr* _collection = nullptr;
     CollectionPtr _storedCollection;
     Collection* _writableCollection = nullptr;
-    OperationContext* _opCtx = nullptr;
 
     // Indicates if this instance is managing Collection pointers through commit and rollback.
     bool _managed;

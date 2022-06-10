@@ -478,7 +478,6 @@ struct CollectionWriter::SharedImpl {
 
 CollectionWriter::CollectionWriter(OperationContext* opCtx, const UUID& uuid)
     : _collection(&_storedCollection),
-      _opCtx(opCtx),
       _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
@@ -490,7 +489,6 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const UUID& uuid)
 
 CollectionWriter::CollectionWriter(OperationContext* opCtx, const NamespaceString& nss)
     : _collection(&_storedCollection),
-      _opCtx(opCtx),
       _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
     _storedCollection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
@@ -502,7 +500,6 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const NamespaceStrin
 
 CollectionWriter::CollectionWriter(OperationContext* opCtx, AutoGetCollection& autoCollection)
     : _collection(&autoCollection.getCollection()),
-      _opCtx(opCtx),
       _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
     _sharedImpl->_writableCollectionInitializer = [&autoCollection, opCtx]() {
@@ -523,7 +520,7 @@ CollectionWriter::~CollectionWriter() {
     }
 }
 
-Collection* CollectionWriter::getWritableCollection() {
+Collection* CollectionWriter::getWritableCollection(OperationContext* opCtx) {
     // Acquire writable instance lazily if not already available
     if (!_writableCollection) {
         _writableCollection = _sharedImpl->_writableCollectionInitializer();
@@ -539,7 +536,7 @@ Collection* CollectionWriter::getWritableCollection() {
             // and re-clone the Collection if a new write unit of work is opened. Holds the back
             // pointer to the CollectionWriter explicitly so we can detect if the instance is
             // already destroyed.
-            _opCtx->recoveryUnit()->registerChange(
+            opCtx->recoveryUnit()->registerChange(
                 [shared = _sharedImpl](boost::optional<Timestamp>) {
                     if (shared->_parent)
                         shared->_parent->_writableCollection = nullptr;
