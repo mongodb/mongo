@@ -5829,12 +5829,16 @@ tasks:
   tags: ["multiversion_passthrough", "multiversion", "no_version_combination"]
   commands:
   - func: "generate resmoke tasks"
+    vars:
+      multiversion_exclude_tags_version: last_continuous
 
 - <<: *gen_task_template
   name: retryable_writes_downgrade_last_lts_gen
   tags: ["multiversion_passthrough", "multiversion", "no_version_combination"]
   commands:
   - func: "generate resmoke tasks"
+    vars:
+      multiversion_exclude_tags_version: last_lts
 
 - <<: *gen_task_template
   name: sharded_retryable_writes_downgrade_gen
