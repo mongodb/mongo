@@ -73,7 +73,7 @@ if not use_system_version_of_library('pcre'):
 
 if not use_system_version_of_library('pcre2'):
     thirdPartyEnvironmentModifications['pcre2'] = {
-        'CPPPATH': ['#/src/third_party/pcre2'],
+        'CPPPATH': ['#/src/third_party/pcre2/src'],
     }
 
 if not use_system_version_of_library('boost'):
