@@ -46,6 +46,21 @@ struct __wt_config_parser_impl {
 
 #define WT_CONFIG_ITEM_STATIC_INIT(n) static const WT_CONFIG_ITEM n = {"", 0, 0, WT_CONFIG_ITEM_NUM}
 
+/*
+ * If double quotes surround the string, then expand the string to include them. This is always
+ * called in the context of keys or values returned by the configuration parser. The character after
+ * the string must be at a valid memory address, and checking just that one is sufficient. If it is
+ * a double quote, then the character before must be as well, by the rules of the tokenizer.
+ */
+#define WT_CONFIG_PRESERVE_QUOTES(session, item)        \
+    do {                                                \
+        if ((item)->str[(item)->len] == '"') {          \
+            WT_ASSERT(session, (item)->str[-1] == '"'); \
+            (item)->str -= 1;                           \
+            (item)->len += 2;                           \
+        }                                               \
+    } while (0)
+
 #define WT_CONFIG_UNSET (-1)
 /*
  * DO NOT EDIT: automatically built by dist/api_config.py.
