@@ -103,7 +103,7 @@ static const char *const uri_rev = "table:rev";
     "create,log=(file_max=10M,enabled)," \
     "transaction_sync=(enabled,method=%s)"
 #define ENV_CONFIG_TIER \
-    ",tiered_storage=(bucket=./bucket,bucket_prefix=rdio-,local_retention=2,name=dir_store)"
+    ",tiered_storage=(bucket=./bucket,bucket_prefix=pfx-,local_retention=2,name=dir_store)"
 #define ENV_CONFIG_TIER_EXT                                  \
     ",extensions=(%s../../../ext/storage_sources/dir_store/" \
     "libwiredtiger_dir_store.so=(early_load=true))"
@@ -517,7 +517,7 @@ thread_flush_run(void *arg)
         testutil_check(pthread_rwlock_wrlock(&flush_lock));
         testutil_check(session->flush_tier(session, NULL));
         testutil_check(pthread_rwlock_unlock(&flush_lock));
-        printf("Flush tier %" PRIu32 " completed.\n", i);
+        printf("Flush tier %" PRIu32 " completed.\n", ++i);
         fflush(stdout);
     }
     /* NOTREACHED */

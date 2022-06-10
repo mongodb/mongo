@@ -55,7 +55,8 @@ static char home[1024]; /* Program working dir */
  * inserted and it records the timestamp that was used for that insertion.
  */
 #define INVALID_KEY UINT64_MAX
-#define MAX_CKPT_INVL 2 /* Maximum interval between checkpoints */
+#define MAX_CKPT_INVL 6  /* Maximum interval between checkpoints */
+#define MAX_FLUSH_INVL 4 /* Maximum interval between flush_tier calls */
 /* Set large, some slow I/O systems take tens of seconds to fsync. */
 #define MAX_STARTUP 30 /* Seconds to start up and set stable */
 #define MAX_TH 12
@@ -75,7 +76,7 @@ static const char *const uri_collection = "table:collection";
 
 static const char *const ckpt_file = "checkpoint_done";
 
-static bool compat, inmem, use_columns, use_ts, use_txn;
+static bool compat, inmem, tiered, use_columns, use_ts, use_txn;
 static volatile bool stable_set;
 static volatile uint64_t global_ts = 1;
 static volatile uint64_t uid = 1;
@@ -85,11 +86,22 @@ typedef struct {
 } THREAD_TS;
 static volatile THREAD_TS th_ts[MAX_TH];
 
+/*
+ * TODO: WT-7833 Lock to coordinate inserts and flush_tier. This lock should be removed when that
+ * ticket is fixed. Flush_tier should be able to run with ongoing operations.
+ */
+static pthread_rwlock_t flush_lock;
+
 #define ENV_CONFIG_COMPAT ",compatibility=(release=\"2.9\")"
 #define ENV_CONFIG_DEF                                        \
     "create,"                                                 \
     "eviction_updates_trigger=95,eviction_updates_target=80," \
     "log=(enabled,file_max=10M,remove=false)"
+#define ENV_CONFIG_TIER \
+    ",tiered_storage=(bucket=./bucket,bucket_prefix=pfx-,local_retention=2,name=dir_store)"
+#define ENV_CONFIG_TIER_EXT                                   \
+    ",extensions=(../../../../ext/storage_sources/dir_store/" \
+    "libwiredtiger_dir_store.so=(early_load=true))"
 #define ENV_CONFIG_TXNSYNC \
     ENV_CONFIG_DEF         \
     ",transaction_sync=(enabled,method=none)"
@@ -245,7 +257,7 @@ test_bulk_unique(THREAD_DATA *td, int force)
     WT_DECL_RET;
     WT_SESSION *session;
     uint64_t my_uid;
-    char new_uri[64];
+    char dropconf[128], new_uri[64];
 
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
@@ -267,9 +279,13 @@ test_bulk_unique(THREAD_DATA *td, int force)
     else if (ret != EINVAL)
         testutil_die(ret, "session.open_cursor bulk unique: %s, new_uri");
 
-    while ((ret = session->drop(session, new_uri, force ? "force" : NULL)) != 0)
+    testutil_check(__wt_snprintf(dropconf, sizeof(dropconf), "force=%s", force ? "true" : "false"));
+    /* For testing we want to remove objects too. */
+    if (tiered)
+        strcat(dropconf, ",remove_shared=true");
+    while ((ret = session->drop(session, new_uri, dropconf)) != 0)
         if (ret != EBUSY)
-            testutil_die(ret, "session.drop: %s", new_uri);
+            testutil_die(ret, "session.drop: %s %s", new_uri, dropconf);
 
     if (use_txn && (ret = session->commit_transaction(session, NULL)) != 0 && ret != EINVAL)
         testutil_die(ret, "session.commit bulk unique");
@@ -407,6 +423,9 @@ test_upgrade(THREAD_DATA *td)
     WT_DECL_RET;
     WT_SESSION *session;
 
+    /* FIXME-WT-9423 Remove this return when tiered storage supports upgrade. */
+    if (tiered)
+        return;
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
     if ((ret = session->upgrade(session, uri, NULL)) != 0)
@@ -426,6 +445,9 @@ test_verify(THREAD_DATA *td)
     WT_DECL_RET;
     WT_SESSION *session;
 
+    /* FIXME-WT-9423 Remove this return when tiered storage supports verify. */
+    if (tiered)
+        return;
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
     if ((ret = session->verify(session, uri, NULL)) != 0)
@@ -442,8 +464,8 @@ test_verify(THREAD_DATA *td)
 static WT_THREAD_RET
 thread_ts_run(void *arg)
 {
-    WT_SESSION *session;
     THREAD_DATA *td;
+    WT_SESSION *session;
     uint64_t i, last_ts, oldest_ts, this_ts;
     char tscfg[64];
 
@@ -501,9 +523,9 @@ thread_ckpt_run(void *arg)
 {
     struct timespec now, start;
     FILE *fp;
+    THREAD_DATA *td;
     WT_RAND_STATE rnd;
     WT_SESSION *session;
-    THREAD_DATA *td;
     uint64_t ts;
     uint32_t sleep_time;
     int i;
@@ -569,6 +591,38 @@ thread_ckpt_run(void *arg)
 }
 
 /*
+ * thread_flush_run --
+ *     Runner function for the flush_tier thread.
+ */
+static WT_THREAD_RET
+thread_flush_run(void *arg)
+{
+    THREAD_DATA *td;
+    WT_RAND_STATE rnd;
+    WT_SESSION *session;
+    uint32_t i, sleep_time;
+
+    __wt_random_init(&rnd);
+
+    td = (THREAD_DATA *)arg;
+    testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
+    for (i = 0;;) {
+        sleep_time = __wt_random(&rnd) % MAX_FLUSH_INVL;
+        sleep(sleep_time);
+        /*
+         * Currently not testing any of the flush tier configuration strings other than defaults. We
+         * expect the defaults are what MongoDB wants for now.
+         */
+        testutil_check(pthread_rwlock_wrlock(&flush_lock));
+        testutil_check(session->flush_tier(session, NULL));
+        testutil_check(pthread_rwlock_unlock(&flush_lock));
+        printf("Flush tier %" PRIu32 " completed.\n", ++i);
+        fflush(stdout);
+    }
+    /* NOTREACHED */
+}
+
+/*
  * thread_run --
  *     Runner function for the worker threads.
  */
@@ -576,11 +630,11 @@ static WT_THREAD_RET
 thread_run(void *arg)
 {
     FILE *fp;
+    THREAD_DATA *td;
     WT_CURSOR *cur_coll, *cur_local, *cur_oplog;
     WT_ITEM data;
     WT_RAND_STATE rnd;
     WT_SESSION *oplog_session, *session;
-    THREAD_DATA *td;
     uint64_t i, stable_ts;
     char cbuf[MAX_VAL], lbuf[MAX_VAL], obuf[MAX_VAL];
     char kname[64], tscfg[64];
@@ -682,6 +736,7 @@ thread_run(void *arg)
         if (use_ts)
             stable_ts = __wt_atomic_addv64(&global_ts, 1);
 
+        testutil_check(pthread_rwlock_rdlock(&flush_lock));
         testutil_check(session->begin_transaction(session, NULL));
         if (use_prep)
             testutil_check(oplog_session->begin_transaction(oplog_session, NULL));
@@ -758,6 +813,7 @@ thread_run(void *arg)
         data.data = lbuf;
         cur_local->set_value(cur_local, &data);
         testutil_check(cur_local->insert(cur_local));
+        testutil_check(pthread_rwlock_unlock(&flush_lock));
 
         /*
          * Save the timestamp and key separately for checking later.
@@ -782,11 +838,11 @@ run_workload(uint32_t nth)
     WT_SESSION *session;
     THREAD_DATA *td;
     wt_thread_t *thr;
-    uint32_t ckpt_id, i, ts_id;
-    char envconf[512], tableconf[128];
+    uint32_t ckpt_id, flush_id, i, ts_id;
+    char envconf[1024], tableconf[128];
 
-    thr = dcalloc(nth + 2, sizeof(*thr));
-    td = dcalloc(nth + 2, sizeof(THREAD_DATA));
+    thr = dcalloc(nth + 3, sizeof(*thr));
+    td = dcalloc(nth + 3, sizeof(THREAD_DATA));
     stable_set = false;
     if (chdir(home) != 0)
         testutil_die(errno, "Child chdir: %s", home);
@@ -796,6 +852,10 @@ run_workload(uint32_t nth)
         strcpy(envconf, ENV_CONFIG_TXNSYNC);
     if (compat)
         strcat(envconf, ENV_CONFIG_COMPAT);
+    if (tiered) {
+        strcat(envconf, ENV_CONFIG_TIER_EXT);
+        strcat(envconf, ENV_CONFIG_TIER);
+    }
 
     testutil_check(wiredtiger_open(NULL, &event_handler, envconf, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
@@ -829,6 +889,13 @@ run_workload(uint32_t nth)
         td[ts_id].info = nth;
         printf("Create timestamp thread\n");
         testutil_check(__wt_thread_create(NULL, &thr[ts_id], thread_ts_run, &td[ts_id]));
+    }
+    flush_id = nth + 2;
+    if (tiered) {
+        td[flush_id].conn = conn;
+        td[flush_id].info = nth;
+        printf("Create flush_tier thread\n");
+        testutil_check(__wt_thread_create(NULL, &thr[flush_id], thread_flush_run, &td[flush_id]));
     }
     printf("Create %" PRIu32 " writer threads\n", nth);
     for (i = 0; i < nth; ++i) {
@@ -918,14 +985,14 @@ main(int argc, char *argv[])
     uint64_t stable_fp, stable_val;
     uint32_t i, nth, timeout;
     int ch, status;
-    char buf[512], statname[1024];
+    char buf[1024], statname[1024];
     char fname[64], kname[64];
     const char *working_dir;
     bool fatal, preserve, rand_th, rand_time, verify_only;
 
     (void)testutil_set_progname(argv);
 
-    compat = inmem = false;
+    compat = inmem = tiered = false;
     use_ts = true;
     /*
      * Setting this to false forces us to use internal library code. Allow an override but default
@@ -939,8 +1006,11 @@ main(int argc, char *argv[])
     verify_only = false;
     working_dir = "WT_TEST.schema-abort";
 
-    while ((ch = __wt_getopt(progname, argc, argv, "Cch:mpT:t:vxz")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "BCch:mpT:t:vxz")) != EOF)
         switch (ch) {
+        case 'B':
+            tiered = true;
+            break;
         case 'C':
             compat = true;
             break;
@@ -981,6 +1051,7 @@ main(int argc, char *argv[])
     if (argc != 0)
         usage();
 
+    testutil_check(pthread_rwlock_init(&flush_lock, NULL));
     testutil_work_dir_from_path(home, sizeof(home), working_dir);
     /*
      * If the user wants to verify they need to tell us how many threads there were so we can find
@@ -992,6 +1063,10 @@ main(int argc, char *argv[])
     }
     if (!verify_only) {
         testutil_make_work_dir(home);
+        if (tiered) {
+            testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/bucket", home));
+            testutil_make_work_dir(buf);
+        }
 
         __wt_random_init_seed(NULL, &rnd);
         if (rand_time) {
@@ -1008,8 +1083,9 @@ main(int argc, char *argv[])
         printf("Parent: compatibility: %s, in-mem log sync: %s, timestamp in use: %s\n",
           compat ? "true" : "false", inmem ? "true" : "false", use_ts ? "true" : "false");
         printf("Parent: Create %" PRIu32 " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
-        printf("CONFIG: %s%s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 "\n", progname,
-          compat ? " -C" : "", inmem ? " -m" : "", !use_ts ? " -z" : "", working_dir, nth, timeout);
+        printf("CONFIG: %s%s%s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 "\n", progname,
+          compat ? " -C" : "", inmem ? " -m" : "", tiered ? " -B" : "", !use_ts ? " -z" : "",
+          working_dir, nth, timeout);
         /*
          * Fork a child to insert as many items. We will then randomly kill the child, run recovery
          * and make sure all items we wrote exist after recovery runs.
@@ -1059,10 +1135,15 @@ main(int argc, char *argv[])
     testutil_copy_data(home);
     printf("Open database, run recovery and verify content\n");
 
+    strcpy(buf, ENV_CONFIG_REC);
+    if (tiered) {
+        strcat(buf, ENV_CONFIG_TIER_EXT);
+        strcat(buf, ENV_CONFIG_TIER);
+    }
     /*
      * Open the connection which forces recovery to be run.
      */
-    testutil_check(wiredtiger_open(NULL, &event_handler, ENV_CONFIG_REC, &conn));
+    testutil_check(wiredtiger_open(NULL, &event_handler, buf, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     /*
      * Open a cursor on all the tables.
