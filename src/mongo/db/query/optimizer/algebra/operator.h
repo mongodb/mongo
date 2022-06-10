@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <stddef.h>
+#include <utility>
 #include <vector>
 
 #include "mongo/util/concepts.h"
