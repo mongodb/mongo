@@ -42,6 +42,7 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/parsed_distinct.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_solution.h"
@@ -157,7 +158,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    size_t plannerOptions = 0);
+    const QueryPlannerParams& plannerOptions);
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     OperationContext* opCtx,
@@ -192,7 +193,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     bool permitYield = false,
-    size_t plannerOptions = QueryPlannerParams::DEFAULT);
+    QueryPlannerParams plannerOptions = QueryPlannerParams{});
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     OperationContext* opCtx,

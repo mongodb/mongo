@@ -873,6 +873,41 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
     return true;
 }
 
+// This function is used to check if the given index pattern and direction in the traversal
+// preference can be used to satisfy the given sort pattern (specifically for time series
+// collections).
+bool sortMatchesTraversalPreference(const TraversalPreference& traversalPreference,
+                                    const BSONObj& indexPattern) {
+    BSONObjIterator sortIter(traversalPreference.sortPattern);
+    BSONObjIterator indexIter(indexPattern);
+    while (sortIter.more() && indexIter.more()) {
+        BSONElement sortPart = sortIter.next();
+        BSONElement indexPart = indexIter.next();
+
+        if (!sortPart.isNumber() || !indexPart.isNumber()) {
+            return false;
+        }
+
+        // If the field doesn't match or the directions don't match, we return false.
+        if (strcmp(sortPart.fieldName(), indexPart.fieldName()) != 0 ||
+            (sortPart.safeNumberInt() > 0) != (indexPart.safeNumberInt() > 0)) {
+            return false;
+        }
+    }
+
+    if (!indexIter.more() && sortIter.more()) {
+        // The sort still has more, so it cannot be a prefix of the index.
+        return false;
+    }
+    return true;
+}
+
+bool isShardedCollScan(QuerySolutionNode* solnRoot) {
+    return solnRoot->getType() == StageType::STAGE_SHARDING_FILTER &&
+        solnRoot->children.size() == 1 &&
+        solnRoot->children[0]->getType() == StageType::STAGE_COLLSCAN;
+}
+
 // static
 std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
     const CanonicalQuery& query,
@@ -882,6 +917,28 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
     *blockingSortOut = false;
 
     const FindCommandRequest& findCommand = query.getFindCommandRequest();
+    if (params.traversalPreference) {
+        // If we've been passed a traversal preference, we might want to reverse the order we scan
+        // the data to avoid a blocking sort later in the pipeline.
+        auto providedSorts = solnRoot->providedSorts();
+
+        BSONObj solnSortPattern;
+        if (solnRoot->getType() == StageType::STAGE_COLLSCAN || isShardedCollScan(solnRoot.get())) {
+            BSONObjBuilder builder;
+            builder.append(params.traversalPreference->clusterField, 1);
+            solnSortPattern = builder.obj();
+        } else {
+            solnSortPattern = providedSorts.getBaseSortPattern();
+        }
+
+        if (sortMatchesTraversalPreference(params.traversalPreference.get(), solnSortPattern) &&
+            QueryPlannerCommon::scanDirectionsEqual(solnRoot.get(),
+                                                    -params.traversalPreference->direction)) {
+            QueryPlannerCommon::reverseScans(solnRoot.get(), true);
+            return solnRoot;
+        }
+    }
+
     const BSONObj& sortObj = findCommand.getSort();
 
     if (sortObj.isEmpty()) {

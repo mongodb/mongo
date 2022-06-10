@@ -58,9 +58,24 @@ struct SecondaryCollectionInfo {
     long long storageSizeBytes{0};
 };
 
+
+// This holds information about the internal traversal preference used for time series. If we choose
+// an index that involves fields we're interested in, we prefer a specific direction to avoid a
+// blocking sort.
+struct TraversalPreference {
+    // If we end up with an index that provides {sortPattern}, we prefer to scan it in direction
+    // {direction}.
+    BSONObj sortPattern;
+    int direction;
+    // Cluster key for the collection this query accesses (for time-series it's control.min.time).
+    // If a collection scan is chosen, this will be compared against the sortPattern to see if we
+    // can satisfy the traversal preference.
+    std::string clusterField;
+};
+
 struct QueryPlannerParams {
-    QueryPlannerParams()
-        : options(DEFAULT),
+    QueryPlannerParams(size_t options = DEFAULT)
+        : options(options),
           indexFiltersApplied(false),
           maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions.load()),
           clusteredCollectionCollator(nullptr) {}
@@ -178,6 +193,8 @@ struct QueryPlannerParams {
 
     // List of information about any secondary collections that can be executed against.
     std::map<NamespaceString, SecondaryCollectionInfo> secondaryCollectionsInfo;
+
+    boost::optional<TraversalPreference> traversalPreference = boost::none;
 };
 
 }  // namespace mongo
