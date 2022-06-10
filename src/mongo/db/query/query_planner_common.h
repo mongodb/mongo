@@ -79,10 +79,17 @@ public:
     }
 
     /**
-     * Traverses the tree rooted at 'node'.  For every STAGE_IXSCAN encountered, reverse
-     * the scan direction and index bounds.
+     * Traverses the tree rooted at 'node'. Tests scan directions recursively to see if they are
+     * equal to the given direction argument. Returns true if they are and false otherwise.
      */
-    static void reverseScans(QuerySolutionNode* node);
+    static bool scanDirectionsEqual(QuerySolutionNode* node, int direction);
+
+    /**
+     * Traverses the tree rooted at 'node'.  For every STAGE_IXSCAN encountered, reverse
+     * the scan direction and index bounds, unless reverseCollScans equals true, in which case
+     * STAGE_COLLSCAN is reversed as well.
+     */
+    static void reverseScans(QuerySolutionNode* node, bool reverseCollScans = false);
 
     /**
      * Extracts all field names for the sortKey meta-projection and stores them in the returned

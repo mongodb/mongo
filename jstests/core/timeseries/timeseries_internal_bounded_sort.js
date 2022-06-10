@@ -105,21 +105,12 @@ function runTest(ascending) {
 
         // Check plan using control.max.t
         if (ascending) {
-            // TODO (SERVER-64994): We can remove this manual re-write once we support index
-            // direction hints
-            const opt = buckets
-                            .aggregate([
-                                {$sort: {'control.max.t': ascending ? 1 : -1}},
-                                unpackStage,
-                                {
-                                    $_internalBoundedSort: {
-                                        sortKey: {t: 1},
-                                        bound: {base: "max", offsetSeconds: -bucketMaxSpanSeconds}
-                                    }
-                                },
-                            ])
+            const opt = coll.aggregate(
+                                [
+                                    {$sort: {t: 1}},
+                                ],
+                                {hint: {t: -1}})
                             .toArray();
-
             assertSorted(opt, ascending);
             assert.eq(reference, opt);
         } else {
