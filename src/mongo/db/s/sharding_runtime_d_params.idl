@@ -32,8 +32,10 @@ server_parameters:
     rangeDeleterBatchSize:
         description: >-
           The maximum number of documents in each batch to delete during the cleanup stage of chunk
-          migration (or the cleanupOrphaned command). A value of 0 indicates that the system chooses
-          the default value (INT_MAX).
+          migration (or the cleanupOrphaned command). Between each batch, secondaryThrottle and
+          rangeDeleterBatchDelayMS will apply.
+
+          A value of 0 indicates that the system chooses the default value (INT_MAX).
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: rangeDeleterBatchSize
@@ -110,7 +112,7 @@ server_parameters:
         default: 10
 
     orphanCleanupDelaySecs:
-        description: 'How long to wait before starting cleanup of an emigrated chunk range.'
+        description: How long to wait before starting cleanup of an emigrated chunk range.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: orphanCleanupDelaySecs
