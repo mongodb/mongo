@@ -258,6 +258,7 @@ if (typeof _threadInject != "undefined") {
                 "doc_validation_error.js",
                 "merge_sort_collation.js",
                 "explode_for_sort_fetch.js",
+                "or_to_in.js",
                 "update_pipeline_shell_helpers.js",
                 "update_with_pipeline.js",
                 "verify_update_mods.js",
