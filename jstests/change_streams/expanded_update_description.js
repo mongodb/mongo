@@ -23,19 +23,21 @@ assert.commandWorked(db.coll.insert({
     _id: 100,
     "topLevelArray": [{subArray: [0, [0, [{bottomArray: [1, 2, kLargeStr]}]], 2, 3, kLargeStr]}],
     "arrayForReplacement": [0, 1, 2, 3],
-    "array.For.Resize": [kLargeStr, 1],
+    "arrayForResize": [kLargeStr, 1],
     obj: {
         'sub.obj': {'d.o.t.t.e.d.a.r.r.a.y..': [[{a: {'b.c': 1, field: kLargeStr}}, "truncated"]]}
     },
     'd.o.t.t.e.d.o.b.j.': {'sub.obj': {'b.c': 2}},
+    'objectWithNumericField': {'0': {'1': 'numeric', field: kLargeStr}},
     "arrayWithNumericField": [[{'0': "numeric", a: {'b.c': 1}, field: kLargeStr}]],
+    "arrayWithDotted.AndNumericFields": [[{'0': [{'1.2': {'a.b': null, c: kLargeStr}}]}]],
 }));
 
 const changeStreamCursor = cst.startWatchingChanges(
     {pipeline: [{$changeStream: {showExpandedEvents: true}}], collection: db.coll});
 
-// Test to verify that 'specialFields.arrayIndices' reports all the arrayIndices along a path in the
-// presence of nested arrays.
+// Test that a path which only contains non-dotted fields and array indices is not reported under
+// 'disambiguatedPaths'.
 assert.commandWorked(db.coll.update({_id: 100}, {
     $set: {"a": 2, "topLevelArray.0.subArray.1.1.0.bottomArray.2": 3, "arrayForReplacement": [0]}
 }));
@@ -49,42 +51,13 @@ let expected = {
             {"arrayForReplacement": [0], "a": 2, "topLevelArray.0.subArray.1.1.0.bottomArray.2": 3},
         removedFields: [],
         truncatedArrays: [],
-        specialFields: {
-            arrayIndices: {
-                "topLevelArray": [0],
-                "topLevelArray.0.subArray": [1],
-                "topLevelArray.0.subArray.1": [1],
-                "topLevelArray.0.subArray.1.1": [0],
-                "topLevelArray.0.subArray.1.1.0.bottomArray": [2],
-            },
-            dottedFields: {}
-        }
+        disambiguatedPaths: {}
     },
 };
 cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: [expected]});
 
-// Tests that an update modifying multiple array elements are all reported under
-// 'specialFields.arrayIndices'.
-assert.commandWorked(db.coll.update(
-    {_id: 100}, {$set: {"topLevelArray.0.subArray.2": 4, "topLevelArray.0.subArray.3": 5}}));
-expected = {
-    documentKey: {_id: 100},
-    ns: {db: "test", coll: "coll"},
-    operationType: "update",
-    updateDescription: {
-        updatedFields: {"topLevelArray.0.subArray.2": 4, "topLevelArray.0.subArray.3": 5},
-        removedFields: [],
-        truncatedArrays: [],
-        specialFields: {
-            arrayIndices: {topLevelArray: [0], "topLevelArray.0.subArray": [2, 3]},
-            dottedFields: {}
-        }
-    },
-};
-cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: [expected]});
-
-// Tests that an update modifying a non-array numeric field name is NOT reported under
-// 'specialFields.arrayIndices'.
+// Tests that an update modifying a non-array numeric field name is reported as a string rather than
+// as an integer under 'disambiguatedPaths'. Array indexes are reported as integers.
 assert.commandWorked(
     db.coll.update({_id: 100}, {$set: {"arrayWithNumericField.0.0.1": {"b.c": 1}}}));
 expected = {
@@ -95,16 +68,28 @@ expected = {
         updatedFields: {"arrayWithNumericField.0.0.1": {"b.c": 1}},
         removedFields: [],
         truncatedArrays: [],
-        specialFields: {
-            arrayIndices: {arrayWithNumericField: [0], "arrayWithNumericField.0": [0]},
-            dottedFields: {}
-        }
+        disambiguatedPaths: {"arrayWithNumericField.0.0.1": ["arrayWithNumericField", 0, 0, "1"]}
     },
 };
 cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: [expected]});
 
-// Tests that an update with $unset array does not report the array under
-// 'specialFields.arrayIndices'.
+// Tests that an update modifying a non-array numeric field name is reported when no array indices
+// or dotted fields are present.
+assert.commandWorked(db.coll.update({_id: 100}, {$set: {"objectWithNumericField.0.1": "updated"}}));
+expected = {
+    documentKey: {_id: 100},
+    ns: {db: "test", coll: "coll"},
+    operationType: "update",
+    updateDescription: {
+        updatedFields: {"objectWithNumericField.0.1": "updated"},
+        removedFields: [],
+        truncatedArrays: [],
+        disambiguatedPaths: {"objectWithNumericField.0.1": ["objectWithNumericField", "0", "1"]}
+    },
+};
+cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: [expected]});
+
+// Tests that an update with $unset array does not report the array under 'disambiguatedPaths'.
 assert.commandWorked(db.coll.update({_id: 100}, [{$unset: ["arrayForReplacement"]}]));
 expected = {
     documentKey: {_id: 100},
@@ -114,15 +99,14 @@ expected = {
         updatedFields: {},
         removedFields: ["arrayForReplacement"],
         truncatedArrays: [],
-        specialFields: {arrayIndices: {}, dottedFields: {}}
+        disambiguatedPaths: {}
     },
 };
 cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: [expected]});
 
-// Tests that an update with 'truncatedArrays' does not report the array under
-// 'specialFields.arrayIndices'.
+// Tests that an update with 'truncatedArrays' does not report the array under 'disambiguatedPaths'.
 assert.commandWorked(db.coll.update({_id: 100}, [
-    {$replaceWith: {$setField: {field: "array.For.Resize", input: '$$ROOT', value: [kLargeStr]}}},
+    {$replaceWith: {$setField: {field: "arrayForResize", input: '$$ROOT', value: [kLargeStr]}}},
 ]));
 expected = {
     documentKey: {_id: 100},
@@ -131,14 +115,13 @@ expected = {
     updateDescription: {
         updatedFields: {},
         removedFields: [],
-        truncatedArrays: [{field: "array.For.Resize", newSize: 1}],
-        specialFields: {arrayIndices: {}, dottedFields: {"": ["array.For.Resize"]}}
+        truncatedArrays: [{field: "arrayForResize", newSize: 1}],
+        disambiguatedPaths: {}
     },
 };
 cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: [expected]});
 
-// Verify that the top-level dotted fields are reported with empty path-prefix under
-// 'specialFields.dottedFields'.
+// Verify that top-level dotted fields are reported under 'disambiguatedPaths'.
 assert.commandWorked(db.coll.update({_id: 100}, [
     {
         $replaceWith:
@@ -154,13 +137,13 @@ expected = {
         updatedFields: {"d.o.t.t.e.d.o.b.j.": {subObj: 1}, "new.Field.": 1},
         removedFields: [],
         truncatedArrays: [],
-        specialFields: {arrayIndices: {}, dottedFields: {"": ["d.o.t.t.e.d.o.b.j.", "new.Field."]}}
+        disambiguatedPaths:
+            {"d.o.t.t.e.d.o.b.j.": ["d.o.t.t.e.d.o.b.j."], "new.Field.": ["new.Field."]}
     },
 };
 cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: [expected]});
 
-// Verify that a dotted fields can be reported under both 'specialFields.arrayIndices' and
-// 'specialFields.dottedFields'.
+// Test that a combination of dotted fields and array indices are reported in 'disambiguatedPaths'.
 assert.commandWorked(db.coll.update(
     {_id: 100}, [{
         $set: {
@@ -183,16 +166,39 @@ expected = {
         updatedFields: {"obj.sub.obj.d.o.t.t.e.d.a.r.r.a.y...0.0.a.b.c": 2},
         removedFields: [],
         truncatedArrays: [{field: "obj.sub.obj.d.o.t.t.e.d.a.r.r.a.y...0", newSize: 1}],
-        specialFields: {
-            arrayIndices: {
-                "obj.sub.obj.d.o.t.t.e.d.a.r.r.a.y..": [0],
-                "obj.sub.obj.d.o.t.t.e.d.a.r.r.a.y...0": [0]
-            },
-            dottedFields: {
-                "obj.sub.obj.d.o.t.t.e.d.a.r.r.a.y...0.0.a": ["b.c"],
-                "obj.sub.obj": ["d.o.t.t.e.d.a.r.r.a.y.."],
-                obj: ["sub.obj"]
-            }
+        disambiguatedPaths: {
+            "obj.sub.obj.d.o.t.t.e.d.a.r.r.a.y...0":
+                ["obj", "sub.obj", "d.o.t.t.e.d.a.r.r.a.y..", 0],
+            "obj.sub.obj.d.o.t.t.e.d.a.r.r.a.y...0.0.a.b.c":
+                ["obj", "sub.obj", "d.o.t.t.e.d.a.r.r.a.y..", 0, 0, "a", "b.c"],
+        }
+    },
+};
+cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: [expected]});
+
+// Test that an update which modifies a path containing dotted, numeric and array index fields
+// distinguishes all three in 'disambiguatedPaths'.
+assert.commandWorked(
+    db.coll.update({_id: 100}, [{
+                       $replaceWith: {
+                           $setField: {
+                               field: "arrayWithDotted.AndNumericFields",
+                               input: '$$ROOT',
+                               value: {$literal: [[{'0': [{'1.2': {'a.b': true, c: kLargeStr}}]}]]}
+                           }
+                       }
+                   }]));
+expected = {
+    documentKey: {_id: 100},
+    ns: {db: "test", coll: "coll"},
+    operationType: "update",
+    updateDescription: {
+        updatedFields: {"arrayWithDotted.AndNumericFields.0.0.0.0.1.2.a.b": true},
+        removedFields: [],
+        truncatedArrays: [],
+        disambiguatedPaths: {
+            "arrayWithDotted.AndNumericFields.0.0.0.0.1.2.a.b":
+                ["arrayWithDotted.AndNumericFields", 0, 0, "0", 0, "1.2", "a.b"]
         }
     },
 };

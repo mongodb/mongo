@@ -213,21 +213,18 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 if (_changeStreamSpec.getShowRawUpdateDescription()) {
                     updateDescription = input[repl::OplogEntry::kObjectFieldName];
                 } else {
-                    const auto populateSpecialFields = _changeStreamSpec.getShowExpandedEvents() &&
+                    const auto showDisambiguatedPaths = _changeStreamSpec.getShowExpandedEvents() &&
                         feature_flags::gFeatureFlagChangeStreamsFurtherEnrichedEvents.isEnabled(
                             serverGlobalParams.featureCompatibility);
                     const auto& deltaDesc = change_stream_document_diff_parser::parseDiff(
                         diffObj.getDocument().toBson());
 
-                    updateDescription = Value(
-                        Document{{"updatedFields", deltaDesc.updatedFields},
-                                 {"removedFields", std::move(deltaDesc.removedFields)},
-                                 {"truncatedArrays", std::move(deltaDesc.truncatedArrays)},
-                                 {"specialFields",
-                                  populateSpecialFields
-                                      ? Value(Document{{"arrayIndices", deltaDesc.arrayIndices},
-                                                       {"dottedFields", deltaDesc.dottedFields}})
-                                      : Value()}});
+                    updateDescription = Value(Document{
+                        {"updatedFields", deltaDesc.updatedFields},
+                        {"removedFields", std::move(deltaDesc.removedFields)},
+                        {"truncatedArrays", std::move(deltaDesc.truncatedArrays)},
+                        {"disambiguatedPaths",
+                         showDisambiguatedPaths ? Value(deltaDesc.disambiguatedPaths) : Value()}});
                 }
             } else if (id.missing()) {
                 operationType = DocumentSourceChangeStream::kUpdateOpType;

@@ -36,11 +36,14 @@
 namespace mongo {
 namespace change_stream_document_diff_parser {
 struct DeltaUpdateDescription {
+    DeltaUpdateDescription(const DeltaUpdateDescription& other) = delete;
+    DeltaUpdateDescription(DeltaUpdateDescription&& other) = default;
+    DeltaUpdateDescription() = default;
+
     Document updatedFields;
     std::vector<Value> removedFields;
     std::vector<Value> truncatedArrays;
-    Document arrayIndices;
-    Document dottedFields;
+    Document disambiguatedPaths;
 };
 
 /**

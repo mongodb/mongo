@@ -92,8 +92,7 @@ TEST(ChangeStreamEventTransformTest, TestDefaultUpdateTransform) {
             Document{{"updatedFields", Document{{"y", 2}}},
                      {"removedFields", std::vector<Value>()},
                      {"truncatedArrays", std::vector<Value>()},
-                     {"specialFields",
-                      Document{{"arrayIndices", Document()}, {"dottedFields", Document()}}}},
+                     {"disambiguatedPaths", Document{}}},
         },
     };
 
