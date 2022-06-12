@@ -40,6 +40,17 @@ using namespace fmt::literals;
 using namespace std::string_literals;
 using namespace unittest::match;
 
+/**
+ * In C++20, u8 literals yield char8_t[N].
+ * These require explicit conversion to `std::string` and `StringData`.
+ */
+template <typename Out, typename Ch, size_t N>
+Out u8Cast(const Ch (&in)[N]) {
+    const Ch* inp = in;
+    auto cp = reinterpret_cast<const char*>(inp);
+    return Out{cp, cp + N - 1};
+}
+
 TEST(PcreTest, GoodPatterns) {
     const char* goodPatterns[] = {
         "hi",
@@ -264,7 +275,7 @@ TEST(PcreTest, CapturesByName) {
 }
 
 TEST(PcreTest, Utf) {
-    StringData subject = u8"é";
+    StringData subject = u8Cast<StringData>(u8"é");
     ASSERT_EQ(subject, "\xc3\xa9"_sd);
     ASSERT_TRUE(Regex("^..$").matchView(subject)) << "é is 2 bytes";
     ASSERT_TRUE(Regex("^.$", UTF).matchView(subject)) << "é is 1 UTF-8 character";
@@ -309,7 +320,7 @@ TEST(PcreTest, BadUtfEncoding) {
         // missing 5 code points
         {"\xfc", Errc::ERROR_UTF8_ERR5},
         // Emoji ?
-        {u8"🍌", {}},
+        {u8Cast<std::string>(u8"🍌"), {}},
     };
     for (auto&& [in, err] : specs) {
         ASSERT_EQ(re.matchView(in).error(), err);
