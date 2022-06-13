@@ -169,7 +169,7 @@ subtest_error_handler(
 
     /* Filter out errors about bulk load usage - they are annoying */
     if (strstr(message, "bulk-load is only supported on newly") == NULL)
-        fprintf(stderr, "%s", message);
+        fprintf(stderr, "%s\n", message);
     return (0);
 }
 
