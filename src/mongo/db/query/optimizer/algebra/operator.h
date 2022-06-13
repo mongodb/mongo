@@ -44,10 +44,11 @@ namespace algebra {
  */
 template <typename T, int S>
 struct OpNodeStorage {
-    T _nodes[S];
-
     template <typename... Ts>
     OpNodeStorage(Ts&&... vals) : _nodes{std::forward<Ts>(vals)...} {}
+
+protected:
+    T _nodes[S];
 };
 
 /**
