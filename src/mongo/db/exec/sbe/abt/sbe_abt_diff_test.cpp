@@ -247,6 +247,14 @@ TEST_F(NodeSBE, DiffTest) {
 
     ASSERT_TRUE(compare("[{$match: {'a': {$ne: 2}}}]",
                         {"{a: 1}", "{a: 2}", "{a: [1, 2]}", "{a: [1]}", "{a: [2]}"}));
+
+
+    ASSERT_TRUE(compare("[{$project: {concat: {$concat: ['$a', ' - ', '$b', ' - ', '$c']}}}]",
+                        {"{a: 'a1', b: 'b1', c: 'c1'}"}));
+    ASSERT_TRUE(compare(
+        "[{$project: {res1: {$divide: ['$a', '$b']}, res2: {$divide: ['$c', '$a']}, res3: {$mod: "
+        "['$d', '$b']}, res4: {$abs: '$e'}, res5: {$floor: '$f'}, res6: {$ceil: {$ln: '$d'}}}}]",
+        {"{a: 5, b: 10, c: 20, d: 25, e: -5, f: 2.4}"}));
 }
 
 }  // namespace

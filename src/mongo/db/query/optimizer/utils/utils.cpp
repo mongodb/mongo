@@ -62,9 +62,12 @@ std::vector<ABT::reference_type> collectComposed(const ABT& n) {
     return {n.ref()};
 }
 
-FieldNameType getSimpleField(const ABT& node) {
-    const PathGet* pathGet = node.cast<PathGet>();
-    return pathGet != nullptr ? pathGet->name() : "";
+bool isSimplePath(const ABT& node) {
+    if (auto getPtr = node.cast<PathGet>();
+        getPtr != nullptr && getPtr->getPath().is<PathIdentity>()) {
+        return true;
+    }
+    return false;
 }
 
 std::string PrefixId::getNextId(const std::string& key) {

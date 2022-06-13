@@ -65,10 +65,9 @@ size_t roundUpToNextPow2(size_t v, size_t maxPower);
 std::vector<ABT::reference_type> collectComposed(const ABT& n);
 
 /**
- * Returns the path represented by 'node' as a simple dotted string. Returns an empty string if
- * 'node' is not a path.
+ * Returns true if the path represented by 'node' is of the form PathGet "field" PathId
  */
-FieldNameType getSimpleField(const ABT& node);
+bool isSimplePath(const ABT& node);
 
 template <class Element = PathComposeM>
 inline void maybeComposePath(ABT& composition, ABT child) {
