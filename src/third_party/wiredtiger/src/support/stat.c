@@ -1430,6 +1430,7 @@ static const char *const __stats_connection_desc[] = {
   "cursor: cursor sweep cursors examined",
   "cursor: cursor sweeps",
   "cursor: cursor truncate calls",
+  "cursor: cursor truncates performed on individual keys",
   "cursor: cursor update calls",
   "cursor: cursor update calls that return an error",
   "cursor: cursor update key and value bytes",
@@ -2015,6 +2016,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cursor_sweep_examined = 0;
     stats->cursor_sweep = 0;
     stats->cursor_truncate = 0;
+    stats->cursor_truncate_keys_deleted = 0;
     stats->cursor_update = 0;
     stats->cursor_update_error = 0;
     stats->cursor_update_bytes = 0;
@@ -2604,6 +2606,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cursor_sweep_examined += WT_STAT_READ(from, cursor_sweep_examined);
     to->cursor_sweep += WT_STAT_READ(from, cursor_sweep);
     to->cursor_truncate += WT_STAT_READ(from, cursor_truncate);
+    to->cursor_truncate_keys_deleted += WT_STAT_READ(from, cursor_truncate_keys_deleted);
     to->cursor_update += WT_STAT_READ(from, cursor_update);
     to->cursor_update_error += WT_STAT_READ(from, cursor_update_error);
     to->cursor_update_bytes += WT_STAT_READ(from, cursor_update_bytes);

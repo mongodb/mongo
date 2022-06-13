@@ -603,6 +603,7 @@ struct __wt_connection_stats {
     int64_t cursor_sweep_examined;
     int64_t cursor_sweep;
     int64_t cursor_truncate;
+    int64_t cursor_truncate_keys_deleted;
     int64_t cursor_update;
     int64_t cursor_update_error;
     int64_t cursor_update_bytes;
