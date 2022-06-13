@@ -181,7 +181,7 @@ public:
         /**
          * Records a set of new-to-the-bucket fields. Active batches only.
          */
-        void _recordNewFields(NewFieldNames&& fields);
+        void _recordNewFields(Bucket* bucket, NewFieldNames&& fields);
 
         /**
          * Prepares the batch for commit. Sets min/max appropriately, records the number of

@@ -349,7 +349,6 @@ private:
     void _calculateBucketFieldsAndSizeChange(const BSONObj& doc,
                                              boost::optional<StringData> metaField,
                                              NewFieldNames* newFieldNamesToBeInserted,
-                                             uint32_t* newFieldNamesSize,
                                              uint32_t* sizeToBeAdded) const {
         // BSON size for an object with an empty object field where field name is empty string.
         // We can use this as an offset to know the size when we have real field names.
@@ -358,7 +357,6 @@ private:
         dassert(emptyObjSize == BSON("" << BSONObj()).objsize());
 
         newFieldNamesToBeInserted->clear();
-        *newFieldNamesSize = 0;
         *sizeToBeAdded = 0;
         auto numMeasurementsFieldLength = numDigits(_numMeasurements);
         for (const auto& elem : doc) {
@@ -368,12 +366,24 @@ private:
                 continue;
             }
 
-            // If the field name is new, add the size of an empty object with that field name.
             auto hashedKey = StringSet::hasher().hashed_key(fieldName);
             if (!_fieldNames.contains(hashedKey)) {
+                // Record the new field name only if it hasn't been committed yet. There could be
+                // concurrent batches writing to this bucket with the same new field name, but
+                // they're not guaranteed to commit successfully.
                 newFieldNamesToBeInserted->push_back(hashedKey);
-                *newFieldNamesSize += elem.fieldNameSize();
-                *sizeToBeAdded += emptyObjSize + fieldName.size();
+
+                // Only update the bucket size once to account for the new field name if it isn't
+                // already pending a commit from another batch.
+                if (!_uncommittedFieldNames.contains(hashedKey)) {
+                    // Add the size of an empty object with that field name.
+                    *sizeToBeAdded += emptyObjSize + fieldName.size();
+
+                    // The control.min and control.max summaries don't have any information for this
+                    // new field name yet. Add two measurements worth of data to account for this.
+                    // As this is the first measurement for this field, min == max.
+                    *sizeToBeAdded += elem.size() * 2;
+                }
             }
 
             // Add the element size, taking into account that the name will be changed to its
@@ -419,6 +429,9 @@ private:
 
     // Top-level hashed field names of the measurements that have been inserted into the bucket.
     StringSet _fieldNames;
+
+    // Top-level hashed new field names that have not yet been committed into the bucket.
+    StringSet _uncommittedFieldNames;
 
     // Time field for the measurements that have been inserted into the bucket.
     std::string _timeField;
@@ -536,9 +549,10 @@ void BucketCatalog::WriteBatch::_addMeasurement(const BSONObj& doc) {
     _measurements.push_back(doc);
 }
 
-void BucketCatalog::WriteBatch::_recordNewFields(NewFieldNames&& fields) {
+void BucketCatalog::WriteBatch::_recordNewFields(Bucket* bucket, NewFieldNames&& fields) {
     for (auto&& field : fields) {
         _newFieldNamesToBeInserted[field] = field.hash();
+        bucket->_uncommittedFieldNames.emplace(field);
     }
 }
 
@@ -550,6 +564,7 @@ void BucketCatalog::WriteBatch::_prepareCommit(Bucket* bucket) {
     // by someone else.
     for (auto it = _newFieldNamesToBeInserted.begin(); it != _newFieldNamesToBeInserted.end();) {
         StringMapHashedKey fieldName(it->first, it->second);
+        bucket->_uncommittedFieldNames.erase(fieldName);
         if (bucket->_fieldNames.contains(fieldName)) {
             _newFieldNamesToBeInserted.erase(it++);
             continue;
@@ -761,13 +776,9 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(
     invariant(bucket);
 
     NewFieldNames newFieldNamesToBeInserted;
-    uint32_t newFieldNamesSize = 0;
     uint32_t sizeToBeAdded = 0;
-    bucket->_calculateBucketFieldsAndSizeChange(doc,
-                                                options.getMetaField(),
-                                                &newFieldNamesToBeInserted,
-                                                &newFieldNamesSize,
-                                                &sizeToBeAdded);
+    bucket->_calculateBucketFieldsAndSizeChange(
+        doc, options.getMetaField(), &newFieldNamesToBeInserted, &sizeToBeAdded);
 
     auto shouldCloseBucket = [&](Bucket* bucket) -> bool {
         if (bucket->schemaIncompatible(doc, metaFieldName, comparator)) {
@@ -798,16 +809,13 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(
         info.openedDuetoMetadata = false;
         bucket = _rollover(&stripe, stripeLock, bucket, info);
 
-        bucket->_calculateBucketFieldsAndSizeChange(doc,
-                                                    options.getMetaField(),
-                                                    &newFieldNamesToBeInserted,
-                                                    &newFieldNamesSize,
-                                                    &sizeToBeAdded);
+        bucket->_calculateBucketFieldsAndSizeChange(
+            doc, options.getMetaField(), &newFieldNamesToBeInserted, &sizeToBeAdded);
     }
 
     auto batch = bucket->_activeBatch(getOpId(opCtx, combine), stats);
     batch->_addMeasurement(doc);
-    batch->_recordNewFields(std::move(newFieldNamesToBeInserted));
+    batch->_recordNewFields(bucket, std::move(newFieldNamesToBeInserted));
 
     bucket->_numMeasurements++;
     bucket->_size += sizeToBeAdded;

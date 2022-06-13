@@ -4,7 +4,6 @@
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_getmore,
- *   requires_fcv_52,
  * ]
  */
 (function() {
@@ -25,9 +24,9 @@ TimeseriesTest.run((insert) => {
     const numDocs = 3;
 
     // The measurement data should not take up all of the 'bucketMaxSizeKB' limit because we need to
-    // leave a little room for the _id and the time fields. We need to fit two measurements within
-    // this limit to trigger compression if enabled.
-    const largeValue = 'x'.repeat(((bucketMaxSizeKB - 1) / 2) * 1024);
+    // leave room for the control.min and control.max summaries (two measurements worth of data). We
+    // need to fit two measurements within this limit to trigger compression if enabled.
+    const largeValue = 'x'.repeat(((bucketMaxSizeKB - 1) / 4) * 1024);
 
     const runTest = function(numDocsPerInsert) {
         const coll = db.getCollection(collNamePrefix + numDocsPerInsert);
