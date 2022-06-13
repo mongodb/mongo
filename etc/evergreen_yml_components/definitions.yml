@@ -524,13 +524,6 @@ functions:
     params:
       file: src/version_expansions.yml
 
-  "check binary version": &check_binary_version
-    command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "src/evergreen/functions/binary_version_check.sh"
-
   "fetch benchmarks": &fetch_benchmarks
     command: s3.get
     params:
@@ -860,9 +853,6 @@ functions:
   - *adjust_venv
   - *fetch_binaries
   - *extract_binaries
-  - *apply_version_expansions
-  - *f_expansions_write
-  - *check_binary_version
   - *get_buildnumber
   - *f_expansions_write
   - *set_up_credentials
@@ -2251,8 +2241,6 @@ tasks:
       - "./etc/repo_config.yaml"
       - "./etc/scons/**"
       - "buildscripts/**"
-      - "version_expansions.yml"
-      - "compile_expansions.yml"
       - "all_feature_flags.txt"  # Must correspond to the definition in buildscripts/idl/lib.py.
       - "jstests/**"
       - "patch_files.txt"
