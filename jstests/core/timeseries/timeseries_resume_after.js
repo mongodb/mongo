@@ -7,7 +7,6 @@
  *   assumes_against_mongod_not_mongos,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
- *   requires_getmore,
  * ]
  */
 (function() {

@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   does_not_support_transactions,
- *   requires_getmore,
  * ]
  */
 (function() {

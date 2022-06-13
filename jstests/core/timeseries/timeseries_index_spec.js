@@ -8,7 +8,6 @@
  *     does_not_support_stepdowns,
  *     does_not_support_transactions,
  *     requires_find_command,
- *     requires_getmore,
  * ]
  */
 (function() {

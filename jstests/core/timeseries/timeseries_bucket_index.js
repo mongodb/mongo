@@ -4,8 +4,6 @@
  * @tags: [
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
- *   requires_fcv_53,
- *   requires_getmore,
  * ]
  */
 (function() {

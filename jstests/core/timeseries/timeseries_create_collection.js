@@ -4,8 +4,8 @@
  * in that case.
  *
  * @tags: [
+ *   does_not_support_stepdowns,
  *   does_not_support_transactions,
- *   requires_getmore,
  * ]
  */
 (function() {
