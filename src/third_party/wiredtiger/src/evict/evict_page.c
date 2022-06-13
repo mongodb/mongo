@@ -458,6 +458,14 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
     WT_INTL_FOREACH_END;
 
     /*
+     * It is always OK to evict pages from checkpoint cursor trees if they don't have children, and
+     * visibility checks for pages deleted in the checkpoint aren't needed (or correct when done in
+     * eviction threads).
+     */
+    if (WT_READING_CHECKPOINT(session))
+        return (0);
+
+    /*
      * The fast check is done and there are no cursors in the child pages. Make sure the child
      * WT_REF structures pages can be discarded.
      */
