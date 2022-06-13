@@ -195,8 +195,8 @@ private:
     }
 
     std::shared_ptr<transport::Session> _session;
-    stdx::thread _thread;
     BlockingQueue<std::function<void(transport::Session&)>> _tasks;
+    stdx::thread _thread;
 };
 
 class MockSEP : public ServiceEntryPoint {
