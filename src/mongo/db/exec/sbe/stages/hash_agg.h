@@ -184,6 +184,11 @@ private:
     std::vector<std::unique_ptr<value::MaterializedSingleRowAccessor>> _outRecordStoreKeyAccessors;
     std::vector<std::unique_ptr<value::MaterializedSingleRowAccessor>> _outRecordStoreAggAccessors;
 
+    // This buffer stores values for the spilled '_aggKeyRecordStore' that's loaded into memory from
+    // the '_recordStore'. Values in the '_aggKeyRecordStore' row are pointers that point to data in
+    // this buffer.
+    BufBuilder _aggKeyRSBuffer;
+
     std::vector<value::SlotAccessor*> _seekKeysAccessors;
     value::MaterializedRow _seekKeys;
 

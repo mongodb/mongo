@@ -63,8 +63,7 @@ boost::optional<value::MaterializedRow> readFromRecordStore(OperationContext* op
     RecordData record;
     if (rs->findRecord(opCtx, rid, &record)) {
         auto valueReader = BufReader(record.data(), record.size());
-        auto val = value::MaterializedRow::deserializeForSorter(valueReader, {});
-        return val;
+        return value::MaterializedRow::deserializeForSorter(valueReader, {});
     }
     return boost::none;
 }
