@@ -858,12 +858,13 @@ tasks:
             {scale: 10,
              schema: denormalized}
 
-  - name: queries_on_columnstore_indexes
+# TODO PERF-3094: Remove this task.
+  - name: column_store_index_charts_events_1G
     priority: 5
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: "columnstore"
+          test_control: "charts_events_1G"
 
   - name: non_sharded_workloads
     priority: 5
@@ -1180,7 +1181,7 @@ buildvariants:
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
-      - name: queries_on_columnstore_indexes
+      - name: column_store_index_charts_events_1G
 
   - name: compile-rhel70
     display_name: Compile for Atlas-like
