@@ -4419,7 +4419,7 @@ void ReplicationCoordinatorImpl::_errorOnPromisesIfHorizonChanged(WithLock lk,
         HelloMetrics::get(opCtx)->resetNumAwaitingTopologyChanges();
     }
 
-    if (oldIndex >= 0 && newIndex >= 0) {
+    if (oldIndex >= 0) {
         invariant(_sniToValidConfigPromiseMap.empty());
 
         const auto oldHorizonMappings = oldConfig.getMemberAt(oldIndex).getHorizonMappings();
