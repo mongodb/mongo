@@ -51,20 +51,15 @@ function runReconfigToSplitConfig() {
         return status.set === kRecipientSetName;
     }, "waiting for split config to take", 30000, 2000);
 
-    jsTestLog("Waiting for recipient to elect a primary");
-    assert.soon(() => {
-        const recipientNode = test.recipientNodes[0];
-        const status =
-            assert.commandWorked(recipientNode.getDB('admin').runCommand({replSetGetStatus: 1}));
-        return status.members.some(member => member.stateStr === 'PRIMARY');
-    }, "waiting for recipient to elect primary", 30000, 2000);
-
     jsTestLog("Confirming we can write to recipient");
-
-    const recipientPrimary = test.recipientNodes.filter(node => {
-        const n = node.getDB('admin')._helloOrLegacyHello();
-        return n.isWritablePrimary || n.ismaster;
-    })[0];
+    let recipientPrimary = undefined;
+    assert.soon(function() {
+        recipientPrimary = test.recipientNodes.find(node => {
+            const n = node.adminCommand('hello');
+            return n.isWritablePrimary || n.ismaster;
+        });
+        return recipientPrimary != undefined;
+    }, "waiting for primary to be available", 30000, 1000);
 
     assert(recipientPrimary);
     assert.commandWorked(recipientPrimary.getDB('foo').bar.insert({fake: 'document'}));
