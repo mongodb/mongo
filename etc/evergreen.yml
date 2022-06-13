@@ -4107,36 +4107,6 @@ tasks:
       resmoke_args: --suites=initial_sync_fuzzer
       name: initial_sync_fuzzer
 
-## Standalone generational fuzzer for aggregation pipelines ##
-- <<: *jstestfuzz_template
-  name: aggregation_multiversion_fuzzer_gen
-  tags: ["aggfuzzer", "common", "multiversion"]
-  commands:
-  - func: "generate fuzzer tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 10
-      resmoke_args: --suites=generational_fuzzer
-      npm_command: agg-fuzzer
-      name: aggregation_multiversion_fuzzer
-      task_path_suffix: "/data/multiversion"
-
-## Standalone generational fuzzer for aggregation expressions ##
-- <<: *jstestfuzz_template
-  name: aggregation_expression_multiversion_fuzzer_gen
-  tags: ["aggfuzzer"]
-  commands:
-  - func: "generate fuzzer tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 10
-      resmoke_args: --suites=generational_fuzzer
-      npm_command: agg-expr-fuzzer
-      name: aggregation_expression_multiversion_fuzzer
-      task_path_suffix: "/data/multiversion"
-
 ## Standalone fuzzer for checking wildcard index correctness ##
 - <<: *jstestfuzz_template
   name: aggregation_wildcard_fuzzer_gen
@@ -8201,7 +8171,6 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
   - name: .aggregation !.auth !.encrypt
-  - name: aggregation_expression_multiversion_fuzzer_gen
   - name: auth_gen
   - name: bulk_gle_passthrough
   - name: .causally_consistent !.sharding
@@ -9001,7 +8970,6 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - rhel62-large
-  - name: .aggfuzzer !.wildcard
   - name: .aggregation !.read_write_concern
   - name: audit
   - name: .auth !.multiversion
