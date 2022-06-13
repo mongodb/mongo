@@ -236,11 +236,11 @@ void ReplicationCoordinatorMock::setMyHeartbeatMessage(const std::string& msg) {
 }
 
 void ReplicationCoordinatorMock::_setMyLastAppliedOpTimeAndWallTime(
-    const OpTimeAndWallTime& opTimeAndWallTime) {
+    WithLock lk, const OpTimeAndWallTime& opTimeAndWallTime) {
     _myLastAppliedOpTime = opTimeAndWallTime.opTime;
     _myLastAppliedWallTime = opTimeAndWallTime.wallTime;
 
-    setCurrentCommittedSnapshotOpTime(opTimeAndWallTime.opTime);
+    _setCurrentCommittedSnapshotOpTime(lk, opTimeAndWallTime.opTime);
 
     if (auto storageEngine = _service->getStorageEngine()) {
         if (auto snapshotManager = storageEngine->getSnapshotManager()) {
@@ -253,7 +253,7 @@ void ReplicationCoordinatorMock::setMyLastAppliedOpTimeAndWallTime(
     const OpTimeAndWallTime& opTimeAndWallTime) {
     stdx::lock_guard<Mutex> lk(_mutex);
 
-    _setMyLastAppliedOpTimeAndWallTime(opTimeAndWallTime);
+    _setMyLastAppliedOpTimeAndWallTime(lk, opTimeAndWallTime);
 }
 
 void ReplicationCoordinatorMock::setMyLastDurableOpTimeAndWallTime(
@@ -269,7 +269,7 @@ void ReplicationCoordinatorMock::setMyLastAppliedOpTimeAndWallTimeForward(
     stdx::lock_guard<Mutex> lk(_mutex);
 
     if (opTimeAndWallTime.opTime > _myLastAppliedOpTime) {
-        _setMyLastAppliedOpTimeAndWallTime(opTimeAndWallTime);
+        _setMyLastAppliedOpTimeAndWallTime(lk, opTimeAndWallTime);
     }
 }
 
@@ -657,11 +657,17 @@ Status ReplicationCoordinatorMock::updateTerm(OperationContext* opCtx, long long
 
 void ReplicationCoordinatorMock::clearCommittedSnapshot() {}
 
-void ReplicationCoordinatorMock::setCurrentCommittedSnapshotOpTime(OpTime time) {
+void ReplicationCoordinatorMock::_setCurrentCommittedSnapshotOpTime(WithLock lk, OpTime time) {
     _currentCommittedSnapshotOpTime = time;
 }
 
+void ReplicationCoordinatorMock::setCurrentCommittedSnapshotOpTime(OpTime time) {
+    stdx::lock_guard<Mutex> lk(_mutex);
+    _setCurrentCommittedSnapshotOpTime(lk, time);
+}
+
 OpTime ReplicationCoordinatorMock::getCurrentCommittedSnapshotOpTime() const {
+    stdx::lock_guard<Mutex> lk(_mutex);
     return _currentCommittedSnapshotOpTime;
 }
 
