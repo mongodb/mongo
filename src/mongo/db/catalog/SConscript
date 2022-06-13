@@ -670,6 +670,7 @@ if wiredtiger:
             'collection',
             'collection_catalog',
             'collection_options',
+            'collection_query_info',
             'collection_validation',
             'commit_quorum_options',
             'database_holder',
