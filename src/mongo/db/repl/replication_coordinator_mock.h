@@ -422,7 +422,9 @@ public:
     virtual WriteConcernTagChanges* getWriteConcernTagChanges() override;
 
 private:
-    void _setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime);
+    void _setMyLastAppliedOpTimeAndWallTime(WithLock lk,
+                                            const OpTimeAndWallTime& opTimeAndWallTime);
+    void _setCurrentCommittedSnapshotOpTime(WithLock lk, OpTime time);
 
     ServiceContext* const _service;
     ReplSettings _settings;
