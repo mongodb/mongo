@@ -25,7 +25,10 @@ directory.
 
 For more information on the Storage Engine API, see the [storage/README][].
 
+For more information on time-series collections, see the [timeseries/README][].
+
 [storage/README]: https://github.com/mongodb/mongo/blob/master/src/mongo/db/storage/README.md
+[timeseries/README]: https://github.com/mongodb/mongo/blob/master/src/mongo/db/timeseries/README.md
 
 # The Catalog
 
@@ -1721,6 +1724,10 @@ values are ObjectId's.
 The TTL monitor will only delete data from a time-series bucket collection when a bucket's minimum
 time, _id, is past the expiration plus the bucket maximum time span (default 1 hour). This
 procedure avoids deleting buckets with data that is not older than the expiration time.
+
+For more information on time-series collections, see the [timeseries/README][].
+
+[timeseries/README]: https://github.com/mongodb/mongo/blob/master/src/mongo/db/timeseries/README.md
 
 ## Capped clustered collections
 
