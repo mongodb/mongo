@@ -501,9 +501,9 @@ PlanState HashAggStage::getNext() {
                 KeyString::TypeBits::fromBuffer(KeyString::Version::kLatestVersion, &valReader);
             _aggValueRecordStore = val;
 
-            BufBuilder buf;
+            _aggKeyRSBuffer.reset();
             _aggKeyRecordStore = value::MaterializedRow::deserializeFromKeyString(
-                decodeKeyString(nextRecord->id, typeBits), &buf);
+                decodeKeyString(nextRecord->id, typeBits), &_aggKeyRSBuffer);
             return trackPlanState(PlanState::ADVANCED);
         } else {
             _rsCursor.reset();
