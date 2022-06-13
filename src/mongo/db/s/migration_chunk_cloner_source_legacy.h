@@ -248,17 +248,17 @@ private:
                                       const CollectionPtr& collection,
                                       BSONArrayBuilder* arrBuilder);
 
-    void _nextCloneBatchFromCloneLocs(OperationContext* opCtx,
-                                      const CollectionPtr& collection,
-                                      BSONArrayBuilder* arrBuilder);
+    void _nextCloneBatchFromCloneRecordIds(OperationContext* opCtx,
+                                           const CollectionPtr& collection,
+                                           BSONArrayBuilder* arrBuilder);
 
     /**
-     * Get the disklocs that belong to the chunk migrated and sort them in _cloneLocs (to avoid
-     * seeking disk later).
+     * Get the recordIds that belong to the chunk migrated and sort them in _cloneRecordIds (to
+     * avoid seeking disk later).
      *
      * Returns OK or any error status otherwise.
      */
-    Status _storeCurrentLocs(OperationContext* opCtx);
+    Status _storeCurrentRecordId(OperationContext* opCtx);
 
     /**
      * Adds the OpTime to the list of OpTimes for oplog entries that we should consider migrating as
@@ -349,11 +349,11 @@ private:
     State _state{kNew};
 
     // List of record ids that needs to be transferred (initial clone)
-    std::set<RecordId> _cloneLocs;
+    std::set<RecordId> _cloneRecordIds;
 
     // The estimated average object size during the clone phase. Used for buffer size
     // pre-allocation (initial clone).
-    uint64_t _averageObjectSizeForCloneLocs{0};
+    uint64_t _averageObjectSizeForCloneRecordIds{0};
 
     // The estimated average object _id size during the clone phase.
     uint64_t _averageObjectIdSize{0};
