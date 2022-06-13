@@ -156,3 +156,8 @@ feature_flags:
       description: "Feature flag to enable using SBE for a larger number of queries"
       cpp_varname: gFeatureFlagSbeFull
       default: false
+
+    featureFlagTimeSeriesChangeStreams:
+      description: "Feature flag for $changeStream support for time series"
+      cpp_varname: gFeatureFlagTimeSeriesChangeStreams
+      default: false
