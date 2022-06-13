@@ -957,8 +957,6 @@ _Code spelunking starting points:_
 * [_The TTLCollectionCache Class_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl_collection_cache.h)
 * [_ttl.idl_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl)
 
-TODO SERVER-66898: Refresh links
-
 # Repair
 
 Data corruption has a variety of causes, but can usually be attributed to misconfigured or
