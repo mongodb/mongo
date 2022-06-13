@@ -82,6 +82,7 @@ SyncTransactionWithRetries::SyncTransactionWithRetries(
       _txn(std::make_shared<details::TransactionWithRetries>(
           opCtx,
           executor,
+          _source.token(),
           txnClient ? std::move(txnClient)
                     : std::make_unique<details::SEPTransactionClient>(
                           opCtx,
@@ -101,6 +102,8 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
     }
 
     auto txnResult = _txn->run(std::move(callback)).getNoThrow(opCtx);
+    // Cancel the source to guarantee the transaction will terminate if our opCtx was interrupted.
+    _source.cancel();
 
     // Post transaction processing, which must also happen inline.
     OperationTimeTracker::get(opCtx)->updateOperationTime(_txn->getOperationTime());
@@ -188,8 +191,7 @@ SemiFuture<CommitResult> TransactionWithRetries::run(Callback callback) noexcept
             return txnStatus.isOK() || txnStatus != ErrorCodes::TransactionAPIMustRetryTransaction;
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        // Cancellation happens by interrupting the caller's opCtx.
-        .on(_executor, CancellationToken::uncancelable())
+        .on(_executor, _token)
         // Safe to inline because the continuation only holds state.
         .unsafeToInlineFuture()
         .tapAll([anchor = shared_from_this()](auto&&) {})
@@ -257,8 +259,7 @@ ExecutorFuture<CommitResult> TransactionWithRetries::_runCommitWithRetries() {
             return swResult.isOK() || swResult != ErrorCodes::TransactionAPIMustRetryCommit;
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        // Cancellation happens by interrupting the caller's opCtx.
-        .on(_executor, CancellationToken::uncancelable());
+        .on(_executor, _token);
 }
 
 ExecutorFuture<void> TransactionWithRetries::_bestEffortAbort() {
@@ -297,12 +298,16 @@ SemiFuture<BSONObj> SEPTransactionClient::runCommand(StringData dbName, BSONObj 
     invariant(!haveClient());
     auto client = _serviceContext->makeClient("SEP-internal-txn-client");
     AlternativeClientRegion clientRegion(client);
-    auto opCtxHolder = cc().makeOperationContext();
+    // Note that _token is only cancelled once the caller of the transaction no longer cares about
+    // its result, so CancelableOperationContexts only being interrupted by ErrorCodes::Interrupted
+    // shouldn't impact any upstream retry logic.
+    CancelableOperationContextFactory opCtxFactory(_token, _executor);
+    auto cancellableOpCtx = opCtxFactory.makeOperationContext(&cc());
     primeInternalClient(&cc());
 
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(dbName, cmdBuilder.obj());
     auto requestMessage = opMsgRequest.serialize();
-    return _behaviors->handleRequest(opCtxHolder.get(), requestMessage)
+    return _behaviors->handleRequest(cancellableOpCtx.get(), requestMessage)
         .then([this](DbResponse dbResponse) {
             auto reply = rpc::makeReply(&dbResponse.response)->getCommandReply().getOwned();
             _hooks->runReplyHook(reply);
@@ -383,7 +388,7 @@ SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
                     // an error upon fetching more documents.
                     return result != ErrorCodes::InternalTransactionsExhaustiveFindHasMore;
                 })
-                .on(_executor, CancellationToken::uncancelable())
+                .on(_executor, _token)
                 .then([response = std::move(response)] { return std::move(*response); });
         })
         .semi();
@@ -494,6 +499,29 @@ int getMaxRetries() {
                                                                                 : kTxnRetryLimit;
 }
 
+bool isLocalTransactionFatalResult(const StatusWith<CommitResult>& swResult) {
+    // If the local node is shutting down all retries would fail and if the node has failed over,
+    // retries could eventually succeed on the new primary, but we want to prevent that since
+    // whatever command that ran the internal transaction will fail with this error and may be
+    // retried itself.
+    auto isLocalFatalStatus = [](Status status) -> bool {
+        return status.isA<ErrorCategory::NotPrimaryError>() ||
+            status.isA<ErrorCategory::ShutdownError>();
+    };
+
+    if (!swResult.isOK()) {
+        return isLocalFatalStatus(swResult.getStatus());
+    }
+    return isLocalFatalStatus(swResult.getValue().getEffectiveStatus());
+}
+
+// True if the transaction is running entirely against the local node, e.g. a single replica set
+// transaction on a mongod. False for remote transactions from a mongod or all transactions from a
+// mongos.
+bool isRunningLocalTransaction(const TransactionClient& txnClient) {
+    return !isMongos() && !txnClient.runsClusterOperations();
+}
+
 Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitResult>& swResult,
                                                         int attemptCounter) const noexcept {
     stdx::lock_guard<Latch> lg(_mutex);
@@ -510,6 +538,11 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
 
     if (_execContext == ExecutionContext::kClientTransaction) {
         // If we're nested in another transaction, let the outer most client decide on errors.
+        return ErrorHandlingStep::kDoNotRetry;
+    }
+
+    // If we're running locally, some errors mean we should not retry, like a failover or shutdown.
+    if (isRunningLocalTransaction(*_txnClient) && isLocalTransactionFatalResult(swResult)) {
         return ErrorHandlingStep::kDoNotRetry;
     }
 
