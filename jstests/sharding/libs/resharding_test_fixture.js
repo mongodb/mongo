@@ -326,9 +326,8 @@ var ReshardingTest = class {
 
         this._commandDoneSignal = new CountDownLatch(1);
 
-        this._reshardingThread = new Thread(
-            function(
-                host, ns, newShardKeyPattern, newChunks, commandDoneSignal, expectedErrorCode) {
+        this._reshardingThread =
+            new Thread(function(host, ns, newShardKeyPattern, newChunks, commandDoneSignal) {
                 const conn = new Mongo(host);
 
                 // We allow the client to retry the reshardCollection a large but still finite
@@ -359,18 +358,8 @@ var ReshardingTest = class {
                     }
                 }
 
-                if (expectedErrorCode === ErrorCodes.OK) {
-                    assert.commandWorked(res);
-                } else {
-                    assert.commandFailedWithCode(res, expectedErrorCode);
-                }
-            },
-            this._st.s.host,
-            this._ns,
-            newShardKeyPattern,
-            newChunks,
-            this._commandDoneSignal,
-            expectedErrorCode);
+                return res;
+            }, this._st.s.host, this._ns, newShardKeyPattern, newChunks, this._commandDoneSignal);
 
         this._reshardingThread.start();
         this._isReshardingActive = true;
@@ -459,7 +448,7 @@ var ReshardingTest = class {
                     fp.off();
                 } catch (disableFailpointError) {
                     print(`Ignoring error from disabling the resharding coordinator failpoint: ${
-                        tojson(disableFailpointError)}`);
+                        tojsononeline(disableFailpointError)}`);
 
                     print(
                         "The config server primary and the mongo shell along with it are expected" +
@@ -476,13 +465,16 @@ var ReshardingTest = class {
                 try {
                     this._reshardingThread.join();
                 } catch (joinError) {
-                    print(`Ignoring error from the resharding thread: ${tojson(joinError)}`);
+                    print(`Ignoring error from the resharding thread: ${tojsononeline(joinError)}`);
+                } finally {
+                    print(`Ignoring response from the resharding thread: ${
+                        tojsononeline(this._reshardingThread.returnData())}`);
                 }
 
                 this._isReshardingActive = false;
             } catch (killOpError) {
                 print(`Ignoring error from sending killOp to the reshardCollection command: ${
-                    tojson(killOpError)}`);
+                    tojsononeline(killOpError)}`);
 
                 print("The mongo shell is expected to abort due to the resharding thread being" +
                       " left unjoined");
@@ -585,6 +577,12 @@ var ReshardingTest = class {
             this._reshardingThread.join();
         } finally {
             this._isReshardingActive = false;
+        }
+
+        if (expectedErrorCode === ErrorCodes.OK) {
+            assert.commandWorked(this._reshardingThread.returnData());
+        } else {
+            assert.commandFailedWithCode(this._reshardingThread.returnData(), expectedErrorCode);
         }
 
         // Reaching this line implies the `_reshardingThread` has successfully exited without
