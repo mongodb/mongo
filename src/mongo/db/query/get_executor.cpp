@@ -1043,10 +1043,7 @@ protected:
             ixScan->bounds.fields.push_back(std::move(oil));
             ixScan->queryCollator = _cq->getCollator();
 
-            auto limit = std::make_unique<LimitNode>();
-            limit->limit = 1;
-            limit->children.push_back(std::move(ixScan));
-            return limit;
+            return ixScan;
         }();
 
         // IDHack plans always include a FETCH by convention. A covered IDHack probably isn't a
