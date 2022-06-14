@@ -41,6 +41,11 @@ feature_flags:
         default: true
         version: 6.0
 
+    featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp:
+        description: Feature flag to enable always creating the config.transactions partial index on step up to primary even if the collection is not empty.
+        cpp_varname: gFeatureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp
+        default: false
+
     featureFlagUpdateDocumentShardKeyUsingTransactionApi:
         description: Feature flag to enable usage of the transaction api for update findAndModify and update commands that change a document's shard key.
         cpp_varname: gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi

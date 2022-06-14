@@ -379,23 +379,55 @@ void createTransactionTable(OperationContext* opCtx) {
     auto createCollectionStatus = storageInterface->createCollection(
         opCtx, NamespaceString::kSessionTransactionsTableNamespace, options);
 
+    auto internalTransactionsFlagEnabled =
+        feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+            serverGlobalParams.featureCompatibility);
+
+    // This flag is off by default and only exists to facilitate creating the partial index more
+    // easily, so we don't tie it to FCV. This overrides the internal transactions feature flag.
+    auto alwaysCreateIndexFlagEnabled =
+        feature_flags::gFeatureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp
+            .isEnabledAndIgnoreFCV();
+
     if (createCollectionStatus == ErrorCodes::NamespaceExists) {
-        if (!feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+        if (!internalTransactionsFlagEnabled && !alwaysCreateIndexFlagEnabled) {
             return;
         }
 
-        AutoGetCollection autoColl(
-            opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_IS);
+        bool collectionIsEmpty = false;
+        {
+            AutoGetCollection autoColl(
+                opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_IS);
+            invariant(autoColl);
 
-        // During failover recovery it is possible that the collection is created, but the partial
-        // index is not since they are recorded as separate oplog entries. If it is already created
-        // or if the collection isn't empty we can return early.
-        if (autoColl->getIndexCatalog()->findIndexByName(
-                opCtx, MongoDSessionCatalog::kConfigTxnsPartialIndexName) ||
-            !autoColl->isEmpty(opCtx)) {
+            if (autoColl->getIndexCatalog()->findIndexByName(
+                    opCtx, MongoDSessionCatalog::kConfigTxnsPartialIndexName)) {
+                // Index already exists, so there's nothing to do.
+                return;
+            }
+
+            collectionIsEmpty = autoColl->isEmpty(opCtx);
+        }
+
+        if (!collectionIsEmpty) {
+            // Unless explicitly enabled, don't create the index to avoid delaying step up.
+            if (alwaysCreateIndexFlagEnabled) {
+                AutoGetCollection autoColl(
+                    opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_X);
+                IndexBuildsCoordinator::get(opCtx)->createIndex(
+                    opCtx,
+                    autoColl->uuid(),
+                    MongoDSessionCatalog::getConfigTxnPartialIndexSpec(),
+                    IndexBuildsManager::IndexConstraints::kEnforce,
+                    false /* fromMigration */);
+            }
+
             return;
         }
+
+        // The index does not exist and the collection is empty, so fall through to create it on the
+        // empty collection. This can happen after a failover because the collection and index
+        // creation are recorded as separate oplog entries.
     } else {
         uassertStatusOKWithContext(createCollectionStatus,
                                    str::stream()
@@ -404,8 +436,7 @@ void createTransactionTable(OperationContext* opCtx) {
                                        << " collection");
     }
 
-    if (!feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (!internalTransactionsFlagEnabled && !alwaysCreateIndexFlagEnabled) {
         return;
     }
 
