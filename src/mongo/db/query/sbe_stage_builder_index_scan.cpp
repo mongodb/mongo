@@ -890,9 +890,10 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
     auto lowKeySlot = makeKeySlot(std::move(lowKey));
     auto highKeySlot = makeKeySlot(std::move(highKey));
 
+    /*
     if (indexIdSlot) {
         // Construct a copy of 'indexName' to project for use in the index consistency check.
-        projects.emplace(*indexIdSlot, makeConstant(indexName));
+        //projects.emplace(*indexIdSlot, makeConstant(indexName));
     }
 
     if (indexKeyPatternSlot) {
@@ -901,6 +902,7 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
                                   sbe::value::bitcastFrom<const char*>(keyPattern.objdata()));
         projects.emplace(*indexKeyPatternSlot, makeConstant(bsonObjTag, bsonObjVal));
     }
+    */
 
     auto lowHighKeyBranch = [&]() {
         auto childStage = [&]() {
@@ -934,7 +936,7 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
     // snapshot id.
     boost::optional<sbe::value::SlotId> indexSnapshotSlot;
     if (snapshotIdSlot) {
-        indexSnapshotSlot = slotIdGenerator->generate();
+        // indexSnapshotSlot = slotIdGenerator->generate();
     }
 
     // Scan the index in the range {'lowKeySlot', 'highKeySlot'} (subject to inclusive or
@@ -945,7 +947,8 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
                                                  forward,
                                                  recordSlot,
                                                  recordIdSlot,
-                                                 indexSnapshotSlot,
+                                                 // indexSnapshotSlot,
+                                                 boost::none,
                                                  indexKeysToInclude,
                                                  std::move(indexKeySlots),
                                                  lowKeySlot,
@@ -962,6 +965,7 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
     }
 
     auto outerSv = sbe::makeSV();
+    /*
     if (indexIdSlot) {
         outerSv.push_back(*indexIdSlot);
     }
@@ -969,6 +973,7 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
     if (indexKeyPatternSlot) {
         outerSv.push_back(*indexKeyPatternSlot);
     }
+    */
 
     // Finally, get the keys from the outer side and feed them to the inner side.
     return {recordIdSlot,

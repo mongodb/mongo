@@ -999,6 +999,29 @@ public:
     }
 
 protected:
+    std::unique_ptr<SlotBasedPrepareExecutionResult> buildIdHackPlanFastPath() {
+        const auto& mainColl = getMainCollection();
+        if (!isIdHackEligibleQuery(mainColl, *_cq))
+            return nullptr;
+        const IndexDescriptor* descriptor = mainColl->getIndexCatalog()->findIdIndex(_opCtx);
+        if (!descriptor)
+            return nullptr;
+
+        LOGV2_DEBUG(
+            6006801, 2, "Using SBE idhack", "canonicalQuery"_attr = redact(_cq->toStringShort()));
+        tassert(5536100,
+                "SBE cannot handle query with metadata",
+                !_cq->metadataDeps()[DocumentMetadataFields::kSortKey]);
+
+        // For the return key case, we use the common path.
+        if (_cq->getFindCommandRequest().getReturnKey()) {
+            return nullptr;
+        }
+
+        invariant(descriptor->getEntry());
+        return nullptr;
+    }
+
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildIdHackPlan() {
         // When the SBE plan cache is enabled we rely on it for fast find-by-_id queries rather than
         // having a special implementation of the idhack. Therefore, this function returns nullptr
@@ -1073,11 +1096,9 @@ protected:
         soln->setRoot(std::move(root));
 
         auto execTree = buildExecutableTree(*soln);
-        /*
         sbe::DebugPrinter p;
 
         std::cout << p.print(*execTree.first.get()) << std::endl;
-        */
 
         auto result = makeResult();
         result->emplace(std::move(execTree), std::move(soln));
@@ -1095,7 +1116,7 @@ protected:
                 // If the feature flag is off, we first try to build an "id hack" plan because the
                 // id hack plans are not cached in the classic cache. We then fall back to use the
                 // classic plan cache.
-                if (auto result = buildIdHackPlan()) {
+                if (auto result = buildIdHackPlanFastPath()) {
                     return result;
                 } else {
                     return buildCachedPlanFromClassicCache();
@@ -1127,7 +1148,7 @@ protected:
 
         // If a cached plan can be used we will have already returned the resulting plan. Otherwise
         // we try to construct a find-by-_id plan
-        return buildIdHackPlan();
+        return buildIdHackPlanFastPath();
     }
 
     // A temporary function to allow recovering SBE plans from the classic plan cache.
