@@ -66,7 +66,10 @@ public:
            << "    commitQuorum: <string|number|object> option to define the required quorum for"
            << std::endl
            << "                  the index builds to commit" << std::endl
-           << "}";
+           << "}" << std::endl
+           << "This command is useful if the commitQuorum of an active index build is no longer "
+              "possible or desirable (replica set membership has changed), or potential secondary "
+              "replication lag has become a greater concern";
         return ss.str();
     }
 

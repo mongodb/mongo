@@ -302,8 +302,6 @@ public:
 
     /**
      * Called when commit quorum is satisfied.
-     * Invokes 'onCommitQuorumSatisfied' if state is successfully transitioned to commit quorum
-     * satisfied.
      */
     void setCommitQuorumSatisfied(OperationContext* opCtx);
 

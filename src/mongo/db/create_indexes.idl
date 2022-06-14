@@ -215,7 +215,10 @@ commands:
                 default: false
                 unstable: true
             commitQuorum:
-                description: 'Commit Quorum options'
+                description: "Dictates which or how many replica set members must be ready to commit
+                              the index build before the primary will proceed to commit the index.
+                              This minimizes replication lag by ensuring secondaries are ready for
+                              commit and can quickly apply the commit on a finished index build"
                 type: CommitQuorum
                 optional: true
                 unstable: false
