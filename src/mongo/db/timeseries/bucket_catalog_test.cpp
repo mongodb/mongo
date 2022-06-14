@@ -43,6 +43,15 @@
 
 namespace mongo {
 namespace {
+constexpr StringData kNumSchemaChanges = "numBucketsClosedDueToSchemaChange"_sd;
+constexpr StringData kNumBucketsReopened = "numBucketsReopened"_sd;
+constexpr StringData kNumArchivedDueToTimeForward = "numBucketsArchivedDueToTimeForward"_sd;
+constexpr StringData kNumArchivedDueToTimeBackward = "numBucketsArchivedDueToTimeBackward"_sd;
+constexpr StringData kNumArchivedDueToMemoryThreshold = "numBucketsArchivedDueToMemoryThreshold"_sd;
+constexpr StringData kNumClosedDueToTimeForward = "numBucketsClosedDueToTimeForward"_sd;
+constexpr StringData kNumClosedDueToTimeBackward = "numBucketsClosedDueToTimeBackward"_sd;
+constexpr StringData kNumClosedDueToMemoryThreshold = "numBucketsClosedDueToMemoryThreshold"_sd;
+
 class BucketCatalogTest : public CatalogTestFixture {
 protected:
     class Task {
@@ -74,9 +83,7 @@ protected:
     void _insertOneAndCommit(const NamespaceString& ns,
                              uint16_t numPreviouslyCommittedMeasurements);
 
-    long long _getNumWaits(const NamespaceString& ns);
-    long long _getNumSchemaChanges(const NamespaceString& ns);
-    long long _getNumBucketsReopened(const NamespaceString& ns);
+    long long _getExecutionStat(const NamespaceString& ns, StringData stat);
 
     // Check that each group of objects has compatible schema with itself, but that inserting the
     // first object in new group closes the existing bucket and opens a new one
@@ -180,22 +187,10 @@ void BucketCatalogTest::_insertOneAndCommit(const NamespaceString& ns,
     _commit(batch, numPreviouslyCommittedMeasurements);
 }
 
-long long BucketCatalogTest::_getNumWaits(const NamespaceString& ns) {
+long long BucketCatalogTest::_getExecutionStat(const NamespaceString& ns, StringData stat) {
     BSONObjBuilder builder;
     _bucketCatalog->appendExecutionStats(ns, &builder);
-    return builder.obj().getIntField("numWaits");
-}
-
-long long BucketCatalogTest::_getNumSchemaChanges(const NamespaceString& ns) {
-    BSONObjBuilder builder;
-    _bucketCatalog->appendExecutionStats(ns, &builder);
-    return builder.obj().getIntField("numBucketsClosedDueToSchemaChange");
-}
-
-long long BucketCatalogTest::_getNumBucketsReopened(const NamespaceString& ns) {
-    BSONObjBuilder builder;
-    _bucketCatalog->appendExecutionStats(ns, &builder);
-    return builder.obj().getIntField("numBucketsReopened");
+    return builder.obj().getIntField(stat);
 }
 
 void BucketCatalogTest::_testMeasurementSchema(
@@ -212,7 +207,7 @@ void BucketCatalogTest::_testMeasurementSchema(
             timestampedDoc.append(_timeField, Date_t::now());
             timestampedDoc.appendElements(doc);
 
-            auto pre = _getNumSchemaChanges(_ns1);
+            auto pre = _getExecutionStat(_ns1, kNumSchemaChanges);
             auto result = _bucketCatalog
                               ->insert(_opCtx,
                                        _ns1,
@@ -221,7 +216,7 @@ void BucketCatalogTest::_testMeasurementSchema(
                                        timestampedDoc.obj(),
                                        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow)
                               .getValue();
-            auto post = _getNumSchemaChanges(_ns1);
+            auto post = _getExecutionStat(_ns1, kNumSchemaChanges);
 
             if (firstMember) {
                 if (firstGroup) {
@@ -1095,7 +1090,7 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     Status status = _bucketCatalog->reopenBucket(_opCtx, autoColl.getCollection(), bucketDoc);
     ASSERT_OK(status);
-    ASSERT_EQ(1, _getNumBucketsReopened(_ns1));
+    ASSERT_EQ(1, _getExecutionStat(_ns1, kNumBucketsReopened));
 
     // Insert a measurement that is compatible with the reopened bucket.
     auto result =
@@ -1109,7 +1104,7 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
 
     // No buckets are closed.
     ASSERT(result.getValue().closedBuckets.empty());
-    ASSERT_EQ(0, _getNumSchemaChanges(_ns1));
+    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumSchemaChanges));
 
     auto batch = result.getValue().batch;
     ASSERT(batch->claimCommitRights());
@@ -1145,7 +1140,7 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertIncompatibleMeasureme
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     Status status = _bucketCatalog->reopenBucket(_opCtx, autoColl.getCollection(), bucketDoc);
     ASSERT_OK(status);
-    ASSERT_EQ(1, _getNumBucketsReopened(_ns1));
+    ASSERT_EQ(1, _getExecutionStat(_ns1, kNumBucketsReopened));
 
     // Insert a measurement that is incompatible with the reopened bucket.
     auto result =
@@ -1159,7 +1154,7 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertIncompatibleMeasureme
 
     // The reopened bucket gets closed as the schema is incompatible.
     ASSERT_EQ(1, result.getValue().closedBuckets.size());
-    ASSERT_EQ(1, _getNumSchemaChanges(_ns1));
+    ASSERT_EQ(1, _getExecutionStat(_ns1, kNumSchemaChanges));
 
     auto batch = result.getValue().batch;
     ASSERT(batch->claimCommitRights());
@@ -1194,7 +1189,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
     Status status =
         _bucketCatalog->reopenBucket(_opCtx, autoColl.getCollection(), compressedBucketDoc);
     ASSERT_OK(status);
-    ASSERT_EQ(1, _getNumBucketsReopened(_ns1));
+    ASSERT_EQ(1, _getExecutionStat(_ns1, kNumBucketsReopened));
 
     // Insert a measurement that is compatible with the reopened bucket.
     auto result =
@@ -1208,7 +1203,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
 
     // No buckets are closed.
     ASSERT(result.getValue().closedBuckets.empty());
-    ASSERT_EQ(0, _getNumSchemaChanges(_ns1));
+    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumSchemaChanges));
 
     auto batch = result.getValue().batch;
     ASSERT(batch->claimCommitRights());
@@ -1249,7 +1244,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
     Status status =
         _bucketCatalog->reopenBucket(_opCtx, autoColl.getCollection(), compressedBucketDoc);
     ASSERT_OK(status);
-    ASSERT_EQ(1, _getNumBucketsReopened(_ns1));
+    ASSERT_EQ(1, _getExecutionStat(_ns1, kNumBucketsReopened));
 
     // Insert a measurement that is incompatible with the reopened bucket.
     auto result =
@@ -1263,7 +1258,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
 
     // The reopened bucket gets closed as the schema is incompatible.
     ASSERT_EQ(1, result.getValue().closedBuckets.size());
-    ASSERT_EQ(1, _getNumSchemaChanges(_ns1));
+    ASSERT_EQ(1, _getExecutionStat(_ns1, kNumSchemaChanges));
 
     auto batch = result.getValue().batch;
     ASSERT(batch->claimCommitRights());
@@ -1275,5 +1270,157 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
 
     _bucketCatalog->finish(batch, {});
 }
+
+TEST_F(BucketCatalogTest, ArchiveIfTimeForward) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
+                                                     true};
+    auto baseTimestamp = Date_t::now();
+
+    // Insert an initial document to make sure we have an open bucket.
+    auto result1 =
+        _bucketCatalog->insert(_opCtx,
+                               _ns1,
+                               _getCollator(_ns1),
+                               _getTimeseriesOptions(_ns1),
+                               BSON(_timeField << baseTimestamp),
+                               BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result1.getStatus());
+    auto batch1 = result1.getValue().batch;
+    ASSERT(batch1->claimCommitRights());
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch1));
+    _bucketCatalog->finish(batch1, {});
+
+    // Make sure we start out with nothing closed or archived.
+    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumArchivedDueToTimeForward));
+    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumClosedDueToTimeForward));
+
+    // Now insert another that's too far forward to fit in the same bucket
+    auto result2 =
+        _bucketCatalog->insert(_opCtx,
+                               _ns1,
+                               _getCollator(_ns1),
+                               _getTimeseriesOptions(_ns1),
+                               BSON(_timeField << (baseTimestamp + Seconds{7200})),
+                               BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result2.getStatus());
+    auto batch2 = result2.getValue().batch;
+    ASSERT(batch2->claimCommitRights());
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch2));
+    _bucketCatalog->finish(batch2, {});
+
+    // Make sure it was archived, not closed.
+    ASSERT_EQ(1, _getExecutionStat(_ns1, kNumArchivedDueToTimeForward));
+    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumClosedDueToTimeForward));
+}
+
+TEST_F(BucketCatalogTest, ArchiveIfTimeBackward) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
+                                                     true};
+    auto baseTimestamp = Date_t::now();
+
+    // Insert an initial document to make sure we have an open bucket.
+    auto result1 =
+        _bucketCatalog->insert(_opCtx,
+                               _ns1,
+                               _getCollator(_ns1),
+                               _getTimeseriesOptions(_ns1),
+                               BSON(_timeField << baseTimestamp),
+                               BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result1.getStatus());
+    auto batch1 = result1.getValue().batch;
+    ASSERT(batch1->claimCommitRights());
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch1));
+    _bucketCatalog->finish(batch1, {});
+
+    // Make sure we start out with nothing closed or archived.
+    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumArchivedDueToTimeBackward));
+    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumClosedDueToTimeBackward));
+
+    // Now insert another that's too far Backward to fit in the same bucket
+    auto result2 =
+        _bucketCatalog->insert(_opCtx,
+                               _ns1,
+                               _getCollator(_ns1),
+                               _getTimeseriesOptions(_ns1),
+                               BSON(_timeField << (baseTimestamp - Seconds{7200})),
+                               BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result2.getStatus());
+    auto batch2 = result2.getValue().batch;
+    ASSERT(batch2->claimCommitRights());
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch2));
+    _bucketCatalog->finish(batch2, {});
+
+    // Make sure it was archived, not closed.
+    ASSERT_EQ(1, _getExecutionStat(_ns1, kNumArchivedDueToTimeBackward));
+    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumClosedDueToTimeBackward));
+}
+
+TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
+                                                     true};
+    RAIIServerParameterControllerForTest memoryLimit{
+        "timeseriesIdleBucketExpiryMemoryUsageThreshold", 10000};
+
+    // Insert a measurement with a unique meta value, guaranteeing we will open a new bucket but not
+    // close an old one except under memory pressure.
+    long long meta = 0;
+    auto insertDocument = [&meta, this]() -> BucketCatalog::ClosedBuckets {
+        auto result =
+            _bucketCatalog->insert(_opCtx,
+                                   _ns1,
+                                   _getCollator(_ns1),
+                                   _getTimeseriesOptions(_ns1),
+                                   BSON(_timeField << Date_t::now() << _metaField << meta++),
+                                   BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+        ASSERT_OK(result.getStatus());
+        auto batch = result.getValue().batch;
+        ASSERT(batch->claimCommitRights());
+        ASSERT_OK(_bucketCatalog->prepareCommit(batch));
+        _bucketCatalog->finish(batch, {});
+
+        return result.getValue().closedBuckets;
+    };
+
+    // Ensure we start out with no buckets archived or closed due to memory pressure.
+    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumArchivedDueToMemoryThreshold));
+    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumClosedDueToMemoryThreshold));
+
+    // With a memory limit of 10000 bytes, we should be guaranteed to hit the memory limit with no
+    // more than 1000 buckets since an open bucket takes up at least 10 bytes (in reality,
+    // significantly more, but this is definitely a safe assumption).
+    for (int i = 0; i < 1000; ++i) {
+        [[maybe_unused]] auto closedBuckets = insertDocument();
+
+        if (0 < _getExecutionStat(_ns1, kNumArchivedDueToMemoryThreshold)) {
+            break;
+        }
+    }
+
+    // When we first hit the limit, we should try to archive some buckets prior to closing anything.
+    // However, depending on how the buckets are distributed over the stripes, it's possible that
+    // the current stripe will not have enough open buckets to archive to drop below the limit, and
+    // may immediately close a bucket it has just archived. We should be able to guarantee that we
+    // have archived a bucket prior to closing it though.
+    ASSERT_LT(0, _getExecutionStat(_ns1, kNumArchivedDueToMemoryThreshold));
+    auto numClosedInFirstRound = _getExecutionStat(_ns1, kNumClosedDueToMemoryThreshold);
+    ASSERT_LTE(numClosedInFirstRound, _getExecutionStat(_ns1, kNumArchivedDueToMemoryThreshold));
+
+    // If we continue to open more new buckets with distinct meta values, eventually we'll run out
+    // of open buckets to archive and have to start closing archived buckets to relieve memory
+    // pressure. Again, an archived bucket should take up more than 10 bytes in the catalog, so we
+    // should be fine with a maximum of 1000 iterations.
+    for (int i = 0; i < 1000; ++i) {
+        auto closedBuckets = insertDocument();
+
+        if (numClosedInFirstRound < _getExecutionStat(_ns1, kNumClosedDueToMemoryThreshold)) {
+            ASSERT_FALSE(closedBuckets.empty());
+            break;
+        }
+    }
+
+    // We should have closed some (additional) buckets by now.
+    ASSERT_LT(numClosedInFirstRound, _getExecutionStat(_ns1, kNumClosedDueToMemoryThreshold));
+}
+
 }  // namespace
 }  // namespace mongo

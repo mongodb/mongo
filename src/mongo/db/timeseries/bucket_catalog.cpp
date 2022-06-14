@@ -261,6 +261,24 @@ void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToMemoryThre
     _globalStats->numBucketsClosedDueToMemoryThreshold.fetchAndAddRelaxed(increment);
 }
 
+void BucketCatalog::ExecutionStatsController::incNumBucketsArchivedDueToTimeForward(
+    long long increment) {
+    _collectionStats->numBucketsArchivedDueToTimeForward.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketsArchivedDueToTimeForward.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumBucketsArchivedDueToTimeBackward(
+    long long increment) {
+    _collectionStats->numBucketsArchivedDueToTimeBackward.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketsArchivedDueToTimeBackward.fetchAndAddRelaxed(increment);
+}
+
+void BucketCatalog::ExecutionStatsController::incNumBucketsArchivedDueToMemoryThreshold(
+    long long increment) {
+    _collectionStats->numBucketsArchivedDueToMemoryThreshold.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketsArchivedDueToMemoryThreshold.fetchAndAddRelaxed(increment);
+}
+
 void BucketCatalog::ExecutionStatsController::incNumCommits(long long increment) {
     _collectionStats->numCommits.fetchAndAddRelaxed(increment);
     _globalStats->numCommits.fetchAndAddRelaxed(increment);
@@ -285,7 +303,8 @@ class BucketCatalog::Bucket {
 public:
     friend class BucketCatalog;
 
-    Bucket(const OID& id, StripeNumber stripe) : _id(id), _stripe(stripe) {}
+    Bucket(const OID& id, StripeNumber stripe, BucketKey::Hash hash)
+        : _id(id), _stripe(stripe), _keyHash(hash) {}
 
     /**
      * Returns the ID for the underlying bucket.
@@ -299,6 +318,13 @@ public:
      */
     StripeNumber stripe() const {
         return _stripe;
+    }
+
+    /**
+     * Returns the pre-computed hash of the corresponding BucketKey
+     */
+    BucketKey::Hash keyHash() const {
+        return _keyHash;
     }
 
     // Returns the time associated with the bucket (id)
@@ -421,6 +447,9 @@ private:
     // The stripe which owns this bucket.
     const StripeNumber _stripe;
 
+    // The pre-computed hash of the associated BucketKey
+    const BucketKey::Hash _keyHash;
+
     // The namespace that this bucket is used for.
     NamespaceString _ns;
 
@@ -457,9 +486,10 @@ private:
     // The number of committed measurements in the bucket.
     uint32_t _numCommittedMeasurements = 0;
 
-    // Whether the bucket is full. This can be due to number of measurements, size, or time
+    // Whether the bucket has been marked for a rollover action. It can be marked for closure due to
+    // number of measurements, size, or schema changes, or it can be marked for archival due to time
     // range.
-    bool _full = false;
+    RolloverAction _rolloverAction = RolloverAction::kNone;
 
     // The batch that has been prepared and is currently in the process of being committed, if
     // any.
@@ -649,7 +679,7 @@ Status BucketCatalog::reopenBucket(OperationContext* opCtx,
     auto stripeNumber = _getStripeNumber(key);
 
     auto bucketId = bucketIdElem.OID();
-    std::unique_ptr<Bucket> bucket = std::make_unique<Bucket>(bucketId, stripeNumber);
+    std::unique_ptr<Bucket> bucket = std::make_unique<Bucket>(bucketId, stripeNumber, key.hash);
 
     // Initialize the remaining member variables from the bucket document.
     bucket->_ns = ns;
@@ -693,18 +723,6 @@ Status BucketCatalog::reopenBucket(OperationContext* opCtx,
 
     bucket->_numMeasurements = numMeasurements;
     bucket->_numCommittedMeasurements = numMeasurements;
-
-    auto isBucketFull = [](Bucket* bucket) -> bool {
-        if (bucket->_numMeasurements >= static_cast<std::uint64_t>(gTimeseriesBucketMaxCount)) {
-            return true;
-        }
-        if (bucket->_size >= static_cast<std::uint64_t>(gTimeseriesBucketMaxSize)) {
-            return true;
-        }
-        return false;
-    };
-
-    bucket->_full = isBucketFull(bucket.get());
 
     ExecutionStatsController stats = _getExecutionStats(ns);
     stats.incNumBucketsReopened();
@@ -780,37 +798,53 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(
     bucket->_calculateBucketFieldsAndSizeChange(
         doc, options.getMetaField(), &newFieldNamesToBeInserted, &sizeToBeAdded);
 
-    auto shouldCloseBucket = [&](Bucket* bucket) -> bool {
+    auto determineRolloverAction = [&](Bucket* bucket) -> RolloverAction {
+        const bool canArchive = feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility);
+
         if (bucket->schemaIncompatible(doc, metaFieldName, comparator)) {
             stats.incNumBucketsClosedDueToSchemaChange();
-            return true;
+            return RolloverAction::kClose;
         }
         if (bucket->_numMeasurements == static_cast<std::uint64_t>(gTimeseriesBucketMaxCount)) {
             stats.incNumBucketsClosedDueToCount();
-            return true;
+            return RolloverAction::kClose;
         }
         if (bucket->_size + sizeToBeAdded > static_cast<std::uint64_t>(gTimeseriesBucketMaxSize)) {
             stats.incNumBucketsClosedDueToSize();
-            return true;
+            return RolloverAction::kClose;
         }
         auto bucketTime = bucket->getTime();
         if (time - bucketTime >= Seconds(*options.getBucketMaxSpanSeconds())) {
-            stats.incNumBucketsClosedDueToTimeForward();
-            return true;
+            if (canArchive) {
+                stats.incNumBucketsArchivedDueToTimeForward();
+                return RolloverAction::kArchive;
+            } else {
+                stats.incNumBucketsClosedDueToTimeForward();
+                return RolloverAction::kClose;
+            }
         }
         if (time < bucketTime) {
-            stats.incNumBucketsClosedDueToTimeBackward();
-            return true;
+            if (canArchive) {
+                stats.incNumBucketsArchivedDueToTimeBackward();
+                return RolloverAction::kArchive;
+            } else {
+                stats.incNumBucketsClosedDueToTimeBackward();
+                return RolloverAction::kClose;
+            }
         }
-        return false;
+        return RolloverAction::kNone;
     };
 
-    if (!bucket->_ns.isEmpty() && shouldCloseBucket(bucket)) {
-        info.openedDuetoMetadata = false;
-        bucket = _rollover(&stripe, stripeLock, bucket, info);
+    if (!bucket->_ns.isEmpty()) {
+        auto action = determineRolloverAction(bucket);
+        if (action != RolloverAction::kNone) {
+            info.openedDuetoMetadata = false;
+            bucket = _rollover(&stripe, stripeLock, bucket, info, action);
 
-        bucket->_calculateBucketFieldsAndSizeChange(
-            doc, options.getMetaField(), &newFieldNamesToBeInserted, &sizeToBeAdded);
+            bucket->_calculateBucketFieldsAndSizeChange(
+                doc, options.getMetaField(), &newFieldNamesToBeInserted, &sizeToBeAdded);
+        }
     }
 
     auto batch = bucket->_activeBatch(getOpId(opCtx, combine), stats);
@@ -917,29 +951,21 @@ boost::optional<BucketCatalog::ClosedBucket> BucketCatalog::finish(
                    getTimeseriesBucketClearedError(bucket->id(), bucket->_ns));
         }
     } else if (bucket->allCommitted()) {
-        if (bucket->_full) {
-            // Everything in the bucket has been committed, and nothing more will be added since the
-            // bucket is full. Thus, we can remove it.
-            _memoryUsage.fetchAndSubtract(bucket->_memoryUsage);
-
-            auto it = stripe.allBuckets.find(batch->bucket().id);
-            if (it != stripe.allBuckets.end()) {
-                bucket = it->second.get();
-
-                closedBucket = ClosedBucket{batch->bucket().id,
-                                            bucket->getTimeField().toString(),
-                                            bucket->numMeasurements()};
-
-                // Only remove from allBuckets and idleBuckets. If it was marked full, we know
-                // that happened in Stripe::rollover, and that there is already a new open
-                // bucket for this metadata.
-                _markBucketNotIdle(&stripe, stripeLock, bucket);
-                _eraseBucketState(batch->bucket().id);
-
-                stripe.allBuckets.erase(batch->bucket().id);
+        switch (bucket->_rolloverAction) {
+            case RolloverAction::kClose: {
+                closedBucket = ClosedBucket{
+                    bucket->id(), bucket->getTimeField().toString(), bucket->numMeasurements()};
+                _removeBucket(&stripe, stripeLock, bucket, false);
+                break;
             }
-        } else {
-            _markBucketIdle(&stripe, stripeLock, bucket);
+            case RolloverAction::kArchive: {
+                _archiveBucket(&stripe, stripeLock, bucket);
+                break;
+            }
+            case RolloverAction::kNone: {
+                _markBucketIdle(&stripe, stripeLock, bucket);
+                break;
+            }
         }
     }
     return closedBucket;
@@ -1015,6 +1041,7 @@ void BucketCatalog::_appendExecutionStatsToBuilder(const ExecutionStats* stats,
                           stats->numBucketsClosedDueToTimeBackward.load());
     builder->appendNumber("numBucketsClosedDueToMemoryThreshold",
                           stats->numBucketsClosedDueToMemoryThreshold.load());
+
     auto commits = stats->numCommits.load();
     builder->appendNumber("numCommits", commits);
     builder->appendNumber("numWaits", stats->numWaits.load());
@@ -1026,10 +1053,15 @@ void BucketCatalog::_appendExecutionStatsToBuilder(const ExecutionStats* stats,
 
     if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
             serverGlobalParams.featureCompatibility)) {
+        builder->appendNumber("numBucketsArchivedDueToTimeForward",
+                              stats->numBucketsArchivedDueToTimeForward.load());
+        builder->appendNumber("numBucketsArchivedDueToTimeBackward",
+                              stats->numBucketsArchivedDueToTimeBackward.load());
+        builder->appendNumber("numBucketsArchivedDueToMemoryThreshold",
+                              stats->numBucketsArchivedDueToMemoryThreshold.load());
         builder->appendNumber("numBucketsReopened", stats->numBucketsReopened.load());
     }
 }
-
 
 void BucketCatalog::appendExecutionStats(const NamespaceString& ns, BSONObjBuilder* builder) const {
     const std::shared_ptr<ExecutionStats> stats = _getExecutionStats(ns);
@@ -1076,6 +1108,10 @@ BucketCatalog::BucketKey::BucketKey(const NamespaceString& n, const BucketMetada
 std::size_t BucketCatalog::BucketHasher::operator()(const BucketKey& key) const {
     // Use the default absl hasher.
     return key.hash;
+}
+
+std::size_t BucketCatalog::PreHashed::operator()(const BucketKey::Hash& key) const {
+    return key;
 }
 
 BucketCatalog::StripeNumber BucketCatalog::_getStripeNumber(const BucketKey& key) {
@@ -1173,23 +1209,51 @@ void BucketCatalog::_waitToCommitBatch(Stripe* stripe, const std::shared_ptr<Wri
     }
 }
 
-bool BucketCatalog::_removeBucket(Stripe* stripe, WithLock stripeLock, Bucket* bucket) {
-    auto it = stripe->allBuckets.find(bucket->id());
-    if (it == stripe->allBuckets.end()) {
-        return false;
-    }
-
+void BucketCatalog::_removeBucket(Stripe* stripe,
+                                  WithLock stripeLock,
+                                  Bucket* bucket,
+                                  bool archiving) {
     invariant(bucket->_batches.empty());
     invariant(!bucket->_preparedBatch);
 
+    auto allIt = stripe->allBuckets.find(bucket->id());
+    invariant(allIt != stripe->allBuckets.end());
+
     _memoryUsage.fetchAndSubtract(bucket->_memoryUsage);
     _markBucketNotIdle(stripe, stripeLock, bucket);
-    stripe->openBuckets.erase({bucket->_ns, bucket->_metadata});
-    _eraseBucketState(bucket->id());
 
-    stripe->allBuckets.erase(it);
+    // If the bucket was rolled over, then there may be a different open bucket for this metadata.
+    auto openIt = stripe->openBuckets.find({bucket->_ns, bucket->_metadata});
+    if (openIt != stripe->openBuckets.end() && openIt->second == bucket) {
+        stripe->openBuckets.erase(openIt);
+    }
 
-    return true;
+    // If we are cleaning up while archiving a bucket, then we want to preserve its state. Otherwise
+    // we can remove the state from the catalog altogether.
+    if (!archiving) {
+        _eraseBucketState(bucket->id());
+    }
+
+    stripe->allBuckets.erase(allIt);
+}
+
+void BucketCatalog::_archiveBucket(Stripe* stripe, WithLock stripeLock, Bucket* bucket) {
+    bool archived = false;
+    auto& archivedSet = stripe->archivedBuckets[bucket->keyHash()];
+    auto it = archivedSet.find(bucket->getTime());
+    if (it == archivedSet.end()) {
+        archivedSet.emplace(bucket->getTime(),
+                            ArchivedBucket{bucket->id(),
+                                           bucket->getTimeField().toString(),
+                                           bucket->numMeasurements()});
+
+        long long memory = _marginalMemoryUsageForArchivedBucket(archivedSet[bucket->getTime()],
+                                                                 archivedSet.size() == 1);
+        _memoryUsage.fetchAndAdd(memory);
+
+        archived = true;
+    }
+    _removeBucket(stripe, stripeLock, bucket, archived);
 }
 
 void BucketCatalog::_abort(Stripe* stripe,
@@ -1235,7 +1299,7 @@ void BucketCatalog::_abort(Stripe* stripe,
     }
 
     if (doRemove) {
-        [[maybe_unused]] bool removed = _removeBucket(stripe, stripeLock, bucket);
+        _removeBucket(stripe, stripeLock, bucket, false);
     }
 }
 
@@ -1258,19 +1322,54 @@ void BucketCatalog::_expireIdleBuckets(Stripe* stripe,
                                        ExecutionStatsController& stats,
                                        std::vector<BucketCatalog::ClosedBucket>* closedBuckets) {
     // As long as we still need space and have entries and remaining attempts, close idle buckets.
-    int32_t numClosed = 0;
+    int32_t numExpired = 0;
+
+    const bool canArchive = feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+        serverGlobalParams.featureCompatibility);
+
     while (!stripe->idleBuckets.empty() &&
            _memoryUsage.load() > getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes() &&
-           numClosed <= gTimeseriesIdleBucketExpiryMaxCountPerAttempt) {
+           numExpired <= gTimeseriesIdleBucketExpiryMaxCountPerAttempt) {
         Bucket* bucket = stripe->idleBuckets.back();
-        ClosedBucket closed{
-            bucket->id(), bucket->getTimeField().toString(), bucket->numMeasurements()};
 
-        if (_removeBucket(stripe, stripeLock, bucket)) {
+        if (canArchive) {
+            _archiveBucket(stripe, stripeLock, bucket);
+            stats.incNumBucketsArchivedDueToMemoryThreshold();
+        } else {
+            ClosedBucket closed{
+                bucket->id(), bucket->getTimeField().toString(), bucket->numMeasurements()};
+            _removeBucket(stripe, stripeLock, bucket, false);
             stats.incNumBucketsClosedDueToMemoryThreshold();
             closedBuckets->push_back(closed);
-            ++numClosed;
         }
+
+        ++numExpired;
+    }
+
+    while (canArchive && !stripe->archivedBuckets.empty() &&
+           _memoryUsage.load() > getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes() &&
+           numExpired <= gTimeseriesIdleBucketExpiryMaxCountPerAttempt) {
+
+        auto& [hash, archivedSet] = *stripe->archivedBuckets.begin();
+        invariant(!archivedSet.empty());
+
+        auto& [timestamp, bucket] = *archivedSet.begin();
+        ClosedBucket closed{bucket.bucketId, bucket.timeField, bucket.numMeasurements, true};
+
+        long long memory = _marginalMemoryUsageForArchivedBucket(bucket, archivedSet.size() == 1);
+        _eraseBucketState(bucket.bucketId);
+        if (archivedSet.size() == 1) {
+            // If this is the only entry, erase the whole map so we don't leave it empty.
+            stripe->archivedBuckets.erase(stripe->archivedBuckets.begin());
+        } else {
+            // Otherwise just erase this bucket from the map.
+            archivedSet.erase(archivedSet.begin());
+        }
+        _memoryUsage.fetchAndSubtract(memory);
+
+        stats.incNumBucketsClosedDueToMemoryThreshold();
+        closedBuckets->push_back(closed);
+        ++numExpired;
     }
 }
 
@@ -1281,8 +1380,8 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
 
     auto [bucketId, roundedTime] = generateBucketId(info.time, info.options);
 
-    auto [it, inserted] =
-        stripe->allBuckets.try_emplace(bucketId, std::make_unique<Bucket>(bucketId, info.stripe));
+    auto [it, inserted] = stripe->allBuckets.try_emplace(
+        bucketId, std::make_unique<Bucket>(bucketId, info.stripe, info.key.hash));
     tassert(6130900, "Expected bucket to be inserted", inserted);
     Bucket* bucket = it->second.get();
     stripe->openBuckets[info.key] = bucket;
@@ -1306,20 +1405,25 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
 BucketCatalog::Bucket* BucketCatalog::_rollover(Stripe* stripe,
                                                 WithLock stripeLock,
                                                 Bucket* bucket,
-                                                const CreationInfo& info) {
-
+                                                const CreationInfo& info,
+                                                RolloverAction action) {
+    invariant(action != RolloverAction::kNone);
     if (bucket->allCommitted()) {
-        // The bucket does not contain any measurements that are yet to be committed, so we can
-        // remove it now.
-        info.closedBuckets->push_back(ClosedBucket{
-            bucket->id(), bucket->getTimeField().toString(), bucket->numMeasurements()});
+        // The bucket does not contain any measurements that are yet to be committed, so we can take
+        // action now.
+        if (action == RolloverAction::kClose) {
+            info.closedBuckets->push_back(ClosedBucket{
+                bucket->id(), bucket->getTimeField().toString(), bucket->numMeasurements()});
 
-        bool removed = _removeBucket(stripe, stripeLock, bucket);
-        invariant(removed);
+            _removeBucket(stripe, stripeLock, bucket, false);
+        } else {
+            invariant(action == RolloverAction::kArchive);
+            _archiveBucket(stripe, stripeLock, bucket);
+        }
     } else {
-        // We must keep the bucket around until it is committed, just mark it full so it we know to
-        // clean it up when the last batch finishes.
-        bucket->_full = true;
+        // We must keep the bucket around until all measurements are committed committed, just mark
+        // the action we chose now so it we know what to do when the last batch finishes.
+        bucket->_rolloverAction = action;
     }
 
     return _allocateBucket(stripe, stripeLock, info);
@@ -1404,6 +1508,12 @@ boost::optional<BucketCatalog::BucketState> BucketCatalog::_setBucketState(const
     }
 
     return state;
+}
+
+long long BucketCatalog::_marginalMemoryUsageForArchivedBucket(const ArchivedBucket& bucket,
+                                                               bool onlyEntryForMatchingMetaHash) {
+    return sizeof(std::size_t) + sizeof(Date_t) + sizeof(ArchivedBucket) + bucket.timeField.size() +
+        (onlyEntryForMatchingMetaHash ? sizeof(decltype(Stripe::archivedBuckets)::value_type) : 0);
 }
 
 class BucketCatalog::ServerStatus : public ServerStatusSection {
