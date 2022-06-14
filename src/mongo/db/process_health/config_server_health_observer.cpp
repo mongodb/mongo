@@ -85,7 +85,7 @@ public:
      * previous one is filled, thus synchronization can be relaxed.
      */
     Future<HealthCheckStatus> periodicCheckImpl(
-        PeriodicHealthCheckContext&& periodicCheckContext) noexcept override;
+        PeriodicHealthCheckContext&& periodicCheckContext) override;
 
 private:
     // Collects the results of one check.
@@ -144,7 +144,7 @@ ConfigServerHealthObserver::ConfigServerHealthObserver(ServiceContext* svcCtx)
     : HealthObserverBase(svcCtx) {}
 
 Future<HealthCheckStatus> ConfigServerHealthObserver::periodicCheckImpl(
-    PeriodicHealthCheckContext&& periodicCheckContext) noexcept {
+    PeriodicHealthCheckContext&& periodicCheckContext) {
     // The chain is not capturing 'this' for the case the network call outlives the observer.
     return _checkImpl(std::move(periodicCheckContext))
         .then([type = getType()](CheckResult result) mutable -> Future<HealthCheckStatus> {
