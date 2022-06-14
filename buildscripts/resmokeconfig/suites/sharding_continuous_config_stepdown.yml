@@ -111,7 +111,6 @@ selector:
   # Runs setShardVersion/getShardVersion against the config server and we don't support retries
   # for this command
   - jstests/sharding/major_version_check.js
-  - jstests/sharding/ssv_config_check.js
   # Runs replSetGetStatus -- via awaitLastOpCommitted -- directly against the config server:
   # retries aren't supported.
   - jstests/sharding/coll_epoch_test1.js

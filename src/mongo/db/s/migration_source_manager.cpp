@@ -60,7 +60,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/s/request_types/commit_chunk_migration_request_type.h"
-#include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/elapsed_tracker.h"
@@ -93,12 +92,10 @@ void refreshRecipientRoutingTable(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   const HostAndPort& toShardHost,
                                   const ChunkVersion& newCollVersion) {
-    SetShardVersionRequest ssv(nss, newCollVersion, false);
-
     const executor::RemoteCommandRequest request(
         toShardHost,
         NamespaceString::kAdminDb.toString(),
-        ssv.toBSON(),
+        BSON("_flushRoutingTableCacheUpdates" << nss.ns()),
         ReadPreferenceSetting{ReadPreference::PrimaryOnly}.toContainingBSON(),
         opCtx,
         executor::RemoteCommandRequest::kNoTimeout);

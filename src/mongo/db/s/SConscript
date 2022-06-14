@@ -403,7 +403,6 @@ env.Library(
         'resharding_test_commands.idl',
         'set_allow_migrations_coordinator_document.idl',
         'set_allow_migrations_coordinator.cpp',
-        'set_shard_version_command.cpp',
         'sharded_collmod.idl',
         'sharded_index_consistency_server_status.cpp',
         'sharded_rename_collection.idl',
