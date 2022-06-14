@@ -4,12 +4,14 @@ from __future__ import absolute_import
 
 import collections
 import datetime
+from io import StringIO
 import os
 import sys
 import subprocess
 import unittest
 
 from mock import Mock, patch, MagicMock
+import yaml
 
 import buildscripts.burn_in_tests as under_test
 from buildscripts.ciconfig.evergreen import parse_evergreen_file, VariantTask
@@ -556,3 +558,19 @@ class TestLocalFileChangeDetector(unittest.TestCase):
         self.assertIn(file_list[2], found_tests)
         self.assertNotIn(file_list[1], found_tests)
         self.assertEqual(2, len(found_tests))
+
+
+class TestYamlBurnInExecutor(unittest.TestCase):
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_found_tasks_should_be_reported_as_yaml(self, stdout):
+        n_tasks = 5
+        n_tests = 3
+        tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
+
+        yaml_executor = under_test.YamlBurnInExecutor()
+        yaml_executor.execute(tests_by_task)
+
+        yaml_raw = stdout.getvalue()
+        results = yaml.safe_load(yaml_raw)
+        self.assertEqual(n_tasks, len(results["discovered_tasks"]))
+        self.assertEqual(n_tests, len(results["discovered_tasks"][0]["test_list"]))

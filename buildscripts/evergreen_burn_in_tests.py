@@ -436,8 +436,8 @@ def burn_in(task_id: str, build_variant: str, generate_config: GenerateConfig,
     change_detector = EvergreenFileChangeDetector(task_id, evg_api, os.environ)
     executor = GenerateBurnInExecutor(generate_config, repeat_config, evg_api, generate_tasks_file)
 
-    burn_in_orchestrator = BurnInOrchestrator(change_detector, executor, evg_conf)
-    burn_in_orchestrator.burn_in(repos, build_variant, install_dir)
+    burn_in_orchestrator = BurnInOrchestrator(change_detector, executor, evg_conf, install_dir)
+    burn_in_orchestrator.burn_in(repos, build_variant)
 
 
 @click.command()
