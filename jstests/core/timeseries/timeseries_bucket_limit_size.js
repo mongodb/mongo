@@ -4,6 +4,7 @@
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   tenant_migration_incompatible,
+ *   requires_fcv_61,
  * ]
  */
 (function() {

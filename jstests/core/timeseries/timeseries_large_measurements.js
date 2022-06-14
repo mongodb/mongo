@@ -6,6 +6,7 @@
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_collstats,
+ *   requires_fcv_61,
  * ]
  */
 (function() {
