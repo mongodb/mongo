@@ -186,8 +186,12 @@ void RecipientStateMachineExternalStateImpl::updateCoordinatorDocument(Operation
     }
 }
 
-void RecipientStateMachineExternalStateImpl::clearFilteringMetadata(OperationContext* opCtx) {
-    resharding::clearFilteringMetadata(opCtx, true /* scheduleAsyncRefresh */);
+void RecipientStateMachineExternalStateImpl::clearFilteringMetadata(
+    OperationContext* opCtx,
+    const NamespaceString& sourceNss,
+    const NamespaceString& tempReshardingNss) {
+    stdx::unordered_set<NamespaceString> namespacesToRefresh{sourceNss, tempReshardingNss};
+    resharding::clearFilteringMetadata(opCtx, namespacesToRefresh, true /* scheduleAsyncRefresh */);
 }
 
 }  // namespace mongo

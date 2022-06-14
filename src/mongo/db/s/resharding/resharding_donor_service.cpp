@@ -178,8 +178,12 @@ public:
         }
     }
 
-    void clearFilteringMetadata(OperationContext* opCtx) {
-        resharding::clearFilteringMetadata(opCtx, true /* scheduleAsyncRefresh */);
+    void clearFilteringMetadata(OperationContext* opCtx,
+                                const NamespaceString& sourceNss,
+                                const NamespaceString& tempReshardingNss) {
+        stdx::unordered_set<NamespaceString> namespacesToRefresh{sourceNss, tempReshardingNss};
+        resharding::clearFilteringMetadata(
+            opCtx, namespacesToRefresh, true /* scheduleAsyncRefresh */);
     }
 };
 
@@ -375,8 +379,8 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
 
                {
                    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-
-                   _externalState->clearFilteringMetadata(opCtx.get());
+                   _externalState->clearFilteringMetadata(
+                       opCtx.get(), _metadata.getSourceNss(), _metadata.getTempReshardingNss());
 
                    RecoverableCriticalSectionService::get(opCtx.get())
                        ->releaseRecoverableCriticalSection(

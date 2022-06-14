@@ -332,7 +332,12 @@ void clearFilteringMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh) 
             return true;
         });
     }
+    clearFilteringMetadata(opCtx, namespacesToRefresh, scheduleAsyncRefresh);
+}
 
+void clearFilteringMetadata(OperationContext* opCtx,
+                            stdx::unordered_set<NamespaceString> namespacesToRefresh,
+                            bool scheduleAsyncRefresh) {
     for (const auto& nss : namespacesToRefresh) {
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
         CollectionShardingRuntime::get(opCtx, nss)->clearFilteringMetadata(opCtx);
