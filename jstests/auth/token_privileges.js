@@ -72,11 +72,14 @@ const opts = {
     runTest(standalone);
     MongoRunner.stopMongod(standalone);
 }
-{
+
+// TODO SERVER-66708 Run on replica sets as well. Currently the namespace from oplog entries
+// won't be deserialized including the tenantId.
+/*{
     const rst = new ReplSetTest({nodes: 2, nodeOptions: opts});
     rst.startSet({keyFile: 'jstests/libs/key1'});
     rst.initiate();
     runTest(rst.getPrimary(), rst);
     rst.stopSet();
-}
+}*/
 })();

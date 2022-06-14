@@ -153,13 +153,17 @@ function runTests(enabled) {
         runTest(standalone, enabled);
         MongoRunner.stopMongod(standalone);
     }
-    {
+
+    // TODO SERVER-66708 Run on replica sets as well. Currently the namespace from oplog entries
+    // won't be deserialized including the tenantId.
+    /*{
         const rst = new ReplSetTest({nodes: 2, nodeOptions: opts});
         rst.startSet({keyFile: 'jstests/libs/key1'});
         rst.initiate();
         runTest(rst.getPrimary(), enabled, rst);
         rst.stopSet();
-    }
+    }*/
+
     // Do not test sharding since mongos must have an authenticated connection to
     // all mongod nodes, and this conflicts with proxying tokens which we'll be
     // performing in mongoq.

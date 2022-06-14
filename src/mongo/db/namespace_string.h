@@ -233,57 +233,50 @@ public:
     /**
      * Constructs an empty NamespaceString.
      */
-    NamespaceString() : _ns(), _dotIndex(std::string::npos), _dbName() {}
+    NamespaceString() = default;
 
     /**
      * Constructs a NamespaceString from the fully qualified namespace named in "ns" and the
      * tenantId. "ns" is NOT expected to contain the tenantId.
      */
     explicit NamespaceString(boost::optional<TenantId> tenantId, StringData ns) {
-        _ns = tenantId ? tenantId->toString() + "_" + ns.toString()
-                       : ns.toString();  // copy to our buffer
-        _dotIndex = _ns.find('.');
+        _dotIndex = ns.find(".");
+
         uassert(ErrorCodes::InvalidNamespace,
                 "namespaces cannot have embedded null characters",
-                _ns.find('\0') == std::string::npos);
+                ns.find('\0') == std::string::npos);
 
-        auto db = _dotIndex == std::string::npos ? ns : ns.substr(0, ns.find('.'));
-        _dbName = DatabaseName(tenantId, db);
+        StringData db = ns.substr(0, _dotIndex);
+        _dbName = DatabaseName(std::move(tenantId), db);
+        _ns = ns.toString();
     }
 
     // TODO SERVER-65920 Remove this constructor once all constructor call sites have been updated
     // to pass tenantId explicitly
     explicit NamespaceString(StringData ns, boost::optional<TenantId> tenantId = boost::none)
-        : NamespaceString(tenantId, ns) {}
+        : NamespaceString(std::move(tenantId), ns) {}
 
     /**
      * Constructs a NamespaceString for the given database and collection names.
      * "dbName" must not contain a ".", and "collectionName" must not start with one.
      */
     NamespaceString(DatabaseName dbName, StringData collectionName)
-        : _ns(dbName.toString().size() + collectionName.size() + 1, '\0') {
+        : _dbName(std::move(dbName)), _ns(str::stream() << _dbName.db() << '.' << collectionName) {
+        auto db = _dbName.db();
+
         uassert(ErrorCodes::InvalidNamespace,
-                "'.' is an invalid character in the database name: " + dbName.db(),
-                dbName.db().find('.') == std::string::npos);
+                "'.' is an invalid character in the database name: " + db,
+                db.find('.') == std::string::npos);
         uassert(ErrorCodes::InvalidNamespace,
                 "Collection names cannot start with '.': " + collectionName,
                 collectionName.empty() || collectionName[0] != '.');
 
-        auto db = dbName.toString();
-        std::string::iterator it = std::copy(db.begin(), db.end(), _ns.begin());
-        *it = '.';
-        ++it;
-        it = std::copy(collectionName.begin(), collectionName.end(), it);
         _dotIndex = db.size();
-
-        dassert(it == _ns.end());
         dassert(_ns[_dotIndex] == '.');
 
         uassert(ErrorCodes::InvalidNamespace,
                 "namespaces cannot have embedded null characters",
                 _ns.find('\0') == std::string::npos);
-
-        _dbName = std::move(dbName);
     }
 
     /**
@@ -292,14 +285,14 @@ public:
      * NOT expected to contain a tenantId.
      */
     NamespaceString(boost::optional<TenantId> tenantId, StringData db, StringData collectionName)
-        : NamespaceString(DatabaseName(tenantId, db), collectionName) {}
+        : NamespaceString(DatabaseName(std::move(tenantId), db), collectionName) {}
 
     // TODO SERVER-65920 Remove this constructor once all constructor call sites have been updated
     // to pass tenantId explicitly
     NamespaceString(StringData db,
                     StringData collectionName,
                     boost::optional<TenantId> tenantId = boost::none)
-        : NamespaceString(DatabaseName(tenantId, db), collectionName) {}
+        : NamespaceString(DatabaseName(std::move(tenantId), db), collectionName) {}
 
     /**
      * Constructs a NamespaceString from the string 'ns'. Should only be used when reading a
@@ -341,7 +334,7 @@ public:
 
     StringData db() const {
         // TODO SERVER-65456 Remove this function.
-        return StringData(_dbName.toString());
+        return _dbName.db();
     }
 
     const DatabaseName& dbName() const {
@@ -359,6 +352,13 @@ public:
     }
 
     const std::string& toString() const {
+        return ns();
+    }
+
+    std::string toStringWithTenantId() const {
+        if (auto tenantId = _dbName.tenantId())
+            return str::stream() << *tenantId << '_' << ns();
+
         return ns();
     }
 
@@ -647,26 +647,35 @@ public:
 
     // Relops among `NamespaceString`.
     friend bool operator==(const NamespaceString& a, const NamespaceString& b) {
-        return a.ns() == b.ns();
+        return (a.tenantId() == b.tenantId()) && (a.ns() == b.ns());
     }
     friend bool operator!=(const NamespaceString& a, const NamespaceString& b) {
-        return a.ns() != b.ns();
+        return !(a == b);
     }
     friend bool operator<(const NamespaceString& a, const NamespaceString& b) {
+        if (a.tenantId() != b.tenantId()) {
+            return a.tenantId() < b.tenantId();
+        }
         return a.ns() < b.ns();
     }
     friend bool operator>(const NamespaceString& a, const NamespaceString& b) {
+        if (a.tenantId() != b.tenantId()) {
+            return a.tenantId() > b.tenantId();
+        }
         return a.ns() > b.ns();
     }
     friend bool operator<=(const NamespaceString& a, const NamespaceString& b) {
-        return a.ns() <= b.ns();
+        return !(a > b);
     }
     friend bool operator>=(const NamespaceString& a, const NamespaceString& b) {
-        return a.ns() >= b.ns();
+        return !(a < b);
     }
 
     template <typename H>
     friend H AbslHashValue(H h, const NamespaceString& nss) {
+        if (nss.tenantId()) {
+            return H::combine(std::move(h), nss._dbName.tenantId().get(), nss._ns);
+        }
         return H::combine(std::move(h), nss._ns);
     }
 
@@ -675,9 +684,9 @@ public:
     }
 
 private:
-    std::string _ns;
-    size_t _dotIndex = 0;
     DatabaseName _dbName;
+    std::string _ns;
+    size_t _dotIndex = std::string::npos;
 };
 
 /**

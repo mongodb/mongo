@@ -48,7 +48,8 @@ TEST(DatabaseNameTest, MultitenancySupportDisabled) {
     ASSERT(dbnWithTenant.tenantId());
     ASSERT_EQUALS(tenantId, *dbnWithTenant.tenantId());
     ASSERT_EQUALS(std::string("a"), dbnWithTenant.db());
-    ASSERT_EQUALS(std::string(tenantId.toString() + "_a"), dbnWithTenant.toString());
+    ASSERT_EQUALS(std::string("a"), dbnWithTenant.toString());
+    ASSERT_EQUALS(std::string(tenantId.toString() + "_a"), dbnWithTenant.toStringWithTenantId());
 }
 
 TEST(DatabaseNameTest, MultitenancySupportEnabledTenantIDNotRequired) {
@@ -65,7 +66,8 @@ TEST(DatabaseNameTest, MultitenancySupportEnabledTenantIDNotRequired) {
     ASSERT(dbnWithTenant.tenantId());
     ASSERT_EQUALS(tenantId, *dbnWithTenant.tenantId());
     ASSERT_EQUALS(std::string("a"), dbnWithTenant.db());
-    ASSERT_EQUALS(std::string(tenantId.toString() + "_a"), dbnWithTenant.toString());
+    ASSERT_EQUALS(std::string("a"), dbnWithTenant.toString());
+    ASSERT_EQUALS(std::string(tenantId.toString() + "_a"), dbnWithTenant.toStringWithTenantId());
 }
 
 /*

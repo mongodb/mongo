@@ -303,22 +303,25 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
     TenantId tenantId(OID::gen());
     std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
 
-    NamespaceString nss("foo.bar", tenantId);
-    ASSERT_EQ(nss.ns(), tenantNsStr);
-    ASSERT_EQ(nss.toString(), tenantNsStr);
+    NamespaceString nss(tenantId, "foo.bar");
+    ASSERT_EQ(nss.ns(), "foo.bar");
+    ASSERT_EQ(nss.toString(), "foo.bar");
+    ASSERT_EQ(nss.toStringWithTenantId(), tenantNsStr);
     ASSERT(nss.tenantId());
     ASSERT_EQ(*nss.tenantId(), tenantId);
 
     DatabaseName dbName(tenantId, "foo");
     NamespaceString nss2(dbName, "bar");
-    ASSERT_EQ(nss2.ns(), tenantNsStr);
-    ASSERT_EQ(nss2.toString(), tenantNsStr);
+    ASSERT_EQ(nss2.ns(), "foo.bar");
+    ASSERT_EQ(nss2.toString(), "foo.bar");
+    ASSERT_EQ(nss2.toStringWithTenantId(), tenantNsStr);
     ASSERT(nss2.tenantId());
     ASSERT_EQ(*nss2.tenantId(), tenantId);
 
     NamespaceString nss3("foo", "bar", tenantId);
-    ASSERT_EQ(nss3.ns(), tenantNsStr);
-    ASSERT_EQ(nss3.toString(), tenantNsStr);
+    ASSERT_EQ(nss3.ns(), "foo.bar");
+    ASSERT_EQ(nss3.toString(), "foo.bar");
+    ASSERT_EQ(nss3.toStringWithTenantId(), tenantNsStr);
     ASSERT(nss3.tenantId());
     ASSERT_EQ(*nss3.tenantId(), tenantId);
 }
@@ -327,9 +330,10 @@ TEST(NamespaceStringTest, NSSNoCollectionWithTenantId) {
     TenantId tenantId(OID::gen());
     std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo";
 
-    NamespaceString nss("foo", tenantId);
-    ASSERT_EQ(nss.ns(), tenantNsStr);
-    ASSERT_EQ(nss.toString(), tenantNsStr);
+    NamespaceString nss(tenantId, "foo");
+    ASSERT_EQ(nss.ns(), "foo");
+    ASSERT_EQ(nss.toString(), "foo");
+    ASSERT_EQ(nss.toStringWithTenantId(), tenantNsStr);
     ASSERT(nss.tenantId());
     ASSERT_EQ(*nss.tenantId(), tenantId);
 
@@ -351,7 +355,8 @@ TEST(NamespaceStringTest, ParseNSSWithTenantId) {
 
     NamespaceString nss =
         NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(tenantNsStr);
-    ASSERT_EQ(nss.ns(), tenantNsStr);
+    ASSERT_EQ(nss.ns(), "foo.bar");
+    ASSERT_EQ(nss.toStringWithTenantId(), tenantNsStr);
     ASSERT(nss.tenantId());
     ASSERT_EQ(*nss.tenantId(), tenantId);
 }
