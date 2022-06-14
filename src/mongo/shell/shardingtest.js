@@ -1414,7 +1414,6 @@ var ShardingTest = function(params) {
 
         // Do replication.
         rst.awaitNodesAgreeOnPrimary();
-        rst.getPrimary().getDB("admin").foo.save({x: 1});
         if (rst.keyFile) {
             authutil.asCluster(rst.nodes, rst.keyFile, function() {
                 rst.awaitReplication();
