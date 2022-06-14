@@ -177,13 +177,11 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
         }
 
         if (const auto& cappedSize = cmr.getCappedSize()) {
-            static constexpr long long minCappedSize = 4096;
             auto swCappedSize = CollectionOptions::checkAndAdjustCappedSize(*cappedSize);
             if (!swCappedSize.isOK()) {
                 return swCappedSize.getStatus();
             }
-            parsed.cappedSize =
-                (swCappedSize.getValue() < minCappedSize) ? minCappedSize : swCappedSize.getValue();
+            parsed.cappedSize = swCappedSize.getValue();
             oplogEntryBuilder.append(CollMod::kCappedSizeFieldName, *cappedSize);
         }
         if (const auto& cappedMax = cmr.getCappedMax()) {
