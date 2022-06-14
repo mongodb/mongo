@@ -372,17 +372,12 @@ let testCases = {
         checkWriteConcern: false,
     },
     donorAbortMigration: {skip: "does not accept read or write concern"},
-    // TODO(SERVER-61845) : remove overrides once possible
-    donorAbortSplit: {skip: "has been removed from the server"},
     donorForgetMigration: {skip: "does not accept read or write concern"},
-    donorForgetSplit: {skip: "has been removed from the server"},
     donorStartMigration: {skip: "does not accept read or write concern"},
-    donorStartSplit: {skip: "has been removed from the server"},
     donorWaitForMigrationToCommit: {skip: "does not accept read or write concern"},
-    // TODO(SERVER-63743) : split cmds need to support writeConcern.
-    abortShardSplit: {skip: "does not accept read or write concern"},
-    commitShardSplit: {skip: "does not accept read or write concern"},
-    forgetShardSplit: {skip: "does not accept read or write concern"},
+    abortShardSplit: {skip: "internal command"},
+    commitShardSplit: {skip: "internal command"},
+    forgetShardSplit: {skip: "internal command"},
     driverOIDTest: {skip: "internal command"},
     drop: {
         setUp: function(conn) {
