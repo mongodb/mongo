@@ -40,6 +40,7 @@
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
@@ -373,25 +374,45 @@ int removeExpiredTransactionSessionsFromDisk(
 }
 
 void createTransactionTable(OperationContext* opCtx) {
-    auto serviceCtx = opCtx->getServiceContext();
     CollectionOptions options;
-    auto createCollectionStatus =
-        repl::StorageInterface::get(serviceCtx)
-            ->createCollection(opCtx, NamespaceString::kSessionTransactionsTableNamespace, options);
+    auto storageInterface = repl::StorageInterface::get(opCtx);
+    auto createCollectionStatus = storageInterface->createCollection(
+        opCtx, NamespaceString::kSessionTransactionsTableNamespace, options);
+
     if (createCollectionStatus == ErrorCodes::NamespaceExists) {
+        if (!feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            return;
+        }
+
+        AutoGetCollection autoColl(
+            opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_IS);
+
+        // During failover recovery it is possible that the collection is created, but the partial
+        // index is not since they are recorded as separate oplog entries. If it is already created
+        // or if the collection isn't empty we can return early.
+        if (autoColl->getIndexCatalog()->findIndexByName(
+                opCtx, MongoDSessionCatalog::kConfigTxnsPartialIndexName) ||
+            !autoColl->isEmpty(opCtx)) {
+            return;
+        }
+    } else {
+        uassertStatusOKWithContext(createCollectionStatus,
+                                   str::stream()
+                                       << "Failed to create the "
+                                       << NamespaceString::kSessionTransactionsTableNamespace.ns()
+                                       << " collection");
+    }
+
+    if (!feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
         return;
     }
 
-    uassertStatusOKWithContext(
-        createCollectionStatus,
-        str::stream() << "Failed to create the "
-                      << NamespaceString::kSessionTransactionsTableNamespace.ns() << " collection");
-
     auto indexSpec = MongoDSessionCatalog::getConfigTxnPartialIndexSpec();
 
-    const auto createIndexStatus =
-        repl::StorageInterface::get(opCtx)->createIndexesOnEmptyCollection(
-            opCtx, NamespaceString::kSessionTransactionsTableNamespace, {indexSpec});
+    const auto createIndexStatus = storageInterface->createIndexesOnEmptyCollection(
+        opCtx, NamespaceString::kSessionTransactionsTableNamespace, {indexSpec});
     uassertStatusOKWithContext(
         createIndexStatus,
         str::stream() << "Failed to create partial index for the "

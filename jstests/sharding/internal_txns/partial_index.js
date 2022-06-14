@@ -14,9 +14,87 @@ const st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 const kDbName = "testDb";
 const kCollName = "testColl";
 const kConfigTxnNs = "config.transactions";
+const kPartialIndexName = "parent_lsid";
 
 const mongosTestDB = st.s.getDB(kDbName);
 const shard0PrimaryConfigTxnColl = st.rs0.getPrimary().getCollection(kConfigTxnNs);
+
+function assertPartialIndexExists(node) {
+    const configDB = node.getDB("config");
+    const indexSpecs = assert.commandWorked(configDB.runCommand({"listIndexes": "transactions"}))
+                           .cursor.firstBatch;
+    indexSpecs.sort((index0, index1) => index0.name > index1.name);
+    assert.eq(indexSpecs.length, 2);
+    const idIndexSpec = indexSpecs[0];
+    assert.eq(idIndexSpec.key, {"_id": 1});
+    const partialIndexSpec = indexSpecs[1];
+    assert.eq(partialIndexSpec.key, {"parentLsid": 1, "_id.txnNumber": 1, "_id": 1});
+    assert.eq(partialIndexSpec.partialFilterExpression, {"parentLsid": {"$exists": true}});
+}
+
+function assertFindUsesCoveredQuery(node) {
+    const configTxnColl = node.getCollection(kConfigTxnNs);
+    const childSessionDoc = configTxnColl.findOne({
+        "_id.id": sessionUUID,
+        "_id.txnNumber": childLsid.txnNumber,
+        "_id.txnUUID": childLsid.txnUUID
+    });
+
+    const explainRes = assert.commandWorked(
+        configTxnColl.explain()
+            .find({"parentLsid": parentSessionDoc._id, "_id.txnNumber": childLsid.txnNumber},
+                  {_id: 1})
+            .finish());
+    const winningPlan = getWinningPlan(explainRes.queryPlanner);
+    assert.eq(winningPlan.stage, "PROJECTION_COVERED");
+    assert.eq(winningPlan.inputStage.stage, "IXSCAN");
+
+    const findRes =
+        configTxnColl
+            .find({"parentLsid": parentSessionDoc._id, "_id.txnNumber": childLsid.txnNumber},
+                  {_id: 1})
+            .toArray();
+    assert.eq(findRes.length, 1);
+    assert.eq(findRes[0]._id, childSessionDoc._id);
+}
+
+function assertPartialIndexDoesNotExist(node) {
+    const configDB = node.getDB("config");
+    const indexSpecs = assert.commandWorked(configDB.runCommand({"listIndexes": "transactions"}))
+                           .cursor.firstBatch;
+    assert.eq(indexSpecs.length, 1);
+    const idIndexSpec = indexSpecs[0];
+    assert.eq(idIndexSpec.key, {"_id": 1});
+}
+
+function indexRecreationTest(recreateAfterDrop) {
+    st.rs0.getPrimary().getCollection(kConfigTxnNs).dropIndex(kPartialIndexName);
+    st.rs0.awaitReplication();
+
+    st.rs0.nodes.forEach(node => {
+        assertPartialIndexDoesNotExist(node);
+    });
+
+    let primary = st.rs0.getPrimary();
+    assert.commandWorked(
+        primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));
+
+    st.rs0.awaitNodesAgreeOnPrimary();
+    st.rs0.awaitReplication();
+
+    st.rs0.nodes.forEach(node => {
+        if (recreateAfterDrop) {
+            assertPartialIndexExists(node);
+        } else {
+            assertPartialIndexDoesNotExist(node);
+        }
+    });
+}
+
+// If the collection is empty and the index does not exist, we should create the partial index on
+// stepup.
+indexRecreationTest(true /*Recreate after drop*/);
 
 const sessionUUID = UUID();
 const parentLsid = {
@@ -59,45 +137,6 @@ function runRetryableInternalTransaction(txnNumber) {
     }));
 }
 
-function assertPartialIndexExists(node) {
-    const configDB = node.getDB("config");
-    const indexSpecs = assert.commandWorked(configDB.runCommand({"listIndexes": "transactions"}))
-                           .cursor.firstBatch;
-    indexSpecs.sort((index0, index1) => index0.name > index1.name);
-    assert.eq(indexSpecs.length, 2);
-    const idIndexSpec = indexSpecs[0];
-    assert.eq(idIndexSpec.key, {"_id": 1});
-    const partialIndexSpec = indexSpecs[1];
-    assert.eq(partialIndexSpec.key, {"parentLsid": 1, "_id.txnNumber": 1, "_id": 1});
-    assert.eq(partialIndexSpec.partialFilterExpression, {"parentLsid": {"$exists": true}});
-}
-
-function assertFindUsesCoveredQuery(node) {
-    const configTxnColl = node.getCollection(kConfigTxnNs);
-    const childSessionDoc = configTxnColl.findOne({
-        "_id.id": sessionUUID,
-        "_id.txnNumber": childLsid.txnNumber,
-        "_id.txnUUID": childLsid.txnUUID
-    });
-
-    const explainRes = assert.commandWorked(
-        configTxnColl.explain()
-            .find({"parentLsid": parentSessionDoc._id, "_id.txnNumber": childLsid.txnNumber},
-                  {_id: 1})
-            .finish());
-    const winningPlan = getWinningPlan(explainRes.queryPlanner);
-    assert.eq(winningPlan.stage, "PROJECTION_COVERED");
-    assert.eq(winningPlan.inputStage.stage, "IXSCAN");
-
-    const findRes =
-        configTxnColl
-            .find({"parentLsid": parentSessionDoc._id, "_id.txnNumber": childLsid.txnNumber},
-                  {_id: 1})
-            .toArray();
-    assert.eq(findRes.length, 1);
-    assert.eq(findRes[0]._id, childSessionDoc._id);
-}
-
 runRetryableInternalTransaction(childTxnNumber);
 assert.eq(shard0PrimaryConfigTxnColl.count({"_id.id": sessionUUID}), 2);
 
@@ -121,7 +160,7 @@ st.rs0.nodes.forEach(node => {
 //
 
 const indexConn = st.rs0.getPrimary();
-assert.commandWorked(indexConn.getCollection("config.transactions").dropIndex("parent_lsid"));
+assert.commandWorked(indexConn.getCollection("config.transactions").dropIndex(kPartialIndexName));
 
 // Normal writes don't involve config.transactions, so they succeed.
 assert.commandWorked(indexConn.getDB(kDbName).runCommand(
@@ -245,6 +284,10 @@ assert.commandWorked(indexConn.adminCommand({
     txnNumber: NumberLong(11),
     autocommit: false
 }));
+
+// We expect that if the partial index is dropped when the collection isn't empty, then on stepup we
+// should not recreate the collection.
+indexRecreationTest(false /*Don't recreate after drop*/);
 
 st.stop();
 })();
