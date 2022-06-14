@@ -38,6 +38,7 @@
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
@@ -380,17 +381,41 @@ void createTransactionTable(OperationContext* opCtx) {
         opCtx, NamespaceString::kSessionTransactionsTableNamespace, options);
 
     if (createCollectionStatus == ErrorCodes::NamespaceExists) {
-        AutoGetCollection autoColl(
-            opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_IS);
+        bool collectionIsEmpty = false;
+        {
+            AutoGetCollection autoColl(
+                opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_IS);
+            invariant(autoColl);
 
-        // During failover recovery it is possible that the collection is created, but the partial
-        // index is not since they are recorded as separate oplog entries. If it is already created
-        // or if the collection isn't empty we can return early.
-        if (autoColl->getIndexCatalog()->findIndexByName(
-                opCtx, MongoDSessionCatalog::kConfigTxnsPartialIndexName) ||
-            !autoColl->isEmpty(opCtx)) {
+            if (autoColl->getIndexCatalog()->findIndexByName(
+                    opCtx, MongoDSessionCatalog::kConfigTxnsPartialIndexName)) {
+                // Index already exists, so there's nothing to do.
+                return;
+            }
+
+            collectionIsEmpty = autoColl->isEmpty(opCtx);
+        }
+
+        if (!collectionIsEmpty) {
+            // Unless explicitly enabled, don't create the index to avoid delaying step up.
+            if (feature_flags::gFeatureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp
+                    .isEnabledAndIgnoreFCV()) {
+                AutoGetCollection autoColl(
+                    opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_X);
+                IndexBuildsCoordinator::get(opCtx)->createIndex(
+                    opCtx,
+                    autoColl->uuid(),
+                    MongoDSessionCatalog::getConfigTxnPartialIndexSpec(),
+                    IndexBuildsManager::IndexConstraints::kEnforce,
+                    false /* fromMigration */);
+            }
+
             return;
         }
+
+        // The index does not exist and the collection is empty, so fall through to create it on the
+        // empty collection. This can happen after a failover because the collection and index
+        // creation are recorded as separate oplog entries.
     } else {
         uassertStatusOKWithContext(createCollectionStatus,
                                    str::stream()
