@@ -46,6 +46,7 @@ namespace process_health {
 
 // Using the common fault manager test suite.
 using test::FaultManagerTest;
+using PeriodicHealthCheckContext = HealthObserverBase::PeriodicHealthCheckContext;
 
 namespace {
 // Tests that the mock observer is registered properly.
@@ -252,6 +253,49 @@ TEST_F(FaultManagerTest, SchedulingDuplicateHealthChecksRejected) {
     ASSERT_LT(totalCompletedCount, kLoops);
     ASSERT_GT(totalCompletedCount, 0);
     LOGV2(6418205, "Total completed checks count", "count"_attr = totalCompletedCount);
+}
+
+TEST_F(FaultManagerTest, HealthCheckThrowingExceptionMakesFailedStatus) {
+    resetManager(std::make_unique<FaultManagerConfig>());
+
+    FaultFacetType facetType = FaultFacetType::kMock1;
+    AtomicWord<bool> shouldThrow{false};
+
+    std::string logMsg = "Failed due to exception";
+
+    auto periodicCheckImpl =
+        [facetType, &shouldThrow, logMsg](
+            PeriodicHealthCheckContext&& periodicHealthCheckCtx) -> Future<HealthCheckStatus> {
+        if (shouldThrow.load()) {
+            uasserted(ErrorCodes::InternalError, logMsg);
+        }
+        auto completionPf = makePromiseFuture<HealthCheckStatus>();
+        completionPf.promise.emplaceValue(HealthCheckStatus(facetType, Severity::kOk, "success"));
+        return std::move(completionPf.future);
+    };
+
+    HealthObserverRegistration::registerObserverFactory(
+        [facetType, periodicCheckImpl](ServiceContext* svcCtx) {
+            return std::make_unique<HealthObserverMock>(
+                facetType, svcCtx, periodicCheckImpl, Milliseconds(Seconds(30)));
+        });
+
+    assertSoon([this] { return (manager().getFaultState() == FaultState::kStartupCheck); });
+
+    auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
+    assertSoon([this] { return (manager().getFaultState() == FaultState::kOk); });
+
+    auto observer = manager().getHealthObserversTest().front();
+    ASSERT_EQ(observer->getStats().completedChecksWithFaultCount, 0);
+
+    shouldThrow.store(true);
+    assertSoon([this] { return (manager().getFaultState() == FaultState::kTransientFault); });
+
+    ASSERT_EQ(manager().currentFault()->toBSON()["facets"]["mock1"]["description"].String(),
+              "InternalError: Failed due to exception ");
+
+    ASSERT_GTE(observer->getStats().completedChecksWithFaultCount, 1);
+    resetManager();
 }
 
 }  // namespace
