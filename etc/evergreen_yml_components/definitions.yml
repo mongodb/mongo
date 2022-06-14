@@ -4195,7 +4195,7 @@ tasks:
 
 - <<: *task_template
   name: audit
-  tags: []
+  tags: ["audit", "patch_build"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -4252,7 +4252,7 @@ tasks:
 
 - <<: *gen_task_template
   name: auth_audit_gen
-  tags: ["auth", "audit"]
+  tags: ["auth", "audit", "patch_build"]
   commands:
   - func: "generate resmoke tasks"
 
@@ -4476,7 +4476,7 @@ tasks:
 
 - <<: *task_template
   name: ese
-  tags: ["encrypt"]
+  tags: ["encrypt", "patch_build"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5695,7 +5695,7 @@ tasks:
 
 - <<: *task_template
   name: sasl
-  tags: []
+  tags: ["sasl", "patch_build"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5819,7 +5819,7 @@ tasks:
 
 - <<: *gen_task_template
   name: ssl_gen
-  tags: ["encrypt", "ssl"]
+  tags: ["encrypt", "ssl", "patch_build"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -5827,7 +5827,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sslSpecial_gen
-  tags: ["encrypt", "ssl"]
+  tags: ["encrypt", "ssl", "patch_build"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -5835,7 +5835,7 @@ tasks:
 
 - <<: *gen_task_template
   name: ssl_x509_gen
-  tags: ["encrypt", "ssl"]
+  tags: ["encrypt", "ssl", "patch_build"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6054,7 +6054,7 @@ tasks:
 
 - <<: *task_template
   name: client_encrypt
-  tags: ["ssl", "encrypt"]
+  tags: ["ssl", "encrypt", "patch_build"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6063,7 +6063,7 @@ tasks:
 
 - <<: *task_template
   name: fle
-  tags: ["encrypt"]
+  tags: ["encrypt", "patch_build"]
   commands:
   - func: "do setup"
   - func: "load aws test credentials"
@@ -6073,7 +6073,7 @@ tasks:
 
 - <<: *task_template
   name: fle2_query_analysis
-  tags: ["encrypt"]
+  tags: ["encrypt", "patch_build"]
   commands:
   - func: "do setup"
   - func: "load aws test credentials"
@@ -6081,21 +6081,21 @@ tasks:
 
 - <<: *task_template
   name: fle2
-  tags: ["encrypt"]
+  tags: ["encrypt", "patch_build"]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: fle2_sharding
-  tags: ["encrypt"]
+  tags: ["encrypt", "patch_build"]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: ocsp
-  tags: ["ssl", "encrypt", "ocsp"]
+  tags: ["ssl", "encrypt", "ocsp", "patch_build"]
   commands:
   - func: "do setup"
   - func: "run tests"

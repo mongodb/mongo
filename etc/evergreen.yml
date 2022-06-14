@@ -3016,6 +3016,31 @@ buildvariants:
       --excludeWithAnyTags=resource_intensive
       --excludeWithAnyTags=incompatible_with_shard_merge
 
+- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
+  name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-security-patch-only
+  display_name: "~ Shared Library Enterprise RHEL 8.0 Security Patch Only (all feature flags)"
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+  expansions:
+    <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
+    target_resmoke_time: 15
+    max_sub_suites: 15
+  tasks:
+  - name: .audit .patch_build
+  - name: .sasl .patch_build
+  - name: .encrypt .patch_build
+  - name: .lint
+  - name: lint_fuzzer_sanity_patch
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+      - rhel80-xlarge
+# Disable unittests for now since they're not aware of feature flags.
+#  - name: compile_test_and_package_parallel_unittest_stream_TG
+#    distros:
+#      - rhel80-xlarge
+#  - name: compile_test_and_package_parallel_dbtest_stream_TG
+#    distros:
+#      - rhel80-xlarge
+
 - name: enterprise-ubuntu1804-64-libvoidstar
   display_name: ~ Enterprise Ubuntu 18.04 w/ libvoidstar
   cron: "0 4 * * FRI" # Every week at 0400 UTC Friday. This has to be a Friday since we run Antithesis on Fridays.
