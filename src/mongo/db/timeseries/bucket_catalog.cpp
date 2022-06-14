@@ -164,7 +164,7 @@ std::pair<OID, Date_t> generateBucketId(const Date_t& time, const TimeseriesOpti
     // together into predictable chunks for sharding. This way we know from a measurement timestamp
     // what the bucket timestamp will be, so we can route measurements to the right shard chunk.
     auto roundedTime = timeseries::roundTimestampToGranularity(time, options.getGranularity());
-    uint64_t const roundedSeconds = durationCount<Seconds>(roundedTime.toDurationSinceEpoch());
+    int64_t const roundedSeconds = durationCount<Seconds>(roundedTime.toDurationSinceEpoch());
     bucketId.setTimestamp(roundedSeconds);
 
     // Now, if we stopped here we could end up with bucket OID collisions. Consider the case where
@@ -292,7 +292,7 @@ public:
 
     // Returns the time associated with the bucket (id)
     Date_t getTime() const {
-        return _id.asDateT();
+        return _minTime;
     }
 
     /**
@@ -422,6 +422,9 @@ private:
 
     // Time field for the measurements that have been inserted into the bucket.
     std::string _timeField;
+
+    // Minimum timestamp over contained measurements
+    Date_t _minTime;
 
     // The minimum and maximum values for each field in the bucket.
     timeseries::MinMax _minmax;
@@ -1173,6 +1176,7 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
     }
 
     bucket->_timeField = info.options.getTimeField().toString();
+    bucket->_minTime = roundedTime;
 
     // Make sure we set the control.min time field to match the rounded _id timestamp.
     auto controlDoc = buildControlMinTimestampDoc(info.options.getTimeField(), roundedTime);
