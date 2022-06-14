@@ -117,7 +117,8 @@ DocumentSource::GetModPathsReturn DocumentSourceReshardingOwnershipMatch::getMod
 DocumentSource::GetNextResult DocumentSourceReshardingOwnershipMatch::doGetNext() {
     if (!_tempReshardingChunkMgr) {
         // TODO: Actually propagate the temporary resharding namespace from the recipient.
-        auto tempReshardingNss = constructTemporaryReshardingNss(pExpCtx->ns.db(), *pExpCtx->uuid);
+        auto tempReshardingNss =
+            resharding::constructTemporaryReshardingNss(pExpCtx->ns.db(), *pExpCtx->uuid);
 
         auto* catalogCache = Grid::get(pExpCtx->opCtx)->catalogCache();
         _tempReshardingChunkMgr =

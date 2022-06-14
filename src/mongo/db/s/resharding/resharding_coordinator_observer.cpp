@@ -112,7 +112,7 @@ bool stateTransistionsComplete(WithLock lk,
 template <class TParticipant>
 Status getStatusFromAbortReasonWithShardInfo(const TParticipant& participant,
                                              StringData participantType) {
-    return getStatusFromAbortReason(participant.getMutableState())
+    return resharding::getStatusFromAbortReason(participant.getMutableState())
         .withContext("{} shard {} reached an unrecoverable error"_format(
             participantType, participant.getId().toString()));
 }
@@ -128,7 +128,7 @@ boost::optional<Status> getAbortReasonIfExists(
     if (updatedStateDoc.getAbortReason()) {
         // Note: the absence of context specifying which shard the abortReason originates from
         // implies the abortReason originates from the coordinator.
-        return getStatusFromAbortReason(updatedStateDoc);
+        return resharding::getStatusFromAbortReason(updatedStateDoc);
     }
 
     for (const auto& donorShard : updatedStateDoc.getDonorShards()) {

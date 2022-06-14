@@ -58,7 +58,7 @@ public:
     const NamespaceString kOriginalNss = NamespaceString("db", "foo");
 
     const NamespaceString kTemporaryReshardingNss =
-        constructTemporaryReshardingNss("db", kExistingUUID);
+        resharding::constructTemporaryReshardingNss("db", kExistingUUID);
     const std::string kOriginalShardKey = "oldKey";
     const BSONObj kOriginalShardKeyPattern = BSON(kOriginalShardKey << 1);
     const std::string kReshardingKey = "newKey";
@@ -195,7 +195,7 @@ protected:
         const boost::optional<Timestamp>& cloneTimestamp = boost::none) {
         auto recipientFields =
             TypeCollectionRecipientFields(donorShards, existingUUID, originalNss, 5000);
-        emplaceCloneTimestampIfExists(recipientFields, cloneTimestamp);
+        resharding::emplaceCloneTimestampIfExists(recipientFields, cloneTimestamp);
         fields.setRecipientFields(std::move(recipientFields));
     }
 
@@ -620,10 +620,10 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
     OperationContext* opCtx = operationContext();
     NamespaceString sourceNss1 = NamespaceString("db", "one");
     NamespaceString tempReshardingNss1 =
-        constructTemporaryReshardingNss(sourceNss1.db(), UUID::gen());
+        resharding::constructTemporaryReshardingNss(sourceNss1.db(), UUID::gen());
     NamespaceString sourceNss2 = NamespaceString("db", "two");
     NamespaceString tempReshardingNss2 =
-        constructTemporaryReshardingNss(sourceNss2.db(), UUID::gen());
+        resharding::constructTemporaryReshardingNss(sourceNss2.db(), UUID::gen());
     ShardId shardId1 = ShardId{"recipient1"};
     ShardId shardId2 = ShardId{"recipient2"};
     ReshardingDonorDocument doc1 =

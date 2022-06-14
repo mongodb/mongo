@@ -193,7 +193,7 @@ TEST_F(ReshardingDataReplicationTest, GetOplogFetcherResumeId) {
     auto opCtx = makeOperationContext();
 
     const auto reshardingUUID = UUID::gen();
-    auto oplogBufferNss = getLocalOplogBufferNamespace(reshardingUUID, {"shard0"});
+    auto oplogBufferNss = resharding::getLocalOplogBufferNamespace(reshardingUUID, {"shard0"});
 
     const auto minFetchTimestamp = Timestamp{10, 0};
     const auto oplogId1 = ReshardingDonorOplogId{{20, 0}, {18, 0}};

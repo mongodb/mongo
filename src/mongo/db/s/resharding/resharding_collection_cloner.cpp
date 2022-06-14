@@ -109,7 +109,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
     resolvedNamespaces[_sourceNss.coll()] = {_sourceNss, std::vector<BSONObj>{}};
 
     // Assume that the config.cache.chunks collection isn't a view either.
-    auto tempNss = constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
+    auto tempNss = resharding::constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
     auto tempCacheChunksNss =
         NamespaceString(NamespaceString::kConfigDb, "cache.chunks." + tempNss.ns());
     resolvedNamespaces[tempCacheChunksNss.coll()] = {tempCacheChunksNss, std::vector<BSONObj>{}};

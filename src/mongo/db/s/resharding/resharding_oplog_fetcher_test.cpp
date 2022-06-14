@@ -298,7 +298,8 @@ public:
                     BSON(
                         "msg" << fmt::format("Writes to {} are temporarily blocked for resharding.",
                                              dataColl.getCollection()->ns().toString())),
-                    BSON("type" << kReshardFinalOpLogType << "reshardingUUID" << _reshardingUUID),
+                    BSON("type" << resharding::kReshardFinalOpLogType << "reshardingUUID"
+                                << _reshardingUUID),
                     boost::none,
                     boost::none,
                     boost::none,

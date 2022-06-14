@@ -203,7 +203,7 @@ public:
                                           {DonorShardEntry(ShardId("shard0000"), {})},
                                           {RecipientShardEntry(ShardId("shard0001"), {})});
         doc.setCommonReshardingMetadata(meta);
-        emplaceCloneTimestampIfExists(doc, cloneTimestamp);
+        resharding::emplaceCloneTimestampIfExists(doc, cloneTimestamp);
         return doc;
     }
 
@@ -372,10 +372,11 @@ public:
 
         TypeCollectionReshardingFields reshardingFields(coordinatorDoc.getReshardingUUID());
         reshardingFields.setState(coordinatorDoc.getState());
-        reshardingFields.setDonorFields(TypeCollectionDonorFields(
-            coordinatorDoc.getTempReshardingNss(),
-            coordinatorDoc.getReshardingKey(),
-            extractShardIdsFromParticipantEntries(coordinatorDoc.getRecipientShards())));
+        reshardingFields.setDonorFields(
+            TypeCollectionDonorFields(coordinatorDoc.getTempReshardingNss(),
+                                      coordinatorDoc.getReshardingKey(),
+                                      resharding::extractShardIdsFromParticipantEntries(
+                                          coordinatorDoc.getRecipientShards())));
 
         auto originalNssCatalogEntry = makeOriginalCollectionCatalogEntry(
             coordinatorDoc,

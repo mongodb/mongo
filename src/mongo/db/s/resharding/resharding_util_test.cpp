@@ -52,6 +52,7 @@
 
 
 namespace mongo {
+namespace resharding {
 namespace {
 
 class ReshardingUtilTest : public ConfigServerTestFixture {
@@ -309,4 +310,7 @@ TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineAfterID) {
 }
 
 }  // namespace
+
+}  // namespace resharding
+
 }  // namespace mongo

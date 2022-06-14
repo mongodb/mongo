@@ -131,7 +131,7 @@ public:
                 .getAsync([](auto) {});
 
             // Ensure the command isn't run on a stale primary.
-            doNoopWrite(opCtx, "_flushReshardingStateChange no-op", ns());
+            resharding::doNoopWrite(opCtx, "_flushReshardingStateChange no-op", ns());
         }
     };
 } _flushReshardingStateChange;

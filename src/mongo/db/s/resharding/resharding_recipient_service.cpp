@@ -728,8 +728,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         .then([this, &factory] {
             auto opCtx = factory.makeOperationContext(&cc());
             for (const auto& donor : _donorShards) {
-                auto stashNss =
-                    getLocalConflictStashNamespace(_metadata.getSourceUUID(), donor.getShardId());
+                auto stashNss = resharding::getLocalConflictStashNamespace(
+                    _metadata.getSourceUUID(), donor.getShardId());
                 AutoGetCollection stashColl(opCtx.get(), stashNss, MODE_IS);
                 uassert(5356800,
                         "Resharding completed with non-empty stash collections",
@@ -902,7 +902,7 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToError(
     Status abortReason, const CancelableOperationContextFactory& factory) {
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kError);
-    emplaceTruncatedAbortReasonIfExists(newRecipientCtx, abortReason);
+    resharding::emplaceTruncatedAbortReasonIfExists(newRecipientCtx, abortReason);
     _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
 }
 
@@ -1168,10 +1168,10 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
         progressDocList;
     for (const auto& donor : _donorShards) {
         {
-            AutoGetCollection oplogBufferColl(
-                opCtx.get(),
-                getLocalOplogBufferNamespace(_metadata.getSourceUUID(), donor.getShardId()),
-                MODE_IS);
+            AutoGetCollection oplogBufferColl(opCtx.get(),
+                                              resharding::getLocalOplogBufferNamespace(
+                                                  _metadata.getSourceUUID(), donor.getShardId()),
+                                              MODE_IS);
             if (oplogBufferColl) {
                 oplogEntriesFetched += oplogBufferColl->numRecords(opCtx.get());
             }

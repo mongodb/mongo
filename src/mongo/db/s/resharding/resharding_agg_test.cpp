@@ -362,7 +362,7 @@ protected:
         expCtx->ns = kRemoteOplogNss;
         expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(pipelineSource);
 
-        auto pipeline = createOplogFetchingPipelineForResharding(
+        auto pipeline = resharding::createOplogFetchingPipelineForResharding(
             expCtx,
             ReshardingDonorOplogId(Timestamp::min(), Timestamp::min()),
             _reshardingCollUUID,
@@ -524,13 +524,14 @@ TEST_F(ReshardingAggTest, VerifyPipelineOutputHasOplogSchema) {
     expCtx->ns = kRemoteOplogNss;
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(pipelineSource);
 
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline = createOplogFetchingPipelineForResharding(
-        expCtx,
-        // Use the test to also exercise the stages for resuming. The timestamp passed in is
-        // excluded from the results.
-        ReshardingDonorOplogId(insertOplog.getTimestamp(), insertOplog.getTimestamp()),
-        _reshardingCollUUID,
-        {_destinedRecipient});
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline =
+        resharding::createOplogFetchingPipelineForResharding(
+            expCtx,
+            // Use the test to also exercise the stages for resuming. The timestamp passed in is
+            // excluded from the results.
+            ReshardingDonorOplogId(insertOplog.getTimestamp(), insertOplog.getTimestamp()),
+            _reshardingCollUUID,
+            {_destinedRecipient});
     auto bsonPipeline = pipeline->serializeToBson();
     if (debug) {
         std::cout << "Pipeline stages:" << std::endl;
@@ -624,11 +625,12 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxn) {
     expCtx->ns = kRemoteOplogNss;
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(pipelineSource);
 
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline = createOplogFetchingPipelineForResharding(
-        expCtx,
-        ReshardingDonorOplogId(Timestamp::min(), Timestamp::min()),
-        _reshardingCollUUID,
-        {_destinedRecipient});
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline =
+        resharding::createOplogFetchingPipelineForResharding(
+            expCtx,
+            ReshardingDonorOplogId(Timestamp::min(), Timestamp::min()),
+            _reshardingCollUUID,
+            {_destinedRecipient});
     if (debug) {
         std::cout << "Pipeline stages:" << std::endl;
         // This is can be changed to process a prefix of the pipeline for debugging.
@@ -1476,7 +1478,7 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
         expCtx->mongoProcessInterface = std::move(mockMongoInterface);
     }
 
-    auto pipeline = createOplogFetchingPipelineForResharding(
+    auto pipeline = resharding::createOplogFetchingPipelineForResharding(
         expCtx, ReshardingDonorOplogId(Timestamp::min(), Timestamp::min()), kCrudUUID, kMyShardId);
 
     pipeline->addInitialSource(DocumentSourceMock::createForTest(pipelineSource, expCtx));
@@ -1578,8 +1580,8 @@ TEST_F(ReshardingAggWithStorageTest,
             expCtx->mongoProcessInterface = std::move(mockMongoInterface);
         }
 
-        auto pipeline =
-            createOplogFetchingPipelineForResharding(expCtx, startAt, kCrudUUID, kMyShardId);
+        auto pipeline = resharding::createOplogFetchingPipelineForResharding(
+            expCtx, startAt, kCrudUUID, kMyShardId);
         pipeline->addInitialSource(DocumentSourceMock::createForTest(pipelineSource, expCtx));
         return pipeline;
     };

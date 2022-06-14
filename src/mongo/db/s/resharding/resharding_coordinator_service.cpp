@@ -295,9 +295,9 @@ TypeCollectionRecipientFields constructRecipientFields(
         coordinatorDoc.getSourceNss(),
         resharding::gReshardingMinimumOperationDurationMillis.load());
 
-    emplaceCloneTimestampIfExists(recipientFields, coordinatorDoc.getCloneTimestamp());
-    emplaceApproxBytesToCopyIfExists(recipientFields,
-                                     coordinatorDoc.getReshardingApproxCopySizeStruct());
+    resharding::emplaceCloneTimestampIfExists(recipientFields, coordinatorDoc.getCloneTimestamp());
+    resharding::emplaceApproxBytesToCopyIfExists(
+        recipientFields, coordinatorDoc.getReshardingApproxCopySizeStruct());
 
     return recipientFields;
 }
@@ -323,10 +323,10 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
                                        << CollectionType::kAllowMigrationsFieldName << false));
         }
         case CoordinatorStateEnum::kPreparingToDonate: {
-            TypeCollectionDonorFields donorFields(
-                coordinatorDoc.getTempReshardingNss(),
-                coordinatorDoc.getReshardingKey(),
-                extractShardIdsFromParticipantEntries(coordinatorDoc.getRecipientShards()));
+            TypeCollectionDonorFields donorFields(coordinatorDoc.getTempReshardingNss(),
+                                                  coordinatorDoc.getReshardingKey(),
+                                                  resharding::extractShardIdsFromParticipantEntries(
+                                                      coordinatorDoc.getRecipientShards()));
 
             BSONObjBuilder updateBuilder;
             {
@@ -394,7 +394,7 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
                     // If the abortReason exists, include it in the update.
                     setBuilder.append("reshardingFields.abortReason", *abortReason);
 
-                    auto abortStatus = getStatusFromAbortReason(coordinatorDoc);
+                    auto abortStatus = resharding::getStatusFromAbortReason(coordinatorDoc);
                     setBuilder.append("reshardingFields.userCanceled",
                                       abortStatus == ErrorCodes::ReshardCollectionAborted);
                 }
@@ -504,7 +504,7 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                     if (auto abortReason = coordinatorDoc.getAbortReason()) {
                         setBuilder.append("reshardingFields.abortReason", *abortReason);
 
-                        auto abortStatus = getStatusFromAbortReason(coordinatorDoc);
+                        auto abortStatus = resharding::getStatusFromAbortReason(coordinatorDoc);
                         setBuilder.append("reshardingFields.userCanceled",
                                           abortStatus == ErrorCodes::ReshardCollectionAborted);
                     }
@@ -1592,8 +1592,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
     // the possibility of the document reaching the BSONObj size constraint.
     std::vector<BSONObj> zones;
     if (updatedCoordinatorDoc.getZones()) {
-        zones = buildTagsDocsFromZones(updatedCoordinatorDoc.getTempReshardingNss(),
-                                       *updatedCoordinatorDoc.getZones());
+        zones = resharding::buildTagsDocsFromZones(updatedCoordinatorDoc.getTempReshardingNss(),
+                                                   *updatedCoordinatorDoc.getZones());
     }
     updatedCoordinatorDoc.setPresetReshardedChunks(boost::none);
     updatedCoordinatorDoc.setZones(boost::none);
@@ -1652,8 +1652,8 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllDonorsReadyToDonat
                     opCtx.get(), _ctHolder->getAbortToken());
             }
 
-            auto highestMinFetchTimestamp =
-                getHighestMinFetchTimestamp(coordinatorDocChangedOnDisk.getDonorShards());
+            auto highestMinFetchTimestamp = resharding::getHighestMinFetchTimestamp(
+                coordinatorDocChangedOnDisk.getDonorShards());
             _updateCoordinatorDocStateAndCatalogEntries(
                 CoordinatorStateEnum::kCloning,
                 coordinatorDocChangedOnDisk,
@@ -1693,7 +1693,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_startCommitMonitor(
     _commitMonitor = std::make_shared<resharding::CoordinatorCommitMonitor>(
         _metrics,
         _coordinatorDoc.getSourceNss(),
-        extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards()),
+        resharding::extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards()),
         **executor,
         _ctHolder->getCommitMonitorToken());
 
@@ -1849,7 +1849,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllParticipantShardsD
 
             boost::optional<Status> abortReason;
             if (coordinatorDoc.getAbortReason()) {
-                abortReason = getStatusFromAbortReason(coordinatorDoc);
+                abortReason = resharding::getStatusFromAbortReason(coordinatorDoc);
             }
 
             if (!abortReason) {
@@ -1909,9 +1909,9 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
     // Build new state doc for coordinator state update
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
     updatedCoordinatorDoc.setState(nextState);
-    emplaceApproxBytesToCopyIfExists(updatedCoordinatorDoc, std::move(approxCopySize));
-    emplaceCloneTimestampIfExists(updatedCoordinatorDoc, std::move(cloneTimestamp));
-    emplaceTruncatedAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
+    resharding::emplaceApproxBytesToCopyIfExists(updatedCoordinatorDoc, std::move(approxCopySize));
+    resharding::emplaceCloneTimestampIfExists(updatedCoordinatorDoc, std::move(cloneTimestamp));
+    resharding::emplaceTruncatedAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     resharding::writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
@@ -1924,9 +1924,10 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
 void ReshardingCoordinatorService::ReshardingCoordinator::_sendCommandToAllParticipants(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const BSONObj& command) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-    auto donorShardIds = extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards());
+    auto donorShardIds =
+        resharding::extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards());
     auto recipientShardIds =
-        extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards());
+        resharding::extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards());
     std::set<ShardId> participantShardIds{donorShardIds.begin(), donorShardIds.end()};
     participantShardIds.insert(recipientShardIds.begin(), recipientShardIds.end());
 
@@ -1942,7 +1943,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_sendCommandToAllRecip
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const BSONObj& command) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     auto recipientShardIds =
-        extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards());
+        resharding::extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards());
 
     _reshardingCoordinatorExternalState->sendCommandToShards(
         opCtx.get(),
@@ -1955,7 +1956,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_sendCommandToAllRecip
 void ReshardingCoordinatorService::ReshardingCoordinator::_sendCommandToAllDonors(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const BSONObj& command) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-    auto donorShardIds = extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards());
+    auto donorShardIds =
+        resharding::extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards());
 
     _reshardingCoordinatorExternalState->sendCommandToShards(
         opCtx.get(),

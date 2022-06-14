@@ -335,10 +335,11 @@ private:
     const ShardId _otherDonorId{"otherDonorId"};
 
     const NamespaceString _outputNss =
-        constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
-    const NamespaceString _myStashNss = getLocalConflictStashNamespace(_sourceUUID, _myDonorId);
+        resharding::constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
+    const NamespaceString _myStashNss =
+        resharding::getLocalConflictStashNamespace(_sourceUUID, _myDonorId);
     const NamespaceString _otherStashNss =
-        getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
+        resharding::getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
 
     std::unique_ptr<ReshardingOplogApplicationRules> _applier;
     std::unique_ptr<ReshardingMetrics> _metrics;

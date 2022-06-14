@@ -271,7 +271,7 @@ NamespaceString ReshardingOplogApplier::ensureStashCollectionExists(
     const UUID& existingUUID,
     const ShardId& donorShardId,
     const CollectionOptions& options) {
-    auto nss = getLocalConflictStashNamespace(existingUUID, donorShardId);
+    auto nss = resharding::getLocalConflictStashNamespace(existingUUID, donorShardId);
 
     resharding::data_copy::ensureCollectionExists(opCtx, nss, options);
     return nss;

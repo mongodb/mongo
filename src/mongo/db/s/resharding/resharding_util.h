@@ -50,6 +50,7 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
+namespace resharding {
 
 constexpr auto kReshardFinalOpLogType = "reshardFinalOp"_sd;
 constexpr auto kReshardProgressMark = "reshardProgressMark"_sd;
@@ -324,5 +325,6 @@ std::vector<std::shared_ptr<Instance>> getReshardingStateMachines(OperationConte
     return result;
 }
 
+}  // namespace resharding
 
 }  // namespace mongo

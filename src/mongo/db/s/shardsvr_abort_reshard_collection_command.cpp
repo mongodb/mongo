@@ -99,7 +99,7 @@ public:
             // If abort actually went through, the resharding documents should be cleaned up.
             // If they still exists, it could be because that it was interrupted or it is no
             // longer primary.
-            doNoopWrite(opCtx, "_shardsvrAbortReshardCollection no-op", ns());
+            resharding::doNoopWrite(opCtx, "_shardsvrAbortReshardCollection no-op", ns());
             PersistentTaskStore<CommonReshardingMetadata> donorReshardingOpStore(
                 NamespaceString::kDonorReshardingOperationsNamespace);
             uassert(5563802,

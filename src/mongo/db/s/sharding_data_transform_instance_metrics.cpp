@@ -118,7 +118,8 @@ ShardingDataTransformInstanceMetrics::~ShardingDataTransformInstanceMetrics() {
 Milliseconds ShardingDataTransformInstanceMetrics::getHighEstimateRemainingTimeMillis() const {
     switch (_role) {
         case Role::kRecipient: {
-            auto estimate = estimateRemainingRecipientTime(_applyingStartTime.load() != kNoDate,
+            auto estimate =
+                resharding::estimateRemainingRecipientTime(_applyingStartTime.load() != kNoDate,
                                                            _bytesCopied.load(),
                                                            _approxBytesToCopy.load(),
                                                            getCopyingElapsedTimeSecs(),

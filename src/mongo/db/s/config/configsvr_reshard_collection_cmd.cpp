@@ -63,8 +63,9 @@ getExistingInstanceToJoin(OperationContext* opCtx,
                           const NamespaceString& nss,
                           const BSONObj& newShardKey) {
     auto instances =
-        getReshardingStateMachines<ReshardingCoordinatorService,
-                                   ReshardingCoordinatorService::ReshardingCoordinator>(opCtx, nss);
+        resharding::getReshardingStateMachines<ReshardingCoordinatorService,
+                                               ReshardingCoordinatorService::ReshardingCoordinator>(
+            opCtx, nss);
     for (const auto& instance : instances) {
         if (SimpleBSONObjComparator::kInstance.evaluate(
                 instance->getMetadata().getReshardingKey().toBSON() == newShardKey)) {
@@ -139,7 +140,7 @@ public:
                         "Must specify only one of _presetReshardedChunks or numInitialChunks",
                         !(bool(request().getNumInitialChunks())));
 
-                validateReshardedChunks(
+                resharding::validateReshardedChunks(
                     *presetChunks, opCtx, ShardKeyPattern(request().getKey()).getKeyPattern());
             }
 
@@ -183,11 +184,12 @@ public:
                     return boost::none;
                 }
 
-                auto tempReshardingNss = constructTemporaryReshardingNss(nss.db(), cm.getUUID());
+                auto tempReshardingNss =
+                    resharding::constructTemporaryReshardingNss(nss.db(), cm.getUUID());
 
 
                 if (auto zones = request().getZones()) {
-                    checkForOverlappingZones(*zones);
+                    resharding::checkForOverlappingZones(*zones);
                 }
 
                 auto coordinatorDoc =

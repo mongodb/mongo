@@ -63,6 +63,7 @@
 
 
 namespace mongo {
+namespace resharding {
 
 namespace {
 /**
@@ -414,4 +415,5 @@ boost::optional<Milliseconds> estimateRemainingRecipientTime(bool applyingBegan,
     return {};
 }
 
+}  // namespace resharding
 }  // namespace mongo

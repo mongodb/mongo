@@ -121,7 +121,7 @@ std::vector<std::unique_ptr<ReshardingOplogFetcher>> ReshardingDataReplication::
 
     for (const auto& donor : donorShards) {
         auto oplogBufferNss =
-            getLocalOplogBufferNamespace(metadata.getSourceUUID(), donor.getShardId());
+            resharding::getLocalOplogBufferNamespace(metadata.getSourceUUID(), donor.getShardId());
         auto minFetchTimestamp = *donor.getMinFetchTimestamp();
         auto idToResumeFrom = getOplogFetcherResumeId(
             opCtx, metadata.getReshardingUUID(), oplogBufferNss, minFetchTimestamp);
@@ -182,7 +182,7 @@ std::vector<std::unique_ptr<ReshardingOplogApplier>> ReshardingDataReplication::
         invariant((idToResumeFrom >= ReshardingDonorOplogId{minFetchTimestamp, minFetchTimestamp}));
 
         const auto& oplogBufferNss =
-            getLocalOplogBufferNamespace(metadata.getSourceUUID(), donorShardId);
+            resharding::getLocalOplogBufferNamespace(metadata.getSourceUUID(), donorShardId);
 
         auto applierMetrics = (*applierMetricsMap)[donorShardId].get();
         oplogAppliers.emplace_back(std::make_unique<ReshardingOplogApplier>(
@@ -456,7 +456,7 @@ ReshardingDonorOplogId ReshardingDataReplication::getOplogFetcherResumeId(
 
         if (highestOplogBufferId) {
             auto oplogEntry = repl::OplogEntry{highestOplogBufferId->toBson()};
-            if (isFinalOplog(oplogEntry, reshardingUUID)) {
+            if (resharding::isFinalOplog(oplogEntry, reshardingUUID)) {
                 return ReshardingOplogFetcher::kFinalOpAlreadyFetched;
             }
 

@@ -108,10 +108,9 @@ public:
         }
 
         Response typedRun(OperationContext* opCtx) {
-            auto instances =
-                getReshardingStateMachines<ReshardingRecipientService,
-                                           ReshardingRecipientService::RecipientStateMachine>(opCtx,
-                                                                                              ns());
+            auto instances = resharding::getReshardingStateMachines<
+                ReshardingRecipientService,
+                ReshardingRecipientService::RecipientStateMachine>(opCtx, ns());
             if (instances.empty()) {
                 return Response{boost::none, boost::none};
             }

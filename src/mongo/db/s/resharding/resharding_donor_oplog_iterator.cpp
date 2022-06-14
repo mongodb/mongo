@@ -129,7 +129,7 @@ std::vector<repl::OplogEntry> ReshardingDonorOplogIterator::_fillBatch(Pipeline&
 
         numBytes += obj.objsize();
 
-        if (isFinalOplog(entry)) {
+        if (resharding::isFinalOplog(entry)) {
             // The ReshardingOplogFetcher should never insert documents after the reshardFinalOp
             // entry. We defensively check each oplog entry for being the reshardFinalOp and confirm
             // the pipeline has been exhausted.
@@ -185,7 +185,7 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
             const auto& lastEntryInBatch = batch.back();
             _resumeToken = getId(lastEntryInBatch);
 
-            if (isFinalOplog(lastEntryInBatch)) {
+            if (resharding::isFinalOplog(lastEntryInBatch)) {
                 _hasSeenFinalOplogEntry = true;
                 // Skip returning the final oplog entry because it is known to be a no-op.
                 batch.pop_back();

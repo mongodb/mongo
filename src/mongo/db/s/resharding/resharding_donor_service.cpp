@@ -715,7 +715,7 @@ void ReshardingDonorService::DonorStateMachine::
             oplog.setObject(
                 BSON("msg" << fmt::format("Writes to {} are temporarily blocked for resharding.",
                                           _metadata.getSourceNss().toString())));
-            oplog.setObject2(BSON("type" << kReshardFinalOpLogType << "reshardingUUID"
+            oplog.setObject2(BSON("type" << resharding::kReshardFinalOpLogType << "reshardingUUID"
                                          << _metadata.getReshardingUUID()));
             oplog.setOpTime(OplogSlot());
             oplog.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
@@ -856,7 +856,7 @@ void ReshardingDonorService::DonorStateMachine::_transitionToDonatingInitialData
 void ReshardingDonorService::DonorStateMachine::_transitionToError(Status abortReason) {
     auto newDonorCtx = _donorCtx;
     newDonorCtx.setState(DonorStateEnum::kError);
-    emplaceTruncatedAbortReasonIfExists(newDonorCtx, abortReason);
+    resharding::emplaceTruncatedAbortReasonIfExists(newDonorCtx, abortReason);
     _transitionState(std::move(newDonorCtx));
 }
 

@@ -272,9 +272,9 @@ AggregateCommandRequest ReshardingOplogFetcher::_makeAggregateCommandRequest(
     auto opCtx = opCtxRaii.get();
     auto expCtx = _makeExpressionContext(opCtx);
 
-    auto serializedPipeline =
-        createOplogFetchingPipelineForResharding(expCtx, _startAt, _collUUID, _recipientShard)
-            ->serializeToBson();
+    auto serializedPipeline = resharding::createOplogFetchingPipelineForResharding(
+                                  expCtx, _startAt, _collUUID, _recipientShard)
+                                  ->serializeToBson();
 
     AggregateCommandRequest aggRequest(NamespaceString::kRsOplogNamespace,
                                        std::move(serializedPipeline));
@@ -368,7 +368,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
                     _onInsertFuture = std::move(f);
                 }
 
-                if (isFinalOplog(nextOplog, _reshardingUUID)) {
+                if (resharding::isFinalOplog(nextOplog, _reshardingUUID)) {
                     moreToCome = false;
                     return false;
                 }
@@ -392,7 +392,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
                     oplog.set_id(Value(startAt.toBSON()));
                     oplog.setObject(BSON("msg"
                                          << "Latest oplog ts from donor's cursor response"));
-                    oplog.setObject2(BSON("type" << kReshardProgressMark));
+                    oplog.setObject2(BSON("type" << resharding::kReshardProgressMark));
                     oplog.setOpTime(OplogSlot());
                     oplog.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
 
