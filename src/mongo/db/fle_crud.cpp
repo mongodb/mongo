@@ -46,6 +46,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/fle/server_rewrite.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_api.h"
 #include "mongo/idl/idl_parser.h"
@@ -96,21 +97,24 @@ void appendSingleStatusToWriteErrors(const Status& status,
     replyBase->setWriteErrors(errors);
 }
 
-void replyToResponse(write_ops::WriteCommandReplyBase* replyBase,
+void replyToResponse(OperationContext* opCtx,
+                     write_ops::WriteCommandReplyBase* replyBase,
                      BatchedCommandResponse* response) {
     response->setStatus(Status::OK());
     response->setN(replyBase->getN());
-    if (replyBase->getElectionId()) {
-        response->setElectionId(replyBase->getElectionId().value());
-    }
-    if (replyBase->getOpTime()) {
-        response->setLastOp(replyBase->getOpTime().value());
-    }
     if (replyBase->getWriteErrors()) {
         for (const auto& error : *replyBase->getWriteErrors()) {
             response->addToErrDetails(error);
         }
     }
+
+    // Update the OpTime for the reply to current OpTime
+    //
+    // The OpTime in the reply reflects the OpTime of when the request was run, not when it was
+    // committed. The Transaction API propagates the OpTime from the commit transaction onto the
+    // current thread so grab it from TLS and change the OpTime on the reply.
+    //
+    response->setLastOp(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp());
 }
 
 void responseToReply(const BatchedCommandResponse& response,
@@ -904,7 +908,7 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
             return FLEBatchResult::kNotProcessed;
         }
 
-        replyToResponse(&insertReply.getWriteCommandReplyBase(), response);
+        replyToResponse(opCtx, &insertReply.getWriteCommandReplyBase(), response);
 
         return FLEBatchResult::kProcessed;
     } else if (request.getBatchType() == BatchedCommandRequest::BatchType_Delete) {
@@ -913,7 +917,7 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
 
         auto deleteReply = processDelete(opCtx, deleteRequest, &getTransactionWithRetriesForMongoS);
 
-        replyToResponse(&deleteReply.getWriteCommandReplyBase(), response);
+        replyToResponse(opCtx, &deleteReply.getWriteCommandReplyBase(), response);
         return FLEBatchResult::kProcessed;
 
     } else if (request.getBatchType() == BatchedCommandRequest::BatchType_Update) {
@@ -922,7 +926,7 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
 
         auto updateReply = processUpdate(opCtx, updateRequest, &getTransactionWithRetriesForMongoS);
 
-        replyToResponse(&updateReply.getWriteCommandReplyBase(), response);
+        replyToResponse(opCtx, &updateReply.getWriteCommandReplyBase(), response);
 
         response->setNModified(updateReply.getNModified());
 
