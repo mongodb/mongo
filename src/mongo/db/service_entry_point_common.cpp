@@ -1284,8 +1284,7 @@ void RunCommandAndWaitForWriteConcern::_waitForWriteConcern(BSONObjBuilder& bb) 
     }
 
     CurOp::get(opCtx)->debug().writeConcern.emplace(opCtx->getWriteConcern());
-    _execContext->behaviors->waitForWriteConcern(
-        opCtx, invocation, repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(), bb);
+    _execContext->behaviors->waitForWriteConcern(opCtx, invocation, _ecd->getLastOpBeforeRun(), bb);
 }
 
 Future<void> RunCommandAndWaitForWriteConcern::_runImpl() {
