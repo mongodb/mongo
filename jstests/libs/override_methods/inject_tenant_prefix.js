@@ -435,7 +435,7 @@ function convertServerConnectionStringToURI(input) {
  * that there is only one such operation.
  */
 function getOperationStateDocument(conn) {
-    const collection = isShardSplitPassthrough() ? "tenantSplitDonors" : "tenantMigrationDonors";
+    const collection = isShardSplitPassthrough() ? "shardSplitDonors" : "tenantMigrationDonors";
     const filter =
         isShardSplitPassthrough() ? {tenantIds: TestData.tenantIds} : {tenantId: TestData.tenantId};
     const findRes = assert.commandWorked(

@@ -56,7 +56,7 @@ public:
     }
 
     NamespaceString getStateDocumentsNS() const override {
-        return NamespaceString::kTenantSplitDonorsNamespace;
+        return NamespaceString::kShardSplitDonorsNamespace;
     }
 
     ThreadPool::Limits getThreadPoolLimits() const override;
@@ -156,9 +156,12 @@ public:
 
 private:
     // Tasks
-    ExecutorFuture<void> _enterBlockingOrAbortedState(const ScopedTaskExecutorPtr& executor,
-                                                      const CancellationToken& primaryToken,
-                                                      const CancellationToken& abortToken);
+    ExecutorFuture<void> _enterAbortIndexBuildsOrAbortedState(const ScopedTaskExecutorPtr& executor,
+                                                              const CancellationToken& primaryToken,
+                                                              const CancellationToken& abortToken);
+
+    ExecutorFuture<void> _abortIndexBuildsAndEnterBlockingState(
+        const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken);
 
     ExecutorFuture<void> _waitForRecipientToReachBlockTimestamp(
         const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken);
@@ -195,7 +198,7 @@ private:
 
     void _initiateTimeout(const ScopedTaskExecutorPtr& executor,
                           const CancellationToken& abortToken);
-
+    ConnectionString _setupAcceptanceMonitoring(WithLock lock, const CancellationToken& abortToken);
     bool _hasInstalledSplitConfig(WithLock lock);
 
     /*
@@ -205,10 +208,8 @@ private:
     ExecutorFuture<void> _cleanRecipientStateDoc(const ScopedTaskExecutorPtr& executor,
                                                  const CancellationToken& token);
 
-    void _abortIndexBuilds(const CancellationToken& abortToken);
-
 private:
-    const NamespaceString _stateDocumentsNS = NamespaceString::kTenantSplitDonorsNamespace;
+    const NamespaceString _stateDocumentsNS = NamespaceString::kShardSplitDonorsNamespace;
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardSplitDonorService::_mutex");
 
     const UUID _migrationId;

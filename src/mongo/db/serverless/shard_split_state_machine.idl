@@ -40,6 +40,7 @@ enums:
         type: string
         values:
             kUninitialized: "uninitialized"
+            kAbortingIndexBuilds: "aborting index builds"
             kBlocking: "blocking"
             kCommitted: "committed"
             kAborted: "aborted"

@@ -156,7 +156,7 @@ public:
     static const NamespaceString kTenantMigrationOplogView;
 
     // Namespace for storing the persisted state of tenant split donors.
-    static const NamespaceString kTenantSplitDonorsNamespace;
+    static const NamespaceString kShardSplitDonorsNamespace;
 
     // Namespace for replica set configuration settings.
     static const NamespaceString kSystemReplSetNamespace;

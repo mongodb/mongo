@@ -347,7 +347,7 @@ class BasicServerlessTest {
 
     /*
      *  Wait for state document garbage collection by polling for when the document has been removed
-     * from the tenantSplitDonors namespace, and all access blockers have been removed.
+     * from the 'shardSplitDonors' namespace, and all access blockers have been removed.
      * @param {migrationId} id that was used for the commitShardSplit command.
      * @param {tenantIds} tenant ids of the shard split.
      */
@@ -538,7 +538,7 @@ class BasicServerlessTest {
     }
 }
 
-BasicServerlessTest.kConfigSplitDonorsNS = "config.tenantSplitDonors";
+BasicServerlessTest.kConfigSplitDonorsNS = "config.shardSplitDonors";
 BasicServerlessTest.DonorState = {
     kUninitialized: "uninitialized",
     kBlocking: "blocking",
