@@ -260,6 +260,8 @@ last-continuous:
       test_file: jstests/core/or_to_in.js
     - ticket: SERVER-66422
       test_file: jstests/sharding/resharding_metrics.js
+    - ticket: SERVER-50792
+      test_file: jstests/core/check_shard_index.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -653,6 +655,8 @@ last-lts:
       test_file: jstests/core/or_to_in.js
     - ticket: SERVER-66422
       test_file: jstests/sharding/resharding_metrics.js
+    - ticket: SERVER-50792
+      test_file: jstests/core/check_shard_index.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
