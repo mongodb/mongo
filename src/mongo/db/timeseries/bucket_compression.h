@@ -58,6 +58,7 @@ struct CompressionResult {
 CompressionResult compressBucket(const BSONObj& bucketDoc,
                                  StringData timeFieldName,
                                  const NamespaceString& nss,
+                                 bool eligibleForReopening,
                                  bool validateDecompression);
 
 /**

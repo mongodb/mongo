@@ -18,6 +18,8 @@ load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
 TimeseriesTest.run((insert) => {
     const isTimeseriesBucketCompressionEnabled =
         TimeseriesTest.timeseriesBucketCompressionEnabled(db);
+    const areTimeseriesScalabilityImprovementsEnabled =
+        TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db);
 
     const collNamePrefix = 'timeseries_bucket_limit_count_';
 
@@ -78,6 +80,15 @@ TimeseriesTest.run((insert) => {
                   bucketDocs[0].control.version,
                   'unexpected control.version in first bucket: ' + tojson(bucketDocs));
 
+        if (areTimeseriesScalabilityImprovementsEnabled) {
+            assert.eq(true,
+                      bucketDocs[0].control.closed,
+                      'unexpected control.closed in first bucket: ' + tojson(bucketDocs));
+        } else {
+            assert(!bucketDocs[0].control.hasOwnProperty("closed"),
+                   'unexpected control.closed in first bucket: ' + tojson(bucketDocs));
+        }
+
         // Second bucket should contain the remaining documents.
         assert.eq(bucketMaxCount,
                   bucketDocs[1].control.min._id,
@@ -93,7 +104,16 @@ TimeseriesTest.run((insert) => {
                   'invalid control.max for x in second bucket: ' + tojson(bucketDocs));
         assert.eq(1,
                   bucketDocs[1].control.version,
-                  'unexpected control.version in first bucket: ' + tojson(bucketDocs));
+                  'unexpected control.version in second bucket: ' + tojson(bucketDocs));
+
+        if (areTimeseriesScalabilityImprovementsEnabled) {
+            assert.eq(false,
+                      bucketDocs[1].control.closed,
+                      'unexpected control.closed in second bucket: ' + tojson(bucketDocs));
+        } else {
+            assert(!bucketDocs[1].control.hasOwnProperty("closed"),
+                   'unexpected control.closed in second bucket: ' + tojson(bucketDocs));
+        }
     };
 
     runTest(1);

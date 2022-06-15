@@ -1180,7 +1180,11 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
                     "b":{"0":1,"1":2,"2":3}}})");
 
     timeseries::CompressionResult compressionResult =
-        timeseries::compressBucket(bucketDoc, _timeField, _ns1, /*validateDecompression=*/true);
+        timeseries::compressBucket(bucketDoc,
+                                   _timeField,
+                                   _ns1,
+                                   /*eligibleForReopening=*/false,
+                                   /*validateDecompression=*/true);
     const BSONObj& compressedBucketDoc = compressionResult.compressedBucket.get();
 
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
@@ -1235,7 +1239,11 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
                     "b":{"0":1,"1":2,"2":3}}})");
 
     timeseries::CompressionResult compressionResult =
-        timeseries::compressBucket(bucketDoc, _timeField, _ns1, /*validateDecompression=*/true);
+        timeseries::compressBucket(bucketDoc,
+                                   _timeField,
+                                   _ns1,
+                                   /*eligibleForReopening=*/false,
+                                   /*validateDecompression=*/true);
     const BSONObj& compressedBucketDoc = compressionResult.compressedBucket.get();
 
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",

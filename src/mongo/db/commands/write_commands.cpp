@@ -263,6 +263,11 @@ BSONObj makeTimeseriesInsertDocument(std::shared_ptr<BucketCatalog::WriteBatch> 
                                     kTimeseriesControlDefaultVersion);
         bucketControlBuilder.append(kBucketControlMinFieldName, batch->min());
         bucketControlBuilder.append(kBucketControlMaxFieldName, batch->max());
+
+        if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            bucketControlBuilder.append(kBucketControlClosedFieldName, false);
+        }
     }
     if (metadataElem) {
         builder.appendAs(metadataElem, kBucketMetaFieldName);
@@ -727,8 +732,11 @@ public:
                 beforeSize = bucketDoc.objsize();
                 // Reset every time we run to ensure we never use a stale value
                 compressionStats = {};
-                auto compressed = timeseries::compressBucket(
-                    bucketDoc, closedBucket.timeField, ns(), validateCompression);
+                auto compressed = timeseries::compressBucket(bucketDoc,
+                                                             closedBucket.timeField,
+                                                             ns(),
+                                                             closedBucket.eligibleForReopening,
+                                                             validateCompression);
                 if (compressed.compressedBucket) {
                     // If compressed object size is larger than uncompressed, skip compression
                     // update.
