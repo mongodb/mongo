@@ -303,20 +303,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
                     renameCollParticipantRequest.toBSON({}));
 
-                try {
-                    sharding_ddl_util::sendAuthenticatedCommandToShards(
-                        opCtx,
-                        fromNss.db(),
-                        cmdObj.addFields(osi.toBSON()),
-                        participants,
-                        **executor);
-
-                } catch (const ExceptionFor<ErrorCodes::NotARetryableWriteCommand>&) {
-                    // Older 5.0 binaries don't support running the command as a
-                    // retryable write yet. In that case, retry without attaching session info.
-                    sharding_ddl_util::sendAuthenticatedCommandToShards(
-                        opCtx, fromNss.db(), cmdObj, participants, **executor);
-                }
+                sharding_ddl_util::sendAuthenticatedCommandToShards(
+                    opCtx, fromNss.db(), cmdObj.addFields(osi.toBSON()), participants, **executor);
             }))
         .then(_executePhase(
             Phase::kRenameMetadata,
@@ -325,8 +313,12 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
+                // For an unsharded collection the CSRS server can not verify the targetUUID.
+                // Use the session ID + txnNumber to ensure no stale requests get through.
+                _doc = _updateSession(opCtx, _doc);
+                const OperationSessionInfo osi = getCurrentSession(_doc);
+
                 if (!_firstExecution) {
-                    _doc = _updateSession(opCtx, _doc);
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                         opCtx, getCurrentSession(_doc), **executor);
                 }
@@ -336,28 +328,13 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(req.toBSON({}));
                 const auto& configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-                // For an unsharded collection the CSRS server can not verify the targetUUID.
-                // Use the session ID + txnNumber to ensure no stale requests get through.
-                _doc = _updateSession(opCtx, _doc);
-                const OperationSessionInfo osi = getCurrentSession(_doc);
 
-                try {
-                    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(
-                        configShard->runCommand(opCtx,
-                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                                "admin",
-                                                cmdObj.addFields(osi.toBSON()),
-                                                Shard::RetryPolicy::kIdempotent)));
-                } catch (const ExceptionFor<ErrorCodes::NotARetryableWriteCommand>&) {
-                    // Older 5.0 binaries don't support running the command as a
-                    // retryable write yet. In that case, retry without attaching session info.
-                    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(
-                        configShard->runCommand(opCtx,
-                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                                "admin",
-                                                cmdObj,
-                                                Shard::RetryPolicy::kIdempotent)));
-                }
+                uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(
+                    configShard->runCommand(opCtx,
+                                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                            "admin",
+                                            cmdObj.addFields(osi.toBSON()),
+                                            Shard::RetryPolicy::kIdempotent)));
             }))
         .then(_executePhase(
             Phase::kUnblockCRUD,
@@ -386,19 +363,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 _doc = _updateSession(opCtx, _doc);
                 const OperationSessionInfo osi = getCurrentSession(_doc);
 
-                try {
-                    sharding_ddl_util::sendAuthenticatedCommandToShards(
-                        opCtx,
-                        fromNss.db(),
-                        cmdObj.addFields(osi.toBSON()),
-                        participants,
-                        **executor);
-                } catch (const ExceptionFor<ErrorCodes::NotARetryableWriteCommand>&) {
-                    // Older 5.0 binaries don't support running the command as a
-                    // retryable write yet. In that case, retry without attaching session info.
-                    sharding_ddl_util::sendAuthenticatedCommandToShards(
-                        opCtx, fromNss.db(), cmdObj, participants, **executor);
-                }
+                sharding_ddl_util::sendAuthenticatedCommandToShards(
+                    opCtx, fromNss.db(), cmdObj.addFields(osi.toBSON()), participants, **executor);
             }))
         .then(_executePhase(Phase::kSetResponse,
                             [this, anchor = shared_from_this()] {

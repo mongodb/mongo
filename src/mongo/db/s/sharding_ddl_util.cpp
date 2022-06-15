@@ -340,14 +340,7 @@ void shardedRenameMetadata(OperationContext* opCtx,
     auto now = VectorClock::get(opCtx)->getTime();
     auto newTimestamp = now.clusterTime().asTimestamp();
     fromCollType.setTimestamp(newTimestamp);
-    {
-        // Only bump the epoch if the whole cluster is in FCV 5.0, so chunks do not contain epochs.
-        FixedFCVRegion fixedFCVRegion(opCtx);
-        if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0)) {
-            fromCollType.setEpoch(OID::gen());
-        }
-    }
+    fromCollType.setEpoch(OID::gen());
 
     // Insert the TO collection entry
     uassertStatusOK(catalogClient->insertConfigDocument(
