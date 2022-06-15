@@ -62,6 +62,29 @@ MakeObjStageBase<O>::MakeObjStageBase(std::unique_ptr<PlanStage> input,
 }
 
 template <MakeObjOutputType O>
+MakeObjStageBase<O>::MakeObjStageBase(std::unique_ptr<PlanStage> input,
+                                      value::SlotId objSlot,
+                                      boost::optional<value::SlotId> rootSlot,
+                                      boost::optional<FieldBehavior> fieldBehavior,
+                                      std::set<std::string> fields,
+                                      std::set<std::string> projectFields,
+                                      value::SlotVector projectVars,
+                                      bool forceNewObject,
+                                      bool returnOldObject,
+                                      PlanNodeId planNodeId)
+    : MakeObjStageBase<O>::MakeObjStageBase(
+          std::move(input),
+          objSlot,
+          rootSlot,
+          fieldBehavior,
+          std::vector<std::string>(fields.begin(), fields.end()),
+          std::vector<std::string>(projectFields.begin(), projectFields.end()),
+          std::move(projectVars),
+          forceNewObject,
+          returnOldObject,
+          planNodeId) {}
+
+template <MakeObjOutputType O>
 std::unique_ptr<PlanStage> MakeObjStageBase<O>::clone() const {
     return std::make_unique<MakeObjStageBase<O>>(_children[0]->clone(),
                                                  _objSlot,

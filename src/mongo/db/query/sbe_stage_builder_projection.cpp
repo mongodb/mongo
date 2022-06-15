@@ -413,7 +413,7 @@ public:
                                              childLevelResultSlot,
                                              childLevelInputSlot,
                                              sbe::MakeBsonObjStage::FieldBehavior::keep,
-                                             keepFields,
+                                             std::move(keepFields),
                                              std::move(projectFields),
                                              std::move(projectSlots),
                                              true,
