@@ -3,7 +3,6 @@
  * the following batch resumes from where the previous one left off.
  *
  * @tags: [
- *   requires_journaling,
  *   requires_replication,
  * ]
  */

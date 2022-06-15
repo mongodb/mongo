@@ -2,7 +2,7 @@
  * Tests the 'reconfigForPSASet()' shell function and makes sure that reconfig will succeed while
  * preserving majority reads.
  *
- * @tags: [requires_journaling]
+ * @tags: [requires_replication]
  */
 
 (function() {

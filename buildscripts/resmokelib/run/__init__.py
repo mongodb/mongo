@@ -633,9 +633,6 @@ class RunPlugin(PluginInterface):
                   " started by resmoke.py. The argument is specified as bracketed YAML -"
                   " i.e. JSON with support for single quoted and unquoted keys."))
 
-        parser.add_argument("--nojournal", action="store_true", dest="no_journal",
-                            help="Disables journaling for all mongod's.")
-
         parser.add_argument("--numClientsPerFixture", type=int, dest="num_clients_per_fixture",
                             help="Number of clients running tests per fixture.")
 

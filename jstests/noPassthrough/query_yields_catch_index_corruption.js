@@ -1,5 +1,4 @@
 // @tags: [
-//   requires_journaling,
 //   requires_persistence,
 // ]
 (function() {

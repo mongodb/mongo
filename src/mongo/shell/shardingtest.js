@@ -1090,7 +1090,6 @@ var ShardingTest = function(params) {
 
     // Allow specifying mixed-type options like this:
     // { mongos : [ { bind_ip : "localhost" } ],
-    //   config : [ { nojournal : "" } ],
     //   shards : { rs : true, d : true } }
     if (Array.isArray(numShards)) {
         for (var i = 0; i < numShards.length; i++) {
@@ -1328,7 +1327,6 @@ var ShardingTest = function(params) {
     var startOptions = {
         pathOpts: pathOpts,
         // Ensure that journaling is always enabled for config servers.
-        journal: "",
         configsvr: "",
         storageEngine: "wiredTiger",
     };

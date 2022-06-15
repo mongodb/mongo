@@ -2,7 +2,7 @@
  * This file tests that commands that should accept a writeConcern on a standalone can accept one.
  * This does not test that writes with j: true are actually made durable or that if j: true fails
  * that there is a writeConcern error.
- * @tags: [requires_journaling]
+ * @tags: [requires_persistence]
  */
 
 (function() {

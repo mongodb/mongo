@@ -10,7 +10,7 @@
  * current size of the oplog is less than --oplogSize only after the minimum retention time has
  * passed since inserting the first set of oplog entries
  *
- * @tags: [requires_journaling]
+ * @tags: [requires_replication]
  */
 (function() {
 "use strict";

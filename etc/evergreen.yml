@@ -288,46 +288,6 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     test_flags: --excludeWithAnyTags=requires_http_client
 
-- name: linux-64-duroff
-  display_name: Linux (No Journal)
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel80-small
-  expansions: &linux-64-required-duroff-expansions
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off --link-model=dynamic
-    multiversion_platform: rhel80
-    multiversion_edition: targeted
-    # Running WiredTiger with --nojournal in a replica set is no longer supported, so this variant
-    # does not include replica set tests. Since transactions are only supported on replica sets, we
-    # exclude those tests as well.
-    test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_sharding,uses_transactions,requires_http_client
-    scons_cache_mode: all
-    scons_cache_scope: shared
-    num_scons_link_jobs_available: 0.99
-    large_distro_name: rhel80-medium
-  tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: .aggfuzzer .common
-  - name: aggregation !.feature_flag_guarded
-  - name: aggregation_auth !.feature_flag_guarded
-  - name: auth_gen
-  - name: .misc_js !.sharded
-  - name: concurrency_gen
-  - name: concurrency_simultaneous_gen
-  - name: disk_wiredtiger
-  - name: failpoints_auth
-  - name: .jscore .common !.sharding !.decimal !.txns
-  - name: .jstestfuzz .common !.sharding !.repl
-  - name: generate_buildid_to_debug_symbols_mapping
-
 - name: tla-plus
   display_name: TLA+
   run_on:
@@ -1243,7 +1203,7 @@ buildvariants:
     idle_timeout_factor: 1.5
     exec_timeout_factor: 1.5
     large_distro_name: rhel80-medium
-    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-inmem linux-64-duroff enterprise-rhel-80-64-bit-multiversion
+    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-inmem enterprise-rhel-80-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
@@ -1547,7 +1507,7 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 5
     large_distro_name: rhel80-medium
-    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-inmem linux-64-duroff enterprise-rhel-80-64-bit-multiversion
+    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-inmem enterprise-rhel-80-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
     test_flags: >-
       --mongodSetParameters="{internalQueryForceClassicEngine: true}"

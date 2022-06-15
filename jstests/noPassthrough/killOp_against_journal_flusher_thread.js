@@ -1,7 +1,7 @@
 /**
  * Tests that killOp is ineffectual against the journal flusher thread.
  *
- * @tags: [requires_journaling]
+ * @tags: [requires_replication]
  */
 
 (function() {
@@ -10,7 +10,7 @@
 load("jstests/libs/fail_point_util.js");
 
 const rst = new ReplSetTest({nodes: 1});
-rst.startSet({journal: "", journalCommitInterval: 500});
+rst.startSet({journalCommitInterval: 500});
 rst.initiate();
 
 const primary = rst.getPrimary();

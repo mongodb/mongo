@@ -119,18 +119,6 @@ configs:
         arg_vartype: Switch
         source: [ cli, ini ]
 
-    'storage.journal.enabled':
-        description: 'Enable journaling'
-        short_name: journal
-        deprecated_short_name: dur
-        arg_vartype: Switch
-
-    nojournal:
-        description: 'Disable journaling (journaling is on by default for 64 bit)'
-        deprecated_short_name: nodur
-        arg_vartype: Switch
-        source: [ cli, ini ]
-
     'storage.oplogMinRetentionHours':
         description: 'Minimum number of hours to preserve in the oplog. Default is 0 (turned off). Fractions are allowed (e.g. 1.5 hours)'
         short_name: oplogMinRetentionHours

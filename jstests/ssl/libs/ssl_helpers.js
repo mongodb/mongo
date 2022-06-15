@@ -130,7 +130,7 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         // authentication, so in this test we must make the choice explicitly, based on the global
         // test options.
         let wcMajorityJournalDefault;
-        if (jsTestOptions().noJournal || jsTestOptions().storageEngine == "inMemory") {
+        if (jsTestOptions().storageEngine == "inMemory") {
             wcMajorityJournalDefault = false;
         } else {
             wcMajorityJournalDefault = true;

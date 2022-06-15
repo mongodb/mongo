@@ -5,8 +5,6 @@
  *   # Certain serverStatus sections might pivot to taking the RSTL lock if an action is unsupported
  *   # by a non-WT storage engine.
  *   requires_wiredtiger,
- *   # Replication requires journaling support so this tag also implies exclusion from --nojournal
- *   # test configurations.
  *   requires_sharding,
  *   requires_replication,
  * ]

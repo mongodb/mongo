@@ -6,10 +6,6 @@
 # Where and how to store data.
 storage:
   dbPath: %MONGO_DATA_PATH%
-  journal:
-    enabled: true
-#  engine:
-#  wiredTiger:
 
 # where to write logging data.
 systemLog:

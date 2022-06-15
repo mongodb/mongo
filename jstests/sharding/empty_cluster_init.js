@@ -9,7 +9,7 @@
 //
 
 var configRS = new ReplSetTest({name: "configRS", nodes: 3, useHostName: true});
-configRS.startSet({configsvr: '', journal: "", storageEngine: 'wiredTiger'});
+configRS.startSet({configsvr: '', storageEngine: 'wiredTiger'});
 var replConfig = configRS.getReplSetConfig();
 replConfig.configsvr = true;
 configRS.initiate(replConfig);

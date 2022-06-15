@@ -146,12 +146,7 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
             22152,
             {logv2::LogTag::kStartupWarnings},
             "This is a 32 bit MongoDB binary. 32 bit builds are limited to less than 2GB "
-            "of data (or less with --journal). See http://dochub.mongodb.org/core/32bit");
-        if (!storageParams.dur) {
-            LOGV2_WARNING_OPTIONS(22154,
-                                  {logv2::LogTag::kStartupWarnings},
-                                  "Journaling defaults to off for 32 bit and is currently off");
-        }
+            "of data. See http://dochub.mongodb.org/core/32bit");
     }
 
 #ifdef __linux__
@@ -218,18 +213,15 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
         }
     }
 
-    if (storageParams.dur) {
-        std::fstream f("/proc/sys/vm/overcommit_memory", ios_base::in);
-        unsigned val;
-        f >> val;
+    std::fstream f("/proc/sys/vm/overcommit_memory", ios_base::in);
+    unsigned val;
+    f >> val;
 
-        if (val == 2) {
-            LOGV2_OPTIONS(
-                22171,
-                {logv2::LogTag::kStartupWarnings},
-                "Journaling works best if /proc/sys/vm/overcommit_memory is set to 0 or 1",
-                "currentValue"_attr = val);
-        }
+    if (val == 2) {
+        LOGV2_OPTIONS(22171,
+                      {logv2::LogTag::kStartupWarnings},
+                      "Journaling works best if /proc/sys/vm/overcommit_memory is set to 0 or 1",
+                      "currentValue"_attr = val);
     }
 
     if (boost::filesystem::exists("/proc/sys/vm/zone_reclaim_mode")) {

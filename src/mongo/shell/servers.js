@@ -331,7 +331,6 @@ MongoRunner.logicalOptions = {
     noReplSet: true,
     forgetPort: true,
     arbiter: true,
-    noJournal: true,
     binVersion: true,
     waitForConnect: true,
     bridgeOptions: true,
@@ -666,7 +665,6 @@ var _removeSetParameterIfBeforeVersion = function(
  *     useLogFiles {boolean}: use with logFile option.
  *     logFile {string}: path to the log file. If not specified and useLogFiles
  *       is true, automatically creates a log file inside dbpath.
- *     noJournal {boolean}
  *     keyFile
  *     replSet
  *     oplogSize
@@ -714,11 +712,6 @@ MongoRunner.mongodOptions = function(opts = {}) {
 
     if (opts.logFile !== undefined) {
         opts.logpath = opts.logFile;
-    }
-
-    if ((jsTestOptions().noJournal || opts.noJournal) && !('journal' in opts) &&
-        !('configsvr' in opts)) {
-        opts.nojournal = "";
     }
 
     if (jsTestOptions().keyFile && !opts.keyFile) {

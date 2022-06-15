@@ -4,7 +4,7 @@
  * we can do so even after we crash in the middle of an attempt to restore.
  *
  * This test only makes sense for storage engines that support recover to stable timestamp.
- * @tags: [requires_wiredtiger, requires_persistence, requires_journaling, requires_replication,
+ * @tags: [requires_wiredtiger, requires_persistence, requires_replication,
  * requires_majority_read_concern, uses_transactions, uses_prepare_transaction,
  * # We don't expect to do this while upgrading.
  * multiversion_incompatible]

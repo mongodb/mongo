@@ -8,7 +8,7 @@ class TestDefinition extends SelinuxBaseTest {
         return {
             "systemLog":
                 {"destination": "file", "logAppend": true, "path": "/var/log/mongodb/mongod.log"},
-            "storage": {"dbPath": "/var/lib/mongo", "journal": {"enabled": true}},
+            "storage": {"dbPath": "/var/lib/mongo"},
             "processManagement": {
                 "fork": true,
                 "pidFilePath": "/var/run/mongodb/mongod.pid",

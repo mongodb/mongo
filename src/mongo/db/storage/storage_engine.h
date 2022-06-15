@@ -207,11 +207,6 @@ public:
     virtual bool supportsCappedCollections() const = 0;
 
     /**
-     * Returns whether the engine supports a journalling concept or not.
-     */
-    virtual bool isDurable() const = 0;
-
-    /**
      * Returns true if the engine does not persist data to disk; false otherwise.
      */
     virtual bool isEphemeral() const = 0;

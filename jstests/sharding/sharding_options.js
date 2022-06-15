@@ -29,13 +29,9 @@ testGetCmdLineOptsMongod({config: "jstests/libs/config_files/enable_paranoia.jso
 // Sharding Role
 jsTest.log("Testing \"configsvr\" command line option");
 var expectedResult = {
-    "parsed": {
-        "sharding": {"clusterRole": "configsvr"},
-        "replication": {"replSet": "dummy"},
-        "storage": {"journal": {"enabled": true}}
-    }
+    "parsed": {"sharding": {"clusterRole": "configsvr"}, "replication": {"replSet": "dummy"}}
 };
-testGetCmdLineOptsMongod({configsvr: "", journal: "", replSet: "dummy"}, expectedResult);
+testGetCmdLineOptsMongod({configsvr: "", replSet: "dummy"}, expectedResult);
 
 jsTest.log("Testing \"shardsvr\" command line option");
 expectedResult = {

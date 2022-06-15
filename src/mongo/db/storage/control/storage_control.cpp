@@ -70,17 +70,13 @@ void startStorageControls(ServiceContext* serviceContext, bool forTestOnly) {
     // Ephemeral engines are not durable -- waitUntilDurable() returns early -- but frequent updates
     // to replication's JournalListener in the waitUntilDurable() code may help update replication
     // timestamps more quickly.
-    //
-    // (Note: the ephemeral engine returns false for isDurable(), so we must be careful not to
-    // disable it.)
     if (journalFlusherPaused) {
         // This is a restart and the JournalListener was paused. Resume the existing JournalFlusher.
         JournalFlusher::get(serviceContext)->resume();
         journalFlusherPaused = false;
     } else {
         std::unique_ptr<JournalFlusher> journalFlusher = std::make_unique<JournalFlusher>(
-            /*disablePeriodicFlushes*/ forTestOnly ||
-            (!storageEngine->isDurable() && !storageEngine->isEphemeral()));
+            /*disablePeriodicFlushes*/ forTestOnly);
         journalFlusher->go();
         JournalFlusher::set(serviceContext, std::move(journalFlusher));
     }

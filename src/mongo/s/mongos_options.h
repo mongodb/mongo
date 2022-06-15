@@ -75,8 +75,8 @@ Status validateMongosOptions(const moe::Environment& params);
 /**
  * Canonicalize mongos options for the given environment.
  *
- * For example, the options "dur", "nodur", "journal", "nojournal", and
- * "storage.journaling.enabled" should all be merged into "storage.journaling.enabled".
+ * For example, the options "noscripting" and "security.javascriptEnabled" and should all be merged
+ * into "security.javascriptEnabled".
  */
 Status canonicalizeMongosOptions(moe::Environment* params);
 

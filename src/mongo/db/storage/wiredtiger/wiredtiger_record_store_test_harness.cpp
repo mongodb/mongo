@@ -49,7 +49,6 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData ext
               _testLoggingSettings(extraStrings.toString()),
               1,
               0,
-              true,
               false,
               false) {
     repl::ReplicationCoordinator::set(

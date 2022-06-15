@@ -1329,7 +1329,6 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
     # Initialize the mongod options
     # Note - We use posixpath for Windows client to Linux server scenarios.
     root_dir = f"{powercycle_constants.REMOTE_DIR}/mongodb-powercycle-test-{int(time.time())}"
-    mongod_options_map = parse_options(task_config.mongod_options)
     set_fcv_cmd = "set_fcv" if task_config.fcv is not None else ""
 
     # Error out earlier if these options are not properly specified
@@ -1411,11 +1410,6 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
     mongo_repo_root_dir = os.getcwd()
 
     # Setup the validate_canary option.
-    if "nojournal" in mongod_options_map:
-        LOGGER.error("Cannot create and validate canary documents if the mongod option"
-                     " '--nojournal' is used.")
-        local_exit(1)
-
     canary_doc = ""
 
     # Set the Pymongo connection timeout to 1 hour for canary insert & validation.

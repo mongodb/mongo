@@ -3,7 +3,6 @@
  * documents into account. In particular, a shard which possesses *only* orphan documents does not
  * induce the infinite-loop behaviour detailed in SERVER-36871.
  * @tags: [
- *   requires_journaling,
  *   requires_replication,
  * ]
  */

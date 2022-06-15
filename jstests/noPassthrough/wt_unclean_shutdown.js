@@ -4,7 +4,7 @@
  * restart and recovery verify that all expected records inserted are there and no records in the
  * middle of the data set are lost.
  *
- * @tags: [requires_wiredtiger, requires_journaling]
+ * @tags: [requires_wiredtiger]
  */
 
 load('jstests/libs/parallelTester.js');  // For Thread

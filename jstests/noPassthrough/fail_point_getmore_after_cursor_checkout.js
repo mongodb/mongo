@@ -1,6 +1,6 @@
 /**
  * Test that 'failGetMoreAfterCursorCheckout' works.
- * @tags: [requires_replication, requires_journaling]
+ * @tags: [requires_replication]
  */
 (function() {
 "use strict";

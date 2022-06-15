@@ -1,6 +1,5 @@
 // Tests writeConcern metrics in the serverStatus output.
 // @tags: [
-//   requires_journaling,
 //   requires_persistence,
 //   requires_replication,
 // ]

@@ -40,7 +40,7 @@ configs:
         description: 'Declare this is a config db of a cluster; default port 27019; default dir /data/configdb'
         arg_vartype: Switch
         source: [ cli, ini ]
-        conflicts: [ shardsvr, nojournal ]
+        conflicts: [ shardsvr ]
     shardsvr:
         description: 'Declare this is a shard db of a cluster; default port 27018'
         arg_vartype: Switch

@@ -59,16 +59,6 @@ matchingLogLines = [...findMatchingLogLines(globalLogs.log, fieldMatcher)];
 assert.eq(matchingLogLines.length, 1, matchingLogLines);
 MongoRunner.stopMongod(standalone);
 
-// The tests below this comment connect through mongos and shard a collection (creating replica
-// sets). This if stanza assures that we skip the portion below if testing a build variant with
-// --nojournal and WiredTiger, as that variant will always fail when using replica sets.
-if (jsTest.options().noJournal &&
-    (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger")) {
-    print("Skipping test because running WiredTiger without journaling isn't a valid" +
-          " replica set configuration");
-    return;
-}
-
 jsTest.log('Test cluster');
 
 const st = new ShardingTest({shards: 2, mongos: 1});

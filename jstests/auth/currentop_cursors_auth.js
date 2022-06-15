@@ -1,7 +1,7 @@
 /**
  * Tests that a user's ability to view open cursors via $currentOp obeys authentication rules on
  * both mongoD and mongoS.
- * @tags: [assumes_read_concern_unchanged, requires_auth, requires_journaling, requires_replication]
+ * @tags: [assumes_read_concern_unchanged, requires_auth, requires_replication]
  */
 (function() {
 "use strict";

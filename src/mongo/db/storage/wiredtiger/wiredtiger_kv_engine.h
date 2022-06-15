@@ -107,7 +107,6 @@ public:
                        const std::string& extraOpenOptions,
                        size_t cacheSizeMB,
                        size_t maxHistoryFileSizeMB,
-                       bool durable,
                        bool ephemeral,
                        bool repair);
 
@@ -121,10 +120,6 @@ public:
     bool supportsDirectoryPerDB() const override;
 
     void checkpoint() override;
-
-    bool isDurable() const override {
-        return _durable;
-    }
 
     bool isEphemeral() const override {
         return _ephemeral;
@@ -483,8 +478,6 @@ private:
     std::unique_ptr<WiredTigerSizeStorer> _sizeStorer;
     std::string _sizeStorerUri;
     mutable ElapsedTracker _sizeStorerSyncTracker;
-
-    bool _durable;
     bool _ephemeral;  // whether we are using the in-memory mode of the WT engine
     const bool _inRepairMode;
 

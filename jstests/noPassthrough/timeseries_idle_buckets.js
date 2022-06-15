@@ -2,8 +2,6 @@
  * Tests that idle buckets are removed when the bucket catalog's memory threshold is reached.
  *
  * @tags: [
- *  # Replication requires journaling support so this tag also implies exclusion from
- *  # --nojournal test configurations.
  *  requires_replication,
  * ]
  */

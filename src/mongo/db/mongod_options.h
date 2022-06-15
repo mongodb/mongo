@@ -69,8 +69,7 @@ Status validateMongodOptions(const moe::Environment& params);
 /**
  * Canonicalize mongod options for the given environment.
  *
- * For example, the options "dur", "nodur", "journal", "nojournal", and
- * "storage.journaling.enabled" should all be merged into "storage.journaling.enabled".
+ * For example, "nounixsocket" maps to "net.unixDomainSocket.enabled".
  */
 Status canonicalizeMongodOptions(moe::Environment* params);
 

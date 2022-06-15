@@ -1,7 +1,0 @@
-{
-    "storage" : {
-        "journal" : {
-            "enabled" : false
-        }
-    }
-}

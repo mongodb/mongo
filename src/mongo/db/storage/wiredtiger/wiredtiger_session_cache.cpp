@@ -282,13 +282,13 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     // WT_CONNECTION, i.e: replication is on) requires `forceCheckpoint` to be true and journaling
     // to be enabled.
     if (syncType == Fsync::kCheckpointStableTimestamp && getGlobalReplSettings().usingReplSets()) {
-        invariant(_engine->isDurable());
+        invariant(!isEphemeral());
     }
 
     // When forcing a checkpoint with journaling enabled, don't synchronize with other
     // waiters, as a log flush is much cheaper than a full checkpoint.
     if ((syncType == Fsync::kCheckpointStableTimestamp || syncType == Fsync::kCheckpointAll) &&
-        _engine->isDurable()) {
+        !isEphemeral()) {
         UniqueWiredTigerSession session = getSession();
         WT_SESSION* s = session->getSession();
         {
@@ -357,7 +357,7 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     }
 
     // Use the journal when available, or a checkpoint otherwise.
-    if (_engine && _engine->isDurable()) {
+    if (!isEphemeral()) {
         invariantWTOK(_waitUntilDurableSession->log_flush(_waitUntilDurableSession, "sync=on"),
                       _waitUntilDurableSession);
         LOGV2_DEBUG(22419, 4, "flushed journal");

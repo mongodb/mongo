@@ -2,7 +2,7 @@
 // time to shards, and that mongos correctly times out max time sharded getmore operations (which
 // are run in parallel on shards).
 // @tags: [
-//   requires_journaling,
+//   requires_replication,
 // ]
 (function() {
 'use strict';

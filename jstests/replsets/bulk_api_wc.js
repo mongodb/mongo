@@ -3,18 +3,17 @@
 
 jsTest.log("Starting bulk api write concern tests...");
 
-// Skip this test if running with the "wiredTiger" storage engine, since it requires
-// using 'nojournal' in a replica set, which is not supported when using WT.
-if (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger") {
-    // WT is currently the default engine so it is used when 'storageEngine' is not set.
-    jsTest.log("Skipping test because it is not applicable for the wiredTiger storage engine");
+// Skip this test when running with storage engines other than inMemory, as the test relies on
+// journaling not being active.
+if (jsTest.options().storageEngine !== "inMemory") {
+    jsTest.log("Skipping test because it is only applicable for the inMemory storage engine");
     return;
 }
 
 // Start a 2-node replica set with no journal.
 // Allows testing immediate write concern failures and wc application failures
 var rst = new ReplSetTest({nodes: 2});
-rst.startSet({nojournal: ""});
+rst.startSet();
 rst.initiate();
 var mongod = rst.getPrimary();
 var coll = mongod.getCollection("test.bulk_api_wc");

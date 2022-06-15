@@ -231,24 +231,14 @@ var ReplSetTest = function(opts) {
      */
     function _isRunningWithoutJournaling(conn) {
         var result = asCluster(conn, function() {
+            // Persistent storage engines (WT) can only run with journal enabled.
             var serverStatus = assert.commandWorked(conn.adminCommand({serverStatus: 1}));
             if (serverStatus.storageEngine.hasOwnProperty('persistent')) {
-                if (!serverStatus.storageEngine.persistent) {
-                    return true;
+                if (serverStatus.storageEngine.persistent) {
+                    return false;
                 }
-            } else if (serverStatus.storageEngine.name == 'inMemory') {
-                return true;
             }
-            var cmdLineOpts = assert.commandWorked(conn.adminCommand({getCmdLineOpts: 1}));
-            var getWithDefault = function(dict, key, dflt) {
-                if (dict[key] === undefined)
-                    return dflt;
-                return dict[key];
-            };
-            return !getWithDefault(
-                getWithDefault(getWithDefault(cmdLineOpts.parsed, "storage", {}), "journal", {}),
-                "enabled",
-                true);
+            return true;
         });
         return result;
     }

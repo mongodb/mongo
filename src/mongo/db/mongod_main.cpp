@@ -475,17 +475,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         exitCleanly(EXIT_BADOPTIONS);
     }
 
-    // Disallow running WiredTiger with --nojournal in a replica set
-    if (storageGlobalParams.engine == "wiredTiger" && !storageGlobalParams.dur &&
-        replSettings.usingReplSets()) {
-        LOGV2_ERROR(
-            20535,
-            "Running wiredTiger without journaling in a replica set is not supported. Make sure "
-            "you are not using --nojournal and that storage.journal.enabled is not set to "
-            "'false'");
-        exitCleanly(EXIT_BADOPTIONS);
-    }
-
     if (storageGlobalParams.repair && replSettings.usingReplSets()) {
         LOGV2_ERROR(5019200,
                     "Cannot specify both repair and replSet at the same time (remove --replSet to "

@@ -945,10 +945,6 @@ StatusWith<std::deque<std::string>> StorageEngineImpl::extendBackupCursor(Operat
     return _engine->extendBackupCursor(opCtx);
 }
 
-bool StorageEngineImpl::isDurable() const {
-    return _engine->isDurable();
-}
-
 bool StorageEngineImpl::isEphemeral() const {
     return _engine->isEphemeral();
 }

@@ -81,21 +81,6 @@ class TestLocalCommandLine(unittest.TestCase):
             "--includeWithAnyTags=tag3,tag5",
         ])
 
-    def test_keeps_no_journal_option(self):
-        cmdline = to_local_args([
-            "run",
-            "--suites=my_suite",
-            "--nojournal",
-            "--storageEngine=my_storage_engine",
-        ])
-
-        self.assertEqual(cmdline, [
-            "run",
-            "--suites=my_suite",
-            "--storageEngine=my_storage_engine",
-            "--nojournal",
-        ])
-
     def test_keeps_num_clients_per_fixture_option(self):
         cmdline = to_local_args([
             "run",

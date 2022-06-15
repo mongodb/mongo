@@ -304,7 +304,6 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                                        const std::string& extraOpenOptions,
                                        size_t cacheSizeMB,
                                        size_t maxHistoryFileSizeMB,
-                                       bool durable,
                                        bool ephemeral,
                                        bool repair)
     : _clockSource(cs),
@@ -312,14 +311,13 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
       _canonicalName(canonicalName),
       _path(path),
       _sizeStorerSyncTracker(cs, 100000, Seconds(60)),
-      _durable(durable),
       _ephemeral(ephemeral),
       _inRepairMode(repair),
       _keepDataHistory(serverGlobalParams.enableMajorityReadConcern) {
     _pinnedOplogTimestamp.store(Timestamp::max().asULL());
     boost::filesystem::path journalPath = path;
     journalPath /= "journal";
-    if (_durable) {
+    if (!_ephemeral) {
         if (!boost::filesystem::exists(journalPath)) {
             try {
                 boost::filesystem::create_directory(journalPath);
@@ -356,13 +354,19 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         ss << "cache_cursors=false,";
     }
 
-    // The setting may have a later setting override it if not using the journal.  We make it
-    // unconditional here because even nojournal may need this setting if it is a transition
-    // from using the journal.
-    ss << "log=(enabled=true,remove=true,path=journal,compressor=";
-    ss << wiredTigerGlobalOptions.journalCompressor << "),";
-    ss << "builtin_extension_config=(zstd=(compression_level="
-       << wiredTigerGlobalOptions.zstdCompressorLevel << ")),";
+    if (_ephemeral) {
+        // If we've requested an ephemeral instance we store everything into memory instead of
+        // backing it onto disk. Logging is not supported in this instance, thus we also have to
+        // disable it.
+        ss << ",in_memory=true,log=(enabled=false),";
+    } else {
+        // In persistent mode we enable the journal and set the compression settings.
+        ss << "log=(enabled=true,remove=true,path=journal,compressor=";
+        ss << wiredTigerGlobalOptions.journalCompressor << "),";
+        ss << "builtin_extension_config=(zstd=(compression_level="
+           << wiredTigerGlobalOptions.zstdCompressorLevel << ")),";
+    }
+
     ss << "file_manager=(close_idle_time=" << gWiredTigerFileHandleCloseIdleTime
        << ",close_scan_interval=" << gWiredTigerFileHandleCloseScanInterval
        << ",close_handle_minimum=" << gWiredTigerFileHandleCloseMinimum << "),";
@@ -423,58 +427,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     ss << WiredTigerExtensions::get(getGlobalServiceContext())->getOpenExtensionsConfig();
     ss << extraOpenOptions;
 
-    if (!_durable) {
-        // If we started without the journal, but previously used the journal then open with the
-        // WT log enabled to perform any unclean shutdown recovery and then close and reopen in
-        // the normal path without the journal.
-        if (boost::filesystem::exists(journalPath)) {
-            string config = ss.str();
-            auto start = Date_t::now();
-            LOGV2(22313,
-                  "Detected WT journal files. Running recovery from last checkpoint. journal to "
-                  "nojournal transition config",
-                  "config"_attr = config);
-            int ret = wiredtiger_open(
-                path.c_str(), _eventHandler.getWtEventHandler(), config.c_str(), &_conn);
-            LOGV2(4795911, "Recovery complete", "duration"_attr = Date_t::now() - start);
-            if (ret == EINVAL) {
-                fassertFailedNoTrace(28717);
-            } else if (ret != 0) {
-                Status s(wtRCToStatus(ret, nullptr));
-                msgasserted(28718, s.reason());
-            }
-            start = Date_t::now();
-            invariantWTOK(_conn->close(_conn, nullptr), nullptr);
-            LOGV2(4795910,
-                  "WiredTiger closed. Removing journal files",
-                  "duration"_attr = Date_t::now() - start);
-            // After successful recovery, remove the journal directory.
-            try {
-                start = Date_t::now();
-                boost::filesystem::remove_all(journalPath);
-            } catch (std::exception& e) {
-                LOGV2_ERROR(22355,
-                            "error removing journal dir {directory} {error}",
-                            "Error removing journal directory",
-                            "directory"_attr = journalPath.generic_string(),
-                            "error"_attr = e.what(),
-                            "duration"_attr = Date_t::now() - start);
-                throw;
-            }
-            LOGV2(4795908, "Journal files removed", "duration"_attr = Date_t::now() - start);
-        }
-        // This setting overrides the earlier setting because it is later in the config string.
-        ss << ",log=(enabled=false),";
-    }
-
     if (WiredTigerUtil::willRestoreFromBackup()) {
         ss << WiredTigerUtil::generateRestoreConfig() << ",";
-    }
-
-    // If we've requested an ephemeral instance we store everything into memory instead of backing
-    // it onto disk. Logging is not supported in this instance, thus we also have to disable it.
-    if (_ephemeral) {
-        ss << "in_memory=true,log=(enabled=false),";
     }
 
     string config = ss.str();
@@ -957,8 +911,8 @@ void WiredTigerKVEngine::flushAllFiles(OperationContext* opCtx, bool callerHolds
     // operations such as backup, it's imperative that we copy the most up-to-date data files.
     syncSizeInfo(true);
 
-    // If there's no journal, we must checkpoint all of the data.
-    WiredTigerSessionCache::Fsync fsyncType = _durable
+    // If there's no journal (ephemeral), we must checkpoint all of the data.
+    WiredTigerSessionCache::Fsync fsyncType = !_ephemeral
         ? WiredTigerSessionCache::Fsync::kCheckpointStableTimestamp
         : WiredTigerSessionCache::Fsync::kCheckpointAll;
 

@@ -241,8 +241,6 @@ public:
 
     virtual void checkpoint() {}
 
-    virtual bool isDurable() const = 0;
-
     /**
      * Returns true if the KVEngine is ephemeral -- that is, it is NOT persistent and all data is
      * lost after shutdown. Otherwise, returns false.

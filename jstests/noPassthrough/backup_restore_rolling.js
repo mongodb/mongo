@@ -30,13 +30,6 @@ if (_isWindows()) {
 // Grab the storage engine, default is wiredTiger
 var storageEngine = jsTest.options().storageEngine || "wiredTiger";
 
-// Skip this test if running with --nojournal.
-if (jsTest.options().noJournal) {
-    print(
-        "Skipping test because running without journaling isn't a valid replica set configuration");
-    return;
-}
-
 // if rsync is not available on the host, then this test is skipped
 if (!runProgram('bash', '-c', 'which rsync')) {
     new BackupRestoreTest({backup: 'rolling', clientTime: 30000}).run();

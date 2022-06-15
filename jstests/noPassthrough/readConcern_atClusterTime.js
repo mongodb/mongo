@@ -16,13 +16,6 @@ function _getClusterTime(rst) {
 (function() {
 "use strict";
 
-// Skip this test if running with --nojournal.
-if (jsTest.options().noJournal) {
-    print(
-        "Skipping test because running without journaling isn't a valid replica set configuration");
-    return;
-}
-
 const dbName = "test";
 const collName = "coll";
 

@@ -156,22 +156,19 @@ void startWatchdog(ServiceContext* service) {
 
     checks.push_back(std::move(dataCheck));
 
-    // Add a check for the journal if it is not disabled
-    if (storageGlobalParams.dur) {
-        auto journalDirectory = boost::filesystem::path(storageGlobalParams.dbpath);
-        journalDirectory /= "journal";
+    // Check for the journal.
+    auto journalDirectory = boost::filesystem::path(storageGlobalParams.dbpath);
+    journalDirectory /= "journal";
 
-        if (boost::filesystem::exists(journalDirectory)) {
-            auto journalCheck = std::make_unique<DirectoryCheck>(journalDirectory);
+    if (boost::filesystem::exists(journalDirectory)) {
+        auto journalCheck = std::make_unique<DirectoryCheck>(journalDirectory);
 
-            checks.push_back(std::move(journalCheck));
-        } else {
-            LOGV2_WARNING(23835,
-                          "Watchdog is skipping check for journal directory since it does not "
-                          "exist: '{journalDirectory_generic_string}'",
-                          "journalDirectory_generic_string"_attr =
-                              journalDirectory.generic_string());
-        }
+        checks.push_back(std::move(journalCheck));
+    } else {
+        LOGV2_WARNING(23835,
+                      "Watchdog is skipping check for journal directory since it does not "
+                      "exist: '{journalDirectory_generic_string}'",
+                      "journalDirectory_generic_string"_attr = journalDirectory.generic_string());
     }
 
     // If the user specified a log path, also monitor that directory.

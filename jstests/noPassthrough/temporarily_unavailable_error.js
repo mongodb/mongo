@@ -4,7 +4,6 @@
  *
  * @tags: [
  *   # Exclude in-memory engine, rollbacks due to pinned cache content rely on eviction.
- *   requires_journaling,
  *   requires_persistence,
  *   requires_replication,
  *   requires_wiredtiger,

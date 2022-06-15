@@ -311,7 +311,6 @@ class MongodLauncher(object):
 
         shortcut_opts = {
             "enableMajorityReadConcern": self.config.MAJORITY_READ_CONCERN,
-            "nojournal": self.config.NO_JOURNAL,
             "storageEngine": self.config.STORAGE_ENGINE,
             "transportLayer": self.config.TRANSPORT_LAYER,
             "wiredTigerCollectionConfigString": self.config.WT_COLL_CONFIG,
@@ -327,16 +326,10 @@ class MongodLauncher(object):
             shortcut_opts["wiredTigerCacheSizeGB"] = self.config.STORAGE_ENGINE_CACHE_SIZE
 
         # These options are just flags, so they should not take a value.
-        opts_without_vals = ("nojournal", "logappend")
-
-        # Have the --nojournal command line argument to resmoke.py unset the journal option.
-        if shortcut_opts["nojournal"] and "journal" in mongod_options:
-            del mongod_options["journal"]
+        opts_without_vals = ("logappend")
 
         # Ensure that config servers run with journaling enabled.
         if "configsvr" in mongod_options:
-            shortcut_opts["nojournal"] = False
-            mongod_options["journal"] = ""
             suite_set_parameters.setdefault("reshardingMinimumOperationDurationMillis", 5000)
             suite_set_parameters.setdefault("reshardingCriticalSectionTimeoutMillis",
                                             24 * 60 * 60)  # 24 hours

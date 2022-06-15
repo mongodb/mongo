@@ -59,13 +59,6 @@ function testMongod(mongod, systemuserpwd = undefined) {
     MongoRunner.stopMongod(standalone);
 }
 
-if (!jsTestOptions().noJournal &&
-    (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger")) {
-    print("Skipping test because running WiredTiger without journaling isn't a valid" +
-          " replica set configuration");
-    return;
-}
-
 {
     const kKeyfile = 'jstests/libs/key1';
     const kKey = cat(kKeyfile).replace(/[\011-\015\040]/g, '');

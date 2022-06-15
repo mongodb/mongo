@@ -5,14 +5,6 @@
 "use strict";
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 
-// Skip this test if running with --nojournal and WiredTiger.
-if (jsTest.options().noJournal &&
-    (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger")) {
-    print("Skipping test because running WiredTiger without journaling isn't a valid" +
-          " replica set configuration");
-    return;
-}
-
 function assertChangeStreamNotSupportedOnConnection(conn) {
     const notReplicaSetErrorCode = 40573;
     assertErrorCode(conn.getDB("test").non_existent, [{$changeStream: {}}], notReplicaSetErrorCode);

@@ -3,8 +3,7 @@
  *
  * @tags: [
  *  requires_fcv_61,
- *  # Running as a replica set requires journaling.
- *  requires_journaling,
+ *  requires_replication,
  * ]
  */
 

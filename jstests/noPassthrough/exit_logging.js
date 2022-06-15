@@ -82,9 +82,7 @@ if (_isAddressSanitizerActive()) {
 
     runAllTests({
         start: function(opts) {
-            var actualOpts = {nojournal: ""};
-            Object.extend(actualOpts, opts);
-            return MongoRunner.runMongod(actualOpts);
+            return MongoRunner.runMongod(opts);
         },
 
         stop: MongoRunner.stopMongod

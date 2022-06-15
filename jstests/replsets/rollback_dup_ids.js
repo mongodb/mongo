@@ -1,6 +1,6 @@
 // When run with --majorityReadConcern=off, this test reproduces the bug described in SERVER-38925,
 // where rolling back a delete followed by a restart produces documents with duplicate _id.
-// @tags: [requires_persistence, requires_journaling]
+// @tags: [requires_persistence]
 (function() {
 "use strict";
 

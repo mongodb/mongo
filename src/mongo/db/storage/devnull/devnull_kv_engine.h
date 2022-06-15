@@ -116,13 +116,6 @@ public:
         return false;
     }
 
-    /**
-     * devnull does no journaling, so don't report the engine as durable.
-     */
-    virtual bool isDurable() const {
-        return false;
-    }
-
     virtual bool isEphemeral() const {
         return true;
     }

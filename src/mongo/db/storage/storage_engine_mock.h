@@ -47,9 +47,7 @@ public:
     bool supportsCappedCollections() const final {
         return true;
     }
-    bool isDurable() const final {
-        return false;
-    }
+
     bool isEphemeral() const final {
         return true;
     }

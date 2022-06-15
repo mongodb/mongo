@@ -3,7 +3,6 @@
  * without an _id index. On startup, mongod should automatically build any missing _id indexes.
  *
  * @tags: [
- *   requires_journaling,
  *   requires_persistence
  * ]
  */

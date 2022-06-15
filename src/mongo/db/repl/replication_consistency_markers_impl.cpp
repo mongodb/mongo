@@ -170,7 +170,7 @@ void ReplicationConsistencyMarkersImpl::clearInitialSyncFlag(OperationContext* o
               "Clearing the truncate point while primary is unsafe: it is asynchronously updated.");
     setOplogTruncateAfterPoint(opCtx, Timestamp());
 
-    if (getGlobalServiceContext()->getStorageEngine()->isDurable()) {
+    if (!getGlobalServiceContext()->getStorageEngine()->isEphemeral()) {
         JournalFlusher::get(opCtx)->waitForJournalFlush();
         replCoord->setMyLastDurableOpTimeAndWallTime(opTimeAndWallTime);
     }

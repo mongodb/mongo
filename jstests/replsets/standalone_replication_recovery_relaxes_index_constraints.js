@@ -4,7 +4,7 @@
  * never fail without a bug.
  *
  * This test only makes sense for storage engines that support recover to stable timestamp.
- * @tags: [requires_persistence, requires_journaling, requires_replication,
+ * @tags: [requires_persistence, requires_replication,
  * requires_majority_read_concern,
  * # Restarting as a standalone is not supported in multiversion tests.
  * multiversion_incompatible]

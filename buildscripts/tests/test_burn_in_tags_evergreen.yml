@@ -125,7 +125,7 @@ buildvariants:
     multiversion_edition: enterprise
     multiversion_platform: rhel80
     scons_cache_scope: shared
-    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence
   modules:
   - enterprise
   run_on:

@@ -3,7 +3,7 @@
  * to primary (for replica set nodes).
  * Note: test will deliberately cause a mongod instance to terminate abruptly and mongod instance
  * without journaling will complain about unclean shutdown.
- * @tags: [requires_persistence, requires_journaling]
+ * @tags: [requires_persistence]
  */
 
 (function() {

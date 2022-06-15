@@ -10,8 +10,6 @@
 // example, $group is pushed down to SBE at the shard-side and some accumulators may return the
 // partial aggregation results in a special format to the mongos.
 //
-// Needs the following tag to be excluded from linux-64-duroff build variant because running
-// wiredTiger without journaling in a replica set is not supported.
 // @tags: [requires_sharding]
 (function() {
 'use strict';

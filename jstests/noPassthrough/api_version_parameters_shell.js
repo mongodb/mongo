@@ -3,7 +3,7 @@
  * test passing API parameters to the Mongo() constructor.
  *
  * @tags: [
- *   requires_journaling,
+ *   requires_persistence,
  * ]
  */
 

@@ -3,7 +3,7 @@
  * token with each document and returning the postBatchResumeToken as soon as each batch is
  * exhausted.
  * @tags: [
- *   requires_journaling,
+ *   requires_replication,
  *   requires_majority_read_concern,
  * ]
  */

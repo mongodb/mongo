@@ -1,5 +1,5 @@
 // Storage Node Watchdog - validate watchdog monitors --dbpath /journal
-// @tags: [requires_journaling]
+// @tags: [requires_persistence]
 //
 load("jstests/watchdog/lib/wd_test_common.js");
 

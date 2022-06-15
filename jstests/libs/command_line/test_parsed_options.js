@@ -143,8 +143,8 @@ function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
     // options of its own, and we only want to compare against the options we care about.
     function getCmdLineOptsFromMongos(mongosOptions) {
         // Start mongod with no options
-        var baseMongod = MongoRunner.runMongod(
-            {configsvr: "", journal: "", replSet: "csrs", storageEngine: "wiredTiger"});
+        var baseMongod =
+            MongoRunner.runMongod({configsvr: "", replSet: "csrs", storageEngine: "wiredTiger"});
         assert.commandWorked(baseMongod.adminCommand({
             replSetInitiate:
                 {_id: "csrs", configsvr: true, members: [{_id: 0, host: baseMongod.host}]}

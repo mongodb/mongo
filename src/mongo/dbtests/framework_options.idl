@@ -62,12 +62,6 @@ configs:
         description: Verbose
         arg_vartype: Switch
         single_name: v
-    dur:
-        description: 'Enable journaling (currently the default)'
-        arg_vartype: Switch
-    nodur:
-        description: 'Disable journaling'
-        arg_vartype: Switch
     seed:
         description: 'Random number seed'
         arg_vartype: UnsignedLongLong

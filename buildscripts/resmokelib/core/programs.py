@@ -135,7 +135,6 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
         "enableMajorityReadConcern": (config.MAJORITY_READ_CONCERN, True),
         "mixedBinVersions": (config.MIXED_BIN_VERSIONS, ""),
         "multiversionBinVersion": (shell_mixed_version, ""),
-        "noJournal": (config.NO_JOURNAL, False),
         "storageEngine": (config.STORAGE_ENGINE, ""),
         "storageEngineCacheSizeGB": (config.STORAGE_ENGINE_CACHE_SIZE, ""),
         "testName": (test_name, ""),

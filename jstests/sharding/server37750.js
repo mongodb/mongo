@@ -2,7 +2,7 @@
  * Confirms that a sharded $sample which employs the DSSampleFromRandomCursor optimization is
  * capable of yielding.
  *
- * @tags: [assumes_read_concern_unchanged, do_not_wrap_aggregations_in_facets, requires_journaling,
+ * @tags: [assumes_read_concern_unchanged, do_not_wrap_aggregations_in_facets,
  * requires_sharding]
  */
 (function() {

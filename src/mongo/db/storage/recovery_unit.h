@@ -203,7 +203,7 @@ public:
     /**
      * Waits until all commits that happened before this call are durable in the journal. Returns
      * true, unless the storage engine cannot guarantee durability, which should never happen when
-     * isDurable() returned true. This cannot be called from inside a unit of work, and should
+     * the engine is non-ephemeral. This cannot be called from inside a unit of work, and should
      * fail if it is. This method invariants if the caller holds any locks, except for repair.
      *
      * Can throw write interruption errors from the JournalListener.

@@ -9,14 +9,6 @@
 
 load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
 
-// Skip this test if running with --nojournal and WiredTiger.
-if (jsTest.options().noJournal &&
-    (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger")) {
-    print("Skipping test because running WiredTiger without journaling isn't a valid" +
-          " replica set configuration");
-    return;
-}
-
 const dbName = "test";
 const collName = "coll";
 

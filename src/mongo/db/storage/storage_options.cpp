@@ -49,9 +49,6 @@ void StorageGlobalParams::reset() {
     repair = false;
     restore = false;
 
-    // The intention here is to enable the journal by default if we are running on a 64 bit system.
-    dur = (sizeof(void*) == 8);
-
     noTableScan.store(false);
     directoryperdb = false;
     syncdelay = 60.0;

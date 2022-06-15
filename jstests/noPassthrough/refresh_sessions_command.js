@@ -32,7 +32,7 @@ assert.commandWorked(result, "could not run refreshSessions logged in with --aut
 
 // Turn on auth for further testing.
 MongoRunner.stopMongod(conn);
-conn = MongoRunner.runMongod({auth: "", nojournal: "", setParameter: {maxSessions: 3}});
+conn = MongoRunner.runMongod({auth: "", setParameter: {maxSessions: 3}});
 admin = conn.getDB("admin");
 
 admin.createUser({user: 'admin', pwd: 'admin', roles: ['readAnyDatabase', 'userAdminAnyDatabase']});

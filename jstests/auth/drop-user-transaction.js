@@ -1,5 +1,5 @@
 // Validate dropUser performed via transaction.
-// @tags: [requires_journaling,requires_replication,exclude_from_large_txns]
+// @tags: [requires_replication,exclude_from_large_txns]
 
 (function() {
 'use strict';

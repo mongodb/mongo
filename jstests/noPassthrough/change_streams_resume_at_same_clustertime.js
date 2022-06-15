@@ -3,7 +3,6 @@
  * clusterTime is identical, differing only by documentKey, without causing the PBRT sent to mongoS
  * to go back-in-time.
  * @tags: [
- *   requires_journaling,
  *   requires_majority_read_concern,
  *   requires_replication,
  * ]

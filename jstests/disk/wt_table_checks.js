@@ -2,7 +2,7 @@
  * Tests that MongoDB sets the WiredTiger table logging settings correctly under different
  * circumstances.
  *
- * @tags: [requires_wiredtiger, requires_journaling]
+ * @tags: [requires_wiredtiger]
  */
 (function() {
 

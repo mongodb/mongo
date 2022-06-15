@@ -6,7 +6,7 @@ class Rd {
     constructor() {
         jsTest.log("Going to create and start Rd.");
         this.rs = new ReplSetTest({name: "Rd", nodes: 3, useHostName: true});
-        this.rs.startSet({journal: "", storageEngine: 'wiredTiger'});
+        this.rs.startSet({storageEngine: 'wiredTiger'});
         this.rs.initiate();
 
         jsTest.log("Going to create connection with Rd.");

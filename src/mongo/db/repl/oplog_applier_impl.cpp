@@ -262,9 +262,9 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
     invariant(!_replCoord->getMemberState().arbiter());
 
     std::unique_ptr<ApplyBatchFinalizer> finalizer{
-        getGlobalServiceContext()->getStorageEngine()->isDurable()
-            ? new ApplyBatchFinalizerForJournal(_replCoord)
-            : new ApplyBatchFinalizer(_replCoord)};
+        getGlobalServiceContext()->getStorageEngine()->isEphemeral()
+            ? new ApplyBatchFinalizer(_replCoord)
+            : new ApplyBatchFinalizerForJournal(_replCoord)};
 
     while (true) {  // Exits on message from OplogBatcher.
         // Use a new operation context each iteration, as otherwise we may appear to use a single

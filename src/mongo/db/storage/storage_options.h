@@ -80,8 +80,6 @@ struct StorageGlobalParams {
     // entries for collections not restored and more.
     bool restore;
 
-    bool dur;  // --dur durability (now --journal)
-
     // Whether the Storage Engine selected should be ephemeral in nature or not.
     bool ephemeral = false;
 

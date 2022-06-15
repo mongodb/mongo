@@ -167,7 +167,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
 
 Status validateWriteConcern(OperationContext* opCtx, const WriteConcernOptions& writeConcern) {
     if (writeConcern.syncMode == WriteConcernOptions::SyncMode::JOURNAL &&
-        !opCtx->getServiceContext()->getStorageEngine()->isDurable()) {
+        opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {
         return Status(ErrorCodes::BadValue,
                       "cannot use 'j' option when a host does not have journaling enabled");
     }
@@ -291,9 +291,7 @@ Status waitForWriteConcern(OperationContext* opCtx,
                 break;
             case WriteConcernOptions::SyncMode::FSYNC: {
                 waitForNoOplogHolesIfNeeded(opCtx);
-                if (!storageEngine->isDurable()) {
-                    storageEngine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
-
+                if (!storageEngine->isEphemeral()) {
                     // This field has had a dummy value since MMAP went away. It is undocumented.
                     // Maintaining it so as not to cause unnecessary user pain across upgrades.
                     result->fsyncFiles = 1;

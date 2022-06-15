@@ -161,11 +161,6 @@ Status validateMongodOptions(const moe::Environment& params) {
         return ret;
     }
 
-    if (params.count("nojournal") && params.count("storage.journal.enabled")) {
-        return Status(ErrorCodes::BadValue,
-                      "Can't specify both --journal and --nojournal options.");
-    }
-
 #ifdef _WIN32
     if (params.count("install") || params.count("reinstall")) {
         if (params.count("storage.dbPath") &&
@@ -208,18 +203,6 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
     Status ret = canonicalizeServerOptions(params);
     if (!ret.isOK()) {
         return ret;
-    }
-
-    if (params->count("nojournal")) {
-        Status ret =
-            params->set("storage.journal.enabled", moe::Value(!(*params)["nojournal"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("nojournal");
-        if (!ret.isOK()) {
-            return ret;
-        }
     }
 
     // "security.authorization" comes from the config file, so override it if "auth" is
@@ -447,14 +430,7 @@ Status storeMongodOptions(const moe::Environment& params) {
         storageGlobalParams.groupCollections = params["storage.groupCollections"].as<bool>();
     }
 
-    if (params.count("storage.journal.enabled")) {
-        storageGlobalParams.dur = params["storage.journal.enabled"].as<bool>();
-    }
-
     if (params.count("storage.journal.commitIntervalMs")) {
-        // don't check if dur is false here as many will just use the default, and will default
-        // to off on win32.  ie no point making life a little more complex by giving an error on
-        // a dev environment.
         auto journalCommitIntervalMs = params["storage.journal.commitIntervalMs"].as<int>();
         storageGlobalParams.journalCommitIntervalMs.store(journalCommitIntervalMs);
         if (journalCommitIntervalMs < 1 ||
@@ -643,12 +619,6 @@ Status storeMongodOptions(const moe::Environment& params) {
                                   << "enableMajorityReadConcern=false",
                     serverGlobalParams.enableMajorityReadConcern);
 
-            // If we haven't explicitly specified a journal option, default journaling to true for
-            // the config server role
-            if (!params.count("storage.journal.enabled")) {
-                storageGlobalParams.dur = true;
-            }
-
             if (!params.count("storage.dbPath")) {
                 storageGlobalParams.dbpath = storageGlobalParams.kDefaultConfigDbPath;
             }
@@ -690,13 +660,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         storageGlobalParams.dbpath = currentPath.root_name().string() + storageGlobalParams.dbpath;
     }
 #endif
-
-    // Check if we are 32 bit and have not explicitly specified any journaling options
-    if (sizeof(void*) == 4 && !params.count("storage.journal.enabled")) {
-        LOGV2_WARNING(20880,
-                      "32-bit servers don't have journaling enabled by default. Please use "
-                      "--journal if you want durability");
-    }
 
     bool isClusterRoleShard = params.count("shardsvr");
     bool isClusterRoleConfig = params.count("configsvr");

@@ -66,7 +66,7 @@ function runFixture(Fixture) {
 }
 
 function Standalone() {
-    this.standalone = MongoRunner.runMongod({auth: "", nojournal: ""});
+    this.standalone = MongoRunner.runMongod({auth: ""});
 }
 
 Standalone.prototype.stop = function() {

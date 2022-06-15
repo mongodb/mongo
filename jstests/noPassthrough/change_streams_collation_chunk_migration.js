@@ -2,7 +2,6 @@
  * Tests that a change stream on a sharded collection with a non-simple default collation is not
  * erroneously invalidated upon chunk migration. Reproduction script for the bug in SERVER-33944.
  * @tags: [
- *   requires_journaling,
  *   requires_replication,
  * ]
  */

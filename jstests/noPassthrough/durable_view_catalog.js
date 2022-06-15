@@ -12,7 +12,7 @@
 let dbpath = MongoRunner.dataPath + '_durable_view_catalog';
 resetDbpath(dbpath);
 
-let mongodArgs = {dbpath: dbpath, noCleanData: true, journal: ''};
+let mongodArgs = {dbpath: dbpath, noCleanData: true};
 
 // Start a mongod.
 let conn = MongoRunner.runMongod(mongodArgs);

@@ -101,8 +101,6 @@ public:
     virtual StatusWith<std::deque<std::string>> extendBackupCursor(
         OperationContext* opCtx) override;
 
-    virtual bool isDurable() const override;
-
     virtual bool isEphemeral() const override;
 
     virtual Status repairRecordStore(OperationContext* opCtx,

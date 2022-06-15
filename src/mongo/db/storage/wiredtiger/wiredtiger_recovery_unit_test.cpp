@@ -58,7 +58,6 @@ public:
                   "",                     // .extraOpenOptions
                   1,                      // .cacheSizeMB
                   0,                      // .maxCacheOverflowFileSizeMB
-                  false,                  // .durable
                   false,                  // .ephemeral
                   false                   // .repair
           ) {
@@ -176,7 +175,7 @@ public:
 
 private:
     const char* wt_uri = "table:prepare_transaction";
-    const char* wt_config = "key_format=S,value_format=S";
+    const char* wt_config = "key_format=S,value_format=S,log=(enabled=false)";
 };
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, SetReadSource) {

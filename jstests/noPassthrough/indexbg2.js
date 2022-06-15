@@ -4,7 +4,7 @@
 (function() {
 "use strict";
 
-const conn = MongoRunner.runMongod({nojournal: ""});
+const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");
 
 let db = conn.getDB("test");

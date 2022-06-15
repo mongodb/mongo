@@ -1,6 +1,6 @@
 // Tests the behaviour of change streams on an oplog which rolls over.
 // @tags: [
-//   requires_journaling,
+//   requires_replication,
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]

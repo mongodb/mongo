@@ -160,9 +160,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                 "writeConcernMajorityJournalDefault"] = self.write_concern_majority_journal_default
         else:
             server_status = client.admin.command({"serverStatus": 1})
-            cmd_line_opts = client.admin.command({"getCmdLineOpts": 1})
-            if not (server_status["storageEngine"]["persistent"] and cmd_line_opts["parsed"].get(
-                    "storage", {}).get("journal", {}).get("enabled", True)):
+            if not server_status["storageEngine"]["persistent"]:
                 repl_config["writeConcernMajorityJournalDefault"] = False
 
         if self.replset_config_options.get("configsvr", False):

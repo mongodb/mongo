@@ -2,7 +2,6 @@
  * Verify that adding 'comment' field to any command shouldn't cause unexpected failures.
  * @tags: [
  *   requires_capped,
- *   requires_journaling,
  *   requires_persistence,
  *   requires_replication,
  *   requires_sharding,

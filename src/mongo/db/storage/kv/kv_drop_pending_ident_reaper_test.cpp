@@ -115,9 +115,7 @@ public:
     Status repairIdent(OperationContext* opCtx, StringData ident) override {
         return Status::OK();
     }
-    bool isDurable() const override {
-        return false;
-    }
+
     bool isEphemeral() const override {
         return false;
     }

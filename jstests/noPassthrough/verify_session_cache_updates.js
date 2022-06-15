@@ -66,7 +66,7 @@ function runTest(conn) {
 }
 
 {
-    var mongod = MongoRunner.runMongod({nojournal: ""});
+    var mongod = MongoRunner.runMongod();
     runTest(mongod);
     MongoRunner.stopMongod(mongod);
 }

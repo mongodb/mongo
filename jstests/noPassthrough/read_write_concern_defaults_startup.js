@@ -3,8 +3,8 @@
 //
 // This test restarts a replica set node, which requires persistence and journaling.
 // @tags: [
-//   requires_journaling,
 //   requires_persistence,
+//   requires_replication,
 //   requires_sharding,
 // ]
 (function() {

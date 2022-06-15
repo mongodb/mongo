@@ -3,9 +3,7 @@
  * option.
  *
  *  @tags: [
- *  # Replication requires journaling support so this tag also implies exclusion from
- *  # --nojournal test configurations.
- *  requires_journaling,
+ *  requires_replication,
  * ]
  */
 

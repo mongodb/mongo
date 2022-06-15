@@ -2,7 +2,7 @@
  * Checks that API version 2 will behave correctly with mongod/mongos.
  *
  * @tags: [
- *   requires_journaling,
+ *   requires_persistence,
  * ]
  */
 

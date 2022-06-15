@@ -52,7 +52,6 @@ var rstOptions = {
 };
 var startOptions = {
     // Ensure that journaling is always enabled for config servers.
-    journal: "",
     configsvr: "",
     storageEngine: "wiredTiger",
     sslMode: 'allowSSL',

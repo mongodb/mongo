@@ -11,14 +11,6 @@
 load("jstests/replsets/rslib.js");
 load("jstests/libs/fail_point_util.js");
 
-// Skip this test if running with --nojournal and WiredTiger.
-if (jsTest.options().noJournal &&
-    (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger")) {
-    print("Skipping test because running WiredTiger without journaling isn't a valid" +
-          " replica set configuration");
-    return;
-}
-
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 if (!assert.commandWorked(conn.getDB("test").serverStatus())

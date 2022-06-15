@@ -3,7 +3,6 @@
  *
  * This test only makes sense for storage engines that support recover to stable timestamp.
  * @tags: [
- *   requires_journaling,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,

@@ -3,7 +3,7 @@
  * into the index catalog, that is hidden index remains hidden after restart.
  *
  * @tags: [
- *   requires_journaling,
+ *   requires_persistence,
  *   requires_replication,
  * ]
  */

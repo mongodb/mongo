@@ -6,8 +6,7 @@
  * for no holes for writes with {j: true} write concern, and no confirmed writes will be truncated.
  *
  * @tags: [
- *   # Replica sets using WT require journaling (startup error otherwise).
- *   requires_journaling,
+ *   requires_replication,
  *   # The primary is restarted and must retain its data.
  *   requires_persistence,
  * ]

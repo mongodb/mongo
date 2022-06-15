@@ -23,7 +23,7 @@ class ServerlessTest {
 
         jsTest.log("Going to create and start config server.");
         this.configRS = new ReplSetTest({name: "configRS", nodes: 3, useHostName: true});
-        this.configRS.startSet({configsvr: '', journal: "", storageEngine: 'wiredTiger'});
+        this.configRS.startSet({configsvr: '', storageEngine: 'wiredTiger'});
 
         jsTest.log("Initiate config server before starting mongoq.");
         let replConfig = this.configRS.getReplSetConfig();
