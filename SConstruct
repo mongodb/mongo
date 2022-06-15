@@ -4012,7 +4012,17 @@ def doConfigure(myenv):
             # If anything is changed, added, or removed in either asan_options or
             # lsan_options, be sure to make the corresponding changes to the
             # appropriate build variants in etc/evergreen.yml
-            asan_options = "detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1"
+            asan_options_clear = [
+                "detect_leaks=1",
+                "check_initialization_order=true",
+                "strict_init_order=true",
+                "abort_on_error=1",
+                "disable_coredump=0",
+                "handle_abort=1",
+                "strict_string_checks=true",
+                "detect_invalid_pointer_pairs=1",
+            ]
+            asan_options = ":".join(asan_options_clear)
             lsan_options = f"report_objects=1:suppressions={myenv.File('#etc/lsan.suppressions').abspath}"
             env['ENV']['ASAN_OPTIONS'] = asan_options + symbolizer_option
             env['ENV']['LSAN_OPTIONS'] = lsan_options + symbolizer_option
