@@ -185,9 +185,12 @@ void DatabaseShardingState::checkDbVersion(OperationContext* opCtx, DSSLock&) co
         auto criticalSectionSignal = _critSec.getSignal(
             opCtx->lockState()->isWriteLocked() ? ShardingMigrationCriticalSection::kWrite
                                                 : ShardingMigrationCriticalSection::kRead);
+        const std::string reason =
+            _critSec.getReason() ? _critSec.getReason()->toString() : "unknown";
         uassert(
             StaleDbRoutingVersion(_dbName, *clientDbVersion, boost::none, criticalSectionSignal),
-            str::stream() << "movePrimary commit in progress for " << _dbName,
+            str::stream() << "The critical section for " << _dbName
+                          << " is acquired with reason: " << reason,
             !criticalSectionSignal);
     }
 
