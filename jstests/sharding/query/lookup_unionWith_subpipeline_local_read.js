@@ -515,7 +515,10 @@ assertAggResultAndRouting(pipeline, expectedRes, {comment: "lookup_foreign_does_
     // and we've figured out that the foreign collection is unsharded, we no longer need to target a
     // shard and instead can read locally. As such, we will not generate an entry in the profiler
     // for querying the foreign collection.
-    subPipelineRemote: FeatureFlagUtil.isEnabled(mongosDB, "SBELookupPushdown") ? [0, 0] : [1, 0],
+    subPipelineRemote:
+        FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB(dbName), "SBELookupPushdown")
+        ? [0, 0]
+        : [1, 0],
 });
 
 //
