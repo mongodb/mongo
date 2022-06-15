@@ -1409,8 +1409,9 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
                                 sort->getSortKeyPattern(),
                                 (indexOrderedByMinTime ? DocumentSourceSort::kMin
                                                        : DocumentSourceSort::kMax),
-                                ((indexOrderedByMinTime) ? unpack->getBucketMaxSpanSeconds()
-                                                         : -unpack->getBucketMaxSpanSeconds()) *
+                                static_cast<long long>((indexOrderedByMinTime)
+                                                           ? unpack->getBucketMaxSpanSeconds()
+                                                           : -unpack->getBucketMaxSpanSeconds()) *
                                     1000,
                                 sort->getLimit(),
                                 expCtx));
