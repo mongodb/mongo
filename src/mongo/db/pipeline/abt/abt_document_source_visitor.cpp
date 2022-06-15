@@ -334,6 +334,9 @@ public:
         for (const auto& [fieldName, expr] : idFields) {
             groupByFieldNames.push_back(fieldName);
         }
+        const bool isSingleIdField =
+            groupByFieldNames.size() == 1 && groupByFieldNames.front() == "_id";
+
         // Sort in order to generate consistent plans.
         std::sort(groupByFieldNames.begin(), groupByFieldNames.end());
 
@@ -434,11 +437,21 @@ public:
 
         ABT integrationPath = make<PathIdentity>();
         for (size_t i = 0; i < groupByFieldNames.size(); i++) {
+            std::string fieldName = std::move(groupByFieldNames.at(i));
+            if (!isSingleIdField) {
+                // Erase '_id.' prefix.
+                fieldName = fieldName.substr(strlen("_id."));
+            }
+
             maybeComposePath(integrationPath,
-                             make<PathField>(std::move(groupByFieldNames.at(i)),
+                             make<PathField>(std::move(fieldName),
                                              make<PathConstant>(make<Variable>(
                                                  std::move(groupByProjNames.at(i))))));
         }
+        if (!isSingleIdField) {
+            integrationPath = make<PathField>("_id", std::move(integrationPath));
+        }
+
         for (size_t i = 0; i < aggProjFieldNames.size(); i++) {
             maybeComposePath(
                 integrationPath,
