@@ -61,14 +61,5 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     const std::shared_ptr<executor::TaskExecutor>& executor,
     bool throwOnError = true);
 
-/**
- * Unset the `noAutosplit` and `maxChunkSizeBytes` fields from:
- * - `config.collections` on the CSRS
- * - `config.cache.collections` on shards
- *
- * TODO SERVER-62693 remove this method and all its usages once 6.0 branches out
- */
-void downgradeCollectionBalancingFieldsToPre53(OperationContext* opCtx);
-
 }  // namespace sharding_util
 }  // namespace mongo

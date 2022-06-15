@@ -74,7 +74,6 @@
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
-#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -550,14 +549,6 @@ private:
         const bool preImagesFeatureFlagDisabledOnDowngradeVersion =
             !feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledOnVersion(
                 requestedVersion);
-
-        // TODO SERVER-62693: remove the following scope once 6.0 branches out
-        if (requestedVersion == multiversion::GenericFCV::kLastLTS) {
-            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
-                serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-                sharding_util::downgradeCollectionBalancingFieldsToPre53(opCtx);
-            }
-        }
 
         // TODO  SERVER-65332 remove logic bound to this future object When kLastLTS is 6.0
         boost::optional<SharedSemiFuture<void>> chunkResizeAsyncTask;
