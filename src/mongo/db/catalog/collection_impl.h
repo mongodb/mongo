@@ -381,7 +381,7 @@ public:
         uint64_t n = numRecords(opCtx);
 
         if (n == 0)
-            return 5;
+            return 0;
         return static_cast<int>(dataSize(opCtx) / n);
     }
 
