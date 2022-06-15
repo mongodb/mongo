@@ -793,8 +793,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     const auto generateIndexScanFunc =
-        // ixn->iets.empty() ? generateIndexScan : generateIndexScanWithDynamicBounds;
-        generateIndexScan;
+        ixn->iets.empty() ? generateIndexScan : generateIndexScanWithDynamicBounds;
     auto&& [stage, outputs] = generateIndexScanFunc(_state,
                                                     getCurrentCollection(reqs),
                                                     ixn,

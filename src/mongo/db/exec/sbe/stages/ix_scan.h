@@ -31,8 +31,10 @@
 
 #include "mongo/bson/ordering.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 
@@ -85,6 +87,19 @@ public:
                    PlanYieldPolicy* yieldPolicy,
                    PlanNodeId nodeId);
 
+    IndexScanStage(UUID collUuid,
+                   StringData indexName,
+                   bool forward,
+                   boost::optional<value::SlotId> recordSlot,
+                   boost::optional<value::SlotId> recordIdSlot,
+                   boost::optional<value::SlotId> snapshotIdSlot,
+                   IndexKeysInclusionSet indexKeysToInclude,
+                   value::SlotVector vars,
+                   std::unique_ptr<EExpression> seekKeyLowVar,
+                   std::unique_ptr<EExpression> seekKeyHighVar,
+                   PlanYieldPolicy* yieldPolicy,
+                   PlanNodeId nodeId);
+
     std::unique_ptr<PlanStage> clone() const final;
 
     void prepare(CompileCtx& ctx) final;
@@ -129,6 +144,16 @@ private:
     const value::SlotVector _vars;
     const boost::optional<value::SlotId> _seekKeySlotLow;
     const boost::optional<value::SlotId> _seekKeySlotHigh;
+
+    std::unique_ptr<EExpression> _seekKeyLowVar;
+    std::unique_ptr<EExpression> _seekKeyHighVar;
+
+    // For the EExpression overload for seek keys.
+    std::unique_ptr<vm::CodeFragment> _seekKeyLowCodes;
+    std::unique_ptr<vm::CodeFragment> _seekKeyHighCodes;
+
+    vm::ByteCode _bytecode;
+
 
     // These members are default constructed to boost::none and are initialized when 'prepare()'
     // is called. Once they are set, they are never modified again.

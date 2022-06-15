@@ -51,7 +51,11 @@
 #include "mongo/db/exec/record_store_fast_count.h"
 #include "mongo/db/exec/return_key.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
+#include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
+#include "mongo/db/exec/sbe/stages/loop_join.h"
+#include "mongo/db/exec/sbe/stages/scan.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/subplan.h"
@@ -88,6 +92,8 @@
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/db/query/sbe_cached_solution_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
+#include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/sbe_stage_builder_index_scan.h"
 #include "mongo/db/query/sbe_sub_planner.h"
 #include "mongo/db/query/sbe_utils.h"
 #include "mongo/db/query/stage_builder_util.h"
@@ -1019,7 +1025,92 @@ protected:
         }
 
         invariant(descriptor->getEntry());
-        return nullptr;
+
+        sbe::value::SlotIdGenerator ids;
+        auto resultSlot = ids.generate();
+        auto recordSlot = ids.generate();
+        auto recordIdSlot = ids.generate();
+        auto seekKeySlot = ids.generate();
+
+        PlanNodeId planNodeId{0};
+        sbe::ScanCallbacks callbacks;
+
+        const auto bsonKey =
+            IndexBoundsBuilder::objFromElement(_cq->getQueryObj()["_id"], _cq->getCollator());
+
+        OrderedIntervalList oil("_id");
+        oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(bsonKey));
+
+        IndexBounds bounds;
+        bounds.fields.push_back(std::move(oil));
+
+        auto accessMethod =
+            mainColl->getIndexCatalog()->getEntry(descriptor)->accessMethod()->asSortedData();
+
+        auto intervals = stage_builder::makeIntervalsFromIndexBounds(
+            bounds,
+            true,
+            accessMethod->getSortedDataInterface()->getKeyStringVersion(),
+            accessMethod->getSortedDataInterface()->getOrdering());
+
+        sbe::IndexKeysInclusionSet keySet;
+        invariant(intervals.size() == 1);
+        auto&& [lowKey, highKey] = intervals[0];
+        auto ixScan = sbe::makeS<sbe::IndexScanStage>(
+            mainColl->uuid(),
+            descriptor->indexName(),
+            true,
+            recordSlot,
+            recordIdSlot,
+            boost::none,
+            keySet,
+            sbe::makeSV(),
+            stage_builder::makeConstant(
+                sbe::value::TypeTags::ksValue,
+                sbe::value::bitcastFrom<KeyString::Value*>(lowKey.release())),
+            stage_builder::makeConstant(
+                sbe::value::TypeTags::ksValue,
+                sbe::value::bitcastFrom<KeyString::Value*>(highKey.release())),
+            _yieldPolicy,
+            planNodeId);
+
+
+        auto scanStage = sbe::makeS<sbe::ScanStage>(mainColl->uuid(),
+                                                    resultSlot,
+                                                    recordIdSlot,
+                                                    boost::none,
+                                                    boost::none,
+                                                    boost::none,
+                                                    boost::none,
+                                                    boost::none,
+                                                    std::vector<std::string>{},
+                                                    sbe::makeSV(),
+                                                    seekKeySlot,
+                                                    true,
+                                                    nullptr,
+                                                    planNodeId,
+                                                    std::move(callbacks));
+
+        auto result = makeResult();
+
+        stage_builder::PlanStageData data{std::make_unique<sbe::RuntimeEnvironment>()};
+        data.outputs.set(stage_builder::PlanStageSlots::kResult, resultSlot);
+
+        auto stage = sbe::makeS<sbe::LoopJoinStage>(
+            sbe::makeS<sbe::LimitSkipStage>(std::move(ixScan), 1, boost::none, planNodeId),
+            sbe::makeS<sbe::LimitSkipStage>(std::move(scanStage), 1, boost::none, planNodeId),
+            sbe::makeSV(),
+            sbe::makeSV(seekKeySlot),
+            nullptr,
+            planNodeId);
+
+        sbe::DebugPrinter p;
+
+        std::cout << p.print(*stage.get()) << std::endl;
+
+
+        result->emplace({std::move(stage), data}, nullptr);
+        return result;
     }
 
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildIdHackPlan() {
@@ -1209,7 +1300,7 @@ protected:
 
 private:
     const MultipleCollectionAccessor& _collections;
-};
+};  // namespace
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecutor(
     OperationContext* opCtx,

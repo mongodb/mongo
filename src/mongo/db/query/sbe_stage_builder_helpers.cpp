@@ -973,10 +973,10 @@ makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
     auto scanStage = sbe::makeS<sbe::ScanStage>(collToFetch->uuid(),
                                                 resultSlot,
                                                 recordIdSlot,
-                                                boost::none,
-                                                boost::none,
-                                                boost::none,
-                                                boost::none,
+                                                snapshotIdSlot,
+                                                indexIdSlot,
+                                                indexKeySlot,
+                                                indexKeyPatternSlot,
                                                 boost::none,
                                                 std::vector<std::string>{},
                                                 sbe::makeSV(),
@@ -984,7 +984,7 @@ makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
                                                 true,
                                                 nullptr,
                                                 planNodeId,
-                                                sbe::ScanCallbacks{});
+                                                std::move(callbacks));
 
     // Get the recordIdSlot from the outer side (e.g., IXSCAN) and feed it to the inner side,
     // limiting the result set to 1 row.
@@ -992,8 +992,7 @@ makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
         std::move(inputStage),
         sbe::makeS<sbe::LimitSkipStage>(std::move(scanStage), 1, boost::none, planNodeId),
         std::move(slotsToForward),
-        // sbe::makeSV(seekKeySlot, snapshotIdSlot, indexIdSlot, indexKeySlot, indexKeyPatternSlot),
-        sbe::makeSV(seekKeySlot),
+        sbe::makeSV(seekKeySlot, snapshotIdSlot, indexIdSlot, indexKeySlot, indexKeyPatternSlot),
         nullptr,
         planNodeId);
 

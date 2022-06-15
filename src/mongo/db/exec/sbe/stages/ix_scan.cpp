@@ -68,6 +68,35 @@ IndexScanStage::IndexScanStage(UUID collUuid,
 
     invariant(_indexKeysToInclude.count() == _vars.size());
 }
+IndexScanStage::IndexScanStage(UUID collUuid,
+                               StringData indexName,
+                               bool forward,
+                               boost::optional<value::SlotId> recordSlot,
+                               boost::optional<value::SlotId> recordIdSlot,
+                               boost::optional<value::SlotId> snapshotIdSlot,
+                               IndexKeysInclusionSet indexKeysToInclude,
+                               value::SlotVector vars,
+                               std::unique_ptr<EExpression> seekKeyLowVar,
+                               std::unique_ptr<EExpression> seekKeyHighVar,
+                               PlanYieldPolicy* yieldPolicy,
+                               PlanNodeId nodeId)
+    : PlanStage(seekKeyLowVar ? "ixseek"_sd : "ixscan"_sd, yieldPolicy, nodeId),
+      _collUuid(collUuid),
+      _indexName(indexName),
+      _forward(forward),
+      _recordSlot(recordSlot),
+      _recordIdSlot(recordIdSlot),
+      _snapshotIdSlot(snapshotIdSlot),
+      _indexKeysToInclude(indexKeysToInclude),
+      _vars(std::move(vars)),
+      _seekKeyLowVar(std::move(seekKeyLowVar)),
+      _seekKeyHighVar(std::move(seekKeyHighVar)) {
+    // The valid state is when both boundaries, or none is set, or only low key is set.
+    invariant((_seekKeyLowVar && _seekKeyHighVar) || (!_seekKeyLowVar && !_seekKeyHighVar) ||
+              (_seekKeyLowVar && !_seekKeyHighVar));
+
+    invariant(_indexKeysToInclude.count() == _vars.size());
+}
 
 std::unique_ptr<PlanStage> IndexScanStage::clone() const {
     return std::make_unique<IndexScanStage>(_collUuid,
@@ -132,6 +161,15 @@ void IndexScanStage::prepare(CompileCtx& ctx) {
         _snapshotIdAccessor->reset(
             value::TypeTags::NumberInt64,
             value::bitcastFrom<uint64_t>(_opCtx->recoveryUnit()->getSnapshotId().toNumber()));
+    }
+
+    if (_seekKeyLowVar) {
+        ctx.root = this;
+        _seekKeyLowCodes = _seekKeyLowVar->compile(ctx);
+    }
+    if (_seekKeyHighVar) {
+        ctx.root = this;
+        _seekKeyHighCodes = _seekKeyHighVar->compile(ctx);
     }
 }
 
@@ -300,6 +338,12 @@ void IndexScanStage::open(bool reOpen) {
                 str::stream() << "seek key is wrong type: " << msgTagLow,
                 tagLow == value::TypeTags::ksValue);
         _seekKeyLowHolder->reset(false, tagLow, valLow);
+    } else if (_seekKeyLowVar && _seekKeyHighVar) {
+        auto [ownedLow, tagLow, valLow] = _bytecode.run(_seekKeyLowCodes.get());
+        _seekKeyLowHolder->reset(ownedLow, tagLow, valLow);
+
+        auto [ownedHigh, tagHigh, valHigh] = _bytecode.run(_seekKeyHighCodes.get());
+        _seekKeyHighHolder->reset(ownedHigh, tagHigh, valHigh);
     } else {
         auto sdi = entry->accessMethod()->asSortedData()->getSortedDataInterface();
         KeyString::Builder kb(sdi->getKeyStringVersion(),
