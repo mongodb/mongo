@@ -10,6 +10,7 @@
  *   does_not_support_transactions,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
+ *   tenant_migration_incompatible,
  * ]
  */
 (function() {
