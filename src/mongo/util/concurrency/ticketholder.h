@@ -231,6 +231,9 @@ public:
     }
 
     Ticket& operator=(Ticket&& t) {
+        if (&t == this) {
+            return *this;
+        }
         invariant(!valid(), "Attempting to overwrite a valid ticket with another one");
         _ticketholder = t._ticketholder;
         _admissionContext = t._admissionContext;
