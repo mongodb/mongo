@@ -3,7 +3,7 @@
 /**
  * Performs range deletions while chunks are being moved.
  *
- * @tags: [requires_sharding, assumes_balancer_on]
+ * @tags: [requires_sharding, assumes_balancer_on, antithesis_incompatible]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');

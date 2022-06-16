@@ -3053,7 +3053,6 @@ buildvariants:
 
 - name: enterprise-ubuntu1804-64-libvoidstar
   display_name: ~ Enterprise Ubuntu 18.04 w/ libvoidstar
-  cron: "0 4 * * FRI" # Every week at 0400 UTC Friday. This has to be a Friday since we run Antithesis on Fridays.
   modules:
   - enterprise
   run_on:
@@ -3067,11 +3066,10 @@ buildvariants:
     multiversion_edition: enterprise
     repo_edition: enterprise
     large_distro_name: ubuntu1804-build
-    use_scons_cache: false
-    scons_cache_scope: "none"
+    scons_cache_scope: shared
   tasks:
   - name: compile_and_archive_dist_test_TG
-  - name: .antithesis
+  - name: antithesis_image_push
   - name: generate_buildid_to_debug_symbols_mapping
 
 - <<: *enterprise-windows-nopush-template

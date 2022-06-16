@@ -10,6 +10,7 @@
  *  requires_fcv_60,
  *  requires_sharding,
  *  uses_transactions,
+ *  antithesis_incompatible
  * ]
  */
 

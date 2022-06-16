@@ -8,7 +8,8 @@
  * @tags: [
  *  requires_fcv_60,
  *  requires_sharding,
- *  uses_transactions
+ *  uses_transactions,
+ *  antithesis_incompatible
  * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');

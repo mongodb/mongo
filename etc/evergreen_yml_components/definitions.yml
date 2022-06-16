@@ -2072,6 +2072,26 @@ functions:
       content_type: text/plain
       display_name: Resmoke.py Invocation for Local Usage
 
+  "antithesis image build":
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/antithesis_image_build.sh"
+
+  "antithesis image push":
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/antithesis_image_push.sh"
+
+  "antithesis dry run":
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/antithesis_dry_run.sh"
 
 # Pre task steps
 pre:
@@ -7332,16 +7352,16 @@ tasks:
       args:
       - "./src/evergreen/feature_flag_tags_check.sh"
 
-- name: antithesis_image_build
+- name: antithesis_image_push
   tags: ["antithesis"]
   # this is not patchable to avoid hitting the docker registry excessively.
   # When iterating on this task, feel free to make this patchable for
   # testing purposes. Your image changes will be pushed with the
   # evergreen-patch tag, so as to not clobber the waterfall. Use the
   # antithesis_image_tag build parameter to override this if required.
-  patchable: false
   depends_on:
   - name: archive_dist_test_debug
+  exec_timeout_secs: 7200
   commands:
   - *f_expansions_write
   - func: "git get project no modules"
@@ -7349,13 +7369,6 @@ tasks:
   - func: "kill processes"
   - func: "cleanup environment"
   - func: "set up venv"
-  - command: s3.get
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      remote_file: ${project}/${build_variant}/antithesis_last_push.txt
-      local_file: antithesis_last_push.txt
-      bucket: mciuploads
   - func: "do setup"
   - command: s3.get
     params:
@@ -7364,22 +7377,9 @@ tasks:
       remote_file: ${mongo_debugsymbols}
       bucket: mciuploads
       local_file: src/mongo-debugsymbols.tgz
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/antithesis_image_build.sh"
-  - command: s3.put
-    params:
-      optional: true
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: antithesis_next_push.txt
-      remote_file: ${project}/${build_variant}/antithesis_last_push.txt
-      bucket: mciuploads
-      permissions: private
-      content_type: text/plain
-      display_name: Last Push Date (seconds since epoch)
+  - func: "antithesis image build"
+  - func: "antithesis dry run"
+  - func: "antithesis image push"
 
 - name: generate_buildid_to_debug_symbols_mapping
   tags: ["symbolizer"]

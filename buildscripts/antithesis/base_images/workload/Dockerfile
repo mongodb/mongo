@@ -30,8 +30,12 @@ COPY src /resmoke
 
 RUN bash -c "cd /resmoke && python3.9 -m venv python3-venv && . python3-venv/bin/activate && pip install --upgrade pip wheel && pip install -r ./buildscripts/requirements.txt && ./buildscripts/antithesis_suite.py generate-all"
 
+# copy the run_suite.py script & mongo binary -- make sure they are executable
+COPY run_suite.py /resmoke
+
 COPY mongo /usr/bin
 RUN chmod +x /usr/bin/mongo
+
 COPY libvoidstar.so /usr/lib/libvoidstar.so
 
 RUN /usr/bin/mongo --version

@@ -3,7 +3,6 @@
 
 import os.path
 import sys
-import pathlib
 
 import click
 import yaml
@@ -12,35 +11,74 @@ import yaml
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-SUITE_BLACKLIST = [
-    "CheckReplDBHash",
-    "CheckReplOplogs",
+HOOKS_BLACKLIST = [
     "CleanEveryN",
     "ContinuousStepdown",
-    "ValidateCollections",
     "CheckOrphansDeleted",
 ]
 
-
-def _sanitize_hooks(hooks):
-    if len(hooks) == 0:
-        return hooks
-    # it's either a list of strings, or a list of dicts, each with key 'class'
-    if isinstance(hooks[0], str):
-        return list(filter(lambda x: x not in SUITE_BLACKLIST, hooks))
-    elif isinstance(hooks[0], dict):
-        return list(filter(lambda x: x['class'] not in SUITE_BLACKLIST, hooks))
-    else:
-        raise RuntimeError('Unknown structure in hook. File a TIG ticket.')
-
-
-def _sanitize_test_data(test_data):
-    if test_data.get("useStepdownPermittedFile", None):
-        test_data["useStepdownPermittedFile"] = False
-    return test_data
-
-
 _SUITES_PATH = os.path.join("buildscripts", "resmokeconfig", "suites")
+
+
+def delete_archival(suite):
+    """Remove archival for Antithesis environment."""
+    suite.pop("archive", None)
+    suite.get("executor", {}).pop("archive", None)
+
+
+def make_hooks_compatible(suite):
+    """Make hooks compatible in Antithesis environment."""
+    if suite.get("executor", {}).get("hooks", None):
+        # it's either a list of strings, or a list of dicts, each with key 'class'
+        if isinstance(suite["executor"]["hooks"][0], str):
+            suite["executor"]["hooks"] = ["AntithesisLogging"] + [
+                hook for hook in suite["executor"]["hooks"] if hook not in HOOKS_BLACKLIST
+            ]
+        elif isinstance(suite["executor"]["hooks"][0], dict):
+            suite["executor"]["hooks"] = [{"class": "AntithesisLogging"}] + [
+                hook for hook in suite["executor"]["hooks"] if hook["class"] not in HOOKS_BLACKLIST
+            ]
+        else:
+            raise RuntimeError('Unknown structure in hook. File a TIG ticket.')
+
+
+def use_external_fixture(suite):
+    """Use external version of this fixture."""
+    if suite.get("executor", {}).get("fixture", None):
+        suite["executor"]["fixture"] = {
+            "class": f"External{suite['executor']['fixture']['class']}",
+            "shell_conn_string": "mongodb://mongos:27017"
+        }
+
+
+def update_test_data(suite):
+    """Update TestData to be compatible with antithesis."""
+    suite.setdefault("executor", {}).setdefault(
+        "config", {}).setdefault("shell_options", {}).setdefault("global_vars", {}).setdefault(
+            "TestData", {}).update({"useStepdownPermittedFile": False})
+
+
+def update_shell(suite):
+    """Update shell for when running in Antithesis."""
+    suite.setdefault("executor", {}).setdefault("config", {}).setdefault("shell_options",
+                                                                         {}).setdefault("eval", "")
+    suite["executor"]["config"]["shell_options"]["eval"] += "jsTestLog = Function.prototype;"
+
+
+def update_exclude_tags(suite):
+    """Update the exclude tags to exclude antithesis incompatible tests."""
+    suite.setdefault('selector', {}).setdefault('exclude_with_any_tags',
+                                                []).append("antithesis_incompatible")
+
+
+def make_suite_antithesis_compatible(suite):
+    """Modify suite in-place to be antithesis compatible."""
+    delete_archival(suite)
+    make_hooks_compatible(suite)
+    use_external_fixture(suite)
+    update_test_data(suite)
+    update_shell(suite)
+    update_exclude_tags(suite)
 
 
 @click.group()
@@ -50,54 +88,13 @@ def cli():
 
 
 def _generate(suite_name: str) -> None:
-    with open(os.path.join(_SUITES_PATH, "{}.yml".format(suite_name))) as fstream:
+    with open(os.path.join(_SUITES_PATH, f"{suite_name}.yml")) as fstream:
         suite = yaml.safe_load(fstream)
 
-    try:
-        suite["archive"]["hooks"] = _sanitize_hooks(suite["archive"]["hooks"])
-    except KeyError:
-        # pass, don't care
-        pass
-    except TypeError:
-        pass
-
-    try:
-        suite["executor"]["archive"]["hooks"] = _sanitize_hooks(
-            suite["executor"]["archive"]["hooks"])
-    except KeyError:
-        # pass, don't care
-        pass
-    except TypeError:
-        pass
-
-    try:
-        suite["executor"]["hooks"] = _sanitize_hooks(suite["executor"]["hooks"])
-    except KeyError:
-        # pass, don't care
-        pass
-    except TypeError:
-        pass
-
-    try:
-        suite["executor"]["config"]["shell_options"]["global_vars"][
-            "TestData"] = _sanitize_test_data(
-                suite["executor"]["config"]["shell_options"]["global_vars"]["TestData"])
-    except KeyError:
-        # pass, don't care
-        pass
-    except TypeError:
-        pass
-
-    try:
-        suite["executor"]["config"]["shell_options"]["eval"] += "jsTestLog = Function.prototype;"
-    except KeyError:
-        # pass, don't care
-        pass
-    except TypeError:
-        pass
+    make_suite_antithesis_compatible(suite)
 
     out = yaml.dump(suite)
-    with open(os.path.join(_SUITES_PATH, "antithesis_{}.yml".format(suite_name)), "w") as fstream:
+    with open(os.path.join(_SUITES_PATH, f"antithesis_{suite_name}.yml"), "w") as fstream:
         fstream.write(
             "# this file was generated by buildscripts/antithesis_suite.py generate {}\n".format(
                 suite_name))
