@@ -105,8 +105,9 @@ Status unsetPersistedRefreshFlags(OperationContext* opCtx,
     // Set 'refreshing' to false and update the last refreshed collection version.
     BSONObjBuilder updateBuilder;
     updateBuilder.append(ShardCollectionType::kRefreshingFieldName, false);
-    updateBuilder.appendTimestamp(ShardCollectionType::kLastRefreshedCollectionVersionFieldName,
-                                  refreshedVersion.toLong());
+    updateBuilder.appendTimestamp(
+        ShardCollectionType::kLastRefreshedCollectionMajorMinorVersionFieldName,
+        refreshedVersion.toLong());
 
     return updateShardCollectionsEntry(opCtx,
                                        BSON(ShardCollectionType::kNssFieldName << nss.ns()),
@@ -211,7 +212,8 @@ Status updateShardCollectionsEntry(OperationContext* opCtx,
     if (upsert) {
         // If upserting, this should be an update from the config server that does not have shard
         // refresh / migration inc signal information.
-        invariant(!update.hasField(ShardCollectionType::kLastRefreshedCollectionVersionFieldName));
+        invariant(!update.hasField(
+            ShardCollectionType::kLastRefreshedCollectionMajorMinorVersionFieldName));
     }
 
     try {

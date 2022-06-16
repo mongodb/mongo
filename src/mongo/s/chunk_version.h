@@ -199,12 +199,6 @@ public:
 
     std::string toString() const;
 
-    // Methods that are here for the purposes of parsing of ShardCollectionType only
-    static ChunkVersion parseMajorMinorVersionOnlyFromShardCollectionType(
-        const BSONElement& element);
-    void serialiseMajorMinorVersionOnlyForShardCollectionType(StringData field,
-                                                              BSONObjBuilder* builder) const;
-
 private:
     // The combined major/minor version, which exists as subordinate to the collection generation
     uint64_t _combined;

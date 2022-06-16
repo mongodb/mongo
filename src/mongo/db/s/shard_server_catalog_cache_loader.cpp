@@ -57,7 +57,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
 
 using namespace shardmetadatautil;
@@ -211,13 +210,13 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
         return ChunkVersion::UNSHARDED();
     }
 
-    auto statusWithChunk = shardmetadatautil::readShardChunks(opCtx,
-                                                              nss,
-                                                              BSONObj(),
-                                                              BSON(ChunkType::lastmod() << -1),
-                                                              1LL,
-                                                              cachedCollection.getEpoch(),
-                                                              cachedCollection.getTimestamp());
+    auto statusWithChunk = readShardChunks(opCtx,
+                                           nss,
+                                           BSONObj(),
+                                           BSON(ChunkType::lastmod() << -1),
+                                           1LL,
+                                           cachedCollection.getEpoch(),
+                                           cachedCollection.getTimestamp());
     uassertStatusOKWithContext(
         statusWithChunk,
         str::stream() << "Failed to read highest version persisted chunk for collection '"
