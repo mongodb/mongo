@@ -60,8 +60,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         self._suite = suite
         self.test_queue_logger = logging.loggers.new_testqueue_logger(suite.test_kind)
 
-        if _config.AUTO_KILL != 'off':
-            self._check_for_mongo_processes()
+        self._check_for_mongo_processes()
 
         # Must be done after getting buildlogger configuration.
         self._jobs = self._create_jobs(suite.get_num_jobs_to_start())
@@ -237,7 +236,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         if rogue_procs:
             msg = "detected existing mongo processes. Please clean up these processes as they may affect tests:"
 
-            if _config.AUTO_KILL == 'on':
+            if _config.AUTO_KILL:
                 msg += textwrap.dedent("""\
 
                     Congratulations, you have selected auto kill mode:
@@ -263,7 +262,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                 self.logger.error("ERROR: " + msg)
 
             for proc in rogue_procs:
-                if _config.AUTO_KILL == 'on':
+                if _config.AUTO_KILL:
                     proc_msg = f"    Target acquired: pid: {str(proc.pid).ljust(5)} name: {proc.exe()}"
                     try:
                         proc.kill()
@@ -276,7 +275,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                 else:
                     self.logger.error("    pid: %s name: %s", str(proc.pid).ljust(5), proc.exe())
 
-            if _config.AUTO_KILL == 'on':
+            if _config.AUTO_KILL:
                 print("I'll be back...\n")
             else:
                 raise errors.TestFailure("Failing because existing mongo processes detected.")

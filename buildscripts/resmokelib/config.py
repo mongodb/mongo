@@ -267,7 +267,7 @@ class MultiversionOptions(object):
 ##
 
 # Allow resmoke permission to automatically kill existing rogue mongo processes.
-AUTO_KILL = 'warn'
+AUTO_KILL = False
 
 # Log to files located in the db path and don't clean dbpaths after tests.
 ALWAYS_USE_LOG_FILES = False
