@@ -561,13 +561,6 @@ class RunPlugin(PluginInterface):
                   " positional arguments, they will be run using the suites'"
                   " configurations."))
 
-        parser.add_argument(
-            "--auto-kill-all-mongo", dest="auto_kill", action="store_true",
-            help=("When resmoke starts up, existing mongo processes could cause"
-                  " issues when running tests. Normally resmoke will just warn and"
-                  " exit with failure. This option gives resmoke permission to kill"
-                  " the detected existing processes and continue running the test."))
-
         parser.add_argument("--installDir", dest="install_dir", metavar="INSTALL_DIR",
                             help="Directory to search for MongoDB binaries")
 

@@ -1,13 +1,8 @@
 """Driver of the test execution framework."""
 
-import os
-import sys
-import textwrap
 import threading
 import time
 from typing import List
-
-import psutil
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import errors
@@ -59,8 +54,6 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
 
         self._suite = suite
         self.test_queue_logger = logging.loggers.new_testqueue_logger(suite.test_kind)
-
-        self._check_for_mongo_processes()
 
         # Must be done after getting buildlogger configuration.
         self._jobs = self._create_jobs(suite.get_num_jobs_to_start())
@@ -215,70 +208,6 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         # instance if a test fails and it decides to drain the queue. We only want to raise a
         # StopExecution exception in TestSuiteExecutor.run() if the user triggered the interrupt.
         return combined_report, user_interrupted
-
-    def _check_for_mongo_processes(self):
-        # pylint: disable=too-many-branches,
-        """Check for existing mongo processes as they could interfere with running the tests."""
-
-        rogue_procs = []
-
-        # Iterate over all running process
-        for proc in psutil.process_iter():
-            try:
-                # Get process name & pid from process object.
-                process_name = proc.exe()
-                if os.path.basename(process_name) in ['mongod', 'mongos']:
-                    rogue_procs.append(proc)
-
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                pass
-
-        if rogue_procs:
-            msg = "detected existing mongo processes. Please clean up these processes as they may affect tests:"
-
-            if _config.AUTO_KILL:
-                msg += textwrap.dedent("""\
-
-                    Congratulations, you have selected auto kill mode:
-                    HASTA LA VISTA MONGO""" + r"""
-                                          ______
-                                         <((((((\\\
-                                         /      . }\
-                                         ;--..--._|}
-                      (\                 '--/\--'  )
-                       \\                | '-'  :'|
-                        \\               . -==- .-|
-                         \\               \.__.'   \--._
-                         [\\          __.--|       //  _/'--.
-                         \ \\       .'-._ ('-----'/ __/      \\
-                          \ \\     /   __>|      | '--.       |
-                           \ \\   |   \   |     /    /       /
-                            \ '\ /     \  |     |  _/       /
-                             \  \       \ |     | /        /
-                              \  \      \        /
-                    """)
-                print(f"WARNING: {msg}")
-            else:
-                self.logger.error("ERROR: " + msg)
-
-            for proc in rogue_procs:
-                if _config.AUTO_KILL:
-                    proc_msg = f"    Target acquired: pid: {str(proc.pid).ljust(5)} name: {proc.exe()}"
-                    try:
-                        proc.kill()
-                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as exc:
-                        proc_msg += f" - target escaped: {type(exc).__name__ }"
-                    else:
-                        proc_msg += " - target destroyed\n"
-                    print(proc_msg)
-
-                else:
-                    self.logger.error("    pid: %s name: %s", str(proc.pid).ljust(5), proc.exe())
-
-            if _config.AUTO_KILL:
-                print("I'll be back...\n")
-            else:
-                raise errors.TestFailure("Failing because existing mongo processes detected.")
 
     def _teardown_fixtures(self):
         """Tear down all of the fixtures.
