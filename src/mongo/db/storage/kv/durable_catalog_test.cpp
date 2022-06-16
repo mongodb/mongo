@@ -62,6 +62,8 @@ static const long kExpectedVersion = 1;
 
 class DurableCatalogTest : public CatalogTestFixture {
 public:
+    explicit DurableCatalogTest(Options options = {}) : CatalogTestFixture(std::move(options)) {}
+
     void setUp() override {
         CatalogTestFixture::setUp();
 
@@ -195,6 +197,9 @@ private:
 };
 
 class ImportCollectionTest : public DurableCatalogTest {
+public:
+    explicit ImportCollectionTest() : DurableCatalogTest(Options{}.ephemeral(false)) {}
+
 protected:
     void setUp() override {
         DurableCatalogTest::setUp();
