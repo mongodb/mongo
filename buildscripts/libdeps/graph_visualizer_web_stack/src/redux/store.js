@@ -8,6 +8,7 @@ import { links } from "./links";
 import { graphData } from "./graphData";
 import { findNode } from "./findNode";
 import { graphPaths } from "./graphPaths";
+import { listSearchTerm } from "./listSearchTerm";
 
 export const initialState = {
   loading: false,
@@ -61,6 +62,7 @@ export const initialState = {
       dependencies: [{ node: "test/test2.so", symbols: [] }],
     },
   ],
+  listSearchTerm: "",
 };
 
 export const getLoading = (state) => {
@@ -88,11 +90,12 @@ export const getCounts = (state) => {
 };
 
 export const getRows = (state) => {
+  let searchedNodes = state.nodes.filter(node => node.node.indexOf(state.listSearchTerm) > -1);
   return {
-    rowCount: state.nodes.length,
-    rowGetter: ({ index }) => state.nodes[index],
-    checkBox: ({ index }) => state.nodes[index].selected,
-    nodes: state.nodes,
+    rowCount: searchedNodes.length,
+    rowGetter: ({ index }) => searchedNodes[index],
+    checkBox: ({ index }) => searchedNodes[index].selected,
+    nodes: searchedNodes,
   };
 };
 
@@ -109,6 +112,8 @@ export const getNodes = (state) => {
   return {
     nodes: state.nodes,
     loading: state.loading,
+    listSearchTerm: state.listSearchTerm,
+    searchedNodes: state.nodes.filter(node => node.node.indexOf(state.listSearchTerm) > -1),
   };
 };
 
@@ -137,6 +142,7 @@ const store = createStore(
     graphData,
     findNode,
     graphPaths,
+    listSearchTerm,
   }),
   initialState
 );
