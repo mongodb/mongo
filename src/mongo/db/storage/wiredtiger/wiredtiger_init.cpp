@@ -116,7 +116,6 @@ public:
                               "RAM. See http://dochub.mongodb.org/core/faq-memory-diagnostics-wt");
             }
         }
-        const bool ephemeral = false;
         auto kv =
             std::make_unique<WiredTigerKVEngine>(getCanonicalName().toString(),
                                                  params.dbpath,
@@ -125,7 +124,7 @@ public:
                                                  cacheMB,
                                                  wiredTigerGlobalOptions.getMaxHistoryFileSizeMB(),
                                                  params.dur,
-                                                 ephemeral,
+                                                 params.ephemeral,
                                                  params.repair,
                                                  params.readOnly);
         kv->setRecordStoreExtraOptions(wiredTigerGlobalOptions.collectionConfig);

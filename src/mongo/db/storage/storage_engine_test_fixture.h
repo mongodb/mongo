@@ -199,9 +199,8 @@ public:
 
 class StorageEngineRepairTest : public StorageEngineTest {
 public:
-    // TODO (SERVER-65191): Use wiredTiger.
     StorageEngineRepairTest()
-        : StorageEngineTest(Options{}.engine("ephemeralForTest").repair(RepairAction::kRepair)) {}
+        : StorageEngineTest(Options{}.repair(RepairAction::kRepair).ephemeral(false)) {}
 
     void tearDown() {
         auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
@@ -217,6 +216,11 @@ public:
                   logv2::seqLog(boost::make_transform_iterator(modifications.begin(), asString),
                                 boost::make_transform_iterator(modifications.end(), asString)));
     }
+};
+
+class StorageEngineTestNotEphemeral : public StorageEngineTest {
+public:
+    StorageEngineTestNotEphemeral() : StorageEngineTest(Options{}.ephemeral(false)){};
 };
 
 }  // namespace mongo

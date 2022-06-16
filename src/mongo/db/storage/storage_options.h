@@ -82,6 +82,9 @@ struct StorageGlobalParams {
 
     bool dur;  // --dur durability (now --journal)
 
+    // Whether the Storage Engine selected should be ephemeral in nature or not.
+    bool ephemeral = false;
+
     // --journalCommitInterval
     static constexpr int kMaxJournalCommitIntervalMs = 500;
     AtomicWord<int> journalCommitIntervalMs;
