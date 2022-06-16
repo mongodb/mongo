@@ -90,7 +90,7 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
 
     for (int attempt = 1; true; attempt++) {
         try {
-            // Saving and restoring can modifies '_yieldable', so we make a copy before we start.
+            // Saving and restoring can modify '_yieldable', so we make a copy before we start.
             const Yieldable* yieldable = _yieldable;
 
             try {
@@ -122,7 +122,8 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                 invariant(!opCtx->isLockFreeReadsOp());
                 opCtx->recoveryUnit()->abandonSnapshot();
             } else {
-                performYield(opCtx, yieldable, whileYieldingFn);
+                invariant(yieldable);
+                performYield(opCtx, *yieldable, whileYieldingFn);
             }
 
             restoreState(opCtx, yieldable);
@@ -144,7 +145,7 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
 }
 
 void PlanYieldPolicy::performYield(OperationContext* opCtx,
-                                   const Yieldable* yieldable,
+                                   const Yieldable& yieldable,
                                    std::function<void()> whileYieldingFn) {
     // Things have to happen here in a specific order:
     //   * Release 'yieldable'.
@@ -162,9 +163,7 @@ void PlanYieldPolicy::performYield(OperationContext* opCtx,
 
     // Since the locks are not recursively held, this is a top level operation and we can safely
     // clear the 'yieldable' state before unlocking and then re-establish it after re-locking.
-    if (yieldable) {
-        yieldable->yield();
-    }
+    yieldable.yield();
 
     Locker::LockSnapshot snapshot;
     auto unlocked = locker->saveLockStateAndUnlock(&snapshot);
@@ -179,9 +178,7 @@ void PlanYieldPolicy::performYield(OperationContext* opCtx,
     if (!unlocked) {
         // Nothing was unlocked. Recursively held locks are not the only reason locks cannot be
         // released. Restore the 'yieldable' state before returning.
-        if (yieldable) {
-            yieldable->restore();
-        }
+        yieldable.restore();
         return;
     }
 
@@ -199,15 +196,10 @@ void PlanYieldPolicy::performYield(OperationContext* opCtx,
 
     locker->restoreLockState(opCtx, snapshot);
 
-    // A yield has occurred, but there still may not be a 'yieldable'. This is true, for example,
-    // when executing a getMore for the slot-based execution engine. SBE uses the "locks internally"
-    // lock policy, and therefore the getMore code path does not acquire any db_raii object. As a
-    // result, there is no db_raii object to restore here when executing a getMore against a cursor
-    // using SBE.
-    if (yieldable) {
-        // Yieldable restore may set a new read source if necessary.
-        yieldable->restore();
-    }
+    // A yield has occurred, but there still may not be a 'yieldable' if the PlanExecutor
+    // has a 'locks internally' lock policy.
+    // Yieldable restore may set a new read source if necessary.
+    yieldable.restore();
 }
 
 }  // namespace mongo
