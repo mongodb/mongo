@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/document_source_internal_inhibit_optimization.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_internal_split_pipeline.h"
+#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_list_cached_and_active_users.h"
 #include "mongo/db/pipeline/document_source_list_local_sessions.h"
@@ -108,6 +109,7 @@ void DocumentSourceWalker::walk(const Pipeline& pipeline) {
                 visitHelper<DocumentSourceInternalInhibitOptimization>(ds) ||
                 visitHelper<DocumentSourceInternalShardFilter>(ds) ||
                 visitHelper<DocumentSourceInternalSplitPipeline>(ds) ||
+                visitHelper<DocumentSourceInternalUnpackBucket>(ds) ||
                 visitHelper<DocumentSourceLimit>(ds) ||
                 visitHelper<DocumentSourceListCachedAndActiveUsers>(ds) ||
                 visitHelper<DocumentSourceListLocalSessions>(ds) ||

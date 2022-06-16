@@ -155,6 +155,8 @@ public:
                 "$in with regexes is not supported.",
                 expr->getRegexes().empty());
 
+        assertSupportedPathExpression(expr);
+
         const auto& equalities = expr->getEqualities();
 
         // $in with an empty equalities list matches nothing; replace with constant false.
@@ -406,6 +408,8 @@ private:
 
     template <bool isValueElemMatch>
     void generateElemMatch(const ArrayMatchingMatchExpression* expr) {
+        assertSupportedPathExpression(expr);
+
         // Returns true if at least one sub-objects matches the condition.
 
         const size_t childCount = expr->numChildren();
@@ -484,7 +488,15 @@ private:
             });
     }
 
+    void assertSupportedPathExpression(const PathMatchExpression* expr) {
+        uassert(ErrorCodes::InternalErrorNotSupported,
+                "Expression contains a numeric path component",
+                !FieldRef(expr->path()).hasNumericPathComponents());
+    }
+
     void generateSimpleComparison(const ComparisonMatchExpressionBase* expr, const Operations op) {
+        assertSupportedPathExpression(expr);
+
         auto [tag, val] = convertFrom(Value(expr->getData()));
         const bool isArray = tag == sbe::value::TypeTags::Array;
         ABT result = make<PathCompare>(op, make<Constant>(tag, val));

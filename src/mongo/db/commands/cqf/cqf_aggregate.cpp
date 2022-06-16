@@ -87,15 +87,10 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
     while (indexIterator->more()) {
         const IndexCatalogEntry& catalogEntry = *indexIterator->next();
 
-        const bool isMultiKey = catalogEntry.isMultikey(opCtx, collection);
-        const MultikeyPaths& multiKeyPaths = catalogEntry.getMultikeyPaths(opCtx, collection);
-        uassert(6624251, "Multikey paths cannot be empty.", !multiKeyPaths.empty());
-
         const IndexDescriptor& descriptor = *catalogEntry.descriptor();
         if (descriptor.hidden() || descriptor.isSparse() ||
             descriptor.getIndexType() != IndexType::INDEX_BTREE) {
-            // Not supported for now.
-            continue;
+            uasserted(ErrorCodes::InternalErrorNotSupported, "Unsupported index type");
         }
 
         if (indexHint) {
@@ -110,6 +105,10 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
                 continue;
             }
         }
+
+        const bool isMultiKey = catalogEntry.isMultikey(opCtx, collection);
+        const MultikeyPaths& multiKeyPaths = catalogEntry.getMultikeyPaths(opCtx, collection);
+        uassert(6624251, "Multikey paths cannot be empty.", !multiKeyPaths.empty());
 
         // SBE version is base 0.
         const int64_t version = static_cast<int>(descriptor.version()) - 1;
@@ -380,6 +379,18 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
         uasserted(6624256,
                   "For now we can apply hints only for queries involving a single collection");
     }
+    // Unsupported command/collection options.
+    uassert(ErrorCodes::InternalErrorNotSupported,
+            "Collection-default collation is not supported",
+            !collection || collection->getCollectionOptions().collation.isEmpty());
+
+    uassert(ErrorCodes::InternalErrorNotSupported,
+            "Clustered collections are not supported",
+            !collection || !collection->isClustered());
+
+    uassert(ErrorCodes::InternalErrorNotSupported,
+            "Timeseries collections are not supported",
+            !collection || !collection->getTimeseriesOptions());
 
     QueryHints queryHints = getHintsFromQueryKnobs();
 

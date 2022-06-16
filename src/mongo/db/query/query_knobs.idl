@@ -728,7 +728,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryEnableCascadesOptimizer"
     cpp_vartype: AtomicWord<bool>
-    default: false
+    default: true
 
   internalCascadesOptimizerDisableScan:
     description: "Disable full collection scans in the Cascades optimizer."
@@ -778,6 +778,14 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalCascadesOptimizerDisableBranchAndBound"
     cpp_vartype: AtomicWord<bool>
+    default: false
+
+  internalQueryForceCommonQueryFramework:
+    description: "Set to always use the bonsai optimizer, regardless of the query."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryForceCommonQueryFramework"
+    cpp_vartype: AtomicWord<bool>
+    test_only: true
     default: false
 
   internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin:

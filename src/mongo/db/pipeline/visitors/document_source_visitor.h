@@ -47,6 +47,7 @@ class DocumentSourceIndexStats;
 class DocumentSourceInternalInhibitOptimization;
 class DocumentSourceInternalShardFilter;
 class DocumentSourceInternalSplitPipeline;
+class DocumentSourceInternalUnpackBucket;
 class DocumentSourceLimit;
 class DocumentSourceListCachedAndActiveUsers;
 class DocumentSourceListLocalSessions;
@@ -98,6 +99,8 @@ public:
         tree_walker::MaybeConstPtr<IsConst, DocumentSourceInternalShardFilter> source) = 0;
     virtual void visit(
         tree_walker::MaybeConstPtr<IsConst, DocumentSourceInternalSplitPipeline> source) = 0;
+    virtual void visit(
+        tree_walker::MaybeConstPtr<IsConst, DocumentSourceInternalUnpackBucket> source) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceLimit> source) = 0;
     virtual void visit(
         tree_walker::MaybeConstPtr<IsConst, DocumentSourceListCachedAndActiveUsers> source) = 0;

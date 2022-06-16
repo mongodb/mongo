@@ -3,6 +3,7 @@
  */
 
 load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
+load('jstests/libs/optimizer_utils.js');
 
 (function() {
 "use strict";
@@ -37,6 +38,11 @@ const runTest = (filter, expected) => {
         const result = coll.aggregate({$match: filter}).toArray();
         assertArrayEq(
             {actual: result, expected: expected, extraErrorMsg: tojson({filter: filter})});
+
+        // Sanity check that the query uses the bonsai optimizer.
+        const explain = assert.commandWorked(db.runCommand(
+            {explain: {aggregate: coll.getName(), pipeline: [{$match: filter}], cursor: {}}}));
+        assert(usedBonsaiOptimizer(explain), tojson(explain));
     } finally {
         assert.commandWorked(
             db.adminCommand({'configureFailPoint': 'disablePipelineOptimization', 'mode': 'off'}));

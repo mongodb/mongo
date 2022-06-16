@@ -43,6 +43,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/commands/cqf/cqf_aggregate.h"
+#include "mongo/db/commands/cqf/cqf_command_utils.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
@@ -953,9 +954,7 @@ Status runAggregate(OperationContext* opCtx,
         constexpr bool alreadyOptimized = true;
         pipeline->validateCommon(alreadyOptimized);
 
-        if (feature_flags::gfeatureFlagCommonQueryFramework.isEnabled(
-                serverGlobalParams.featureCompatibility) &&
-            internalQueryEnableCascadesOptimizer.load()) {
+        if (isEligibleForBonsai(request, *pipeline, opCtx, collections.getMainCollection())) {
             uassert(6624344,
                     "Exchanging is not supported in the Cascades optimizer",
                     !request.getExchange().has_value());
