@@ -299,6 +299,12 @@ void BucketCatalog::ExecutionStatsController::incNumBucketsReopened(long long in
     _globalStats->numBucketsReopened.fetchAndAddRelaxed(increment);
 }
 
+void BucketCatalog::ExecutionStatsController::incNumBucketsKeptOpenDueToLargeMeasurements(
+    long long increment) {
+    _collectionStats->numBucketsKeptOpenDueToLargeMeasurements.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketsKeptOpenDueToLargeMeasurements.fetchAndAddRelaxed(increment);
+}
+
 class BucketCatalog::Bucket {
 public:
     friend class BucketCatalog;
@@ -490,6 +496,10 @@ private:
     // number of measurements, size, or schema changes, or it can be marked for archival due to time
     // range.
     RolloverAction _rolloverAction = RolloverAction::kNone;
+
+    // Whether this bucket was kept open after exceeding the bucket max size to improve bucketing
+    // performance for large measurements.
+    bool _keptOpenDueToLargeMeasurements = false;
 
     // The batch that has been prepared and is currently in the process of being committed, if
     // any.
@@ -810,10 +820,6 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(
             stats.incNumBucketsClosedDueToCount();
             return RolloverAction::kClose;
         }
-        if (bucket->_size + sizeToBeAdded > static_cast<std::uint64_t>(gTimeseriesBucketMaxSize)) {
-            stats.incNumBucketsClosedDueToSize();
-            return RolloverAction::kClose;
-        }
         auto bucketTime = bucket->getTime();
         if (time - bucketTime >= Seconds(*options.getBucketMaxSpanSeconds())) {
             if (canArchive) {
@@ -830,6 +836,36 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(
                 return RolloverAction::kArchive;
             } else {
                 stats.incNumBucketsClosedDueToTimeBackward();
+                return RolloverAction::kClose;
+            }
+        }
+        if (bucket->_size + sizeToBeAdded > static_cast<std::uint64_t>(gTimeseriesBucketMaxSize)) {
+            bool keepBucketOpenForLargeMeasurements =
+                bucket->_numMeasurements < static_cast<std::uint64_t>(gTimeseriesBucketMinCount) &&
+                feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+                    serverGlobalParams.featureCompatibility);
+            if (keepBucketOpenForLargeMeasurements) {
+                // Instead of packing the bucket to the BSON size limit, 16MB, we'll limit the max
+                // bucket size to 12MB. This is to leave some space in the bucket if we need to add
+                // new internal fields to existing, full buckets.
+                static constexpr size_t largeMeasurementsMaxBucketSize =
+                    BSONObjMaxUserSize - (4 * 1024 * 1024);
+
+                if (bucket->_size + sizeToBeAdded > largeMeasurementsMaxBucketSize) {
+                    stats.incNumBucketsClosedDueToSize();
+                    return RolloverAction::kClose;
+                }
+
+                // There's enough space to add this measurement and we're still below the large
+                // measurement threshold.
+                if (!bucket->_keptOpenDueToLargeMeasurements) {
+                    // Only increment this metric once per bucket.
+                    bucket->_keptOpenDueToLargeMeasurements = true;
+                    stats.incNumBucketsKeptOpenDueToLargeMeasurements();
+                }
+                return RolloverAction::kNone;
+            } else {
+                stats.incNumBucketsClosedDueToSize();
                 return RolloverAction::kClose;
             }
         }
@@ -1060,6 +1096,8 @@ void BucketCatalog::_appendExecutionStatsToBuilder(const ExecutionStats* stats,
         builder->appendNumber("numBucketsArchivedDueToMemoryThreshold",
                               stats->numBucketsArchivedDueToMemoryThreshold.load());
         builder->appendNumber("numBucketsReopened", stats->numBucketsReopened.load());
+        builder->appendNumber("numBucketsKeptOpenDueToLargeMeasurements",
+                              stats->numBucketsKeptOpenDueToLargeMeasurements.load());
     }
 }
 

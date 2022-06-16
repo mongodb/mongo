@@ -12,6 +12,11 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
 
+const conn = MongoRunner.runMongod({setParameter: {timeseriesBucketMinCount: 1}});
+
+const dbName = jsTestName();
+const db = conn.getDB(dbName);
+
 TimeseriesTest.run((insert) => {
     const isTimeseriesBucketCompressionEnabled =
         TimeseriesTest.timeseriesBucketCompressionEnabled(db);
@@ -121,4 +126,6 @@ TimeseriesTest.run((insert) => {
     runTest(1);
     runTest(numDocs);
 });
+
+MongoRunner.stopMongod(conn);
 })();

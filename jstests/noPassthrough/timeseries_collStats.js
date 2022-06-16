@@ -14,8 +14,10 @@ load("jstests/core/timeseries/libs/timeseries.js");
 
 const kIdleBucketExpiryMemoryUsageThreshold = 1024 * 1024 * 10;
 const conn = MongoRunner.runMongod({
-    setParameter:
-        {timeseriesIdleBucketExpiryMemoryUsageThreshold: kIdleBucketExpiryMemoryUsageThreshold}
+    setParameter: {
+        timeseriesIdleBucketExpiryMemoryUsageThreshold: kIdleBucketExpiryMemoryUsageThreshold,
+        timeseriesBucketMinCount: 1
+    }
 });
 
 const dbName = jsTestName();
@@ -63,6 +65,11 @@ const clearCollection = function() {
     expectedStats.numCompressedBuckets = 0;
     expectedStats.numUncompressedBuckets = 0;
     expectedStats.numSubObjCompressionRestart = 0;
+
+    if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
+        expectedStats.numBucketsReopened = 0;
+        expectedStats.numBucketsKeptOpenDueToLargeMeasurements = 0;
+    }
 };
 clearCollection();
 

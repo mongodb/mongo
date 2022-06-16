@@ -74,6 +74,7 @@ class BucketCatalog {
         AtomicWord<long long> numWaits;
         AtomicWord<long long> numMeasurementsCommitted;
         AtomicWord<long long> numBucketsReopened;
+        AtomicWord<long long> numBucketsKeptOpenDueToLargeMeasurements;
     };
 
     class ExecutionStatsController {
@@ -98,6 +99,7 @@ class BucketCatalog {
         void incNumWaits(long long increment = 1);
         void incNumMeasurementsCommitted(long long increment = 1);
         void incNumBucketsReopened(long long increment = 1);
+        void incNumBucketsKeptOpenDueToLargeMeasurements(long long increment = 1);
 
     private:
         std::shared_ptr<ExecutionStats> _collectionStats;
