@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/database_name.h"
 #include "mongo/stdx/variant.h"
 
 namespace mongo {
@@ -132,7 +133,7 @@ public:
     /**
      * For isExact() commands, returns a set of T with unspecified DB names resolved with $dbname.
      */
-    std::vector<T> getElements(StringData dbname) const {
+    std::vector<T> getElements(const DatabaseName& dbname) const {
         if (!isExact()) {
             dassert(false);
             uasserted(ErrorCodes::InternalError, "Unable to get exact match for wildcard query");
@@ -190,7 +191,7 @@ private:
         }
     }
 
-    static T getElement(Single elem, StringData dbname) {
+    static T getElement(Single elem, const DatabaseName& dbname) {
         if (stdx::holds_alternative<T>(elem)) {
             return stdx::get<T>(elem);
         } else {

@@ -39,7 +39,7 @@
 #include "mongo/db/auth/privilege_format.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/user.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
 
@@ -326,14 +326,16 @@ public:
     virtual void invalidateUserByName(OperationContext* opCtx, const UserName& user) = 0;
 
     /**
-     * Invalidates all users who's source is "dbname" and removes them from the user cache.
+     * Invalidates all users whose source is "dbname" and removes them from the user cache.
      */
-    virtual void invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) = 0;
+    virtual void invalidateUsersFromDB(OperationContext* opCtx, const DatabaseName& dbname) = 0;
 
     /**
-     * Invalidate all users associated with a given tenant.
+     * Invalidate all users associated with a given tenant,
+     * or entire cache if tenant == boost::none.
      */
-    virtual void invalidateUsersByTenant(OperationContext* opCtx, const TenantId& tenant) = 0;
+    virtual void invalidateUsersByTenant(OperationContext* opCtx,
+                                         const boost::optional<TenantId>& tenant) = 0;
 
     /**
      * Retrieves all users whose source is "$external" and checks if the corresponding user in the

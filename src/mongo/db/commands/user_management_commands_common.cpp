@@ -79,7 +79,7 @@ Status checkAuthorizedToGrantPrivilege(AuthorizationSession* authzSession,
 }  // namespace
 
 std::vector<RoleName> resolveRoleNames(const std::vector<RoleNameOrString>& possibleRoles,
-                                       StringData dbname) {
+                                       const DatabaseName& dbname) {
     // De-duplicate as we resolve names by using a set.
     stdx::unordered_set<RoleName> roles;
     for (const auto& possibleRole : possibleRoles) {

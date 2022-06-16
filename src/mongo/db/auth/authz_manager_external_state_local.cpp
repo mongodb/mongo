@@ -164,7 +164,8 @@ constexpr auto kAuthenticationRestrictionFieldName = "authenticationRestrictions
 std::vector<RoleName> filterAndMapRole(BSONObjBuilder* builder,
                                        BSONObj role,
                                        ResolveRoleOption option,
-                                       bool liftAuthenticationRestrictions) {
+                                       bool liftAuthenticationRestrictions,
+                                       const boost::optional<TenantId>& tenant) {
     std::vector<RoleName> subRoles;
     bool sawRestrictions = false;
 
@@ -173,7 +174,7 @@ std::vector<RoleName> filterAndMapRole(BSONObjBuilder* builder,
             uassert(
                 ErrorCodes::BadValue, "Invalid roles field, expected array", elem.type() == Array);
             for (const auto& roleName : elem.Obj()) {
-                subRoles.push_back(RoleName::parseFromBSON(roleName));
+                subRoles.push_back(RoleName::parseFromBSON(roleName, tenant));
             }
             if ((option & ResolveRoleOption::kRoles) == 0) {
                 continue;
@@ -379,7 +380,8 @@ Status AuthzManagerExternalStateLocal::getUserDescription(OperationContext* opCt
             return status;
         }
 
-        directRoles = filterAndMapRole(&resultBuilder, userDoc, ResolveRoleOption::kAll, false);
+        directRoles = filterAndMapRole(
+            &resultBuilder, userDoc, ResolveRoleOption::kAll, false, userName.getTenant());
     } else {
         uassert(ErrorCodes::BadValue,
                 "Illegal combination of pre-defined roles with tenant identifier",
@@ -439,7 +441,6 @@ StatusWith<ResolvedRoleData> AuthzManagerExternalStateLocal::resolveRoles(
     const bool processRests = option & ResolveRoleOption::kRestrictions;
     const bool walkIndirect = (option & ResolveRoleOption::kDirectOnly) == 0;
 
-    auto optTenant = getActiveTenant(opCtx);
     RoleNameSet inheritedRoles;
     PrivilegeVector inheritedPrivileges;
     RestrictionDocuments::sequence_type inheritedRestrictions;
@@ -478,7 +479,7 @@ StatusWith<ResolvedRoleData> AuthzManagerExternalStateLocal::resolveRoles(
                                 << "', expected an array but found " << typeName(elem.type())};
                 }
                 for (const auto& subroleElem : elem.Obj()) {
-                    auto subrole = RoleName::parseFromBSON(subroleElem, optTenant);
+                    auto subrole = RoleName::parseFromBSON(subroleElem, role.getTenant());
                     if (visited.count(subrole) || nextFrontier.count(subrole)) {
                         continue;
                     }
@@ -613,7 +614,7 @@ Status AuthzManagerExternalStateLocal::getRolesDescription(
             }
 
             BSONObjBuilder roleBuilder;
-            auto subRoles = filterAndMapRole(&roleBuilder, roleDoc, option, true);
+            auto subRoles = filterAndMapRole(&roleBuilder, roleDoc, option, true, role.getTenant());
             auto data = uassertStatusOK(resolveRoles(opCtx, subRoles, option));
             data.roles->insert(subRoles.cbegin(), subRoles.cend());
             serializeResolvedRoles(&roleBuilder, data, roleDoc);
@@ -681,14 +682,15 @@ Status AuthzManagerExternalStateLocal::getRoleDescriptionsForDB(
     }
 
     return query(opCtx,
-                 getRolesCollection(getActiveTenant(opCtx)),
+                 getRolesCollection(dbname.tenantId()),
                  BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname.db()),
                  BSONObj(),
                  [&](const BSONObj& roleDoc) {
                      try {
                          BSONObjBuilder roleBuilder;
 
-                         auto subRoles = filterAndMapRole(&roleBuilder, roleDoc, option, true);
+                         auto subRoles = filterAndMapRole(
+                             &roleBuilder, roleDoc, option, true, dbname.tenantId());
                          roleBuilder.append("isBuiltin", false);
                          auto data = uassertStatusOK(resolveRoles(opCtx, subRoles, option));
                          data.roles->insert(subRoles.cbegin(), subRoles.cend());

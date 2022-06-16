@@ -37,6 +37,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/database_name.h"
 
 namespace mongo {
 
@@ -66,7 +67,7 @@ public:
      * Returns the fully qualified RoleName if present,
      * or constructs a RoleName using the parsed role and provided dbname.
      */
-    RoleName getRoleName(StringData dbname) const;
+    RoleName getRoleName(const DatabaseName& dbname) const;
 
 private:
     std::variant<RoleName, std::string> _roleName;

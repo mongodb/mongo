@@ -684,16 +684,23 @@ void AuthorizationManagerImpl::invalidateUserByName(OperationContext* opCtx,
     _userCache.invalidateKey(UserRequest(userName, boost::none));
 }
 
-void AuthorizationManagerImpl::invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) {
+void AuthorizationManagerImpl::invalidateUsersFromDB(OperationContext* opCtx,
+                                                     const DatabaseName& dbname) {
     LOGV2_DEBUG(20236, 2, "Invalidating all users from database", "database"_attr = dbname);
     _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
-    _userCache.invalidateKeyIf(
-        [&](const UserRequest& userRequest) { return userRequest.name.getDB() == dbname; });
+    _userCache.invalidateKeyIf([&](const UserRequest& userRequest) {
+        return userRequest.name.getDatabaseName() == dbname;
+    });
 }
 
 void AuthorizationManagerImpl::invalidateUsersByTenant(OperationContext* opCtx,
-                                                       const TenantId& tenant) {
+                                                       const boost::optional<TenantId>& tenant) {
+    if (!tenant) {
+        invalidateUserCache(opCtx);
+        return;
+    }
+
     LOGV2_DEBUG(6323600, 2, "Invalidating tenant users", "tenant"_attr = tenant);
     _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();

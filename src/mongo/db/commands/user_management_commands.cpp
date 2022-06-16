@@ -65,6 +65,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/multitenancy.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
@@ -96,9 +97,20 @@ namespace {
 constexpr auto kOne = "1"_sd;
 
 Status useDefaultCode(const Status& status, ErrorCodes::Error defaultCode) {
-    if (status.code() != ErrorCodes::UnknownError)
-        return status;
-    return Status(defaultCode, status.reason());
+    if (status.code() == ErrorCodes::UnknownError) {
+        return Status(defaultCode, status.reason());
+    }
+
+    return status;
+}
+
+template <typename T>
+StatusWith<T> useDefaultCode(StatusWith<T>&& status, ErrorCodes::Error defaultCode) {
+    if (!status.isOK()) {
+        return useDefaultCode(status.getStatus(), defaultCode);
+    }
+
+    return std::move(status);
 }
 
 template <typename Container>
@@ -210,36 +222,37 @@ Status checkOkayToGrantPrivilegesToRole(const RoleName& role, const PrivilegeVec
     return Status::OK();
 }
 
-// Temporary placeholder pending availability of NamespaceWithTenant.
-NamespaceString getNamespaceWithTenant(const NamespaceString& nss,
-                                       const boost::optional<TenantId>& tenant) {
-    if (tenant) {
-        return NamespaceString(str::stream() << tenant.get() << '_' << nss.db(), nss.coll());
+// TODO (SERVER-67423) Convert DBClient to accept DatabaseName type.
+// Currently tenant is lost on the way from DBDirectClient to runCommand.
+// For now, just mangle the NamespaceName into (`tenant_db`, `coll`) format.
+NamespaceString patchTenantNSS(const NamespaceString& nss) {
+    if (auto tenant = nss.tenantId()) {
+        return NamespaceString(
+            boost::none, str::stream() << *tenant << '_' << nss.dbName().db(), nss.coll());
     } else {
         return nss;
     }
 }
 
-/**
- * Finds all documents matching "query" in "collectionName".  For each document returned,
- * calls the function resultProcessor on it.
- * Should only be called on collections with authorization documents in them
- * (ie admin.system.users and admin.system.roles).
- */
-Status queryAuthzDocument(OperationContext* opCtx,
-                          const NamespaceString& collectionName,
-                          const BSONObj& query,
-                          const BSONObj& projection,
-                          const std::function<void(const BSONObj&)>& resultProcessor) {
-    try {
-        DBDirectClient client(opCtx);
-        FindCommandRequest findRequest{collectionName};
-        findRequest.setFilter(query);
-        findRequest.setProjection(projection);
-        client.find(std::move(findRequest), resultProcessor);
-        return Status::OK();
-    } catch (const DBException& e) {
-        return e.toStatus();
+// TODO (SERVER-67423) Convert DBClient to accept DatabaseName type.
+NamespaceString usersNSS(const boost::optional<TenantId>& tenant) {
+    if (tenant) {
+        return NamespaceString(boost::none,
+                               str::stream() << *tenant << '_' << NamespaceString::kAdminDb,
+                               NamespaceString::kSystemUsers);
+    } else {
+        return AuthorizationManager::usersCollectionNamespace;
+    }
+}
+
+// TODO (SERVER-67423) Convert DBClient to accept DatabaseName type.
+NamespaceString rolesNSS(const boost::optional<TenantId>& tenant) {
+    if (tenant) {
+        return NamespaceString(boost::none,
+                               str::stream() << *tenant << '_' << NamespaceString::kAdminDb,
+                               NamespaceString::kSystemRoles);
+    } else {
+        return AuthorizationManager::rolesCollectionNamespace;
     }
 }
 
@@ -251,16 +264,14 @@ Status queryAuthzDocument(OperationContext* opCtx,
  * (ie admin.system.users and admin.system.roles).
  */
 Status insertAuthzDocument(OperationContext* opCtx,
-                           const NamespaceString& collectionName,
-                           const BSONObj& document) {
-    try {
-        DBDirectClient client(opCtx);
-        write_ops::checkWriteErrors(
-            client.insert(write_ops::InsertCommandRequest(collectionName, {document})));
-        return Status::OK();
-    } catch (const DBException& e) {
-        return e.toStatus();
-    }
+                           const NamespaceString& nss,
+                           const BSONObj& document) try {
+    DBDirectClient client(opCtx);
+    write_ops::checkWriteErrors(
+        client.insert(write_ops::InsertCommandRequest(patchTenantNSS(nss), {document})));
+    return Status::OK();
+} catch (const DBException& e) {
+    return e.toStatus();
 }
 
 /**
@@ -269,34 +280,30 @@ Status insertAuthzDocument(OperationContext* opCtx,
  * Should only be called on collections with authorization documents in them
  * (ie admin.system.users and admin.system.roles).
  */
-Status updateAuthzDocuments(OperationContext* opCtx,
-                            const NamespaceString& collectionName,
-                            const BSONObj& query,
-                            const BSONObj& updatePattern,
-                            bool upsert,
-                            bool multi,
-                            std::int64_t* numMatched) {
-    try {
-        DBDirectClient client(opCtx);
-        auto result = client.update([&] {
-            write_ops::UpdateCommandRequest updateOp(collectionName);
-            updateOp.setUpdates({[&] {
-                write_ops::UpdateOpEntry entry;
-                entry.setQ(query);
-                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(updatePattern));
-                entry.setMulti(multi);
-                entry.setUpsert(upsert);
-                return entry;
-            }()});
-            return updateOp;
-        }());
+StatusWith<std::int64_t> updateAuthzDocuments(OperationContext* opCtx,
+                                              const NamespaceString& nss,
+                                              const BSONObj& query,
+                                              const BSONObj& updatePattern,
+                                              bool upsert,
+                                              bool multi) try {
+    DBDirectClient client(opCtx);
+    auto result = client.update([&] {
+        write_ops::UpdateCommandRequest updateOp(patchTenantNSS(nss));
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(query);
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(updatePattern));
+            entry.setMulti(multi);
+            entry.setUpsert(upsert);
+            return entry;
+        }()});
+        return updateOp;
+    }());
 
-        *numMatched = result.getN();
-        write_ops::checkWriteErrors(result);
-        return Status::OK();
-    } catch (const DBException& e) {
-        return e.toStatus();
-    }
+    write_ops::checkWriteErrors(result);
+    return result.getN();
+} catch (const DBException& e) {
+    return e.toStatus();
 }
 
 /**
@@ -316,16 +323,18 @@ Status updateOneAuthzDocument(OperationContext* opCtx,
                               const BSONObj& query,
                               const BSONObj& updatePattern,
                               bool upsert) {
-    std::int64_t numMatched;
-    Status status = updateAuthzDocuments(
-        opCtx, collectionName, query, updatePattern, upsert, false, &numMatched);
-    if (!status.isOK()) {
-        return status;
+    auto swNumMatched =
+        updateAuthzDocuments(opCtx, collectionName, query, updatePattern, upsert, false);
+    if (!swNumMatched.isOK()) {
+        return swNumMatched.getStatus();
     }
+
+    auto numMatched = swNumMatched.getValue();
     dassert(numMatched == 1 || numMatched == 0);
     if (numMatched == 0) {
-        return Status(ErrorCodes::NoMatchingDocument, "No document found");
+        return {ErrorCodes::NoMatchingDocument, "No document found"};
     }
+
     return Status::OK();
 }
 
@@ -335,50 +344,46 @@ Status updateOneAuthzDocument(OperationContext* opCtx,
  * Should only be called on collections with authorization documents in them
  * (ie admin.system.users and admin.system.roles).
  */
-Status removeAuthzDocuments(OperationContext* opCtx,
-                            const NamespaceString& collectionName,
-                            const BSONObj& query,
-                            std::int64_t* numRemoved) {
-    try {
-        DBDirectClient client(opCtx);
-        auto result = client.remove([&] {
-            write_ops::DeleteCommandRequest deleteOp(collectionName);
-            deleteOp.setDeletes({[&] {
-                write_ops::DeleteOpEntry entry;
-                entry.setQ(query);
-                entry.setMulti(true);
-                return entry;
-            }()});
-            return deleteOp;
-        }());
+StatusWith<std::int64_t> removeAuthzDocuments(OperationContext* opCtx,
+                                              const NamespaceString& nss,
+                                              const BSONObj& query) try {
+    DBDirectClient client(opCtx);
+    auto result = client.remove([&] {
+        write_ops::DeleteCommandRequest deleteOp(patchTenantNSS(nss));
+        deleteOp.setDeletes({[&] {
+            write_ops::DeleteOpEntry entry;
+            entry.setQ(query);
+            entry.setMulti(true);
+            return entry;
+        }()});
+        return deleteOp;
+    }());
 
-        *numRemoved = result.getN();
-        write_ops::checkWriteErrors(result);
-        return Status::OK();
-    } catch (const DBException& e) {
-        return e.toStatus();
-    }
+    write_ops::checkWriteErrors(result);
+    return result.getN();
+} catch (const DBException& e) {
+    return e.toStatus();
 }
 
 /**
  * Creates the given role object in the given database.
  */
-Status insertRoleDocument(OperationContext* opCtx, const BSONObj& roleObj) {
-    Status status =
-        insertAuthzDocument(opCtx, AuthorizationManager::rolesCollectionNamespace, roleObj);
+Status insertRoleDocument(OperationContext* opCtx,
+                          const BSONObj& roleObj,
+                          const boost::optional<TenantId>& tenant) {
+    auto status = insertAuthzDocument(opCtx, rolesNSS(tenant), roleObj);
     if (status.isOK()) {
         return status;
     }
+
     if (status.code() == ErrorCodes::DuplicateKey) {
         std::string name = roleObj[AuthorizationManager::ROLE_NAME_FIELD_NAME].String();
         std::string source = roleObj[AuthorizationManager::ROLE_DB_FIELD_NAME].String();
         return Status(ErrorCodes::Error(51002),
                       str::stream() << "Role \"" << name << "@" << source << "\" already exists");
     }
-    if (status.code() == ErrorCodes::UnknownError) {
-        return Status(ErrorCodes::RoleModificationFailed, status.reason());
-    }
-    return status;
+
+    return useDefaultCode(status, ErrorCodes::RoleModificationFailed);
 }
 
 /**
@@ -387,7 +392,7 @@ Status insertRoleDocument(OperationContext* opCtx, const BSONObj& roleObj) {
 Status updateRoleDocument(OperationContext* opCtx, const RoleName& role, const BSONObj& updateObj) {
     Status status = updateOneAuthzDocument(
         opCtx,
-        AuthorizationManager::rolesCollectionNamespace,
+        rolesNSS(role.getTenant()),
         BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
              << role.getRole() << AuthorizationManager::ROLE_DB_FIELD_NAME << role.getDB()),
         updateObj,
@@ -395,28 +400,23 @@ Status updateRoleDocument(OperationContext* opCtx, const RoleName& role, const B
     if (status.isOK()) {
         return status;
     }
+
     if (status.code() == ErrorCodes::NoMatchingDocument) {
         return Status(ErrorCodes::RoleNotFound, str::stream() << "Role " << role << " not found");
     }
-    if (status.code() == ErrorCodes::UnknownError) {
-        return Status(ErrorCodes::RoleModificationFailed, status.reason());
-    }
-    return status;
+
+    return useDefaultCode(status, ErrorCodes::RoleModificationFailed);
 }
 
 /**
  * Removes roles matching the given query.
  * Writes into *numRemoved the number of role documents that were modified.
  */
-Status removeRoleDocuments(OperationContext* opCtx,
-                           const BSONObj& query,
-                           std::int64_t* numRemoved) {
-    Status status = removeAuthzDocuments(
-        opCtx, AuthorizationManager::rolesCollectionNamespace, query, numRemoved);
-    if (status.code() == ErrorCodes::UnknownError) {
-        return Status(ErrorCodes::RoleModificationFailed, status.reason());
-    }
-    return status;
+StatusWith<std::int64_t> removeRoleDocuments(OperationContext* opCtx,
+                                             const BSONObj& query,
+                                             const boost::optional<TenantId>& tenant) {
+    return useDefaultCode(removeAuthzDocuments(opCtx, rolesNSS(tenant), query),
+                          ErrorCodes::RoleModificationFailed);
 }
 
 /**
@@ -425,7 +425,7 @@ Status removeRoleDocuments(OperationContext* opCtx,
 Status insertPrivilegeDocument(OperationContext* opCtx,
                                const BSONObj& userObj,
                                const boost::optional<TenantId>& tenant = boost::none) {
-    auto nss = getNamespaceWithTenant(AuthorizationManager::usersCollectionNamespace, tenant);
+    auto nss = usersNSS(tenant);
     Status status = insertAuthzDocument(opCtx, nss, userObj);
     if (status.isOK()) {
         return status;
@@ -453,15 +453,14 @@ Status updatePrivilegeDocument(OperationContext* opCtx,
     dassert(queryObj.hasField(AuthorizationManager::USER_NAME_FIELD_NAME));
     dassert(queryObj.hasField(AuthorizationManager::USER_DB_FIELD_NAME));
 
-    const auto status = updateOneAuthzDocument(
-        opCtx, AuthorizationManager::usersCollectionNamespace, queryObj, updateObj, false);
-    if (status.code() == ErrorCodes::UnknownError) {
-        return {ErrorCodes::UserModificationFailed, status.reason()};
-    }
+    const auto status =
+        updateOneAuthzDocument(opCtx, usersNSS(user.getTenant()), queryObj, updateObj, false);
+
     if (status.code() == ErrorCodes::NoMatchingDocument) {
         return {ErrorCodes::UserNotFound, str::stream() << "User " << user << " not found"};
     }
-    return status;
+
+    return useDefaultCode(status, ErrorCodes::UserModificationFailed);
 }
 
 /**
@@ -471,28 +470,23 @@ Status updatePrivilegeDocument(OperationContext* opCtx,
 Status updatePrivilegeDocument(OperationContext* opCtx,
                                const UserName& user,
                                const BSONObj& updateObj) {
-    const auto status = updatePrivilegeDocument(
+    return updatePrivilegeDocument(
         opCtx,
         user,
         BSON(AuthorizationManager::USER_NAME_FIELD_NAME
              << user.getUser() << AuthorizationManager::USER_DB_FIELD_NAME << user.getDB()),
         updateObj);
-    return status;
 }
 
 /**
  * Removes users for the given database matching the given query.
  * Writes into *numRemoved the number of user documents that were modified.
  */
-Status removePrivilegeDocuments(OperationContext* opCtx,
-                                const BSONObj& query,
-                                std::int64_t* numRemoved) {
-    Status status = removeAuthzDocuments(
-        opCtx, AuthorizationManager::usersCollectionNamespace, query, numRemoved);
-    if (status.code() == ErrorCodes::UnknownError) {
-        return Status(ErrorCodes::UserModificationFailed, status.reason());
-    }
-    return status;
+StatusWith<std::int64_t> removePrivilegeDocuments(OperationContext* opCtx,
+                                                  const BSONObj& query,
+                                                  const boost::optional<TenantId>& tenant) {
+    return useDefaultCode(removeAuthzDocuments(opCtx, usersNSS(tenant), query),
+                          ErrorCodes::UserModificationFailed);
 }
 
 /**
@@ -746,7 +740,9 @@ public:
     static constexpr StringData kCommitTransaction = "commitTransaction"_sd;
     static constexpr StringData kAbortTransaction = "abortTransaction"_sd;
 
-    UMCTransaction(OperationContext* opCtx, StringData forCommand) {
+    UMCTransaction(OperationContext* opCtx,
+                   StringData forCommand,
+                   const boost::optional<TenantId>& tenant) {
         // Don't transactionalize on standalone.
         _isReplSet = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
             repl::ReplicationCoordinator::modeReplSet;
@@ -756,6 +752,12 @@ public:
         auto as = AuthorizationSession::get(_client.get());
         if (as) {
             as->grantInternalAuthorization(_client.get());
+        }
+
+        if (tenant) {
+            _dbName = str::stream() << *tenant << '_' << kAdminDB;
+        } else {
+            _dbName = kAdminDB.toString();
         }
 
         AlternativeClientRegion clientRegion(_client);
@@ -771,14 +773,14 @@ public:
     }
 
     StatusWith<std::uint32_t> insert(const NamespaceString& nss, const std::vector<BSONObj>& docs) {
-        dassert(nss.db() == kAdminDB);
+        dassert(validNamespace(nss));
         write_ops::InsertCommandRequest op(nss);
         op.setDocuments(docs);
         return doCrudOp(op.toBSON({}));
     }
 
     StatusWith<std::uint32_t> update(const NamespaceString& nss, BSONObj query, BSONObj update) {
-        dassert(nss.db() == kAdminDB);
+        dassert(validNamespace(nss));
         write_ops::UpdateOpEntry entry;
         entry.setQ(query);
         entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
@@ -789,7 +791,7 @@ public:
     }
 
     StatusWith<std::uint32_t> remove(const NamespaceString& nss, BSONObj query) {
-        dassert(nss.db() == kAdminDB);
+        dassert(validNamespace(nss));
         write_ops::DeleteOpEntry entry;
         entry.setQ(query);
         entry.setMulti(true);
@@ -816,6 +818,23 @@ public:
     }
 
 private:
+    static bool validNamespace(const NamespaceString& nss) {
+        if (nss.dbName().db() == kAdminDB) {
+            return true;
+        }
+        if (gMultitenancySupport && !nss.tenantId()) {
+            // TODO (SERVER-67423) Convert DBClient to accept DatabaseName type.
+            try {
+                auto parsed =
+                    NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(nss.ns());
+                return parsed.dbName().db() == kAdminDB;
+            } catch (const DBException&) {
+            }
+        }
+
+        return false;
+    }
+
     StatusWith<std::uint32_t> doCrudOp(BSONObj op) try {
         invariant(_state != TransactionState::kDone);
 
@@ -872,7 +891,7 @@ private:
 
         auto svcCtx = _client->getServiceContext();
         auto sep = svcCtx->getServiceEntryPoint();
-        auto opMsgRequest = OpMsgRequest::fromDBAndBody(kAdminDB, cmdBuilder->obj());
+        auto opMsgRequest = OpMsgRequest::fromDBAndBody(_dbName, cmdBuilder->obj());
         auto requestMessage = opMsgRequest.serialize();
 
         // Switch to our local client and create a short-lived opCtx for this transaction op.
@@ -891,8 +910,15 @@ private:
 
     bool _isReplSet;
     ServiceContext::UniqueClient _client;
+    std::string _dbName;
     OperationSessionInfoFromClient _sessionInfo;
     TransactionState _state = TransactionState::kInit;
+};
+
+enum class SupportTenantOption {
+    kNever,
+    kTestOnly,
+    kAlways,
 };
 
 // Used by most UMC commands.
@@ -901,6 +927,7 @@ struct UMCStdParams {
     static constexpr bool supportsWriteConcern = true;
     static constexpr auto allowedOnSecondary = BasicCommand::AllowedOnSecondary::kNever;
     static constexpr bool skipApiVersionCheck = false;
+    static constexpr auto supportTenant = SupportTenantOption::kTestOnly;
 };
 
 // Used by {usersInfo:...} and {rolesInfo:...}
@@ -909,6 +936,7 @@ struct UMCInfoParams {
     static constexpr bool supportsWriteConcern = false;
     static constexpr auto allowedOnSecondary = BasicCommand::AllowedOnSecondary::kOptIn;
     static constexpr bool skipApiVersionCheck = false;
+    static constexpr auto supportTenant = SupportTenantOption::kAlways;
 };
 
 // Used by {invalidateUserCache:...}
@@ -917,6 +945,7 @@ struct UMCInvalidateUserCacheParams {
     static constexpr bool supportsWriteConcern = false;
     static constexpr auto allowedOnSecondary = BasicCommand::AllowedOnSecondary::kAlways;
     static constexpr bool skipApiVersionCheck = false;
+    static constexpr auto supportTenant = SupportTenantOption::kAlways;
 };
 
 // Used by {_getUserCacheGeneration:...}
@@ -925,6 +954,7 @@ struct UMCGetUserCacheGenParams {
     static constexpr bool supportsWriteConcern = false;
     static constexpr auto allowedOnSecondary = BasicCommand::AllowedOnSecondary::kAlways;
     static constexpr bool skipApiVersionCheck = true;
+    static constexpr auto supportTenant = SupportTenantOption::kNever;
 };
 
 template <typename T>
@@ -976,6 +1006,20 @@ public:
     typename TC::AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return Params::allowedOnSecondary;
     }
+
+    bool allowedWithSecurityToken() const final {
+        switch (Params::supportTenant) {
+            case SupportTenantOption::kAlways:
+                return true;
+            case SupportTenantOption::kTestOnly:
+                return getTestCommandsEnabled();
+            case SupportTenantOption::kNever:
+                return false;
+        }
+
+        MONGO_UNREACHABLE;
+        return false;
+    }
 };
 
 
@@ -991,24 +1035,28 @@ public:
 template <>
 void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    const auto& dbname = cmd.getDbName();
+    // TODO (SERVER-67516) cmd.getDatabaseName()
+    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
 
     // Validate input
-    uassert(ErrorCodes::BadValue, "Cannot create users in the local database", dbname != "local");
+    uassert(ErrorCodes::BadValue,
+            "Cannot create users in the local database",
+            dbname.db() != NamespaceString::kLocalDb);
 
     uassert(ErrorCodes::BadValue,
             "Username cannot contain NULL characters",
             cmd.getCommandParameter().find('\0') == std::string::npos);
-    UserName userName(cmd.getCommandParameter(), dbname, getActiveTenant(opCtx));
+    UserName userName(cmd.getCommandParameter(), dbname);
 
+    const bool isExternal = dbname.db() == NamespaceString::kExternalDb;
     uassert(ErrorCodes::BadValue,
             "Must provide a 'pwd' field for all user documents, except those"
             " with '$external' as the user's source db",
-            (cmd.getPwd() != boost::none) || (dbname == "$external"));
+            (cmd.getPwd() != boost::none) || isExternal);
 
     uassert(ErrorCodes::BadValue,
             "Cannot set the password for users defined on the '$external' database",
-            (cmd.getPwd() == boost::none) || (dbname != "$external"));
+            (cmd.getPwd() == boost::none) || !isExternal);
 
     uassert(ErrorCodes::BadValue,
             "mechanisms field must not be empty",
@@ -1017,8 +1065,7 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
 #ifdef MONGO_CONFIG_SSL
     auto configuration = opCtx->getClient()->session()->getSSLConfiguration();
 
-    if ((dbname == "$external") && configuration &&
-        configuration->isClusterMember(userName.getUser())) {
+    if (isExternal && configuration && configuration->isClusterMember(userName.getUser())) {
         if (gEnforceUserClusterSeparation) {
             uasserted(ErrorCodes::BadValue,
                       "Cannot create an x.509 user with a subjectname that would be "
@@ -1099,7 +1146,8 @@ public:
 template <>
 void CmdUMCTyped<UpdateUserCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    const auto& dbname = cmd.getDbName();
+    // TODO (SERVER-67516) cmd.getDatabaseName()
+    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
     UserName userName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
@@ -1197,7 +1245,8 @@ CmdUMCTyped<DropUserCommand> cmdDropUser;
 template <>
 void CmdUMCTyped<DropUserCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    const auto& dbname = cmd.getDbName();
+    // TODO (SERVER-67516) cmd.getDatabaseName()
+    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
     UserName userName(cmd.getCommandParameter(), dbname);
 
     auto* serviceContext = opCtx->getClient()->getServiceContext();
@@ -1206,16 +1255,15 @@ void CmdUMCTyped<DropUserCommand>::Invocation::typedRun(OperationContext* opCtx)
 
     audit::logDropUser(Client::getCurrent(), userName);
 
-    std::int64_t numMatched;
-    auto status = removePrivilegeDocuments(
+    auto swNumMatched = removePrivilegeDocuments(
         opCtx,
         BSON(AuthorizationManager::USER_NAME_FIELD_NAME
              << userName.getUser() << AuthorizationManager::USER_DB_FIELD_NAME << userName.getDB()),
-        &numMatched);
+        userName.getTenant());
 
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
     authzManager->invalidateUserByName(opCtx, userName);
-    uassertStatusOK(status);
+    auto numMatched = uassertStatusOK(swNumMatched);
 
     uassert(ErrorCodes::UserNotFound,
             str::stream() << "User '" << userName << "' not found",
@@ -1227,25 +1275,24 @@ template <>
 DropAllUsersFromDatabaseReply CmdUMCTyped<DropAllUsersFromDatabaseCommand>::Invocation::typedRun(
     OperationContext* opCtx) {
     const auto& cmd = request();
-    const auto& dbname = cmd.getDbName();
+    // TODO (SERVER-67516) cmd.getDatabaseName()
+    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
 
     auto* client = opCtx->getClient();
     auto* serviceContext = client->getServiceContext();
     auto* authzManager = AuthorizationManager::get(serviceContext);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
-    audit::logDropAllUsersFromDatabase(client, dbname);
+    audit::logDropAllUsersFromDatabase(client, dbname.db());
 
-    std::int64_t numRemoved;
-    auto status = removePrivilegeDocuments(
-        opCtx, BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname), &numRemoved);
+    auto swNumRemoved = removePrivilegeDocuments(
+        opCtx, BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname.db()), dbname.tenantId());
 
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
     authzManager->invalidateUsersFromDB(opCtx, dbname);
-    uassertStatusOK(status);
 
     DropAllUsersFromDatabaseReply reply;
-    reply.setCount(numRemoved);
+    reply.setCount(uassertStatusOK(swNumRemoved));
     return reply;
 }
 
@@ -1253,7 +1300,8 @@ CmdUMCTyped<GrantRolesToUserCommand> cmdGrantRolesToUser;
 template <>
 void CmdUMCTyped<GrantRolesToUserCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    const auto& dbname = cmd.getDbName();
+    // TODO (SERVER-67516) cmd.getDatabaseName()
+    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
     UserName userName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
@@ -1288,7 +1336,8 @@ CmdUMCTyped<RevokeRolesFromUserCommand> cmdRevokeRolesFromUser;
 template <>
 void CmdUMCTyped<RevokeRolesFromUserCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    const auto& dbname = cmd.getDbName();
+    // TODO (SERVER-67516) cmd.getDatabaseName()
+    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
     UserName userName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
@@ -1325,7 +1374,8 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
     OperationContext* opCtx) {
     const auto& cmd = request();
     const auto& arg = cmd.getCommandParameter();
-    const auto& dbname = cmd.getDbName();
+    // TODO (SERVER-67516) cmd.getDatabaseName()
+    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
 
     auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
     auto lk = uassertStatusOK(requireReadableAuthSchema26Upgrade(opCtx, authzManager));
@@ -1404,7 +1454,7 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
             // Leave the pipeline unconstrained, we want to return every user.
         } else if (arg.isAllOnCurrentDB()) {
             pipeline.push_back(
-                BSON("$match" << BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname)));
+                BSON("$match" << BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname.db())));
         } else {
             invariant(arg.isExact());
             BSONArrayBuilder usersMatchArray;
@@ -1448,11 +1498,10 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
         DBDirectClient client(opCtx);
 
         rpc::OpMsgReplyBuilder replyBuilder;
-        AggregateCommandRequest aggRequest(AuthorizationManager::usersCollectionNamespace,
-                                           std::move(pipeline));
+        AggregateCommandRequest aggRequest(usersNSS(dbname.tenantId()), std::move(pipeline));
         // Impose no cursor privilege requirements, as cursor is drained internally
         uassertStatusOK(runAggregate(opCtx,
-                                     AuthorizationManager::usersCollectionNamespace,
+                                     usersNSS(dbname.tenantId()),
                                      aggRequest,
                                      aggregation_request_helper::serializeToCommandObj(aggRequest),
                                      PrivilegeVector(),
@@ -1481,24 +1530,27 @@ CmdUMCTyped<CreateRoleCommand> cmdCreateRole;
 template <>
 void CmdUMCTyped<CreateRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    const auto& dbname = cmd.getDbName();
+    // TODO (SERVER-67516) cmd.getDatabaseName()
+    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
 
     uassert(
         ErrorCodes::BadValue, "Role name must be non-empty", !cmd.getCommandParameter().empty());
     RoleName roleName(cmd.getCommandParameter(), dbname);
 
-    uassert(ErrorCodes::BadValue, "Cannot create roles in the local database", dbname != "local");
+    uassert(ErrorCodes::BadValue,
+            "Cannot create roles in the local database",
+            dbname.db() != NamespaceString::kLocalDb);
 
     uassert(ErrorCodes::BadValue,
             "Cannot create roles in the $external database",
-            dbname != "$external");
+            dbname.db() != NamespaceString::kExternalDb);
 
     uassert(ErrorCodes::BadValue,
             "Cannot create roles with the same name as a built-in role",
             !auth::isBuiltinRole(roleName));
 
     BSONObjBuilder roleObjBuilder;
-    roleObjBuilder.append("_id", str::stream() << roleName.getDB() << "." << roleName.getRole());
+    roleObjBuilder.append("_id", roleName.getUnambiguousName());
     roleObjBuilder.append(AuthorizationManager::ROLE_NAME_FIELD_NAME, roleName.getRole());
     roleObjBuilder.append(AuthorizationManager::ROLE_DB_FIELD_NAME, roleName.getDB());
 
@@ -1527,14 +1579,15 @@ void CmdUMCTyped<CreateRoleCommand>::Invocation::typedRun(OperationContext* opCt
     audit::logCreateRole(
         client, roleName, resolvedRoleNames, cmd.getPrivileges(), bsonAuthRestrictions);
 
-    uassertStatusOK(insertRoleDocument(opCtx, roleObjBuilder.done()));
+    uassertStatusOK(insertRoleDocument(opCtx, roleObjBuilder.done(), roleName.getTenant()));
 }
 
 CmdUMCTyped<UpdateRoleCommand> cmdUpdateRole;
 template <>
 void CmdUMCTyped<UpdateRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    const auto& dbname = cmd.getDbName();
+    // TODO (SERVER-67516) cmd.getDatabaseName()
+    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
     RoleName roleName(cmd.getCommandParameter(), dbname);
 
     const bool hasRoles = cmd.getRoles() != boost::none;
@@ -1601,7 +1654,7 @@ void CmdUMCTyped<UpdateRoleCommand>::Invocation::typedRun(OperationContext* opCt
 
     auto status = updateRoleDocument(opCtx, roleName, updateDocumentBuilder.obj());
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-    authzManager->invalidateUserCache(opCtx);
+    authzManager->invalidateUsersByTenant(opCtx, dbname.tenantId());
     uassertStatusOK(status);
 }
 
@@ -1609,7 +1662,8 @@ CmdUMCTyped<GrantPrivilegesToRoleCommand> cmdGrantPrivilegesToRole;
 template <>
 void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    const auto& dbname = cmd.getDbName();
+    // TODO (SERVER-67516) cmd.getDatabaseName()
+    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
     RoleName roleName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
@@ -1650,7 +1704,7 @@ void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationCo
 
     auto status = updateRoleDocument(opCtx, roleName, updateBSONBuilder.done());
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-    authzManager->invalidateUserCache(opCtx);
+    authzManager->invalidateUsersByTenant(opCtx, dbname.tenantId());
     uassertStatusOK(status);
 }
 
@@ -1658,7 +1712,8 @@ CmdUMCTyped<RevokePrivilegesFromRoleCommand> cmdRevokePrivilegesFromRole;
 template <>
 void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    const auto& dbname = cmd.getDbName();
+    // TODO (SERVER-67516) cmd.getDatabaseName()
+    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
     RoleName roleName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
@@ -1704,7 +1759,7 @@ void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(Operatio
 
     auto status = updateRoleDocument(opCtx, roleName, updateBSONBuilder.done());
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-    authzManager->invalidateUserCache(opCtx);
+    authzManager->invalidateUsersByTenant(opCtx, dbname.tenantId());
     uassertStatusOK(status);
 }
 
@@ -1712,7 +1767,8 @@ CmdUMCTyped<GrantRolesToRoleCommand> cmdGrantRolesToRole;
 template <>
 void CmdUMCTyped<GrantRolesToRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    const auto& dbname = cmd.getDbName();
+    // TODO (SERVER-67516) cmd.getDatabaseName()
+    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
     RoleName roleName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
@@ -1744,7 +1800,7 @@ void CmdUMCTyped<GrantRolesToRoleCommand>::Invocation::typedRun(OperationContext
     auto status = updateRoleDocument(
         opCtx, roleName, BSON("$set" << BSON("roles" << containerToBSONArray(directRoles))));
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-    authzManager->invalidateUserCache(opCtx);
+    authzManager->invalidateUsersByTenant(opCtx, dbname.tenantId());
     uassertStatusOK(status);
 }
 
@@ -1752,7 +1808,8 @@ CmdUMCTyped<RevokeRolesFromRoleCommand> cmdRevokeRolesFromRole;
 template <>
 void CmdUMCTyped<RevokeRolesFromRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    const auto& dbname = cmd.getDbName();
+    // TODO (SERVER-67516) cmd.getDatabaseName()
+    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
     RoleName roleName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
@@ -1783,7 +1840,7 @@ void CmdUMCTyped<RevokeRolesFromRoleCommand>::Invocation::typedRun(OperationCont
     auto status = updateRoleDocument(
         opCtx, roleName, BSON("$set" << BSON("roles" << containerToBSONArray(roles))));
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-    authzManager->invalidateUserCache(opCtx);
+    authzManager->invalidateUsersByTenant(opCtx, dbname.tenantId());
     uassertStatusOK(status);
 }
 
@@ -1800,6 +1857,7 @@ bool shouldRetryTransaction(const Status& status) {
 }
 
 Status retryTransactionOps(OperationContext* opCtx,
+                           const boost::optional<TenantId>& tenant,
                            StringData forCommand,
                            TxnOpsCallback ops,
                            TxnAuditCallback audit) {
@@ -1822,7 +1880,7 @@ Status retryTransactionOps(OperationContext* opCtx,
                         "reason"_attr = status);
         }
 
-        UMCTransaction txn(opCtx, forCommand);
+        UMCTransaction txn(opCtx, forCommand, tenant);
         status = ops(txn);
         if (!status.isOK()) {
             if (!shouldRetryTransaction(status)) {
@@ -1857,7 +1915,8 @@ CmdUMCTyped<DropRoleCommand> cmdDropRole;
 template <>
 void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    const auto& dbname = cmd.getDbName();
+    // TODO (SERVER-67516) cmd.getDatabaseName()
+    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
     RoleName roleName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
@@ -1874,7 +1933,7 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
     // From here on, we always want to invalidate the user cache before returning.
     ScopeGuard invalidateGuard([&] {
         try {
-            authzManager->invalidateUserCache(opCtx);
+            authzManager->invalidateUsersByTenant(opCtx, dbname.tenantId());
         } catch (const AssertionException& ex) {
             LOGV2_WARNING(4907701, "Failed invalidating user cache", "exception"_attr = ex);
         }
@@ -1882,7 +1941,7 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
 
     const auto dropRoleOps = [&](UMCTransaction& txn) -> Status {
         // Remove this role from all users
-        auto swCount = txn.update(AuthorizationManager::usersCollectionNamespace,
+        auto swCount = txn.update(usersNSS(dbname.tenantId()),
                                   BSON("roles" << BSON("$elemMatch" << roleName.toBSON())),
                                   BSON("$pull" << BSON("roles" << roleName.toBSON())));
         if (!swCount.isOK()) {
@@ -1892,7 +1951,7 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
         }
 
         // Remove this role from all other roles
-        swCount = txn.update(AuthorizationManager::rolesCollectionNamespace,
+        swCount = txn.update(rolesNSS(dbname.tenantId()),
                              BSON("roles" << BSON("$elemMatch" << roleName.toBSON())),
                              BSON("$pull" << BSON("roles" << roleName.toBSON())));
         if (!swCount.isOK()) {
@@ -1902,7 +1961,7 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
         }
 
         // Finally, remove the actual role document
-        swCount = txn.remove(AuthorizationManager::rolesCollectionNamespace, roleName.toBSON());
+        swCount = txn.remove(rolesNSS(dbname.tenantId()), roleName.toBSON());
         if (!swCount.isOK()) {
             return swCount.getStatus().withContext(str::stream()
                                                    << "Failed to remove role " << roleName);
@@ -1911,9 +1970,10 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
         return Status::OK();
     };
 
-    auto status = retryTransactionOps(opCtx, DropRoleCommand::kCommandName, dropRoleOps, [&] {
-        audit::logDropRole(client, roleName);
-    });
+    auto status = retryTransactionOps(
+        opCtx, roleName.getTenant(), DropRoleCommand::kCommandName, dropRoleOps, [&] {
+            audit::logDropRole(client, roleName);
+        });
     if (!status.isOK()) {
         uassertStatusOK(status.withContext("Failed applying dropRole transaction"));
     }
@@ -1924,7 +1984,8 @@ template <>
 DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invocation::typedRun(
     OperationContext* opCtx) {
     const auto& cmd = request();
-    const auto& dbname = cmd.getDbName();
+    // TODO (SERVER-67516) cmd.getDatabaseName()
+    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
 
     auto* client = opCtx->getClient();
     auto* serviceContext = client->getServiceContext();
@@ -1932,9 +1993,9 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     // From here on, we always want to invalidate the user cache before returning.
-    ScopeGuard invalidateGuard([opCtx, authzManager] {
+    ScopeGuard invalidateGuard([opCtx, authzManager, &dbname] {
         try {
-            authzManager->invalidateUserCache(opCtx);
+            authzManager->invalidateUsersByTenant(opCtx, dbname.tenantId());
         } catch (const AssertionException& ex) {
             LOGV2_WARNING(4907700, "Failed invalidating user cache", "exception"_attr = ex);
         }
@@ -1942,34 +2003,33 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
 
     DropAllRolesFromDatabaseReply reply;
     const auto dropRoleOps = [&](UMCTransaction& txn) -> Status {
-        auto roleMatch = BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname);
+        auto roleMatch = BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname.db());
         auto rolesMatch = BSON("roles" << roleMatch);
 
         // Remove these roles from all users
-        auto swCount = txn.update(AuthorizationManager::usersCollectionNamespace,
-                                  rolesMatch,
-                                  BSON("$pull" << rolesMatch));
+        auto swCount =
+            txn.update(usersNSS(dbname.tenantId()), rolesMatch, BSON("$pull" << rolesMatch));
         if (!swCount.isOK()) {
             return useDefaultCode(swCount.getStatus(), ErrorCodes::UserModificationFailed)
-                .withContext(str::stream() << "Failed to remove roles from \"" << dbname
+                .withContext(str::stream() << "Failed to remove roles from \"" << dbname.db()
                                            << "\" db from all users");
         }
 
         // Remove these roles from all other roles
-        swCount = txn.update(AuthorizationManager::rolesCollectionNamespace,
-                             BSON("roles.db" << dbname),
+        swCount = txn.update(rolesNSS(dbname.tenantId()),
+                             BSON("roles.db" << dbname.db()),
                              BSON("$pull" << rolesMatch));
         if (!swCount.isOK()) {
             return useDefaultCode(swCount.getStatus(), ErrorCodes::RoleModificationFailed)
-                .withContext(str::stream() << "Failed to remove roles from \"" << dbname
+                .withContext(str::stream() << "Failed to remove roles from \"" << dbname.db()
                                            << "\" db from all roles");
         }
 
         // Finally, remove the actual role documents
-        swCount = txn.remove(AuthorizationManager::rolesCollectionNamespace, roleMatch);
+        swCount = txn.remove(rolesNSS(dbname.tenantId()), roleMatch);
         if (!swCount.isOK()) {
             return swCount.getStatus().withContext(
-                str::stream() << "Removed roles from \"" << dbname
+                str::stream() << "Removed roles from \"" << dbname.db()
                               << "\" db "
                                  " from all users and roles but failed to actually delete"
                                  " those roles themselves");
@@ -1979,9 +2039,9 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
         return Status::OK();
     };
 
-    auto status =
-        retryTransactionOps(opCtx, DropAllRolesFromDatabaseCommand::kCommandName, dropRoleOps, [&] {
-            audit::logDropAllRolesFromDatabase(Client::getCurrent(), dbname);
+    auto status = retryTransactionOps(
+        opCtx, dbname.tenantId(), DropAllRolesFromDatabaseCommand::kCommandName, dropRoleOps, [&] {
+            audit::logDropAllRolesFromDatabase(opCtx->getClient(), dbname.db());
         });
     if (!status.isOK()) {
         uassertStatusOK(
@@ -2019,7 +2079,8 @@ RolesInfoReply CmdUMCTyped<RolesInfoCommand, UMCInfoParams>::Invocation::typedRu
     OperationContext* opCtx) {
     const auto& cmd = request();
     const auto& arg = cmd.getCommandParameter();
-    const auto& dbname = cmd.getDbName();
+    // TODO (SERVER-67516) cmd.getDatabaseName()
+    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
 
     auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
     auto lk = uassertStatusOK(requireReadableAuthSchema26Upgrade(opCtx, authzManager));
@@ -2069,7 +2130,8 @@ void CmdUMCTyped<InvalidateUserCacheCommand, UMCInvalidateUserCacheParams>::Invo
     OperationContext* opCtx) {
     auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
     auto lk = requireReadableAuthSchema26Upgrade(opCtx, authzManager);
-    authzManager->invalidateUserCache(opCtx);
+    // TODO (SERVER-67516) cmd.getDatabaseName().tenantId()
+    authzManager->invalidateUsersByTenant(opCtx, getActiveTenant(opCtx));
 }
 
 CmdUMCTyped<GetUserCacheGenerationCommand, UMCGetUserCacheGenParams> cmdGetUserCacheGeneration;
@@ -2117,7 +2179,7 @@ public:
             auth::checkAuthForTypedCommand(opCtx, request());
         }
 
-        NamespaceString ns() const override {
+        NamespaceString ns() const final {
             return NamespaceString(request().getDbName(), "");
         }
     };
@@ -2126,8 +2188,13 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    bool adminOnly() const {
+    bool adminOnly() const final {
         return true;
+    }
+
+    bool allowedWithSecurityToken() const final {
+        // TODO (SERVER-TBD) Support mergeAuthzCollections in multitenancy
+        return false;
     }
 } cmdMergeAuthzCollections;
 
@@ -2235,6 +2302,28 @@ void _addUser(OperationContext* opCtx,
 
 
 /**
+ * Finds all documents matching "query" in "collectionName".  For each document returned,
+ * calls the function resultProcessor on it.
+ * Should only be called on collections with authorization documents in them
+ * (ie admin.system.users and admin.system.roles).
+ */
+Status queryAuthzDocument(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const BSONObj& query,
+                          const BSONObj& projection,
+                          const std::function<void(const BSONObj&)>& resultProcessor) try {
+    DBDirectClient client(opCtx);
+    FindCommandRequest findRequest{patchTenantNSS(nss)};
+    findRequest.setFilter(query);
+    findRequest.setProjection(projection);
+    client.find(std::move(findRequest), resultProcessor);
+    return Status::OK();
+} catch (const DBException& e) {
+    return e.toStatus();
+}
+
+
+/**
  * Moves all user objects from usersCollName into admin.system.users.  If drop is true,
  * removes any users that were in admin.system.users but not in usersCollName.
  */
@@ -2282,9 +2371,9 @@ void _processUsers(OperationContext* opCtx,
 
     if (drop) {
         for (const auto& userName : usersToDrop) {
-            audit::logDropUser(Client::getCurrent(), userName);
-            std::int64_t numRemoved;
-            uassertStatusOK(removePrivilegeDocuments(opCtx, userName.toBSON(), &numRemoved));
+            audit::logDropUser(opCtx->getClient(), userName);
+            auto numRemoved = uassertStatusOK(
+                removePrivilegeDocuments(opCtx, userName.toBSON(), userName.getTenant()));
             dassert(numRemoved == 1);
         }
     }
@@ -2350,7 +2439,7 @@ void _addRole(OperationContext* opCtx,
         }
     } else {
         _auditCreateOrUpdateRole(roleObj, true);
-        Status status = insertRoleDocument(opCtx, roleObj);
+        Status status = insertRoleDocument(opCtx, roleObj, roleName.getTenant());
         if (!status.isOK()) {
             // Match the behavior of mongorestore to continue on failure
             LOGV2_WARNING(20513,
@@ -2411,8 +2500,8 @@ void _processRoles(OperationContext* opCtx,
     if (drop) {
         for (const auto& roleName : rolesToDrop) {
             audit::logDropRole(Client::getCurrent(), roleName);
-            std::int64_t numRemoved;
-            uassertStatusOK(removeRoleDocuments(opCtx, roleName.toBSON(), &numRemoved));
+            auto numRemoved = uassertStatusOK(
+                removeRoleDocuments(opCtx, roleName.toBSON(), roleName.getTenant()));
             dassert(numRemoved == 1);
         }
     }

@@ -120,11 +120,11 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    void invalidateUsersFromDB(OperationContext*, const StringData dbname) override {
+    void invalidateUsersFromDB(OperationContext*, const DatabaseName& dbname) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    void invalidateUsersByTenant(OperationContext*, const TenantId&) override {
+    void invalidateUsersByTenant(OperationContext*, const boost::optional<TenantId>&) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 

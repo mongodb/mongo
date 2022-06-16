@@ -203,7 +203,23 @@ bool NamespaceString::isCollectionlessAggregateNS() const {
 
 bool NamespaceString::isLegalClientSystemNS(
     const ServerGlobalParams::FeatureCompatibility& currentFCV) const {
-    if (db() == kAdminDb) {
+    auto dbname = dbName().db();
+
+    NamespaceString parsedNSS;
+    if (gMultitenancySupport && !tenantId()) {
+        // TODO (SERVER-67423) Remove support for mangled dbname in isLegalClientSystemNS check
+        // Transitional support for accepting tenantId as a mangled database name.
+        try {
+            parsedNSS = parseFromStringExpectTenantIdInMultitenancyMode(ns());
+            if (parsedNSS.tenantId()) {
+                dbname = parsedNSS.dbName().db();
+            }
+        } catch (const DBException&) {
+            // Swallow exception.
+        }
+    }
+
+    if (dbname == kAdminDb) {
         if (coll() == "system.roles")
             return true;
         if (coll() == kServerConfigurationNamespace.coll())
@@ -212,7 +228,7 @@ bool NamespaceString::isLegalClientSystemNS(
             return true;
         if (coll() == "system.backup_users")
             return true;
-    } else if (db() == kConfigDb) {
+    } else if (dbname == kConfigDb) {
         if (coll() == "system.sessions")
             return true;
         if (coll() == kIndexBuildEntryNamespace.coll())
@@ -223,7 +239,7 @@ bool NamespaceString::isLegalClientSystemNS(
             return true;
         if (coll() == kConfigsvrCoordinatorsNamespace.coll())
             return true;
-    } else if (db() == kLocalDb) {
+    } else if (dbname == kLocalDb) {
         if (coll() == kSystemReplSetNamespace.coll())
             return true;
         if (coll() == "system.healthlog")
