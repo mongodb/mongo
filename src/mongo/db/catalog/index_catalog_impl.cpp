@@ -907,8 +907,11 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
                 str::stream() << pluginName
                               << " indexes are under development and cannot be used without "
                                  "enabling the feature flag",
-                feature_flags::gFeatureFlagColumnstoreIndexes.isEnabled(
-                    serverGlobalParams.featureCompatibility));
+                // With our testing failpoint we may try to run this code before we've initialized
+                // the FCV.
+                !serverGlobalParams.featureCompatibility.isVersionInitialized() ||
+                    feature_flags::gFeatureFlagColumnstoreIndexes.isEnabled(
+                        serverGlobalParams.featureCompatibility));
         if (auto columnSpecStatus = validateColumnStoreSpec(collection, spec, indexVersion);
             !columnSpecStatus.isOK()) {
             return columnSpecStatus;

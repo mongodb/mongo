@@ -24,7 +24,7 @@ buildvariants:
     separate_debug: off
   tasks:
     - name: compile_test_and_package_serial_TG
-    - name: .aggfuzzer .common
+    - name: .aggfuzzer .common !.feature_flag_guarded
     - name: free_monitoring
     - name: .jstestfuzz !.initsync
 
@@ -56,7 +56,7 @@ buildvariants:
     large_distro_name: rhel80-build
   tasks:
   - name: compile_test_benchmark_and_package_serial_TG
-  - name: .aggregation
+  - name: .aggregation !.feature_flag_guarded
   - name: .auth
   - name: audit
   - name: .benchmarks
@@ -128,7 +128,7 @@ buildvariants:
     large_distro_name: rhel80-build
   tasks:
   - name: compile_test_benchmark_and_package_serial_TG
-  - name: .aggregation
+  - name: .aggregation !.feature_flag_guarded
   - name: .auth
   - name: audit
   - name: .benchmarks

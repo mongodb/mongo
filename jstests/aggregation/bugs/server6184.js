@@ -1,4 +1,5 @@
 // SERVER-6184 Support mixing nested and dotted fields with common prefixes
+// @tags: [tests_projection_field_order]
 
 c = db.c;
 c.drop();

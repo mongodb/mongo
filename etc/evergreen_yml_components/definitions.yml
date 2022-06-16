@@ -4214,6 +4214,17 @@ tasks:
   - func: "run tests"
 
 - <<: *task_template
+  name: aggregation_column_store_index_passthrough
+  # TODO SERVER-61644 Remove the 'feature_flag_guarded' tag and ensure this suite is run on all
+  # variants.
+  tags: ["aggregation", "sbe_only", "feature_flag_guarded"]
+  depends_on:
+  - name: aggregation
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
   name: audit
   tags: ["audit", "patch_build"]
   commands:

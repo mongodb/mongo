@@ -59,6 +59,7 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -92,6 +93,17 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
 MONGO_FAIL_POINT_DEFINE(hangAndFailAfterCreateCollectionReservesOpTime);
 MONGO_FAIL_POINT_DEFINE(openCreateCollectionWindowFp);
 MONGO_FAIL_POINT_DEFINE(allowSystemViewsDrop);
+
+// When active, a column index will be created for all new collections. This is used for the column
+// index JS test passthrough suite. Other passthroughs work by overriding javascript methods on the
+// client side, but this approach often requires the drop() function to create the collection. This
+// behavior is confusing, and requires a large number of tests to be re-written to accommodate this
+// passthrough behavior. In case you're wondering, this failpoint approach would not work as well
+// for the sharded collections task, since mongos and the config servers are generally unaware of
+// when a collection is created. There isn't a great server-side hook we can use to auto-shard a
+// collection, and it is more complex technically to drive this process from one shard in the
+// cluster. For column store indexes, we just need to change local state on each mongod.
+MONGO_FAIL_POINT_DEFINE(createColumnIndexOnAllCollections);
 
 Status validateDBNameForWindows(StringData dbname) {
     const std::vector<std::string> windowsReservedNames = {
@@ -132,6 +144,12 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const&
     }
 }
 
+static const BSONObj kColumnStoreSpec = BSON("name"
+                                             << "$**_columnstore"
+                                             << "key"
+                                             << BSON("$**"
+                                                     << "columnstore")
+                                             << "v" << 2);
 }  // namespace
 
 Status DatabaseImpl::validateDBName(StringData dbname) {
@@ -890,23 +908,30 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 
     BSONObj fullIdIndexSpec;
 
-    if (createIdIndex) {
-        if (collection->requiresIdIndex()) {
-            if (optionsWithUUID.autoIndexId == CollectionOptions::YES ||
-                optionsWithUUID.autoIndexId == CollectionOptions::DEFAULT) {
-                IndexCatalog* ic = collection->getIndexCatalog();
-                fullIdIndexSpec = uassertStatusOK(ic->createIndexOnEmptyCollection(
-                    opCtx,
-                    collection,
-                    !idIndex.isEmpty() ? idIndex : ic->getDefaultIdIndexSpec(collection)));
-            } else {
-                // autoIndexId: false is only allowed on unreplicated collections.
-                uassert(50001,
-                        str::stream() << "autoIndexId:false is not allowed for collection " << nss
-                                      << " because it can be replicated",
-                        !nss.isReplicated());
-            }
+    bool createColumnIndex = false;
+    if (createIdIndex && collection->requiresIdIndex()) {
+        if (optionsWithUUID.autoIndexId == CollectionOptions::YES ||
+            optionsWithUUID.autoIndexId == CollectionOptions::DEFAULT) {
+            auto* ic = collection->getIndexCatalog();
+            fullIdIndexSpec = uassertStatusOK(ic->createIndexOnEmptyCollection(
+                opCtx,
+                collection,
+                !idIndex.isEmpty() ? idIndex : ic->getDefaultIdIndexSpec(collection)));
+            createColumnIndex = createColumnIndexOnAllCollections.shouldFail();
+        } else {
+            // autoIndexId: false is only allowed on unreplicated collections.
+            uassert(50001,
+                    str::stream() << "autoIndexId:false is not allowed for collection " << nss
+                                  << " because it can be replicated",
+                    !nss.isReplicated());
         }
+    }
+
+    if (MONGO_unlikely(createColumnIndex)) {
+        invariant(!internalQueryForceClassicEngine.load(),
+                  "Column Store Indexes failpoint in use without enabling SBE engine");
+        uassertStatusOK(collection->getIndexCatalog()->createIndexOnEmptyCollection(
+            opCtx, collection, kColumnStoreSpec));
     }
 
     hangBeforeLoggingCreateCollection.pauseWhileSet();
