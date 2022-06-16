@@ -62,6 +62,7 @@ venv
 /buildscripts/libdeps/graph_visualizer_web_stack/node_modules
 package-lock.json
 libdeps.graphml
+build-metrics.json
 config.log
 settings.py
 log_config.py

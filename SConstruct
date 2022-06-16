@@ -715,6 +715,19 @@ add_option(
 )
 
 add_option(
+    'build-metrics',
+    metavar="FILE",
+    const='build-metrics.json',
+    default='build-metrics.json',
+    help='Enable tracking of build performance and output data as json.'
+    ' Use "-" to output json to stdout, or supply a path to the desired'
+    ' file to output to. If no argument is supplied, the default log'
+    ' file will be "build-metrics.json".',
+    nargs='?',
+    type=str,
+)
+
+add_option(
     'visibility-support',
     choices=['auto', 'on', 'off'],
     const='auto',
@@ -1307,6 +1320,12 @@ env_vars.Add(
         default='$BUILD_ROOT/tmp_test_data',
         validator=PathVariable.PathAccept,
     ), )
+
+env_vars.AddVariables(
+    ("BUILD_METRICS_EVG_TASK_ID", "Evergreen task ID to add to build metrics data."),
+    ("BUILD_METRICS_EVG_BUILD_VARIANT", "Evergreen build variant to add to build metrics data."),
+)
+
 # -- Validate user provided options --
 
 # A dummy environment that should *only* have the variables we have set. In practice it has
@@ -1327,7 +1346,7 @@ variables_only_env = Environment(
 if GetOption('help'):
     try:
         Help('\nThe following variables may also be set like scons VARIABLE=value\n', append=True)
-        Help(env_vars.GenerateHelpText(variables_only_env), append=True)
+        Help(env_vars.GenerateHelpText(variables_only_env, sort=True), append=True)
         Help(
             '\nThe \'list-targets\' target can be built to list useful comprehensive build targets\n',
             append=True)
@@ -1449,6 +1468,11 @@ if get_option('build-tools') == 'next':
 
 env = Environment(variables=env_vars, **envDict)
 del envDict
+
+if get_option('build-metrics'):
+    env.Tool('build_metrics')
+    env.AddBuildMetricsMetaData('evg_id', env.get("BUILD_METRICS_EVG_TASK_ID", "UNKNOWN"))
+    env.AddBuildMetricsMetaData('variant', env.get("BUILD_METRICS_EVG_BUILD_VARIANT", "UNKNOWN"))
 
 # TODO SERVER-42170 We can remove this Execute call
 # when support for PathIsDirCreate can be used as a validator
