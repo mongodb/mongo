@@ -375,7 +375,7 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
         for (const auto& spec : specs) {
             uassert(6100900,
                     "Cannot implicitly create a new collection with createIndex 'clustered' option",
-                    !spec["clustered"]);
+                    !spec[IndexDescriptor::kClusteredFieldName]);
         }
 
         // We need to create the collection.

@@ -118,8 +118,8 @@ Status isSpecOKClusteredIndexCheck(const BSONObj& indexSpec,
     auto key = indexSpec.getObjectField("key");
     bool keysMatch = clustered_util::matchesClusterKey(key, collInfo);
 
-    bool clusteredOptionPresent =
-        indexSpec.hasField("clustered") && indexSpec["clustered"].trueValue();
+    bool clusteredOptionPresent = indexSpec.hasField(IndexDescriptor::kClusteredFieldName) &&
+        indexSpec[IndexDescriptor::kClusteredFieldName].trueValue();
 
     if (clusteredOptionPresent && !keysMatch) {
         // The 'clustered' option implies the indexSpec must match the clustered index.

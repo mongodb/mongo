@@ -819,7 +819,7 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
                                               Milliseconds(-1)));
 
     for (auto&& spec : indexes.docs) {
-        if (spec["clustered"]) {
+        if (spec[IndexDescriptor::kClusteredFieldName]) {
             // The 'clustered' index is implicitly created upon clustered collection creation.
         } else {
             donorIndexSpecs.push_back(spec);

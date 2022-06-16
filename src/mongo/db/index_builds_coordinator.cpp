@@ -1812,7 +1812,8 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
     // Always run single phase index build for empty collection. And, will be coordinated using
     // createIndexes oplog entry.
     for (const auto& spec : specs) {
-        if (spec.hasField("clustered") && spec.getBoolField("clustered")) {
+        if (spec.hasField(IndexDescriptor::kClusteredFieldName) &&
+            spec.getBoolField(IndexDescriptor::kClusteredFieldName)) {
             // The index is already built implicitly.
             continue;
         }
