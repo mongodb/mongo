@@ -149,7 +149,6 @@ selector:
   # $listSessions
   - jstests/core/list_all_local_sessions.js
   - jstests/core/list_all_sessions.js
-  - jstests/core/list_local_sessions.js
   - jstests/core/list_sessions.js
 
   # $collStats
