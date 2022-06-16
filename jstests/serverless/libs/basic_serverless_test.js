@@ -528,6 +528,33 @@ class BasicServerlessTest {
     }
 
     /**
+     * Asserts that the TenantMigrationAccessBlocker for the given tenant on the given node has the
+     * expected statistics.
+     */
+    static checkShardSplitAccessBlocker(node, tenantId, {
+        numBlockedWrites = 0,
+        numBlockedReads = 0,
+        numTenantMigrationCommittedErrors = 0,
+        numTenantMigrationAbortedErrors = 0
+    }) {
+        const mtab = BasicServerlessTest.getTenantMigrationAccessBlocker({node, tenantId}).donor;
+        if (!mtab) {
+            assert.eq(0, numBlockedWrites);
+            assert.eq(0, numTenantMigrationCommittedErrors);
+            assert.eq(0, numTenantMigrationAbortedErrors);
+            return;
+        }
+
+        assert.eq(mtab.numBlockedReads, numBlockedReads, tojson(mtab));
+        assert.eq(mtab.numBlockedWrites, numBlockedWrites, tojson(mtab));
+        assert.eq(mtab.numTenantMigrationCommittedErrors,
+                  numTenantMigrationCommittedErrors,
+                  tojson(mtab));
+        assert.eq(
+            mtab.numTenantMigrationAbortedErrors, numTenantMigrationAbortedErrors, tojson(mtab));
+    }
+
+    /**
      * Get the current donor primary by ignoring all the recipient nodes from the current donor set.
      */
     getDonorPrimary() {
