@@ -374,8 +374,7 @@ bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t d
         // Acquiring a ticket is a potentially blocking operation. This must not be called after a
         // transaction timestamp has been set, indicating this transaction has created an oplog
         // hole.
-        if (opCtx)
-            invariant(!opCtx->recoveryUnit()->isTimestamped());
+        invariant(!opCtx->recoveryUnit()->isTimestamped());
 
         auto waitMode = _uninterruptibleLocksRequested ? TicketHolder::WaitMode::kUninterruptible
                                                        : TicketHolder::WaitMode::kInterruptible;
