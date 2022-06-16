@@ -170,6 +170,7 @@ void IndexScanStage::prepare(CompileCtx& ctx) {
     if (_seekKeyHighVar) {
         ctx.root = this;
         _seekKeyHighCodes = _seekKeyHighVar->compile(ctx);
+        _seekKeyHighHolder = std::make_unique<value::OwnedValueAccessor>();
     }
 }
 
@@ -492,6 +493,13 @@ std::vector<DebugPrinter::Block> IndexScanStage::debugPrint() const {
         DebugPrinter::addIdentifier(ret, _seekKeySlotLow.get());
         if (_seekKeySlotHigh) {
             DebugPrinter::addIdentifier(ret, _seekKeySlotHigh.get());
+        } else {
+            DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+        }
+    } else if (_seekKeyLowVar) {
+        DebugPrinter::addBlocks(ret, _seekKeyLowVar->debugPrint());
+        if (_seekKeyHighVar) {
+            DebugPrinter::addBlocks(ret, _seekKeyHighVar->debugPrint());
         } else {
             DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
         }

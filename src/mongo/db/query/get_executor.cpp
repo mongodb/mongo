@@ -1030,7 +1030,7 @@ protected:
         auto resultSlot = ids.generate();
         auto recordSlot = ids.generate();
         auto recordIdSlot = ids.generate();
-        auto seekKeySlot = ids.generate();
+        // auto seekKeySlot = ids.generate();
 
         PlanNodeId planNodeId{0};
         sbe::ScanCallbacks callbacks;
@@ -1085,7 +1085,7 @@ protected:
                                                     boost::none,
                                                     std::vector<std::string>{},
                                                     sbe::makeSV(),
-                                                    seekKeySlot,
+                                                    recordIdSlot,
                                                     true,
                                                     nullptr,
                                                     planNodeId,
@@ -1100,14 +1100,9 @@ protected:
             sbe::makeS<sbe::LimitSkipStage>(std::move(ixScan), 1, boost::none, planNodeId),
             sbe::makeS<sbe::LimitSkipStage>(std::move(scanStage), 1, boost::none, planNodeId),
             sbe::makeSV(),
-            sbe::makeSV(seekKeySlot),
+            sbe::makeSV(recordIdSlot),
             nullptr,
             planNodeId);
-
-        sbe::DebugPrinter p;
-
-        std::cout << p.print(*stage.get()) << std::endl;
-
 
         result->emplace({std::move(stage), data}, nullptr);
         return result;
