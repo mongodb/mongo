@@ -1234,7 +1234,6 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
         unpack && sort) {
         auto execImpl = dynamic_cast<PlanExecutorImpl*>(exec.get());
         if (execImpl) {
-
             // Get source stage
             PlanStage* rootStage = execImpl->getRootStage();
             while (rootStage &&
@@ -1247,28 +1246,27 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
                     case STAGE_SHARDING_FILTER:
                         rootStage = rootStage->child().get();
                         break;
-                    case STAGE_MULTI_PLAN:
-                        if (auto mps = static_cast<MultiPlanStage*>(rootStage)) {
-                            if (mps->bestPlanChosen() && mps->bestPlanIdx()) {
-                                rootStage = (mps->getChildren())[*(mps->bestPlanIdx())].get();
-                            } else {
-                                rootStage = nullptr;
-                                tasserted(6655801,
-                                          "Expected multiplanner to have selected a bestPlan.");
-                            }
+                    case STAGE_MULTI_PLAN: {
+                        auto mps = static_cast<MultiPlanStage*>(rootStage);
+                        if (mps->bestPlanChosen() && mps->bestPlanIdx()) {
+                            rootStage = (mps->getChildren())[*(mps->bestPlanIdx())].get();
+                        } else {
+                            rootStage = nullptr;
+                            tasserted(6655801,
+                                      "Expected multiplanner to have selected a bestPlan.");
                         }
                         break;
-                    case STAGE_CACHED_PLAN:
-                        if (auto cp = static_cast<CachedPlanStage*>(rootStage)) {
-                            if (cp->bestPlanChosen()) {
-                                rootStage = rootStage->child().get();
-                            } else {
-                                rootStage = nullptr;
-                                tasserted(6655802,
-                                          "Expected cached plan to have selected a bestPlan.");
-                            }
+                    }
+                    case STAGE_CACHED_PLAN: {
+                        auto cp = static_cast<CachedPlanStage*>(rootStage);
+                        if (cp->bestPlanChosen()) {
+                            rootStage = rootStage->child().get();
+                        } else {
+                            rootStage = nullptr;
+                            tasserted(6655802, "Expected cached plan to have selected a bestPlan.");
                         }
                         break;
+                    }
                     default:
                         rootStage = nullptr;
                 }
