@@ -58,12 +58,15 @@ public:
     /*
      * Construct a ServiceStateMachine for a given Client.
      */
-    ServiceStateMachine(ServiceContext::UniqueClient client);
+    explicit ServiceStateMachine(ServiceContext::UniqueClient client);
+
+    /** Returns the Client given in the constructor. */
+    Client* client() const;
 
     /*
      * start() schedules a call to _runOnce() in the future.
      */
-    void start(ServiceExecutorContext seCtx);
+    void start();
 
     /*
      * Terminates the associated transport Session, regardless of tags.
@@ -80,11 +83,6 @@ public:
      * This will not block on the session terminating cleaning itself up, it returns immediately.
      */
     void terminateIfTagsDontMatch(transport::Session::TagMask tags);
-
-    /*
-     * Sets a function to be called after the session is ended
-     */
-    void setCleanupHook(std::function<void()> hook);
 
 private:
     std::shared_ptr<Impl> _impl;

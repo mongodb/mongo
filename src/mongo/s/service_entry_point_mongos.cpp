@@ -221,7 +221,7 @@ void ServiceEntryPointMongos::onClientConnect(Client* client) {
     }
 }
 
-void ServiceEntryPointMongos::onClientDisconnect(Client* client) {
+void ServiceEntryPointMongos::derivedOnClientDisconnect(Client* client) {
     if (load_balancer_support::isFromLoadBalancer(client)) {
         _loadBalancedConnections.decrement();
 

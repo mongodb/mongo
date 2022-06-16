@@ -54,7 +54,7 @@ public:
     void appendStats(BSONObjBuilder* bob) const override;
 
     void onClientConnect(Client* client) override;
-    void onClientDisconnect(Client* client) override;
+    void derivedOnClientDisconnect(Client* client) override;
 
 private:
     Counter64 _loadBalancedConnections;

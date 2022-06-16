@@ -29,26 +29,21 @@
 
 #pragma once
 
-#include <list>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
 
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/transport/service_entry_point.h"
-#include "mongo/transport/service_executor_fixed.h"
-#include "mongo/transport/service_executor_reserved.h"
-#include "mongo/transport/service_executor_synchronous.h"
-#include "mongo/transport/service_state_machine.h"
-#include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/cidr.h"
 
 namespace mongo {
 class ServiceContext;
-
-namespace transport {
-class Session;
-}  // namespace transport
 
 /**
  * A basic entry point from the TransportLayer into a server.
@@ -58,11 +53,12 @@ class Session;
  * (transport::Session).
  */
 class ServiceEntryPointImpl : public ServiceEntryPoint {
-    ServiceEntryPointImpl(const ServiceEntryPointImpl&) = delete;
-    ServiceEntryPointImpl& operator=(const ServiceEntryPointImpl&) = delete;
-
 public:
     explicit ServiceEntryPointImpl(ServiceContext* svcCtx);
+    ~ServiceEntryPointImpl();
+
+    ServiceEntryPointImpl(const ServiceEntryPointImpl&) = delete;
+    ServiceEntryPointImpl& operator=(const ServiceEntryPointImpl&) = delete;
 
     void startSession(transport::SessionHandle session) override;
 
@@ -76,32 +72,23 @@ public:
 
     void appendStats(BSONObjBuilder* bob) const override;
 
-    size_t numOpenSessions() const final {
-        return _currentConnections.load();
-    }
+    size_t numOpenSessions() const final;
 
-    size_t maxOpenSessions() const final {
-        return _maxNumConnections;
-    }
+    size_t maxOpenSessions() const final;
+
+    void onClientDisconnect(Client* client) final;
+
+    /** `onClientDisconnect` calls this before doing anything else. */
+    virtual void derivedOnClientDisconnect(Client* client) {}
 
 private:
-    void _terminateAll(WithLock);
-    bool _waitForNoSessions(stdx::unique_lock<Mutex>& lk, Date_t deadline);
-
-    using SSMList = std::list<transport::ServiceStateMachine>;
-    using SSMListIterator = SSMList::iterator;
+    class Sessions;
 
     ServiceContext* const _svcCtx;
-    AtomicWord<std::size_t> _nWorkers;
 
-    mutable Mutex _sessionsMutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ServiceEntryPointImpl::_sessionsMutex");
-    stdx::condition_variable _sessionsCV;
-    SSMList _sessions;
+    const size_t _maxSessions;
 
-    const size_t _maxNumConnections{DEFAULT_MAX_CONN};
-    AtomicWord<size_t> _currentConnections{0};
-    AtomicWord<size_t> _createdConnections{0};
+    std::unique_ptr<Sessions> _sessions;
 };
 
 /*

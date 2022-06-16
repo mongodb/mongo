@@ -156,7 +156,7 @@ public:
      *
      * This function may only be invoked once and only while under the Client lock.
      */
-    static void set(Client* client, ServiceExecutorContext seCtx) noexcept;
+    static void set(Client* client, std::unique_ptr<ServiceExecutorContext> seCtx) noexcept;
 
 
     /**
@@ -169,18 +169,8 @@ public:
     ServiceExecutorContext() = default;
     ServiceExecutorContext(const ServiceExecutorContext&) = delete;
     ServiceExecutorContext& operator=(const ServiceExecutorContext&) = delete;
-    ServiceExecutorContext(ServiceExecutorContext&& seCtx)
-        : _client{std::exchange(seCtx._client, nullptr)},
-          _sep{std::exchange(seCtx._sep, nullptr)},
-          _threadingModel{seCtx._threadingModel},
-          _canUseReserved{seCtx._canUseReserved} {}
-    ServiceExecutorContext& operator=(ServiceExecutorContext&& seCtx) {
-        _client = std::exchange(seCtx._client, nullptr);
-        _sep = std::exchange(seCtx._sep, nullptr);
-        _threadingModel = seCtx._threadingModel;
-        _canUseReserved = seCtx._canUseReserved;
-        return *this;
-    }
+    ServiceExecutorContext(ServiceExecutorContext&&) = delete;
+    ServiceExecutorContext& operator=(ServiceExecutorContext&&) = delete;
 
     /**
      * Set the ThreadingModel for the associated Client's service execution.
