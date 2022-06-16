@@ -799,8 +799,17 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
     // Step 1 ----
     std::vector<EDCServerPayloadInfo> serverPayload;
     auto newUpdateOpEntry = updateRequest.getUpdates()[0];
-    newUpdateOpEntry.setQ(fle::rewriteEncryptedFilterInsideTxn(
-        queryImpl, updateRequest.getDbName(), efc, expCtx, newUpdateOpEntry.getQ()));
+
+    auto highCardinalityModeAllowed = newUpdateOpEntry.getUpsert()
+        ? fle::HighCardinalityModeAllowed::kDisallow
+        : fle::HighCardinalityModeAllowed::kAllow;
+
+    newUpdateOpEntry.setQ(fle::rewriteEncryptedFilterInsideTxn(queryImpl,
+                                                               updateRequest.getDbName(),
+                                                               efc,
+                                                               expCtx,
+                                                               newUpdateOpEntry.getQ(),
+                                                               highCardinalityModeAllowed));
 
     if (updateModification.type() == write_ops::UpdateModification::Type::kModifier) {
         auto updateModifier = updateModification.getUpdateModifier();
@@ -970,19 +979,25 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
                                            request.getNS(),
                                            deleteRequest.getEncryptionInformation().get(),
                                            newDeleteOp.getQ(),
-                                           &getTransactionWithRetriesForMongoS));
+                                           &getTransactionWithRetriesForMongoS,
+                                           fle::HighCardinalityModeAllowed::kAllow));
         deleteRequest.setDeletes({newDeleteOp});
         deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(boost::none);
         return std::make_unique<BatchedCommandRequest>(deleteRequest);
     } else if (request.getBatchType() == BatchedCommandRequest::BatchType_Update) {
         auto updateRequest = request.getUpdateRequest();
         auto newUpdateOp = updateRequest.getUpdates()[0];
+        auto highCardinalityModeAllowed = newUpdateOp.getUpsert()
+            ? fle::HighCardinalityModeAllowed::kDisallow
+            : fle::HighCardinalityModeAllowed::kAllow;
+
         newUpdateOp.setQ(fle::rewriteQuery(opCtx,
                                            getExpCtx(newUpdateOp),
                                            request.getNS(),
                                            updateRequest.getEncryptionInformation().get(),
                                            newUpdateOp.getQ(),
-                                           &getTransactionWithRetriesForMongoS));
+                                           &getTransactionWithRetriesForMongoS,
+                                           highCardinalityModeAllowed));
         updateRequest.setUpdates({newUpdateOp});
         updateRequest.getWriteCommandRequestBase().setEncryptionInformation(boost::none);
         return std::make_unique<BatchedCommandRequest>(updateRequest);
@@ -1007,8 +1022,17 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
 
     // Step 0 ----
     // Rewrite filter
-    newFindAndModifyRequest.setQuery(fle::rewriteEncryptedFilterInsideTxn(
-        queryImpl, edcNss.db(), efc, expCtx, findAndModifyRequest.getQuery()));
+    auto highCardinalityModeAllowed = findAndModifyRequest.getUpsert().value_or(false)
+        ? fle::HighCardinalityModeAllowed::kDisallow
+        : fle::HighCardinalityModeAllowed::kAllow;
+
+    newFindAndModifyRequest.setQuery(
+        fle::rewriteEncryptedFilterInsideTxn(queryImpl,
+                                             edcNss.db(),
+                                             efc,
+                                             expCtx,
+                                             findAndModifyRequest.getQuery(),
+                                             highCardinalityModeAllowed));
 
     // Make sure not to inherit the command's writeConcern, this should be set at the transaction
     // level.
@@ -1131,8 +1155,17 @@ write_ops::FindAndModifyCommandRequest processFindAndModifyExplain(
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
 
     auto newFindAndModifyRequest = findAndModifyRequest;
-    newFindAndModifyRequest.setQuery(fle::rewriteEncryptedFilterInsideTxn(
-        queryImpl, edcNss.db(), efc, expCtx, findAndModifyRequest.getQuery()));
+    auto highCardinalityModeAllowed = findAndModifyRequest.getUpsert().value_or(false)
+        ? fle::HighCardinalityModeAllowed::kDisallow
+        : fle::HighCardinalityModeAllowed::kAllow;
+
+    newFindAndModifyRequest.setQuery(
+        fle::rewriteEncryptedFilterInsideTxn(queryImpl,
+                                             edcNss.db(),
+                                             efc,
+                                             expCtx,
+                                             findAndModifyRequest.getQuery(),
+                                             highCardinalityModeAllowed));
 
     newFindAndModifyRequest.setEncryptionInformation(boost::none);
     return newFindAndModifyRequest;

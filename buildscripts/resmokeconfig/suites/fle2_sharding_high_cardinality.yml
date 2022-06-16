@@ -1,0 +1,37 @@
+test_kind: js_test
+selector:
+  roots:
+  - jstests/fle2/*.js
+  - src/mongo/db/modules/*/jstests/fle2/*.js
+  - src/mongo/db/modules/*/jstests/fle2/query/*.js
+  exclude_with_any_tags:
+  # Not compatible with tests the expect fle to always using $in in queries,
+  # i.e. verify explain output
+  - requires_fle_in_always
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: "testingReplication = false; testingFLESharding = true;"
+  hooks:
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryFLEAlwaysUseHighCardinalityMode: 1
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryFLEAlwaysUseHighCardinalityMode: 1
+    num_rs_nodes_per_shard: 2
+    enable_sharding:
+    - test

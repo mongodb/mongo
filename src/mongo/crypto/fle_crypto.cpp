@@ -53,6 +53,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -153,6 +154,8 @@ PrfBlock blockToArray(const SHA256Block& block) {
     return data;
 }
 
+}  // namespace
+
 PrfBlock PrfBlockfromCDR(ConstDataRange block) {
     uassert(6373501, "Invalid prf length", block.length() == sizeof(PrfBlock));
 
@@ -161,6 +164,7 @@ PrfBlock PrfBlockfromCDR(ConstDataRange block) {
     return ret;
 }
 
+namespace {
 ConstDataRange hmacKey(const KeyMaterial& keyMaterial) {
     static_assert(kHmacKeyOffset + crypto::sym256KeySize <= crypto::kFieldLevelEncryptionKeySize);
     invariant(crypto::kFieldLevelEncryptionKeySize == keyMaterial->size());
@@ -212,13 +216,16 @@ ConstDataRange binDataToCDR(const BSONElement element) {
     return ConstDataRange(data, data + len);
 }
 
-ConstDataRange binDataToCDR(const Value& value) {
-    uassert(6334103, "Expected binData Value type", value.getType() == BinData);
-
-    auto binData = value.getBinData();
+ConstDataRange binDataToCDR(const BSONBinData binData) {
     int len = binData.length;
     const char* data = static_cast<const char*>(binData.data);
     return ConstDataRange(data, data + len);
+}
+
+ConstDataRange binDataToCDR(const Value& value) {
+    uassert(6334103, "Expected binData Value type", value.getType() == BinData);
+
+    return binDataToCDR(value.getBinData());
 }
 
 template <typename T>
@@ -292,7 +299,7 @@ void toEncryptedBinData(StringData field,
 
 std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(BSONElement element) {
     uassert(
-        6373502, "Expected binData with subtype Encrypt", element.isBinData(BinDataType::Encrypt));
+        6672414, "Expected binData with subtype Encrypt", element.isBinData(BinDataType::Encrypt));
 
     return fromEncryptedConstDataRange(binDataToCDR(element));
 }
@@ -1163,6 +1170,28 @@ uint64_t generateRandomContention(uint64_t cm) {
 
 }  // namespace
 
+std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(const Value& value) {
+    uassert(6672416, "Expected binData with subtype Encrypt", value.getType() == BinData);
+
+    auto binData = value.getBinData();
+
+    uassert(6672415, "Expected binData with subtype Encrypt", binData.type == BinDataType::Encrypt);
+
+    return fromEncryptedConstDataRange(binDataToCDR(binData));
+}
+
+BSONBinData toBSONBinData(const std::vector<uint8_t>& buf) {
+    return BSONBinData(buf.data(), buf.size(), Encrypt);
+}
+
+std::vector<uint8_t> toEncryptedVector(EncryptedBinDataType dt, const PrfBlock& block) {
+    std::vector<uint8_t> buf(block.size() + 1);
+    buf[0] = static_cast<uint8_t>(dt);
+
+    std::copy(block.data(), block.data() + block.size(), buf.data() + 1);
+
+    return buf;
+}
 
 CollectionsLevel1Token FLELevel1TokenGenerator::generateCollectionsLevel1Token(
     FLEIndexKey indexKey) {
@@ -1363,6 +1392,8 @@ std::pair<BSONType, std::vector<uint8_t>> FLEClientCrypto::decrypt(ConstDataRang
         // maintain the encryption subtype.
         return {EOO, vectorFromCDR(pair.second)};
     } else if (pair.first == EncryptedBinDataType::kFLE2InsertUpdatePayload) {
+        return {EOO, vectorFromCDR(pair.second)};
+    } else if (pair.first == EncryptedBinDataType::kFLE2TransientRaw) {
         return {EOO, vectorFromCDR(pair.second)};
     } else {
         uasserted(6373507, "Not supported");
@@ -1720,6 +1751,8 @@ FLE2FindEqualityPayload FLEClientCrypto::serializeFindPayload(FLEIndexKeyAndId i
     auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
 
     auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
+    auto serverToken =
+        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(indexKey.key);
 
     auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
     auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
@@ -1738,6 +1771,7 @@ FLE2FindEqualityPayload FLEClientCrypto::serializeFindPayload(FLEIndexKeyAndId i
     payload.setEscDerivedToken(escDatakey.toCDR());
     payload.setEccDerivedToken(eccDatakey.toCDR());
     payload.setMaxCounter(maxContentionFactor);
+    payload.setServerEncryptionToken(serverToken.toCDR());
 
     return payload;
 }
@@ -2076,6 +2110,44 @@ PrfBlock EDCServerCollection::generateTag(const FLE2IndexedEqualityEncryptedValu
     return generateTag(edcTwiceDerived, indexedValue.count);
 }
 
+
+StatusWith<FLE2IndexedEqualityEncryptedValue> EDCServerCollection::decryptAndParse(
+    ServerDataEncryptionLevel1Token token, ConstDataRange serializedServerValue) {
+    auto pair = fromEncryptedConstDataRange(serializedServerValue);
+    uassert(6672412,
+            "Wrong encrypted field type",
+            pair.first == EncryptedBinDataType::kFLE2EqualityIndexedValue);
+
+    return FLE2IndexedEqualityEncryptedValue::decryptAndParse(token, pair.second);
+}
+
+StatusWith<FLE2IndexedEqualityEncryptedValue> EDCServerCollection::decryptAndParse(
+    ConstDataRange token, ConstDataRange serializedServerValue) {
+    auto serverToken = FLETokenFromCDR<FLETokenType::ServerDataEncryptionLevel1Token>(token);
+
+    return FLE2IndexedEqualityEncryptedValue::decryptAndParse(serverToken, serializedServerValue);
+}
+
+std::vector<EDCDerivedFromDataTokenAndContentionFactorToken> EDCServerCollection::generateEDCTokens(
+    EDCDerivedFromDataToken token, uint64_t maxContentionFactor) {
+    std::vector<EDCDerivedFromDataTokenAndContentionFactorToken> tokens;
+    tokens.reserve(maxContentionFactor);
+
+    for (uint64_t i = 0; i <= maxContentionFactor; ++i) {
+        tokens.push_back(FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+                             generateEDCDerivedFromDataTokenAndContentionFactorToken(token, i));
+    }
+
+    return tokens;
+}
+
+std::vector<EDCDerivedFromDataTokenAndContentionFactorToken> EDCServerCollection::generateEDCTokens(
+    ConstDataRange rawToken, uint64_t maxContentionFactor) {
+    auto token = FLETokenFromCDR<FLETokenType::EDCDerivedFromDataToken>(rawToken);
+
+    return generateEDCTokens(token, maxContentionFactor);
+}
+
 BSONObj EDCServerCollection::finalizeForInsert(
     const BSONObj& doc, const std::vector<EDCServerPayloadInfo>& serverPayload) {
     std::vector<TagInfo> tags;
@@ -2305,6 +2377,7 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
     return efc;
 }
 
+
 std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(ConstDataRange cdr) {
     ConstDataRangeCursor cdrc(cdr);
 
@@ -2377,6 +2450,12 @@ ParsedFindPayload::ParsedFindPayload(ConstDataRange cdr) {
     escToken = FLETokenFromCDR<FLETokenType::ESCDerivedFromDataToken>(payload.getEscDerivedToken());
     eccToken = FLETokenFromCDR<FLETokenType::ECCDerivedFromDataToken>(payload.getEccDerivedToken());
     edcToken = FLETokenFromCDR<FLETokenType::EDCDerivedFromDataToken>(payload.getEdcDerivedToken());
+
+    if (payload.getServerEncryptionToken().has_value()) {
+        serverToken = FLETokenFromCDR<FLETokenType::ServerDataEncryptionLevel1Token>(
+            payload.getServerEncryptionToken().value());
+    }
+
     maxCounter = payload.getMaxCounter();
 }
 
