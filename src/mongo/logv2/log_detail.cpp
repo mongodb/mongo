@@ -174,14 +174,21 @@ static void checkUniqueAttrs(int32_t id, const TypeErasedAttributeStorage& attrs
     }
 }
 
-void doLogImpl(int32_t id,
+void doSafeLog(int32_t id,
                LogSeverity const& severity,
                LogOptions const& options,
                StringData message,
                TypeErasedAttributeStorage const& attrs) {
-    loggingDepth++;
-    ScopeGuard updateDepth = [] { loggingDepth--; };
 
+    signalSafeWriteToStderr(
+        format(FMT_STRING("{}({}): {}\n"), severity.toStringData(), id, message));
+}
+
+void _doLogImpl(int32_t id,
+                LogSeverity const& severity,
+                LogOptions const& options,
+                StringData message,
+                TypeErasedAttributeStorage const& attrs) {
     dassert(options.component() != LogComponent::kNumLogComponents);
     // TestingProctor isEnabled cannot be called before it has been
     // initialized. But log statements occurring earlier than that still need
@@ -220,6 +227,35 @@ void doLogImpl(int32_t id,
         }
 
         source.push_record(std::move(record));
+    }
+}
+
+void doLogImpl(int32_t id,
+               LogSeverity const& severity,
+               LogOptions const& options,
+               StringData message,
+               TypeErasedAttributeStorage const& attrs) {
+    if (loggingInProgress()) {
+        doSafeLog(id, severity, options, message, attrs);
+        return;
+    }
+
+    loggingDepth++;
+    ScopeGuard updateDepth = [] { loggingDepth--; };
+
+    try {
+        _doLogImpl(id, severity, options, message, attrs);
+    } catch (const fmt::format_error& ex) {
+        _doLogImpl(4638200,
+                   LogSeverity::Error(),
+                   LogOptions(LogComponent::kAssert),
+                   "Exception during log"_sd,
+                   AttributeStorage{"original_msg"_attr = message, "what"_attr = ex.what()});
+
+        invariant(!kDebugBuild, format(FMT_STRING("Exception during log: {}"), ex.what()));
+    } catch (...) {
+        doSafeLog(id, severity, options, message, attrs);
+        throw;
     }
 }
 

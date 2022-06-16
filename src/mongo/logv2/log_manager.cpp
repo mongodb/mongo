@@ -36,6 +36,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/log_util.h"
@@ -54,33 +55,6 @@ struct LogManager::Impl {
 
 LogManager::LogManager() {
     _impl = std::make_unique<Impl>();
-
-    boost::log::core::get()->set_exception_handler([]() {
-        thread_local uint32_t depth = 0;
-        ScopeGuard depthGuard([]() { --depth; });
-        ++depth;
-        // Try and log that we failed to log
-        if (depth == 1) {
-            std::exception_ptr ex = nullptr;
-            try {
-                throw;
-            } catch (const DBException&) {
-                ex = std::current_exception();
-            } catch (...) {
-                LOGV2(4638200,
-                      "Exception during log, message not written to stream",
-                      "exception"_attr = exceptionToStatus());
-            }
-            if (ex)
-                std::rethrow_exception(ex);
-        }
-
-        // Logging exceptions are fatal in debug builds. Guard ourselves from additional logging
-        // during the assert that might also fail
-        if (kDebugBuild && depth <= 2) {
-            dassert(false, "Exception during log");
-        }
-    });
 }
 
 LogManager::~LogManager() {}

@@ -103,13 +103,6 @@ public:
     }
 
     /**
-     * Returns a std::string naming this severity level.
-     *
-     * See toStringData(), below.
-     */
-    std::string toString() const;
-
-    /**
      * Returns a StringData naming this security level.
      *
      * Not all levels are uniquely named.  Debug(N) is named "debug", regardless of "N",
