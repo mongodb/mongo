@@ -863,6 +863,14 @@ server_parameters:
         gt: 0
         lt: 16777216
 
+  internalQueryFLEAlwaysUseHighCardinalityMode:
+    description: "Boolean flag to force FLE to always use low selectivity mode"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryFLEAlwaysUseHighCardinalityMode"
+    cpp_vartype: AtomicWord<bool>
+    default:
+        expr: false
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

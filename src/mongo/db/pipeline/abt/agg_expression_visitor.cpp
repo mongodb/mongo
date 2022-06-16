@@ -322,6 +322,10 @@ public:
         unsupportedExpression(expr->getOpName());
     }
 
+    void visit(const ExpressionInternalFLEEqual* expr) override final {
+        unsupportedExpression(expr->getOpName());
+    }
+
     void visit(const ExpressionMap* expr) override final {
         unsupportedExpression("$map");
     }

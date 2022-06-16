@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/base/error_codes.h"
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
@@ -1199,7 +1200,7 @@ TEST_F(FleTagsTest, MemoryLimit) {
     doSingleInsert(10, doc);
 
     // readTags returns 11 tags which does exceed memory limit.
-    ASSERT_THROWS_CODE(readTags(doc), DBException, 6401800);
+    ASSERT_THROWS_CODE(readTags(doc), DBException, ErrorCodes::FLEMaxTagLimitExceeded);
 
     doSingleDelete(5);
 

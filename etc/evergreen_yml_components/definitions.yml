@@ -6094,6 +6094,20 @@ tasks:
   - func: "run tests"
 
 - <<: *task_template
+  name: fle2_high_cardinality
+  tags: ["encrypt"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
+  name: fle2_sharding_high_cardinality
+  tags: ["encrypt"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
   name: ocsp
   tags: ["ssl", "encrypt", "ocsp", "patch_build"]
   commands:

@@ -31,7 +31,7 @@
 
 #include <memory>
 
-#include "boost/smart_ptr/intrusive_ptr.hpp"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/fle_crypto.h"
@@ -45,6 +45,14 @@
 namespace mongo {
 class FLEQueryInterface;
 namespace fle {
+
+/**
+ * Low Selectivity rewrites use $expr which is not supported in all commands such as upserts.
+ */
+enum class HighCardinalityModeAllowed {
+    kAllow,
+    kDisallow,
+};
 
 /**
  * Make a collator object from its BSON representation. Useful when creating ExpressionContext
@@ -62,7 +70,8 @@ BSONObj rewriteQuery(OperationContext* opCtx,
                      const NamespaceString& nss,
                      const EncryptionInformation& info,
                      BSONObj filter,
-                     GetTxnCallback getTransaction);
+                     GetTxnCallback getTransaction,
+                     HighCardinalityModeAllowed mode);
 
 /**
  * Process a find command with encryptionInformation in-place, rewriting the filter condition so
@@ -100,11 +109,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> processPipeline(
  * from inside an existing transaction using a FLEQueryInterface constructed from a
  * transaction client.
  */
-BSONObj rewriteEncryptedFilterInsideTxn(FLEQueryInterface* queryImpl,
-                                        StringData db,
-                                        const EncryptedFieldConfig& efc,
-                                        boost::intrusive_ptr<ExpressionContext> expCtx,
-                                        BSONObj filter);
+BSONObj rewriteEncryptedFilterInsideTxn(
+    FLEQueryInterface* queryImpl,
+    StringData db,
+    const EncryptedFieldConfig& efc,
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    BSONObj filter,
+    HighCardinalityModeAllowed mode = HighCardinalityModeAllowed::kDisallow);
 
 /**
  * Class which handles rewriting filter MatchExpressions for FLE2. The functionality is encapsulated
@@ -116,14 +127,37 @@ BSONObj rewriteEncryptedFilterInsideTxn(FLEQueryInterface* queryImpl,
  */
 class FLEQueryRewriter {
 public:
+    enum class HighCardinalityMode {
+        // Always use high cardinality filters, used by tests
+        kForceAlways,
+
+        // Use high cardinality mode if $in rewrites do not fit in the
+        // internalQueryFLERewriteMemoryLimit memory limit
+        kUseIfNeeded,
+
+        // Do not rewrite into high cardinality filter, throw exceptions instead
+        // Some contexts like upsert do not support $expr
+        kDisallow,
+    };
+
     /**
      * Takes in references to collection readers for the ESC and ECC that are used during tag
      * computation.
      */
     FLEQueryRewriter(boost::intrusive_ptr<ExpressionContext> expCtx,
                      const FLEStateCollectionReader& escReader,
-                     const FLEStateCollectionReader& eccReader)
+                     const FLEStateCollectionReader& eccReader,
+                     HighCardinalityModeAllowed mode = HighCardinalityModeAllowed::kAllow)
         : _expCtx(expCtx), _escReader(&escReader), _eccReader(&eccReader) {
+
+        if (internalQueryFLEAlwaysUseHighCardinalityMode.load()) {
+            _mode = HighCardinalityMode::kForceAlways;
+        }
+
+        if (mode == HighCardinalityModeAllowed::kDisallow) {
+            _mode = HighCardinalityMode::kDisallow;
+        }
+
         // This isn't the "real" query so we don't want to increment Expression
         // counters here.
         _expCtx->stopExpressionCounters();
@@ -184,6 +218,18 @@ public:
         return _expCtx.get();
     }
 
+    bool isForceHighCardinality() const {
+        return _mode == HighCardinalityMode::kForceAlways;
+    }
+
+    void setForceHighCardinalityForTest() {
+        _mode = HighCardinalityMode::kForceAlways;
+    }
+
+    HighCardinalityMode getHighCardinalityMode() const {
+        return _mode;
+    }
+
 protected:
     // This constructor should only be used for mocks in testing.
     FLEQueryRewriter(boost::intrusive_ptr<ExpressionContext> expCtx)
@@ -196,8 +242,8 @@ private:
     std::unique_ptr<MatchExpression> _rewrite(MatchExpression* me);
 
     virtual BSONObj rewritePayloadAsTags(BSONElement fleFindPayload) const;
-    std::unique_ptr<InMatchExpression> rewriteEq(const EqualityMatchExpression* expr);
-    std::unique_ptr<InMatchExpression> rewriteIn(const InMatchExpression* expr);
+    std::unique_ptr<MatchExpression> rewriteEq(const EqualityMatchExpression* expr);
+    std::unique_ptr<MatchExpression> rewriteIn(const InMatchExpression* expr);
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
@@ -208,6 +254,9 @@ private:
 
     // True if the last Expression or MatchExpression processed by this rewriter was rewritten.
     bool _rewroteLastExpression = false;
+
+    // Controls how query rewriter rewrites the query
+    HighCardinalityMode _mode{HighCardinalityMode::kUseIfNeeded};
 };
 
 
