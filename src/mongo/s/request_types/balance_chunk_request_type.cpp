@@ -153,7 +153,7 @@ BSONObj BalanceChunkRequest::serializeToRebalanceCommandForConfig(
     range.append(&cmdBuilder);
     cmdBuilder.append(ChunkType::shard(), owningShard);
     collectionUUID.appendToBuilder(&cmdBuilder, ChunkType::collectionUUID());
-    expectedChunkVersion.appendLegacyWithField(&cmdBuilder, ChunkType::lastmod());
+    expectedChunkVersion.serializeToBSON(ChunkType::lastmod(), &cmdBuilder);
     cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
                       kMajorityWriteConcernNoTimeout.toBSON());
 

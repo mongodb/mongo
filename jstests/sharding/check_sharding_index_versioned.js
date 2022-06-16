@@ -21,7 +21,7 @@ assert.throwsWithCode(() => {
     st.rs0.getPrimary().getDB(dbName).runCommand({
         checkShardingIndex: ns,
         keyPattern: {x: 1},
-        shardVersion: [Timestamp(99, 10101), ObjectId(), Timestamp(1, 1)],
+        shardVersion: {e: ObjectId(), t: Timestamp(1, 1), v: Timestamp(99, 10101)},
     });
 }, ErrorCodes.StaleConfig);
 

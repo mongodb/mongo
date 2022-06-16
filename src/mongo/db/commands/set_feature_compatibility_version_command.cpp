@@ -86,7 +86,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
-#include "mongo/s/pm2583_feature_flags_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
@@ -344,14 +343,10 @@ public:
 
                 // Drain moveChunks if the actualVersion relies on the new migration protocol but
                 // the requestedVersion uses the old one (downgrading).
-                if ((feature_flags::gFeatureFlagMigrationRecipientCriticalSection
-                         .isEnabledOnVersion(actualVersion) &&
-                     !feature_flags::gFeatureFlagMigrationRecipientCriticalSection
-                          .isEnabledOnVersion(requestedVersion)) ||
-                    (feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
-                         actualVersion) &&
-                     !feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
-                         requestedVersion))) {
+                if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
+                        actualVersion) &&
+                    !feature_flags::gFeatureFlagMigrationRecipientCriticalSection
+                         .isEnabledOnVersion(requestedVersion)) {
                     drainNewMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionDowngrade");
 
                     // At this point, because we are holding the MigrationBlockingGuard, no new
@@ -444,10 +439,6 @@ public:
             if ((!feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
                      actualVersion) &&
                  feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
-                     requestedVersion)) ||
-                (!feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
-                     actualVersion) &&
-                 feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
                      requestedVersion)) ||
                 orphanTrackingCondition) {
                 drainOldMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionUpgrade");

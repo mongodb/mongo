@@ -140,7 +140,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
                                                             validAfter));
 
     // Verify the versions returned match expected values.
-    auto mver = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["shardVersion"]);
+    auto mver = ChunkVersion::parse(versions["shardVersion"]);
     ASSERT_EQ(ChunkVersion(migratedChunk.getVersion().majorVersion() + 1,
                            1,
                            migratedChunk.getVersion().epoch(),
@@ -148,7 +148,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
               mver);
 
     // Verify that a collection version is returned
-    auto cver = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["collectionVersion"]);
+    auto cver = ChunkVersion::parse(versions["collectionVersion"]);
     ASSERT_TRUE(mver.isOlderOrEqualThan(cver));
 
     // Verify the chunks ended up in the right shards.
@@ -222,11 +222,11 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
 
     // Verify the version returned matches expected value.
     BSONObj versions = resultBSON.getValue();
-    auto mver = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["shardVersion"]);
+    auto mver = ChunkVersion::parse(versions["shardVersion"]);
     ASSERT_EQ(ChunkVersion(0, 0, origVersion.epoch(), origVersion.getTimestamp()), mver);
 
     // Verify that a collection version is returned
-    auto cver = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["collectionVersion"]);
+    auto cver = ChunkVersion::parse(versions["collectionVersion"]);
     ASSERT_EQ(ChunkVersion(origMajorVersion + 1, 0, collEpoch, collTimestamp), cver);
 
     // Verify the chunk ended up in the right shard.
@@ -288,7 +288,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
 
     // Verify the version returned matches expected value.
     BSONObj versions = resultBSON.getValue();
-    auto mver = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["shardVersion"]);
+    auto mver = ChunkVersion::parse(versions["shardVersion"]);
     ASSERT_EQ(ChunkVersion(0, 0, origVersion.epoch(), origVersion.getTimestamp()), mver);
 
     // Verify the chunk ended up in the right shard.
@@ -525,7 +525,7 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
 
     // Verify the versions returned match expected values.
     BSONObj versions = resultBSON.getValue();
-    auto mver = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["shardVersion"]);
+    auto mver = ChunkVersion::parse(versions["shardVersion"]);
     ASSERT_EQ(ChunkVersion(0, 0, origVersion.epoch(), origVersion.getTimestamp()), mver);
 
     // Verify the chunks ended up in the right shards.

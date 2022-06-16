@@ -1683,7 +1683,7 @@ void ExecCommandDatabase::_initiateCommand() {
 
         boost::optional<ChunkVersion> shardVersion;
         if (auto shardVersionElem = request.body[ChunkVersion::kShardVersionField]) {
-            shardVersion = ChunkVersion::fromBSONPositionalOrNewerFormat(shardVersionElem);
+            shardVersion = ChunkVersion::parse(shardVersionElem);
         }
 
         boost::optional<DatabaseVersion> databaseVersion;

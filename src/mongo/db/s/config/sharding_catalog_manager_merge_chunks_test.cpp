@@ -119,8 +119,8 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
                                                       _shardId,
                                                       validAfter));
 
-    auto collVersion = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["collectionVersion"]);
-    auto shardVersion = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["shardVersion"]);
+    auto collVersion = ChunkVersion::parse(versions["collectionVersion"]);
+    auto shardVersion = ChunkVersion::parse(versions["shardVersion"]);
 
     ASSERT_TRUE(origVersion.isOlderThan(shardVersion));
     ASSERT_EQ(collVersion, shardVersion);

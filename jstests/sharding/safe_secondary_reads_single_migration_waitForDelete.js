@@ -512,7 +512,7 @@ for (let command of commands) {
                                     {"command.shardVersion.0": {"$exists": true}},
                                     {
                                         "command.shardVersion.0":
-                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion[0]}
+                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion.v}
                                     },
                                 ]
                             },
@@ -521,7 +521,7 @@ for (let command of commands) {
                                     {"command.shardVersion.v": {"$exists": true}},
                                     {
                                         "command.shardVersion.v":
-                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion[0]}
+                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion.v}
                                     },
                                 ]
                             },
@@ -534,7 +534,7 @@ for (let command of commands) {
                                     {"command.shardVersion.1": {"$exists": true}},
                                     {
                                         "command.shardVersion.1":
-                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion[1]}
+                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion.e}
                                     },
                                 ]
                             },
@@ -543,7 +543,7 @@ for (let command of commands) {
                                     {"command.shardVersion.e": {"$exists": true}},
                                     {
                                         "command.shardVersion.e":
-                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion[1]}
+                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion.e}
                                     },
                                 ]
                             },

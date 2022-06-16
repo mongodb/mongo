@@ -66,9 +66,9 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandNoSecondaryThrottle) {
                                    << "uuid" << uuid << "min" << BSON("a" << -100LL) << "max"
                                    << BSON("a" << 100LL) << "shard"
                                    << "TestShard0000"
-                                   << "lastmod" << Date_t::fromMillisSinceEpoch(version.toLong())
-                                   << "lastmodEpoch" << version.epoch() << "lastmodTimestamp"
-                                   << version.getTimestamp())));
+                                   << "lastmod"
+                                   << BSON("e" << version.epoch() << "t" << version.getTimestamp()
+                                               << "v" << Timestamp(version.toLong())))));
     const auto& chunk = request.getChunk();
     ASSERT_EQ("TestDB.TestColl", request.getNss().ns());
     ASSERT_BSONOBJ_EQ(BSON("a" << -100LL), chunk.getMin());
@@ -81,7 +81,7 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandNoSecondaryThrottle) {
               secondaryThrottle.getSecondaryThrottle());
 }
 
-TEST(BalanceChunkRequest, ParseFromConfigCommandWithUUID) {
+TEST(BalanceChunkRequest, ParseFromConfigCommandWithUUIDNoSecondaryThrottle) {
     const auto uuid = UUID::gen();
     const ChunkVersion version(1, 0, OID::gen(), Timestamp(1, 1));
     auto request = assertGet(BalanceChunkRequest::parseFromConfigCommand(
@@ -90,9 +90,9 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandWithUUID) {
                                    << "uuid" << uuid << "min" << BSON("a" << -100LL) << "max"
                                    << BSON("a" << 100LL) << "shard"
                                    << "TestShard0000"
-                                   << "lastmod" << Date_t::fromMillisSinceEpoch(version.toLong())
-                                   << "lastmodEpoch" << version.epoch() << "lastmodTimestamp"
-                                   << version.getTimestamp())));
+                                   << "lastmod"
+                                   << BSON("e" << version.epoch() << "t" << version.getTimestamp()
+                                               << "v" << Timestamp(version.toLong())))));
     const auto& chunk = request.getChunk();
     ASSERT_EQ(uuid, chunk.getCollectionUUID());
     ASSERT_BSONOBJ_EQ(BSON("a" << -100LL), chunk.getMin());
@@ -108,15 +108,18 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandWithUUID) {
 TEST(BalanceChunkRequest, ParseFromConfigCommandWithSecondaryThrottle) {
     const auto uuid{UUID::gen()};
     const ChunkVersion version(1, 0, OID::gen(), Timestamp(1, 1));
-    auto request = assertGet(BalanceChunkRequest::parseFromConfigCommand(BSON(
-        "_configsvrMoveChunk"
-        << 1 << "ns"
-        << "TestDB.TestColl"
-        << "uuid" << uuid << "min" << BSON("a" << -100LL) << "max" << BSON("a" << 100LL) << "shard"
-        << "TestShard0000"
-        << "lastmod" << Date_t::fromMillisSinceEpoch(version.toLong()) << "lastmodEpoch"
-        << version.epoch() << "lastmodTimestamp" << version.getTimestamp() << "secondaryThrottle"
-        << BSON("_secondaryThrottle" << true << "writeConcern" << BSON("w" << 2)))));
+    auto request = assertGet(BalanceChunkRequest::parseFromConfigCommand(
+        BSON("_configsvrMoveChunk"
+             << 1 << "ns"
+             << "TestDB.TestColl"
+             << "uuid" << uuid << "min" << BSON("a" << -100LL) << "max" << BSON("a" << 100LL)
+             << "shard"
+             << "TestShard0000"
+             << "lastmod"
+             << BSON("e" << version.epoch() << "t" << version.getTimestamp() << "v"
+                         << Timestamp(version.toLong()))
+             << "secondaryThrottle"
+             << BSON("_secondaryThrottle" << true << "writeConcern" << BSON("w" << 2)))));
     const auto& chunk = request.getChunk();
     ASSERT_EQ("TestDB.TestColl", request.getNss().ns());
     ASSERT_BSONOBJ_EQ(BSON("a" << -100LL), chunk.getMin());

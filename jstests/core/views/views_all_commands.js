@@ -645,7 +645,7 @@ let viewsCommandTests = {
             max: {x: 0},
             keyPattern: {x: 1},
             splitKeys: [{x: -2}, {x: -1}],
-            shardVersion: [Timestamp(1, 2), ObjectId(), Timestamp(1, 1)]
+            shardVersion: {t: Timestamp(1, 2), e: ObjectId(), v: Timestamp(1, 1)}
         },
         skipSharded: true,
         expectFailure: true,

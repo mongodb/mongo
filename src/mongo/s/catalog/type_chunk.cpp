@@ -64,8 +64,6 @@ const BSONField<BSONObj> ChunkType::max("max");
 const BSONField<std::string> ChunkType::shard("shard");
 const BSONField<bool> ChunkType::jumbo("jumbo");
 const BSONField<Date_t> ChunkType::lastmod("lastmod");
-const BSONField<OID> ChunkType::epoch("lastmodEpoch");
-const BSONField<Timestamp> ChunkType::timestamp("lastmodTimestamp");
 const BSONField<BSONObj> ChunkType::history("history");
 const BSONField<int64_t> ChunkType::estimatedSizeBytes("estimatedDataSizeBytes");
 const BSONField<bool> ChunkType::historyIsAt40("historyIsAt40");
@@ -444,7 +442,7 @@ StatusWith<ChunkType> ChunkType::parseFromNetworkRequest(const BSONObj& source) 
     }
 
     // Parse version.
-    chunk._version = ChunkVersion::fromBSONLegacyOrNewerFormat(source, ChunkType::lastmod());
+    chunk._version = ChunkVersion::parse(source[ChunkType::lastmod()]);
 
     return chunk;
 }

@@ -123,8 +123,7 @@ StatusWith<CommitChunkMigrationRequest> CommitChunkMigrationRequest::createFromC
     }
 
     try {
-        auto fromShardVersion =
-            ChunkVersion::fromBSONPositionalOrNewerFormat(obj[kFromShardCollectionVersion]);
+        auto fromShardVersion = ChunkVersion::parse(obj[kFromShardCollectionVersion]);
         request._collectionEpoch = fromShardVersion.epoch();
         request._collectionTimestamp = fromShardVersion.getTimestamp();
     } catch (const DBException& ex) {
@@ -164,7 +163,7 @@ void CommitChunkMigrationRequest::appendAsCommand(BSONObjBuilder* builder,
     {
         BSONObjBuilder migrateChunk(builder->subobjStart(kMigratedChunk));
         migratedChunk.getRange().append(&migrateChunk);
-        migratedChunk.getVersion().appendLegacyWithField(&migrateChunk, ChunkType::lastmod());
+        migratedChunk.getVersion().serializeToBSON(ChunkType::lastmod(), &migrateChunk);
     }
     fromShardCollectionVersion.serializeToBSON(kFromShardCollectionVersion, builder);
     builder->append(kValidAfter, validAfter);

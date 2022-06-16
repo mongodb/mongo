@@ -207,8 +207,6 @@ public:
     static const BSONField<std::string> shard;
     static const BSONField<bool> jumbo;
     static const BSONField<Date_t> lastmod;
-    static const BSONField<OID> epoch;
-    static const BSONField<Timestamp> timestamp;
     static const BSONField<BSONObj> history;
     static const BSONField<int64_t> estimatedSizeBytes;
     static const BSONField<bool> historyIsAt40;

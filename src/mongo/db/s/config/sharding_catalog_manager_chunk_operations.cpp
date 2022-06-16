@@ -87,7 +87,7 @@ void appendShortVersion(BufBuilder* out, const ChunkType& chunk) {
     bb.append(ChunkType::min(), chunk.getMin());
     bb.append(ChunkType::max(), chunk.getMax());
     if (chunk.isVersionSet()) {
-        chunk.getVersion().appendLegacyWithField(&bb, ChunkType::lastmod());
+        chunk.getVersion().serializeToBSON(ChunkType::lastmod(), &bb);
     }
     bb.done();
 }
@@ -684,7 +684,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
         BSONObjBuilder b(logDetail.subobjStart("before"));
         b.append(ChunkType::min(), range.getMin());
         b.append(ChunkType::max(), range.getMax());
-        collVersion.appendLegacyWithField(&b, ChunkType::lastmod());
+        collVersion.serializeToBSON(ChunkType::lastmod(), &b);
     }
 
     if (splitChunkResult.newChunks->size() == 2) {
@@ -960,8 +960,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
             b.append(chunkToMerge.toConfigBSON());
         }
     }
-    initialVersion.appendLegacyWithField(&logDetail, "prevShardVersion");
-    mergeVersion.appendLegacyWithField(&logDetail, "mergedVersion");
+    initialVersion.serializeToBSON("prevShardVersion", &logDetail);
+    mergeVersion.serializeToBSON("mergedVersion", &logDetail);
     logDetail.append("owningShard", shardId);
 
     ShardingLogging::get(opCtx)->logChange(

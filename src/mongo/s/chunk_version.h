@@ -67,8 +67,6 @@ protected:
  * 2. (0, n), n > 0 - applicable only to shardVersion; shard has no chunk.
  * 3. (n, 0), n > 0 - invalid configuration.
  * 4. (n, m), n > 0, m > 0 - normal sharded collection version.
- *
- * TODO (SERVER-65530): Get rid of all the legacy format parsers/serialisers
  */
 class ChunkVersion : public CollectionGeneration {
 public:
@@ -83,23 +81,6 @@ public:
           _combined(static_cast<uint64_t>(minor) | (static_cast<uint64_t>(major) << 32)) {}
 
     ChunkVersion() : ChunkVersion(0, 0, OID(), Timestamp()) {}
-
-    /**
-     * Allow parsing a chunk version with the following formats:
-     *  {<field>:(major, minor), <fieldEpoch>:epoch, <fieldTimestmap>:timestamp}
-     *  {<field>: {t:timestamp, e:epoch, v:(major, minor) }}
-     * TODO SERVER-63403: remove this function and only parse the new format.
-     */
-    static ChunkVersion fromBSONLegacyOrNewerFormat(const BSONObj& obj, StringData field = "");
-
-    /**
-     * Allow parsing a chunk version with the following formats:
-     *  [major, minor, epoch, <optional canThrowSSVOnIgnored>, timestamp]
-     *  {0:major, 1:minor, 2:epoch, 3:<optional canThrowSSVOnIgnored>, 4:timestamp}
-     *  {t:timestamp, e:epoch, v:(major, minor)}
-     * TODO SERVER-63403: remove this function and only parse the new format.
-     */
-    static ChunkVersion fromBSONPositionalOrNewerFormat(const BSONElement& element);
 
     /**
      * Indicates that the collection is not sharded.
@@ -216,20 +197,6 @@ public:
     static ChunkVersion parse(const BSONElement& element);
     void serializeToBSON(StringData field, BSONObjBuilder* builder) const;
 
-    /**
-     * NOTE: This format is being phased out. Use serializeToBSON instead.
-     *
-     * Serializes the version held by this object to 'out' in the legacy form:
-     *  { ..., <field>: [ <combined major/minor> ],
-     *         <field>Epoch: [ <OID epoch> ],
-     *         <field>Timestamp: [ <Timestamp> ] ... }
-     *  or
-     *  { ..., <field> : {t: <Timestamp>, e: <OID>, v: <major/minor>}}.
-     *
-     * Depending on the FCV version
-     */
-    void appendLegacyWithField(BSONObjBuilder* out, StringData field) const;
-
     std::string toString() const;
 
     // Methods that are here for the purposes of parsing of ShardCollectionType only
@@ -237,28 +204,6 @@ public:
         const BSONElement& element);
     void serialiseMajorMinorVersionOnlyForShardCollectionType(StringData field,
                                                               BSONObjBuilder* builder) const;
-
-private:
-    // The following static functions will be deprecated. Only one function should be used to parse
-    // ChunkVersion and is fromBSON.
-    /**
-     * The method below parse the "positional" formats of:
-     *
-     *  [major, minor, epoch, <optional canThrowSSVOnIgnored> timestamp]
-     *      OR
-     *  {0: major, 1:minor, 2:epoch, 3:<optional canThrowSSVOnIgnored>, 4:timestamp}
-     *
-     * The latter format was introduced by mistake in 4.4 and is no longer generated from 5.3
-     * onwards, but it is backwards compatible with the 5.2 and older binaries.
-     */
-    static ChunkVersion _parseArrayOrObjectPositionalFormat(const BSONObj& obj);
-
-    /**
-     * Parses the BSON formatted by appendLegacyWithField. If the field is missing, returns
-     * 'NoSuchKey', otherwise if the field is not properly formatted can return any relevant parsing
-     * error (BadValue, TypeMismatch, etc).
-     */
-    static StatusWith<ChunkVersion> _parseLegacyWithField(const BSONObj& obj, StringData field);
 
 private:
     // The combined major/minor version, which exists as subordinate to the collection generation

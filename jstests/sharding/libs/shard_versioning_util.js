@@ -5,7 +5,11 @@ var ShardVersioningUtil = (function() {
     /*
      * Shard version indicating that shard version checking must be skipped.
      */
-    const kIgnoredShardVersion = [Timestamp(0, 0), ObjectId("00000000ffffffffffffffff")];
+    const kIgnoredShardVersion = {
+        e: ObjectId("00000000ffffffffffffffff"),
+        t: Timestamp(Math.pow(2, 32) - 1, Math.pow(2, 32) - 1),
+        v: Timestamp(0, 0)
+    };
 
     /*
      * Returns the metadata for the collection in the shard's catalog cache.

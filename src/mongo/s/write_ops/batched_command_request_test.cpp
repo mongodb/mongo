@@ -60,14 +60,15 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
     BSONArray insertArray = BSON_ARRAY(BSON("a" << 1) << BSON("b" << 1));
 
     const OID epoch = OID::gen();
-    const Timestamp majorAndMinor(1, 2);
     const Timestamp timestamp(2, 2);
+    const Timestamp majorAndMinor(1, 2);
 
     BSONObj origInsertRequestObj = BSON("insert"
                                         << "test"
                                         << "documents" << insertArray << "writeConcern"
                                         << BSON("w" << 1) << "ordered" << true << "shardVersion"
-                                        << BSON_ARRAY(majorAndMinor << epoch << timestamp));
+                                        << BSON("e" << epoch << "t" << timestamp << "v"
+                                                    << majorAndMinor));
 
     for (auto docSeq : {false, true}) {
         const auto opMsgRequest(toOpMsg("TestDB", origInsertRequestObj, docSeq));
