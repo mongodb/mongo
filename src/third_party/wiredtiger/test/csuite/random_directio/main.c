@@ -481,7 +481,7 @@ thread_ckpt_run(void *arg)
      * Keep a separate file with the records we wrote for checking.
      */
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
-    for (i = 0;; ++i) {
+    for (i = 1;; ++i) {
         sleep_time = __wt_random(&rnd) % MAX_CKPT_INVL;
         sleep(sleep_time);
         testutil_check(session->checkpoint(session, NULL));
@@ -507,7 +507,7 @@ thread_flush_run(void *arg)
 
     td = (WT_THREAD_DATA *)arg;
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
-    for (i = 0;;) {
+    for (i = 1;; ++i) {
         sleep_time = __wt_random(&rnd) % MAX_FLUSH_INVL;
         sleep(sleep_time);
         /*
@@ -517,7 +517,7 @@ thread_flush_run(void *arg)
         testutil_check(pthread_rwlock_wrlock(&flush_lock));
         testutil_check(session->flush_tier(session, NULL));
         testutil_check(pthread_rwlock_unlock(&flush_lock));
-        printf("Flush tier %" PRIu32 " completed.\n", ++i);
+        printf("Flush tier %" PRIu32 " completed.\n", i);
         fflush(stdout);
     }
     /* NOTREACHED */
