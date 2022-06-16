@@ -27,6 +27,7 @@
  */
 
 #include "src/common/constants.h"
+#include "src/common/logger.h"
 #include "src/common/random_generator.h"
 #include "src/component/operation_tracker.h"
 #include "src/main/test.h"
@@ -140,7 +141,6 @@ class cache_resize : public test {
               random_generator::instance().generate_pseudo_random_string(tc->key_size);
             const uint64_t cache_size =
               ((WT_CONNECTION_IMPL *)connection_manager::instance().get_connection())->cache_size;
-            /* Take into account the value size given in the test configuration file. */
             const std::string value = std::to_string(cache_size);
 
             tc->txn.try_begin();
@@ -165,7 +165,7 @@ class cache_resize : public test {
     validate(const std::string &operation_table_name, const std::string &,
       const std::vector<uint64_t> &) override final
     {
-        bool first_record = false;
+        bool first_record = true;
         int ret;
         uint64_t cache_size, num_records = 0, prev_txn_id;
         const uint64_t cache_size_500mb = 500000000;
@@ -223,8 +223,11 @@ class cache_resize : public test {
                  */
             }
             prev_txn_id = tracked_txn_id;
-            /* Save the last cache size seen by the transaction. */
-            cache_size = std::stoull(tracked_cache_size);
+            /*
+             * FIXME-WT-9339 - Save the last cache size seen by the transaction.
+             *
+             * cache_size = std::stoull(tracked_cache_size);
+             */
             ++num_records;
         }
         /* All records have been parsed, the last one still needs the be checked. */
