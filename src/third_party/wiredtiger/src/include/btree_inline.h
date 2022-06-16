@@ -1451,6 +1451,23 @@ __wt_row_leaf_value_cell(
 }
 
 /*
+ * WT_ADDR_COPY --
+ *	We have to lock the WT_REF to look at a WT_ADDR: a structure we can use to quickly get a
+ * copy of the WT_REF address information.
+ */
+struct __wt_addr_copy {
+    uint8_t type;
+
+    uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
+    uint8_t size;
+
+    WT_TIME_AGGREGATE ta;
+
+    WT_PAGE_DELETED del; /* Fast-truncate page information */
+    bool del_set;
+};
+
+/*
  * __wt_ref_addr_copy --
  *     Return a copy of the WT_REF address information.
  */
@@ -1463,6 +1480,7 @@ __wt_ref_addr_copy(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY *copy)
 
     unpack = &_unpack;
     page = ref->home;
+    copy->del_set = false;
 
     /*
      * To look at an on-page cell, we need to look at the parent page's disk image, and that can be
@@ -1488,7 +1506,7 @@ __wt_ref_addr_copy(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY *copy)
     /* If on-page, the pointer references a cell. */
     __wt_cell_unpack_addr(session, page->dsk, (WT_CELL *)addr, unpack);
     WT_TIME_AGGREGATE_COPY(&copy->ta, &unpack->ta);
-    copy->type = 0; /* Avoid static analyzer uninitialized value complaints. */
+
     switch (unpack->raw) {
     case WT_CELL_ADDR_INT:
         copy->type = WT_ADDR_INT;
@@ -1496,6 +1514,20 @@ __wt_ref_addr_copy(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY *copy)
     case WT_CELL_ADDR_LEAF:
         copy->type = WT_ADDR_LEAF;
         break;
+    case WT_CELL_ADDR_DEL:
+        /* Copy out any fast-truncate information. */
+        copy->del_set = true;
+        if (F_ISSET(page->dsk, WT_PAGE_FT_UPDATE))
+            copy->del = unpack->page_del;
+        else {
+            /* It's a legacy page; create default delete information. */
+            copy->del.txnid = WT_TXN_NONE;
+            copy->del.timestamp = copy->del.durable_timestamp = WT_TS_NONE;
+            copy->del.prepare_state = 0;
+            copy->del.previous_ref_state = WT_REF_DISK;
+            copy->del.committed = true;
+        }
+        /* FALLTHROUGH */
     case WT_CELL_ADDR_LEAF_NO:
         copy->type = WT_ADDR_LEAF_NO;
         break;
@@ -1524,27 +1556,55 @@ __wt_ref_block_free(WT_SESSION_IMPL *session, WT_REF *ref)
 }
 
 /*
+ * __wt_page_del_visible --
+ *     Return if a truncate operation is visible to the caller.
+ */
+static inline bool
+__wt_page_del_visible(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, bool visible_all)
+{
+    uint8_t prepare_state;
+
+    /*
+     * In general usage, a NULL WT_PAGE_DELETED is a truncate operation whose details were discarded
+     * when it became globally visible.
+     */
+    if (page_del == NULL)
+        return (true);
+
+    /* We discard page_del on transaction abort, so should never see an aborted one. */
+    WT_ASSERT(session, page_del->txnid != WT_TXN_ABORTED);
+
+    WT_ORDERED_READ(prepare_state, page_del->prepare_state);
+    if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED)
+        return (false);
+
+    return (visible_all ?
+        __wt_txn_visible_all(session, page_del->txnid, page_del->durable_timestamp) :
+        __wt_txn_visible(session, page_del->txnid, page_del->timestamp));
+}
+
+/*
  * __wt_page_del_active --
  *     Return if a truncate operation is active.
  */
 static inline bool
 __wt_page_del_active(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
 {
-    WT_PAGE_DELETED *page_del;
-    uint8_t prepare_state;
-
+    /*
+     * Return if a truncate operation is active: "active" means approximately that the truncate is
+     * still in progress, that is, that the underlying original page may still be required. This
+     * function in practice is actually a visibility test (it returns whether the truncate is *not*
+     * visible) and should be renamed and have its sense flipped to be more consistent with the rest
+     * of the system.
+     *
+     * Our caller should have already locked the WT_REF and confirmed that the previous state was
+     * WT_REF_DELETED. Consequently there are two possible cases: either ft_info.del is NULL (in
+     * which case the deletion is globally visible and cannot be rolled back) or it is not, in which
+     * case the information in ft_info.del gives us the visibility.
+     */
     WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 
-    if ((page_del = ref->ft_info.del) == NULL)
-        return (false);
-    if (page_del->txnid == WT_TXN_ABORTED)
-        return (false);
-    WT_ORDERED_READ(prepare_state, page_del->prepare_state);
-    if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED)
-        return (true);
-    return (visible_all ?
-        !__wt_txn_visible_all(session, page_del->txnid, page_del->durable_timestamp) :
-        !__wt_txn_visible(session, page_del->txnid, page_del->timestamp));
+    return (!__wt_page_del_visible(session, ref->ft_info.del, visible_all));
 }
 
 /*
@@ -1719,15 +1779,18 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
     page = ref->page;
     mod = page->modify;
 
-    /* Never modified pages can always be evicted. */
+    /* Pages without modify structures can always be evicted, it's just discarding a disk image. */
     if (mod == NULL)
         return (true);
 
     /*
-     * If a fast-truncate page is subsequently instantiated, it can become an eviction candidate. If
-     * the fast-truncate itself has not resolved when the page is instantiated, a list of updates is
-     * created, which will be discarded as part of transaction resolution. Don't attempt to evict a
-     * fast-truncate page until any update list has been removed.
+     * Check the fast-truncate information. Pages with an uncommitted truncate cannot be evicted.
+     *
+     * Because the page is in memory, we look at ft_info.update. If it's not NULL, that means the
+     * truncate operation isn't committed.
+     *
+     * The list of updates in ft_info.update will be discarded when the transaction they belong to
+     * is resolved.
      */
     if (ref->ft_info.update != NULL)
         return (false);
@@ -2065,6 +2128,7 @@ __wt_btcur_skip_page(
   WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool visible_all, bool *skipp)
 {
     WT_ADDR_COPY addr;
+    WT_BTREE *btree;
     uint8_t previous_state;
 
     WT_UNUSED(context);
@@ -2072,38 +2136,76 @@ __wt_btcur_skip_page(
 
     *skipp = false; /* Default to reading */
 
+    btree = S2BT(session);
+
     /* Don't skip pages in FLCS trees; deleted records need to read back as 0. */
-    if (S2BT(session)->type == BTREE_COL_FIX)
+    if (btree->type == BTREE_COL_FIX)
         return (0);
 
     /*
      * Determine if all records on the page have been deleted and all the tombstones are visible to
      * our transaction. If so, we can avoid reading the records on the page and move to the next
-     * page. We base this decision on the aggregate stop point added to the page during the last
-     * reconciliation. We can skip this test if the page has been modified since it was reconciled.
-     * We also skip this test on an internal page, as we rely on reconciliation to mark the internal
-     * page dirty. There could be a period of time when the internal page is marked clean but the
-     * leaf page is dirty and has newer data than let on by the internal page's aggregated
-     * information.
+     * page.
      *
-     * We are making these decisions while holding a lock for the page as checkpoint or eviction can
-     * make changes to the data structures (i.e., aggregate timestamps) we are reading. It is okay
-     * if the page is not in memory, or gets evicted before we lock it. In such a case, we can forgo
-     * checking if the page has been modified. So, only do a page modified check if the page was in
-     * memory before locking.
+     * Skip this test on an internal page, as we rely on reconciliation to mark the internal page
+     * dirty. There could be a period of time when the internal page is marked clean but the leaf
+     * page is dirty and has newer data than let on by the internal page's aggregated information.
      */
     if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
         return (0);
 
+    /*
+     * We are making these decisions while holding a lock for the page as checkpoint or eviction can
+     * make changes to the data structures (i.e., aggregate timestamps) we are reading.
+     */
     WT_REF_LOCK(session, ref, &previous_state);
-    if ((previous_state == WT_REF_DISK || previous_state == WT_REF_DELETED ||
-          (previous_state == WT_REF_MEM && !__wt_page_is_modified(ref->page))) &&
-      __wt_ref_addr_copy(session, ref, &addr) && addr.ta.newest_stop_txn != WT_TXN_MAX &&
-      addr.ta.newest_stop_ts != WT_TS_MAX &&
-      __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts))
+
+    /*
+     * Check the fast-truncate information, there are 4 cases:
+     *
+     * (1) The page is in the WT_REF_DELETED state and ft_info.del is NULL. The page is deleted.
+     * (2) The page is in the WT_REF_DELETED state and ft_info.del is not NULL. The page is deleted
+     *     if the truncate operation is visible. Look at ft_info.del; we could use the info from the
+     *     address cell below too, but that's slower.
+     * (3) The page is in the WT_REF_DISK state. The page may be deleted; check the delete info from
+     *     the address cell.
+     * (4) The page is in memory and has been instantiated. The delete info from the address cell
+     *     will serve for readonly/unmodified pages, and for modified pages we can't skip the page
+     *     anyway.
+     */
+    if (previous_state == WT_REF_DELETED &&
+      (ref->ft_info.del == NULL ||
+        __wt_txn_visible(session, ref->ft_info.del->txnid, ref->ft_info.del->timestamp))) {
         *skipp = true;
+        goto unlock;
+    }
 
+    /*
+     * Look at the disk address, if it exists, and if the page is unmodified. We must skip this test
+     * if the page has been modified since it was reconciled, since neither the delete information
+     * nor the timestamp information is necessarily up to date.
+     */
+    if ((previous_state == WT_REF_DISK ||
+          (previous_state == WT_REF_MEM && !__wt_page_is_modified(ref->page))) &&
+      __wt_ref_addr_copy(session, ref, &addr)) {
+        /* If there's delete information in the disk address, we can use it. */
+        if (addr.del_set && __wt_txn_visible(session, addr.del.txnid, addr.del.timestamp)) {
+            *skipp = true;
+            goto unlock;
+        }
+
+        /*
+         * Otherwise, check the timestamp information. We base this decision on the aggregate stop
+         * point added to the page during the last reconciliation.
+         */
+        if (addr.ta.newest_stop_txn != WT_TXN_MAX && addr.ta.newest_stop_ts != WT_TS_MAX &&
+          __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts)) {
+            *skipp = true;
+            goto unlock;
+        }
+    }
+
+unlock:
     WT_REF_UNLOCK(ref, previous_state);
-
     return (0);
 }

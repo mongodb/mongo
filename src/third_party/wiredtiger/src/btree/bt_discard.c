@@ -215,6 +215,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
     __wt_ovfl_discard_free(session, page);
 
     __wt_free(session, page->modify->ovfl_track);
+    __wt_free(session, page->modify->page_del);
     __wt_spin_destroy(session, &page->modify->page_lock);
 
     __wt_free(session, page->modify);

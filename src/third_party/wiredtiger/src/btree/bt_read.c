@@ -95,6 +95,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     WT_DECL_RET;
     WT_ITEM tmp;
     WT_PAGE *notused;
+    WT_PAGE_DELETED *del;
     uint32_t page_flags;
     uint8_t previous_state;
     bool prepare;
@@ -155,15 +156,32 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     if (prepare)
         WT_ERR(__wt_page_inmem_prepare(session, ref));
 
-skip_read:
     /*
      * In the case of a fast delete, move all of the page's records to a deleted state based on the
      * fast-delete information. Skip for special commands that don't care about an in-memory state.
+     *
+     * Note: there are three possible cases - the state was WT_REF_DELETED and ft_info.del was NULL;
+     * the state was WT_REF_DELETED and ft_info.del was non-NULL; and the state was WT_REF_DISK and
+     * the parent page cell was a WT_CELL_ADDR_DEL cell. The last is only valid in a readonly tree.
+     *
+     * ft_info.del gets cleared and set to NULL if the deletion is found to be globally visible;
+     * this can happen in any of several places.
      */
-    if (previous_state == WT_REF_DELETED &&
-      !F_ISSET(S2BT(session), WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-        WT_ERR(__wt_delete_page_instantiate(session, ref));
+    del = NULL;
+    if (previous_state == WT_REF_DISK) {
+        WT_ASSERT(session, ref->ft_info.del == NULL);
+        if (addr.del_set) {
+            WT_ASSERT(session, F_ISSET(S2BT(session), WT_BTREE_READONLY));
+            del = &addr.del;
+        }
+    } else
+        del = ref->ft_info.del;
 
+    if ((previous_state == WT_REF_DELETED || del != NULL) &&
+      !F_ISSET(S2BT(session), WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
+        WT_ERR(__wt_delete_page_instantiate(session, ref, del));
+
+skip_read:
     F_CLR(ref, WT_REF_FLAG_READING);
     WT_REF_SET_STATE(ref, WT_REF_MEM);
 
@@ -225,7 +243,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
          ;) {
         switch (current_state = ref->state) {
         case WT_REF_DELETED:
-            if (LF_ISSET(WT_READ_NO_WAIT))
+            /* Optionally limit reads to cache-only. */
+            if (LF_ISSET(WT_READ_CACHE | WT_READ_NO_WAIT))
                 return (WT_NOTFOUND);
             if (LF_ISSET(WT_READ_SKIP_DELETED) &&
               __wt_delete_page_skip(session, ref, !F_ISSET(txn, WT_TXN_HAS_SNAPSHOT)))

@@ -38,6 +38,7 @@ func_ok()
 	    -e '/int __config_parser_close$/d' \
 	    -e '/int __curlog_reset$/d' \
 	    -e '/int __cursor_fix_implicit$/d' \
+	    -e '/int __delete_redo_window_cleanup_skip$/d' \
 	    -e '/int __handle_close_default$/d' \
 	    -e '/int __handle_progress_default$/d' \
 	    -e '/int __im_file_close$/d' \
