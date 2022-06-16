@@ -598,6 +598,7 @@ static WT_THREAD_RET
 thread_flush_run(void *arg)
 {
     THREAD_DATA *td;
+    WT_DECL_RET;
     WT_RAND_STATE rnd;
     WT_SESSION *session;
     uint32_t i, sleep_time;
@@ -614,9 +615,12 @@ thread_flush_run(void *arg)
          * expect the defaults are what MongoDB wants for now.
          */
         testutil_check(pthread_rwlock_wrlock(&flush_lock));
-        testutil_check(session->flush_tier(session, NULL));
+        if ((ret = session->flush_tier(session, NULL)) != 0) {
+            if (ret != EBUSY)
+                testutil_die(ret, "session.flush_tier");
+        } else
+            printf("Flush tier %" PRIu32 " completed.\n", ++i);
         testutil_check(pthread_rwlock_unlock(&flush_lock));
-        printf("Flush tier %" PRIu32 " completed.\n", ++i);
         fflush(stdout);
     }
     /* NOTREACHED */

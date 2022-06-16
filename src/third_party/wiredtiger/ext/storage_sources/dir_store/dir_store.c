@@ -129,7 +129,7 @@ static int dir_store_configure_int(DIR_STORE *, WT_CONFIG_ARG *, const char *, u
 static int dir_store_delay(DIR_STORE *);
 static int dir_store_err(DIR_STORE *, WT_SESSION *, int, const char *, ...);
 static int dir_store_file_copy(
-  DIR_STORE *, WT_SESSION *, const char *, const char *, WT_FS_OPEN_FILE_TYPE);
+  DIR_STORE *, WT_SESSION *, const char *, const char *, WT_FS_OPEN_FILE_TYPE, bool);
 static int dir_store_get_directory(const char *, const char *, ssize_t len, bool, char **);
 static int dir_store_path(WT_FILE_SYSTEM *, const char *, const char *, char **);
 static int dir_store_stat(
@@ -608,7 +608,7 @@ dir_store_exist(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *na
  */
 static int
 dir_store_file_copy(DIR_STORE *dir_store, WT_SESSION *session, const char *src_path,
-  const char *dest_path, WT_FS_OPEN_FILE_TYPE type)
+  const char *dest_path, WT_FS_OPEN_FILE_TYPE type, bool enoent_okay)
 {
     WT_FILE_HANDLE *dest, *src;
     WT_FILE_SYSTEM *wt_fs;
@@ -633,7 +633,12 @@ dir_store_file_copy(DIR_STORE *dir_store, WT_SESSION *session, const char *src_p
     }
     if ((ret = wt_fs->fs_open_file(wt_fs, session, src_path, type, WT_FS_OPEN_READONLY, &src)) !=
       0) {
-        ret = dir_store_err(dir_store, session, ret, "%s: cannot open for read", src_path);
+        /*
+         * It is normal and possible that the source file was dropped. Don't print out an error
+         * message in that case, but still return the ENOENT error value.
+         */
+        if ((ret != 0 && ret != ENOENT) || (ret == ENOENT && !enoent_okay))
+            ret = dir_store_err(dir_store, session, ret, "%s: cannot open for read", src_path);
         goto err;
     }
 
@@ -708,7 +713,7 @@ dir_store_flush(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session, WT_FILE_
         goto err;
 
     if ((ret = dir_store_file_copy(
-           dir_store, session, src_path, dest_path, WT_FS_OPEN_FILE_TYPE_DATA)) != 0)
+           dir_store, session, src_path, dest_path, WT_FS_OPEN_FILE_TYPE_DATA, true)) != 0)
         goto err;
 
     dir_store->object_writes++;
@@ -1010,7 +1015,7 @@ dir_store_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *nam
             goto err;
 
         if ((ret = dir_store_file_copy(
-               dir_store, session, bucket_path, cache_path, WT_FS_OPEN_FILE_TYPE_DATA)) != 0)
+               dir_store, session, bucket_path, cache_path, WT_FS_OPEN_FILE_TYPE_DATA, false)) != 0)
             goto err;
 
         dir_store->object_reads++;
@@ -1143,6 +1148,7 @@ dir_store_remove_if_exists(
               FS2DS(file_system), session, errno, "%s: dir_store_remove stat", file_path);
             goto err;
         }
+        ret = 0;
     } else {
         if ((ret = wt_fs->fs_remove(wt_fs, session, file_path, flags)) != 0) {
             ret =
