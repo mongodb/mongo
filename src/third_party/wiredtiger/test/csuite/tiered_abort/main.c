@@ -250,7 +250,12 @@ thread_flush_run(void *arg)
     testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, sentinel_file));
     (void)unlink(buf);
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
-    for (i = 1;; ++i) {
+    /*
+     * Increment at the end of the loop so we only count actual calls to flush_tier and don't
+     * increment for skipping for the first checkpoint. The condition for creating the sentinel file
+     * requires proper counting.
+     */
+    for (i = 1;;) {
         sleep_time = __wt_random(&rnd) % MAX_FLUSH_INVL;
         sleep(sleep_time);
         testutil_check(td->conn->query_timestamp(td->conn, ts_string, "get=last_checkpoint"));
@@ -275,6 +280,7 @@ thread_flush_run(void *arg)
             testutil_assert_errno((fp = fopen(buf, "w")) != NULL);
             testutil_assert_errno(fclose(fp) == 0);
         }
+        ++i;
     }
     /* NOTREACHED */
 }
