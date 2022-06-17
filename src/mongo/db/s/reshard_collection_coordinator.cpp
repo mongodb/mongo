@@ -107,10 +107,7 @@ ReshardCollectionCoordinator::ReshardCollectionCoordinator(ShardingDDLCoordinato
 ReshardCollectionCoordinator::ReshardCollectionCoordinator(ShardingDDLCoordinatorService* service,
                                                            const BSONObj& initialState,
                                                            bool persistCoordinatorDocument)
-    : ShardingDDLCoordinator(service, initialState),
-      _initialState(initialState.getOwned()),
-      _doc(ReshardCollectionCoordinatorDocument::parse(
-          IDLParserErrorContext("ReshardCollectionCoordinatorDocument"), _initialState)),
+    : RecoverableShardingDDLCoordinator(service, initialState),
       _request(_doc.getReshardCollectionRequest()),
       _persistCoordinatorDocument(persistCoordinatorDocument) {}
 
@@ -148,27 +145,7 @@ void ReshardCollectionCoordinator::_enterPhase(Phase newPhase) {
     if (!_persistCoordinatorDocument) {
         return;
     }
-
-    StateDoc newDoc(_doc);
-    newDoc.setPhase(newPhase);
-
-    LOGV2_DEBUG(6206400,
-                2,
-                "Reshard collection coordinator phase transition",
-                "namespace"_attr = nss(),
-                "newPhase"_attr = ReshardCollectionCoordinatorPhase_serializer(newDoc.getPhase()),
-                "oldPhase"_attr = ReshardCollectionCoordinatorPhase_serializer(_doc.getPhase()));
-
-    if (_doc.getPhase() == Phase::kUnset) {
-        newDoc = _insertStateDocument(std::move(newDoc));
-    } else {
-        newDoc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
-    }
-
-    {
-        stdx::unique_lock ul{_docMutex};
-        _doc = std::move(newDoc);
-    }
+    RecoverableShardingDDLCoordinator::_enterPhase(newPhase);
 }
 
 ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
@@ -196,7 +173,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                     StateDoc newDoc(_doc);
                     newDoc.setOldShardKey(cmOld.getShardKeyPattern().getKeyPattern().toBSON());
                     newDoc.setOldCollectionUUID(cmOld.getUUID());
-                    _doc = _updateStateDocument(opCtx, std::move(newDoc));
+                    _updateStateDocument(opCtx, std::move(newDoc));
                 } else {
                     _doc.setOldShardKey(cmOld.getShardKeyPattern().getKeyPattern().toBSON());
                     _doc.setOldCollectionUUID(cmOld.getUUID());

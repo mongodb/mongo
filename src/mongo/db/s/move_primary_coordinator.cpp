@@ -46,12 +46,6 @@
 
 namespace mongo {
 
-MovePrimaryCoordinator::MovePrimaryCoordinator(ShardingDDLCoordinatorService* service,
-                                               const BSONObj& initialState)
-    : ShardingDDLCoordinator(service, initialState),
-      _doc(MovePrimaryCoordinatorDocument::parse(
-          IDLParserErrorContext("MovePrimaryCoordinatorDocument"), initialState)) {}
-
 boost::optional<BSONObj> MovePrimaryCoordinator::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {

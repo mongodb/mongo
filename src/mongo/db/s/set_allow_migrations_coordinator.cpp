@@ -50,14 +50,6 @@ bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
     }
 }
 
-SetAllowMigrationsCoordinator::SetAllowMigrationsCoordinator(ShardingDDLCoordinatorService* service,
-                                                             const BSONObj& initialState)
-    : ShardingDDLCoordinator(service, initialState),
-      _doc(SetAllowMigrationsCoordinatorDocument::parse(
-          IDLParserErrorContext("SetAllowMigrationsCoordinatorDocument"), initialState)),
-      _allowMigrations(_doc.getAllowMigrations()) {}
-
-
 void SetAllowMigrationsCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     // If we have two set allow migrations on the same namespace, then the arguments must be the
     // same.

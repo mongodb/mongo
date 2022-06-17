@@ -90,9 +90,7 @@ boost::optional<UUID> getCollectionUUID(OperationContext* opCtx,
 
 RenameCollectionCoordinator::RenameCollectionCoordinator(ShardingDDLCoordinatorService* service,
                                                          const BSONObj& initialState)
-    : ShardingDDLCoordinator(service, initialState),
-      _doc(RenameCollectionCoordinatorDocument::parse(
-          IDLParserErrorContext("RenameCollectionCoordinatorDocument"), initialState)),
+    : RecoverableShardingDDLCoordinator(service, initialState),
       _request(_doc.getRenameCollectionRequest()) {}
 
 void RenameCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
@@ -137,30 +135,6 @@ boost::optional<BSONObj> RenameCollectionCoordinator::reportForCurrentOp(
     bob.append("currentPhase", currPhase);
     bob.append("active", true);
     return bob.obj();
-}
-
-void RenameCollectionCoordinator::_enterPhase(Phase newPhase) {
-    StateDoc newDoc(_doc);
-    newDoc.setPhase(newPhase);
-
-    LOGV2_DEBUG(5460501,
-                2,
-                "Rename collection coordinator phase transition",
-                "fromNs"_attr = nss(),
-                "toNs"_attr = _request.getTo(),
-                "newPhase"_attr = RenameCollectionCoordinatorPhase_serializer(newDoc.getPhase()),
-                "oldPhase"_attr = RenameCollectionCoordinatorPhase_serializer(_doc.getPhase()));
-
-    if (_doc.getPhase() == Phase::kUnset) {
-        newDoc = _insertStateDocument(std::move(newDoc));
-    } else {
-        newDoc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
-    }
-
-    {
-        stdx::unique_lock ul{_docMutex};
-        _doc = std::move(newDoc);
-    }
 }
 
 ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
@@ -275,15 +249,15 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 if (!_firstExecution) {
-                    _doc = _updateSession(opCtx, _doc);
+                    _updateSession(opCtx);
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getCurrentSession(_doc), **executor);
+                        opCtx, getCurrentSession(), **executor);
                 }
 
                 const auto& fromNss = nss();
 
-                _doc = _updateSession(opCtx, _doc);
-                const OperationSessionInfo osi = getCurrentSession(_doc);
+                _updateSession(opCtx);
+                const OperationSessionInfo osi = getCurrentSession();
 
                 // On participant shards:
                 // - Block CRUD on source and target collection in case at least one
@@ -315,12 +289,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                 // For an unsharded collection the CSRS server can not verify the targetUUID.
                 // Use the session ID + txnNumber to ensure no stale requests get through.
-                _doc = _updateSession(opCtx, _doc);
-                const OperationSessionInfo osi = getCurrentSession(_doc);
+                _updateSession(opCtx);
 
                 if (!_firstExecution) {
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getCurrentSession(_doc), **executor);
+                        opCtx, getCurrentSession(), **executor);
                 }
 
                 ConfigsvrRenameCollectionMetadata req(nss(), _request.getTo());
@@ -328,12 +301,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(req.toBSON({}));
                 const auto& configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-
                 uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(
                     configShard->runCommand(opCtx,
                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                             "admin",
-                                            cmdObj.addFields(osi.toBSON()),
+                                            cmdObj.addFields(getCurrentSession().toBSON()),
                                             Shard::RetryPolicy::kIdempotent)));
             }))
         .then(_executePhase(
@@ -344,9 +316,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 if (!_firstExecution) {
-                    _doc = _updateSession(opCtx, _doc);
+                    _updateSession(opCtx);
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getCurrentSession(_doc), **executor);
+                        opCtx, getCurrentSession(), **executor);
                 }
 
                 const auto& fromNss = nss();
@@ -360,8 +332,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     unblockParticipantRequest.toBSON({}));
                 auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
-                _doc = _updateSession(opCtx, _doc);
-                const OperationSessionInfo osi = getCurrentSession(_doc);
+                _updateSession(opCtx);
+                const OperationSessionInfo osi = getCurrentSession();
 
                 sharding_ddl_util::sendAuthenticatedCommandToShards(
                     opCtx, fromNss.db(), cmdObj.addFields(osi.toBSON()), participants, **executor);

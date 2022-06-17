@@ -38,11 +38,14 @@
 
 namespace mongo {
 
-class SetAllowMigrationsCoordinator final : public ShardingDDLCoordinator {
+class SetAllowMigrationsCoordinator final
+    : public ShardingDDLCoordinatorImpl<SetAllowMigrationsCoordinatorDocument> {
 
 public:
     SetAllowMigrationsCoordinator(ShardingDDLCoordinatorService* service,
-                                  const BSONObj& initialState);
+                                  const BSONObj& initialState)
+        : ShardingDDLCoordinatorImpl(service, initialState),
+          _allowMigrations(_doc.getAllowMigrations()) {}
 
     void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
 
@@ -55,14 +58,9 @@ public:
     }
 
 private:
-    ShardingDDLCoordinatorMetadata const& metadata() const override {
-        return _doc.getShardingDDLCoordinatorMetadata();
-    }
-
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
-    SetAllowMigrationsCoordinatorDocument _doc;
     const bool _allowMigrations;
 };
 }  // namespace mongo

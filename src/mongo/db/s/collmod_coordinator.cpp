@@ -77,10 +77,7 @@ bool hasTimeSeriesGranularityUpdate(const CollModRequest& request) {
 
 CollModCoordinator::CollModCoordinator(ShardingDDLCoordinatorService* service,
                                        const BSONObj& initialState)
-    : ShardingDDLCoordinator(service, initialState),
-      _initialState{initialState.getOwned()},
-      _doc{CollModCoordinatorDocument::parse(IDLParserErrorContext("CollModCoordinatorDocument"),
-                                             _initialState)},
+    : RecoverableShardingDDLCoordinator(service, initialState),
       _request{_doc.getCollModRequest()} {}
 
 void CollModCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
@@ -122,29 +119,6 @@ boost::optional<BSONObj> CollModCoordinator::reportForCurrentOp(
     return bob.obj();
 }
 
-void CollModCoordinator::_enterPhase(Phase newPhase) {
-    StateDoc newDoc(_doc);
-    newDoc.setPhase(newPhase);
-
-    LOGV2_DEBUG(6069401,
-                2,
-                "CollMod coordinator phase transition",
-                "namespace"_attr = nss(),
-                "newPhase"_attr = CollModCoordinatorPhase_serializer(newDoc.getPhase()),
-                "oldPhase"_attr = CollModCoordinatorPhase_serializer(_doc.getPhase()));
-
-    if (_doc.getPhase() == Phase::kUnset) {
-        newDoc = _insertStateDocument(std::move(newDoc));
-    } else {
-        newDoc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
-    }
-
-    {
-        stdx::unique_lock ul{_docMutex};
-        _doc = std::move(newDoc);
-    }
-}
-
 void CollModCoordinator::_performNoopRetryableWriteOnParticipants(
     OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor) {
     auto shardsAndConfigsvr = [&] {
@@ -154,9 +128,9 @@ void CollModCoordinator::_performNoopRetryableWriteOnParticipants(
         return participants;
     }();
 
-    _doc = _updateSession(opCtx, _doc);
+    _updateSession(opCtx);
     sharding_ddl_util::performNoopRetryableWriteOnShards(
-        opCtx, shardsAndConfigsvr, getCurrentSession(_doc), executor);
+        opCtx, shardsAndConfigsvr, getCurrentSession(), executor);
 }
 
 void CollModCoordinator::_saveCollectionInfoOnCoordinatorIfNecessary(OperationContext* opCtx) {
@@ -229,7 +203,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
-                _doc = _updateSession(opCtx, _doc);
+                _updateSession(opCtx);
 
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
 
@@ -258,7 +232,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
-                _doc = _updateSession(opCtx, _doc);
+                _updateSession(opCtx);
 
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
@@ -285,7 +259,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
-                _doc = _updateSession(opCtx, _doc);
+                _updateSession(opCtx);
 
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);

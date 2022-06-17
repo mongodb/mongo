@@ -227,54 +227,22 @@ boost::optional<BSONObj> CompactStructuredEncryptionDataCoordinator::reportForCu
     return bob.obj();
 }
 
-void CompactStructuredEncryptionDataCoordinator::_enterPhase(Phase newPhase) {
-    StateDoc doc(_doc);
-    doc.setPhase(newPhase);
-
-    LOGV2_DEBUG(6350490,
-                2,
-                "Transitioning phase for CompactStructuredEncryptionDataCoordinator",
-                "nss"_attr = _doc.getId().getNss().ns(),
-                "escNss"_attr = _doc.getEscNss().ns(),
-                "eccNss"_attr = _doc.getEccNss().ns(),
-                "ecocNss"_attr = _doc.getEcocNss().ns(),
-                "ecocUuid"_attr = _doc.getEcocUuid(),
-                "ecocRenameNss"_attr = _doc.getEcocRenameNss().ns(),
-                "ecocRenameUuid"_attr = _doc.getEcocRenameUuid(),
-                "skipCompact"_attr = _doc.getSkipCompact(),
-                "compactionTokens"_attr = _doc.getCompactionTokens(),
-                "oldPhase"_attr = CompactStructuredEncryptionDataPhase_serializer(_doc.getPhase()),
-                "newPhase"_attr = CompactStructuredEncryptionDataPhase_serializer(newPhase));
-
-    if (_doc.getPhase() == Phase::kUnset) {
-        doc = _insertStateDocument(std::move(doc));
-    } else {
-        auto opCtx = cc().makeOperationContext();
-        doc = _updateStateDocument(opCtx.get(), std::move(doc));
-    }
-
-    {
-        stdx::unique_lock ul{_docMutex};
-        _doc = std::move(doc);
-    }
-}
-
 ExecutorFuture<void> CompactStructuredEncryptionDataCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then(_executePhase(Phase::kRenameEcocForCompact,
-                            [this, anchor = shared_from_this()](const auto& state) {
-                                doRenameOperation(state, &_skipCompact, &_ecocRenameUuid);
+                            [this, anchor = shared_from_this()]() {
+                                doRenameOperation(_doc, &_skipCompact, &_ecocRenameUuid);
                                 stdx::unique_lock ul{_docMutex};
                                 _doc.setSkipCompact(_skipCompact);
                                 _doc.setEcocRenameUuid(_ecocRenameUuid);
                             }))
-        .then(_executePhase(Phase::kCompactStructuredEncryptionData,
-                            [this, anchor = shared_from_this()](const auto& state) {
-                                _response = doCompactOperation(state);
-                            }))
-        .then(_executePhase(Phase::kDropTempCollection, doDropOperation));
+        .then(_executePhase(
+            Phase::kCompactStructuredEncryptionData,
+            [this, anchor = shared_from_this()]() { _response = doCompactOperation(_doc); }))
+        .then(_executePhase(Phase::kDropTempCollection,
+                            [this, anchor = shared_from_this()] { doDropOperation(_doc); }));
 }
 
 }  // namespace mongo

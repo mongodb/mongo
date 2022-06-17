@@ -39,13 +39,20 @@
 
 namespace mongo {
 
-class CreateCollectionCoordinator : public ShardingDDLCoordinator {
+class CreateCollectionCoordinator
+    : public RecoverableShardingDDLCoordinator<CreateCollectionCoordinatorDocument,
+                                               CreateCollectionCoordinatorPhaseEnum> {
 public:
     using CoordDoc = CreateCollectionCoordinatorDocument;
     using Phase = CreateCollectionCoordinatorPhaseEnum;
 
-    CreateCollectionCoordinator(ShardingDDLCoordinatorService* service,
-                                const BSONObj& initialState);
+    CreateCollectionCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
+        : RecoverableShardingDDLCoordinator(service, initialState),
+          _request(_doc.getCreateCollectionRequest()),
+          _critSecReason(BSON("command"
+                              << "createCollection"
+                              << "ns" << nss().toString())) {}
+
     ~CreateCollectionCoordinator() = default;
 
 
@@ -66,37 +73,15 @@ public:
     }
 
 protected:
-    mutable Mutex _docMutex = MONGO_MAKE_LATCH("CreateCollectionCoordinator::_docMutex");
-    CoordDoc _doc;
-
     const mongo::CreateCollectionRequest _request;
 
 private:
-    ShardingDDLCoordinatorMetadata const& metadata() const override {
-        return _doc.getShardingDDLCoordinatorMetadata();
+    StringData serializePhase(const Phase& phase) const override {
+        return CreateCollectionCoordinatorPhase_serializer(phase);
     }
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
-
-    template <typename Func>
-    auto _executePhase(const Phase& newPhase, Func&& func) {
-        return [=] {
-            const auto& currPhase = _doc.getPhase();
-
-            if (currPhase > newPhase) {
-                // Do not execute this phase if we already reached a subsequent one.
-                return;
-            }
-            if (currPhase < newPhase) {
-                // Persist the new phase if this is the first time we are executing it.
-                _enterPhase(newPhase);
-            }
-            return func();
-        };
-    };
-
-    void _enterPhase(Phase newState);
 
     /**
      * Performs all required checks before holding the critical sections.
