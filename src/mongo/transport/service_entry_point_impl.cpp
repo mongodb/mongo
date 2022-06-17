@@ -169,11 +169,10 @@ size_t getSupportedMax() {
 class ServiceEntryPointImpl::Sessions {
 public:
     struct Entry {
-        explicit Entry(std::unique_ptr<transport::ServiceStateMachine> ssm) : ssm{std::move(ssm)} {}
-        std::unique_ptr<transport::ServiceStateMachine> ssm;
+        explicit Entry(std::shared_ptr<transport::ServiceStateMachine> ssm) : ssm{std::move(ssm)} {}
+        std::shared_ptr<transport::ServiceStateMachine> ssm;
         ClientSummary summary{ssm->client()};
     };
-
     using ByClientMap = stdx::unordered_map<Client*, Entry>;
     using iterator = ByClientMap::iterator;
 
@@ -199,7 +198,7 @@ public:
                 _lk, deadline.toSystemTimePoint(), [&] { return _src->_byClient.empty(); });
         }
 
-        iterator insert(std::unique_ptr<transport::ServiceStateMachine> ssm) {
+        iterator insert(std::shared_ptr<transport::ServiceStateMachine> ssm) {
             Client* cli = ssm->client();
             auto [it, ok] = _src->_byClient.insert({cli, Entry(std::move(ssm))});
             invariant(ok);
@@ -313,7 +312,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
             transport::ServiceExecutorContext::set(&*client, std::move(seCtx));
         }
 
-        auto ssm = std::make_unique<transport::ServiceStateMachine>(std::move(client));
+        auto ssm = transport::ServiceStateMachine::make(std::move(client));
         iter = sync.insert(std::move(ssm));
         if (!quiet()) {
             LOGV2(22943,

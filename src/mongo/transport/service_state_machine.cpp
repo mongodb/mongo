@@ -121,8 +121,7 @@ Message makeExhaustMessage(Message requestMsg, DbResponse* dbresponse) {
 }
 }  // namespace
 
-class ServiceStateMachine::Impl final
-    : public std::enable_shared_from_this<ServiceStateMachine::Impl> {
+class ServiceStateMachine::Impl {
 public:
     /*
      * Any state may transition to EndSession in case of an error, otherwise the valid state
@@ -142,8 +141,9 @@ public:
                      // state() if this is the current state.
     };
 
-    explicit Impl(ServiceContext::UniqueClient client)
-        : _state{State::Created},
+    Impl(ServiceStateMachine* ssm, ServiceContext::UniqueClient client)
+        : _ssm{ssm},
+          _state{State::Created},
           _serviceContext{client->getServiceContext()},
           _sep{_serviceContext->getServiceEntryPoint()},
           _clientStrand{ClientStrand::make(std::move(client))} {}
@@ -229,6 +229,13 @@ public:
     }
 
 private:
+    /** Alias: refers to this Impl, but holds a ref to the enclosing SSM. */
+    std::shared_ptr<Impl> shared_from_this() {
+        return {_ssm->shared_from_this(), this};
+    }
+
+    ServiceStateMachine* const _ssm;
+
     AtomicWord<State> _state{State::Created};
 
     ServiceContext* const _serviceContext;
@@ -544,8 +551,10 @@ void ServiceStateMachine::Impl::cleanupSession(const Status& status) {
     invariant(_state.swap(State::Ended) != State::Ended);
 }
 
-ServiceStateMachine::ServiceStateMachine(ServiceContext::UniqueClient client)
-    : _impl{std::make_shared<Impl>(std::move(client))} {}
+ServiceStateMachine::ServiceStateMachine(PassKeyTag, ServiceContext::UniqueClient client)
+    : _impl{std::make_unique<Impl>(this, std::move(client))} {}
+
+ServiceStateMachine::~ServiceStateMachine() = default;
 
 Client* ServiceStateMachine::client() const {
     return _impl->client();
