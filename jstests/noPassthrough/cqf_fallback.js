@@ -15,6 +15,14 @@ let db = conn.getDB("test");
 let coll = db[jsTestName()];
 coll.drop();
 
+// This test relies on the bonsai optimizer being enabled.
+if (assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryForceClassicEngine: 1}))
+        .internalQueryForceClassicEngine == true) {
+    jsTestLog("Skipping test due to internalQueryForceClassicEngine");
+    MongoRunner.stopMongod(conn);
+    return;
+}
+
 function assertUsesFallback(cmd, testOnly) {
     // An unsupported stage should not use the new optimizer.
     assert.commandWorked(
