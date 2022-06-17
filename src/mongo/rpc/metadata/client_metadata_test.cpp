@@ -47,6 +47,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -104,8 +105,9 @@ TEST(ClientMetadataTest, TestLoopbackTest) {
                             .append(kApplication,
                                     BOB{}
                                         .append(kName, "g")
-                                        .appendElements(kDebugBuild ? BOB{}.append(kPid, pid).obj()
-                                                                    : BOB{}.obj())
+                                        .appendElements(TestingProctor::instance().isEnabled()
+                                                            ? BOB{}.append(kPid, pid).obj()
+                                                            : BOB{}.obj())
                                         .obj())
                             .append(kDriver, BOB{}.append(kName, "a").append(kVersion, "b").obj())
                             .append(kOperatingSystem,
@@ -329,7 +331,9 @@ TEST(ClientMetadataTest, TestMongoSAppend) {
             .append(kApplication,
                     BOB{}
                         .append(kName, "g")
-                        .appendElements(kDebugBuild ? BOB{}.append(kPid, pid).obj() : BOB{}.obj())
+                        .appendElements(TestingProctor::instance().isEnabled()
+                                            ? BOB{}.append(kPid, pid).obj()
+                                            : BOB{}.obj())
                         .obj())
             .append(kDriver, BOB{}.append(kName, "a").append(kVersion, "b").obj())
             .append(kOperatingSystem,
