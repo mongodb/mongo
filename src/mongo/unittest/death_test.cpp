@@ -35,6 +35,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/temp_dir.h"
 #include "mongo/util/exit_code.h"
 
 #ifndef _WIN32
@@ -120,7 +121,7 @@ void initDeathTest() {
 #ifdef DEATH_TEST_ENABLED
 struct DeathTestBase::Subprocess {
     void run();
-    void execChild();
+    void execChild(std::string tempPath);
     void monitorChild(FILE* fromChild);
     void prepareChild(int (&pipes)[2]);
     void invokeTest();
@@ -199,6 +200,8 @@ void DeathTestBase::Subprocess::run() {
     }
     LOGV2(6186001, "Child", "exec"_attr = doExec);
 
+    TempDir childTempPath{"DeathTestChildTempPath"};
+
     int pipes[2];
     THROWY_LIBC(pipe(pipes));
     if ((child = THROWY_LIBC(fork())) != 0) {
@@ -210,14 +213,15 @@ void DeathTestBase::Subprocess::run() {
         prepareChild(pipes);
         if (doExec) {
             // Go further: fully reboot the child with `execve`.
-            execChild();
+            execChild(childTempPath.release());
         } else {
+            TempDir::setTempPath(childTempPath.release());
             invokeTest();
         }
     }
 }
 
-void DeathTestBase::Subprocess::execChild() {
+void DeathTestBase::Subprocess::execChild(std::string tempPath) {
     auto& spawnInfo = getSpawnInfo();
     std::vector<std::string> av = spawnInfo.argVec;
     // Arrange for the subprocess to execute only this test, exactly once.
@@ -226,9 +230,11 @@ void DeathTestBase::Subprocess::execChild() {
     stripOption(av, "suite");
     stripOption(av, "filter");
     stripOption(av, "filterFileName");
+    stripOption(av, "tempPath");
     const TestInfo* info = UnitTest::getInstance()->currentTestInfo();
     av.push_back("--suite={}"_format(info->suiteName()));
     av.push_back("--filter=^{}$"_format(pcrecpp::RE::QuoteMeta(std::string{info->testName()})));
+    av.push_back("--tempPath={}"_format(tempPath));
     // The presence of this flag is how the test body in the child process knows it's in the
     // child process, and therefore to not exec again. Its value is ignored.
     av.push_back("--internalRunDeathTest=1");

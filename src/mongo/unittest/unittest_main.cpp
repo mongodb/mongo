@@ -39,6 +39,7 @@
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/log_manager.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/unittest/unittest_options_gen.h"
 #include "mongo/util/options_parser/environment.h"
@@ -104,6 +105,10 @@ int main(int argc, char** argv) {
     environment.get("verbose", &verbose).ignore();
     environment.get("fileNameFilter", &fileNameFilter).ignore();
     environment.get("internalRunDeathTest", &internalRunDeathTest).ignore();
+
+    if (environment.count("tempPath")) {
+        ::mongo::unittest::TempDir::setTempPath(environment["tempPath"].as<std::string>());
+    }
 
     mongo::unittest::getSpawnInfo() = {argVec, internalRunDeathTest, true};
 

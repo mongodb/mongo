@@ -58,3 +58,6 @@ configs:
     internalRunDeathTest:
         description: "Used internally to resume a death test in the child process."
         arg_vartype: String
+    tempPath:
+        description: 'Directory to place mongo::TempDir subdirectories'
+        arg_vartype: String
