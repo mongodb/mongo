@@ -499,16 +499,8 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
     const auto cmdObj =
         CommandHelpers::appendMajorityWriteConcern(dropCollectionParticipant.toBSON({}));
 
-    try {
-        sharding_ddl_util::sendAuthenticatedCommandToShards(
-            opCtx, nss.db(), cmdObj.addFields(osi.toBSON()), shardIds, executor);
-    } catch (const ExceptionFor<ErrorCodes::NotARetryableWriteCommand>&) {
-        // Older 5.0 binaries don't support running the _shardsvrDropCollectionParticipant
-        // command as a retryable write yet. In that case, retry without attaching session
-        // info.
-        sharding_ddl_util::sendAuthenticatedCommandToShards(
-            opCtx, nss.db(), cmdObj, shardIds, executor);
-    }
+    sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx, nss.db(), cmdObj.addFields(osi.toBSON()), shardIds, executor);
 }
 
 }  // namespace sharding_ddl_util

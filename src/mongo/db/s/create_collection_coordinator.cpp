@@ -507,14 +507,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             ShardingCatalogClient::kMajorityWriteConcern);
 
                     _updateSession(opCtx);
-                    try {
-                        _createCollectionOnNonPrimaryShards(opCtx, getCurrentSession());
-                    } catch (const ExceptionFor<ErrorCodes::NotARetryableWriteCommand>&) {
-                        // Older 5.0 binaries don't support running the
-                        // _shardsvrCreateCollectionParticipant command as a retryable write yet. In
-                        // that case, retry without attaching session info.
-                        _createCollectionOnNonPrimaryShards(opCtx, boost::none);
-                    }
+                    _createCollectionOnNonPrimaryShards(opCtx, getCurrentSession());
 
                     _commit(opCtx);
                 }
@@ -731,7 +724,7 @@ void CreateCollectionCoordinator::_createChunks(OperationContext* opCtx) {
 }
 
 void CreateCollectionCoordinator::_createCollectionOnNonPrimaryShards(
-    OperationContext* opCtx, const boost::optional<OperationSessionInfo>& osi) {
+    OperationContext* opCtx, const OperationSessionInfo& osi) {
     LOGV2_DEBUG(5277905,
                 2,
                 "Create collection _createCollectionOnNonPrimaryShards",
@@ -758,10 +751,9 @@ void CreateCollectionCoordinator::_createCollectionOnNonPrimaryShards(
         createCollectionParticipantRequest.setIdIndex(idIndex);
         createCollectionParticipantRequest.setIndexes(indexes);
 
-        requests.emplace_back(
-            chunkShardId,
-            CommandHelpers::appendMajorityWriteConcern(
-                createCollectionParticipantRequest.toBSON(osi ? osi->toBSON() : BSONObj())));
+        requests.emplace_back(chunkShardId,
+                              CommandHelpers::appendMajorityWriteConcern(
+                                  createCollectionParticipantRequest.toBSON(osi.toBSON())));
 
         initializedShards.emplace(chunkShardId);
     }

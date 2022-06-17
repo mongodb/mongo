@@ -113,7 +113,7 @@ private:
      * participant shards.
      */
     void _createCollectionOnNonPrimaryShards(OperationContext* opCtx,
-                                             const boost::optional<OperationSessionInfo>& osi);
+                                             const OperationSessionInfo& osi);
 
     /**
      * Does the following writes:
