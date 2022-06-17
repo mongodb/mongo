@@ -720,12 +720,14 @@ public:
 
     /**
      * Returns database name if this object was initialized with a UUID.
+     *
+     * TODO SERVER-66887 remove this function for better clarity once call sites have been changed
      */
     std::string dbname() const {
         return _dbname ? _dbname->db() : "";
     }
 
-    const boost::optional<DatabaseName>& dbnameWithTenant() const {
+    const boost::optional<DatabaseName>& dbName() const {
         return _dbname;
     }
 
