@@ -57,7 +57,6 @@ selector:
   # can be triggered deterministically.
   - jstests/core/list_all_local_sessions.js
   - jstests/core/list_all_sessions.js
-  - jstests/core/list_local_sessions.js
   - jstests/core/list_sessions.js
   # TODO: Remove after fixing SERVER-29449. executionStats.nReturned is incorrect for sharded
   # queries with a limit or for distinct commands.
