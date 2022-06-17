@@ -1564,7 +1564,10 @@ err:
  * __wt_meta_read_checkpoint_snapshot --
  *     Fetch the snapshot data for a checkpoint from the metadata file. Reads the selected named
  *     checkpoint's snapshot, or if the checkpoint name passed is null, the most recent checkpoint's
- *     snapshot. The snapshot list returned is allocated and must be freed by the caller.
+ *     snapshot. The snapshot list returned is allocated and must be freed by the caller. Can be
+ *     called with NULL return parameters to avoid (in particular) bothering to allocate the
+ *     snapshot data if it's not needed. Note that if you retrieve the snapshot data you must also
+ *     retrieve the snapshot count.
  */
 int
 __wt_meta_read_checkpoint_snapshot(WT_SESSION_IMPL *session, const char *ckpt_name,
@@ -1598,10 +1601,14 @@ __wt_meta_read_checkpoint_snapshot(WT_SESSION_IMPL *session, const char *ckpt_na
     /* Initialize to an empty snapshot. */
     if (snap_write_gen != NULL)
         *snap_write_gen = 0;
-    *snap_min = WT_TXN_NONE;
-    *snap_max = WT_TXN_NONE;
-    *snapshot = NULL;
-    *snapshot_count = 0;
+    if (snap_min != NULL)
+        *snap_min = WT_TXN_NONE;
+    if (snap_max != NULL)
+        *snap_max = WT_TXN_NONE;
+    if (snapshot != NULL)
+        *snapshot = NULL;
+    if (snapshot_count != NULL)
+        *snapshot_count = 0;
     if (ckpttime != NULL)
         *ckpttime = 0;
 
@@ -1618,20 +1625,25 @@ __wt_meta_read_checkpoint_snapshot(WT_SESSION_IMPL *session, const char *ckpt_na
     /* Extract the components of the metadata string. */
     if (sys_config != NULL) {
         WT_CLEAR(cval);
-        if (__wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT_MIN, &cval) == 0 &&
+        if (snap_min != NULL &&
+          __wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT_MIN, &cval) == 0 &&
           cval.len != 0)
             *snap_min = (uint64_t)cval.val;
 
-        if (__wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT_MAX, &cval) == 0 &&
+        if (snap_max != NULL &&
+          __wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT_MAX, &cval) == 0 &&
           cval.len != 0)
             *snap_max = (uint64_t)cval.val;
 
-        if (__wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT_COUNT, &cval) == 0 &&
+        if (snapshot_count != NULL &&
+          __wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT_COUNT, &cval) == 0 &&
           cval.len != 0)
             *snapshot_count = (uint32_t)cval.val;
 
-        if (__wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT, &cval) == 0 &&
+        if (snapshot != NULL &&
+          __wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT, &cval) == 0 &&
           cval.len != 0) {
+            WT_ASSERT(session, snapshot_count != NULL);
             __wt_config_subinit(session, &list, &cval);
             WT_ERR(__wt_calloc_def(session, *snapshot_count, snapshot));
             while (__wt_config_subget_next(&list, &k) == 0)
@@ -1648,17 +1660,14 @@ __wt_meta_read_checkpoint_snapshot(WT_SESSION_IMPL *session, const char *ckpt_na
         if (snap_write_gen != NULL)
             *snap_write_gen = write_gen;
 
-        if (ckpttime != NULL) {
-            /*
-             * If the write generation is current, extract the checkpoint time. Otherwise we use 0.
-             */
-            if (cval.val != 0 && write_gen >= conn->base_write_gen) {
-                WT_ERR_NOTFOUND_OK(
-                  __wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT_TIME, &cval),
-                  false);
-                if (cval.val != 0)
-                    *ckpttime = (uint64_t)cval.val;
-            }
+        /*
+         * If the write generation is current, extract the checkpoint time. Otherwise we use 0.
+         */
+        if (ckpttime != NULL && cval.val != 0 && write_gen >= conn->base_write_gen) {
+            WT_ERR_NOTFOUND_OK(
+              __wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT_TIME, &cval), false);
+            if (cval.val != 0)
+                *ckpttime = (uint64_t)cval.val;
         }
 
         /*
@@ -1666,7 +1675,7 @@ __wt_meta_read_checkpoint_snapshot(WT_SESSION_IMPL *session, const char *ckpt_na
          * transaction IDs between min and max.
          */
         WT_ASSERT(session,
-          *snapshot == NULL ||
+          snapshot == NULL || snap_min == NULL || snap_max == NULL || *snapshot == NULL ||
             (*snapshot_count == counter && (*snapshot)[0] == *snap_min &&
               (*snapshot)[counter - 1] < *snap_max));
     }
