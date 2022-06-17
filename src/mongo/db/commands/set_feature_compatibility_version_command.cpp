@@ -74,7 +74,9 @@
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -87,6 +89,8 @@
 #include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/s/pm2583_feature_flags_gen.h"
 #include "mongo/s/refine_collection_shard_key_coordinator_feature_flags_gen.h"
@@ -544,6 +548,26 @@ public:
                     setOrphanCountersOnRangeDeletionTasks(opCtx);
                     BalancerStatsRegistry::get(opCtx)->initializeAsync(opCtx);
                 }
+            }
+
+            if (requestedVersion == multiversion::FeatureCompatibilityVersion::kVersion_6_0 &&
+                ShardingState::get(opCtx)->enabled()) {
+                const auto colls = CollectionShardingState::getCollectionNames(opCtx);
+                for (const auto& collName : colls) {
+                    onShardVersionMismatch(opCtx, collName, boost::none);
+                    CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, collName);
+                }
+
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
+
+                // Wait until the changes on config.cache.* are majority committed.
+                WriteConcernResult ignoreResult;
+                auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+                uassertStatusOK(waitForWriteConcern(opCtx,
+                                                    latestOpTime,
+                                                    ShardingCatalogClient::kMajorityWriteConcern,
+                                                    &ignoreResult));
             }
 
             // Complete transition by updating the local FCV document to the fully upgraded or
