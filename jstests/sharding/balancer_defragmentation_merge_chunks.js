@@ -2,8 +2,6 @@
  * Test the configureCollectionBalancing command and balancerCollectionStatus command
  *
  * @tags: [
- *  requires_fcv_53,
- *  featureFlagPerCollBalancingSettings,
  *  # This test does not support stepdowns of CSRS because of how it uses failpoints
  *  # to control phase transition
  *  does_not_support_stepdowns,

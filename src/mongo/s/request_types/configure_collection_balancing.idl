@@ -34,13 +34,6 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
-feature_flags:
-  featureFlagPerCollBalancingSettings:
-    description: "Add capability to configure per collection balancing settings."
-    cpp_varname: feature_flags::gPerCollBalancingSettings
-    default: true
-    version: 5.3
-
 structs:
     configure_coll_balancing_params:
         description: "Parameters for configureCollectionBalancing command"

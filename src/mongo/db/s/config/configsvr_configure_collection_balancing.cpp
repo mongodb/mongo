@@ -66,11 +66,6 @@ public:
                     str::stream() << Request::kCommandName << " can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
-            uassert(8423309,
-                    str::stream() << Request::kCommandName << " command not supported",
-                    mongo::feature_flags::gPerCollBalancingSettings.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-
             const NamespaceString& nss = ns();
 
             uassert(ErrorCodes::InvalidNamespace,

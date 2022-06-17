@@ -1,12 +1,8 @@
 /**
  * This test confirms that chunks get split according to a collection specific setting as they grow
  * due to data insertion.
- *
- * @tags: [
- *  requires_fcv_53,
- *  featureFlagPerCollBalancingSettings,
- * ]
  */
+
 (function() {
 'use strict';
 load('jstests/sharding/autosplit_include.js');

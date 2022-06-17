@@ -5,8 +5,6 @@
  * of 5MB across all sharding tests in wiredTiger.
  * @tags: [
  *  resource_intensive,
- *  requires_fcv_53,
- *  featureFlagPerCollBalancingSettings,
  * ]
  */
 (function() {
