@@ -927,7 +927,8 @@ struct __wt_session {
 	 * Cursors capable of supporting transactional operations operate in the
 	 * context of the current transaction, if any.
 	 *
-	 * WT_SESSION::rollback_transaction implicitly resets all cursors.
+	 * WT_SESSION::rollback_transaction implicitly resets all cursors associated with the
+         # session.
 	 *
 	 * Cursors are relatively light-weight objects but may hold references
 	 * to heavier-weight objects; applications should re-use cursors when
@@ -1763,7 +1764,7 @@ struct __wt_session {
 	 * A transaction must be in progress when this method is called.
 	 *
 	 * If WT_SESSION::commit_transaction returns an error, the transaction
-	 * was rolled back, not committed.
+	 * was rolled back, not committed, and all cursors associated with the session are reset.
 	 *
 	 * @requires_transaction
 	 *
@@ -1829,7 +1830,7 @@ struct __wt_session {
 	 *
 	 * A transaction must be in progress when this method is called.
 	 *
-	 * All cursors are reset.
+	 * All cursors associated with the session are reset.
 	 *
 	 * @requires_transaction
 	 *
