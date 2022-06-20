@@ -607,7 +607,12 @@ void ShardServerCatalogCacheLoader::_runSecondaryGetChunksSince(
     const ChunkVersion& catalogCacheSinceVersion,
     stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
     std::shared_ptr<Notification<void>> notify) {
+
+    Timer t;
     forcePrimaryCollectionRefreshAndWaitForReplication(opCtx, nss);
+    LOG_CATALOG_REFRESH(2) << "Cache loader on secondary successfully waited for primary refresh "
+                              "and replication for collection "
+                           << nss << " in " << t.millis() << "ms";
 
     // Read the local metadata.
 
@@ -739,8 +744,11 @@ void ShardServerCatalogCacheLoader::_runSecondaryGetDatabase(
     StringData dbName,
     stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
 
+    Timer t;
     forcePrimaryDatabaseRefreshAndWaitForReplication(opCtx, dbName);
-
+    LOG_CATALOG_REFRESH(2) << "Cache loader on secondary successfully waited for primary refresh "
+                              "and replication for database "
+                           << dbName << " in " << t.millis() << "ms";
     // Read the local metadata.
     auto swDatabaseType = getPersistedDbMetadata(opCtx, dbName);
     callbackFn(opCtx, std::move(swDatabaseType));
