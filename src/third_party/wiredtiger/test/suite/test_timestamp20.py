@@ -107,7 +107,10 @@ class test_timestamp20(wttest.WiredTigerTestCase):
             cursor[self.get_key(i)] = value5
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(40))
 
+        # Run a checkpoint to clean the tree to ensure the pages are evictable
+        self.session.checkpoint()
         self.evict(uri)
+
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(30))
         for i in range(1, 10000):
             self.assertEqual(cursor[self.get_key(i)], value4)
@@ -182,7 +185,10 @@ class test_timestamp20(wttest.WiredTigerTestCase):
             cursor[self.get_key(i)] = value3
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(50))
 
+        # Run a checkpoint to clean the tree to ensure the pages are evictable
+        self.session.checkpoint()
         self.evict(uri)
+
         # Open up a new transaction and read at 30.
         # We shouldn't be able to see past no timestamp due to txnid visibility.
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(30))
