@@ -49,14 +49,14 @@ class MultiversionConfigSubcommand(Subcommand):
             mongo_version=MongoVersion.from_yaml_file(multiversionconstants.MONGO_VERSION_YAML),
             mongo_releases=MongoReleases.from_yaml_file(multiversionconstants.RELEASES_YAML),
         )
-        fcv_constants = multiversion_service.calculate_fcv_constants()
+        version_constants = multiversion_service.calculate_version_constants()
         return MultiversionConfig(
             last_versions=multiversionconstants.OLD_VERSIONS,
-            requires_fcv_tag=fcv_constants.get_fcv_tag_list(),
-            requires_fcv_tag_lts=fcv_constants.get_lts_fcv_tag_list(),
-            requires_fcv_tag_continuous=fcv_constants.get_continuous_fcv_tag_list(),
-            last_lts_fcv=fcv_constants.get_last_lts_fcv(),
-            last_continuous_fcv=fcv_constants.get_last_continuous_fcv(),
+            requires_fcv_tag=version_constants.get_fcv_tag_list(),
+            requires_fcv_tag_lts=version_constants.get_lts_fcv_tag_list(),
+            requires_fcv_tag_continuous=version_constants.get_continuous_fcv_tag_list(),
+            last_lts_fcv=version_constants.get_last_lts_fcv(),
+            last_continuous_fcv=version_constants.get_last_continuous_fcv(),
         )
 
 
