@@ -426,11 +426,6 @@ SharedSemiFuture<ShardRegistry::Cache::ValueHandle> ShardRegistry::_reloadIntern
     return _getDataAsync();
 }
 
-void ShardRegistry::clearEntries() {
-    LOGV2_DEBUG(6471800, 1, "Invalidating Shard Registry");
-    _cache->invalidateAll();
-}
-
 void ShardRegistry::updateReplicaSetOnConfigServer(ServiceContext* serviceContext,
                                                    const ConnectionString& connStr) noexcept {
     ThreadClient tc("UpdateReplicaSetOnConfigServer", serviceContext);
@@ -570,18 +565,9 @@ std::pair<ShardRegistryData, Timestamp> ShardRegistryData::createFromCatalogClie
     OperationContext* opCtx, ShardFactory* shardFactory) {
     auto const catalogClient = Grid::get(opCtx)->catalogClient();
 
-    auto readConcern = repl::ReadConcernLevel::kMajorityReadConcern;
-
-    // ShardRemote requires a majority read. We can only allow a non-majority read if we are a
-    // config server.
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
-        !repl::ReadConcernArgs::get(opCtx).isEmpty()) {
-        readConcern = repl::ReadConcernArgs::get(opCtx).getLevel();
-    }
-
-    auto shardsAndOpTime =
-        uassertStatusOKWithContext(catalogClient->getAllShards(opCtx, readConcern),
-                                   "could not get updated shard list from config server");
+    auto shardsAndOpTime = uassertStatusOKWithContext(
+        catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern),
+        "could not get updated shard list from config server");
 
     auto shards = std::move(shardsAndOpTime.value);
     auto reloadOpTime = std::move(shardsAndOpTime.opTime);

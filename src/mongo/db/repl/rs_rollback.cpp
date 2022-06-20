@@ -2012,14 +2012,6 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         validator->resetKeyManagerCache();
     }
 
-    // Force the config server to update its shard registry on next access. Otherwise it may have
-    // the stale data that has been just rolled back.
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        if (auto shardRegistry = Grid::get(opCtx)->shardRegistry()) {
-            shardRegistry->clearEntries();
-        }
-    }
-
     // Force the default read/write concern cache to reload on next access in case the defaults
     // document was rolled back.
     ReadWriteConcernDefaults::get(opCtx).invalidate();
