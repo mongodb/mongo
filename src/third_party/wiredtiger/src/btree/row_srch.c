@@ -61,6 +61,16 @@ __search_insert_append(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_INSERT
         cbt->compare = -cmp;
         cbt->ins = ins;
         cbt->ins_head = ins_head;
+
+        /*
+         * If we find an exact match, copy the key into the temporary buffer, our callers expect to
+         * find it there.
+         */
+        if (cbt->compare == 0) {
+            cbt->tmp->data = WT_INSERT_KEY(cbt->ins);
+            cbt->tmp->size = WT_INSERT_KEY_SIZE(cbt->ins);
+        }
+
         *donep = 1;
     }
     return (0);
@@ -471,7 +481,6 @@ leaf_only:
             ins_head = WT_ROW_INSERT_SMALLEST(page);
         } else {
             cbt->slot = WT_ROW_SLOT(page, page->pg_row + (page->entries - 1));
-
             ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
         }
 
@@ -586,7 +595,8 @@ leaf_match:
 
     /*
      * Test for an append first when inserting onto an insert list, try to catch cursors repeatedly
-     * inserting at a single point.
+     * inserting at a single point, then search the insert list. If we find an exact match, copy the
+     * key into the temporary buffer, our callers expect to find it there.
      */
     if (insert) {
         WT_ERR(__search_insert_append(session, cbt, ins_head, srch_key, &done));
@@ -594,7 +604,10 @@ leaf_match:
             return (0);
     }
     WT_ERR(__wt_search_insert(session, cbt, ins_head, srch_key));
-
+    if (cbt->compare == 0) {
+        cbt->tmp->data = WT_INSERT_KEY(cbt->ins);
+        cbt->tmp->size = WT_INSERT_KEY_SIZE(cbt->ins);
+    }
     return (0);
 
 err:
