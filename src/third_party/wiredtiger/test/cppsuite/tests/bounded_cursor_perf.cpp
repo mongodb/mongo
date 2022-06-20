@@ -63,7 +63,6 @@ class bounded_cursor_perf : public test {
          * Each read operation performs next() and prev() calls with both normal cursors and bounded
          * cursors.
          */
-        int range_ret_next, range_ret_prev, ret_next, ret_prev;
 
         /* Initialize the different timers for each function. */
         execution_timer bounded_next("bounded_next", test::_args.test_name);
@@ -89,14 +88,15 @@ class bounded_cursor_perf : public test {
         set_bounds(prev_range_cursor);
 
         while (tc->running()) {
+            int ret_next = 0, ret_prev = 0;
             while (ret_next != WT_NOTFOUND && ret_prev != WT_NOTFOUND && tc->running()) {
-                range_ret_next = bounded_next.track([&next_range_cursor]() -> int {
+                auto range_ret_next = bounded_next.track([&next_range_cursor]() -> int {
                     return next_range_cursor->next(next_range_cursor.get());
                 });
                 ret_next = default_next.track(
                   [&next_cursor]() -> int { return next_cursor->next(next_cursor.get()); });
 
-                range_ret_prev = bounded_prev.track([&prev_range_cursor]() -> int {
+                auto range_ret_prev = bounded_prev.track([&prev_range_cursor]() -> int {
                     return prev_range_cursor->prev(prev_range_cursor.get());
                 });
                 ret_prev = default_prev.track(
