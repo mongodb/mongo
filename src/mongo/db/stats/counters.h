@@ -113,7 +113,7 @@ public:
         _checkWrap(&OpCounters::_acceptableErrorInCommand, 1);
     }
 
-    // thse are used by snmp, and other things, do not remove
+    // thse are used by metrics things, do not remove
     const AtomicWord<long long>* getInsert() const {
         return &*_insert;
     }

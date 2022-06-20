@@ -72,14 +72,6 @@
           <File Id="f_saslPdb" Name="libsasl.pdb" Source="$(var.SaslSource)\libsasl.pdb"
                 DiskId="1" KeyPath="yes" />
         </Component>
-        <Component Id="c_snmp" Guid="F5E5A889-FC9F-4B9A-BEFD-C8ABC9A92D8D">
-          <File Id="f_ssnmp" Name="netsnmp.dll" Source="$(var.SnmpSource)\netsnmp.dll"
-                DiskId="1" KeyPath="yes" />
-        </Component>
-        <Component Id="c_snmpPdb" Guid="6AAB0ACE-C354-4D3A-B490-2AA235647AB3">
-          <File Id="f_snmpPdb" Name="netsnmp.pdb" Source="$(var.SnmpSource)\netsnmp.pdb"
-                DiskId="1" KeyPath="yes" />
-        </Component>
         <Component Id="c_mongocryptd" Guid="D243D194-B765-4DF8-BC67-8F4C329AD1B5">
           <File Id="f_mongocryptd" Name="mongocryptd.exe" Source="$(var.BinarySource)\mongocryptd.exe"
                 DiskId ="1" KeyPath="yes"/>
@@ -90,30 +82,6 @@
         </Component>
       <?endif ?>
     </DirectoryRef>
-    <?if $(var.Edition) = Enterprise ?>
-      <DirectoryRef Id="SNMP">
-      <Component Id="c_snmpReadme" Guid="B968FBAC-1813-4039-9FED-A607A0E4CBB3">
-          <File Id="f_snmpReadme" Name="README-snmp.txt" Source="$(var.EnterpriseBase)\docs\snmp\README-snmp.txt"
-                DiskId="1" KeyPath="yes" />
-        </Component>
-        <Component Id="c_snmpConfMaster" Guid="0C8CAA6C-1473-4B14-9EE5-AF5A35B1DD8D">
-          <File Id="f_snmpConfMaster" Name="mongod.conf.master" Source="$(var.EnterpriseBase)\docs\snmp\mongod.conf.master"
-                DiskId="1" KeyPath="yes" />
-        </Component>
-        <Component Id="c_snmpConfSubagent" Guid="6FB66102-41A7-41BD-BB1F-1987E150FA78">
-          <File Id="f_snmpConfSubagent" Name="mongod.conf.subagent" Source="$(var.EnterpriseBase)\docs\snmp\mongod.conf.subagent"
-                DiskId="1" KeyPath="yes" />
-        </Component>
-        <Component Id="c_snmpMongodMib" Guid="F3E98C6B-FE42-44E7-8A1F-E47BDDD0A3D7">
-          <File Id="f_snmpMongodMib" Name="MONGOD-MIB.txt" Source="$(var.EnterpriseBase)\docs\snmp\MONGOD-MIB.txt"
-                DiskId="1" KeyPath="yes" />
-        </Component>
-        <Component Id="c_snmpMongodbincMib" Guid="58c6bd8e-a785-48a0-af48-42f6bf9f68b4">
-          <File Id="f_snmpMongodbincMib" Name="MONGODBINC-MIB.txt" Source="$(var.EnterpriseBase)\docs\snmp\MONGODBINC-MIB.txt"
-                DiskId="1" KeyPath="yes" />
-        </Component>
-      </DirectoryRef>
-    <?endif ?>
     <DirectoryRef Id="MONGO_DATA_PATH" >
       <Component Id="c_MONGO_DATA_PATH" Guid="F695F048-E262-4871-A31B-0E2361BB4BCB">
           <CreateFolder Directory="MONGO_DATA_PATH" >
@@ -143,13 +111,6 @@
       </ComponentGroup>
       <ComponentGroup Id="cg_EnterpriseServer">
         <ComponentGroupRef Id="cg_EnterpriseBase" />
-        <ComponentRef Id="c_snmp" />
-        <ComponentRef Id="c_snmpPdb" />
-        <ComponentRef Id="c_snmpReadme" />
-        <ComponentRef Id="c_snmpConfMaster" />
-        <ComponentRef Id="c_snmpConfSubagent" />
-        <ComponentRef Id="c_snmpMongodMib" />
-        <ComponentRef Id="c_snmpMongodbincMib" />
       </ComponentGroup>
     <?endif ?>
   </Fragment>

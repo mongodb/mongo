@@ -89,7 +89,6 @@
 #include "mongo/db/index_builds_coordinator_mongod.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/initialize_server_global_state.h"
-#include "mongo/db/initialize_snmp.h"
 #include "mongo/db/internal_transactions_reap_service.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/json.h"
@@ -542,8 +541,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     BackupCursorHooks::initialize(serviceContext);
 
     startMongoDFTDC();
-
-    initializeSNMP();
 
     if (mongodGlobalParams.scriptingEnabled) {
         ScriptEngine::setup();

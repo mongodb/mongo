@@ -14,7 +14,7 @@ RUN debconf-set-selections /tmp/preseed.txt
 RUN rm /tmp/preseed.txt
 
 RUN apt-get update
-RUN apt-get install -qy libcurl4 libgssapi-krb5-2 libldap-2.4-2 libwrap0 libsasl2-2 libsasl2-modules libsasl2-modules-gssapi-mit snmp openssl liblzma5 libssl-dev build-essential software-properties-common
+RUN apt-get install -qy libcurl4 libgssapi-krb5-2 libldap-2.4-2 libwrap0 libsasl2-2 libsasl2-modules libsasl2-modules-gssapi-mit openssl liblzma5 libssl-dev build-essential software-properties-common
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt-get update
 

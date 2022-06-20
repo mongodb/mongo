@@ -108,16 +108,6 @@ env.Library(
 )
 
 env.Library(
-    target='initialize_snmp',
-    source=[
-        'initialize_snmp.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.Library(
     target="dbmessage",
     source=[
         "dbmessage.cpp",
@@ -2441,7 +2431,6 @@ env.Library(
         'index/index_access_methods',
         'index/index_descriptor',
         'index_builds_coordinator_mongod',
-        'initialize_snmp',
         'introspect',
         'keys_collection_client_direct',
         'kill_sessions_local',
@@ -2551,7 +2540,6 @@ env.Library(
         'index/index_access_method_factory',
         'index/index_access_methods',
         'index_builds_coordinator_mongod',
-        'initialize_snmp',
         'keys_collection_client_direct',
         'kill_sessions',
         'kill_sessions_local',

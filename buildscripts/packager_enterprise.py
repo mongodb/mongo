@@ -24,7 +24,7 @@
 # * Before you run the program on a new host, these are the
 # prerequisites:
 #
-# apt-get install dpkg-dev rpm debhelper fakeroot ia32-libs createrepo git-core libsnmp15
+# apt-get install dpkg-dev rpm debhelper fakeroot ia32-libs createrepo git-core
 # echo "Now put the dist gnupg signing keys in ~root/.gnupg"
 
 import errno
@@ -228,7 +228,7 @@ def unpack_binaries_into(build_os, arch, spec, where):
     try:
         packager.sysassert(["tar", "xvzf", rootdir + "/" + tarfile(build_os, arch, spec)])
         release_dir = glob('mongodb-linux-*')[0]
-        for releasefile in "bin", "snmp", "LICENSE-Enterprise.txt", "README", "THIRD-PARTY-NOTICES", "MPL-2":
+        for releasefile in "bin", "LICENSE-Enterprise.txt", "README", "THIRD-PARTY-NOTICES", "MPL-2":
             os.rename("%s/%s" % (release_dir, releasefile), releasefile)
         os.rmdir(release_dir)
     except Exception:
@@ -257,7 +257,7 @@ def make_package(distro, build_os, arch, spec, srcdir):
             "(cd \"%s\" && git archive %s %s/ ) | (cd \"%s\" && tar xvf -)" %
             (srcdir, spec.metadata_gitspec(), pkgdir, sdir)
         ])
-    # Splat the binaries and snmp files under sdir.  The "build" stages of the
+    # Splat the binaries under sdir.  The "build" stages of the
     # packaging infrastructure will move the files to wherever they
     # need to go.
     unpack_binaries_into(build_os, arch, spec, sdir)
