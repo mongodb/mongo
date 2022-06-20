@@ -1578,7 +1578,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     invariant(op.getObject2());
                     auto&& documentId = *op.getObject2();
                     auto documentFound = Helpers::findById(
-                        opCtx, db, collection->ns().ns(), documentId, changeStreamPreImage);
+                        opCtx, collection->ns().ns(), documentId, changeStreamPreImage);
                     invariant(documentFound);
                 }
 

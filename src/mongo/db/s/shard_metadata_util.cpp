@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/shard_metadata_util.h"
-
-#include <memory>
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
@@ -48,7 +43,6 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace shardmetadatautil {

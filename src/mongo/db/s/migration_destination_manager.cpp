@@ -201,11 +201,10 @@ bool willOverrideLocalId(OperationContext* opCtx,
                          BSONObj min,
                          BSONObj max,
                          BSONObj shardKeyPattern,
-                         Database* db,
                          BSONObj remoteDoc,
                          BSONObj* localDoc) {
     *localDoc = BSONObj();
-    if (Helpers::findById(opCtx, db, nss.ns(), remoteDoc, *localDoc)) {
+    if (Helpers::findById(opCtx, nss.ns(), remoteDoc, *localDoc)) {
         return !isInRange(*localDoc, min, max, shardKeyPattern);
     }
 
@@ -1774,7 +1773,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
 
             // Do not apply delete if doc does not belong to the chunk being migrated
             BSONObj fullObj;
-            if (Helpers::findById(opCtx, autoColl.getDb(), _nss.ns(), id, fullObj)) {
+            if (Helpers::findById(opCtx, _nss.ns(), id, fullObj)) {
                 if (!isInRange(fullObj, _min, _max, _shardKeyPattern)) {
                     if (MONGO_unlikely(failMigrationReceivedOutOfRangeOperation.shouldFail())) {
                         MONGO_UNREACHABLE;
@@ -1823,14 +1822,8 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
             }
 
             BSONObj localDoc;
-            if (willOverrideLocalId(opCtx,
-                                    _nss,
-                                    _min,
-                                    _max,
-                                    _shardKeyPattern,
-                                    autoColl.getDb(),
-                                    updatedDoc,
-                                    &localDoc)) {
+            if (willOverrideLocalId(
+                    opCtx, _nss, _min, _max, _shardKeyPattern, updatedDoc, &localDoc)) {
                 // Exception will abort migration cleanly
                 LOGV2_ERROR_OPTIONS(
                     16977,

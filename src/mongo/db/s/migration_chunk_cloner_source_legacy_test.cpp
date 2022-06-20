@@ -355,7 +355,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
 
         {
             BSONObjBuilder modsBuilder;
-            ASSERT_OK(cloner.nextModsBatch(operationContext(), autoColl.getDb(), &modsBuilder));
+            ASSERT_OK(cloner.nextModsBatch(operationContext(), &modsBuilder));
 
             const auto modsObj = modsBuilder.obj();
             ASSERT_EQ(2U, modsObj["reload"].Array().size());
@@ -455,7 +455,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, RemoveDuplicateDocuments) {
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
         {
             BSONObjBuilder modsBuilder;
-            ASSERT_OK(cloner.nextModsBatch(operationContext(), autoColl.getDb(), &modsBuilder));
+            ASSERT_OK(cloner.nextModsBatch(operationContext(), &modsBuilder));
 
             const auto modsObj = modsBuilder.obj();
             ASSERT_EQ(1U, modsObj["reload"].Array().size());
@@ -522,7 +522,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, OneLargeDocumentTransferMods) {
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
         {
             BSONObjBuilder modsBuilder;
-            ASSERT_OK(cloner.nextModsBatch(operationContext(), autoColl.getDb(), &modsBuilder));
+            ASSERT_OK(cloner.nextModsBatch(operationContext(), &modsBuilder));
 
             const auto modsObj = modsBuilder.obj();
             ASSERT_EQ(1, modsObj["reload"].Array().size());
@@ -600,7 +600,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, ManySmallDocumentsTransferMods) {
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
         {
             BSONObjBuilder modsBuilder;
-            ASSERT_OK(cloner.nextModsBatch(operationContext(), autoColl.getDb(), &modsBuilder));
+            ASSERT_OK(cloner.nextModsBatch(operationContext(), &modsBuilder));
             const auto modsObj = modsBuilder.obj();
             ASSERT_EQ(modsObj["reload"].Array().size(), numDocuments);
         }

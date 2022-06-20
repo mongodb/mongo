@@ -324,12 +324,6 @@ template <typename AutoGetCollectionType>
 StatusWith<const CollectionPtr*> getCollection(const AutoGetCollectionType& autoGetCollection,
                                                const NamespaceStringOrUUID& nsOrUUID,
                                                const std::string& message) {
-    if (!autoGetCollection.getDb()) {
-        StringData dbName = nsOrUUID.nss() ? nsOrUUID.nss()->db() : nsOrUUID.dbname();
-        return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "Database [" << dbName << "] not found. " << message};
-    }
-
     const auto& collection = autoGetCollection.getCollection();
     if (!collection) {
         return {ErrorCodes::NamespaceNotFound,

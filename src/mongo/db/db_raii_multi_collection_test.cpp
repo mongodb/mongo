@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
-#include <string>
-
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
@@ -40,7 +35,6 @@
 #include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -82,10 +76,11 @@ public:
     const NamespaceString _primaryNss = NamespaceString("db1.primary1");
     const NamespaceString _secondaryNss1 = NamespaceString("db1.secondary1");
     const NamespaceString _secondaryNss2 = NamespaceString("db1.secondary2");
-    const NamespaceString _secondaryNssOtherDbNss = NamespaceString("db2.secondary1");
 
     const std::vector<NamespaceStringOrUUID> _secondaryNssOrUUIDVec = {
         NamespaceStringOrUUID(_secondaryNss1), NamespaceStringOrUUID(_secondaryNss2)};
+
+    const NamespaceString _secondaryNssOtherDbNss = NamespaceString("db2.secondary1");
     const std::vector<NamespaceStringOrUUID> _secondaryNssOtherDbNssVec = {
         NamespaceStringOrUUID(_secondaryNssOtherDbNss)};
 
@@ -235,34 +230,6 @@ TEST_F(AutoGetCollectionMultiTest, LockFreeMultiDBs) {
                                                                        _secondaryNssOtherDbNss));
 }
 
-TEST_F(AutoGetCollectionMultiTest, LockedMultiDBs) {
-    auto opCtx1 = _client1.second.get();
-
-    createCollections(opCtx1);
-
-    AutoGetCollectionForRead autoGet(opCtx1,
-                                     NamespaceStringOrUUID(_primaryNss),
-                                     AutoGetCollectionViewMode::kViewsForbidden,
-                                     Date_t::max(),
-                                     _secondaryNssOtherDbNssVec);
-
-    auto locker = opCtx1->lockState();
-    locker->dump();
-    invariant(locker->isLockHeldForMode(resourceIdGlobal, MODE_IS));
-    invariant(locker->isDbLockedForMode(_primaryNss.db(), MODE_IS));
-    invariant(locker->isDbLockedForMode(_secondaryNssOtherDbNss.db(), MODE_IS));
-    // Set 'shouldConflictWithSecondaryBatchApplication' to true so isCollectionLockedForMode()
-    // doesn't return true regardless of what locks are held.
-    opCtx1->lockState()->setShouldConflictWithSecondaryBatchApplication(true);
-    invariant(locker->isCollectionLockedForMode(_primaryNss, MODE_IS));
-    invariant(locker->isCollectionLockedForMode(_secondaryNssOtherDbNss, MODE_IS));
-
-    const auto& coll = autoGet.getCollection();
-    ASSERT(coll);
-    ASSERT(CollectionCatalog::get(opCtx1)->lookupCollectionByNamespace(opCtx1,
-                                                                       _secondaryNssOtherDbNss));
-}
-
 TEST_F(AutoGetCollectionMultiTest, LockFreeSecondaryNamespaceNotFoundIsOK) {
     auto opCtx1 = _client1.second.get();
 
@@ -287,7 +254,7 @@ TEST_F(AutoGetCollectionMultiTest, LockedSecondaryNamespaceNotFound) {
                                      NamespaceStringOrUUID(_primaryNss),
                                      AutoGetCollectionViewMode::kViewsForbidden,
                                      Date_t::max(),
-                                     _secondaryNssOrUUIDAllVec);
+                                     _secondaryNssOrUUIDVec);
 
     auto locker = opCtx1->lockState();
 
@@ -301,9 +268,9 @@ TEST_F(AutoGetCollectionMultiTest, LockedSecondaryNamespaceNotFound) {
     invariant(locker->isDbLockedForMode(_primaryNss.db(), MODE_IS));
     invariant(locker->isCollectionLockedForMode(_primaryNss, MODE_IS));
 
-    for (const auto& secondaryNss : _secondaryNamespacesAll) {
+    for (const auto& secondaryNss : _secondaryNssOrUUIDVec) {
         invariant(locker->isDbLockedForMode(secondaryNss.db(), MODE_IS));
-        invariant(locker->isCollectionLockedForMode(secondaryNss, MODE_IS));
+        invariant(locker->isCollectionLockedForMode(*secondaryNss.nss(), MODE_IS));
     }
 
     const auto& coll = autoGet.getCollection();

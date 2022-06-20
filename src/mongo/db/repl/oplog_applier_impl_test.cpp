@@ -3319,10 +3319,7 @@ TEST_F(IdempotencyTest, EmptyCappedNamespaceNotFound) {
     ASSERT_OK(runOpInitialSync(emptyCappedOp));
 
     AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
-
-    // Ensure that autoColl.getCollection() and autoColl.getDb() are both null.
-    ASSERT_FALSE(autoColl.getCollection());
-    ASSERT_FALSE(autoColl.getDb());
+    ASSERT_FALSE(autoColl);
 }
 
 TEST_F(IdempotencyTest, UpdateTwoFields) {

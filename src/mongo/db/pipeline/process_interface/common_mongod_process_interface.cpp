@@ -365,12 +365,6 @@ Status CommonMongodProcessInterface::appendQueryExecStats(OperationContext* opCt
                                                           const NamespaceString& nss,
                                                           BSONObjBuilder* builder) const {
     AutoGetCollectionForReadCommand collection(opCtx, nss);
-
-    if (!collection.getDb()) {
-        return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "Database [" << nss.db().toString() << "] not found."};
-    }
-
     if (!collection) {
         return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "Collection [" << nss.toString() << "] not found."};
@@ -398,9 +392,6 @@ BSONObj CommonMongodProcessInterface::getCollectionOptionsLocally(OperationConte
                                                                   const NamespaceString& nss) {
     AutoGetCollectionForReadCommand collection(opCtx, nss);
     BSONObj collectionOptions = {};
-    if (!collection.getDb()) {
-        return collectionOptions;
-    }
     if (!collection) {
         return collectionOptions;
     }
@@ -883,8 +874,7 @@ boost::optional<Document> CommonMongodProcessInterface::lookupSingleDocumentLoca
     const Document& documentKey) {
     AutoGetCollectionForRead autoColl(expCtx->opCtx, nss);
     BSONObj document;
-    if (!Helpers::findById(
-            expCtx->opCtx, autoColl.getDb(), nss.ns(), documentKey.toBson(), document)) {
+    if (!Helpers::findById(expCtx->opCtx, nss.ns(), documentKey.toBson(), document)) {
         return boost::none;
     }
     return Document(document).getOwned();

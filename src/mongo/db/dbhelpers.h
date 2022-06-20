@@ -88,7 +88,6 @@ struct Helpers {
      * Returns true if a matching document was found.
      */
     static bool findById(OperationContext* opCtx,
-                         Database* db,
                          StringData ns,
                          BSONObj query,
                          BSONObj& result,

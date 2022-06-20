@@ -27,12 +27,8 @@
  *    it in the license file.
  */
 
+#include <boost/optional/optional_io.hpp>
 
-#include "mongo/platform/basic.h"
-
-#include <string>
-
-#include "boost/optional/optional_io.hpp"
 #include "mongo/db/catalog/database_holder_mock.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -46,7 +42,6 @@
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -66,6 +61,7 @@ public:
     const NamespaceString nss = NamespaceString("test", "coll");
     const NamespaceString kSecondaryNss1 = NamespaceString("test", "secondaryColl1");
     const NamespaceString kSecondaryNss2 = NamespaceString("test", "secondaryColl2");
+    const NamespaceString kSecondaryNss3 = NamespaceString("test", "secondaryColl3");
     const NamespaceString kSecondaryNssOtherDb1 = NamespaceString("test2", "secondaryColl1");
     const NamespaceString kSecondaryNssOtherDb2 = NamespaceString("test2", "secondaryColl2");
     const Milliseconds timeoutMs = Seconds(1);
@@ -123,44 +119,6 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineMin) {
     AutoGetDb db(client2.second.get(), nss.db(), MODE_IX);
     failsWithLockTimeout([&] { AutoGetDb db(client2.second.get(), nss.db(), MODE_X, Date_t{}); },
                          Milliseconds(0));
-}
-
-TEST_F(CatalogRAIITestFixture, AutoGetDBMultiDBDeadline) {
-    // Take the kSecondaryNssOtherDb1 database MODE_X lock to create a conflict later.
-    boost::optional<Lock::DBLock> dbLockXLock;
-    dbLockXLock.emplace(client1.second.get(), kSecondaryNssOtherDb1.db(), MODE_X);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(kSecondaryNssOtherDb1.db(), MODE_X));
-
-    // Trying to acquire the kSecondaryNssOtherDb1 database MODE_IS lock should time out.
-    std::set<StringData> secondaryDbNamesConflicting{kSecondaryNss1.db(),
-                                                     kSecondaryNss2.db(),
-                                                     kSecondaryNssOtherDb1.db(),
-                                                     kSecondaryNssOtherDb2.db()};
-    failsWithLockTimeout(
-        [&] {
-            AutoGetDb autoGetDb(client2.second.get(),
-                                nss.db(),
-                                MODE_IS,
-                                Date_t::now() + timeoutMs,
-                                secondaryDbNamesConflicting);
-        },
-        timeoutMs);
-
-    {
-        // Acquiring multiple database locks without the kSecondaryNssOtherDb1 database should work.
-        std::set<StringData> secondaryDbNamesNoConflict{kSecondaryNss1.db()};
-        AutoGetDb autoGetDbNoConflict(client2.second.get(),
-                                      kSecondaryNss1.db(),
-                                      MODE_IS,
-                                      Date_t::max(),
-                                      secondaryDbNamesNoConflict);
-    }
-
-    // Lastly, with the MODE_X lock on kSecondaryNssOtherDb1.db() released, the original multi
-    // database lock request should work.
-    dbLockXLock.reset();
-    AutoGetDb autoGetDb(
-        client2.second.get(), nss.db(), MODE_IS, Date_t::max(), secondaryDbNamesConflicting);
 }
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionCollLockDeadline) {
@@ -337,50 +295,11 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionMultiNamespacesMODEIX) {
     ASSERT(!opCtx1->lockState()->isLocked());  // Global lock check
 }
 
-TEST_F(CatalogRAIITestFixture, AutoGetCollectionSecondaryNamespacesMultiDb) {
-    auto opCtx1 = client1.second.get();
-
-    std::vector<NamespaceStringOrUUID> secondaryNamespaces{
-        NamespaceStringOrUUID(kSecondaryNss1),
-        NamespaceStringOrUUID(kSecondaryNss2),
-        NamespaceStringOrUUID(kSecondaryNssOtherDb1),
-        NamespaceStringOrUUID(kSecondaryNssOtherDb2)};
-    boost::optional<AutoGetCollection> autoGetColl;
-    autoGetColl.emplace(opCtx1,
-                        nss,
-                        MODE_IS,
-                        AutoGetCollectionViewMode::kViewsForbidden,
-                        Date_t::max(),
-                        secondaryNamespaces);
-
-    ASSERT(opCtx1->lockState()->isRSTLLocked());
-    ASSERT(opCtx1->lockState()->isReadLocked());  // Global lock check
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(nss.db(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss1.db(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss2.db(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb1.db(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb2.db(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isCollectionLockedForMode(nss, MODE_IS));
-    ASSERT(opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNss1, MODE_IS));
-    ASSERT(opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNss2, MODE_IS));
-    ASSERT(opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNssOtherDb1, MODE_IS));
-    ASSERT(opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNssOtherDb2, MODE_IS));
-
-    ASSERT(!opCtx1->lockState()->isRSTLExclusive());
-    ASSERT(!opCtx1->lockState()->isGlobalLockedRecursively());
-    ASSERT(!opCtx1->lockState()->isWriteLocked());
-
-    // All the locks should release.
-    autoGetColl.reset();
-    ASSERT(!opCtx1->lockState()->isLocked());  // Global lock check.
-}
-
 TEST_F(CatalogRAIITestFixture, AutoGetDbSecondaryNamespacesSingleDb) {
     auto opCtx1 = client1.second.get();
 
-    std::set<StringData> secondaryDbNames{kSecondaryNss1.db(), kSecondaryNss2.db()};
     boost::optional<AutoGetDb> autoGetDb;
-    autoGetDb.emplace(opCtx1, nss.db(), MODE_IS, Date_t::max(), secondaryDbNames);
+    autoGetDb.emplace(opCtx1, nss.db(), MODE_IS, Date_t::max());
 
     ASSERT(opCtx1->lockState()->isRSTLLocked());
     ASSERT(opCtx1->lockState()->isReadLocked());  // Global lock check
@@ -390,33 +309,6 @@ TEST_F(CatalogRAIITestFixture, AutoGetDbSecondaryNamespacesSingleDb) {
 
     ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb1.db(), MODE_IS));
     ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb2.db(), MODE_IS));
-    ASSERT(!opCtx1->lockState()->isRSTLExclusive());
-    ASSERT(!opCtx1->lockState()->isGlobalLockedRecursively());
-    ASSERT(!opCtx1->lockState()->isWriteLocked());
-
-    // All the locks should release.
-    autoGetDb.reset();
-    ASSERT(!opCtx1->lockState()->isLocked());  // Global lock check.
-}
-
-TEST_F(CatalogRAIITestFixture, AutoGetDbSecondaryNamespacesMultiDb) {
-    auto opCtx1 = client1.second.get();
-
-    std::set<StringData> secondaryDbNames{kSecondaryNss1.db(),
-                                          kSecondaryNss2.db(),
-                                          kSecondaryNssOtherDb1.db(),
-                                          kSecondaryNssOtherDb2.db()};
-    boost::optional<AutoGetDb> autoGetDb;
-    autoGetDb.emplace(opCtx1, nss.db(), MODE_IS, Date_t::max(), secondaryDbNames);
-
-    ASSERT(opCtx1->lockState()->isReadLocked());  // Global lock check
-    ASSERT(opCtx1->lockState()->isRSTLLocked());
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(nss.db(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss1.db(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss2.db(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb1.db(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb2.db(), MODE_IS));
-
     ASSERT(!opCtx1->lockState()->isRSTLExclusive());
     ASSERT(!opCtx1->lockState()->isGlobalLockedRecursively());
     ASSERT(!opCtx1->lockState()->isWriteLocked());
@@ -437,7 +329,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionMultiNssCollLockDeadline) {
     const std::vector<NamespaceStringOrUUID> secondaryNamespacesConflict{
         NamespaceStringOrUUID(kSecondaryNss1),
         NamespaceStringOrUUID(kSecondaryNss2),
-        NamespaceStringOrUUID(kSecondaryNssOtherDb1)};
+        NamespaceStringOrUUID(kSecondaryNss3)};
     failsWithLockTimeout(
         [&] {
             AutoGetCollection coll(client2.second.get(),
@@ -452,7 +344,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionMultiNssCollLockDeadline) {
     {
         // Sanity check that there's no conflict without kSecondaryNss1 that's MODE_X locked.
         const std::vector<NamespaceStringOrUUID> secondaryNamespacesNoConflict{
-            NamespaceStringOrUUID(kSecondaryNss2), NamespaceStringOrUUID(kSecondaryNssOtherDb1)};
+            NamespaceStringOrUUID(kSecondaryNss2), NamespaceStringOrUUID(kSecondaryNss2)};
         AutoGetCollection collNoConflict(client2.second.get(),
                                          nss,
                                          MODE_IS,

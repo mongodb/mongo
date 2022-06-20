@@ -32,7 +32,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/s/chunk_version.h"
@@ -40,17 +40,11 @@
 namespace mongo {
 
 class ChunkType;
-class CollectionMetadata;
 class NamespaceString;
 class OperationContext;
 class ShardCollectionType;
 class ShardDatabaseType;
-template <typename T>
-class StatusWith;
 
-/**
- * Function helpers to locally, using a DBDirectClient, read and write sharding metadata on a shard.
- */
 namespace shardmetadatautil {
 
 /**
@@ -59,25 +53,6 @@ namespace shardmetadatautil {
 struct QueryAndSort {
     const BSONObj query;
     const BSONObj sort;
-};
-
-/**
- * Subset of the shard's collections collection document that relates to refresh state.
- */
-struct RefreshState {
-    bool operator==(const RefreshState& other) const;
-
-    std::string toString() const;
-
-    // The current generation of the collection.
-    CollectionGeneration generation;
-
-    // Whether a refresh is currently in progress.
-    bool refreshing;
-
-    // The collection version after the last complete refresh. Indicates change if refreshing has
-    // started and finished since last loaded.
-    ChunkVersion lastRefreshedCollectionVersion;
 };
 
 /**
@@ -113,6 +88,26 @@ QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionVersion);
 Status unsetPersistedRefreshFlags(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   const ChunkVersion& refreshedVersion);
+
+/**
+ * Represents a subset of a collection's config.cache.collections entry that relates to refresh
+ * state.
+ */
+struct RefreshState {
+    bool operator==(const RefreshState& other) const;
+
+    std::string toString() const;
+
+    // The current generation of the collection.
+    CollectionGeneration generation;
+
+    // Whether a refresh is currently in progress.
+    bool refreshing;
+
+    // The collection version after the last complete refresh. Indicates change if refreshing has
+    // started and finished since last loaded.
+    ChunkVersion lastRefreshedCollectionVersion;
+};
 
 /**
  * Reads the persisted refresh signal for 'nss' and returns those settings.

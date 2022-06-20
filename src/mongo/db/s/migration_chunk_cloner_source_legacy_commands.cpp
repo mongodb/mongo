@@ -103,11 +103,6 @@ public:
             _autoColl = boost::none;
     }
 
-    Database* getDb() const {
-        invariant(_autoColl);
-        return _autoColl->getDb();
-    }
-
     const CollectionPtr& getColl() const {
         invariant(_autoColl);
         return _autoColl->getCollection();
@@ -235,7 +230,7 @@ public:
 
         AutoGetActiveCloner autoCloner(opCtx, migrationSessionId, true);
 
-        uassertStatusOK(autoCloner.getCloner()->nextModsBatch(opCtx, autoCloner.getDb(), &result));
+        uassertStatusOK(autoCloner.getCloner()->nextModsBatch(opCtx, &result));
         return true;
     }
 

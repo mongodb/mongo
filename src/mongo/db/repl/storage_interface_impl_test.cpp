@@ -2684,7 +2684,6 @@ TEST_F(StorageInterfaceImplTest,
     auto doc = BSON("_id" << 0 << "x" << 1);
     auto status = storage.upsertById(opCtx, nss, doc["_id"], doc);
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
-    ASSERT_EQUALS("Database [nosuchdb] not found. Unable to update document.", status.reason());
 }
 
 TEST_F(StorageInterfaceImplTest,
@@ -2879,10 +2878,6 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsNamespaceNotFoundWhenDatab
     auto filter = BSON("x" << 1);
     auto status = storage.deleteByFilter(opCtx, nss, filter);
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
-    ASSERT_EQUALS(std::string(str::stream()
-                              << "Database [nosuchdb] not found. Unable to delete documents in "
-                              << nss.ns() << " using filter " << filter),
-                  status.reason());
 }
 
 TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsBadValueWhenFilterContainsUnknownOperator) {

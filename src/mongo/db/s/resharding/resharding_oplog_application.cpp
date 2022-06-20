@@ -252,7 +252,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
 
     // First, query the conflict stash collection using [op _id] as the query. If a doc exists,
     // apply rule #1 and run a replacement update on the stash collection.
-    auto stashCollDoc = _queryStashCollById(opCtx, db, stashColl, idQuery);
+    auto stashCollDoc = _queryStashCollById(opCtx, stashColl, idQuery);
     if (!stashCollDoc.isEmpty()) {
         auto request = UpdateRequest();
         request.setNamespaceString(_myStashNss);
@@ -348,7 +348,7 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
 
     // First, query the conflict stash collection using [op _id] as the query. If a doc exists,
     // apply rule #1 and update the doc from the stash collection.
-    auto stashCollDoc = _queryStashCollById(opCtx, db, stashColl, idQuery);
+    auto stashCollDoc = _queryStashCollById(opCtx, stashColl, idQuery);
     if (!stashCollDoc.isEmpty()) {
         auto request = UpdateRequest();
         request.setNamespaceString(_myStashNss);
@@ -430,7 +430,7 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
 
     // First, query the conflict stash collection using [op _id] as the query. If a doc exists,
     // apply rule #1 and delete the doc from the stash collection.
-    auto stashCollDoc = _queryStashCollById(opCtx, db, stashColl, idQuery);
+    auto stashCollDoc = _queryStashCollById(opCtx, stashColl, idQuery);
     if (!stashCollDoc.isEmpty()) {
         auto nDeleted = deleteObjects(opCtx, stashColl, _myStashNss, idQuery, true /* justOne */);
         invariant(nDeleted != 0);
@@ -543,7 +543,6 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
 }
 
 BSONObj ReshardingOplogApplicationRules::_queryStashCollById(OperationContext* opCtx,
-                                                             Database* db,
                                                              const CollectionPtr& coll,
                                                              const BSONObj& idQuery) const {
     const IndexCatalog* indexCatalog = coll->getIndexCatalog();
@@ -552,7 +551,7 @@ BSONObj ReshardingOplogApplicationRules::_queryStashCollById(OperationContext* o
             indexCatalog->haveIdIndex(opCtx));
 
     BSONObj result;
-    Helpers::findById(opCtx, db, _myStashNss.ns(), idQuery, result);
+    Helpers::findById(opCtx, _myStashNss.ns(), idQuery, result);
     return result;
 }
 }  // namespace mongo

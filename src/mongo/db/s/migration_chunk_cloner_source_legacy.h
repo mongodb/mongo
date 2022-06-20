@@ -174,7 +174,7 @@ public:
      *
      * NOTE: Must be called with the collection lock held in at least IS mode.
      */
-    Status nextModsBatch(OperationContext* opCtx, Database* db, BSONObjBuilder* builder);
+    Status nextModsBatch(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**
      * Appends to 'arrBuilder' oplog entries which wrote to the currently migrated chunk and contain

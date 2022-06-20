@@ -137,14 +137,11 @@ RecordId Helpers::findOne(OperationContext* opCtx,
 }
 
 bool Helpers::findById(OperationContext* opCtx,
-                       Database* database,
                        StringData ns,
                        BSONObj query,
                        BSONObj& result,
                        bool* nsFound,
                        bool* indexFound) {
-    invariant(database);
-
     // TODO ForRead?
     NamespaceString nss{ns};
     CollectionPtr collection =

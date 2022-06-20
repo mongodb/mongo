@@ -27,16 +27,7 @@
  *    it in the license file.
  */
 
-
-#define LOGV2_FOR_CATALOG_REFRESH(ID, DLEVEL, MESSAGE, ...) \
-    LOGV2_DEBUG_OPTIONS(                                    \
-        ID, DLEVEL, {logv2::LogComponent::kShardingCatalogRefresh}, MESSAGE, ##__VA_ARGS__)
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
-
-#include <memory>
 
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/client.h"
@@ -65,7 +56,6 @@ using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunk
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(hangPersistCollectionAndChangedChunksAfterDropChunks);
 MONGO_FAIL_POINT_DEFINE(hangCollectionFlush);
 
 AtomicWord<unsigned long long> taskIdGenerator{0};
@@ -83,11 +73,6 @@ void dropChunksIfEpochChanged(OperationContext* opCtx,
 
     // Drop the 'config.cache.chunks.<ns>' collection
     dropChunks(opCtx, nss);
-
-    if (MONGO_unlikely(hangPersistCollectionAndChangedChunksAfterDropChunks.shouldFail())) {
-        LOGV2(22093, "Hit hangPersistCollectionAndChangedChunksAfterDropChunks failpoint");
-        hangPersistCollectionAndChangedChunksAfterDropChunks.pauseWhileSet(opCtx);
-    }
 
     LOGV2(5990400,
           "Dropped persisted chunk metadata due to epoch change",
@@ -130,7 +115,6 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
         return status;
     }
 
-    // Update the chunk metadata.
     try {
         dropChunksIfEpochChanged(opCtx, maxLoaderVersion, collAndChunks.epoch, nss);
     } catch (const DBException& ex) {

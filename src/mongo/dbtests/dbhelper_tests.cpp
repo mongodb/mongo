@@ -150,7 +150,7 @@ public:
         }
 
         BSONObj result;
-        Helpers::findById(opCtx1.get(), db, nss.ns(), idQuery, result, nullptr, nullptr);
+        Helpers::findById(opCtx1.get(), nss.ns(), idQuery, result, nullptr, nullptr);
         ASSERT_BSONOBJ_EQ(result, doc);
 
         // Assert that the same doc still exists after findByIdAndNoopUpdate
@@ -214,11 +214,11 @@ private:
 
         // Assert that the doc still exists in the collection.
         BSONObj res1;
-        Helpers::findById(opCtx1, db, nss.ns(), idQuery, res1, nullptr, nullptr);
+        Helpers::findById(opCtx1, nss.ns(), idQuery, res1, nullptr, nullptr);
         ASSERT_BSONOBJ_EQ(res1, doc);
 
         BSONObj res2;
-        Helpers::findById(opCtx2, db, nss.ns(), idQuery, res2, nullptr, nullptr);
+        Helpers::findById(opCtx2, nss.ns(), idQuery, res2, nullptr, nullptr);
         ASSERT_BSONOBJ_EQ(res2, doc);
 
         // Assert that findByIdAndNoopUpdate did not generate an oplog entry.
@@ -258,11 +258,11 @@ private:
 
         // Assert that the first storage transaction succeeded and that the doc is removed.
         BSONObj res1;
-        Helpers::findById(opCtx1, db, nss.ns(), idQuery, res1, nullptr, nullptr);
+        Helpers::findById(opCtx1, nss.ns(), idQuery, res1, nullptr, nullptr);
         ASSERT_BSONOBJ_EQ(res1, BSONObj());
 
         BSONObj res2;
-        Helpers::findById(opCtx2, db, nss.ns(), idQuery, res2, nullptr, nullptr);
+        Helpers::findById(opCtx2, nss.ns(), idQuery, res2, nullptr, nullptr);
         ASSERT_BSONOBJ_EQ(res2, BSONObj());
     }
 

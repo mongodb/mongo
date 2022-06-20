@@ -56,16 +56,10 @@ class AutoGetDb {
     AutoGetDb& operator=(const AutoGetDb&) = delete;
 
 public:
-    /**
-     * Database locks are also acquired for any 'secondaryDbNames' database names provided. Only
-     * MODE_IS is supported when 'secondaryDbNames' are provided. It is safe to repeat 'dbName' in
-     * 'secondaryDbNames'.
-     */
     AutoGetDb(OperationContext* opCtx,
               StringData dbName,
               LockMode mode,
-              Date_t deadline = Date_t::max(),
-              const std::set<StringData>& secondaryDbNames = {});
+              Date_t deadline = Date_t::max());
 
     AutoGetDb(AutoGetDb&&) = default;
 
