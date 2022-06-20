@@ -118,8 +118,10 @@ void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* o
     auto filterQuery =
         BSON("_id" << NamespaceString::kLogicalSessionsNamespace.ns()
                    << CollectionType::kMaxChunkSizeBytesFieldName << BSON("$exists" << false));
-    auto updateQuery =
-        BSON("$set" << BSON(CollectionType::kMaxChunkSizeBytesFieldName << kMaxChunkSizeBytes));
+    auto updateQuery = BSON("$set" << BSON(CollectionType::kMaxChunkSizeBytesFieldName
+                                           << kMaxChunkSizeBytes
+                                           << CollectionType::kNoAutoSplitFieldName << true));
+
     uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
         CollectionType::ConfigNS,
