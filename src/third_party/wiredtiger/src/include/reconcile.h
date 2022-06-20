@@ -305,7 +305,8 @@ struct __wt_reconcile {
 };
 
 typedef struct {
-    WT_UPDATE *upd; /* Update to write (or NULL) */
+    WT_UPDATE *upd;       /* Update to write (or NULL) */
+    WT_UPDATE *tombstone; /* The tombstone to write (or NULL) */
 
     WT_TIME_WINDOW tw;
 
