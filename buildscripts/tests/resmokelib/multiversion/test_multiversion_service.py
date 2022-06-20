@@ -38,6 +38,8 @@ class TestCalculateFcvConstants(TestCase):
                     "100.0"
                 ],
                 "longTermSupportReleases": ["4.0", "4.2", "4.4", "5.0"],
+                "eolVersions":
+                    ["2.0", "2.2", "2.4", "2.6", "3.0", "3.2", "3.4", "3.6", "4.0", "5.1", "5.2"],
             })
 
         multiversion_service = under_test.MultiversionService(
@@ -45,15 +47,15 @@ class TestCalculateFcvConstants(TestCase):
             mongo_releases=mongo_releases,
         )
 
-        fcv_constants = multiversion_service.calculate_fcv_constants()
+        version_constants = multiversion_service.calculate_version_constants()
 
-        self.assertEqual(fcv_constants.latest, Version("6.0"))
-        self.assertEqual(fcv_constants.last_continuous, Version("5.3"))
-        self.assertEqual(fcv_constants.last_lts, Version("5.0"))
-        self.assertEqual(fcv_constants.requires_fcv_tag_list,
+        self.assertEqual(version_constants.latest, Version("6.0"))
+        self.assertEqual(version_constants.last_continuous, Version("5.3"))
+        self.assertEqual(version_constants.last_lts, Version("5.0"))
+        self.assertEqual(version_constants.requires_fcv_tag_list,
                          [Version(v) for v in ["5.1", "5.2", "5.3", "6.0"]])
-        self.assertEqual(fcv_constants.requires_fcv_tag_list_continuous, [Version("6.0")])
-        self.assertEqual(fcv_constants.fcvs_less_than_latest, [
+        self.assertEqual(version_constants.requires_fcv_tag_list_continuous, [Version("6.0")])
+        self.assertEqual(version_constants.fcvs_less_than_latest, [
             Version(v)
             for v in ["4.0", "4.2", "4.4", "4.7", "4.8", "4.9", "5.0", "5.1", "5.2", "5.3"]
         ])
@@ -67,6 +69,8 @@ class TestCalculateFcvConstants(TestCase):
                     "6.1", "100.0"
                 ],
                 "longTermSupportReleases": ["4.0", "4.2", "4.4", "5.0", "6.0"],
+                "eolVersions":
+                    ["2.0", "2.2", "2.4", "2.6", "3.0", "3.2", "3.4", "3.6", "4.0", "5.1", "5.2"],
             })
 
         multiversion_service = under_test.MultiversionService(
@@ -74,15 +78,15 @@ class TestCalculateFcvConstants(TestCase):
             mongo_releases=mongo_releases,
         )
 
-        fcv_constants = multiversion_service.calculate_fcv_constants()
+        version_constants = multiversion_service.calculate_version_constants()
 
-        self.assertEqual(fcv_constants.latest, Version("100.0"))
-        self.assertEqual(fcv_constants.last_continuous, Version("6.1"))
-        self.assertEqual(fcv_constants.last_lts, Version("6.0"))
-        self.assertEqual(fcv_constants.requires_fcv_tag_list,
+        self.assertEqual(version_constants.latest, Version("100.0"))
+        self.assertEqual(version_constants.last_continuous, Version("6.1"))
+        self.assertEqual(version_constants.last_lts, Version("6.0"))
+        self.assertEqual(version_constants.requires_fcv_tag_list,
                          [Version(v) for v in ["6.1", "100.0"]])
-        self.assertEqual(fcv_constants.requires_fcv_tag_list_continuous, [Version("100.0")])
-        self.assertEqual(fcv_constants.fcvs_less_than_latest, [
+        self.assertEqual(version_constants.requires_fcv_tag_list_continuous, [Version("100.0")])
+        self.assertEqual(version_constants.fcvs_less_than_latest, [
             Version(v) for v in
             ["4.0", "4.2", "4.4", "4.7", "4.8", "4.9", "5.0", "5.1", "5.2", "5.3", "6.0", "6.1"]
         ])
