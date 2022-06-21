@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <pcrecpp.h>
 
 #include "mongo/bson/json.h"
@@ -59,7 +56,6 @@
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {
@@ -375,7 +371,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
     chunkA.setCollectionUUID(collUuid);
     chunkA.setMin(BSON("a" << 1));
     chunkA.setMax(BSON("a" << 100));
-    chunkA.setVersion({1, 2, collEpoch, collTimestamp});
+    chunkA.setVersion(ChunkVersion({collEpoch, collTimestamp}, {1, 2}));
     chunkA.setShard(ShardId("shard0000"));
 
     ChunkType chunkB;
@@ -383,10 +379,10 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
     chunkB.setCollectionUUID(collUuid);
     chunkB.setMin(BSON("a" << 100));
     chunkB.setMax(BSON("a" << 200));
-    chunkB.setVersion({3, 4, collEpoch, collTimestamp});
+    chunkB.setVersion(ChunkVersion({collEpoch, collTimestamp}, {3, 4}));
     chunkB.setShard(ShardId("shard0001"));
 
-    ChunkVersion queryChunkVersion({1, 2, collEpoch, collTimestamp});
+    ChunkVersion queryChunkVersion({collEpoch, collTimestamp}, {1, 2});
 
     const BSONObj chunksQuery(
         BSON(ChunkType::collectionUUID()
@@ -458,7 +454,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForUUIDNoSortNoLimit) {
     const auto collEpoch = OID::gen();
     const auto collTimestamp = Timestamp(1, 1);
 
-    ChunkVersion queryChunkVersion({1, 2, collEpoch, collTimestamp});
+    ChunkVersion queryChunkVersion({collEpoch, collTimestamp}, {1, 2});
 
     const BSONObj chunksQuery(
         BSON(ChunkType::collectionUUID()
@@ -507,7 +503,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSInvalidChunk) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     const auto collUuid = UUID::gen();
-    ChunkVersion queryChunkVersion({1, 2, OID::gen(), Timestamp(1, 1)});
+    ChunkVersion queryChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 2});
 
     const BSONObj chunksQuery(
         BSON(ChunkType::collectionUUID()
@@ -533,14 +529,14 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSInvalidChunk) {
         chunkA.setCollectionUUID(collUuid);
         chunkA.setMin(BSON("a" << 1));
         chunkA.setMax(BSON("a" << 100));
-        chunkA.setVersion({1, 2, OID::gen(), Timestamp(1, 1)});
+        chunkA.setVersion(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 2}));
         chunkA.setShard(ShardId("shard0000"));
 
         ChunkType chunkB;
         chunkB.setCollectionUUID(collUuid);
         chunkB.setMin(BSON("a" << 100));
         chunkB.setMax(BSON("a" << 200));
-        chunkB.setVersion({3, 4, OID::gen(), Timestamp(1, 1)});
+        chunkB.setVersion(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {3, 4}));
         // Missing shard id
 
         return vector<BSONObj>{chunkA.toConfigBSON(), chunkB.toConfigBSON()};

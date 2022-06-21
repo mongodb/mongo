@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
 #include "mongo/unittest/unittest.h"
@@ -63,7 +61,7 @@ public:
 TEST_F(MongosProcessInterfaceTest, FailsToEnsureFieldsUniqueIfTargetCollectionVersionIsSpecified) {
     auto expCtx = getExpCtx();
     auto targetCollectionVersion =
-        boost::make_optional(ChunkVersion(0, 0, OID::gen(), Timestamp(1, 1)));
+        boost::make_optional(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {0, 0}));
     auto processInterface = makeProcessInterface();
 
     ASSERT_THROWS_CODE(processInterface->ensureFieldsUniqueOrResolveDocumentKey(

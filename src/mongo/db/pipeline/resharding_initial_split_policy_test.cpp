@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
@@ -38,7 +35,6 @@
 #include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {

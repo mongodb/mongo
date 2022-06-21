@@ -82,7 +82,7 @@ boost::optional<ChunkVersion> ShardCollectionType::getLastRefreshedCollectionVer
         return boost::none;
 
     Timestamp majorMinor = *getLastRefreshedCollectionMajorMinorVersion();
-    return ChunkVersion(majorMinor.getSecs(), majorMinor.getInc(), getEpoch(), getTimestamp());
+    return ChunkVersion({getEpoch(), getTimestamp()}, {majorMinor.getSecs(), majorMinor.getInc()});
 }
 
 }  // namespace mongo

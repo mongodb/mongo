@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/pipeline/document_source_group.h"
@@ -533,7 +531,7 @@ TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
     const std::vector<std::string> xBoundaries = {"a", "g", "m", "r", "u"};
     auto chunks = [&]() {
         std::vector<ChunkType> chunks;
-        ChunkVersion version(1, 0, epoch, timestamp);
+        ChunkVersion version({epoch, timestamp}, {1, 0});
         chunks.emplace_back(uuid,
                             ChunkRange{BSON("x" << MINKEY << "y" << MINKEY),
                                        BSON("x" << xBoundaries[0] << "y" << MINKEY)},

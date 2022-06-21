@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/keypattern.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/platform/random.h"
@@ -79,7 +76,7 @@ std::pair<ShardStatisticsVector, ShardToChunksMap> generateCluster(
 
     int64_t currentChunk = 0;
 
-    ChunkVersion chunkVersion(1, 0, OID::gen(), Timestamp(1, 1));
+    ChunkVersion chunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
     const UUID uuid = UUID::gen();
 
     const KeyPattern shardKeyPattern(BSON("x" << 1));

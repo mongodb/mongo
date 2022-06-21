@@ -41,7 +41,7 @@ using unittest::assertGet;
 
 TEST(BalanceChunkRequest, RoundTrip) {
     UUID uuid{UUID::gen()};
-    ChunkVersion version(30, 1, OID::gen(), Timestamp{2, 0});
+    ChunkVersion version({OID::gen(), Timestamp(2, 0)}, {30, 1});
     auto obj = BalanceChunkRequest::serializeToRebalanceCommandForConfig(
         NamespaceString("DB.Test"),
         ChunkRange(BSON("A" << 100), BSON("A" << 200)),
@@ -59,7 +59,7 @@ TEST(BalanceChunkRequest, RoundTrip) {
 
 TEST(BalanceChunkRequest, ParseFromConfigCommandNoSecondaryThrottle) {
     const auto uuid{UUID::gen()};
-    const ChunkVersion version(1, 0, OID::gen(), Timestamp(1, 1));
+    const ChunkVersion version({OID::gen(), Timestamp(1, 1)}, {1, 0});
     auto request = assertGet(BalanceChunkRequest::parseFromConfigCommand(
         BSON("_configsvrMoveChunk" << 1 << "ns"
                                    << "TestDB.TestColl"
@@ -83,7 +83,7 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandNoSecondaryThrottle) {
 
 TEST(BalanceChunkRequest, ParseFromConfigCommandWithUUIDNoSecondaryThrottle) {
     const auto uuid = UUID::gen();
-    const ChunkVersion version(1, 0, OID::gen(), Timestamp(1, 1));
+    const ChunkVersion version({OID::gen(), Timestamp(1, 1)}, {1, 0});
     auto request = assertGet(BalanceChunkRequest::parseFromConfigCommand(
         BSON("_configsvrMoveChunk" << 1 << "ns"
                                    << "TestDB.TestColl"
@@ -107,7 +107,7 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandWithUUIDNoSecondaryThrottle) {
 
 TEST(BalanceChunkRequest, ParseFromConfigCommandWithSecondaryThrottle) {
     const auto uuid{UUID::gen()};
-    const ChunkVersion version(1, 0, OID::gen(), Timestamp(1, 1));
+    const ChunkVersion version({OID::gen(), Timestamp(1, 1)}, {1, 0});
     auto request = assertGet(BalanceChunkRequest::parseFromConfigCommand(
         BSON("_configsvrMoveChunk"
              << 1 << "ns"

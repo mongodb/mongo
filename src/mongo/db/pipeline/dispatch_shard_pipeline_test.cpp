@@ -175,7 +175,7 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineDoesNotRetryOnStaleConfig
         OID epoch{OID::gen()};
         Timestamp timestamp{1, 0};
         return createErrorCursorResponse({StaleConfigInfo(kTestAggregateNss,
-                                                          ChunkVersion(1, 0, epoch, timestamp),
+                                                          ChunkVersion({epoch, timestamp}, {1, 0}),
                                                           boost::none,
                                                           ShardId{"0"}),
                                           "Mock error: shard version mismatch"});
@@ -218,7 +218,7 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
     // namespace, then mock out a successful response.
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return createErrorCursorResponse({StaleConfigInfo(kTestAggregateNss,
-                                                          ChunkVersion(2, 0, epoch, timestamp),
+                                                          ChunkVersion({epoch, timestamp}, {2, 0}),
                                                           boost::none,
                                                           ShardId{"0"}),
                                           "Mock error: shard version mismatch"});
@@ -227,7 +227,7 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
     // Mock the expected config server queries.
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
-    ChunkVersion version(2, 0, epoch, timestamp);
+    ChunkVersion version({epoch, timestamp}, {2, 0});
 
     ChunkType chunk1(
         uuid, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"0"});

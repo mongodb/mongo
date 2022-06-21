@@ -130,6 +130,11 @@ void validateChunkIsNotOlderThan(const std::shared_ptr<ChunkInfo>& chunk,
 
 }  // namespace
 
+ChunkMap::ChunkMap(OID epoch, const Timestamp& timestamp, size_t initialCapacity)
+    : _collectionVersion({epoch, timestamp}, {0, 0}) {
+    _chunkMap.reserve(initialCapacity);
+}
+
 ShardVersionMap ChunkMap::constructShardVersionMap() const {
     ShardVersionMap shardVersions;
     ChunkVector::const_iterator current = _chunkMap.cbegin();
@@ -212,10 +217,7 @@ void ChunkMap::appendChunk(const std::shared_ptr<ChunkInfo>& chunk) {
     appendChunkTo(_chunkMap, chunk);
     const auto chunkVersion = chunk->getLastmod();
     if (_collectionVersion.isOlderThan(chunkVersion)) {
-        _collectionVersion = ChunkVersion(chunkVersion.majorVersion(),
-                                          chunkVersion.minorVersion(),
-                                          chunkVersion.epoch(),
-                                          _collTimestamp);
+        _collectionVersion = chunkVersion;
     }
 }
 
@@ -317,7 +319,7 @@ ChunkMap::_overlappingBounds(const BSONObj& min, const BSONObj& max, bool isMaxI
 }
 
 ShardVersionTargetingInfo::ShardVersionTargetingInfo(const OID& epoch, const Timestamp& timestamp)
-    : shardVersion(0, 0, epoch, timestamp) {}
+    : shardVersion({epoch, timestamp}, {0, 0}) {}
 
 RoutingTableHistory::RoutingTableHistory(
     NamespaceString nss,
@@ -748,7 +750,7 @@ ChunkVersion RoutingTableHistory::_getVersion(const ShardId& shardName,
         // Shards without explicitly tracked shard versions (meaning they have no chunks) always
         // have a version of (0, 0, epoch, timestamp)
         const auto collVersion = _chunkMap.getVersion();
-        return ChunkVersion(0, 0, collVersion.epoch(), collVersion.getTimestamp());
+        return ChunkVersion({collVersion.epoch(), collVersion.getTimestamp()}, {0, 0});
     }
 
     if (throwOnStaleShard && gEnableFinerGrainedCatalogCacheRefresh) {

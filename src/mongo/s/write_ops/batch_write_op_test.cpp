@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/session_catalog_router.h"
@@ -289,8 +287,8 @@ TEST_F(BatchWriteOpTest, SingleStaleError) {
     response.addToErrDetails(
         write_ops::WriteError(0,
                               Status{StaleConfigInfo(nss,
-                                                     ChunkVersion(101, 200, epoch, timestamp),
-                                                     ChunkVersion(105, 200, epoch, timestamp),
+                                                     ChunkVersion({epoch, timestamp}, {101, 200}),
+                                                     ChunkVersion({epoch, timestamp}, {105, 200}),
                                                      ShardId("shard")),
                                      "mock stale error"}));
 

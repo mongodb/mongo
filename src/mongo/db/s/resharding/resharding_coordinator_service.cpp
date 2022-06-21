@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 
 #include "mongo/base/string_data.h"
@@ -78,7 +75,6 @@
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
-
 
 namespace mongo {
 namespace {
@@ -857,7 +853,7 @@ ChunkVersion ReshardingCoordinatorExternalState::calculateChunkVersionForInitial
     OperationContext* opCtx) {
     const auto now = VectorClock::get(opCtx)->getTime();
     const auto timestamp = now.clusterTime().asTimestamp();
-    return ChunkVersion(1, 0, OID::gen(), timestamp);
+    return ChunkVersion({OID::gen(), timestamp}, {1, 0});
 }
 
 std::vector<DonorShardEntry> constructDonorShardEntries(const std::set<ShardId>& donorShardIds) {

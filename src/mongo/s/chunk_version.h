@@ -53,9 +53,52 @@ public:
 
     std::string toString() const;
 
+    // TODO: Do not add any new usages of these methods. Use isSameCollection instead.
+
+    const OID& epoch() const {
+        return _epoch;
+    }
+
+    const Timestamp& getTimestamp() const {
+        return _timestamp;
+    }
+
 protected:
     OID _epoch;
     Timestamp _timestamp;
+};
+
+/**
+ * Reflects the placement information for a collection. An object of this class has no meaning on
+ * its own without the Generation component above, that's why most of its methods are protected and
+ * are exposed as semantic checks in ChunkVersion below.
+ */
+class CollectionPlacement {
+public:
+    CollectionPlacement(uint32_t major, uint32_t minor)
+        : _combined(static_cast<uint64_t>(minor) | (static_cast<uint64_t>(major) << 32)) {}
+
+    // TODO: Do not add any new usages of these methods. Use isSamePlacement instead.
+
+    uint32_t majorVersion() const {
+        return _combined >> 32;
+    }
+
+    uint32_t minorVersion() const {
+        return _combined & 0xFFFFFFFF;
+    }
+
+protected:
+    /**
+     * Returns whether two collection placements are compatible with each other (meaning that they
+     * refer to the same distribution of chunks across the cluster).
+     */
+    bool isSamePlacement(const CollectionPlacement& other) const {
+        return majorVersion() == other.majorVersion();
+    }
+
+    // The combined major/minor version, which exists as subordinate to the collection generation
+    uint64_t _combined;
 };
 
 /**
@@ -68,7 +111,7 @@ protected:
  * 3. (n, 0), n > 0 - invalid configuration.
  * 4. (n, m), n > 0, m > 0 - normal sharded collection version.
  */
-class ChunkVersion : public CollectionGeneration {
+class ChunkVersion : public CollectionGeneration, public CollectionPlacement {
 public:
     /**
      * The name for the shard version information field, which shard-aware commands should include
@@ -76,11 +119,14 @@ public:
      */
     static constexpr StringData kShardVersionField = "shardVersion"_sd;
 
-    ChunkVersion(uint32_t major, uint32_t minor, const OID& epoch, const Timestamp& timestamp)
-        : CollectionGeneration(epoch, timestamp),
-          _combined(static_cast<uint64_t>(minor) | (static_cast<uint64_t>(major) << 32)) {}
+    ChunkVersion(CollectionGeneration geneneration, CollectionPlacement placement)
+        : CollectionGeneration(geneneration), CollectionPlacement(placement) {}
 
-    ChunkVersion() : ChunkVersion(0, 0, OID(), Timestamp()) {}
+    ChunkVersion() : ChunkVersion({OID(), Timestamp()}, {0, 0}) {}
+
+    // TODO: Do not add any new usages of this constructor. Use the one above instead.
+    ChunkVersion(uint32_t major, uint32_t minor, OID epoch, Timestamp timestamp)
+        : CollectionGeneration(epoch, timestamp), CollectionPlacement(major, minor) {}
 
     /**
      * Indicates that the collection is not sharded.
@@ -134,22 +180,6 @@ public:
         return _combined > 0;
     }
 
-    uint32_t majorVersion() const {
-        return _combined >> 32;
-    }
-
-    uint32_t minorVersion() const {
-        return _combined & 0xFFFFFFFF;
-    }
-
-    const OID& epoch() const {
-        return _epoch;
-    }
-
-    const Timestamp& getTimestamp() const {
-        return _timestamp;
-    }
-
     bool operator==(const ChunkVersion& otherVersion) const {
         return otherVersion.getTimestamp() == getTimestamp() && otherVersion._combined == _combined;
     }
@@ -160,7 +190,7 @@ public:
 
     // Can we write to this data and not have a problem?
     bool isWriteCompatibleWith(const ChunkVersion& other) const {
-        return isSameCollection(other) && majorVersion() == other.majorVersion();
+        return isSameCollection(other) && isSamePlacement(other);
     }
 
     // Unsharded timestamp cannot be compared with other timestamps
@@ -198,10 +228,6 @@ public:
     void serializeToBSON(StringData field, BSONObjBuilder* builder) const;
 
     std::string toString() const;
-
-private:
-    // The combined major/minor version, which exists as subordinate to the collection generation
-    uint64_t _combined;
 };
 
 inline std::ostream& operator<<(std::ostream& s, const ChunkVersion& v) {

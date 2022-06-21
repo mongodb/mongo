@@ -179,7 +179,7 @@ protected:
                 true,
                 {ChunkType{uuid,
                            ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},
-                           ChunkVersion(1, 0, epoch, timestamp),
+                           ChunkVersion({epoch, timestamp}, {1, 0}),
                            ShardId("dummyShardId")}});
 
             AutoGetDb autoDb(operationContext(), kNss.db(), MODE_IX);

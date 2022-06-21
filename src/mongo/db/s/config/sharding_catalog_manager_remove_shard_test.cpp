@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <string>
 #include <vector>
 
@@ -57,7 +54,6 @@
 #include "mongo/stdx/future.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {
@@ -227,15 +223,15 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
     const auto timestamp = Timestamp(1);
     ChunkType chunk1(uuid,
                      ChunkRange(BSON("_id" << 0), BSON("_id" << 20)),
-                     ChunkVersion(1, 1, epoch, timestamp),
+                     ChunkVersion({epoch, timestamp}, {1, 1}),
                      shard1.getName());
     ChunkType chunk2(uuid,
                      ChunkRange(BSON("_id" << 21), BSON("_id" << 50)),
-                     ChunkVersion(1, 2, epoch, timestamp),
+                     ChunkVersion({epoch, timestamp}, {1, 2}),
                      shard1.getName());
     ChunkType chunk3(uuid,
                      ChunkRange(BSON("_id" << 51), BSON("_id" << 1000)),
-                     ChunkVersion(1, 3, epoch, timestamp),
+                     ChunkVersion({epoch, timestamp}, {1, 3}),
                      shard1.getName());
 
     chunk3.setJumbo(true);
@@ -314,15 +310,15 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     Timestamp timestamp = Timestamp(1);
     ChunkType chunk1(uuid,
                      ChunkRange(BSON("_id" << 0), BSON("_id" << 20)),
-                     ChunkVersion(1, 1, epoch, timestamp),
+                     ChunkVersion({epoch, timestamp}, {1, 1}),
                      shard1.getName());
     ChunkType chunk2(uuid,
                      ChunkRange(BSON("_id" << 21), BSON("_id" << 50)),
-                     ChunkVersion(1, 2, epoch, timestamp),
+                     ChunkVersion({epoch, timestamp}, {1, 2}),
                      shard1.getName());
     ChunkType chunk3(uuid,
                      ChunkRange(BSON("_id" << 51), BSON("_id" << 1000)),
-                     ChunkVersion(1, 3, epoch, timestamp),
+                     ChunkVersion({epoch, timestamp}, {1, 3}),
                      shard1.getName());
 
     std::vector<ChunkType> chunks{chunk1, chunk2, chunk3};

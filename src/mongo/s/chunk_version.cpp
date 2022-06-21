@@ -60,10 +60,8 @@ ChunkVersion ChunkVersion::parse(const BSONElement& element) {
     auto parsedVersion =
         ChunkVersion60Format::parse(IDLParserErrorContext("ChunkVersion"), element.Obj());
     auto version = parsedVersion.getVersion();
-    return ChunkVersion(version.getSecs(),
-                        version.getInc(),
-                        parsedVersion.getEpoch(),
-                        parsedVersion.getTimestamp());
+    return ChunkVersion({parsedVersion.getEpoch(), parsedVersion.getTimestamp()},
+                        {version.getSecs(), version.getInc()});
 }
 
 void ChunkVersion::serializeToBSON(StringData field, BSONObjBuilder* builder) const {

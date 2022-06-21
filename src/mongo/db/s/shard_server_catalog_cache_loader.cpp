@@ -230,11 +230,9 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
     // If the epochs are the same we can safely take the timestamp from the shard coll entry.
     ChunkVersion startingVersion = version.isSameCollection({shardCollectionEntry.getEpoch(),
                                                              shardCollectionEntry.getTimestamp()})
-        ? ChunkVersion(version.majorVersion(),
-                       version.minorVersion(),
-                       version.epoch(),
-                       shardCollectionEntry.getTimestamp())
-        : ChunkVersion(0, 0, shardCollectionEntry.getEpoch(), shardCollectionEntry.getTimestamp());
+        ? version
+        : ChunkVersion({shardCollectionEntry.getEpoch(), shardCollectionEntry.getTimestamp()},
+                       {0, 0});
 
     QueryAndSort diff = createShardChunkDiffQuery(startingVersion);
 
@@ -1277,16 +1275,7 @@ ShardServerCatalogCacheLoader::CollAndChunkTask::CollAndChunkTask(
     if (statusWithCollectionAndChangedChunks.isOK()) {
         collectionAndChangedChunks = std::move(statusWithCollectionAndChangedChunks.getValue());
         invariant(!collectionAndChangedChunks->changedChunks.empty());
-        const auto highestVersion = collectionAndChangedChunks->changedChunks.back().getVersion();
-        // Note that due to the way Phase 1 of the FCV upgrade writes timestamps to chunks
-        // (non-atomically), it is possible that chunks exist with timestamps, but the
-        // corresponding config.collections entry doesn't. In this case, the chunks timestamp
-        // should be ignored when computing the max query version and we should use the
-        // timestamp that comes from config.collections.
-        maxQueryVersion = ChunkVersion(highestVersion.majorVersion(),
-                                       highestVersion.minorVersion(),
-                                       highestVersion.epoch(),
-                                       collectionAndChangedChunks->timestamp);
+        maxQueryVersion = collectionAndChangedChunks->changedChunks.back().getVersion();
     } else {
         invariant(statusWithCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound);
         dropped = true;
