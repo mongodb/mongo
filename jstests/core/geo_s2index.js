@@ -159,6 +159,12 @@ assert.commandFailedWithCode(res, ErrorCodes.TypeMismatch);
 res = t.createIndex({loc: '2dsphere'}, {coarsestIndexedLevel: 'NOT_A_NUMBER'});
 assert.commandFailedWithCode(res, ErrorCodes.TypeMismatch);
 
+res = t.createIndex({loc: '2dsphere'}, {finestIndexedLevel: true});
+assert.commandFailedWithCode(res, ErrorCodes.TypeMismatch);
+
+res = t.createIndex({loc: '2dsphere'}, {coarsestIndexedLevel: true});
+assert.commandFailedWithCode(res, ErrorCodes.TypeMismatch);
+
 // Ensure polygon which previously triggered an assertion error in SERVER-19674
 // is able to be indexed.
 t.drop();

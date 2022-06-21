@@ -501,8 +501,6 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
         } else if ((IndexDescriptor::kBackgroundFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::kUniqueFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::kSparseFieldName == indexSpecElemFieldName ||
-                    IndexDescriptor::k2dsphereCoarsestIndexedLevel == indexSpecElemFieldName ||
-                    IndexDescriptor::k2dsphereFinestIndexedLevel == indexSpecElemFieldName ||
                     IndexDescriptor::kDropDuplicatesFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::kPrepareUniqueFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::kClusteredFieldName == indexSpecElemFieldName)) {
@@ -529,7 +527,9 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                     IndexDescriptor::kTextVersionFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::k2dIndexBitsFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::k2dIndexMinFieldName == indexSpecElemFieldName ||
-                    IndexDescriptor::k2dIndexMaxFieldName == indexSpecElemFieldName) &&
+                    IndexDescriptor::k2dIndexMaxFieldName == indexSpecElemFieldName ||
+                    IndexDescriptor::k2dsphereCoarsestIndexedLevel == indexSpecElemFieldName ||
+                    IndexDescriptor::k2dsphereFinestIndexedLevel == indexSpecElemFieldName) &&
                    !indexSpecElem.isNumber()) {
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "The field '" << indexSpecElemFieldName
