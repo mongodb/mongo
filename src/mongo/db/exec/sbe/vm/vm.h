@@ -828,6 +828,19 @@ public:
     std::tuple<uint8_t, value::TypeTags, value::Value> run(const CodeFragment* code);
     bool runPredicate(const CodeFragment* code);
 
+    static std::tuple<bool, value::TypeTags, value::Value> genericAdd(value::TypeTags lhsTag,
+                                                                      value::Value lhsValue,
+                                                                      value::TypeTags rhsTag,
+                                                                      value::Value rhsValue);
+    static std::tuple<bool, value::TypeTags, value::Value> genericSub(value::TypeTags lhsTag,
+                                                                      value::Value lhsValue,
+                                                                      value::TypeTags rhsTag,
+                                                                      value::Value rhsValue);
+    static std::tuple<bool, value::TypeTags, value::Value> genericMul(value::TypeTags lhsTag,
+                                                                      value::Value lhsValue,
+                                                                      value::TypeTags rhsTag,
+                                                                      value::Value rhsValue);
+
 private:
     // The VM stack is used to pass inputs to instructions and hold the outputs produced by
     // instructions. Each element of the VM stack is 3-tuple comprised of a boolean ('owned'),
@@ -915,18 +928,6 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> runLambdaInternal(const CodeFragment* code,
                                                                       int64_t position);
 
-    std::tuple<bool, value::TypeTags, value::Value> genericAdd(value::TypeTags lhsTag,
-                                                               value::Value lhsValue,
-                                                               value::TypeTags rhsTag,
-                                                               value::Value rhsValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericSub(value::TypeTags lhsTag,
-                                                               value::Value lhsValue,
-                                                               value::TypeTags rhsTag,
-                                                               value::Value rhsValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericMul(value::TypeTags lhsTag,
-                                                               value::Value lhsValue,
-                                                               value::TypeTags rhsTag,
-                                                               value::Value rhsValue);
     std::tuple<bool, value::TypeTags, value::Value> genericDiv(value::TypeTags lhsTag,
                                                                value::Value lhsValue,
                                                                value::TypeTags rhsTag,

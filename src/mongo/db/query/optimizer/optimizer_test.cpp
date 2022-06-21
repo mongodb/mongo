@@ -31,6 +31,8 @@
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/syntax/syntax_fwd_declare.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/unittest/unittest.h"
@@ -38,44 +40,105 @@
 namespace mongo::optimizer {
 namespace {
 
-TEST(Optimizer, ConstEval) {
-    // 1 + 2
-    auto tree = make<BinaryOp>(Operations::Add, Constant::int64(1), Constant::int64(2));
 
-    // Run the evaluator.
+Constant* constEval(ABT& tree) {
     auto env = VariableEnvironment::build(tree);
     ConstEval evaluator{env};
     evaluator.optimize(tree);
 
     // The result must be Constant.
-    auto result = tree.cast<Constant>();
+    Constant* result = tree.cast<Constant>();
     ASSERT(result != nullptr);
-
-    // And the value must be 3 (i.e. 1+2).
-    ASSERT_EQ(result->getValueInt64(), 3);
 
     ASSERT_NE(ABT::tagOf<Constant>(), ABT::tagOf<BinaryOp>());
     ASSERT_EQ(tree.tagOf(), ABT::tagOf<Constant>());
+    return result;
 }
+
+TEST(Optimizer, ConstEval) {
+    // 1 + 2
+    ABT tree = make<BinaryOp>(Operations::Add, Constant::int64(1), Constant::int64(2));
+    Constant* result = constEval(tree);
+    ASSERT_EQ(result->getValueInt64(), 3);
+}
+
 
 TEST(Optimizer, ConstEvalCompose) {
     // (1 + 2) + 3
-    auto tree =
+    ABT tree =
         make<BinaryOp>(Operations::Add,
                        make<BinaryOp>(Operations::Add, Constant::int64(1), Constant::int64(2)),
                        Constant::int64(3));
-
-    // Run the evaluator.
-    auto env = VariableEnvironment::build(tree);
-    ConstEval evaluator{env};
-    evaluator.optimize(tree);
-
-    // The result must be Constant.
-    auto result = tree.cast<Constant>();
-    ASSERT(result != nullptr);
-
-    // And the value must be 6 (i.e. 1+2+3).
+    Constant* result = constEval(tree);
     ASSERT_EQ(result->getValueInt64(), 6);
+}
+
+
+TEST(Optimizer, ConstEvalCompose2) {
+    // 3 - (5 - 4)
+    auto tree =
+        make<BinaryOp>(Operations::Sub,
+                       Constant::int64(3),
+                       make<BinaryOp>(Operations::Sub, Constant::int64(5), Constant::int64(4)));
+    Constant* result = constEval(tree);
+    ASSERT_EQ(result->getValueInt64(), 2);
+}
+
+TEST(Optimizer, ConstEval3) {
+    // 1.5 + 0.5
+    auto tree =
+        make<BinaryOp>(Operations::Add, Constant::fromDouble(1.5), Constant::fromDouble(0.5));
+    Constant* result = constEval(tree);
+    ASSERT_EQ(result->getValueDouble(), 2.0);
+}
+
+TEST(Optimizer, ConstEval4) {
+    // INT32_MAX (as int) + 0 (as double) => INT32_MAX (as double)
+    auto tree =
+        make<BinaryOp>(Operations::Add, Constant::int32(INT32_MAX), Constant::fromDouble(0));
+    Constant* result = constEval(tree);
+    ASSERT_EQ(result->getValueDouble(), INT32_MAX);
+}
+
+TEST(Optimizer, ConstEval5) {
+    // -1 + -2
+    ABT tree1 = make<BinaryOp>(Operations::Add, Constant::int32(-1), Constant::int32(-2));
+    ASSERT_EQ(constEval(tree1)->getValueInt32(), -3);
+    // 1 + -1
+    ABT tree2 = make<BinaryOp>(Operations::Add, Constant::int32(1), Constant::int32(-1));
+    ASSERT_EQ(constEval(tree2)->getValueInt32(), 0);
+    // 1 + INT32_MIN
+    ABT tree3 = make<BinaryOp>(Operations::Add, Constant::int32(1), Constant::int32(INT32_MIN));
+    ASSERT_EQ(constEval(tree3)->getValueInt32(), -2147483647);
+}
+
+TEST(Optimizer, ConstEval6) {
+    // -1 * -2
+    ABT tree1 = make<BinaryOp>(Operations::Mult, Constant::int32(-1), Constant::int32(-2));
+    ASSERT_EQ(constEval(tree1)->getValueInt32(), 2);
+    // 1 * -1
+    ABT tree2 = make<BinaryOp>(Operations::Mult, Constant::int32(1), Constant::int32(-1));
+    ASSERT_EQ(constEval(tree2)->getValueInt32(), -1);
+    // 2 * INT32_MAX
+    ABT tree3 = make<BinaryOp>(Operations::Mult, Constant::int32(2), Constant::int32(INT32_MAX));
+    ASSERT_EQ(constEval(tree3)->getValueInt64(), 4294967294);
+}
+
+
+TEST(Optimizer, IntegerOverflow) {
+    auto int32tree =
+        make<BinaryOp>(Operations::Add, Constant::int32(INT32_MAX), Constant::int32(1));
+    ASSERT_EQ(constEval(int32tree)->getValueInt64(), 2147483648);
+}
+
+TEST(Optimizer, IntegerUnderflow) {
+    auto int32tree =
+        make<BinaryOp>(Operations::Add, Constant::int32(INT32_MIN), Constant::int32(-1));
+    ASSERT_EQ(constEval(int32tree)->getValueInt64(), -2147483649);
+
+    auto tree =
+        make<BinaryOp>(Operations::Add, Constant::int32(INT32_MAX), Constant::int64(INT64_MIN));
+    ASSERT_EQ(constEval(tree)->getValueInt64(), -9223372034707292161);
 }
 
 TEST(Optimizer, Tracker1) {

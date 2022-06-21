@@ -28,7 +28,15 @@
  */
 
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
+#include <bits/floatn-common.h>
+#include <cfloat>
+#include <climits>
+#include <cstdint>
 
 namespace mongo::optimizer {
 bool ConstEval::optimize(ABT& n) {
@@ -191,22 +199,81 @@ namespace fold_helpers {
 using namespace sbe::value;
 
 template <class T>
-sbe::value::Value constFoldNumberHelper(const sbe::value::TypeTags lhsTag,
-                                        const sbe::value::Value lhsValue,
-                                        const TypeTags rhsTag,
-                                        const sbe::value::Value rhsValue) {
+sbe::value::Value constFoldNumberAdd(const sbe::value::TypeTags lhsTag,
+                                     const sbe::value::Value lhsValue,
+                                     const TypeTags rhsTag,
+                                     const sbe::value::Value rhsValue) {
     const auto result = numericCast<T>(lhsTag, lhsValue) + numericCast<T>(rhsTag, rhsValue);
     return bitcastFrom<T>(result);
 }
 
 template <>
-sbe::value::Value constFoldNumberHelper<Decimal128>(const TypeTags lhsTag,
-                                                    const sbe::value::Value lhsValue,
-                                                    const TypeTags rhsTag,
-                                                    const sbe::value::Value rhsValue) {
-    const auto result =
+sbe::value::Value constFoldNumberAdd<Decimal128>(const TypeTags lhsTag,
+                                                 const sbe::value::Value lhsValue,
+                                                 const TypeTags rhsTag,
+                                                 const sbe::value::Value rhsValue) {
+    const Decimal128 result =
         numericCast<Decimal128>(lhsTag, lhsValue).add(numericCast<Decimal128>(rhsTag, rhsValue));
     return makeCopyDecimal(result).second;
+}
+
+template <class T>
+sbe::value::Value constFoldNumberSubtract(const sbe::value::TypeTags lhsTag,
+                                          const sbe::value::Value lhsValue,
+                                          const TypeTags rhsTag,
+                                          const sbe::value::Value rhsValue) {
+    const auto result = numericCast<T>(lhsTag, lhsValue) - numericCast<T>(rhsTag, rhsValue);
+    return bitcastFrom<T>(result);
+}
+
+template <>
+sbe::value::Value constFoldNumberSubtract<Decimal128>(const TypeTags lhsTag,
+                                                      const sbe::value::Value lhsValue,
+                                                      const TypeTags rhsTag,
+                                                      const sbe::value::Value rhsValue) {
+    const Decimal128 result = numericCast<Decimal128>(lhsTag, lhsValue)
+                                  .subtract(numericCast<Decimal128>(rhsTag, rhsValue));
+    return makeCopyDecimal(result).second;
+}
+
+template <class T>
+sbe::value::Value constFoldNumberMult(const sbe::value::TypeTags lhsTag,
+                                      const sbe::value::Value lhsValue,
+                                      const TypeTags rhsTag,
+                                      const sbe::value::Value rhsValue) {
+    const auto result = numericCast<T>(lhsTag, lhsValue) * numericCast<T>(rhsTag, rhsValue);
+    return bitcastFrom<T>(result);
+}
+
+template <>
+sbe::value::Value constFoldNumberMult<Decimal128>(const TypeTags lhsTag,
+                                                  const sbe::value::Value lhsValue,
+                                                  const TypeTags rhsTag,
+                                                  const sbe::value::Value rhsValue) {
+    const Decimal128 result = numericCast<Decimal128>(lhsTag, lhsValue)
+                                  .multiply(numericCast<Decimal128>(rhsTag, rhsValue));
+    return makeCopyDecimal(result).second;
+}
+
+// Checks for Integer Overflow and Underflow
+bool willOverflow(const TypeTags lhsTag,
+                  const sbe::value::Value lhsValue,
+                  const TypeTags rhsTag,
+                  const sbe::value::Value rhsValue,
+                  const TypeTags resultType) {
+    if (resultType == TypeTags::NumberInt32) {
+        int castedLHS = numericCast<int32_t>(resultType, lhsValue);
+        int castedRHS = numericCast<int32_t>(resultType, rhsValue);
+        return (castedLHS > 0 && castedRHS > (INT32_MAX - castedLHS)) ||
+            (castedLHS < 0 && castedRHS < (INT32_MIN - castedLHS));
+    } else if (resultType == TypeTags::NumberInt64) {
+        long castedLHS = numericCast<int64_t>(resultType, lhsValue);
+        long castedRHS = numericCast<int64_t>(resultType, rhsValue);
+        return (castedLHS > 0 && castedRHS > (INT64_MAX - castedLHS)) ||
+            (castedLHS < 0 && castedRHS < (INT64_MIN - castedLHS));
+    } else {
+        MONGO_UNREACHABLE;
+    }
 }
 
 }  // namespace fold_helpers
@@ -221,52 +288,46 @@ void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
         case Operations::Add: {
             // Let say we want to recognize ConstLhs + ConstRhs and replace it with the result of
             // addition.
+            Constant* lhsConst = lhs.cast<Constant>();
+            Constant* rhsConst = rhs.cast<Constant>();
+            if (lhsConst && rhsConst) {
+                auto [lhsTag, lhsValue] = lhsConst->get();
+                auto [rhsTag, rhsValue] = rhsConst->get();
+                auto [_, resultType, resultValue] =
+                    sbe::vm::ByteCode::genericAdd(lhsTag, lhsValue, rhsTag, rhsValue);
+                swapAndUpdate(n, make<Constant>(resultType, resultValue));
+            }
+            break;
+        }
+
+        case Operations::Sub: {
+            // Let say we want to recognize ConstLhs - ConstRhs and replace it with the result of
+            // subtraction.
             auto lhsConst = lhs.cast<Constant>();
             auto rhsConst = rhs.cast<Constant>();
 
             if (lhsConst && rhsConst) {
                 auto [lhsTag, lhsValue] = lhsConst->get();
                 auto [rhsTag, rhsValue] = rhsConst->get();
+                auto [_, resultType, resultValue] =
+                    sbe::vm::ByteCode::genericSub(lhsTag, lhsValue, rhsTag, rhsValue);
+                swapAndUpdate(n, make<Constant>(resultType, resultValue));
+            }
+            break;
+        }
 
-                if (isNumber(lhsTag) && isNumber(rhsTag)) {
-                    // So this is the addition operation and both arguments are number constants,
-                    // hence we can compute the result.
+        case Operations::Mult: {
+            // Let say we want to recognize ConstLhs * ConstRhs and replace it with the result of
+            // multiplication.
+            auto lhsConst = lhs.cast<Constant>();
+            auto rhsConst = rhs.cast<Constant>();
 
-                    const TypeTags resultType = getWidestNumericalType(lhsTag, rhsTag);
-                    sbe::value::Value resultValue;
-
-                    switch (resultType) {
-                        case TypeTags::NumberInt32: {
-                            resultValue =
-                                constFoldNumberHelper<int32_t>(lhsTag, lhsValue, rhsTag, rhsValue);
-                            break;
-                        }
-
-                        case TypeTags::NumberInt64: {
-                            resultValue =
-                                constFoldNumberHelper<int64_t>(lhsTag, lhsValue, rhsTag, rhsValue);
-                            break;
-                        }
-
-                        case TypeTags::NumberDouble: {
-                            resultValue =
-                                constFoldNumberHelper<double>(lhsTag, lhsValue, rhsTag, rhsValue);
-                            break;
-                        }
-
-                        case TypeTags::NumberDecimal: {
-                            resultValue = constFoldNumberHelper<Decimal128>(
-                                lhsTag, lhsValue, rhsTag, rhsValue);
-                            break;
-                        }
-
-                        default:
-                            MONGO_UNREACHABLE;
-                    }
-
-                    // And this is the crucial step - we swap the current node (n) for the result.
-                    swapAndUpdate(n, make<Constant>(resultType, resultValue));
-                }
+            if (lhsConst && rhsConst) {
+                auto [lhsTag, lhsValue] = lhsConst->get();
+                auto [rhsTag, rhsValue] = rhsConst->get();
+                auto [_, resultType, resultValue] =
+                    sbe::vm::ByteCode::genericMul(lhsTag, lhsValue, rhsTag, rhsValue);
+                swapAndUpdate(n, make<Constant>(resultType, resultValue));
             }
             break;
         }
