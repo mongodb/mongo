@@ -709,7 +709,7 @@ void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
                                 << replState->buildUUID);
 
         auto const nextAction = [&] {
-            const ScopedCounter counter{activeIndexBuildsSSS.waitForCommitQuorum};
+            indexBuildsSSS.waitForCommitQuorum.addAndFetch(1);
             // Future wait can be interrupted.
             return _drainSideWritesUntilNextActionIsAvailable(opCtx, replState);
         }();

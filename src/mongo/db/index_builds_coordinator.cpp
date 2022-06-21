@@ -90,8 +90,9 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeBuildingIndexSecond);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeWaitingUntilMajorityOpTime);
 MONGO_FAIL_POINT_DEFINE(failSetUpResumeIndexBuild);
 
-IndexBuildsCoordinator::ActiveIndexBuildsSSS::ActiveIndexBuildsSSS()
-    : ServerStatusSection("activeIndexBuilds"),
+IndexBuildsCoordinator::IndexBuildsSSS::IndexBuildsSSS()
+    : ServerStatusSection("indexBuilds"),
+      registered(0),
       scanCollection(0),
       drainSideWritesTable(0),
       drainSideWritesTablePreCommit(0),
@@ -632,6 +633,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         if (!status.isOK()) {
             return status;
         }
+        indexBuildsSSS.registered.addAndFetch(1);
 
         IndexBuildsManager::SetupOptions options;
         options.protocol = protocol;
@@ -715,6 +717,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
     if (!status.isOK()) {
         return status;
     }
+    indexBuildsSSS.registered.addAndFetch(1);
 
     IndexBuildsManager::SetupOptions options;
     options.protocol = protocol;
@@ -1964,6 +1967,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
     if (!status.isOK()) {
         return status;
     }
+    indexBuildsSSS.registered.addAndFetch(1);
 
     // The index has been registered on the Coordinator in an unstarted state. Return an
     // uninitialized Future so that the caller can set up the index build by calling
@@ -2520,7 +2524,7 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
     boost::optional<RecordId> resumeAfterRecordId) {
     // Collection scan and insert into index.
     {
-        const ScopedCounter counter{activeIndexBuildsSSS.scanCollection};
+        indexBuildsSSS.scanCollection.addAndFetch(1);
 
         ScopeGuard scopeGuard([&] {
             opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
@@ -2586,7 +2590,7 @@ CollectionPtr IndexBuildsCoordinator::_setUpForScanCollectionAndInsertSortedKeys
  */
 void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
-    const ScopedCounter counter{activeIndexBuildsSSS.drainSideWritesTable};
+    indexBuildsSSS.drainSideWritesTable.addAndFetch(1);
 
     // Perform the first drain while holding an intent lock.
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
@@ -2612,7 +2616,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesBlockingWrites(
     OperationContext* opCtx,
     std::shared_ptr<ReplIndexBuildState> replState,
     const IndexBuildOptions& indexBuildOptions) {
-    const ScopedCounter counter{activeIndexBuildsSSS.drainSideWritesTablePreCommit};
+    indexBuildsSSS.drainSideWritesTablePreCommit.addAndFetch(1);
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     // Perform the second drain while stopping writes on the collection.
     {
@@ -2718,7 +2722,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
                             << ", collection UUID: " << replState->collectionUUID);
 
     {
-        const ScopedCounter counter{activeIndexBuildsSSS.drainSideWritesTableOnCommit};
+        indexBuildsSSS.drainSideWritesTableOnCommit.addAndFetch(1);
         // Perform the third and final drain after releasing a shared lock and reacquiring an
         // exclusive lock on the collection.
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
@@ -2760,8 +2764,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         // can be called for two-phase builds in all replication states except during initial sync
         // when this node is not guaranteed to be consistent.
         {
-            const ScopedCounter counter{
-                activeIndexBuildsSSS.processConstraintsViolatonTableOnCommit};
+            indexBuildsSSS.processConstraintsViolatonTableOnCommit.addAndFetch(1);
             bool twoPhaseAndNotInitialSyncing =
                 IndexBuildProtocol::kTwoPhase == replState->protocol &&
                 !replCoord->getMemberState().startup2();
@@ -2771,7 +2774,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
                     opCtx, collection.get(), replState->buildUUID));
             }
         }
-        const ScopedCounter counter{activeIndexBuildsSSS.commit};
+        indexBuildsSSS.commit.addAndFetch(1);
 
         // If two phase index builds is enabled, index build will be coordinated using
         // startIndexBuild and commitIndexBuild oplog entries.
