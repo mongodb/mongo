@@ -990,9 +990,20 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n, co
     generateSlots(fieldProjectionMap, ridSlot, rootSlot, fields, vars);
     uassert(6624233, "Cannot deliver root projection in this context", !rootSlot.has_value());
 
+    std::vector<std::pair<size_t, sbe::value::SlotId>> indexVars;
     sbe::IndexKeysInclusionSet indexKeysToInclude;
-    for (const std::string& fieldName : fields) {
-        indexKeysToInclude.set(decodeIndexKeyName(fieldName), true);
+
+    for (size_t index = 0; index < fields.size(); index++) {
+        const size_t indexFieldPos = decodeIndexKeyName(fields.at(index));
+        indexVars.emplace_back(indexFieldPos, vars.at(index));
+        indexKeysToInclude.set(indexFieldPos, true);
+    }
+
+    // Make sure vars are in sorted order on index field position.
+    std::sort(indexVars.begin(), indexVars.end());
+    vars.clear();
+    for (const auto& [indexFieldPos, slot] : indexVars) {
+        vars.push_back(slot);
     }
 
     auto lowerBoundExpr = convertBoundsToExpr(true /*isLower*/, indexDef, interval);
