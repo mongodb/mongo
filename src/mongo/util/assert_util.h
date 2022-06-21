@@ -709,3 +709,21 @@ Status exceptionToStatus() noexcept;
  * Like `MONGO_UNREACHABLE`, but triggers a `tassert` instead of an `invariant`
  */
 #define MONGO_UNREACHABLE_TASSERT(msgid) tasserted(msgid, "Hit a MONGO_UNREACHABLE_TASSERT!")
+
+/**
+ * Produces an invariant failure if executed. Subset of MONGO_UNREACHABLE, but specifically
+ * to indicate that the program has reached a function that is unimplemented and should be
+ * unreachable from production.
+ * Example:
+ *
+ *   void myFuncToDo() {
+ *       MONGO_UNIMPLEMENTED;
+ *   }
+ */
+#define MONGO_UNIMPLEMENTED \
+    ::mongo::invariantFailed("Hit a MONGO_UNIMPLEMENTED!", __FILE__, __LINE__);
+
+/**
+ * Like `MONGO_UNIMPLEMENTED`, but triggers a `tassert` instead of an `invariant`
+ */
+#define MONGO_UNIMPLEMENTED_TASSERT(msgid) tasserted(msgid, "Hit a MONGO_UNIMPLEMENTED_TASSERT!")
