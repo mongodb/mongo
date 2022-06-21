@@ -59,7 +59,7 @@ class EvgExpansions(BaseModel):
     build_id: str
     build_variant: str
     exec_timeout_secs: Optional[int] = None
-    is_patch: Optional[bool]
+    is_patch: Optional[str]
     project: str
     max_tests_per_suite: Optional[int] = 100
     max_sub_suites: Optional[int] = 5
@@ -83,9 +83,20 @@ class EvgExpansions(BaseModel):
 
     def get_max_sub_suites(self) -> int:
         """Get the max_sub_suites to use."""
-        if not self.is_patch:
+        if not self.determine_is_patch():
             return self.mainline_max_sub_suites
         return self.max_sub_suites
+
+    def determine_is_patch(self) -> bool:
+        """
+        Determine if expansions indicate whether the script is being run in a patch build.
+
+        In a patch build, the `is_patch` expansion will be the string value of "true". In a
+        non-patch setting, it will not exist, or be an empty string.
+
+        :return: True if task is being run in a patch build.
+        """
+        return self.is_patch is not None and self.is_patch.lower() == "true"
 
     def build_suite_split_config(self, start_date: datetime,
                                  end_date: datetime) -> SuiteSplitConfig:
@@ -113,7 +124,7 @@ class EvgExpansions(BaseModel):
         """
         return GenTaskOptions(
             create_misc_suite=True,
-            is_patch=self.is_patch,
+            is_patch=self.determine_is_patch(),
             generated_config_dir=GENERATED_CONFIG_DIR,
             use_default_timeouts=False,
             timeout_secs=self.timeout_secs,
