@@ -30,7 +30,7 @@ assert.eq(100, testColl.find().itcount());
 
 assert.commandWorked(testColl.runCommand({collMod: "foo", validator: {name: {$type: "int"}}}));
 
-let failpoint = configureFailPoint(st.shard1, "migrateThreadHangAtStep4");
+let failpoint = configureFailPoint(st.shard1, "migrateThreadHangAtStep3");
 
 const awaitResult = startParallelShell(
     funWithArgs(function(ns, toShardName) {
