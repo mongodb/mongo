@@ -1442,7 +1442,9 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
                                     // This produces {$const: maxBucketSpanSeconds}
                                     make_intrusive<ExpressionConstant>(
                                         expCtx.get(),
-                                        Value{unpack->getBucketMaxSpanSeconds() * 1000}))),
+                                        Value{static_cast<long long>(
+                                                  unpack->getBucketMaxSpanSeconds()) *
+                                              1000}))),
                             expCtx);
                         pipeline->_sources.insert(
                             unpackIter,
