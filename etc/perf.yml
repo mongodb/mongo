@@ -775,7 +775,7 @@ microbenchmark-buildvariants:
   _linux-wt-standalone: &linux-wt-standalone
     name: linux-wt-standalone
     display_name: Standalone Linux inMemory
-    batchtime: 240  # 4 hours
+    cron: "0 */4 * * *" # Every 4 hours starting at midnight
     modules: *modules
     expansions:
       # We are explicitly tracking the rhel62 variant compile options from evergreen.yml for
@@ -826,7 +826,7 @@ microbenchmark-buildvariants:
   _linux-wt-repl: &linux-wt-repl
     name: linux-wt-repl
     display_name: 1-Node ReplSet Linux inMemory
-    batchtime: 240  # 4 hours
+    cron: "0 */4 * * *" # Every 4 hours starting at midnight
     modules: *modules
     expansions:
       mongod_exec_wrapper: *exec_wrapper
@@ -856,13 +856,20 @@ buildvariants:
   - <<: *linux-wt-standalone
     name: linux-wt-standalone-all-feature-flags
     display_name: Standalone Linux inMemory (all feature flags)
-    batchtime: 1440  # 24 hours
+    cron: "0 0 * * *" # Every day starting at 00:00
     expansions:
       mongodb_setup: microbenchmarks_standalone-all-feature-flags
+
+  - <<: *linux-wt-standalone
+    name: linux-wt-standalone-classic-query-engine
+    display_name: Standalone Linux inMemory (Classic Query Engine)
+    cron: "0 0 * * 4" # 00:00 on Thursday
+    expansions:
+      mongodb_setup: microbenchmarks_standalone-classic-query-engine
 
   - <<: *linux-wt-repl
     name: linux-wt-repl-all-feature-flags
     display_name: 1-Node ReplSet Linux inMemory (all feature flags)
-    batchtime: 1440  # 24 hours
+    cron: "0 0 * * *" # Every day starting at 00:00
     expansions:
       mongodb_setup: microbenchmarks_replica-all-feature-flags
