@@ -832,7 +832,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         }
     }
 
-    if (!initialize_server_global_state::writePidFile(serviceContext)) {
+    if (!initialize_server_global_state::writePidFile()) {
         quickExit(EXIT_FAILURE);
     }
 

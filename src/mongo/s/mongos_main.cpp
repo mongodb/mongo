@@ -812,7 +812,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         return EXIT_NET_ERROR;
     }
 
-    if (!initialize_server_global_state::writePidFile(serviceContext)) {
+    if (!initialize_server_global_state::writePidFile()) {
         return EXIT_ABRUPT;
     }
 

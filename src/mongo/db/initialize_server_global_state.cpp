@@ -423,7 +423,7 @@ bool checkSocketPath() {
     return true;
 }
 
-bool writePidFile(ServiceContext* service) {
+bool writePidFile() {
     return serverGlobalParams.pidFile.empty() ? true
                                               : mongo::writePidFile(serverGlobalParams.pidFile);
 }

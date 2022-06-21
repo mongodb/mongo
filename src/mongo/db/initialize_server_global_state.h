@@ -41,7 +41,7 @@ bool checkSocketPath();
 /**
  * Attempts to write the PID file (if specified) and returns whether it was successful.
  */
-bool writePidFile(ServiceContext* service);
+bool writePidFile();
 
 /**
  * Forks and detaches the server, on platforms that support it, if serverGlobalParams.doFork is
