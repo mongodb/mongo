@@ -18,7 +18,8 @@ load("jstests/libs/parallel_shell_helpers.js");  // startParallelShell
 load("jstests/libs/wait_for_command.js");        // waitForCommand
 
 // Use a sharding environment in order to exercise the sharding specific serverStatus sections.
-const st = new ShardingTest({mongos: 1, config: 1, shards: 1, rs: {nodes: 1}});
+const st = new ShardingTest(
+    {mongos: 1, config: 1, shards: 1, rs: {nodes: 1, setParameter: {watchdogPeriodSeconds: 60}}});
 const testDB = st.rs0.getPrimary().getDB("test");
 
 jsTestLog("Starting the sleep command in a parallel thread to take the RSTL MODE_X lock");
