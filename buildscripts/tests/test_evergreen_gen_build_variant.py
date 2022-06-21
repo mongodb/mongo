@@ -85,6 +85,60 @@ def build_mock_orchestrator(build_expansions=None, task_def_list=None, build_tas
     )
 
 
+class TestDetermineIsPatch(unittest.TestCase):
+    def test_is_patch_is_none_should_return_false(self):
+        evg_expansions = under_test.EvgExpansions(
+            is_patch=None,
+            build_id="build_id",
+            build_variant="build variant",
+            project="project",
+            revision="abc123",
+            task_name="task name",
+            task_id="task_314",
+        )
+
+        self.assertFalse(evg_expansions.determine_is_patch())
+
+    def test_is_patch_is_false_should_return_false(self):
+        evg_expansions = under_test.EvgExpansions(
+            is_patch="false",
+            build_id="build_id",
+            build_variant="build variant",
+            project="project",
+            revision="abc123",
+            task_name="task name",
+            task_id="task_314",
+        )
+
+        self.assertFalse(evg_expansions.determine_is_patch())
+
+    def test_is_patch_is_empty_string_should_return_false(self):
+        evg_expansions = under_test.EvgExpansions(
+            is_patch="",
+            build_id="build_id",
+            build_variant="build variant",
+            project="project",
+            revision="abc123",
+            task_name="task name",
+            task_id="task_314",
+        )
+
+        self.assertFalse(evg_expansions.determine_is_patch())
+
+    def test_is_patch_is_true_should_return_true(self):
+        evg_expansions = under_test.EvgExpansions(
+            is_patch="true",
+            build_id="build_id",
+            build_variant="build variant",
+            project="project",
+            revision="abc123",
+            task_name="task name",
+            task_id="task_314",
+        )
+
+        self.assertTrue(evg_expansions.determine_is_patch())
+
+
 class TestTranslateRunVar(unittest.TestCase):
     def test_normal_value_should_be_returned(self):
         run_var = "some value"
