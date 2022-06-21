@@ -355,7 +355,7 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
         auto nss1 = unittest::assertGet(db->makeUniqueCollectionNamespace(_opCtx.get(), model));
         if (!re.FullMatch(nss1.ns())) {
             FAIL((StringBuilder() << "First generated namespace \"" << nss1.ns()
-                                  << "\" does not match reqular expression \"" << re.pattern()
+                                  << "\" does not match regular expression \"" << re.pattern()
                                   << "\"")
                      .str());
         }
@@ -372,7 +372,7 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
         auto nss2 = unittest::assertGet(db->makeUniqueCollectionNamespace(_opCtx.get(), model));
         if (!re.FullMatch(nss2.ns())) {
             FAIL((StringBuilder() << "Second generated namespace \"" << nss2.ns()
-                                  << "\" does not match reqular expression \"" << re.pattern()
+                                  << "\" does not match regular expression \"" << re.pattern()
                                   << "\"")
                      .str());
         }
