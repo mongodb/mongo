@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 
 namespace mongo::optimizer {
@@ -187,35 +188,10 @@ void ConstEval::transport(ABT& n, const LambdaApplication& app, ABT& lam, ABT& a
     }
 }
 
-namespace fold_helpers {
-using namespace sbe::value;
-
-template <class T>
-sbe::value::Value constFoldNumberHelper(const sbe::value::TypeTags lhsTag,
-                                        const sbe::value::Value lhsValue,
-                                        const TypeTags rhsTag,
-                                        const sbe::value::Value rhsValue) {
-    const auto result = numericCast<T>(lhsTag, lhsValue) + numericCast<T>(rhsTag, rhsValue);
-    return bitcastFrom<T>(result);
-}
-
-template <>
-sbe::value::Value constFoldNumberHelper<Decimal128>(const TypeTags lhsTag,
-                                                    const sbe::value::Value lhsValue,
-                                                    const TypeTags rhsTag,
-                                                    const sbe::value::Value rhsValue) {
-    const auto result =
-        numericCast<Decimal128>(lhsTag, lhsValue).add(numericCast<Decimal128>(rhsTag, rhsValue));
-    return makeCopyDecimal(result).second;
-}
-
-}  // namespace fold_helpers
-
 // Specific transport for binary operation
 // The const correctness is probably wrong (as const ABT& lhs, const ABT& rhs does not work for
 // some reason but we can fix it later).
 void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
-    using namespace fold_helpers;
 
     switch (op.op()) {
         case Operations::Add: {
@@ -223,50 +199,44 @@ void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
             // addition.
             auto lhsConst = lhs.cast<Constant>();
             auto rhsConst = rhs.cast<Constant>();
+            if (lhsConst && rhsConst) {
+                auto [lhsTag, lhsValue] = lhsConst->get();
+                auto [rhsTag, rhsValue] = rhsConst->get();
+                auto [_, resultType, resultValue] =
+                    sbe::value::genericAdd(lhsTag, lhsValue, rhsTag, rhsValue);
+                swapAndUpdate(n, make<Constant>(resultType, resultValue));
+            }
+            break;
+        }
+
+        case Operations::Sub: {
+            // Let say we want to recognize ConstLhs - ConstRhs and replace it with the result of
+            // subtraction.
+            auto lhsConst = lhs.cast<Constant>();
+            auto rhsConst = rhs.cast<Constant>();
 
             if (lhsConst && rhsConst) {
                 auto [lhsTag, lhsValue] = lhsConst->get();
                 auto [rhsTag, rhsValue] = rhsConst->get();
+                auto [_, resultType, resultValue] =
+                    sbe::value::genericSub(lhsTag, lhsValue, rhsTag, rhsValue);
+                swapAndUpdate(n, make<Constant>(resultType, resultValue));
+            }
+            break;
+        }
 
-                if (isNumber(lhsTag) && isNumber(rhsTag)) {
-                    // So this is the addition operation and both arguments are number constants,
-                    // hence we can compute the result.
+        case Operations::Mult: {
+            // Let say we want to recognize ConstLhs * ConstRhs and replace it with the result of
+            // multiplication.
+            auto lhsConst = lhs.cast<Constant>();
+            auto rhsConst = rhs.cast<Constant>();
 
-                    const TypeTags resultType = getWidestNumericalType(lhsTag, rhsTag);
-                    sbe::value::Value resultValue;
-
-                    switch (resultType) {
-                        case TypeTags::NumberInt32: {
-                            resultValue =
-                                constFoldNumberHelper<int32_t>(lhsTag, lhsValue, rhsTag, rhsValue);
-                            break;
-                        }
-
-                        case TypeTags::NumberInt64: {
-                            resultValue =
-                                constFoldNumberHelper<int64_t>(lhsTag, lhsValue, rhsTag, rhsValue);
-                            break;
-                        }
-
-                        case TypeTags::NumberDouble: {
-                            resultValue =
-                                constFoldNumberHelper<double>(lhsTag, lhsValue, rhsTag, rhsValue);
-                            break;
-                        }
-
-                        case TypeTags::NumberDecimal: {
-                            resultValue = constFoldNumberHelper<Decimal128>(
-                                lhsTag, lhsValue, rhsTag, rhsValue);
-                            break;
-                        }
-
-                        default:
-                            MONGO_UNREACHABLE;
-                    }
-
-                    // And this is the crucial step - we swap the current node (n) for the result.
-                    swapAndUpdate(n, make<Constant>(resultType, resultValue));
-                }
+            if (lhsConst && rhsConst) {
+                auto [lhsTag, lhsValue] = lhsConst->get();
+                auto [rhsTag, rhsValue] = rhsConst->get();
+                auto [_, resultType, resultValue] =
+                    sbe::value::genericMul(lhsTag, lhsValue, rhsTag, rhsValue);
+                swapAndUpdate(n, make<Constant>(resultType, resultValue));
             }
             break;
         }

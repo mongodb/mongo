@@ -38,6 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
+#include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/sbe_pattern_value_cmp.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"

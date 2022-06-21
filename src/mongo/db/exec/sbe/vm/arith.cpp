@@ -30,6 +30,7 @@
 #include "mongo/db/exec/sbe/vm/vm.h"
 
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
+#include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/util/represent_as.h"
@@ -48,159 +49,6 @@ static constexpr double kDoublePi = 3.141592653589793;
 static constexpr double kDoublePiOver180 = kDoublePi / 180.0;
 static constexpr double kDouble180OverPi = 180.0 / kDoublePi;
 
-/**
- * The addition operation used by genericArithmeticOp.
- */
-struct Addition {
-    /**
-     * Returns true if the operation failed (overflow).
-     */
-    template <typename T>
-    static bool doOperation(const T& lhs, const T& rhs, T& result) {
-        if constexpr (std::is_same_v<T, Decimal128>) {
-            result = lhs.add(rhs);
-
-            // We do not check overflows with Decimal128.
-            return false;
-        } else if constexpr (std::is_same_v<T, double>) {
-            result = lhs + rhs;
-
-            // We do not check overflows with double.
-            return false;
-        } else {
-            return overflow::add(lhs, rhs, &result);
-        }
-    }
-};
-
-/**
- * The subtraction operation used by genericArithmeticOp.
- */
-struct Subtraction {
-    /**
-     * Returns true if the operation failed (overflow).
-     */
-    template <typename T>
-    static bool doOperation(const T& lhs, const T& rhs, T& result) {
-        if constexpr (std::is_same_v<T, Decimal128>) {
-            result = lhs.subtract(rhs);
-
-            // We do not check overflows with Decimal128.
-            return false;
-        } else if constexpr (std::is_same_v<T, double>) {
-            result = lhs - rhs;
-
-            // We do not check overflows with double.
-            return false;
-        } else {
-            return overflow::sub(lhs, rhs, &result);
-        }
-    }
-};
-
-/**
- * The multiplication operation used by genericArithmeticOp.
- */
-struct Multiplication {
-    /**
-     * Returns true if the operation failed (overflow).
-     */
-    template <typename T>
-    static bool doOperation(const T& lhs, const T& rhs, T& result) {
-        if constexpr (std::is_same_v<T, Decimal128>) {
-            result = lhs.multiply(rhs);
-
-            // We do not check overflows with Decimal128.
-            return false;
-        } else if constexpr (std::is_same_v<T, double>) {
-            result = lhs * rhs;
-
-            // We do not check overflows with double.
-            return false;
-        } else {
-            return overflow::mul(lhs, rhs, &result);
-        }
-    }
-};
-
-/**
- * This is a simple arithmetic operation templated by the Op parameter. It supports operations on
- * standard numeric types and also operations on the Date type.
- */
-template <typename Op>
-std::tuple<bool, value::TypeTags, value::Value> genericArithmeticOp(value::TypeTags lhsTag,
-                                                                    value::Value lhsValue,
-                                                                    value::TypeTags rhsTag,
-                                                                    value::Value rhsValue) {
-    if (value::isNumber(lhsTag) && value::isNumber(rhsTag)) {
-        switch (getWidestNumericalType(lhsTag, rhsTag)) {
-            case value::TypeTags::NumberInt32: {
-                int32_t result;
-
-                if (!Op::doOperation(numericCast<int32_t>(lhsTag, lhsValue),
-                                     numericCast<int32_t>(rhsTag, rhsValue),
-                                     result)) {
-                    return {
-                        false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(result)};
-                }
-                // The result does not fit into int32_t so fallthru to the wider type.
-                [[fallthrough]];
-            }
-            case value::TypeTags::NumberInt64: {
-                int64_t result;
-                if (!Op::doOperation(numericCast<int64_t>(lhsTag, lhsValue),
-                                     numericCast<int64_t>(rhsTag, rhsValue),
-                                     result)) {
-                    return {
-                        false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
-                }
-                // The result does not fit into int64_t so fallthru to the wider type.
-                [[fallthrough]];
-            }
-            case value::TypeTags::NumberDecimal: {
-                Decimal128 result;
-                Op::doOperation(numericCast<Decimal128>(lhsTag, lhsValue),
-                                numericCast<Decimal128>(rhsTag, rhsValue),
-                                result);
-                auto [tag, val] = value::makeCopyDecimal(result);
-                return {true, tag, val};
-            }
-            case value::TypeTags::NumberDouble: {
-                double result;
-                Op::doOperation(numericCast<double>(lhsTag, lhsValue),
-                                numericCast<double>(rhsTag, rhsValue),
-                                result);
-                return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(result)};
-            }
-            default:
-                MONGO_UNREACHABLE;
-        }
-    } else if (lhsTag == TypeTags::Date || rhsTag == TypeTags::Date) {
-        if (isNumber(lhsTag)) {
-            int64_t result;
-            if (!Op::doOperation(
-                    numericCast<int64_t>(lhsTag, lhsValue), bitcastTo<int64_t>(rhsValue), result)) {
-                return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
-            }
-        } else if (isNumber(rhsTag)) {
-            int64_t result;
-            if (!Op::doOperation(
-                    bitcastTo<int64_t>(lhsValue), numericCast<int64_t>(rhsTag, rhsValue), result)) {
-                return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
-            }
-        } else {
-            int64_t result;
-            if (!Op::doOperation(
-                    bitcastTo<int64_t>(lhsValue), bitcastTo<int64_t>(lhsValue), result)) {
-                return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
-            }
-        }
-        // We got here if the Date operation overflowed.
-        uasserted(ErrorCodes::Overflow, "date overflow");
-    }
-
-    return {false, value::TypeTags::Nothing, 0};
-}
 
 // Structures defining trigonometric functions computation.
 struct Acos {
@@ -373,12 +221,6 @@ std::tuple<bool, value::TypeTags, value::Value> genericTrigonometricFun(value::T
 }
 }  // namespace
 
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericAdd(value::TypeTags lhsTag,
-                                                                     value::Value lhsValue,
-                                                                     value::TypeTags rhsTag,
-                                                                     value::Value rhsValue) {
-    return genericArithmeticOp<Addition>(lhsTag, lhsValue, rhsTag, rhsValue);
-}
 
 namespace {
 void setNonDecimalTotal(TypeTags nonDecimalTotalTag,
@@ -579,20 +421,6 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggStdDevFinalizeImpl(
     auto stdDev = sqrt(variance);
 
     return {true, value::TypeTags::NumberDouble, value::bitcastFrom<double>(stdDev)};
-}
-
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericSub(value::TypeTags lhsTag,
-                                                                     value::Value lhsValue,
-                                                                     value::TypeTags rhsTag,
-                                                                     value::Value rhsValue) {
-    return genericArithmeticOp<Subtraction>(lhsTag, lhsValue, rhsTag, rhsValue);
-}
-
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericMul(value::TypeTags lhsTag,
-                                                                     value::Value lhsValue,
-                                                                     value::TypeTags rhsTag,
-                                                                     value::Value rhsValue) {
-    return genericArithmeticOp<Multiplication>(lhsTag, lhsValue, rhsTag, rhsValue);
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericDiv(value::TypeTags lhsTag,

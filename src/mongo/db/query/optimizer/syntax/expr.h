@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/platform/decimal128.h"
 #include <ostream>
 
 #include "mongo/db/exec/sbe/values/value.h"
@@ -80,6 +81,12 @@ public:
 
     bool isValueInt32() const;
     int32_t getValueInt32() const;
+
+    bool isValueDouble() const;
+    double getValueDouble() const;
+
+    bool isValueDecimal() const;
+    Decimal128 getValueDecimal() const;
 
     bool isNumber() const {
         return sbe::value::isNumber(_tag);

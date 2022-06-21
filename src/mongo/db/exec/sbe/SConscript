@@ -15,6 +15,7 @@ env.Library(
 env.Library(
     target='query_sbe_values',
     source=[
+        'values/arith_common.cpp',
         'values/bson.cpp',
         'values/value.cpp',
         'values/value_printer.cpp',

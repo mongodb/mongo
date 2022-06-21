@@ -915,18 +915,6 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> runLambdaInternal(const CodeFragment* code,
                                                                       int64_t position);
 
-    std::tuple<bool, value::TypeTags, value::Value> genericAdd(value::TypeTags lhsTag,
-                                                               value::Value lhsValue,
-                                                               value::TypeTags rhsTag,
-                                                               value::Value rhsValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericSub(value::TypeTags lhsTag,
-                                                               value::Value lhsValue,
-                                                               value::TypeTags rhsTag,
-                                                               value::Value rhsValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericMul(value::TypeTags lhsTag,
-                                                               value::Value lhsValue,
-                                                               value::TypeTags rhsTag,
-                                                               value::Value rhsValue);
     std::tuple<bool, value::TypeTags, value::Value> genericDiv(value::TypeTags lhsTag,
                                                                value::Value lhsValue,
                                                                value::TypeTags rhsTag,
