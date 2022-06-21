@@ -110,6 +110,13 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     // If the collection doesn't exist or disappears after releasing locks and waiting, there is no
     // need to check for pending catalog changes.
     while (auto coll = _autoColl->getCollection()) {
+        // This is our first chance to check without racing (i.e. while holding the RSTL) that a
+        // linearizable read occurs on a writable primary.
+        uassert(ErrorCodes::NotWritablePrimary,
+                "Cannot satisfy linearizable read because node is not a writable primary",
+                readConcernLevel != repl::ReadConcernLevel::kLinearizableReadConcern ||
+                    repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx,
+                                                                                         "admin"));
 
         // During batch application on secondaries, there is a potential to read inconsistent states
         // that would normally be protected by the PBWM lock. In order to serve secondary reads

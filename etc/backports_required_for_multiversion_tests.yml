@@ -234,6 +234,8 @@ suites:
     test_file: jstests/replsets/read_concern_uninitated_set.js
   - ticket: SERVER-47568
     test_file: jstests/replsets/disable_cluster_time_gossiping_in_unreadable_state.js
+  - ticket: SERVER-67302
+    test_file: jstests/replsets/reads_during_catchup.js
 
   concurrency_sharded_replication_multiversion:
 
