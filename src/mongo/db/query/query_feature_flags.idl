@@ -48,12 +48,6 @@ feature_flags:
       default: true
       version: 5.1
 
-    featureFlagSBEGroupPushdown:
-      description: "Feature flag for allowing SBE $group pushdown"
-      cpp_varname: gFeatureFlagSBEGroupPushdown
-      default: true
-      version: 5.2
-
     featureFlagExactTopNAccumulator:
       description: "Feature flag for allowing use of topN family of accumulators"
       cpp_varname: gFeatureFlagExactTopNAccumulator
@@ -121,12 +115,6 @@ feature_flags:
     featureFlagLastPointQuery:
       description : "Feature flag for optimizing Last Point queries on time-series collections"
       cpp_varname: gfeatureFlagLastPointQuery
-      default: true
-      version: 6.0
-
-    featureFlagSBELookupPushdown:
-      description: "Feature flag for allowing SBE $lookup pushdown"
-      cpp_varname: gFeatureFlagSBELookupPushdown
       default: true
       version: 6.0
 

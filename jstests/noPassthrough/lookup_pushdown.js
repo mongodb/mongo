@@ -18,10 +18,8 @@ const JoinAlgorithm = {
 };
 
 // Standalone cases.
-const conn = MongoRunner.runMongod({
-    setParameter:
-        {featureFlagSBELookupPushdown: true, featureFlagSbeFull: true, allowDiskUseByDefault: false}
-});
+const conn =
+    MongoRunner.runMongod({setParameter: {featureFlagSbeFull: true, allowDiskUseByDefault: false}});
 assert.neq(null, conn, "mongod was unable to start up");
 const name = "lookup_pushdown";
 const foreignCollName = "foreign_lookup_pushdown";
@@ -118,7 +116,7 @@ function runTest(coll,
 }
 
 let db = conn.getDB(name);
-if (!checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
+if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping test because either the sbe lookup pushdown feature flag is disabled or" +
               " sbe itself is disabled");
     MongoRunner.stopMongod(conn);
@@ -742,8 +740,7 @@ MongoRunner.stopMongod(conn);
 
 // Verify that pipeline stages get pushed down according to the subset of SBE that is enabled.
 (function verifyPushdownLogicSbePartiallyEnabled() {
-    const conn = MongoRunner.runMongod(
-        {setParameter: {featureFlagSBELookupPushdown: true, allowDiskUseByDefault: false}});
+    const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: false}});
     const db = conn.getDB(name);
     if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
         jsTestLog("Skipping test case because SBE is fully enabled, but this test case assumes" +
@@ -826,8 +823,7 @@ MongoRunner.stopMongod(conn);
 (function testHashJoinQueryKnobs() {
     // Create a new scope and start a new mongod so that the mongod-wide global state changes do not
     // affect subsequent tests if any.
-    const conn = MongoRunner.runMongod(
-        {setParameter: {featureFlagSBELookupPushdown: true, featureFlagSbeFull: true}});
+    const conn = MongoRunner.runMongod({setParameter: {featureFlagSbeFull: true}});
     const db = conn.getDB(name);
     const lcoll = db.query_knobs_local;
     const fcoll = db.query_knobs_foreign;
@@ -1002,15 +998,7 @@ MongoRunner.stopMongod(conn);
 const st = new ShardingTest({
     shards: 2,
     mongos: 1,
-    other: {
-        shardOptions: {
-            setParameter: {
-                featureFlagSBELookupPushdown: true,
-                featureFlagSbeFull: true,
-                allowDiskUseByDefault: false
-            }
-        }
-    }
+    other: {shardOptions: {setParameter: {featureFlagSbeFull: true, allowDiskUseByDefault: false}}}
 });
 db = st.s.getDB(name);
 

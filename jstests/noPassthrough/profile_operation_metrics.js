@@ -24,10 +24,7 @@ const isGroupPushdownEnabled = (db) => {
     const internalQueryForceClassicEngine =
         assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryForceClassicEngine: 1}))
             .internalQueryForceClassicEngine;
-    const featureFlagSBEGroupPushdown =
-        assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagSBEGroupPushdown: 1}))
-            .featureFlagSBEGroupPushdown.value;
-    return !internalQueryForceClassicEngine && featureFlagSBEGroupPushdown;
+    return !internalQueryForceClassicEngine;
 };
 
 const assertMetricsExist = (profilerEntry) => {

@@ -688,12 +688,8 @@ Status runAggregate(OperationContext* opCtx,
 
     // Determine if this aggregation has foreign collections that the execution subsystem needs
     // to be aware of.
-    std::vector<NamespaceStringOrUUID> secondaryExecNssList;
-
-    // Taking locks over multiple collections is not supported outside of $lookup pushdown.
-    if (feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV()) {
-        secondaryExecNssList = liteParsedPipeline.getForeignExecutionNamespaces();
-    }
+    std::vector<NamespaceStringOrUUID> secondaryExecNssList =
+        liteParsedPipeline.getForeignExecutionNamespaces();
 
     // The collation to use for this aggregation. boost::optional to distinguish between the case
     // where the collation has not yet been resolved, and where it has been resolved to nullptr.

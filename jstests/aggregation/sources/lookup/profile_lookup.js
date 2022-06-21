@@ -41,21 +41,13 @@ const actualCount = newTop.totals[foreignColl.getFullName()].commands.count -
     oldTop.totals[foreignColl.getFullName()].commands.count;
 
 // Compute the expected count as follows:
-// 1) If the feature flag is enabled, add one to the count. This is because we will take a lock
-// over 'foreignColl' and, even if we don't push down $lookup into SBE, this will still
-// increment the top counter for 'foreignColl' by one.
-// 2) If $lookup is NOT pushed down into SBE, then we increment the count by three. This is
-// because when executing $lookup in the classic engine, we will add one entry to top for the
-// foreign collection for each document in the local collection (of which there are three).
-let expectedCount = 0;
-const getFeatureFlagSBELookupPushdown =
-    db.adminCommand({getParameter: 1, featureFlagSBELookupPushdown: 1});
-const isSBELookupPushdownEnabled =
-    getFeatureFlagSBELookupPushdown.hasOwnProperty("featureFlagSBELookupPushdown") &&
-    getFeatureFlagSBELookupPushdown["featureFlagSBELookupPushdown"]["value"];
-if (isSBELookupPushdownEnabled) {
-    expectedCount++;
-}
+// 1) We expect the count to be at least one. This is because we will take a lock over 'foreignColl'
+// and, even if we don't push down $lookup into SBE, this will still increment the top counter for
+// 'foreignColl' by one.
+// 2) If $lookup is NOT pushed down into SBE, then we increment the count by three. This is because
+// when executing $lookup in the classic engine, we will add one entry to top for the foreign
+// collection for each document in the local collection (of which there are three).
+let expectedCount = 1;
 const eqLookupNodes = getAggPlanStages(localColl.explain().aggregate(pipeline), "EQ_LOOKUP");
 if (eqLookupNodes.length === 0) {
     expectedCount += 3;

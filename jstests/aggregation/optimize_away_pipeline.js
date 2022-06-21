@@ -137,7 +137,7 @@ function testGetMore({command = null, expectedResult = null} = {}) {
     assert.sameMembers(documents, expectedResult);
 }
 
-const groupPushdownEnabled = checkSBEEnabled(db, ["featureFlagSBEGroupPushdown"]);
+const groupPushdownEnabled = checkSBEEnabled(db);
 
 // Calls 'assertPushdownEnabled' if groupPushdownEnabled is 'true'. Otherwise, it calls
 // 'assertPushdownDisabled'.

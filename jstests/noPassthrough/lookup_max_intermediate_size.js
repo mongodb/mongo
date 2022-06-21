@@ -93,9 +93,7 @@ const db = standalone.getDB("test");
 
 db.lookUp.drop();
 const expectedErrorCode =
-    (checkSBEEnabled(db, ["featureFlagSBELookupPushdown", "featureFlagSbeFull"]))
-    ? ErrorCodes.ExceededMemoryLimit
-    : 4568;
+    (checkSBEEnabled(db, ["featureFlagSbeFull"])) ? ErrorCodes.ExceededMemoryLimit : 4568;
 runTest(db.lookUp, db.from, expectedErrorCode);
 
 MongoRunner.stopMongod(standalone);

@@ -7,7 +7,7 @@
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-if (!checkSBEEnabled(db, ["featureFlagSBEGroupPushdown"])) {
+if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping test because the sbe group pushdown feature flag is disabled");
     return;
 }

@@ -7,7 +7,7 @@
 load('jstests/libs/analyze_plan.js');  // For getWinningPlan().
 load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
-if (!checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
+if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping test because SBE $lookup is not enabled.");
     return;
 }

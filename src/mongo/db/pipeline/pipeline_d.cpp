@@ -118,13 +118,11 @@ namespace {
  * Group stages are extracted from the pipeline when all of the following conditions are met:
  *    - When the 'internalQueryForceClassicEngine' feature flag is 'false'.
  *    - When the 'internalQuerySlotBasedExecutionDisableGroupPushdown' query knob is 'false'.
- *    - When the 'featureFlagSBEGroupPushdown' feature flag is 'true'.
  *    - When the DocumentSourceGroup has 'doingMerge=false'.
  *
  * Lookup stages are extracted from the pipeline when all of the following conditions are met:
  *    - When the 'internalQueryForceClassicEngine' feature flag is 'false'.
  *    - When the 'internalQuerySlotBasedExecutionDisableLookupPushdown' query knob is 'false'.
- *    - When the 'featureFlagSBELookupPushdown' feature flag is 'true'.
  *    - The $lookup uses only the 'localField'/'foreignField' syntax (no pipelines).
  *    - The foreign collection is neither sharded nor a view.
  */
@@ -149,12 +147,6 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
 
     auto&& sources = pipeline->getSources();
 
-    const auto disallowGroupPushdown =
-        !(serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-          feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
-              serverGlobalParams.featureCompatibility)) ||
-        internalQuerySlotBasedExecutionDisableGroupPushdown.load();
-
     bool isMainCollectionSharded = false;
     if (const auto& mainColl = collections.getMainCollection()) {
         isMainCollectionSharded = mainColl.isSharded();
@@ -168,7 +160,6 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
     // sharded and which ones aren't. As such, if any secondary collection is a view or is sharded,
     // no $lookup will be eligible for pushdown.
     const bool disallowLookupPushdown =
-        !feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV() ||
         internalQuerySlotBasedExecutionDisableLookupPushdown.load() || isMainCollectionSharded ||
         collections.isAnySecondaryNamespaceAViewOrSharded();
 
@@ -178,7 +169,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
 
         // $group pushdown logic.
         if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(itr->get())) {
-            if (disallowGroupPushdown) {
+            if (internalQuerySlotBasedExecutionDisableGroupPushdown.load()) {
                 break;
             }
 

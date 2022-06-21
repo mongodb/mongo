@@ -163,9 +163,8 @@ function dropLookupForeignColl() {
     assert(db[foreignCollName].drop());
 }
 
-const lookupPushdownEnabled = checkSBEEnabled(db, ["featureFlagSBELookupPushdown"]);
-const lookupPushdownNLJEnabled =
-    checkSBEEnabled(db, ["featureFlagSBELookupPushdown", "featureFlagSbeFull"]);
+const lookupPushdownEnabled = checkSBEEnabled(db);
+const lookupPushdownNLJEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 function verifyCorrectLookupAlgorithmUsed(targetJoinAlgorithm, pipeline, aggOptions = {}) {
     if (!lookupPushdownEnabled) {
         return;
@@ -407,7 +406,7 @@ coll.getPlanCache().clear();
 
 // Verify that $group gets pushed down, provided that SBE is enabled.
 let groupNodes;
-if (checkSBEEnabled(db, ["featureFlagSBEGroupPushdown"])) {
+if (checkSBEEnabled(db)) {
     explain = coll.explain().aggregate(avoidReplanGroupPipeline);
     let groupNodes = getAggPlanStages(explain, "GROUP");
     assert.eq(groupNodes.length, 1);

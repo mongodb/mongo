@@ -427,14 +427,8 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(Pipeline*
 
     // Reparse 'pipeline' to discover whether there are secondary namespaces that we need to lock
     // when constructing our query executor.
-    std::vector<NamespaceStringOrUUID> secondaryNamespaces = [&]() {
-        if (feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV()) {
-            auto lpp = LiteParsedPipeline(expCtx->ns, pipeline->serializeToBson());
-            return lpp.getForeignExecutionNamespaces();
-        } else {
-            return std::vector<NamespaceStringOrUUID>{};
-        }
-    }();
+    auto lpp = LiteParsedPipeline(expCtx->ns, pipeline->serializeToBson());
+    std::vector<NamespaceStringOrUUID> secondaryNamespaces = lpp.getForeignExecutionNamespaces();
 
     autoColl.emplace(expCtx->opCtx,
                      nsOrUUID,
