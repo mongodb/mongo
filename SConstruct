@@ -2646,13 +2646,25 @@ if get_option("system-boost-lib-search-suffixes") is not None:
 # discover modules, and load the (python) module for each module's build.py
 mongo_modules = moduleconfig.discover_modules('src/mongo/db/modules', get_option('modules'))
 
-if get_option('ninja') != 'disabled':
-    for module in mongo_modules:
-        if hasattr(module, 'NinjaFile'):
-            env.FatalError(textwrap.dedent("""\
-                ERROR: Ninja tool option '--ninja' should not be used with the ninja module.
-                    Remove the ninja module directory or use '--modules= ' to select no modules.
-                    If using enterprise module, explicitly set '--modules=<name-of-enterprise-module>' to exclude the ninja module."""))
+has_ninja_module = False
+for module in mongo_modules:
+    if hasattr(module, 'NinjaFile'):
+        has_ninja_module = True
+        break
+
+if get_option('ninja') != 'disabled' and has_ninja_module:
+    env.FatalError(
+        textwrap.dedent("""\
+        ERROR: Ninja tool option '--ninja' should not be used with the ninja module.
+            Using both options simultaneously may clobber build.ninja files.
+            Remove the ninja module directory or use '--modules= ' to select no modules.
+            If using enterprise module, explicitly set '--modules=<name-of-enterprise-module>' to exclude the ninja module."""
+                        ))
+
+if has_ninja_module:
+    print(
+        "WARNING: You are attempting to use the unsupported/legacy ninja module, instead of the integrated ninja generator. You are strongly encouraged to remove the ninja module from your module list and invoke scons with --ninja generate-ninja"
+    )
 
 # --- check system ---
 ssl_provider = None

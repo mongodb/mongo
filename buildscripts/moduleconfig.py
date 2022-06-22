@@ -33,16 +33,26 @@ import os
 
 
 def discover_modules(module_root, allowed_modules):
+    # pylint: disable=too-many-branches
     """Scan module_root for subdirectories that look like MongoDB modules.
 
     Return a list of imported build.py module objects.
     """
     found_modules = []
+    found_module_names = []
 
     if allowed_modules is not None:
         allowed_modules = allowed_modules.split(',')
+        # When `--modules=` is passed, the split on empty string is represented
+        # in memory as ['']
+        if allowed_modules == ['']:
+            allowed_modules = []
 
     if not os.path.isdir(module_root):
+        if allowed_modules:
+            raise RuntimeError(
+                f"Requested the following modules: {allowed_modules}, but the module root '{module_root}' could not be found. Check the module root, or remove the module from the scons invocation."
+            )
         return found_modules
 
     for name in os.listdir(module_root):
@@ -66,10 +76,16 @@ def discover_modules(module_root, allowed_modules):
                 if getattr(module, "name", None) is None:
                     module.name = name
                 found_modules.append(module)
+                found_module_names.append(name)
             finally:
                 fp.close()
         except (FileNotFoundError, IOError):
             pass
+
+    if allowed_modules is not None:
+        missing_modules = set(allowed_modules) - set(found_module_names)
+        if missing_modules:
+            raise RuntimeError(f"Failed to locate all modules. Could not find: {missing_modules}")
 
     return found_modules
 
