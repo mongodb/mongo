@@ -377,6 +377,10 @@ TransactionCoordinatorService::getAllRemovalFuturesForCoordinatorsForInternalTra
     std::shared_ptr<CatalogAndScheduler> cas = _getCatalogAndScheduler(opCtx);
     auto& catalog = cas->catalog;
 
+    // On step up, we want to wait until the catalog has recovered all active transaction
+    // coordinators before getting the removal futures.
+    cas->recoveryTaskCompleted->get(opCtx);
+
     auto predicate = [](const LogicalSessionId lsid,
                         const TxnNumberAndRetryCounter txnNumberAndRetryCounter,
                         const std::shared_ptr<TransactionCoordinator> transactionCoordinator) {
