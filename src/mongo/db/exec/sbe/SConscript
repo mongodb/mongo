@@ -223,6 +223,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/util/pcre_wrapper',
         'sbe_plan_stage_test',
     ],
 )

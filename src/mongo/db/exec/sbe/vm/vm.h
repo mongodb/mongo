@@ -332,6 +332,19 @@ struct Instruction {
         False,
     };
 
+    static const char* toStringConstants(Constants k) {
+        switch (k) {
+            case Null:
+                return "Null";
+            case True:
+                return "True";
+            case False:
+                return "False";
+            default:
+                return "unknown";
+        }
+    }
+
     // Make sure that values in this arrays are always in-sync with the enum.
     static int stackOffset[];
 
@@ -777,6 +790,9 @@ public:
 
     void fixup(int offset);
 
+    // For printing from an interactive debugger.
+    std::string toString() const;
+
 private:
     void appendSimpleInstruction(Instruction::Tags tag);
     auto allocateSpace(size_t size) {
@@ -789,9 +805,6 @@ private:
     void copyCodeAndFixup(CodeFragment&& from);
 
 private:
-    // For printing from an interactive debugger.
-    std::string toString() const;
-
     absl::InlinedVector<uint8_t, 16> _instrs;
 
     /**
