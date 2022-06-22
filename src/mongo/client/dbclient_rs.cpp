@@ -27,15 +27,13 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/dbclient_rs.h"
 
 #include <memory>
 #include <utility>
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/client/client_deprecated.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/global_conn_pool.h"
@@ -590,89 +588,6 @@ std::unique_ptr<DBClientCursor> DBClientReplicaSet::find(FindCommandRequest find
                 "replicaSet"_attr = _getMonitor()->getName());
 
     return checkPrimary()->find(std::move(findRequest), readPref, exhaustMode);
-}
-
-unique_ptr<DBClientCursor> DBClientReplicaSet::query_DEPRECATED(
-    const NamespaceStringOrUUID& nsOrUuid,
-    const BSONObj& filter,
-    const client_deprecated::Query& querySettings,
-    int limit,
-    int nToSkip,
-    const BSONObj* fieldsToReturn,
-    int queryOptions,
-    int batchSize,
-    boost::optional<BSONObj> readConcernObj) {
-    shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(querySettings, queryOptions));
-    invariant(nsOrUuid.nss());
-    const string ns = nsOrUuid.nss()->ns();
-    if (_isSecondaryQuery(ns, filter, *readPref)) {
-        LOGV2_DEBUG(20133,
-                    3,
-                    "dbclient_rs query using secondary or tagged node selection in {replicaSet}, "
-                    "read pref is {readPref} "
-                    "(primary : {primary}, lastTagged : {lastTagged})",
-                    "dbclient_rs query using secondary or tagged node selection",
-                    "replicaSet"_attr = _getMonitor()->getName(),
-                    "readPref"_attr = readPref->toString(),
-                    "primary"_attr =
-                        (_primary.get() != nullptr ? _primary->getServerAddress() : "[not cached]"),
-                    "lastTagged"_attr = (_lastSecondaryOkConn.get() != nullptr
-                                             ? _lastSecondaryOkConn->getServerAddress()
-                                             : "[not cached]"));
-
-        string lastNodeErrMsg;
-
-        for (size_t retry = 0; retry < MAX_RETRY; retry++) {
-            try {
-                DBClientConnection* conn = selectNodeUsingTags(readPref);
-
-                if (conn == nullptr) {
-                    break;
-                }
-
-                unique_ptr<DBClientCursor> cursor = conn->query_DEPRECATED(nsOrUuid,
-                                                                           filter,
-                                                                           querySettings,
-                                                                           limit,
-                                                                           nToSkip,
-                                                                           fieldsToReturn,
-                                                                           queryOptions,
-                                                                           batchSize,
-                                                                           readConcernObj);
-
-                return checkSecondaryQueryResult(std::move(cursor));
-            } catch (const DBException& ex) {
-                const Status status = ex.toStatus(str::stream() << "can't query replica set node "
-                                                                << _lastSecondaryOkHost);
-                lastNodeErrMsg = status.reason();
-                _invalidateLastSecondaryOkCache(status);
-            }
-        }
-
-        StringBuilder assertMsg;
-        assertMsg << "Failed to do query, no good nodes in " << _getMonitor()->getName();
-        if (!lastNodeErrMsg.empty()) {
-            assertMsg << ", last error: " << lastNodeErrMsg;
-        }
-
-        uasserted(16370, assertMsg.str());
-    }
-
-    LOGV2_DEBUG(20134,
-                3,
-                "dbclient_rs query to primary node in {replicaSet}",
-                "dbclient_rs query to primary node",
-                "replicaSet"_attr = _getMonitor()->getName());
-
-    return checkPrimary()->query_DEPRECATED(nsOrUuid,
-                                            filter,
-                                            querySettings,
-                                            limit,
-                                            nToSkip,
-                                            fieldsToReturn,
-                                            queryOptions,
-                                            batchSize,
-                                            readConcernObj);
 }
 
 void DBClientReplicaSet::killCursor(const NamespaceString& ns, long long cursorID) {

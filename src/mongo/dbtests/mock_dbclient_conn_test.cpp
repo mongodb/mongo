@@ -77,45 +77,6 @@ TEST(MockDBClientConnTest, QueryCount) {
     }
 }
 
-// This test should be removed when the legacy query API is removed.
-TEST(MockDBClientConnTest, LegacyQueryApiBumpsQueryCount) {
-    MockRemoteDBServer server("test");
-    MockDBClientConnection conn(&server);
-    ASSERT_EQUALS(0U, server.getQueryCount());
-    conn.query_DEPRECATED(NamespaceString("foo.bar"));
-    ASSERT_EQUALS(1U, server.getQueryCount());
-}
-
-// This test should be removed when the legacy query API is removed.
-TEST(MockDBClientConnTest, LegacyQueryApiReturnsInsertedDocuments) {
-    MockRemoteDBServer server("test");
-    const std::string ns("test.user");
-
-    {
-        MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query_DEPRECATED(NamespaceString(ns));
-        ASSERT(!cursor->more());
-
-        server.insert(ns, BSON("x" << 1));
-        server.insert(ns, BSON("y" << 2));
-    }
-
-    {
-        MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query_DEPRECATED(NamespaceString(ns));
-
-        ASSERT(cursor->more());
-        BSONObj firstDoc = cursor->next();
-        ASSERT_EQUALS(1, firstDoc["x"].numberInt());
-
-        ASSERT(cursor->more());
-        BSONObj secondDoc = cursor->next();
-        ASSERT_EQUALS(2, secondDoc["y"].numberInt());
-
-        ASSERT(!cursor->more());
-    }
-}
-
 TEST(MockDBClientConnTest, SkipBasedOnResumeAfter) {
     MockRemoteDBServer server{"test"};
     const std::string ns{"test.user"};

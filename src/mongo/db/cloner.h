@@ -104,7 +104,7 @@ private:
                       const std::list<BSONObj>& from_indexes,
                       DBClientBase* conn);
 
-    struct Fun;
+    struct BatchHandler;
 };
 
 }  // namespace mongo

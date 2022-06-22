@@ -806,19 +806,25 @@ TEST_F(OplogFetcherTest,
     auto oplogFetcher = makeOplogFetcher();
     auto findTimeout = durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest());
 
-    auto filter = oplogFetcher->getFindQueryFilter_forTest();
+    auto findCmdRequest = oplogFetcher->makeFindCmdRequest_forTest(findTimeout);
+
+    auto filter = findCmdRequest.getFilter();
     ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp())), filter);
 
-    auto queryObj =
-        (oplogFetcher->getFindQuerySettings_forTest(findTimeout)).getFullSettingsDeprecated();
-    ASSERT_EQUALS(60000, queryObj.getIntField("$maxTimeMS"));
+    auto maxTimeMS = findCmdRequest.getMaxTimeMS();
+    ASSERT(maxTimeMS);
+    ASSERT_EQUALS(60000, *maxTimeMS);
 
-    ASSERT_EQUALS(mongo::BSONType::Object, queryObj["readConcern"].type());
+    auto readConcern = findCmdRequest.getReadConcern();
+    ASSERT(readConcern);
     ASSERT_BSONOBJ_EQ(BSON("level"
                            << "local"
                            << "afterClusterTime" << Timestamp(0, 1)),
-                      queryObj["readConcern"].Obj());
-    ASSERT_EQUALS(dataReplicatorExternalState->currentTerm, queryObj["term"].numberLong());
+                      *readConcern);
+
+    auto term = findCmdRequest.getTerm();
+    ASSERT(term);
+    ASSERT_EQUALS(dataReplicatorExternalState->currentTerm, *term);
 }
 
 TEST_F(OplogFetcherTest,
@@ -826,21 +832,26 @@ TEST_F(OplogFetcherTest,
     dataReplicatorExternalState->currentTerm = OpTime::kUninitializedTerm;
     auto oplogFetcher = makeOplogFetcher();
 
-    auto filter = oplogFetcher->getFindQueryFilter_forTest();
-    ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp())), filter);
-
     // Test that the correct maxTimeMS is set if we are retrying the 'find' query.
     auto findTimeout = durationCount<Milliseconds>(oplogFetcher->getRetriedFindMaxTime_forTest());
-    auto queryObj =
-        (oplogFetcher->getFindQuerySettings_forTest(findTimeout)).getFullSettingsDeprecated();
-    ASSERT_EQUALS(2000, queryObj.getIntField("$maxTimeMS"));
+    auto findCmdRequest = oplogFetcher->makeFindCmdRequest_forTest(findTimeout);
 
-    ASSERT_EQUALS(mongo::BSONType::Object, queryObj["readConcern"].type());
+    auto filter = findCmdRequest.getFilter();
+    ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp())), filter);
+
+    auto maxTimeMS = findCmdRequest.getMaxTimeMS();
+    ASSERT(maxTimeMS);
+    ASSERT_EQUALS(2000, *maxTimeMS);
+
+    auto readConcern = findCmdRequest.getReadConcern();
+    ASSERT(readConcern);
     ASSERT_BSONOBJ_EQ(BSON("level"
                            << "local"
                            << "afterClusterTime" << Timestamp(0, 1)),
-                      queryObj["readConcern"].Obj());
-    ASSERT_FALSE(queryObj.hasField("term"));
+                      *readConcern);
+
+    auto term = findCmdRequest.getTerm();
+    ASSERT(!term);
 }
 
 TEST_F(

@@ -34,6 +34,7 @@
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/client/client_api_version_parameters_gen.h"
+#include "mongo/client/client_deprecated.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/global_conn_pool.h"
