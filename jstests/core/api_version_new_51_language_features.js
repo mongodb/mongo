@@ -2,8 +2,8 @@
  * Tests that language features introduced in version 5.1 are included in API Version 1.
  *
  * @tags: [
- *   requires_fcv_51,
- *   uses_api_parameters,
+ *   requires_fcv_60,
+ *   uses_api_parameters
  * ]
  */
 
