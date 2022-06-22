@@ -3,7 +3,7 @@
  *
  *  @tags: [
  *      requires_fcv_51,
- *      does_not_support_stepdowns, // DropDatabaseCoordinator drops the input collection on step-up
+ *      does_not_support_stepdowns, # DropDatabaseCoordinator drops the input collection on step-up
  *  ]
  */
 

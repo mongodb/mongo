@@ -2,7 +2,7 @@
  * Test nameOnly option of listCollections
  *
  * @tags: [
- *   // We expect the collection to exist when running listCollections
+ *   # We expect the collection to exist when running listCollections
  *   does_not_support_stepdowns
  * ]
  */
