@@ -4310,13 +4310,15 @@ TEST(PhysRewriter, PartialIndex1) {
     // TODO: Test cases where partial filter bound is a range which subsumes the query
     // requirement
     // TODO: (e.g. half open interval)
-    auto conversionResult = convertExprToPartialSchemaReq(make<EvalFilter>(
-        make<PathGet>("b",
-                      make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)))),
-        make<Variable>("root")));
-    ASSERT_TRUE(conversionResult._success);
-    ASSERT_FALSE(conversionResult._hasEmptyInterval);
-    ASSERT_FALSE(conversionResult._retainPredicate);
+    auto conversionResult = convertExprToPartialSchemaReq(
+        make<EvalFilter>(
+            make<PathGet>(
+                "b", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)))),
+            make<Variable>("root")),
+        true /*isFilterContext*/);
+    ASSERT_TRUE(conversionResult.has_value());
+    ASSERT_FALSE(conversionResult->_hasEmptyInterval);
+    ASSERT_FALSE(conversionResult->_retainPredicate);
 
     OptPhaseManager phaseManager(
         {OptPhaseManager::OptPhase::MemoSubstitutionPhase,
@@ -4329,7 +4331,7 @@ TEST(PhysRewriter, PartialIndex1) {
                             IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending}},
                                             true /*isMultiKey*/,
                                             {DistributionType::Centralized},
-                                            std::move(conversionResult._reqMap)}}}}}}},
+                                            std::move(conversionResult->_reqMap)}}}}}}},
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4387,13 +4389,15 @@ TEST(PhysRewriter, PartialIndex2) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterANode));
 
-    auto conversionResult = convertExprToPartialSchemaReq(make<EvalFilter>(
-        make<PathGet>("a",
-                      make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)))),
-        make<Variable>("root")));
-    ASSERT_TRUE(conversionResult._success);
-    ASSERT_FALSE(conversionResult._hasEmptyInterval);
-    ASSERT_FALSE(conversionResult._retainPredicate);
+    auto conversionResult = convertExprToPartialSchemaReq(
+        make<EvalFilter>(
+            make<PathGet>(
+                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)))),
+            make<Variable>("root")),
+        true /*isFilterContext*/);
+    ASSERT_TRUE(conversionResult.has_value());
+    ASSERT_FALSE(conversionResult->_hasEmptyInterval);
+    ASSERT_FALSE(conversionResult->_retainPredicate);
 
     OptPhaseManager phaseManager(
         {OptPhaseManager::OptPhase::MemoSubstitutionPhase,
@@ -4406,7 +4410,7 @@ TEST(PhysRewriter, PartialIndex2) {
                             IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending}},
                                             true /*isMultiKey*/,
                                             {DistributionType::Centralized},
-                                            std::move(conversionResult._reqMap)}}}}}}},
+                                            std::move(conversionResult->_reqMap)}}}}}}},
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4462,13 +4466,15 @@ TEST(PhysRewriter, PartialIndexReject) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterBNode));
 
-    auto conversionResult = convertExprToPartialSchemaReq(make<EvalFilter>(
-        make<PathGet>("b",
-                      make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(4)))),
-        make<Variable>("root")));
-    ASSERT_TRUE(conversionResult._success);
-    ASSERT_FALSE(conversionResult._hasEmptyInterval);
-    ASSERT_FALSE(conversionResult._retainPredicate);
+    auto conversionResult = convertExprToPartialSchemaReq(
+        make<EvalFilter>(
+            make<PathGet>(
+                "b", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(4)))),
+            make<Variable>("root")),
+        true /*isFilterContext*/);
+    ASSERT_TRUE(conversionResult.has_value());
+    ASSERT_FALSE(conversionResult->_hasEmptyInterval);
+    ASSERT_FALSE(conversionResult->_retainPredicate);
 
     OptPhaseManager phaseManager(
         {OptPhaseManager::OptPhase::MemoSubstitutionPhase,
@@ -4481,7 +4487,7 @@ TEST(PhysRewriter, PartialIndexReject) {
                             IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending}},
                                             true /*isMultiKey*/,
                                             {DistributionType::Centralized},
-                                            std::move(conversionResult._reqMap)}}}}}}},
+                                            std::move(conversionResult->_reqMap)}}}}}}},
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
