@@ -3,6 +3,8 @@ import os
 import shutil
 from subprocess import DEVNULL, STDOUT, CalledProcessError, call, check_output
 
+import logging
+import sys
 import structlog
 
 from buildscripts.resmokelib.multiversion.multiversion_service import (
@@ -14,6 +16,11 @@ LAST_LTS = "last_lts"
 LAST_CONTINUOUS = "last_continuous"
 
 LOGGER = structlog.getLogger(__name__)
+logging.basicConfig(
+    format="[%(asctime)s - %(name)s - %(levelname)s] %(message)s",
+    level=logging.INFO,
+    stream=sys.stderr,
+)
 
 
 def generate_mongo_version_file():
@@ -85,8 +92,11 @@ LAST_LTS_BIN_VERSION = version_constants.get_last_lts_fcv()
 LAST_CONTINUOUS_BIN_VERSION = version_constants.get_last_continuous_fcv()
 
 LAST_LTS_FCV = version_constants.get_last_lts_fcv()
+LOGGER.info("Last LTS FCV: {}".format(LAST_LTS_FCV))
 LAST_CONTINUOUS_FCV = version_constants.get_last_continuous_fcv()
+LOGGER.info("Last Continuous FCV: {}".format(LAST_CONTINUOUS_FCV))
 LATEST_FCV = version_constants.get_latest_fcv()
+LOGGER.info("Latest FCV: {}".format(LATEST_FCV))
 
 LAST_CONTINUOUS_MONGO_BINARY = version_constants.build_last_continuous_binary("mongo")
 LAST_CONTINUOUS_MONGOD_BINARY = version_constants.build_last_continuous_binary("mongod")
@@ -97,10 +107,12 @@ LAST_LTS_MONGOD_BINARY = version_constants.build_last_lts_binary("mongod")
 LAST_LTS_MONGOS_BINARY = version_constants.build_last_lts_binary("mongos")
 
 REQUIRES_FCV_TAG_LATEST = version_constants.get_latest_tag()
+LOGGER.info("Requires FCV Tag Latest: {}".format(REQUIRES_FCV_TAG_LATEST))
 
 # Generate tags for all FCVS in (lastLTS, latest], or (lowerBoundOverride, latest] if requested.
 # All multiversion tests should be run with these tags excluded.
 REQUIRES_FCV_TAG = version_constants.get_fcv_tag_list()
+LOGGER.info("Requires FCV Tag: {}".format(REQUIRES_FCV_TAG))
 
 # Generate evergreen project names for all FCVs less than latest.
 EVERGREEN_PROJECTS = ['mongodb-mongo-master']
