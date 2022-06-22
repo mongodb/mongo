@@ -2,7 +2,7 @@
 // @tags: [
 //   assumes_balancer_off,
 //   assumes_read_concern_local,
-//   operations_longer_than_stepdown_interval,  // large bulk inserts
+//   operations_longer_than_stepdown_interval,  # large bulk inserts
 // ]
 
 (function() {

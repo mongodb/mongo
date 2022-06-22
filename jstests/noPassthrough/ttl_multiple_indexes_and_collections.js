@@ -14,7 +14,7 @@
  * @tags: [
  *   assumes_no_implicit_collection_creation_after_drop,
  *   requires_ttl_index,
- *   // Expects TTL parameters 'ttlIndexDeleteTargetDocs' and 'ttlMonitorSubPassTargetSecs'.
+ *   # Expects TTL parameters 'ttlIndexDeleteTargetDocs' and 'ttlMonitorSubPassTargetSecs'.
  *   requires_fcv_61,
  * ]
  */

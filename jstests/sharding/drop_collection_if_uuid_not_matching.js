@@ -5,8 +5,8 @@
  * - Keep the collection if the uuid is exactly the expected one.
  *
  * @tags: [
- *     requires_fcv_51, // The command is not present in v5.0
- *     does_not_support_stepdowns, // The command is not resilient to stepdowns
+ *     requires_fcv_51, # The command is not present in v5.0
+ *     does_not_support_stepdowns, # The command is not resilient to stepdowns
  * ]
  */
 

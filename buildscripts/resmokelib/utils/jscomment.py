@@ -36,6 +36,18 @@ def get_tags(pathname):
                 tags = yaml.safe_load(_strip_jscomments(match.group(1)))
                 if not isinstance(tags, list) and all(isinstance(tag, str) for tag in tags):
                     raise TypeError("Expected a list of string tags, but got '%s'" % (tags))
+
+                for tag in tags:
+                    if '//' in tag:
+                        raise ValueError(("Found a JS line comment '%s'. "\
+                            "Use '#' YAML style comments instead in a tags array %s")
+                            % (tag, pathname))
+
+                    if ' ' in tag:
+                        raise ValueError(("Found an empty space in tag '%s'. "\
+                            "This is not permitted and may indicate a missing comma in %s")
+                            % (tag, pathname))
+
                 return tags
             except yaml.YAMLError as err:
                 raise ValueError(
