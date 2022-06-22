@@ -64,6 +64,9 @@ struct WriteResult {
     bool canContinue = true;
 };
 
+bool getFleCrudProcessed(OperationContext* opCtx,
+                         const boost::optional<EncryptionInformation>& encryptionInfo);
+
 /**
  * Performs a batch of inserts, updates, or deletes.
  *

@@ -311,7 +311,6 @@ if (typeof _threadInject != "undefined") {
             // run in parallel, they could interfere with the cache and cause failures.
             parallelFilesDir + "/list_all_local_sessions.js",
             parallelFilesDir + "/list_all_sessions.js",
-            parallelFilesDir + "/list_local_sessions.js",
             parallelFilesDir + "/list_sessions.js",
         ];
         var serialTests = makeKeys(serialTestsArr);

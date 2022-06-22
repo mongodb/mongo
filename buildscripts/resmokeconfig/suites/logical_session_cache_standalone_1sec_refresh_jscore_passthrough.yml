@@ -13,7 +13,6 @@ selector:
   # can be triggered deterministically.
   - jstests/core/list_all_local_sessions.js
   - jstests/core/list_all_sessions.js
-  - jstests/core/list_local_sessions.js
   - jstests/core/list_sessions.js
   # These tests verify that an expected number of update operations were tracked in the server
   # status metrics, but the logical session cache refresh causes additional updates to be recorded.

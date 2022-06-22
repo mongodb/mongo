@@ -261,7 +261,11 @@ public:
      * FLEStateCollectionContention instead.
      */
     virtual StatusWith<write_ops::InsertCommandReply> insertDocument(
-        const NamespaceString& nss, BSONObj obj, StmtId* pStmtId, bool translateDuplicateKey) = 0;
+        const NamespaceString& nss,
+        BSONObj obj,
+        StmtId* pStmtId,
+        bool translateDuplicateKey,
+        bool bypassDocumentValidation = false) = 0;
 
     /**
      * Delete a single document with the given query.
@@ -294,7 +298,7 @@ public:
     virtual write_ops::UpdateCommandReply update(
         const NamespaceString& nss,
         int32_t stmtId,
-        const write_ops::UpdateCommandRequest& updateRequest) = 0;
+        write_ops::UpdateCommandRequest& updateRequest) = 0;
 
     /**
      * Do a single findAndModify request.
@@ -325,10 +329,12 @@ public:
 
     uint64_t countDocuments(const NamespaceString& nss) final;
 
-    StatusWith<write_ops::InsertCommandReply> insertDocument(const NamespaceString& nss,
-                                                             BSONObj obj,
-                                                             int32_t* pStmtId,
-                                                             bool translateDuplicateKey) final;
+    StatusWith<write_ops::InsertCommandReply> insertDocument(
+        const NamespaceString& nss,
+        BSONObj obj,
+        int32_t* pStmtId,
+        bool translateDuplicateKey,
+        bool bypassDocumentValidation = false) final;
 
     std::pair<write_ops::DeleteCommandReply, BSONObj> deleteWithPreimage(
         const NamespaceString& nss,
@@ -340,10 +346,9 @@ public:
         const EncryptionInformation& ei,
         const write_ops::UpdateCommandRequest& updateRequest) final;
 
-    write_ops::UpdateCommandReply update(
-        const NamespaceString& nss,
-        int32_t stmtId,
-        const write_ops::UpdateCommandRequest& updateRequest) final;
+    write_ops::UpdateCommandReply update(const NamespaceString& nss,
+                                         int32_t stmtId,
+                                         write_ops::UpdateCommandRequest& updateRequest) final;
 
     write_ops::FindAndModifyCommandReply findAndModify(
         const NamespaceString& nss,
@@ -408,7 +413,8 @@ StatusWith<write_ops::InsertCommandReply> processInsert(
     std::vector<EDCServerPayloadInfo>& serverPayload,
     const EncryptedFieldConfig& efc,
     int32_t stmtId,
-    BSONObj document);
+    BSONObj document,
+    bool bypassDocumentValidation = false);
 
 /**
  * Process a FLE delete with the query interface

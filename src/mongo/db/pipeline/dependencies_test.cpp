@@ -162,6 +162,13 @@ TEST(DependenciesToProjectionTest, ShouldIncludeFieldEvenIfSuffixOfAnotherFieldW
                       BSON("a" << 1 << "ab" << 1 << "_id" << 0));
 }
 
+TEST(DependenciesToProjectionTest, ExcludeIndirectDescendants) {
+    const char* array[] = {"a.b", "_id", "a.b.c.d.e"};
+    DepsTracker deps;
+    deps.fields = arrayToSet(array);
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("_id" << 1 << "a.b" << 1));
+}
+
 TEST(DependenciesToProjectionTest, ShouldIncludeIdIfNeeded) {
     const char* array[] = {"a", "_id"};
     DepsTracker deps;
@@ -197,6 +204,27 @@ TEST(DependenciesToProjectionTest, ShouldIncludeFieldPrefixedByIdWhenIdSubfieldI
     deps.fields = arrayToSet(array);
     ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(),
                       BSON("_id.a" << 1 << "_id_a" << 1 << "a" << 1));
+}
+
+// SERVER-66418
+TEST(DependenciesToProjectionTest, ChildCoveredByParentWithSpecialChars) {
+    // without "_id"
+    {
+        // This is an important test case because '-' is one of the few chars before '.' in utf-8.
+        const char* array[] = {"a", "a-b", "a.b"};
+        DepsTracker deps;
+        deps.fields = arrayToSet(array);
+        ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(),
+                          BSON("a" << 1 << "a-b" << 1 << "_id" << 0));
+    }
+    // with "_id"
+    {
+        const char* array[] = {"_id", "a", "a-b", "a.b"};
+        DepsTracker deps;
+        deps.fields = arrayToSet(array);
+        ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(),
+                          BSON("_id" << 1 << "a" << 1 << "a-b" << 1));
+    }
 }
 
 TEST(DependenciesToProjectionTest, ShouldOutputEmptyObjectIfEntireDocumentNeeded) {
@@ -257,6 +285,57 @@ TEST(DependenciesToProjectionTest,
     ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSONObj());
     ASSERT_EQ(deps.metadataDeps().count(), 1u);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
+}
+
+TEST(DependenciesToProjectionTest, SortFieldPaths) {
+    const char* array[] = {"",
+                           "A",
+                           "_id",
+                           "a",
+                           "a.b",
+                           "a.b.c",
+                           "a.c",
+                           // '-' char in utf-8 comes before '.' but our special fieldpath sort
+                           // puts '.' first so that children directly follow their parents.
+                           "a-b",
+                           "a-b.ear",
+                           "a-bear",
+                           "a-bear.",
+                           "a🌲",
+                           "b",
+                           "b.a"
+                           "b.aa"
+                           "b.🌲d"};
+    DepsTracker deps;
+    deps.fields = arrayToSet(array);
+    // our custom sort will restore the ordering above
+    std::list<std::string> fieldPathSorted = deps.sortedFields();
+    auto itr = fieldPathSorted.begin();
+    for (unsigned long i = 0; i < fieldPathSorted.size(); i++) {
+        ASSERT_EQ(*itr, array[i]);
+        ++itr;
+    }
+}
+
+TEST(DependenciesToProjectionTest, PathLessThan) {
+    auto lessThan = PathPrefixComparator();
+    ASSERT_FALSE(lessThan("a", "a"));
+    ASSERT_TRUE(lessThan("a", "aa"));
+    ASSERT_TRUE(lessThan("a", "b"));
+    ASSERT_TRUE(lessThan("", "a"));
+    ASSERT_TRUE(lessThan("Aa", "aa"));
+    ASSERT_TRUE(lessThan("a.b", "ab"));
+    ASSERT_TRUE(lessThan("a.b", "a-b"));  // SERVER-66418
+    ASSERT_TRUE(lessThan("a.b", "a b"));  // SERVER-66418
+    // verify the difference from the standard sort
+    ASSERT_TRUE(std::string("a.b") > std::string("a-b"));
+    ASSERT_TRUE(std::string("a.b") > std::string("a b"));
+    // test unicode behavior
+    ASSERT_TRUE(lessThan("a.b", "a🌲"));
+    ASSERT_TRUE(lessThan("a.b", "a🌲b"));
+    ASSERT_TRUE(lessThan("🌲", "🌳"));  // U+1F332 < U+1F333
+    ASSERT_TRUE(lessThan("🌲", "🌲.b"));
+    ASSERT_FALSE(lessThan("🌲.b", "🌲"));
 }
 
 }  // namespace

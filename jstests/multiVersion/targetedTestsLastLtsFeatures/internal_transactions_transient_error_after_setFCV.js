@@ -31,6 +31,8 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(
     st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
 
+st.refreshCatalogCacheForNs(st.s, ns);
+
 function runTest(lsid) {
     jsTest.log("Test that the correct error response is propagated upon losing in memory " +
                "transaction metadata and durable metadata in the config.transactions collection " +
@@ -38,9 +40,6 @@ function runTest(lsid) {
 
     // Upgrade fcv to make sure cluster is on the latestFCV before starting any transactions.
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-
-    // Upgrading to lastestFCV clears the filtering metadata of all collections.
-    st.refreshCatalogCacheForNs(st.s, ns);
 
     // Inserts are split to guarantee that shard0 will be chosen as the coordinator.
     assert.commandWorked(st.s.getDB(kDbName).runCommand({

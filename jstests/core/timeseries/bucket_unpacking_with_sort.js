@@ -236,7 +236,12 @@ const runRewritesTest = (sortSpec,
     // changing out from under us.
     const bucketSpanMatch = {
         $match: {
-            $expr: {$lte: [{$subtract: ["$control.max.t", "$control.min.t"]}, {$const: 3600000}]},
+            $expr: {
+                $lte: [
+                    {$subtract: ["$control.max.t", "$control.min.t"]},
+                    {$const: NumberLong(3600000)}
+                ]
+            },
         }
     };
     let foundMatch = findFirstMatch(optExplain);

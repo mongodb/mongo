@@ -374,7 +374,7 @@ DEATH_TEST(DensifyGeneratorTest, DateMinMustBeLessThanMax, "lower or equal to") 
                        5733502);
 }
 
-DEATH_TEST(DensifyGeneratorTest, DateStepMustBeInt, "integer") {
+DEATH_TEST(DensifyGeneratorTest, DateStepMustBeInt, "whole number") {
     size_t counter = 0;
     ASSERT_THROWS_CODE(GenClass(makeDate("2021-01-01T00:00:00.000Z"),
                                 RangeStatement(Value(1.5),

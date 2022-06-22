@@ -35,15 +35,14 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(
     st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
 
+st.refreshCatalogCacheForNs(st.s, ns);
+
 function runTestBasic(lsid) {
     jsTest.log("Test transaction coordinator documents are deleted before downgrade finishes " +
                "with lsid: " + tojson(lsid));
 
     // Upgrade fcv to make sure cluster is on the latestFCV before starting any transactions.
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-
-    // Upgrading to lastestFCV clears the filtering metadata of all collections.
-    st.refreshCatalogCacheForNs(st.s, ns);
 
     let commitTxnFp = configureFailPoint(coordinator, "hangBeforeCommitingTxn");
     let deleteCoordinatorDocFp =
@@ -128,9 +127,6 @@ function runTestWithFailoverBeforeDocumentRemoval(lsid) {
 
     // Upgrade fcv to make sure cluster is on the latestFCV before starting any transactions.
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-
-    // Upgrading to lastestFCV clears the filtering metadata of all collections.
-    st.refreshCatalogCacheForNs(st.s, ns);
 
     let commitTxnFp = configureFailPoint(coordinator, "hangBeforeCommitingTxn");
     let deleteCoordinatorDocFp =
