@@ -153,6 +153,7 @@ class ExpressionHyperbolicSine;
 class ExpressionInternalFindSlice;
 class ExpressionInternalFindPositional;
 class ExpressionInternalFindElemMatch;
+class ExpressionInternalFLEEqual;
 class ExpressionInternalJsEmit;
 class ExpressionFunction;
 class ExpressionDegreesToRadians;
@@ -245,6 +246,7 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionLn>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionLog>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionLog10>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionInternalFLEEqual>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionMap>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionMeta>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionMod>) = 0;
@@ -424,6 +426,7 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionLn*) override {}
     void visit(const ExpressionLog*) override {}
     void visit(const ExpressionLog10*) override {}
+    void visit(const ExpressionInternalFLEEqual*) override {}
     void visit(const ExpressionMap*) override {}
     void visit(const ExpressionMeta*) override {}
     void visit(const ExpressionMod*) override {}

@@ -83,6 +83,14 @@ let verifyLimitUpdate = function(updates) {
     assert.eq(stats.count, initialDocSize);
     assert.lte(stats.size, maxSize);
 
+    // We used to not allow resizing the size of a capped collection below 4096 bytes. This
+    // restriction was lifted in SERVER-67036.
+    // We should see a reduction in collection size and count relative to the previous test case.
+    verifyLimitUpdate({cappedSize: 256});
+    stats = assert.commandWorked(cappedColl.stats());
+    assert.lt(stats.count, initialDocSize);
+    assert.lt(stats.size, maxSize);
+
     // We expect the resizing of a capped collection to fail when maxSize <= 0 and maxSize >
     // maxSizeCeiling.
     const negativeSize = -1 * maxSize;

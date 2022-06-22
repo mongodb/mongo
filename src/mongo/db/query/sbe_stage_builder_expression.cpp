@@ -377,6 +377,7 @@ public:
     void visit(const ExpressionLn* expr) final {}
     void visit(const ExpressionLog* expr) final {}
     void visit(const ExpressionLog10* expr) final {}
+    void visit(const ExpressionInternalFLEEqual* expr) final {}
     void visit(const ExpressionMap* expr) final {}
     void visit(const ExpressionMeta* expr) final {}
     void visit(const ExpressionMod* expr) final {}
@@ -609,6 +610,7 @@ public:
     void visit(const ExpressionLn* expr) final {}
     void visit(const ExpressionLog* expr) final {}
     void visit(const ExpressionLog10* expr) final {}
+    void visit(const ExpressionInternalFLEEqual* expr) final {}
     void visit(const ExpressionMap* expr) final {}
     void visit(const ExpressionMeta* expr) final {}
     void visit(const ExpressionMod* expr) final {}
@@ -2315,6 +2317,9 @@ public:
 
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(log10Expr)));
+    }
+    void visit(const ExpressionInternalFLEEqual* expr) final {
+        unsupportedExpression("$_internalFleEq");
     }
     void visit(const ExpressionMap* expr) final {
         unsupportedExpression("$map");

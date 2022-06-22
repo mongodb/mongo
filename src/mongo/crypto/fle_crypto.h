@@ -41,6 +41,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/aead_encryption.h"
@@ -1009,12 +1010,20 @@ public:
     /**
      * Validate that payload is compatible with schema
      */
-    static void validateEncryptedFieldInfo(BSONObj& obj, const EncryptedFieldConfig& efc);
+    static void validateEncryptedFieldInfo(BSONObj& obj,
+                                           const EncryptedFieldConfig& efc,
+                                           bool bypassDocumentValidation);
 
     /**
      * Get information about all FLE2InsertUpdatePayload payloads
      */
     static std::vector<EDCServerPayloadInfo> getEncryptedFieldInfo(BSONObj& obj);
+
+    static StatusWith<FLE2IndexedEqualityEncryptedValue> decryptAndParse(
+        ServerDataEncryptionLevel1Token token, ConstDataRange serializedServerValue);
+
+    static StatusWith<FLE2IndexedEqualityEncryptedValue> decryptAndParse(
+        ConstDataRange token, ConstDataRange serializedServerValue);
 
     /**
      * Generate a search tag
@@ -1024,6 +1033,14 @@ public:
     static PrfBlock generateTag(EDCTwiceDerivedToken edcTwiceDerived, FLECounter count);
     static PrfBlock generateTag(const EDCServerPayloadInfo& payload);
     static PrfBlock generateTag(const FLE2IndexedEqualityEncryptedValue& indexedValue);
+
+    /**
+     * Generate all the EDC tokens
+     */
+    static std::vector<EDCDerivedFromDataTokenAndContentionFactorToken> generateEDCTokens(
+        EDCDerivedFromDataToken token, uint64_t maxContentionFactor);
+    static std::vector<EDCDerivedFromDataTokenAndContentionFactorToken> generateEDCTokens(
+        ConstDataRange rawToken, uint64_t maxContentionFactor);
 
     /**
      * Consumes a payload from a MongoDB client for insert.
@@ -1163,11 +1180,23 @@ struct ParsedFindPayload {
     ESCDerivedFromDataToken escToken;
     ECCDerivedFromDataToken eccToken;
     EDCDerivedFromDataToken edcToken;
+    boost::optional<ServerDataEncryptionLevel1Token> serverToken;
     boost::optional<std::int64_t> maxCounter;
 
     explicit ParsedFindPayload(BSONElement fleFindPayload);
     explicit ParsedFindPayload(const Value& fleFindPayload);
     explicit ParsedFindPayload(ConstDataRange cdr);
 };
+
+/**
+ * Utility functions manipulating buffers
+ */
+PrfBlock PrfBlockfromCDR(ConstDataRange block);
+
+std::vector<uint8_t> toEncryptedVector(EncryptedBinDataType dt, const PrfBlock& block);
+
+BSONBinData toBSONBinData(const std::vector<uint8_t>& buf);
+
+std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(const Value& value);
 
 }  // namespace mongo

@@ -1,4 +1,4 @@
-# Copyright (C) 2021-present MongoDB, Inc.
+# Copyright (C) 2022-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -24,29 +24,34 @@
 # delete this exception statement from your version. If you delete this
 # exception statement from all source files in the program, then also delete
 # it in the license file.
-#
-
-# Feature flag for internal transactions.
 
 global:
-    cpp_namespace: "mongo::feature_flags"
+    cpp_namespace: "mongo"
 
 imports:
     - "mongo/idl/basic_types.idl"
 
-feature_flags:
-    featureFlagInternalTransactions:
-        description: Feature flag for enabling internal transactions.
-        cpp_varname: gFeatureFlagInternalTransactions
-        default: true
-        version: 6.0
+structs:
 
-    featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp:
-        description: Feature flag to enable always creating the config.transactions partial index on step up to primary even if the collection is not empty.
-        cpp_varname: gFeatureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp
-        default: false
+    InternalFleEqStruct:
+        description: "Struct for $_internalFleEq"
+        strict: true
+        fields:
+          field:
+            description: "Expression"
+            type: IDLAnyType
+            cpp_name: field
+          edc:
+            description: "EDCDerivedFromDataToken"
+            type: bindata_encrypt
+            cpp_name: edcDerivedToken
+          server:
+            description: "ServerDataEncryptionLevel1Token"
+            type: bindata_encrypt
+            cpp_name: serverEncryptionToken
+          counter:
+            description: "Queryable Encryption max counter"
+            type: long
+            cpp_name: maxCounter
 
-    featureFlagUpdateDocumentShardKeyUsingTransactionApi:
-        description: Feature flag to enable usage of the transaction api for update findAndModify and update commands that change a document's shard key.
-        cpp_varname: gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi
-        default: false
+

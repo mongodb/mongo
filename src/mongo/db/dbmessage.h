@@ -227,7 +227,7 @@ public:
      * Indicates whether this message is expected to have a ns.
      */
     bool messageShouldHaveNs() const {
-        return (_msg.operation() >= dbUpdate) & (_msg.operation() <= dbDelete);
+        return static_cast<int>(_msg.operation() >= dbUpdate) & (_msg.operation() <= dbDelete);
     }
 
     /**

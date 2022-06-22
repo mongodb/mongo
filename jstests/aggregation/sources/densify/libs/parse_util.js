@@ -139,6 +139,20 @@ let parseUtil = (function(db, coll, stageName, options = {}) {
             }),
             5733402,
             "a bounding array must be an ascending array of either two dates or two numbers");
+        // Non-whole number step with date bounds
+        assert.commandFailedWithCode(
+            run({
+                [stageName]: {
+                    field: "a",
+                    range: {
+                        step: 1.1,
+                        bounds: [new ISODate("2020-01-01"), new ISODate("2020-01-03")],
+                        unit: "second"
+                    }
+                }
+            }),
+            6586400,
+            "The step parameter in a range satement must be a whole number when densifying a date range");
 
         // Positive test cases
         assert.commandWorked(run({[stageName]: {field: "a", range: {step: 1.0, bounds: [1, 2]}}}));
