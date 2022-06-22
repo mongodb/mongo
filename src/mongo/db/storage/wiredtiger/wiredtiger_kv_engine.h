@@ -155,13 +155,24 @@ public:
                                      const CollectionOptions& collOptions,
                                      StringData ident,
                                      const IndexDescriptor* desc) override;
-
     std::unique_ptr<SortedDataInterface> getSortedDataInterface(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const CollectionOptions& collOptions,
         StringData ident,
         const IndexDescriptor* desc) override;
+
+    /**
+     * Creates a new column store for the provided ident.
+     */
+    Status createColumnStore(OperationContext* opCtx,
+                             const NamespaceString& ns,
+                             const CollectionOptions& collOptions,
+                             StringData ident,
+                             const IndexDescriptor* desc) override;
+    /**
+     * Creates a ColumnStore object representing an existing column store for the provided ident.
+     */
     std::unique_ptr<ColumnStore> getColumnStore(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const CollectionOptions& collOptions,

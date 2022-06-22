@@ -87,6 +87,15 @@ public:
         const CollectionOptions& collOptions,
         StringData ident,
         const IndexDescriptor* desc);
+
+    Status createColumnStore(OperationContext* opCtx,
+                             const NamespaceString& ns,
+                             const CollectionOptions& collOptions,
+                             StringData ident,
+                             const IndexDescriptor* desc) override {
+        return Status(ErrorCodes::NotImplemented, "createColumnStore()");
+    }
+
     std::unique_ptr<ColumnStore> getColumnStore(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const CollectionOptions& collOptions,

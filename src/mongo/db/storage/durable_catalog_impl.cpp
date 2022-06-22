@@ -641,7 +641,9 @@ Status DurableCatalogImpl::createIndex(OperationContext* opCtx,
     std::string ident = getIndexIdent(opCtx, catalogId, spec->indexName());
 
     auto kvEngine = _engine->getEngine();
-    const Status status = kvEngine->createSortedDataInterface(opCtx, nss, collOptions, ident, spec);
+    Status status = spec->getIndexType() == INDEX_COLUMN
+        ? kvEngine->createColumnStore(opCtx, nss, collOptions, ident, spec)
+        : kvEngine->createSortedDataInterface(opCtx, nss, collOptions, ident, spec);
     if (status.isOK()) {
         opCtx->recoveryUnit()->onRollback([this, ident, recoveryUnit = opCtx->recoveryUnit()]() {
             // Intentionally ignoring failure.

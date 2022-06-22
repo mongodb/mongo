@@ -129,6 +129,11 @@ public:
                                              const CollectionOptions& collOptions,
                                              StringData ident,
                                              const IndexDescriptor* desc) = 0;
+    virtual Status createColumnStore(OperationContext* opCtx,
+                                     const NamespaceString& ns,
+                                     const CollectionOptions& collOptions,
+                                     StringData ident,
+                                     const IndexDescriptor* desc) = 0;
 
     /**
      * Similar to createSortedDataInterface but this imports from an existing table with the

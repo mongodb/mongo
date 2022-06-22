@@ -1728,6 +1728,31 @@ std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
         opCtx, _uri(ident), ident, keyFormat, desc, WiredTigerUtil::useTableLogging(nss));
 }
 
+Status WiredTigerKVEngine::createColumnStore(OperationContext* opCtx,
+                                             const NamespaceString& ns,
+                                             const CollectionOptions& collOptions,
+                                             StringData ident,
+                                             const IndexDescriptor* desc) {
+    _ensureIdentPath(ident);
+    invariant(desc->getIndexType() == IndexType::INDEX_COLUMN);
+
+    StatusWith<std::string> result =
+        WiredTigerColumnStore::generateCreateString(_canonicalName, ns, *desc);
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+
+    std::string config = std::move(result.getValue());
+
+    LOGV2_DEBUG(6738400,
+                2,
+                "WiredTigerKVEngine::createColumnStore",
+                "collection_uuid"_attr = collOptions.uuid,
+                "ident"_attr = ident,
+                "config"_attr = config);
+    return WiredTigerColumnStore::create(opCtx, _uri(ident), config);
+}
+
 std::unique_ptr<ColumnStore> WiredTigerKVEngine::getColumnStore(
     OperationContext* opCtx,
     const NamespaceString& nss,
