@@ -46,15 +46,6 @@
 
 namespace mongo {
 
-namespace {
-
-bool computeIsStandaloneOrPrimary(OperationContext* opCtx) {
-    const auto replCoord{repl::ReplicationCoordinator::get(opCtx)};
-    return replCoord->canAcceptWritesForDatabase(opCtx, "admin");
-}
-
-}  // namespace
-
 namespace write_stage_common {
 
 PreWriteFilter::PreWriteFilter(OperationContext* opCtx, NamespaceString nss)
@@ -65,14 +56,23 @@ PreWriteFilter::PreWriteFilter(OperationContext* opCtx, NamespaceString nss)
           return fcv.isVersionInitialized() &&
               feature_flags::gFeatureFlagNoChangeStreamEventsDueToOrphans.isEnabled(fcv);
       }()),
-      _isStandaloneOrPrimary(computeIsStandaloneOrPrimary(_opCtx)) {}
+      _skipFiltering([&] {
+          // Always allow writes on replica sets.
+          if (serverGlobalParams.clusterRole == ClusterRole::None) {
+              return true;
+          }
+
+          // Always allow writes on standalone and secondary nodes.
+          const auto replCoord{repl::ReplicationCoordinator::get(opCtx)};
+          return !replCoord->canAcceptWritesForDatabase(opCtx, NamespaceString::kAdminDb);
+      }()) {}
 
 PreWriteFilter::Action PreWriteFilter::computeAction(const Document& doc) {
     // Skip the checks if the Filter is not enabled.
     if (!_isEnabled)
         return Action::kWrite;
 
-    if (!_isStandaloneOrPrimary) {
+    if (_skipFiltering) {
         // Secondaries do not apply any filtering logic as the primary already did.
         return Action::kWrite;
     }
