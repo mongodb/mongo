@@ -537,6 +537,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_plan_cache',
         '$BUILD_DIR/mongo/db/query/query_planner',
         '$BUILD_DIR/mongo/db/update_index_data',
+        'collection',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',

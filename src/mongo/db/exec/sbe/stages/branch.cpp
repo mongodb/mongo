@@ -42,8 +42,9 @@ BranchStage::BranchStage(std::unique_ptr<PlanStage> inputThen,
                          value::SlotVector inputThenVals,
                          value::SlotVector inputElseVals,
                          value::SlotVector outputVals,
-                         PlanNodeId planNodeId)
-    : PlanStage("branch"_sd, planNodeId),
+                         PlanNodeId planNodeId,
+                         bool participateInTrialRunTracking)
+    : PlanStage("branch"_sd, planNodeId, participateInTrialRunTracking),
       _filter(std::move(filter)),
       _inputThenVals(std::move(inputThenVals)),
       _inputElseVals(std::move(inputElseVals)),
@@ -61,7 +62,8 @@ std::unique_ptr<PlanStage> BranchStage::clone() const {
                                          _inputThenVals,
                                          _inputElseVals,
                                          _outputVals,
-                                         _commonStats.nodeId);
+                                         _commonStats.nodeId,
+                                         _participateInTrialRunTracking);
 }
 
 void BranchStage::prepare(CompileCtx& ctx) {

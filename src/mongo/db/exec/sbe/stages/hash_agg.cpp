@@ -47,8 +47,9 @@ HashAggStage::HashAggStage(std::unique_ptr<PlanStage> input,
                            bool optimizedClose,
                            boost::optional<value::SlotId> collatorSlot,
                            bool allowDiskUse,
-                           PlanNodeId planNodeId)
-    : PlanStage("group"_sd, planNodeId),
+                           PlanNodeId planNodeId,
+                           bool participateInTrialRunTracking)
+    : PlanStage("group"_sd, planNodeId, participateInTrialRunTracking),
       _gbs(std::move(gbs)),
       _aggs(std::move(aggs)),
       _collatorSlot(collatorSlot),
@@ -74,7 +75,8 @@ std::unique_ptr<PlanStage> HashAggStage::clone() const {
                                           _optimizedClose,
                                           _collatorSlot,
                                           _allowDiskUse,
-                                          _commonStats.nodeId);
+                                          _commonStats.nodeId,
+                                          _participateInTrialRunTracking);
 }
 
 void HashAggStage::doSaveState(bool relinquishCursor) {

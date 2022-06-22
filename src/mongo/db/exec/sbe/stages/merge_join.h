@@ -62,7 +62,8 @@ public:
                    value::SlotVector innerKeys,
                    value::SlotVector innerProjects,
                    std::vector<value::SortDirection> sortDirs,
-                   PlanNodeId planNodeId);
+                   PlanNodeId planNodeId,
+                   bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 

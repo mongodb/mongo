@@ -53,10 +53,17 @@ CandidatePlans CachedSolutionPlanner::plan(
 
     // If the cached plan is accepted we'd like to keep the results from the trials even if there
     // are parts of agg pipelines being lowered into SBE, so we run the trial with the extended
-    // plan. This works because TrialRunTracker, attached to HashAgg stage, tracks as "results" the
-    // results of its child stage. Thus, we can use the number of reads the plan was cached with
-    // during multiplanning even though multiplanning ran trials of pre-extended plans.
-    if (!_cq.pipeline().empty()) {
+    // plan. This works because TrialRunTracker, attached to HashAgg stage in $group queries, tracks
+    // as "results" the results of its child stage. For $lookup queries, the TrialRunTracker will
+    // only track the number of reads from the local side. Thus, we can use the number of reads the
+    // plan was cached with during multiplanning even though multiplanning ran trials of
+    // pre-extended plans.
+    //
+    // TODO SERVER-61507: Remove canUseSbePlanCache check once $group pushdown is integrated with
+    // SBE plan cache.
+    if (!_cq.pipeline().empty() &&
+        !(feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() &&
+          canonical_query_encoder::canUseSbePlanCache(_cq))) {
         _yieldPolicy->clearRegisteredPlans();
         auto secondaryCollectionsInfo =
             fillOutSecondaryCollectionsInformation(_opCtx, _collections, &_cq);
@@ -184,7 +191,7 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
         cache->deactivate(plan_cache_key_factory::make<mongo::PlanCacheKey>(_cq, mainColl));
         if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
             auto&& sbePlanCache = sbe::getPlanCache(_opCtx);
-            sbePlanCache.deactivate(plan_cache_key_factory::make<sbe::PlanCacheKey>(_cq, mainColl));
+            sbePlanCache.deactivate(plan_cache_key_factory::make(_cq, _collections));
         }
     }
 

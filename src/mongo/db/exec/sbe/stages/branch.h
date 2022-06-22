@@ -52,7 +52,8 @@ public:
                 value::SlotVector inputThenVals,
                 value::SlotVector inputElseVals,
                 value::SlotVector outputVals,
-                PlanNodeId planNodeId);
+                PlanNodeId planNodeId,
+                bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 

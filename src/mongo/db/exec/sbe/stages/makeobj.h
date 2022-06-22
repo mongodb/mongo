@@ -87,7 +87,8 @@ public:
                      value::SlotVector projectVars,
                      bool forceNewObject,
                      bool returnOldObject,
-                     PlanNodeId planNodeId);
+                     PlanNodeId planNodeId,
+                     bool participateInTrialRunTracking = true);
 
     /**
      * A convenience constructor that takes a set instead of a vector for 'fields' and

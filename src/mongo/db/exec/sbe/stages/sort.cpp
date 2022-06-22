@@ -55,8 +55,9 @@ SortStage::SortStage(std::unique_ptr<PlanStage> input,
                      size_t limit,
                      size_t memoryLimit,
                      bool allowDiskUse,
-                     PlanNodeId planNodeId)
-    : PlanStage("sort"_sd, planNodeId),
+                     PlanNodeId planNodeId,
+                     bool participateInTrialRunTracking)
+    : PlanStage("sort"_sd, planNodeId, participateInTrialRunTracking),
       _obs(std::move(obs)),
       _dirs(std::move(dirs)),
       _vals(std::move(vals)),
@@ -80,7 +81,8 @@ std::unique_ptr<PlanStage> SortStage::clone() const {
                                        _specificStats.limit,
                                        _specificStats.maxMemoryUsageBytes,
                                        _allowDiskUse,
-                                       _commonStats.nodeId);
+                                       _commonStats.nodeId,
+                                       _participateInTrialRunTracking);
 }
 
 void SortStage::prepare(CompileCtx& ctx) {

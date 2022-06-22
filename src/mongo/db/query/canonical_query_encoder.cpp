@@ -40,6 +40,7 @@
 #include "mongo/db/matcher/expression_text_noop.h"
 #include "mongo/db/matcher/expression_where.h"
 #include "mongo/db/matcher/expression_where_noop.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/query/analyze_regex.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
@@ -86,6 +87,7 @@ const char kEncodeProjectionRequirementSeparator = '-';
 const char kEncodeRegexFlagsSeparator = '/';
 const char kEncodeSortSection = '~';
 const char kEncodeEngineSection = '@';
+const char kEncodePipelineSection = '^';
 
 // These special bytes are used in the encoding of auto-parameterized match expressions in the SBE
 // plan cache key.
@@ -135,6 +137,7 @@ void encodeUserString(StringData s, BuilderType* builder) {
             case kEncodeEngineSection:
             case kEncodeParamMarker:
             case kEncodeConstantLiteralMarker:
+            case kEncodePipelineSection:
             case '\\':
                 if constexpr (hasAppendChar<BuilderType>) {
                     builder->appendChar('\\');
@@ -429,6 +432,26 @@ void encodeCollation(const CollatorInterface* collation, StringBuilder* keyBuild
 
     // We do not encode 'spec.version' because query shape strings are never persisted, and need
     // not be stable between versions.
+}
+
+void encodePipeline(const std::vector<std::unique_ptr<InnerPipelineStageInterface>>& pipeline,
+                    BufBuilder* bufBuilder) {
+    bufBuilder->appendChar(kEncodePipelineSection);
+    for (auto& stage : pipeline) {
+        std::vector<Value> serializedArray;
+        if (auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(stage->documentSource())) {
+            lookupStage->serializeToArray(serializedArray, boost::none);
+            tassert(6443201,
+                    "$lookup stage isn't serialized to a single bson object",
+                    serializedArray.size() == 1 && serializedArray[0].getType() == Object);
+            const auto bson = serializedArray[0].getDocument().toBson();
+            bufBuilder->appendBuf(bson.objdata(), bson.objsize());
+        } else {
+            tasserted(6443200,
+                      str::stream() << "Pipeline stage cannot be encoded in plan cache key: "
+                                    << stage->documentSource()->getSourceName());
+        }
+    }
 }
 
 template <class RegexIterator>
@@ -1085,6 +1108,8 @@ std::string encodeSBE(const CanonicalQuery& cq) {
 
     encodeFindCommandRequest(cq.getFindCommandRequest(), &bufBuilder);
 
+    encodePipeline(cq.pipeline(), &bufBuilder);
+
     return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
 }
 
@@ -1105,6 +1130,15 @@ CanonicalQuery::IndexFilterKey encodeForIndexFilters(const CanonicalQuery& cq) {
 
 uint32_t computeHash(StringData key) {
     return SimpleStringDataComparator::kInstance.hash(key);
+}
+
+bool canUseSbePlanCache(const CanonicalQuery& cq) {
+    for (auto& stage : cq.pipeline()) {
+        if (StringData{stage->documentSource()->getSourceName()} != "$lookup") {
+            return false;
+        }
+    }
+    return true;
 }
 }  // namespace canonical_query_encoder
 }  // namespace mongo

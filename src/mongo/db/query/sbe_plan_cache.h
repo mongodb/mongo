@@ -56,68 +56,27 @@ struct PlanCacheKeyShardingEpoch {
     Timestamp ts;
 };
 
-/**
- * Represents the "key" used in the PlanCache mapping from query shape -> query plan.
- */
-class PlanCacheKey {
-public:
-    PlanCacheKey(PlanCacheKeyInfo&& info,
-                 UUID collectionUuid,
-                 size_t collectionVersion,
-                 boost::optional<Timestamp> newestVisibleIndexTimestamp,
-                 boost::optional<PlanCacheKeyShardingEpoch> shardVersion)
-        : _info{std::move(info)},
-          _collectionUuid{collectionUuid},
-          _collectionVersion{collectionVersion},
-          _newestVisibleIndexTimestamp{newestVisibleIndexTimestamp},
-          _shardVersion{shardVersion} {}
-
-    const UUID& getCollectionUuid() const {
-        return _collectionUuid;
+struct PlanCacheKeyCollectionState {
+    bool operator==(const PlanCacheKeyCollectionState& other) const {
+        return other.uuid == uuid && other.version == version &&
+            other.newestVisibleIndexTimestamp == newestVisibleIndexTimestamp &&
+            other.shardVersion == shardVersion;
     }
 
-    size_t getCollectionVersion() const {
-        return _collectionVersion;
-    }
-
-    bool operator==(const PlanCacheKey& other) const {
-        return other._collectionVersion == _collectionVersion &&
-            other._collectionUuid == _collectionUuid &&
-            other._newestVisibleIndexTimestamp == _newestVisibleIndexTimestamp &&
-            other._info == _info && other._shardVersion == _shardVersion;
-    }
-
-    bool operator!=(const PlanCacheKey& other) const {
-        return !(*this == other);
-    }
-
-    uint32_t queryHash() const {
-        return _info.queryHash();
-    }
-
-    uint32_t planCacheKeyHash() const {
-        size_t hash = _info.planCacheKeyHash();
-        boost::hash_combine(hash, UUID::Hash{}(_collectionUuid));
-        boost::hash_combine(hash, _collectionVersion);
-        if (_newestVisibleIndexTimestamp) {
-            boost::hash_combine(hash, _newestVisibleIndexTimestamp->asULL());
+    size_t hashCode() const {
+        size_t hash = UUID::Hash{}(uuid);
+        boost::hash_combine(hash, version);
+        if (newestVisibleIndexTimestamp) {
+            boost::hash_combine(hash, newestVisibleIndexTimestamp->asULL());
         }
-        if (_shardVersion) {
-            _shardVersion->epoch.hash_combine(hash);
-            boost::hash_combine(hash, _shardVersion->ts.asULL());
+        if (shardVersion) {
+            shardVersion->epoch.hash_combine(hash);
+            boost::hash_combine(hash, shardVersion->ts.asULL());
         }
         return hash;
     }
 
-    const std::string& toString() const {
-        return _info.toString();
-    }
-
-private:
-    // Contains the actual encoding of the query shape as well as the index discriminators.
-    const PlanCacheKeyInfo _info;
-
-    const UUID _collectionUuid;
+    UUID uuid;
 
     // There is a special collection versioning scheme associated with the SBE plan cache. Whenever
     // an action against a collection is made which should invalidate the plan cache entries for the
@@ -127,7 +86,7 @@ private:
     //
     // We also clean up all cache entries for a particular (collectionUuid, versionNumber) pair when
     // all readers seeing this version of the collection have drained.
-    const size_t _collectionVersion;
+    size_t version;
 
     // The '_collectionVersion' is not currently sufficient in order to ensure that the indexes
     // visible to the reader are consistent with the indexes present in the cache entry. The reason
@@ -141,13 +100,80 @@ private:
     // reflects a newer version of the index catalog than the one visible to the reader.
     //
     // In the future, this could instead be solved with point-in-time catalog lookups.
-    const boost::optional<Timestamp> _newestVisibleIndexTimestamp;
+    boost::optional<Timestamp> newestVisibleIndexTimestamp;
 
     // Ensures that a cached SBE plan cannot be reused if the collection has since become sharded or
     // changed its shard key. The cached plan may no longer be valid after sharding or shard key
     // refining since the structure of the plan depends on whether the collection is sharded, and if
     // sharded depends on the shard key.
-    const boost::optional<PlanCacheKeyShardingEpoch> _shardVersion;
+    const boost::optional<PlanCacheKeyShardingEpoch> shardVersion;
+};
+
+/**
+ * Represents the "key" used in the PlanCache mapping from query shape -> query plan.
+ */
+class PlanCacheKey {
+public:
+    PlanCacheKey(PlanCacheKeyInfo&& info,
+                 PlanCacheKeyCollectionState mainCollectionState,
+                 std::vector<PlanCacheKeyCollectionState> secondaryCollectionStates)
+        : _info{std::move(info)},
+          _mainCollectionState{std::move(mainCollectionState)},
+          _secondaryCollectionStates{std::move(secondaryCollectionStates)} {
+        // For secondary collections, we don't encode shard version in the key since we don't shard
+        // version these collections. This is OK because we only push down $lookup queries to SBE
+        // when involved collections are unsharded.
+        for (const auto& collState : _secondaryCollectionStates) {
+            tassert(6443202,
+                    "Secondary collections should not encode shard version in plan cache key",
+                    collState.shardVersion == boost::none);
+        }
+    }
+
+    const PlanCacheKeyCollectionState& getMainCollectionState() const {
+        return _mainCollectionState;
+    }
+
+    const std::vector<PlanCacheKeyCollectionState>& getSecondaryCollectionStates() const {
+        return _secondaryCollectionStates;
+    }
+
+    bool operator==(const PlanCacheKey& other) const {
+        return other._info == _info && other._mainCollectionState == _mainCollectionState &&
+            other._secondaryCollectionStates == _secondaryCollectionStates;
+    }
+
+    bool operator!=(const PlanCacheKey& other) const {
+        return !(*this == other);
+    }
+
+    uint32_t queryHash() const {
+        return _info.queryHash();
+    }
+
+    uint32_t planCacheKeyHash() const {
+        size_t hash = _info.planCacheKeyHash();
+        boost::hash_combine(hash, _mainCollectionState.hashCode());
+        for (auto& collectionState : _secondaryCollectionStates) {
+            boost::hash_combine(hash, collectionState.hashCode());
+        }
+        return hash;
+    }
+
+    const std::string& toString() const {
+        return _info.toString();
+    }
+
+private:
+    // Contains the actual encoding of the query shape as well as the index discriminators.
+    const PlanCacheKeyInfo _info;
+
+    const PlanCacheKeyCollectionState _mainCollectionState;
+
+    // To make sure the plan cache key matches, the secondary collection states need to be passed
+    // in a defined order. Currently, we use the collection order stored in
+    // MultipleCollectionAccessor, which is ordered by the collection namespaces.
+    const std::vector<PlanCacheKeyCollectionState> _secondaryCollectionStates;
 };
 
 class PlanCacheKeyHasher {

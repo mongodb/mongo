@@ -40,8 +40,9 @@ UnwindStage::UnwindStage(std::unique_ptr<PlanStage> input,
                          value::SlotId outField,
                          value::SlotId outIndex,
                          bool preserveNullAndEmptyArrays,
-                         PlanNodeId planNodeId)
-    : PlanStage("unwind"_sd, planNodeId),
+                         PlanNodeId planNodeId,
+                         bool participateInTrialRunTracking)
+    : PlanStage("unwind"_sd, planNodeId, participateInTrialRunTracking),
       _inField(inField),
       _outField(outField),
       _outIndex(outIndex),
@@ -59,7 +60,8 @@ std::unique_ptr<PlanStage> UnwindStage::clone() const {
                                          _outField,
                                          _outIndex,
                                          _preserveNullAndEmptyArrays,
-                                         _commonStats.nodeId);
+                                         _commonStats.nodeId,
+                                         _participateInTrialRunTracking);
 }
 
 void UnwindStage::prepare(CompileCtx& ctx) {

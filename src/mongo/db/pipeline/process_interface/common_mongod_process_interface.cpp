@@ -559,7 +559,8 @@ std::vector<BSONObj> CommonMongodProcessInterface::getMatchingPlanCacheEntryStat
                                      collVersion = collQueryInfo.getPlanCacheInvalidatorVersion()](
                                         const sbe::PlanCacheKey& key) {
             // Only fetch plan cache entries with keys matching given UUID and collectionVersion.
-            return uuid == key.getCollectionUuid() && collVersion == key.getCollectionVersion();
+            return uuid == key.getMainCollectionState().uuid &&
+                collVersion == key.getMainCollectionState().version;
         };
 
         auto planCacheEntriesSBE =

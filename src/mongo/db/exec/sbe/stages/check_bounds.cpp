@@ -39,8 +39,9 @@ CheckBoundsStage::CheckBoundsStage(std::unique_ptr<PlanStage> input,
                                    value::SlotId inKeySlot,
                                    value::SlotId inRecordIdSlot,
                                    value::SlotId outSlot,
-                                   PlanNodeId planNodeId)
-    : PlanStage{"chkbounds"_sd, planNodeId},
+                                   PlanNodeId planNodeId,
+                                   bool participateInTrialRunTracking)
+    : PlanStage{"chkbounds"_sd, planNodeId, participateInTrialRunTracking},
       _params{std::move(params)},
       _inKeySlot{inKeySlot},
       _inRecordIdSlot{inRecordIdSlot},
@@ -49,8 +50,13 @@ CheckBoundsStage::CheckBoundsStage(std::unique_ptr<PlanStage> input,
 }
 
 std::unique_ptr<PlanStage> CheckBoundsStage::clone() const {
-    return std::make_unique<CheckBoundsStage>(
-        _children[0]->clone(), _params, _inKeySlot, _inRecordIdSlot, _outSlot, _commonStats.nodeId);
+    return std::make_unique<CheckBoundsStage>(_children[0]->clone(),
+                                              _params,
+                                              _inKeySlot,
+                                              _inRecordIdSlot,
+                                              _outSlot,
+                                              _commonStats.nodeId,
+                                              _participateInTrialRunTracking);
 }
 
 void CheckBoundsStage::prepare(CompileCtx& ctx) {

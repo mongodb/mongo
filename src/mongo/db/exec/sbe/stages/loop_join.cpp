@@ -41,7 +41,8 @@ LoopJoinStage::LoopJoinStage(std::unique_ptr<PlanStage> outer,
                              value::SlotVector outerProjects,
                              value::SlotVector outerCorrelated,
                              std::unique_ptr<EExpression> predicate,
-                             PlanNodeId nodeId)
+                             PlanNodeId nodeId,
+                             bool participateInTrialRunTracking)
     : LoopJoinStage(std::move(outer),
                     std::move(inner),
                     std::move(outerProjects),
@@ -49,7 +50,8 @@ LoopJoinStage::LoopJoinStage(std::unique_ptr<PlanStage> outer,
                     value::SlotVector{},
                     std::move(predicate),
                     JoinType::Inner,
-                    nodeId) {}
+                    nodeId,
+                    participateInTrialRunTracking) {}
 
 LoopJoinStage::LoopJoinStage(std::unique_ptr<PlanStage> outer,
                              std::unique_ptr<PlanStage> inner,
@@ -58,8 +60,9 @@ LoopJoinStage::LoopJoinStage(std::unique_ptr<PlanStage> outer,
                              value::SlotVector innerProjects,
                              std::unique_ptr<EExpression> predicate,
                              JoinType joinType,
-                             PlanNodeId nodeId)
-    : PlanStage("nlj"_sd, nodeId),
+                             PlanNodeId nodeId,
+                             bool participateInTrialRunTracking)
+    : PlanStage("nlj"_sd, nodeId, participateInTrialRunTracking),
       _outerProjects(std::move(outerProjects)),
       _outerCorrelated(std::move(outerCorrelated)),
       _innerProjects(std::move(innerProjects)),
@@ -80,7 +83,8 @@ std::unique_ptr<PlanStage> LoopJoinStage::clone() const {
                                            _innerProjects,
                                            _predicate ? _predicate->clone() : nullptr,
                                            _joinType,
-                                           _commonStats.nodeId);
+                                           _commonStats.nodeId,
+                                           _participateInTrialRunTracking);
 }
 
 void LoopJoinStage::prepare(CompileCtx& ctx) {

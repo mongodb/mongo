@@ -74,17 +74,17 @@ void logNotCachingNoData(std::string&& solution) {
 }  // namespace log_detail
 
 void updatePlanCache(OperationContext* opCtx,
-                     const CollectionPtr& collection,
+                     const MultipleCollectionAccessor& collections,
                      const CanonicalQuery& query,
                      const QuerySolution& solution,
                      const sbe::PlanStage& root,
                      const stage_builder::PlanStageData& data) {
-    // TODO SERVER-61507: Integration between lowering parts of aggregation pipeline into the find
-    // subsystem and the new SBE cache isn't implemented yet. Remove cq->pipeline().empty() check
-    // once it's implemented.
-    if (shouldCacheQuery(query) && collection && query.pipeline().empty() &&
+    // TODO SERVER-61507: Remove canUseSbePlanCache check once $group pushdown is
+    // integrated with SBE plan cache.
+    if (shouldCacheQuery(query) && collections.getMainCollection() &&
+        canonical_query_encoder::canUseSbePlanCache(query) &&
         feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
-        auto key = plan_cache_key_factory::make<sbe::PlanCacheKey>(query, collection);
+        auto key = plan_cache_key_factory::make(query, collections);
         auto plan = std::make_unique<sbe::CachedSbePlan>(root.clone(), data);
         plan->indexFilterApplied = solution.indexFilterApplied;
         sbe::getPlanCache(opCtx).setPinned(

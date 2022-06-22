@@ -29,10 +29,11 @@
 
 #include "mongo/db/query/canonical_query_encoder.h"
 
-#include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/inner_pipeline_stage_impl.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -46,10 +47,17 @@ namespace {
 using std::unique_ptr;
 
 static const NamespaceString nss("testdb.testcoll");
+static const NamespaceString foreignNss("testdb.foreigncoll");
 
-PlanCacheKey makeKey(const CanonicalQuery& cq) {
-    CollectionMock coll(nss);
-    return plan_cache_key_factory::make<PlanCacheKey>(cq, &coll);
+std::vector<std::unique_ptr<InnerPipelineStageInterface>> parsePipeline(
+    const boost::intrusive_ptr<ExpressionContext> expCtx, const std::vector<BSONObj>& rawPipeline) {
+    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
+
+    std::vector<std::unique_ptr<InnerPipelineStageInterface>> stages;
+    for (auto&& source : pipeline->getSources()) {
+        stages.emplace_back(std::make_unique<InnerPipelineStageImpl>(source));
+    }
+    return stages;
 }
 
 /**
@@ -59,7 +67,8 @@ unique_ptr<CanonicalQuery> canonicalize(BSONObj query,
                                         BSONObj sort,
                                         BSONObj proj,
                                         BSONObj collation,
-                                        std::unique_ptr<FindCommandRequest> findCommand = nullptr) {
+                                        std::unique_ptr<FindCommandRequest> findCommand = nullptr,
+                                        std::vector<BSONObj> pipelineObj = {}) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
@@ -70,14 +79,26 @@ unique_ptr<CanonicalQuery> canonicalize(BSONObj query,
     findCommand->setSort(sort.getOwned());
     findCommand->setProjection(proj.getOwned());
     findCommand->setCollation(collation.getOwned());
-    const boost::intrusive_ptr<ExpressionContext> expCtx;
+
+    const auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), nss);
+    expCtx->addResolvedNamespaces({foreignNss});
+    if (!findCommand->getCollation().isEmpty()) {
+        auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                      ->makeFromBSON(findCommand->getCollation());
+        ASSERT_OK(statusWithCollator.getStatus());
+        expCtx->setCollator(std::move(statusWithCollator.getValue()));
+    }
+    auto pipeline = parsePipeline(expCtx, pipelineObj);
+
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
                                      std::move(findCommand),
                                      false,
                                      expCtx,
                                      ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+                                     MatchExpressionParser::kAllowAllSpecialFeatures,
+                                     ProjectionPolicies::findProjectionPolicies(),
+                                     std::move(pipeline));
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -115,13 +136,14 @@ void testComputeSBEKey(BSONObj query,
                        BSONObj sort,
                        BSONObj proj,
                        std::string expectedStr,
-                       std::unique_ptr<FindCommandRequest> findCommand = nullptr) {
+                       std::unique_ptr<FindCommandRequest> findCommand = nullptr,
+                       std::vector<BSONObj> pipelineObj = {}) {
     BSONObj collation;
     unique_ptr<CanonicalQuery> cq(
-        canonicalize(query, sort, proj, collation, std::move(findCommand)));
+        canonicalize(query, sort, proj, collation, std::move(findCommand), std::move(pipelineObj)));
     cq->setSbeCompatible(true);
-    auto key = makeKey(*cq);
-    ASSERT_EQUALS(key.toString(), expectedStr);
+    const auto key = canonical_query_encoder::encodeSBE(*cq);
+    ASSERT_EQUALS(key, expectedStr);
 }
 
 void testComputeKey(const char* queryStr,
@@ -135,12 +157,14 @@ void testComputeSBEKey(const char* queryStr,
                        const char* sortStr,
                        const char* projStr,
                        std::string expectedStr,
-                       std::unique_ptr<FindCommandRequest> findCommand = nullptr) {
+                       std::unique_ptr<FindCommandRequest> findCommand = nullptr,
+                       std::vector<BSONObj> pipelineObj = {}) {
     testComputeSBEKey(fromjson(queryStr),
                       fromjson(sortStr),
                       fromjson(projStr),
                       expectedStr,
-                      std::move(findCommand));
+                      std::move(findCommand),
+                      std::move(pipelineObj));
 }
 
 TEST(CanonicalQueryEncoderTest, ComputeKey) {
@@ -262,8 +286,6 @@ TEST(CanonicalQueryEncoderTest, ComputeKeyEscaped) {
 // Cache keys for $geoWithin queries with legacy and GeoJSON coordinates should
 // not be the same.
 TEST(CanonicalQueryEncoderTest, ComputeKeyGeoWithin) {
-    PlanCache planCache(5000);
-
     // Legacy coordinates.
     unique_ptr<CanonicalQuery> cqLegacy(
         canonicalize("{a: {$geoWithin: "
@@ -273,7 +295,8 @@ TEST(CanonicalQueryEncoderTest, ComputeKeyGeoWithin) {
         canonicalize("{a: {$geoWithin: "
                      "{$geometry: {type: 'Polygon', coordinates: "
                      "[[[0, 0], [0, 90], [90, 0], [0, 0]]]}}}}"));
-    ASSERT_NOT_EQUALS(makeKey(*cqLegacy), makeKey(*cqNew));
+    ASSERT_NOT_EQUALS(canonical_query_encoder::encode(*cqLegacy),
+                      canonical_query_encoder::encode(*cqNew));
 }
 
 // GEO_NEAR cache keys should include information on geometry and CRS in addition
@@ -395,85 +418,87 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBE) {
     // SBE must be enabled in order to generate SBE plan cache keys.
     RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", false);
 
-    // TODO SERVER-61314: Remove when featureFlagSbePlanCache is removed.
     RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbePlanCache", true);
 
-    testComputeSBEKey("{}", "{}", "{}", "YW4ABQAAAAAAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAAA=");
+    testComputeSBEKey("{}", "{}", "{}", "YW4ABQAAAAAAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAABe");
     testComputeSBEKey(
         "{$or: [{a: 1}, {b: 2}]}",
         "{}",
         "{}",
-        "b3IAW2VxAGE/AAAAACxlcQBiPwEAAABdBQAAAAAAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAAA=");
+        "b3IAW2VxAGE/AAAAACxlcQBiPwEAAABdBQAAAAAAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAABe");
     testComputeSBEKey(
-        "{a: 1}", "{}", "{}", "ZXEAYT8AAAAABQAAAAAAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAAA=");
+        "{a: 1}", "{}", "{}", "ZXEAYT8AAAAABQAAAAAAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAABe");
     testComputeSBEKey(
-        "{b: 1}", "{}", "{}", "ZXEAYj8AAAAABQAAAAAAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAAA=");
+        "{b: 1}", "{}", "{}", "ZXEAYj8AAAAABQAAAAAAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAABe");
     testComputeSBEKey(
         "{a: 1, b: 1, c: 1}",
         "{}",
         "{}",
-        "YW4AW2VxAGE/AAAAACxlcQBiPwEAAAAsZXEAYz8CAAAAXQUAAAAAAAAAAAAAAABubm5uBQAAAAAFAAAAAAUAAAAA");
+        "YW4AW2VxAGE/"
+        "AAAAACxlcQBiPwEAAAAsZXEAYz8CAAAAXQUAAAAAAAAAAAAAAABubm5uBQAAAAAFAAAAAAUAAAAAXg==");
 
     // With sort
-    testComputeSBEKey("{}", "{a: 1}", "{}", "YW4ABQAAAAB+YWEAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAAA=");
+    testComputeSBEKey("{}", "{a: 1}", "{}", "YW4ABQAAAAB+YWEAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAABe");
     testComputeSBEKey(
-        "{}", "{a: -1}", "{}", "YW4ABQAAAAB+ZGEAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAAA=");
+        "{}", "{a: -1}", "{}", "YW4ABQAAAAB+ZGEAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAABe");
     testComputeSBEKey(
-        "{a: 1}", "{a: 1}", "{}", "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAAA=");
+        "{a: 1}", "{a: 1}", "{}", "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAABe");
 
     // With projection
     testComputeSBEKey("{a: 1}",
                       "{a: 1}",
                       "{a: 1}",
-                      "ZXEAYT8AAAAADAAAABBhAAEAAAAAfmFhAAAAAAAAAABubm5uBQAAAAAFAAAAAAUAAAAA");
-    testComputeSBEKey(
-        "{}", "{a: 1}", "{a: 1}", "YW4ADAAAABBhAAEAAAAAfmFhAAAAAAAAAABubm5uBQAAAAAFAAAAAAUAAAAA");
+                      "ZXEAYT8AAAAADAAAABBhAAEAAAAAfmFhAAAAAAAAAABubm5uBQAAAAAFAAAAAAUAAAAAXg==");
+    testComputeSBEKey("{}",
+                      "{a: 1}",
+                      "{a: 1}",
+                      "YW4ADAAAABBhAAEAAAAAfmFhAAAAAAAAAABubm5uBQAAAAAFAAAAAAUAAAAAXg==");
     testComputeSBEKey("{}",
                       "{a: 1}",
                       "{a: 1, b: [{$const: 1}]}",
                       "YW4AKAAAABBhAAEAAAAEYgAZAAAAAzAAEQAAABAkY29uc3QAAQAAAAAAAH5hYQAAAAAAAAAAbm5u"
-                      "bgUAAAAABQAAAAAFAAAAAA==");
+                      "bgUAAAAABQAAAAAFAAAAAF4=");
     testComputeSBEKey(
-        "{}", "{}", "{a: 1}", "YW4ADAAAABBhAAEAAAAAAAAAAAAAAABubm5uBQAAAAAFAAAAAAUAAAAA");
+        "{}", "{}", "{a: 1}", "YW4ADAAAABBhAAEAAAAAAAAAAAAAAABubm5uBQAAAAAFAAAAAAUAAAAAXg==");
     testComputeSBEKey(
-        "{}", "{}", "{a: true}", "YW4ACQAAAAhhAAEAAAAAAAAAAABubm5uBQAAAAAFAAAAAAUAAAAA");
+        "{}", "{}", "{a: true}", "YW4ACQAAAAhhAAEAAAAAAAAAAABubm5uBQAAAAAFAAAAAAUAAAAAXg==");
     testComputeSBEKey(
-        "{}", "{}", "{a: false}", "YW4ACQAAAAhhAAAAAAAAAAAAAABubm5uBQAAAAAFAAAAAAUAAAAA");
+        "{}", "{}", "{a: false}", "YW4ACQAAAAhhAAAAAAAAAAAAAABubm5uBQAAAAAFAAAAAAUAAAAAXg==");
 
     // With FindCommandRequest
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     testComputeSBEKey("{a: 1}",
                       "{a: 1}",
                       "{}",
-                      "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAAA=",
+                      "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAABe",
                       std::move(findCommand));
     findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setAllowDiskUse(true);
     testComputeSBEKey("{a: 1}",
                       "{a: 1}",
                       "{}",
-                      "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAHRubm4FAAAAAAUAAAAABQAAAAA=",
+                      "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAHRubm4FAAAAAAUAAAAABQAAAABe",
                       std::move(findCommand));
     findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setAllowDiskUse(false);
     testComputeSBEKey("{a: 1}",
                       "{a: 1}",
                       "{}",
-                      "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAGZubm4FAAAAAAUAAAAABQAAAAA=",
+                      "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAGZubm4FAAAAAAUAAAAABQAAAABe",
                       std::move(findCommand));
     findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setReturnKey(true);
     testComputeSBEKey("{a: 1}",
                       "{a: 1}",
                       "{}",
-                      "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAG50bm4FAAAAAAUAAAAABQAAAAA=",
+                      "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAG50bm4FAAAAAAUAAAAABQAAAABe",
                       std::move(findCommand));
     findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setRequestResumeToken(false);
     testComputeSBEKey("{a: 1}",
                       "{a: 1}",
                       "{}",
-                      "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAG5uZm4FAAAAAAUAAAAABQAAAAA=",
+                      "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAG5uZm4FAAAAAAUAAAAABQAAAABe",
                       std::move(findCommand));
 
     findCommand = std::make_unique<FindCommandRequest>(nss);
@@ -481,7 +506,7 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBE) {
     testComputeSBEKey("{a: 1}",
                       "{a: 1}",
                       "{}",
-                      "ZXEAYT8AAAAABQAAAAB+YWEKAAAAAAAAAAAAAABubm5uBQAAAAAFAAAAAAUAAAAA",
+                      "ZXEAYT8AAAAABQAAAAB+YWEKAAAAAAAAAAAAAABubm5uBQAAAAAFAAAAAAUAAAAAXg==",
                       std::move(findCommand));
 
     findCommand = std::make_unique<FindCommandRequest>(nss);
@@ -489,7 +514,7 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBE) {
     testComputeSBEKey("{a: 1}",
                       "{a: 1}",
                       "{}",
-                      "ZXEAYT8AAAAABQAAAAB+YWEAAAAACgAAAAAAAABubm5uBQAAAAAFAAAAAAUAAAAA",
+                      "ZXEAYT8AAAAABQAAAAB+YWEAAAAACgAAAAAAAABubm5uBQAAAAAFAAAAAAUAAAAAXg==",
                       std::move(findCommand));
 
     findCommand = std::make_unique<FindCommandRequest>(nss);
@@ -497,14 +522,14 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBE) {
     testComputeSBEKey("{a: 1}",
                       "{a: 1}",
                       "{}",
-                      "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAG5ubm4FAAAAAAwAAAAQYQABAAAAAAUAAAAA",
+                      "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAG5ubm4FAAAAAAwAAAAQYQABAAAAAAUAAAAAXg==",
                       std::move(findCommand));
     findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setMax(mongo::fromjson("{ a : 1 }"));
     testComputeSBEKey("{a: 1}",
                       "{a: 1}",
                       "{}",
-                      "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAG5ubm4FAAAAAAUAAAAADAAAABBhAAEAAAAA",
+                      "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAG5ubm4FAAAAAAUAAAAADAAAABBhAAEAAAAAXg==",
                       std::move(findCommand));
     findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setRequestResumeToken(true);
@@ -515,8 +540,73 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBE) {
         "{a: 1}",
         "{}",
         "{}",
-        "ZXEAYT8AAAAABQAAAAAAAAAAAAAAAG5udG4YAAAAEiRyZWNvcmRJZAABAAAAAAAAAAAFAAAAAAUAAAAA",
+        "ZXEAYT8AAAAABQAAAAAAAAAAAAAAAG5udG4YAAAAEiRyZWNvcmRJZAABAAAAAAAAAAAFAAAAAAUAAAAAXg==",
         std::move(findCommand));
+}
+
+TEST(CanonicalQueryEncoderTest, ComputeKeySBEWithPipeline) {
+    // SBE must be enabled in order to generate SBE plan cache keys.
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", false);
+
+    RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbePlanCache", true);
+
+    auto getLookupBson = [](StringData localField, StringData foreignField, StringData asField) {
+        return BSON("$lookup" << BSON("from" << foreignNss.coll() << "localField" << localField
+                                             << "foreignField" << foreignField << "as" << asField));
+    };
+
+    // No pipeline stage.
+    testComputeSBEKey("{a: 1}",
+                      "{}",
+                      "{}",
+                      "ZXEAYT8AAAAABQAAAAAAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAABe",
+                      nullptr,
+                      {});
+
+    // Different $lookup stage options.
+    testComputeSBEKey(
+        "{a: 1}",
+        "{}",
+        "{}",
+        "ZXEAYT8AAAAABQAAAAAAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAABeWgAAAAMkbG9va3VwAEwAAAACZnJvbQAMAA"
+        "AAZm9yZWlnbmNvbGwAAmFzAAMAAABhcwACbG9jYWxGaWVsZAACAAAAYQACZm9yZWlnbkZpZWxkAAIAAABiAAAA",
+        nullptr,
+        {getLookupBson("a", "b", "as")});
+    testComputeSBEKey("{a: 1}",
+                      "{}",
+                      "{}",
+                      "ZXEAYT8AAAAABQAAAAAAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAABeWwAAAAMkbG9va3VwAE0A"
+                      "AAACZnJvbQAMAAAAZm9yZWlnbmNvbGwAAmFzAAMAAABhcwACbG9jYWxGaWVsZAADAAAAYTEAAmZv"
+                      "cmVpZ25GaWVsZAACAAAAYgAAAA==",
+                      nullptr,
+                      {getLookupBson("a1", "b", "as")});
+    testComputeSBEKey("{a: 1}",
+                      "{}",
+                      "{}",
+                      "ZXEAYT8AAAAABQAAAAAAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAABeWwAAAAMkbG9va3VwAE0A"
+                      "AAACZnJvbQAMAAAAZm9yZWlnbmNvbGwAAmFzAAMAAABhcwACbG9jYWxGaWVsZAACAAAAYQACZm9y"
+                      "ZWlnbkZpZWxkAAMAAABiMQAAAA==",
+                      nullptr,
+                      {getLookupBson("a", "b1", "as")});
+    testComputeSBEKey("{a: 1}",
+                      "{}",
+                      "{}",
+                      "ZXEAYT8AAAAABQAAAAAAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAABeWwAAAAMkbG9va3VwAE0A"
+                      "AAACZnJvbQAMAAAAZm9yZWlnbmNvbGwAAmFzAAQAAABhczEAAmxvY2FsRmllbGQAAgAAAGEAAmZv"
+                      "cmVpZ25GaWVsZAACAAAAYgAAAA==",
+                      nullptr,
+                      {getLookupBson("a", "b", "as1")});
+
+    // Multiple $lookup stages.
+    testComputeSBEKey("{a: 1}",
+                      "{}",
+                      "{}",
+                      "ZXEAYT8AAAAABQAAAAAAAAAAAAAAAG5ubm4FAAAAAAUAAAAABQAAAABeWgAAAAMkbG9va3VwAEwA"
+                      "AAACZnJvbQAMAAAAZm9yZWlnbmNvbGwAAmFzAAMAAABhcwACbG9jYWxGaWVsZAACAAAAYQACZm9y"
+                      "ZWlnbkZpZWxkAAIAAABiAAAAXQAAAAMkbG9va3VwAE8AAAACZnJvbQAMAAAAZm9yZWlnbmNvbGwA"
+                      "AmFzAAQAAABhczEAAmxvY2FsRmllbGQAAwAAAGExAAJmb3JlaWduRmllbGQAAwAAAGIxAAAA",
+                      nullptr,
+                      {getLookupBson("a", "b", "as"), getLookupBson("a1", "b1", "as1")});
 }
 
 }  // namespace

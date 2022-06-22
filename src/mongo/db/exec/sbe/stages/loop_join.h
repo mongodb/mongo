@@ -63,7 +63,8 @@ public:
                   value::SlotVector outerProjects,
                   value::SlotVector outerCorrelated,
                   std::unique_ptr<EExpression> predicate,
-                  PlanNodeId nodeId);
+                  PlanNodeId planNodeId,
+                  bool participateInTrialRunTracking = true);
 
     LoopJoinStage(std::unique_ptr<PlanStage> outer,
                   std::unique_ptr<PlanStage> inner,
@@ -72,7 +73,8 @@ public:
                   value::SlotVector innerProjects,
                   std::unique_ptr<EExpression> predicate,
                   JoinType joinType,
-                  PlanNodeId nodeId);
+                  PlanNodeId planNodeId,
+                  bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 

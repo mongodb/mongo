@@ -19,32 +19,37 @@ const coll = db.plan_cache_replan_group_lookup;
 const foreignCollName = "foreign";
 coll.drop();
 
+const sbePlanCacheEnabled = checkSBEEnabled(db, ["featureFlagSbePlanCache"]);
+const sbeFullEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
+
 function getPlansForCacheEntry(match) {
     const matchingCacheEntries = coll.getPlanCache().list([{$match: match}]);
     assert.eq(matchingCacheEntries.length, 1, coll.getPlanCache().list());
     return matchingCacheEntries[0];
 }
 
-function planHasIxScanStageForKey(planStats, keyPattern) {
+function planHasIxScanStageForIndex(planStats, indexName) {
     const stage = getPlanStage(planStats, "IXSCAN");
     if (stage === null) {
         return false;
     }
 
-    return bsonWoCompare(keyPattern, stage.keyPattern) === 0;
+    return indexName === stage.indexName;
 }
 
-function assertCacheUsage(
-    multiPlanning, cacheEntryIsActive, cachedIndex, pipeline, aggOptions = {}) {
+function assertCacheUsage(multiPlanning,
+                          cacheEntryVersion,
+                          cacheEntryIsActive,
+                          cachedIndexName,
+                          pipeline,
+                          aggOptions = {}) {
     const profileObj = getLatestProfilerEntry(db, {op: "command", ns: coll.getFullName()});
     const queryHash = profileObj.queryHash;
     const planCacheKey = profileObj.planCacheKey;
     assert.eq(multiPlanning, !!profileObj.fromMultiPlanner);
 
     const entry = getPlansForCacheEntry({queryHash: queryHash});
-    // TODO(SERVER-61507): Convert the assertion to SBE cache once lowered $lookup integrates
-    // with SBE plan cache.
-    assert.eq(entry.version, 1);
+    assert.eq(cacheEntryVersion, entry.version);
     assert.eq(cacheEntryIsActive, entry.isActive);
 
     // If the entry is active, we should have a plan cache key.
@@ -59,7 +64,11 @@ function assertCacheUsage(
             : explain.stages[0].$cursor.queryPlanner.planCacheKey;
         assert.eq(explainKey, entry.planCacheKey);
     }
-    assert.eq(planHasIxScanStageForKey(getCachedPlan(entry.cachedPlan), cachedIndex), true, entry);
+    if (cacheEntryVersion === 2) {
+        assert(entry.cachedPlan.stages.includes(cachedIndexName), entry);
+    } else {
+        assert(planHasIxScanStageForIndex(getCachedPlan(entry.cachedPlan), cachedIndexName), entry);
+    }
 }
 
 assert.commandWorked(db.setProfilingLevel(2));
@@ -79,22 +88,35 @@ for (let i = 1000; i < 1100; i++) {
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 
-function setUpActiveCacheEntry(pipeline, cachedIndex) {
+function setUpActiveCacheEntry(pipeline, cacheEntryVersion, cachedIndexName) {
     // For the first run, the query should go through multiplanning and create inactive cache entry.
     assert.eq(2, coll.aggregate(pipeline).toArray()[0].n);
-    assertCacheUsage(true /*multiPlanning*/, false /*cacheEntryIsActive*/, cachedIndex, pipeline);
+    assertCacheUsage(true /*multiPlanning*/,
+                     cacheEntryVersion,
+                     false /*cacheEntryIsActive*/,
+                     cachedIndexName,
+                     pipeline);
 
     // After the second run, the inactive cache entry should be promoted to an active entry.
     assert.eq(2, coll.aggregate(pipeline).toArray()[0].n);
-    assertCacheUsage(true /*multiPlanning*/, true /*cacheEntryIsActive*/, cachedIndex, pipeline);
+    assertCacheUsage(true /*multiPlanning*/,
+                     cacheEntryVersion,
+                     true /*cacheEntryIsActive*/,
+                     cachedIndexName,
+                     pipeline);
 
     // For the third run, the active cached query should be used.
     assert.eq(2, coll.aggregate(pipeline).toArray()[0].n);
-    assertCacheUsage(false /*multiPlanning*/, true /*cacheEntryIsActive*/, cachedIndex, pipeline);
+    assertCacheUsage(false /*multiPlanning*/,
+                     cacheEntryVersion,
+                     true /*cacheEntryIsActive*/,
+                     cachedIndexName,
+                     pipeline);
 }
 
 function testFn(aIndexPipeline,
                 bIndexPipeline,
+                cacheEntryVersion,
                 setUpFn = undefined,
                 tearDownFn = undefined,
                 explainFn = undefined) {
@@ -107,7 +129,7 @@ function testFn(aIndexPipeline,
         explainFn(bIndexPipeline);
     }
 
-    setUpActiveCacheEntry(aIndexPipeline, {a: 1} /* cachedIndex */);
+    setUpActiveCacheEntry(aIndexPipeline, cacheEntryVersion, "a_1" /* cachedIndexName */);
 
     // Now run the other pipeline, which has the same query shape but is faster with a different
     // index. It should trigger re-planning of the query.
@@ -115,15 +137,17 @@ function testFn(aIndexPipeline,
 
     // The other pipeline again, The cache should be used now.
     assertCacheUsage(true /*multiPlanning*/,
+                     cacheEntryVersion,
                      true /*cacheEntryIsActive*/,
-                     {b: 1} /*cachedIndex*/,
+                     "b_1" /*cachedIndexName*/,
                      bIndexPipeline);
 
     // Run it once again so that the cache entry is reused.
     assert.eq(3, coll.aggregate(bIndexPipeline).toArray()[0].n);
     assertCacheUsage(false /*multiPlanning*/,
+                     cacheEntryVersion,
                      true /*cacheEntryIsActive*/,
-                     {b: 1} /*cachedIndex*/,
+                     "b_1" /*cachedIndexName*/,
                      bIndexPipeline);
 
     if (tearDownFn) {
@@ -144,7 +168,9 @@ const bIndexPredicate = [{$match: {a: 1, b: 1042}}];
 
 // $group tests.
 const groupSuffix = [{$group: {_id: "$c"}}, {$count: "n"}];
-testFn(aIndexPredicate.concat(groupSuffix), bIndexPredicate.concat(groupSuffix));
+testFn(aIndexPredicate.concat(groupSuffix),
+       bIndexPredicate.concat(groupSuffix),
+       1 /* cacheEntryVersion */);
 
 // $lookup tests.
 const lookupStage =
@@ -188,9 +214,13 @@ function verifyCorrectLookupAlgorithmUsed(targetJoinAlgorithm, pipeline, aggOpti
     }
 }
 
+// TODO SERVER-61507: The following test cases are $lookup followed by $group. Update them when
+// $group is integrated with SBE plan cache.
+//
 // NLJ.
 testFn(aLookup,
        bLookup,
+       1 /* cacheEntryVersion */,
        createLookupForeignColl,
        dropLookupForeignColl,
        (pipeline) =>
@@ -199,6 +229,7 @@ testFn(aLookup,
 // INLJ.
 testFn(aLookup,
        bLookup,
+       1 /* cacheEntryVersion */,
        () => {
            createLookupForeignColl();
            assert.commandWorked(db[foreignCollName].createIndex({foreignKey: 1}));
@@ -208,7 +239,7 @@ testFn(aLookup,
            verifyCorrectLookupAlgorithmUsed("IndexedLoopJoin", pipeline, {allowDiskUse: false}));
 
 // HJ.
-testFn(aLookup, bLookup, () => {
+testFn(aLookup, bLookup, 1 /* cacheEntryVersion */, () => {
     createLookupForeignColl();
 }, dropLookupForeignColl, (pipeline) => verifyCorrectLookupAlgorithmUsed("HashJoin", pipeline, {
                               allowDiskUse: true
@@ -221,29 +252,38 @@ testFn(aLookup, bLookup, () => {
 createLookupForeignColl();
 assert.commandWorked(db[foreignCollName].createIndex({foreignKey: 1}));
 verifyCorrectLookupAlgorithmUsed("IndexedLoopJoin", aLookup, {allowDiskUse: true});
-setUpActiveCacheEntry(aLookup, {a: 1} /* cachedIndex */);
+setUpActiveCacheEntry(aLookup, 1 /* cacheEntryVersion */, "a_1" /* cachedIndexName */);
 
 // Drop the index. This should result in using the active plan, but switching to HJ.
 assert.commandWorked(db[foreignCollName].dropIndex({foreignKey: 1}));
 verifyCorrectLookupAlgorithmUsed("HashJoin", aLookup, {allowDiskUse: true});
 assert.eq(2, coll.aggregate(aLookup).toArray()[0].n);
-assertCacheUsage(
-    false /*multiPlanning*/, true /*cacheEntryIsActive*/, {a: 1} /*cachedIndex*/, aLookup);
+assertCacheUsage(false /*multiPlanning*/,
+                 1 /* cacheEntryVersion */,
+                 true /*cacheEntryIsActive*/,
+                 "a_1" /*cachedIndexName*/,
+                 aLookup);
 
 // Set 'allowDiskUse' to 'false'. This should still result in using the active plan, but switching
 // to NLJ.
 verifyCorrectLookupAlgorithmUsed("NestedLoopJoin", aLookup, {allowDiskUse: false});
 assert.eq(2, coll.aggregate(aLookup).toArray()[0].n);
-assertCacheUsage(
-    false /*multiPlanning*/, true /*cacheEntryIsActive*/, {a: 1} /*cachedIndex*/, aLookup);
+assertCacheUsage(false /*multiPlanning*/,
+                 1 /* cacheEntryVersion */,
+                 true /*cacheEntryIsActive*/,
+                 "a_1" /*cachedIndexName*/,
+                 aLookup);
 
 // Drop the foreign collection. This should still result in using the active plan with a special
 // empty collection plan.
 dropLookupForeignColl();
 verifyCorrectLookupAlgorithmUsed("NonExistentForeignCollection", aLookup, {allowDiskUse: true});
 assert.eq(2, coll.aggregate(aLookup).toArray()[0].n);
-assertCacheUsage(
-    false /*multiPlanning*/, true /*cacheEntryIsActive*/, {a: 1} /*cachedIndex*/, aLookup);
+assertCacheUsage(false /*multiPlanning*/,
+                 1 /* cacheEntryVersion */,
+                 true /*cacheEntryIsActive*/,
+                 "a_1" /*cachedIndexName*/,
+                 aLookup);
 
 // Verify that changing the plan for the right side does not trigger a replan.
 const foreignColl = db[foreignCollName];
@@ -280,15 +320,17 @@ verifyCorrectLookupAlgorithmUsed(
 
 runLookupQuery({allowDiskUse: false});
 assertCacheUsage(true /*multiPlanning*/,
+                 sbePlanCacheEnabled ? 2 : 1 /* cacheEntryVersion */,
                  false /*activeCacheEntry*/,
-                 {b: 1} /*cachedIndex*/,
+                 "b_1" /*cachedIndexName*/,
                  avoidReplanLookupPipeline,
                  {allowDiskUse: false});
 
 runLookupQuery({allowDiskUse: false});
 assertCacheUsage(true /*multiPlanning*/,
+                 sbePlanCacheEnabled ? 2 : 1 /* cacheEntryVersion */,
                  true /*activeCacheEntry*/,
-                 {b: 1} /*cachedIndex*/,
+                 "b_1" /*cachedIndexName*/,
                  avoidReplanLookupPipeline,
                  {allowDiskUse: false});
 
@@ -300,17 +342,39 @@ assert.commandWorked(foreignColl.dropIndex({c: 1}));
 verifyCorrectLookupAlgorithmUsed(
     "NestedLoopJoin", avoidReplanLookupPipeline, {allowDiskUse: false});
 
+// If SBE plan cache is enabled, after dropping index, the $lookup plan cache will be invalidated.
+// We will need to rerun the multi-planner.
+if (sbePlanCacheEnabled) {
+    runLookupQuery({allowDiskUse: false});
+    assertCacheUsage(true /*multiPlanning*/,
+                     sbeFullEnabled ? 2 : 1 /* cacheEntryVersion */,
+                     false /*activeCacheEntry*/,
+                     "b_1" /*cachedIndexName*/,
+                     avoidReplanLookupPipeline,
+                     {allowDiskUse: false});
+
+    runLookupQuery({allowDiskUse: false});
+    assertCacheUsage(true /*multiPlanning*/,
+                     sbeFullEnabled ? 2 : 1 /* cacheEntryVersion */,
+                     true /*activeCacheEntry*/,
+                     "b_1" /*cachedIndexName*/,
+                     avoidReplanLookupPipeline,
+                     {allowDiskUse: false});
+}
+
 runLookupQuery({allowDiskUse: false});
 assertCacheUsage(false /*multiPlanning*/,
+                 sbePlanCacheEnabled && sbeFullEnabled ? 2 : 1 /* cacheEntryVersion */,
                  true /*activeCacheEntry*/,
-                 {b: 1} /*cachedIndex*/,
+                 "b_1" /*cachedIndexName*/,
                  avoidReplanLookupPipeline,
                  {allowDiskUse: false});
 
 runLookupQuery({allowDiskUse: false});
 assertCacheUsage(false /*multiPlanning*/,
+                 sbePlanCacheEnabled && sbeFullEnabled ? 2 : 1 /* cacheEntryVersion */,
                  true /*activeCacheEntry*/,
-                 {b: 1} /*cachedIndex*/,
+                 "b_1" /*cachedIndexName*/,
                  avoidReplanLookupPipeline,
                  {allowDiskUse: false});
 
@@ -318,16 +382,38 @@ assertCacheUsage(false /*multiPlanning*/,
 // replanning the cached query.
 verifyCorrectLookupAlgorithmUsed("HashJoin", avoidReplanLookupPipeline, {allowDiskUse: true});
 
+// If SBE plan cache is enabled, using different 'allowDiskUse' option will result in
+// different plan cache key.
+if (sbePlanCacheEnabled) {
+    runLookupQuery({allowDiskUse: true});
+    assertCacheUsage(true /*multiPlanning*/,
+                     2 /* cacheEntryVersion */,
+                     false /*activeCacheEntry*/,
+                     "b_1" /*cachedIndexName*/,
+                     avoidReplanLookupPipeline,
+                     {allowDiskUse: true});
+
+    runLookupQuery({allowDiskUse: true});
+    assertCacheUsage(true /*multiPlanning*/,
+                     2 /* cacheEntryVersion */,
+                     true /*activeCacheEntry*/,
+                     "b_1" /*cachedIndexName*/,
+                     avoidReplanLookupPipeline,
+                     {allowDiskUse: true});
+}
+
 runLookupQuery({allowDiskUse: true});
 assertCacheUsage(false /*multiPlanning*/,
+                 sbePlanCacheEnabled ? 2 : 1 /* cacheEntryVersion */,
                  true /*activeCacheEntry*/,
-                 {b: 1} /*cachedIndex*/,
+                 "b_1" /*cachedIndexName*/,
                  avoidReplanLookupPipeline,
                  {allowDiskUse: true});
 runLookupQuery({allowDiskUse: true});
 assertCacheUsage(false /*multiPlanning*/,
+                 sbePlanCacheEnabled ? 2 : 1 /* cacheEntryVersion */,
                  true /*activeCacheEntry*/,
-                 {b: 1} /*cachedIndex*/,
+                 "b_1" /*cachedIndexName*/,
                  avoidReplanLookupPipeline,
                  {allowDiskUse: true});
 
@@ -351,23 +437,27 @@ verifyCorrectLookupAlgorithmUsed("IndexedLoopJoin", avoidReplanLookupPipeline);
 // Set up an active cache entry.
 runLookupQuery();
 assertCacheUsage(true /*multiPlanning*/,
+                 sbePlanCacheEnabled ? 2 : 1 /* cacheEntryVersion */,
                  false /*activeCacheEntry*/,
-                 {b: 1} /*cachedIndex*/,
+                 "b_1" /*cachedIndexName*/,
                  avoidReplanLookupPipeline);
 runLookupQuery();
 assertCacheUsage(true /*multiPlanning*/,
+                 sbePlanCacheEnabled ? 2 : 1 /* cacheEntryVersion */,
                  true /*activeCacheEntry*/,
-                 {b: 1} /*cachedIndex*/,
+                 "b_1" /*cachedIndexName*/,
                  avoidReplanLookupPipeline);
 runLookupQuery();
 assertCacheUsage(false /*multiPlanning*/,
+                 sbePlanCacheEnabled ? 2 : 1 /* cacheEntryVersion */,
                  true /*activeCacheEntry*/,
-                 {b: 1} /*cachedIndex*/,
+                 "b_1" /*cachedIndexName*/,
                  avoidReplanLookupPipeline);
 runLookupQuery();
 assertCacheUsage(false /*multiPlanning*/,
+                 sbePlanCacheEnabled ? 2 : 1 /* cacheEntryVersion */,
                  true /*activeCacheEntry*/,
-                 {b: 1} /*cachedIndex*/,
+                 "b_1" /*cachedIndexName*/,
                  avoidReplanLookupPipeline);
 
 // Disable $lookup pushdown. This should not invalidate the cache entry, but it should prevent
@@ -380,7 +470,7 @@ let explain = coll.explain().aggregate(avoidReplanLookupPipeline);
 const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
 assert.eq(eqLookupNodes.length, 0, "expected no EQ_LOOKUP nodes; got " + tojson(explain));
 
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+if (sbePlanCacheEnabled) {
     runLookupQuery();
     const profileObj = getLatestProfilerEntry(db, {op: "command", ns: coll.getFullName()});
     const matchingCacheEntries =
@@ -390,13 +480,15 @@ if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
     // When the SBE plan cache is disabled, we will be able to reuse the same cache entry.
     runLookupQuery();
     assertCacheUsage(false /*multiPlanning*/,
+                     1 /* cacheEntryVersion */,
                      true /*activeCacheEntry*/,
-                     {b: 1} /*cachedIndex*/,
+                     "b_1" /*cachedIndexName*/,
                      avoidReplanLookupPipeline);
     runLookupQuery();
     assertCacheUsage(false /*multiPlanning*/,
+                     1 /* cacheEntryVersion */,
                      true /*activeCacheEntry*/,
-                     {b: 1} /*cachedIndex*/,
+                     "b_1" /*cachedIndexName*/,
                      avoidReplanLookupPipeline);
 }
 
@@ -415,23 +507,27 @@ if (checkSBEEnabled(db)) {
 // Set up an active cache entry.
 runGroupQuery();
 assertCacheUsage(true /*multiPlanning*/,
+                 1 /* cacheEntryVersion */,
                  false /*activeCacheEntry*/,
-                 {b: 1} /*cachedIndex*/,
+                 "b_1" /*cachedIndexName*/,
                  avoidReplanGroupPipeline);
 runGroupQuery();
 assertCacheUsage(true /*multiPlanning*/,
+                 1 /* cacheEntryVersion */,
                  true /*activeCacheEntry*/,
-                 {b: 1} /*cachedIndex*/,
+                 "b_1" /*cachedIndexName*/,
                  avoidReplanGroupPipeline);
 runGroupQuery();
 assertCacheUsage(false /*multiPlanning*/,
+                 1 /* cacheEntryVersion */,
                  true /*activeCacheEntry*/,
-                 {b: 1} /*cachedIndex*/,
+                 "b_1" /*cachedIndexName*/,
                  avoidReplanGroupPipeline);
 runGroupQuery();
 assertCacheUsage(false /*multiPlanning*/,
+                 1 /* cacheEntryVersion */,
                  true /*activeCacheEntry*/,
-                 {b: 1} /*cachedIndex*/,
+                 "b_1" /*cachedIndexName*/,
                  avoidReplanGroupPipeline);
 
 // Disable $group pushdown. This should not invalidate the cache entry, but it should prevent $group
@@ -443,7 +539,7 @@ explain = coll.explain().aggregate(avoidReplanLookupPipeline);
 groupNodes = getAggPlanStages(explain, "GROUP");
 assert.eq(groupNodes.length, 0);
 
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+if (sbePlanCacheEnabled) {
     runGroupQuery();
     const profileObj = getLatestProfilerEntry(db, {op: "command", ns: coll.getFullName()});
     const matchingCacheEntries =
@@ -453,13 +549,15 @@ if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
     // When the SBE plan cache is disabled, we will be able to reuse the same cache entry.
     runGroupQuery();
     assertCacheUsage(false /*multiPlanning*/,
+                     1 /* cacheEntryVersion */,
                      true /*activeCacheEntry*/,
-                     {b: 1} /*cachedIndex*/,
+                     "b_1" /*cachedIndexName*/,
                      avoidReplanGroupPipeline);
     runGroupQuery();
     assertCacheUsage(false /*multiPlanning*/,
+                     1 /* cacheEntryVersion */,
                      true /*activeCacheEntry*/,
-                     {b: 1} /*cachedIndex*/,
+                     "b_1" /*cachedIndexName*/,
                      avoidReplanGroupPipeline);
 }
 
