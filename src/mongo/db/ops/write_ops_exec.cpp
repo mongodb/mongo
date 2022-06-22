@@ -452,8 +452,13 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                 opCtx,
                 wholeOp.getNamespace(),
                 fixLockModeForSystemDotViewsChanges(wholeOp.getNamespace(), MODE_IX));
-            if (*collection)
+            checkCollectionUUIDMismatch(opCtx,
+                                        wholeOp.getNamespace(),
+                                        collection->getCollection(),
+                                        wholeOp.getCollectionUUID());
+            if (*collection) {
                 break;
+            }
 
             if (source == OperationSource::kTimeseriesInsert) {
                 assertTimeseriesBucketsCollectionNotFound(wholeOp.getNamespace());
@@ -499,11 +504,6 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     if (shouldProceedWithBatchInsert) {
         try {
             if (!collection->getCollection()->isCapped() && !inTxn && batch.size() > 1) {
-                checkCollectionUUIDMismatch(opCtx,
-                                            wholeOp.getNamespace(),
-                                            collection->getCollection(),
-                                            wholeOp.getCollectionUUID());
-
                 // First try doing it all together. If all goes well, this is all we need to do.
                 // See Collection::_insertDocuments for why we do all capped inserts one-at-a-time.
                 lastOpFixer->startingOp();
@@ -546,10 +546,6 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                     // Transactions are not allowed to operate on capped collections.
                     uassertStatusOK(
                         checkIfTransactionOnCappedColl(opCtx, collection->getCollection()));
-                    checkCollectionUUIDMismatch(opCtx,
-                                                wholeOp.getNamespace(),
-                                                collection->getCollection(),
-                                                wholeOp.getCollectionUUID());
                     lastOpFixer->startingOp();
                     insertDocuments(opCtx,
                                     collection->getCollection(),
@@ -798,6 +794,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     boost::optional<AutoGetCollection> collection;
     while (true) {
         collection.emplace(opCtx, ns, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
+        checkCollectionUUIDMismatch(opCtx, ns, collection->getCollection(), opCollectionUUID);
         if (*collection) {
             break;
         }
@@ -861,8 +858,6 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         // Transactions are not allowed to operate on capped collections.
         uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));
     }
-
-    checkCollectionUUIDMismatch(opCtx, ns, collection->getCollection(), opCollectionUUID);
 
     const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest->getNamespaceString());
     ParsedUpdate parsedUpdate(opCtx, updateRequest, extensionsCallback, forgoOpCounterIncrements);
