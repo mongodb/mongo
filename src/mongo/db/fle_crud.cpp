@@ -1488,7 +1488,6 @@ std::vector<BSONObj> FLEQueryInterfaceImpl::findDocuments(const NamespaceString&
                                                           BSONObj filter) {
     FindCommandRequest find(nss);
     find.setFilter(filter);
-    find.setSingleBatch(true);
 
     // Throws on error
     return _txnClient.exhaustiveFind(find).get();
