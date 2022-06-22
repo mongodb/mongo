@@ -395,13 +395,8 @@ void FleCompactTest::doSingleInsert(int id, BSONObj encryptedFieldsObj) {
     auto efc =
         generateEncryptedFieldConfig(encryptedFieldsObj.getFieldNames<std::set<std::string>>());
 
-    uassertStatusOK(processInsert(_queryImpl.get(),
-                                  _namespaces.edcNss,
-                                  serverPayload,
-                                  efc,
-                                  kUninitializedTxnNumber,
-                                  result,
-                                  false));
+    uassertStatusOK(processInsert(
+        _queryImpl.get(), _namespaces.edcNss, serverPayload, efc, kUninitializedTxnNumber, result));
 }
 
 void FleCompactTest::doSingleDelete(int id, BSONObj encryptedFieldsObj) {

@@ -289,13 +289,6 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
     }
 }
 
-int getEncryptionInformationSize(const BatchedCommandRequest& req) {
-    if (!req.getWriteCommandRequestBase().getEncryptionInformation()) {
-        return 0;
-    }
-    return req.getWriteCommandRequestBase().getEncryptionInformation().get().toBSON().objsize();
-}
-
 }  // namespace
 
 BatchWriteOp::BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest& clientRequest)
@@ -428,7 +421,6 @@ Status BatchWriteOp::targetBatch(
         //
         // The constant 4 is chosen as the size of the BSON representation of the stmtId.
         const int writeSizeBytes = getWriteSizeBytes(writeOp) +
-            getEncryptionInformationSize(_clientRequest) +
             write_ops::kWriteCommandBSONArrayPerElementOverheadBytes +
             (_batchTxnNum ? write_ops::kWriteCommandBSONArrayPerElementOverheadBytes + 4 : 0);
 
@@ -590,9 +582,6 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& 
             _clientRequest.getWriteCommandRequestBase().getBypassDocumentValidation());
         wcb.setOrdered(_clientRequest.getWriteCommandRequestBase().getOrdered());
         wcb.setCollectionUUID(_clientRequest.getWriteCommandRequestBase().getCollectionUUID());
-
-        wcb.setEncryptionInformation(
-            _clientRequest.getWriteCommandRequestBase().getEncryptionInformation());
 
         if (targeter.isShardedTimeSeriesBucketsNamespace() &&
             !_clientRequest.getNS().isTimeseriesBucketsCollection()) {

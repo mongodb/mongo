@@ -188,7 +188,7 @@ public:
             uasserted(ErrorCodes::DNSProtocolError, "DNS CNAME record could not be decompressed");
         }
 
-        return std::string(&buf[0]);
+        return std::string(&buf[0], length);
     }
 
     DNSQueryType getType() const {

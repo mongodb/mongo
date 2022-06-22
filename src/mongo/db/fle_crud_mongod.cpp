@@ -284,13 +284,7 @@ BSONObj processFLEWriteExplainD(OperationContext* opCtx,
                                 const BSONObj& query) {
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx, fle::collatorFromBSON(opCtx, collation), nss, runtimeConstants, letParameters);
-    return fle::rewriteQuery(opCtx,
-                             expCtx,
-                             nss,
-                             info,
-                             query,
-                             &getTransactionWithRetriesForMongoD,
-                             fle::HighCardinalityModeAllowed::kAllow);
+    return fle::rewriteQuery(opCtx, expCtx, nss, info, query, &getTransactionWithRetriesForMongoD);
 }
 
 std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>

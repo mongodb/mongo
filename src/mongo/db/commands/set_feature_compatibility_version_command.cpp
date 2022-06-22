@@ -66,6 +66,7 @@
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/balancer/balancer.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
@@ -74,11 +75,11 @@
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
-#include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/s/type_shard_collection.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog.h"
@@ -90,7 +91,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/s/pm2583_feature_flags_gen.h"
 #include "mongo/s/refine_collection_shard_key_coordinator_feature_flags_gen.h"
@@ -223,6 +223,20 @@ void uassertStatusOKIgnoreNSNotFound(Status status) {
     }
 
     uassertStatusOK(status);
+}
+
+void clearFilteringMetadataOnSecondaries(OperationContext* opCtx, const NamespaceString& collName) {
+    Status signalStatus = shardmetadatautil::updateShardCollectionsEntry(
+        opCtx,
+        BSON(ShardCollectionType::kNssFieldName << collName.ns()),
+        BSON("$inc" << BSON(ShardCollectionType::kEnterCriticalSectionCounterFieldName << 1)),
+        false /*upsert*/);
+
+    uassertStatusOKWithContext(
+        signalStatus,
+        str::stream()
+            << "Failed to persist signal to clear the filtering metadata on secondaries for nss "
+            << collName.ns());
 }
 
 /**
@@ -550,18 +564,26 @@ public:
                 }
             }
 
-            if (requestedVersion == multiversion::FeatureCompatibilityVersion::kVersion_6_0 &&
-                ShardingState::get(opCtx)->enabled()) {
+            if (requestedVersion == multiversion::FeatureCompatibilityVersion::kVersion_5_3 ||
+                requestedVersion == multiversion::FeatureCompatibilityVersion::kVersion_6_0) {
                 const auto colls = CollectionShardingState::getCollectionNames(opCtx);
                 for (const auto& collName : colls) {
-                    onShardVersionMismatch(opCtx, collName, boost::none);
-                    CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, collName);
+                    try {
+                        if (!collName.isSystemDotViews()) {
+                            {
+                                AutoGetCollection coll(opCtx, collName, MODE_IX);
+                                CollectionShardingState::get(opCtx, collName)
+                                    ->clearFilteringMetadata_DoNotUseIt(opCtx);
+                            }
+                            clearFilteringMetadataOnSecondaries(opCtx, collName);
+                        }
+                    } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
+                        // Nothing to do since collName is a view
+                    }
                 }
 
-                repl::ReplClientInfo::forClient(opCtx->getClient())
-                    .setLastOpToSystemLastOpTime(opCtx);
-
-                // Wait until the changes on config.cache.* are majority committed.
+                // Wait until the signals to clear the filtering metadata on secondary nodes are
+                // majority committed.
                 WriteConcernResult ignoreResult;
                 auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
                 uassertStatusOK(waitForWriteConcern(opCtx,

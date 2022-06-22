@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/error_codes.h"
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
@@ -154,12 +153,8 @@ protected:
 
     void assertDocumentCounts(uint64_t edc, uint64_t esc, uint64_t ecc, uint64_t ecoc);
 
-    void testValidateEncryptedFieldInfo(BSONObj obj, bool bypassValidation);
-
-    void testValidateTags(BSONObj obj);
-
-    void doSingleInsert(int id, BSONElement element, bool bypassDocumentValidation = false);
-    void doSingleInsert(int id, BSONObj obj, bool bypassDocumentValidation = false);
+    void doSingleInsert(int id, BSONElement element);
+    void doSingleInsert(int id, BSONObj obj);
 
     void doSingleInsertWithContention(
         int id, BSONElement element, int64_t cm, uint64_t cf, EncryptedFieldConfig efc);
@@ -411,7 +406,7 @@ void FleCrudTest::doSingleWideInsert(int id, uint64_t fieldCount, ValueGenerator
 
     auto efc = getTestEncryptedFieldConfig();
 
-    uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result, false));
+    uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result));
 }
 
 
@@ -456,16 +451,7 @@ std::vector<char> generateSinglePlaceholder(BSONElement value, int64_t cm = 0) {
     return v;
 }
 
-void FleCrudTest::testValidateEncryptedFieldInfo(BSONObj obj, bool bypassValidation) {
-    auto efc = getTestEncryptedFieldConfig();
-    EDCServerCollection::validateEncryptedFieldInfo(obj, efc, bypassValidation);
-}
-
-void FleCrudTest::testValidateTags(BSONObj obj) {
-    FLEClientCrypto::validateTagsArray(obj);
-}
-
-void FleCrudTest::doSingleInsert(int id, BSONElement element, bool bypassDocumentValidation) {
+void FleCrudTest::doSingleInsert(int id, BSONElement element) {
     auto buf = generateSinglePlaceholder(element);
     BSONObjBuilder builder;
     builder.append("_id", id);
@@ -481,10 +467,10 @@ void FleCrudTest::doSingleInsert(int id, BSONElement element, bool bypassDocumen
 
     auto efc = getTestEncryptedFieldConfig();
 
-    uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result, false));
+    uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result));
 }
 
-void FleCrudTest::doSingleInsert(int id, BSONObj obj, bool bypassDocumentValidation) {
+void FleCrudTest::doSingleInsert(int id, BSONObj obj) {
     doSingleInsert(id, obj.firstElement());
 }
 
@@ -504,7 +490,7 @@ void FleCrudTest::doSingleInsertWithContention(
 
     auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
 
-    uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result, false));
+    uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result));
 }
 
 void FleCrudTest::doSingleInsertWithContention(
@@ -904,6 +890,7 @@ TEST_F(FleCrudTest, UpdateOneSameValue) {
                                 << "secret"));
 }
 
+
 // Update one document with replacement
 TEST_F(FleCrudTest, UpdateOneReplace) {
 
@@ -969,16 +956,7 @@ TEST_F(FleCrudTest, SetSafeContent) {
     builder.append("$set", BSON(kSafeContent << "foo"));
     auto result = builder.obj();
 
-    ASSERT_THROWS_CODE(doSingleUpdateWithUpdateDoc(1, result), DBException, 6666200);
-}
-
-// Test that EDCServerCollection::validateEncryptedFieldInfo checks that the
-// safeContent cannot be present in the BSON obj.
-TEST_F(FleCrudTest, testValidateEncryptedFieldConfig) {
-    testValidateEncryptedFieldInfo(BSON(kSafeContent << "secret"), true);
-    ASSERT_THROWS_CODE(testValidateEncryptedFieldInfo(BSON(kSafeContent << "secret"), false),
-                       DBException,
-                       6666200);
+    ASSERT_THROWS_CODE(doSingleUpdateWithUpdateDoc(1, result), DBException, 6371507);
 }
 
 // Update one document via findAndModify
@@ -1060,11 +1038,6 @@ TEST_F(FleCrudTest, FindAndModify_RenameSafeContent) {
     ASSERT_THROWS_CODE(doFindAndModify(req), DBException, 6371506);
 }
 
-TEST_F(FleCrudTest, validateTagsTest) {
-    testValidateTags(BSON(kSafeContent << BSON_ARRAY(123)));
-    ASSERT_THROWS_CODE(testValidateTags(BSON(kSafeContent << "foo")), DBException, 6371507);
-}
-
 // Mess with __safeContent__ and ensure the update errors
 TEST_F(FleCrudTest, FindAndModify_SetSafeContent) {
     doSingleInsert(1,
@@ -1083,7 +1056,8 @@ TEST_F(FleCrudTest, FindAndModify_SetSafeContent) {
     req.setUpdate(
         write_ops::UpdateModification(result, write_ops::UpdateModification::ClassicTag{}, false));
 
-    ASSERT_THROWS_CODE(doFindAndModify(req), DBException, 6666200);
+
+    ASSERT_THROWS_CODE(doFindAndModify(req), DBException, 6371507);
 }
 
 TEST_F(FleTagsTest, InsertOne) {
@@ -1225,7 +1199,7 @@ TEST_F(FleTagsTest, MemoryLimit) {
     doSingleInsert(10, doc);
 
     // readTags returns 11 tags which does exceed memory limit.
-    ASSERT_THROWS_CODE(readTags(doc), DBException, ErrorCodes::FLEMaxTagLimitExceeded);
+    ASSERT_THROWS_CODE(readTags(doc), DBException, 6401800);
 
     doSingleDelete(5);
 

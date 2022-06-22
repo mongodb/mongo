@@ -56,11 +56,8 @@ void verifyTagsWillFit(size_t tagCount, size_t memoryLimit) {
     constexpr size_t largestElementSize = arrayElementSize(std::numeric_limits<size_t>::digits10);
     constexpr size_t ridiculousNumberOfTags =
         std::numeric_limits<size_t>::max() / largestElementSize;
-
-    uassert(ErrorCodes::FLEMaxTagLimitExceeded,
-            "Encrypted rewrite too many tags",
-            tagCount < ridiculousNumberOfTags);
-    uassert(ErrorCodes::FLEMaxTagLimitExceeded,
+    uassert(6653300, "Encrypted rewrite too many tags", tagCount < ridiculousNumberOfTags);
+    uassert(6401800,
             "Encrypted rewrite memory limit exceeded",
             sizeArrayElementsMemory(tagCount) <= memoryLimit);
 }

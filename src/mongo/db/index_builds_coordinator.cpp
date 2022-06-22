@@ -29,9 +29,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-#include "mongo/db/index_builds_coordinator.h"
+#include "mongo/platform/basic.h"
 
-#include <fmt/format.h>
+#include "mongo/db/index_builds_coordinator.h"
 
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_catalog.h"
@@ -1659,39 +1659,19 @@ void IndexBuildsCoordinator::assertNoIndexBuildInProgress() const {
 
 void IndexBuildsCoordinator::assertNoIndexBuildInProgForCollection(
     const UUID& collectionUUID) const {
-    boost::optional<UUID> firstIndexBuildUUID;
-    auto indexBuilds = activeIndexBuilds.filterIndexBuilds([&](const auto& replState) {
-        auto isIndexBuildForCollection = (collectionUUID == replState.collectionUUID);
-        if (isIndexBuildForCollection && !firstIndexBuildUUID) {
-            firstIndexBuildUUID = replState.buildUUID;
-        };
-        return isIndexBuildForCollection;
-    });
-
     uassert(ErrorCodes::BackgroundOperationInProgressForNamespace,
-            fmt::format("cannot perform operation: an index build is currently running for "
-                        "collection with UUID: {}. Found index build: {}",
-                        collectionUUID.toString(),
-                        firstIndexBuildUUID->toString()),
-            indexBuilds.empty());
+            str::stream() << "cannot perform operation: an index build is currently running for "
+                             "collection with UUID: "
+                          << collectionUUID,
+            !inProgForCollection(collectionUUID));
 }
 
 void IndexBuildsCoordinator::assertNoBgOpInProgForDb(StringData db) const {
-    boost::optional<UUID> firstIndexBuildUUID;
-    auto indexBuilds = activeIndexBuilds.filterIndexBuilds([&](const auto& replState) {
-        auto isIndexBuildForCollection = (db == replState.dbName);
-        if (isIndexBuildForCollection && !firstIndexBuildUUID) {
-            firstIndexBuildUUID = replState.buildUUID;
-        };
-        return isIndexBuildForCollection;
-    });
-
     uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
-            fmt::format("cannot perform operation: an index build is currently running for "
-                        "database {}. Found index build: {}",
-                        db,
-                        firstIndexBuildUUID->toString()),
-            indexBuilds.empty());
+            str::stream() << "cannot perform operation: an index build is currently running for "
+                             "database "
+                          << db,
+            !inProgForDb(db));
 }
 
 void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,

@@ -72,7 +72,6 @@ _BINDATA_SUBTYPE = {
     # },
     "uuid": {'scalar': True, 'bindata_enum': 'newUUID'},
     "md5": {'scalar': True, 'bindata_enum': 'MD5Type'},
-    "encrypt": {'scalar': True, 'bindata_enum': 'Encrypt'},
 }
 
 

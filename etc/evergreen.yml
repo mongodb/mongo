@@ -1229,8 +1229,7 @@ buildvariants:
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
-  # TODO: SERVER-66945 Re-enable ESE on enterprise macos
-  # - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore !.ssl
+  - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore !.ssl
   - name: .jscore .common !.decimal !.sharding
   - name: .logical_session_cache .one_sec
   - name: mqlrun

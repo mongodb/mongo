@@ -159,6 +159,19 @@ public:
      * Returns the number of ranges scheduled for deletion on the collection.
      */
     virtual size_t numberOfRangesScheduledForDeletion() const = 0;
+
+    /**
+     * Public interface to clear the filtering metadata associated to a namespace. Do not use it
+     * without the consent of the Sharding Team, please.
+     */
+    void clearFilteringMetadata_DoNotUseIt(OperationContext* opCtx);
+
+private:
+    /**
+     * Private interface to clear the filtering metadata. Please, do not make it public. See
+     * clearFilteringMetadata_DoNotUseIt for more information.
+     */
+    virtual void clearFilteringMetadata(OperationContext* opCtx) = 0;
 };
 
 /**

@@ -51,10 +51,6 @@ enums:
           kFLE2UnindexedEncryptedValue : 6 # see FLE2IndexedEqualityEncryptedValue
           kFLE2EqualityIndexedValue : 7
 
-          # Transient encrypted data in query rewrites, not persisted
-          # same as BinDataGeneral but redacted
-          kFLE2TransientRaw : 8
-
     FleVersion:
         description: "The version / type of field-level encryption in use."
         type: int

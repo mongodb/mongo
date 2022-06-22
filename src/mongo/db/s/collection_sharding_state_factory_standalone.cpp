@@ -67,6 +67,9 @@ public:
     size_t numberOfRangesScheduledForDeletion() const override {
         return 0;
     }
+
+private:
+    void clearFilteringMetadata(OperationContext* opCtx) override {}
 };
 
 }  // namespace

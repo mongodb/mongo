@@ -156,13 +156,6 @@ types:
         cpp_type: "std::array<std::uint8_t, 16>"
         deserializer: "mongo::BSONElement::uuid"
 
-    bindata_encrypt:
-        bson_serialization_type: bindata
-        bindata_subtype: encrypt
-        description: "A BSON bindata of encrypt sub type"
-        cpp_type: "std::vector<std::uint8_t>"
-        deserializer: "mongo::BSONElement::_binDataVector"
-
     uuid:
         bson_serialization_type: bindata
         bindata_subtype: uuid

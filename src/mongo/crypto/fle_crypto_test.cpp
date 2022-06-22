@@ -33,7 +33,6 @@
 #include "mongo/crypto/fle_crypto.h"
 
 #include <algorithm>
-#include <cstdint>
 #include <iostream>
 #include <limits>
 #include <stack>
@@ -697,8 +696,7 @@ std::vector<char> generatePlaceholder(
     BSONElement value,
     Operation operation,
     mongo::Fle2AlgorithmInt algorithm = mongo::Fle2AlgorithmInt::kEquality,
-    boost::optional<UUID> key = boost::none,
-    uint64_t contention = 0) {
+    boost::optional<UUID> key = boost::none) {
     FLE2EncryptionPlaceholder ep;
 
     if (operation == Operation::kFind) {
@@ -711,7 +709,7 @@ std::vector<char> generatePlaceholder(
     ep.setUserKeyId(userKeyId);
     ep.setIndexKeyId(key.value_or(indexKeyId));
     ep.setValue(value);
-    ep.setMaxContentionCounter(contention);
+    ep.setMaxContentionCounter(0);
 
     BSONObj obj = ep.toBSON();
 
@@ -728,7 +726,7 @@ BSONObj encryptDocument(BSONObj obj,
     auto result = FLEClientCrypto::transformPlaceholders(obj, keyVault);
 
     if (nullptr != efc) {
-        EDCServerCollection::validateEncryptedFieldInfo(result, *efc, false);
+        EDCServerCollection::validateEncryptedFieldInfo(result, *efc);
     }
 
     // Start Server Side
@@ -832,41 +830,6 @@ void roundTripMultiencrypted(BSONObj doc1,
 
     assertPayload(finalDoc["encrypted1"], operation1);
     assertPayload(finalDoc["encrypted2"], operation2);
-}
-
-// Used to generate the test data for the ExpressionFLETest in expression_test.cpp
-TEST(FLE_EDC, PrintTest) {
-    auto doc = BSON("value" << 1);
-    auto element = doc.firstElement();
-
-    TestKeyVault keyVault;
-
-    auto inputDoc = BSON("plainText"
-                         << "sample"
-                         << "encrypted" << element);
-
-    {
-        auto buf = generatePlaceholder(element, Operation::kInsert, Fle2AlgorithmInt::kEquality);
-        BSONObjBuilder builder;
-        builder.append("plainText", "sample");
-        builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
-
-        auto finalDoc = encryptDocument(builder.obj(), &keyVault);
-
-        std::cout << finalDoc.jsonString() << std::endl;
-    }
-
-    {
-        auto buf = generatePlaceholder(
-            element, Operation::kInsert, Fle2AlgorithmInt::kEquality, boost::none, 50);
-        BSONObjBuilder builder;
-        builder.append("plainText", "sample");
-        builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
-
-        auto finalDoc = encryptDocument(builder.obj(), &keyVault);
-
-        std::cout << finalDoc.jsonString() << std::endl;
-    }
 }
 
 TEST(FLE_EDC, Allowed_Types) {
@@ -1964,26 +1927,5 @@ TEST(CompactionHelpersTest, countDeletedTest) {
     auto input = pairsToECCDocuments({{15, 20}, {13, 13}, {1, 6}, {7, 12}, {14, 14}});
     ASSERT_EQ(CompactionHelpers::countDeleted(input), 20);
 }
-
-TEST(EDCServerCollectionTest, GenerateEDCTokens) {
-
-    auto doc = BSON("sample" << 123456);
-    auto element = doc.firstElement();
-
-    auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
-
-    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
-    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
-
-    EDCDerivedFromDataToken edcDatakey =
-        FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value);
-
-
-    ASSERT_EQ(EDCServerCollection::generateEDCTokens(edcDatakey, 0).size(), 1);
-    ASSERT_EQ(EDCServerCollection::generateEDCTokens(edcDatakey, 1).size(), 2);
-    ASSERT_EQ(EDCServerCollection::generateEDCTokens(edcDatakey, 2).size(), 3);
-    ASSERT_EQ(EDCServerCollection::generateEDCTokens(edcDatakey, 3).size(), 4);
-}
-
 
 }  // namespace mongo

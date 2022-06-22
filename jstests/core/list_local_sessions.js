@@ -8,20 +8,12 @@
 //   # Sessions are asynchronously flushed to disk, so a stepdown immediately after calling
 //   # startSession may cause this test to fail to find the returned sessionId.
 //   does_not_support_stepdowns,
-//   requires_sharding,
 // ]
 
 (function() {
 'use strict';
 
-const st = new ShardingTest({
-    shards: 1,
-    mongos: 1,
-    other: {mongosOptions: {setParameter: {disableLogicalSessionCacheRefresh: true}}}
-});
-
-const admin = st.s.getDB("admin");
-
+const admin = db.getSiblingDB('admin');
 function listLocalSessions() {
     return admin.aggregate([{'$listLocalSessions': {allUsers: false}}]);
 }
@@ -31,7 +23,7 @@ let originalLogLevel = assert.commandWorked(admin.setLogLevel(1)).was.verbosity;
 
 try {
     // Start a new session and capture its sessionId.
-    const myid = assert.commandWorked(st.s.adminCommand({startSession: 1})).id.id;
+    const myid = assert.commandWorked(db.runCommand({startSession: 1})).id.id;
     assert(myid !== undefined);
 
     // Ensure that the cache now contains the session and is visible.
@@ -88,6 +80,4 @@ try {
 } finally {
     admin.setLogLevel(originalLogLevel);
 }
-
-st.stop();
 })();

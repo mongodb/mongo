@@ -56,10 +56,6 @@ RangeStatement RangeStatement::parse(RangeSpec spec) {
 
     optional<TimeUnit> unit = [&]() {
         if (auto unit = spec.getUnit()) {
-            uassert(6586400,
-                    "The step parameter in a range statement must be a whole number when "
-                    "densifying a date range",
-                    step.integral64Bit());
             return optional<TimeUnit>(parseTimeUnit(unit.get()));
         } else {
             return optional<TimeUnit>(boost::none);
@@ -279,8 +275,8 @@ DocumentSourceInternalDensify::DocGenerator::DocGenerator(DensifyValue min,
         // Extra checks for date step + unit.
         tassert(5733501, "Unit must be specified with a date step", _range.getUnit());
         tassert(5733505,
-                "Step must be a whole number for date densification",
-                _range.getStep().integral64Bit());
+                "Step must be representable as an integer for date densification",
+                _range.getStep().integral());
     } else {
         tassert(5733506, "Unit must not be specified with non-date values", !_range.getUnit());
     }
@@ -881,7 +877,7 @@ DensifyValue DensifyValue::increment(const RangeStatement& range) const {
             },
             [&](Date_t date) {
                 return DensifyValue(dateAdd(
-                    date, range.getUnit().value(), range.getStep().coerceToLong(), timezone()));
+                    date, range.getUnit().value(), range.getStep().getDouble(), timezone()));
             }},
         _value);
 }
@@ -895,7 +891,7 @@ DensifyValue DensifyValue::decrement(const RangeStatement& range) const {
             },
             [&](Date_t date) {
                 return DensifyValue(dateAdd(
-                    date, range.getUnit().value(), -range.getStep().coerceToLong(), timezone()));
+                    date, range.getUnit().value(), -range.getStep().getDouble(), timezone()));
             }},
         _value);
 }
@@ -910,7 +906,7 @@ bool DensifyValue::isOnStepRelativeTo(DensifyValue base, RangeStatement range) c
             },
             [&](Date_t date) {
                 auto unit = range.getUnit().value();
-                long long step = range.getStep().coerceToLong();
+                double step = range.getStep().getDouble();
                 auto baseDate = base.getDate();
 
                 // Months, quarters and years have variable lengths depending on leap days
