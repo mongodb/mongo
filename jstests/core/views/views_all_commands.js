@@ -495,7 +495,7 @@ let viewsCommandTests = {
         expectedErrorCode: ErrorCodes.NamespaceNotSharded,
     },
     moveChunk: {
-        command: {moveChunk: "test.view"},
+        command: {moveChunk: "test.view", find: {}, to: "a"},
         skipStandalone: true,
         isAdminCommand: true,
         expectFailure: true,

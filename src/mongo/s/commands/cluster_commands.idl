@@ -107,3 +107,52 @@ commands:
                 description: "The shard key value that is within a chunk's boundaries.
                               Cannot be used on collections with hashed shard keys."
                 optional: true
+
+    moveChunk:
+        description : "The public moveChunk command on mongos."
+        command_name : moveChunk 
+        command_alias: movechunk
+        cpp_name: ClusterMoveChunkRequest 
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        fields:
+            bounds:
+                type: array<object>
+                description: "The bounds of a specific chunk to move. The array must consist of two documents that specify the lower and upper shard key values of a chunk to move. Specify either the bounds field or the find field but not both."
+                optional: true
+            find:
+                type: object
+                description: "An equality match on the shard key that specifies the shard-key value of the chunk to move. Specify either the bounds field or the find field but not both."
+                optional: true         
+            to:
+                type: string
+                description: "The name of the destination shard for the chunk."
+
+            forceJumbo:
+                type: bool
+                description: "Specifies whether or not forcing jumbo chunks move"
+                default: false
+
+            writeConcern:
+                type: object_owned
+                description: "A document that expresses the write concern that the _secondaryThrottle will use to wait for secondaries during the chunk migration." 
+                default: BSONObj()
+
+            # Secondary throttle can be specified by passing one of the following 2 parameters
+            secondaryThrottle:
+                type: optionalBool
+                description: "Secondary throttle policy to adopt during the migration"
+            _secondaryThrottle:
+                type: optionalBool
+                description: "Secondary throttle policy to adopt during the migration"
+
+           # Wait for delete can be specified with one of the following 2 parameters
+            waitForDelete:
+                type: optionalBool 
+                description: "Internal option for testing purposes. The default is false. If set to true, the delete phase of a moveChunk operation blocks."
+            _waitForDelete:
+                type: optionalBool 
+                description: "Internal option for testing purposes. The default is false. If set to true, the delete phase of a moveChunk operation blocks."
+

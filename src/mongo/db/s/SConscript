@@ -55,6 +55,7 @@ env.Library(
         'collection_critical_section_document.idl',
         'collection_sharding_runtime.cpp',
         'collection_sharding_state_factory_shard.cpp',
+        'commit_chunk_migration.idl',
         'config_server_op_observer.cpp',
         'global_index_metrics.cpp',
         'metadata_manager.cpp',
