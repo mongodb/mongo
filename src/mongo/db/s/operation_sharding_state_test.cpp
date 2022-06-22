@@ -47,7 +47,7 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleDbVersion) {
 }
 
 TEST_F(OperationShardingStateTest, ScopedSetShardRoleShardVersion) {
-    ChunkVersion shardVersion(1, 0, OID::gen(), Timestamp(1, 0));
+    ChunkVersion shardVersion({OID::gen(), Timestamp(1, 0)}, {1, 0});
     ScopedSetShardRole scopedSetShardRole(operationContext(), kNss, shardVersion, boost::none);
 
     auto& oss = OperationShardingState::get(operationContext());
@@ -58,13 +58,13 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleChangeShardVersionSameNames
     auto& oss = OperationShardingState::get(operationContext());
 
     {
-        ChunkVersion shardVersion1(1, 0, OID::gen(), Timestamp(10, 0));
+        ChunkVersion shardVersion1({OID::gen(), Timestamp(10, 0)}, {1, 0});
         ScopedSetShardRole scopedSetShardRole1(
             operationContext(), kNss, shardVersion1, boost::none);
         ASSERT_EQ(shardVersion1, *oss.getShardVersion(kNss));
     }
     {
-        ChunkVersion shardVersion2(1, 0, OID::gen(), Timestamp(20, 0));
+        ChunkVersion shardVersion2({OID::gen(), Timestamp(20, 0)}, {1, 0});
         ScopedSetShardRole scopedSetShardRole2(
             operationContext(), kNss, shardVersion2, boost::none);
         ASSERT_EQ(shardVersion2, *oss.getShardVersion(kNss));
@@ -72,8 +72,8 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleChangeShardVersionSameNames
 }
 
 TEST_F(OperationShardingStateTest, ScopedSetShardRoleRecursiveShardVersionDifferentNamespaces) {
-    ChunkVersion shardVersion1(1, 0, OID::gen(), Timestamp(10, 0));
-    ChunkVersion shardVersion2(1, 0, OID::gen(), Timestamp(20, 0));
+    ChunkVersion shardVersion1({OID::gen(), Timestamp(10, 0)}, {1, 0});
+    ChunkVersion shardVersion2({OID::gen(), Timestamp(20, 0)}, {1, 0});
 
     ScopedSetShardRole scopedSetShardRole1(operationContext(), kNss, shardVersion1, boost::none);
     ScopedSetShardRole scopedSetShardRole2(

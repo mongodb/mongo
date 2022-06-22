@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
@@ -72,7 +70,7 @@ protected:
         ChunkType chunk;
         chunk.setName(OID::gen());
         chunk.setCollectionUUID(collUuid);
-        chunk.setVersion({12, 7, epoch, timestamp});
+        chunk.setVersion(ChunkVersion({epoch, timestamp}, {12, 7}));
         chunk.setShard(_shardName);
         chunk.setMin(jumboChunk().getMin());
         chunk.setMax(jumboChunk().getMax());
@@ -81,7 +79,7 @@ protected:
         ChunkType otherChunk;
         otherChunk.setName(OID::gen());
         otherChunk.setCollectionUUID(collUuid);
-        otherChunk.setVersion({14, 7, epoch, timestamp});
+        otherChunk.setVersion(ChunkVersion({epoch, timestamp}, {14, 7}));
         otherChunk.setShard(_shardName);
         otherChunk.setMin(nonJumboChunk().getMin());
         otherChunk.setMax(nonJumboChunk().getMax());
@@ -107,7 +105,7 @@ TEST_F(ClearJumboFlagTest, ClearJumboShouldBumpVersion) {
             operationContext(), collUuid, jumboChunk().getMin(), collEpoch, collTimestamp));
         ASSERT_FALSE(chunkDoc.getJumbo());
         auto chunkVersion = chunkDoc.getVersion();
-        ASSERT_EQ(ChunkVersion(15, 0, collEpoch, collTimestamp), chunkVersion);
+        ASSERT_EQ(ChunkVersion({collEpoch, collTimestamp}, {15, 0}), chunkVersion);
     };
 
     test(_nss2, Timestamp(42));
@@ -125,7 +123,7 @@ TEST_F(ClearJumboFlagTest, ClearJumboShouldNotBumpVersionIfChunkNotJumbo) {
         auto chunkDoc = uassertStatusOK(getChunkDoc(
             operationContext(), collUuid, nonJumboChunk().getMin(), collEpoch, collTimestamp));
         ASSERT_FALSE(chunkDoc.getJumbo());
-        ASSERT_EQ(ChunkVersion(14, 7, collEpoch, collTimestamp), chunkDoc.getVersion());
+        ASSERT_EQ(ChunkVersion({collEpoch, collTimestamp}, {14, 7}), chunkDoc.getVersion());
     };
 
     test(_nss2, Timestamp(42));

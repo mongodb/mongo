@@ -67,45 +67,12 @@ TEST(BatchedCommandResponseTest, Basic) {
     ASSERT_BSONOBJ_EQ(origResponseObj, genResponseObj);
 }
 
-// TODO (SERVER-64449): Get rid of this entire test case
-TEST(BatchedCommandResponseTest, StaleErrorAsStaleShardVersionCompatibility) {
+TEST(BatchedCommandResponseTest, StaleConfigInfo) {
     OID epoch = OID::gen();
 
     StaleConfigInfo staleInfo(NamespaceString("TestDB.TestColl"),
-                              ChunkVersion(1, 0, epoch, Timestamp(100, 0)),
-                              ChunkVersion(2, 0, epoch, Timestamp(100, 0)),
-                              ShardId("TestShard"));
-    BSONObjBuilder builder;
-    staleInfo.serialize(&builder);
-
-    BSONArray writeErrorsArray(
-        BSON_ARRAY(BSON("index" << 0 << "code" << ErrorCodes::OBSOLETE_StaleShardVersion << "errmsg"
-                                << "OBSOLETE_StaleShardVersion error"
-                                << "errInfo" << builder.obj())
-                   << BSON("index" << 1 << "code" << ErrorCodes::InvalidNamespace << "errmsg"
-                                   << "index 1 failed too")));
-
-    BSONObj origResponseObj =
-        BSON("n" << 0 << "opTime" << mongo::Timestamp(1ULL) << "writeErrors" << writeErrorsArray
-                 << "retriedStmtIds" << BSON_ARRAY(1 << 3) << "ok" << 1.0);
-
-    std::string errMsg;
-    BatchedCommandResponse response;
-    ASSERT_TRUE(response.parseBSON(origResponseObj, &errMsg));
-    ASSERT_EQ(0, response.getErrDetailsAt(0).getIndex());
-    ASSERT_EQ(ErrorCodes::StaleConfig, response.getErrDetailsAt(0).getStatus().code());
-    auto extraInfo = response.getErrDetailsAt(0).getStatus().extraInfo<StaleConfigInfo>();
-    ASSERT_EQ(staleInfo.getVersionReceived(), extraInfo->getVersionReceived());
-    ASSERT_EQ(*staleInfo.getVersionWanted(), *extraInfo->getVersionWanted());
-    ASSERT_EQ(staleInfo.getShardId(), extraInfo->getShardId());
-}
-
-TEST(BatchedCommandResponseTest, StaleErrorAsStaleConfigCompatibility) {
-    OID epoch = OID::gen();
-
-    StaleConfigInfo staleInfo(NamespaceString("TestDB.TestColl"),
-                              ChunkVersion(1, 0, epoch, Timestamp(100, 0)),
-                              ChunkVersion(2, 0, epoch, Timestamp(100, 0)),
+                              ChunkVersion({epoch, Timestamp(100, 0)}, {1, 0}),
+                              ChunkVersion({epoch, Timestamp(100, 0)}, {2, 0}),
                               ShardId("TestShard"));
     BSONObjBuilder builder(BSON("index" << 0 << "code" << ErrorCodes::StaleConfig << "errmsg"
                                         << "StaleConfig error"));
@@ -189,7 +156,7 @@ TEST(BatchedCommandResponseTest, TooManyBigErrors) {
 }
 
 TEST(BatchedCommandResponseTest, CompatibilityFromWriteErrorToBatchCommandResponse) {
-    ChunkVersion versionReceived(1, 0, OID::gen(), Timestamp(2, 0));
+    ChunkVersion versionReceived({OID::gen(), Timestamp(2, 0)}, {1, 0});
 
     write_ops::UpdateCommandReply reply;
     reply.getWriteCommandReplyBase().setN(1);

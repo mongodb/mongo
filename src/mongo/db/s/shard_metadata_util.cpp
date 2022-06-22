@@ -136,12 +136,11 @@ StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
                         entry.getRefreshing() ? *entry.getRefreshing() : true,
                         entry.getLastRefreshedCollectionVersion()
                             ? *entry.getLastRefreshedCollectionVersion()
-                            : ChunkVersion(0, 0, entry.getEpoch(), entry.getTimestamp())};
+                            : ChunkVersion({entry.getEpoch(), entry.getTimestamp()}, {0, 0})};
 }
 
 StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
-
     try {
         DBDirectClient client(opCtx);
         FindCommandRequest findRequest{NamespaceString::kShardConfigCollectionsNamespace};

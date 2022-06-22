@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/catalog/type_chunk.h"
-
-#include <cstring>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -45,7 +40,6 @@
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 
@@ -296,7 +290,7 @@ StatusWith<ChunkType> ChunkType::parseFromConfigBSON(const BSONObj& source,
         if (versionElem.type() == bsonTimestamp || versionElem.type() == Date) {
             auto chunkLastmod = Timestamp(versionElem._numberLong());
             chunk._version =
-                ChunkVersion(chunkLastmod.getSecs(), chunkLastmod.getInc(), epoch, timestamp);
+                ChunkVersion({epoch, timestamp}, {chunkLastmod.getSecs(), chunkLastmod.getInc()});
         } else {
             return {ErrorCodes::BadValue,
                     str::stream() << "The field " << ChunkType::lastmod() << " cannot be parsed."};
@@ -381,7 +375,7 @@ StatusWith<ChunkType> ChunkType::parseFromShardBSON(const BSONObj& source,
         if (lastmodElem.type() == bsonTimestamp || lastmodElem.type() == Date) {
             auto chunkLastmod = Timestamp(lastmodElem._numberLong());
             chunk._version =
-                ChunkVersion(chunkLastmod.getSecs(), chunkLastmod.getInc(), epoch, timestamp);
+                ChunkVersion({epoch, timestamp}, {chunkLastmod.getSecs(), chunkLastmod.getInc()});
         } else {
             return {ErrorCodes::NoSuchKey,
                     str::stream() << "Expected field " << ChunkType::lastmod() << " not found."};

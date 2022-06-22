@@ -34,7 +34,6 @@ env.Library(
 env.Library(
     target='write_ops_parsers',
     source=[
-        'new_write_error_exception_format_feature_flag.idl',
         'write_ops.cpp',
         'write_ops.idl',
     ],

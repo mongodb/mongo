@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/oid.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/balance_stats.h"
@@ -79,7 +77,7 @@ private:
     const Timestamp _timestamp{Timestamp(1, 1)};
     const ShardId _shardPrimary{"dummyShardPrimary"};
     const DatabaseVersion _dbVersion{UUID::gen(), _timestamp};
-    ChunkVersion _nextVersion{1, 0, _epoch, _timestamp};
+    ChunkVersion _nextVersion{{_epoch, _timestamp}, {1, 0}};
 };
 
 TEST_F(BalanceStatsTest, SingleChunkNoZones) {
