@@ -1030,7 +1030,6 @@ protected:
         auto resultSlot = ids.generate();
         auto recordSlot = ids.generate();
         auto recordIdSlot = ids.generate();
-        // auto seekKeySlot = ids.generate();
 
         PlanNodeId planNodeId{0};
         sbe::ScanCallbacks callbacks;
