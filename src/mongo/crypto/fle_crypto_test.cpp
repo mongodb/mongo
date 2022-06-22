@@ -1018,20 +1018,6 @@ BSONObj transformBSON(
     return frameStack.top().builder.obj();
 }
 
-
-template <typename T>
-T parseFromCDR(ConstDataRange cdr) {
-    ConstDataRangeCursor cdc(cdr);
-    auto swObj = cdc.readAndAdvanceNoThrow<Validated<BSONObj>>();
-
-    uassertStatusOK(swObj);
-
-    BSONObj obj = swObj.getValue();
-
-    IDLParserErrorContext ctx("root");
-    return T::parse(ctx, obj);
-}
-
 template <typename T>
 std::vector<uint8_t> toEncryptedVector(EncryptedBinDataType dt, T t) {
     BSONObj obj = t.toBSON();

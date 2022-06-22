@@ -48,7 +48,6 @@
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_endian.h"
-#include "mongo/base/data_type_validated.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -65,6 +64,7 @@
 #include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/crypto/fle_fields_util.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/crypto/symmetric_key.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -154,17 +154,6 @@ PrfBlock blockToArray(const SHA256Block& block) {
     return data;
 }
 
-}  // namespace
-
-PrfBlock PrfBlockfromCDR(ConstDataRange block) {
-    uassert(6373501, "Invalid prf length", block.length() == sizeof(PrfBlock));
-
-    PrfBlock ret;
-    std::copy(block.data(), block.data() + block.length(), ret.data());
-    return ret;
-}
-
-namespace {
 ConstDataRange hmacKey(const KeyMaterial& keyMaterial) {
     static_assert(kHmacKeyOffset + crypto::sym256KeySize <= crypto::kFieldLevelEncryptionKeySize);
     invariant(crypto::kFieldLevelEncryptionKeySize == keyMaterial->size());
@@ -208,13 +197,6 @@ PrfBlock prf(ConstDataRange key, uint64_t value, int64_t value2) {
     return blockToArray(block);
 }
 
-ConstDataRange binDataToCDR(const BSONElement element) {
-    uassert(6338501, "Expected binData BSON element", element.type() == BinData);
-
-    int len;
-    const char* data = element.binData(len);
-    return ConstDataRange(data, data + len);
-}
 
 ConstDataRange binDataToCDR(const BSONBinData binData) {
     int len = binData.length;
@@ -251,14 +233,6 @@ void appendTag(PrfBlock block, BSONArrayBuilder* builder) {
     builder->appendBinData(block.size(), BinDataType::BinDataGeneral, block.data());
 }
 
-template <typename T>
-T parseFromCDR(ConstDataRange cdr) {
-    ConstDataRangeCursor cdc(cdr);
-    auto obj = cdc.readAndAdvance<Validated<BSONObj>>();
-
-    IDLParserErrorContext ctx("root");
-    return T::parse(ctx, obj);
-}
 
 std::vector<uint8_t> vectorFromCDR(ConstDataRange cdr) {
     std::vector<uint8_t> buf(cdr.length());
@@ -1190,6 +1164,14 @@ std::vector<uint8_t> toEncryptedVector(EncryptedBinDataType dt, const PrfBlock& 
     std::copy(block.data(), block.data() + block.size(), buf.data() + 1);
 
     return buf;
+}
+
+PrfBlock PrfBlockfromCDR(const ConstDataRange& block) {
+    uassert(6373501, "Invalid prf length", block.length() == sizeof(PrfBlock));
+
+    PrfBlock ret;
+    std::copy(block.data(), block.data() + block.length(), ret.data());
+    return ret;
 }
 
 CollectionsLevel1Token FLELevel1TokenGenerator::generateCollectionsLevel1Token(
@@ -2517,4 +2499,11 @@ uint64_t CompactionHelpers::countDeleted(const std::vector<ECCDocument>& rangeLi
     return sum;
 }
 
+ConstDataRange binDataToCDR(BSONElement element) {
+    uassert(6338501, "Expected binData BSON element", element.type() == BinData);
+
+    int len;
+    const char* data = element.binData(len);
+    return ConstDataRange(data, data + len);
+}
 }  // namespace mongo
