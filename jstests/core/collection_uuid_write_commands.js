@@ -57,10 +57,12 @@ var testCommand = function(cmd, cmdObj) {
     jsTestLog("The command '" + cmd +
               "' fails when the provided UUID corresponds to a different collection, even if the " +
               "provided namespace does not exist.");
-    coll2.drop();
+    assert.commandWorkedOrFailedWithCode(testDB.runCommand({drop: coll2.getName()}),
+                                         ErrorCodes.NamespaceNotFound);
     res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
     validateErrorResponse(res, testDB.getName(), uuid, coll2.getName(), coll.getName());
+    assert(!testDB.getCollectionNames().includes(coll2.getName()));
 
     jsTestLog("Only collections in the same database are specified by actualCollection.");
     const otherDB = testDB.getSiblingDB(testDB.getName() + '_2');
@@ -75,5 +77,7 @@ var testCommand = function(cmd, cmdObj) {
 
 testCommand("insert", {insert: "", documents: [{inserted: true}]});
 testCommand("update", {update: "", updates: [{q: {_id: 0}, u: {$set: {updated: true}}}]});
+testCommand("update",
+            {update: "", updates: [{q: {_id: 0}, u: {$set: {updated: true}}, upsert: true}]});
 testCommand("delete", {delete: "", deletes: [{q: {_id: 0}, limit: 1}]});
 })();
