@@ -164,7 +164,29 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
 ]
 
 # Do not add user visible fields already released in earlier versions.
-IGNORE_UNSTABLE_LIST: List[str] = [
+# We generally don't allow changing a field from stable to unstable, but we permit it in special cases,
+# such as when we want to avoid making internal fields part of the stable API.
+IGNORE_STABLE_TO_UNSTABLE_LIST: List[str] = [
+    # This list is only used in unit-tests.
+    'newReplyFieldUnstableIgnoreList-reply-unstableNewFieldIgnoreList',
+    'newTypeFieldUnstableIgnoreList-param-unstableNewFieldIgnoreList',
+    'newTypeEnumOrStructIgnoreList-reply-unstableNewFieldIgnoreList',
+    'commandParameterUnstableIgnoreList-param-newUnstableParameterIgnoreList',
+    'newReplyFieldUnstableOptionalIgnoreList-reply-unstableOptionalNewFieldIgnoreList',
+    'newReplyTypeEnumOrStructIgnoreList-reply-newReplyTypeEnumOrStructIgnoreList',
+    'newReplyFieldVariantNotSubsetIgnoreList-reply-variantNotSubsetReplyFieldIgnoreList',
+    'replyFieldVariantDifferentStructIgnoreList-reply-variantStructRecursiveReplyFieldIgnoreList',
+    'replyFieldNonVariantToVariantIgnoreList-reply-nonVariantToVariantReplyFieldIgnoreList',
+    'replyFieldNonEnumToEnumIgnoreList-reply-nonEnumToEnumReplyIgnoreList',
+    'newUnstableParamTypeChangesIgnoreList-param-newUnstableTypeChangesParamIgnoreList',
+    'newUnstableTypeChangesIgnoreList',
+    'newUnstableTypeChangesIgnoreList-param-newUnstableTypeChangesFieldIgnoreList',
+    'newUnstableReplyFieldTypeChangesIgnoreList-reply-newUnstableTypeChangesReplyFieldIgnoreList',
+    'newReplyFieldTypeStructIgnoreList-reply-structReplyField',
+    'newReplyFieldTypeStructIgnoreList-reply-unstableNewFieldIgnoreList',
+
+    # Real use cases for changing a field from 'stable' to 'unstable'.
+
     # The 'originalSpec' field was introduced in v5.1 behind a disabled feature flag and is not user
     # visible. This is part of the listIndexes output when executed against system.bucket.*
     # collections, which users should avoid doing.
@@ -350,11 +372,13 @@ def check_reply_field_type_recursive(ctxt: IDLCompatibilityContext,
     cmd_name = field_pair.cmd_name
     field_name = field_pair.field_name
 
+    ignore_list_name: str = cmd_name + "-reply-" + field_name
+
     # If the old field is unstable, we only add errors related to the use of 'any' as the
     # bson_serialization_type. For all other errors, we check that the old field is stable
     # before adding an error.
     if not isinstance(new_field_type, syntax.Type):
-        if not old_field.unstable:
+        if not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
             ctxt.add_new_reply_field_type_enum_or_struct_error(
                 cmd_name, field_name, new_field_type.name, old_field_type.name,
                 new_field.idl_file_path)
@@ -372,11 +396,9 @@ def check_reply_field_type_recursive(ctxt: IDLCompatibilityContext,
                                                 new_field_type.name, new_field.idl_file_path)
         return
 
-    allow_name: str = cmd_name + "-reply-" + field_name
-
     if "any" in old_field_type.bson_serialization_type:
         # If 'any' is not explicitly allowed as the bson_serialization_type.
-        if allow_name not in ALLOW_ANY_TYPE_LIST:
+        if ignore_list_name not in ALLOW_ANY_TYPE_LIST:
             ctxt.add_old_reply_field_bson_any_not_allowed_error(
                 cmd_name, field_name, old_field_type.name, old_field.idl_file_path)
             return
@@ -387,12 +409,12 @@ def check_reply_field_type_recursive(ctxt: IDLCompatibilityContext,
                                                           new_field.idl_file_path)
 
         # If serializer is changed, it's a potential breaking change.
-        if (not old_field.unstable) and old_field_type.serializer != new_field_type.serializer:
+        if not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST and old_field_type.serializer != new_field_type.serializer:
             ctxt.add_reply_field_serializer_not_equal_error(
                 cmd_name, field_name, new_field_type.name, new_field.idl_file_path)
 
         # If deserializer is changed, it's a potential breaking change.
-        if (not old_field.unstable) and old_field_type.deserializer != new_field_type.deserializer:
+        if not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST and old_field_type.deserializer != new_field_type.deserializer:
             ctxt.add_reply_field_deserializer_not_equal_error(
                 cmd_name, field_name, new_field_type.name, new_field.idl_file_path)
 
@@ -419,7 +441,7 @@ def check_reply_field_type_recursive(ctxt: IDLCompatibilityContext,
 
             else:
                 # new_variant_type was not found in old_variant_types.
-                if not old_field.unstable:
+                if not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
                     ctxt.add_new_reply_field_variant_type_not_subset_error(
                         cmd_name, field_name, new_variant_type.name, new_field.idl_file_path)
 
@@ -427,7 +449,7 @@ def check_reply_field_type_recursive(ctxt: IDLCompatibilityContext,
         # Since enums can't be part of variant types, we don't explicitly check for enums.
         if isinstance(new_field_type,
                       syntax.VariantType) and new_field_type.variant_struct_type is not None:
-            if old_field_type.variant_struct_type is None and not old_field.unstable:
+            if old_field_type.variant_struct_type is None and not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
                 ctxt.add_new_reply_field_variant_type_not_subset_error(
                     cmd_name, field_name, new_field_type.variant_struct_type.name,
                     new_field.idl_file_path)
@@ -437,7 +459,7 @@ def check_reply_field_type_recursive(ctxt: IDLCompatibilityContext,
                                    new_field.idl_file, old_field.idl_file_path,
                                    new_field.idl_file_path)
 
-    elif not old_field.unstable:
+    elif not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
         if isinstance(new_field_type, syntax.VariantType):
             ctxt.add_new_reply_field_variant_type_error(cmd_name, field_name, old_field_type.name,
                                                         new_field.idl_file_path)
@@ -452,6 +474,8 @@ def check_reply_field_type(ctxt: IDLCompatibilityContext, field_pair: FieldCompa
     # pylint: disable=too-many-branches
     old_field = field_pair.old
     new_field = field_pair.new
+    cmd_name = field_pair.cmd_name
+    field_name = field_pair.field_name
     array_check = check_array_type(ctxt, "reply_field", old_field.field_type, new_field.field_type,
                                    field_pair.cmd_name, 'type', old_field.idl_file_path,
                                    new_field.idl_file_path, old_field.unstable)
@@ -475,10 +499,14 @@ def check_reply_field_type(ctxt: IDLCompatibilityContext, field_pair: FieldCompa
         ctxt.errors.dump_errors()
         sys.exit(1)
 
+    ignore_list_name: str = cmd_name + "-reply-" + field_name
+
     if isinstance(old_field_type, syntax.Type):
         check_reply_field_type_recursive(ctxt, field_pair)
 
-    elif isinstance(old_field_type, syntax.Enum) and not old_field.unstable:
+    elif isinstance(
+            old_field_type, syntax.Enum
+    ) and not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
         if isinstance(new_field_type, syntax.Enum):
             check_subset(ctxt, cmd_name, field_name, new_field_type.name, new_field_type.values,
                          old_field_type.values, new_field.idl_file_path)
@@ -491,7 +519,7 @@ def check_reply_field_type(ctxt: IDLCompatibilityContext, field_pair: FieldCompa
             check_reply_fields(ctxt, old_field_type, new_field_type, cmd_name, old_field.idl_file,
                                new_field.idl_file, old_field.idl_file_path, new_field.idl_file_path)
         else:
-            if not old_field.unstable:
+            if not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
                 ctxt.add_new_reply_field_type_not_struct_error(
                     cmd_name, field_name, new_field_type.name, old_field_type.name,
                     new_field.idl_file_path)
@@ -536,9 +564,9 @@ def check_reply_field(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
                                                 and old_field_type.name == "optionalBool")
     new_field_optional = new_field.optional or (new_field_type
                                                 and new_field_type.name == "optionalBool")
-    field_name: str = cmd_name + "-reply-" + new_field.name
-    if not old_field.unstable and field_name not in IGNORE_UNSTABLE_LIST:
-        if new_field.unstable and field_name not in IGNORE_UNSTABLE_LIST:
+    ignore_list_name: str = cmd_name + "-reply-" + new_field.name
+    if not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
+        if new_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
             ctxt.add_new_reply_field_unstable_error(cmd_name, new_field.name, new_idl_file_path)
         if new_field_optional and not old_field_optional:
             ctxt.add_new_reply_field_optional_error(cmd_name, new_field.name, new_idl_file_path)
@@ -652,18 +680,18 @@ def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
     cmd_name = field_pair.cmd_name
     param_name = field_pair.field_name
 
+    ignore_list_name: str = cmd_name + "-param-" + param_name if is_command_parameter else cmd_name
+
     # If the old field is unstable, we only add errors related to the use of 'any' as the
     # bson_serialization_type. For all other errors, we check that the old field is stable
     # before adding an error.
 
     if not isinstance(new_type, syntax.Type):
-        if not old_field.unstable:
+        if not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
             ctxt.add_new_command_or_param_type_enum_or_struct_error(
                 cmd_name, new_type.name, old_type.name, new_field.idl_file_path, param_name,
                 is_command_parameter)
         return
-
-    allow_name: str = cmd_name + "-param-" + param_name if is_command_parameter else cmd_name
 
     # If bson_serialization_type switches from 'any' to non-any type.
     if "any" in old_type.bson_serialization_type and "any" not in new_type.bson_serialization_type:
@@ -681,7 +709,7 @@ def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
 
     if "any" in old_type.bson_serialization_type:
         # If 'any' is not explicitly allowed as the bson_serialization_type.
-        if allow_name not in ALLOW_ANY_TYPE_LIST:
+        if ignore_list_name not in ALLOW_ANY_TYPE_LIST:
             ctxt.add_old_command_or_param_type_bson_any_not_allowed_error(
                 cmd_name, old_type.name, old_field.idl_file_path, param_name, is_command_parameter)
             return
@@ -692,18 +720,20 @@ def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
                 cmd_name, new_type.name, new_field.idl_file_path, param_name, is_command_parameter)
 
         # If serializer is changed, it's a potential breaking change.
-        if (not old_field.unstable) and old_type.serializer != new_type.serializer:
+        if (not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST
+            ) and old_type.serializer != new_type.serializer:
             ctxt.add_command_or_param_serializer_not_equal_error(
                 cmd_name, new_type.name, new_field.idl_file_path, param_name, is_command_parameter)
 
         # If deserializer is changed, it's a potential breaking change.
-        if (not old_field.unstable) and old_type.deserializer != new_type.deserializer:
+        if (not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST
+            ) and old_type.deserializer != new_type.deserializer:
             ctxt.add_command_or_param_deserializer_not_equal_error(
                 cmd_name, new_type.name, new_field.idl_file_path, param_name, is_command_parameter)
 
     if isinstance(old_type, syntax.VariantType):
         if not isinstance(new_type, syntax.VariantType):
-            if not old_field.unstable:
+            if not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
                 ctxt.add_new_command_or_param_type_not_variant_type_error(
                     cmd_name, new_type.name, new_field.idl_file_path, param_name,
                     is_command_parameter)
@@ -730,7 +760,7 @@ def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
                             is_command_parameter)
                         break
                 else:
-                    if not old_field.unstable:
+                    if not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
                         # old_variant_type was not found in new_variant_types.
                         ctxt.add_new_command_or_param_variant_type_not_superset_error(
                             cmd_name, old_variant_type.name, new_field.idl_file_path, param_name,
@@ -746,12 +776,12 @@ def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
                         new_field.idl_file_path, is_command_parameter)
 
                 # If old type has a variant struct type and new type does not have a variant struct type.
-                elif not old_field.unstable:
+                elif not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
                     ctxt.add_new_command_or_param_variant_type_not_superset_error(
                         cmd_name, old_type.variant_struct_type.name, new_field.idl_file_path,
                         param_name, is_command_parameter)
 
-    elif not old_field.unstable:
+    elif not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
         check_superset(ctxt, cmd_name, new_type.name, new_type.bson_serialization_type,
                        old_type.bson_serialization_type, new_field.idl_file_path, param_name,
                        is_command_parameter)
@@ -763,10 +793,12 @@ def check_param_or_command_type(ctxt: IDLCompatibilityContext, field_pair: Field
     # pylint: disable=too-many-branches
     old_field = field_pair.old
     new_field = field_pair.new
+    field_name = field_pair.field_name
+    cmd_name = field_pair.cmd_name
     array_check = check_array_type(
         ctxt, "command_parameter" if is_command_parameter else "command_namespace",
         old_field.field_type, new_field.field_type, field_pair.cmd_name,
-        field_pair.field_name if is_command_parameter else "type", old_field.idl_file_path,
+        field_name if is_command_parameter else "type", old_field.idl_file_path,
         new_field.idl_file_path, old_field.unstable)
     if array_check == ArrayTypeCheckResult.INVALID:
         return
@@ -778,40 +810,42 @@ def check_param_or_command_type(ctxt: IDLCompatibilityContext, field_pair: Field
     old_type = old_field.field_type
     new_type = new_field.field_type
     if old_type is None:
-        ctxt.add_command_or_param_type_invalid_error(field_pair.cmd_name, old_field.idl_file_path,
+        ctxt.add_command_or_param_type_invalid_error(cmd_name, old_field.idl_file_path,
                                                      field_pair.field_name, is_command_parameter)
         ctxt.errors.dump_errors()
         sys.exit(1)
     if new_type is None:
-        ctxt.add_command_or_param_type_invalid_error(field_pair.cmd_name, new_field.idl_file_path,
+        ctxt.add_command_or_param_type_invalid_error(cmd_name, new_field.idl_file_path,
                                                      field_pair.field_name, is_command_parameter)
         ctxt.errors.dump_errors()
         sys.exit(1)
+
+    ignore_list_name: str = cmd_name + "-param-" + field_name
 
     if isinstance(old_type, syntax.Type):
         check_param_or_command_type_recursive(ctxt, field_pair, is_command_parameter)
 
     # Only add type errors if the old field is stable.
-    elif isinstance(old_type, syntax.Enum) and not old_field.unstable:
+    elif isinstance(
+            old_type, syntax.Enum
+    ) and not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
         if isinstance(new_type, syntax.Enum):
-            check_superset(ctxt, field_pair.cmd_name, new_type.name, new_type.values,
-                           old_type.values, new_field.idl_file_path, field_pair.field_name,
-                           is_command_parameter)
+            check_superset(ctxt, cmd_name, new_type.name, new_type.values, old_type.values,
+                           new_field.idl_file_path, field_pair.field_name, is_command_parameter)
         else:
             ctxt.add_new_command_or_param_type_not_enum_error(
-                field_pair.cmd_name, new_type.name, old_type.name, new_field.idl_file_path,
+                cmd_name, new_type.name, old_type.name, new_field.idl_file_path,
                 field_pair.field_name, is_command_parameter)
 
     elif isinstance(old_type, syntax.Struct):
         if isinstance(new_type, syntax.Struct):
             check_command_params_or_type_struct_fields(
-                ctxt, old_type, new_type, field_pair.cmd_name, old_field.idl_file,
-                new_field.idl_file, old_field.idl_file_path, new_field.idl_file_path,
-                is_command_parameter)
+                ctxt, old_type, new_type, cmd_name, old_field.idl_file, new_field.idl_file,
+                old_field.idl_file_path, new_field.idl_file_path, is_command_parameter)
         else:
-            if not old_field.unstable:
+            if not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
                 ctxt.add_new_command_or_param_type_not_struct_error(
-                    field_pair.cmd_name, new_type.name, old_type.name, new_field.idl_file_path,
+                    cmd_name, new_type.name, old_type.name, new_field.idl_file_path,
                     field_pair.field_name, is_command_parameter)
 
 
@@ -948,8 +982,8 @@ def check_command_param_or_type_struct_field(
         is_command_parameter: bool):
     """Check compatibility between the old and new command parameter or command type struct field."""
     # pylint: disable=too-many-arguments
-    field_name: str = cmd_name + "-param-" + new_field.name
-    if not old_field.unstable and new_field.unstable and field_name not in IGNORE_UNSTABLE_LIST:
+    ignore_list_name: str = cmd_name + "-param-" + new_field.name
+    if not old_field.unstable and new_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
         ctxt.add_new_param_or_command_type_field_unstable_error(
             cmd_name, old_field.name, old_idl_file_path, type_name, is_command_parameter)
     # If old field is unstable and new field is stable, the new field should either be optional or
@@ -964,11 +998,11 @@ def check_command_param_or_type_struct_field(
         ctxt.add_new_param_or_command_type_field_stable_required_no_default_error(
             cmd_name, old_field.name, old_idl_file_path, type_name, is_command_parameter)
 
-    if old_field_optional and not new_field_optional:
+    if not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST and old_field_optional and not new_field_optional:
         ctxt.add_new_param_or_command_type_field_required_error(
             cmd_name, old_field.name, old_idl_file_path, type_name, is_command_parameter)
 
-    if not old_field.unstable:
+    if not old_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
         check_param_or_type_validator(ctxt, old_field, new_field, cmd_name, new_idl_file_path,
                                       type_name, is_command_parameter)
 
