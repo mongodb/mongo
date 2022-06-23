@@ -85,42 +85,6 @@ public:
  */
 const size_t MAX_RETRY = 3;
 
-/**
- * Extracts the read preference settings from the query document. Note that this method
- * assumes that the query is ok for secondaries so it defaults to
- * ReadPreference::SecondaryPreferred when nothing is specified. Supports the following
- * format:
- *
- * Format A (official format):
- * { query: <actual query>, $readPreference: <read pref obj> }
- *
- * Format B (unofficial internal format from mongos):
- * { <actual query>, $queryOptions: { $readPreference: <read pref obj> }}
- *
- * @param query the raw query document
- *
- * @return the read preference setting if a read preference exists, otherwise the default read
- *         preference of Primary_Only. If the tags field was not present, it will contain one
- *         empty tag document {} which matches any tag.
- *
- * @throws AssertionException if the read preference object is malformed
- */
-std::unique_ptr<ReadPreferenceSetting> _extractReadPref(
-    const client_deprecated::Query& querySettings, int queryOptions) {
-    // Default read pref is primary only or secondary preferred with secondaryOK
-    const auto defaultReadPref = queryOptions & QueryOption_SecondaryOk
-        ? ReadPreference::SecondaryPreferred
-        : ReadPreference::PrimaryOnly;
-
-    BSONObj readPrefContainingObj = querySettings.getFullSettingsDeprecated();
-    if (auto elem = readPrefContainingObj["$queryOptions"]) {
-        // The readPreference is embedded in the $queryOptions field.
-        readPrefContainingObj = elem.Obj();
-    }
-    return std::make_unique<ReadPreferenceSetting>(uassertStatusOK(
-        ReadPreferenceSetting::fromContainingBSON(readPrefContainingObj, defaultReadPref)));
-}
-
 }  // namespace
 
 // --------------------------------
@@ -734,70 +698,6 @@ void DBClientReplicaSet::say(Message& toSend, bool isRetry, string* actualServer
     if (!isRetry)
         _lastClient = nullptr;
 
-    const int lastOp = toSend.operation();
-
-    if (lastOp == dbQuery) {
-        // TODO: might be possible to do this faster by changing api
-        DbMessage dm(toSend);
-        QueryMessage qm(dm);
-
-        shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(
-            client_deprecated::Query::fromBSONDeprecated(qm.query), qm.queryOptions));
-        if (_isSecondaryQuery(qm.ns, qm.query, *readPref)) {
-            LOGV2_DEBUG(20141,
-                        3,
-                        "dbclient_rs say using secondary or tagged node selection in {replicaSet}, "
-                        "read pref is {readPref} "
-                        "(primary : {primary}, lastTagged : {lastTagged})",
-                        "dbclient_rs say using secondary or tagged node selection",
-                        "replicaSet"_attr = _getMonitor()->getName(),
-                        "readPref"_attr = readPref->toString(),
-                        "primary"_attr = (_primary.get() != nullptr ? _primary->getServerAddress()
-                                                                    : "[not cached]"),
-                        "lastTagged"_attr = (_lastSecondaryOkConn.get() != nullptr
-                                                 ? _lastSecondaryOkConn->getServerAddress()
-                                                 : "[not cached]"));
-
-            string lastNodeErrMsg;
-
-            for (size_t retry = 0; retry < MAX_RETRY; retry++) {
-                try {
-                    DBClientConnection* conn = selectNodeUsingTags(readPref);
-
-                    if (conn == nullptr) {
-                        break;
-                    }
-
-                    if (actualServer != nullptr) {
-                        *actualServer = conn->getServerAddress();
-                    }
-
-                    conn->say(toSend);
-
-                    _lastClient = conn;
-                } catch (const DBException& ex) {
-                    const Status status =
-                        ex.toStatus(str::stream() << "can't callLazy replica set node "
-                                                  << _lastSecondaryOkHost.toString());
-                    lastNodeErrMsg = status.reason();
-                    _invalidateLastSecondaryOkCache(status);
-
-                    continue;
-                }
-
-                return;
-            }
-
-            StringBuilder assertMsg;
-            assertMsg << "Failed to call say, no good nodes in " << _getMonitor()->getName();
-            if (!lastNodeErrMsg.empty()) {
-                assertMsg << ", last error: " << lastNodeErrMsg;
-            }
-
-            uasserted(16380, assertMsg.str());
-        }
-    }
-
     LOGV2_DEBUG(20142,
                 3,
                 "dbclient_rs say to primary node in {replicaSet}",
@@ -899,60 +799,6 @@ bool DBClientReplicaSet::call(Message& toSend,
                               Message& response,
                               bool assertOk,
                               string* actualServer) {
-    const char* ns = nullptr;
-
-    if (toSend.operation() == dbQuery) {
-        // TODO: might be possible to do this faster by changing api
-        DbMessage dm(toSend);
-        QueryMessage qm(dm);
-        ns = qm.ns;
-
-        shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(
-            client_deprecated::Query::fromBSONDeprecated(qm.query), qm.queryOptions));
-        if (_isSecondaryQuery(ns, qm.query, *readPref)) {
-            LOGV2_DEBUG(
-                20145,
-                3,
-                "dbclient_rs call using secondary or tagged node selection in {replicaSet}, "
-                "read pref is {readPref} "
-                "(primary : {primary}, lastTagged : {lastTagged})",
-                "dbclient_rs call using secondary or tagged node selection",
-                "replicaSet"_attr = _getMonitor()->getName(),
-                "readPref"_attr = readPref->toString(),
-                "primary"_attr =
-                    (_primary.get() != nullptr ? _primary->getServerAddress() : "[not cached]"),
-                "lastTagged"_attr = (_lastSecondaryOkConn.get() != nullptr
-                                         ? _lastSecondaryOkConn->getServerAddress()
-                                         : "[not cached]"));
-
-            for (size_t retry = 0; retry < MAX_RETRY; retry++) {
-                try {
-                    DBClientConnection* conn = selectNodeUsingTags(readPref);
-
-                    if (conn == nullptr) {
-                        return false;
-                    }
-
-                    if (actualServer != nullptr) {
-                        *actualServer = conn->getServerAddress();
-                    }
-
-                    return conn->call(toSend, response, assertOk, nullptr);
-                } catch (const DBException& ex) {
-                    if (actualServer)
-                        *actualServer = "";
-
-                    const Status status = ex.toStatus();
-                    _invalidateLastSecondaryOkCache(status.withContext(
-                        str::stream() << "can't call replica set node " << _lastSecondaryOkHost));
-                }
-            }
-
-            // Was not able to successfully send after max retries
-            return false;
-        }
-    }
-
     LOGV2_DEBUG(20146,
                 3,
                 "dbclient_rs call to primary node in {replicaSet}",
@@ -965,20 +811,6 @@ bool DBClientReplicaSet::call(Message& toSend,
 
     if (!m->call(toSend, response, assertOk, nullptr))
         return false;
-
-    if (ns) {
-        QueryResult::View res = response.singleData().view2ptr();
-        if (res.getNReturned() == 1) {
-            BSONObj x(res.data());
-            if (str::contains(ns, "$cmd")) {
-                if (isNotPrimaryErrorString(x["errmsg"]))
-                    isNotPrimary();
-            } else {
-                if (isNotPrimaryErrorString(getErrField(x)))
-                    isNotPrimary();
-            }
-        }
-    }
 
     return true;
 }
