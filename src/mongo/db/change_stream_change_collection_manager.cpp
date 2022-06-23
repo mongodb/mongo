@@ -71,7 +71,9 @@ public:
      * collection when the 'write()' method is called.
      */
     void add(const TenantId& tenantId, InsertStatement insertStatement) {
-        _tenantStatementsMap[tenantId].push_back(std::move(insertStatement));
+        if (_shouldAddEntry(insertStatement)) {
+            _tenantStatementsMap[tenantId].push_back(std::move(insertStatement));
+        }
     }
 
     /**
@@ -112,6 +114,30 @@ public:
     }
 
 private:
+    bool _shouldAddEntry(const InsertStatement& insertStatement) {
+        auto& oplogDoc = insertStatement.doc;
+
+        // TODO SERVER-65950 retreive tenant from the oplog.
+        // TODO SERVER-67170 avoid inspecting the oplog BSON object.
+
+        if (auto nssFieldElem = oplogDoc[repl::OplogEntry::kNssFieldName];
+            nssFieldElem && nssFieldElem.String() == "config.$cmd"_sd) {
+            if (auto objectFieldElem = oplogDoc[repl::OplogEntry::kObjectFieldName]) {
+                // The oplog entry might be a drop command on the change collection. Check if the
+                // drop request is for the already deleted change collection, as such do not attempt
+                // to write to the change collection if that is the case. This scenario is possible
+                // because 'WriteUnitOfWork' will stage the changes and while committing the staged
+                // 'CollectionImpl::insertDocuments' change the collection object might have already
+                // been deleted.
+                if (auto dropFieldElem = objectFieldElem["drop"_sd]) {
+                    return dropFieldElem.String() != NamespaceString::kChangeCollectionName;
+                }
+            }
+        }
+
+        return true;
+    }
+
     // Maps inserts statements for each tenant.
     stdx::unordered_map<TenantId, std::vector<InsertStatement>, TenantId::Hasher>
         _tenantStatementsMap;
