@@ -6,6 +6,7 @@ import errno
 import json
 import os
 import re
+import platform
 import shlex
 import shutil
 import stat
@@ -735,6 +736,13 @@ add_option(
     help='Enable visibility annotations',
     nargs='?',
     type='choice',
+)
+
+add_option(
+    'force-macos-dynamic-link',
+    default=False,
+    action='store_true',
+    help='Bypass link-model=dynamic check for macos versions <12.',
 )
 
 try:
@@ -1857,6 +1865,29 @@ if link_model.startswith('dynamic') and get_option('install-action') == 'symlink
     env.FatalError(
         f"Options '--link-model={link_model}' not supported with '--install-action={get_option('install-action')}'."
     )
+
+if link_model.startswith('dynamic') and env.TargetOSIs(
+        'darwin') and not get_option('force-macos-dynamic-link'):
+
+    macos_version_message = textwrap.dedent("""\
+        link-model=dynamic us only supported on macos version 12 or higher.
+        This is due to a 512 dylib limit on older macos. See this post for
+        more information: https://developer.apple.com/forums//thread/708366?login=true&page=1#717495022
+        Use '--force-macos-dynamic-link' to bypass this check.
+        """)
+
+    try:
+        macos_version_major = int(platform.mac_ver()[0].split('.')[0])
+        if macos_version_major < 12:
+            env.FatalError(
+                textwrap.dedent(f"""\
+                Macos version detected: {macos_version_major}
+                """) + macos_version_message)
+    except (IndexError, TypeError) as exc:
+        env.FatalError(
+            textwrap.dedent(f"""\
+            Failed to detect macos version: {exc}
+            """) + macos_version_message)
 
 # libunwind configuration.
 # In which the following globals are set and normalized to bool:
