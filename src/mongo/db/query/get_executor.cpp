@@ -51,11 +51,7 @@
 #include "mongo/db/exec/record_store_fast_count.h"
 #include "mongo/db/exec/return_key.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
-#include "mongo/db/exec/sbe/stages/loop_join.h"
-#include "mongo/db/exec/sbe/stages/scan.h"
-#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/subplan.h"
@@ -88,12 +84,11 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/db/query/sbe_cached_solution_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
-#include "mongo/db/query/sbe_stage_builder.h"
-#include "mongo/db/query/sbe_stage_builder_index_scan.h"
 #include "mongo/db/query/sbe_sub_planner.h"
 #include "mongo/db/query/sbe_utils.h"
 #include "mongo/db/query/stage_builder_util.h"
@@ -602,10 +597,10 @@ public:
     PrepareExecutionHelper(OperationContext* opCtx,
                            CanonicalQuery* cq,
                            PlanYieldPolicy* yieldPolicy,
-                           size_t plannerOptions)
+                           const QueryPlannerParams& plannerOptions)
         : _opCtx{opCtx}, _cq{cq}, _yieldPolicy{yieldPolicy} {
         invariant(_cq);
-        _plannerParams.options = plannerOptions;
+        _plannerParams = plannerOptions;
     }
 
     /**
@@ -796,7 +791,7 @@ public:
                                   WorkingSet* ws,
                                   CanonicalQuery* cq,
                                   PlanYieldPolicy* yieldPolicy,
-                                  size_t plannerOptions)
+                                  const QueryPlannerParams& plannerOptions)
         : PrepareExecutionHelper{opCtx, std::move(cq), yieldPolicy, plannerOptions},
           _collection(collection),
           _ws{ws} {}
@@ -991,7 +986,10 @@ public:
                                     CanonicalQuery* cq,
                                     PlanYieldPolicy* yieldPolicy,
                                     size_t plannerOptions)
-        : PrepareExecutionHelper{opCtx, std::move(cq), yieldPolicy, plannerOptions},
+        : PrepareExecutionHelper{opCtx,
+                                 std::move(cq),
+                                 yieldPolicy,
+                                 QueryPlannerParams{plannerOptions}},
           _collections(collections) {}
 
     const CollectionPtr& getMainCollection() const override {
@@ -1005,108 +1003,6 @@ public:
     }
 
 protected:
-    std::unique_ptr<SlotBasedPrepareExecutionResult> buildIdHackPlanFastPath() {
-        const auto& mainColl = getMainCollection();
-        if (!isIdHackEligibleQuery(mainColl, *_cq))
-            return nullptr;
-        const IndexDescriptor* descriptor = mainColl->getIndexCatalog()->findIdIndex(_opCtx);
-        if (!descriptor)
-            return nullptr;
-
-        LOGV2_DEBUG(
-            6006801, 2, "Using SBE idhack", "canonicalQuery"_attr = redact(_cq->toStringShort()));
-        tassert(5536100,
-                "SBE cannot handle query with metadata",
-                !_cq->metadataDeps()[DocumentMetadataFields::kSortKey]);
-
-        // For the return key case, we use the common path.
-        if (_cq->getFindCommandRequest().getReturnKey()) {
-            return nullptr;
-        }
-
-        invariant(descriptor->getEntry());
-
-        sbe::value::SlotIdGenerator ids;
-        auto resultSlot = ids.generate();
-        auto recordSlot = ids.generate();
-        auto recordIdSlot = ids.generate();
-
-        PlanNodeId planNodeId{0};
-        sbe::ScanCallbacks callbacks;
-
-        const auto bsonKey =
-            IndexBoundsBuilder::objFromElement(_cq->getQueryObj()["_id"], _cq->getCollator());
-
-        OrderedIntervalList oil("_id");
-        oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(bsonKey));
-
-        IndexBounds bounds;
-        bounds.fields.push_back(std::move(oil));
-
-        auto accessMethod =
-            mainColl->getIndexCatalog()->getEntry(descriptor)->accessMethod()->asSortedData();
-
-        auto intervals = stage_builder::makeIntervalsFromIndexBounds(
-            bounds,
-            true,
-            accessMethod->getSortedDataInterface()->getKeyStringVersion(),
-            accessMethod->getSortedDataInterface()->getOrdering());
-
-        sbe::IndexKeysInclusionSet keySet;
-        invariant(intervals.size() == 1);
-        auto&& [lowKey, highKey] = intervals[0];
-        auto ixScan = sbe::makeS<sbe::IndexScanStage>(
-            mainColl->uuid(),
-            descriptor->indexName(),
-            true,
-            recordSlot,
-            recordIdSlot,
-            boost::none,
-            keySet,
-            sbe::makeSV(),
-            stage_builder::makeConstant(
-                sbe::value::TypeTags::ksValue,
-                sbe::value::bitcastFrom<KeyString::Value*>(lowKey.release())),
-            stage_builder::makeConstant(
-                sbe::value::TypeTags::ksValue,
-                sbe::value::bitcastFrom<KeyString::Value*>(highKey.release())),
-            _yieldPolicy,
-            planNodeId);
-
-
-        auto scanStage = sbe::makeS<sbe::ScanStage>(mainColl->uuid(),
-                                                    resultSlot,
-                                                    recordIdSlot,
-                                                    boost::none,
-                                                    boost::none,
-                                                    boost::none,
-                                                    boost::none,
-                                                    boost::none,
-                                                    std::vector<std::string>{},
-                                                    sbe::makeSV(),
-                                                    recordIdSlot,
-                                                    true,
-                                                    nullptr,
-                                                    planNodeId,
-                                                    std::move(callbacks));
-
-        auto result = makeResult();
-
-        stage_builder::PlanStageData data{std::make_unique<sbe::RuntimeEnvironment>()};
-        data.outputs.set(stage_builder::PlanStageSlots::kResult, resultSlot);
-
-        auto stage = sbe::makeS<sbe::LoopJoinStage>(
-            sbe::makeS<sbe::LimitSkipStage>(std::move(ixScan), 1, boost::none, planNodeId),
-            sbe::makeS<sbe::LimitSkipStage>(std::move(scanStage), 1, boost::none, planNodeId),
-            sbe::makeSV(),
-            sbe::makeSV(recordIdSlot),
-            nullptr,
-            planNodeId);
-
-        result->emplace({std::move(stage), data}, nullptr);
-        return result;
-    }
-
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildIdHackPlan() {
         // When the SBE plan cache is enabled we rely on it for fast find-by-_id queries rather than
         // having a special implementation of the idhack. Therefore, this function returns nullptr
@@ -1150,7 +1046,6 @@ protected:
 
             ixScan->bounds.fields.push_back(std::move(oil));
             ixScan->queryCollator = _cq->getCollator();
-
             return ixScan;
         }();
 
@@ -1168,6 +1063,7 @@ protected:
 
         if (const auto* projection = _cq->getProj(); projection) {
             invariant(_cq->root());
+
             if (projection->isSimple()) {
                 root = std::make_unique<ProjectionNodeSimple>(
                     std::move(root), *_cq->root(), *projection);
@@ -1181,10 +1077,6 @@ protected:
         soln->setRoot(std::move(root));
 
         auto execTree = buildExecutableTree(*soln);
-        sbe::DebugPrinter p;
-
-        std::cout << p.print(*execTree.first.get()) << std::endl;
-
         auto result = makeResult();
         result->emplace(std::move(execTree), std::move(soln));
 
@@ -1201,7 +1093,7 @@ protected:
                 // If the feature flag is off, we first try to build an "id hack" plan because the
                 // id hack plans are not cached in the classic cache. We then fall back to use the
                 // classic plan cache.
-                if (auto result = buildIdHackPlanFastPath()) {
+                if (auto result = buildIdHackPlan()) {
                     return result;
                 } else {
                     return buildCachedPlanFromClassicCache();
@@ -1233,7 +1125,7 @@ protected:
 
         // If a cached plan can be used we will have already returned the resulting plan. Otherwise
         // we try to construct a find-by-_id plan
-        return buildIdHackPlanFastPath();
+        return buildIdHackPlan();
     }
 
     // A temporary function to allow recovering SBE plans from the classic plan cache.
@@ -1294,14 +1186,14 @@ protected:
 
 private:
     const MultipleCollectionAccessor& _collections;
-};  // namespace
+};
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecutor(
     OperationContext* opCtx,
     const CollectionPtr& collection,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    size_t plannerOptions) {
+    const QueryPlannerParams& plannerParams) {
     // Mark that this query uses the classic engine, unless this has already been set.
     OpDebug& opDebug = CurOp::get(opCtx)->debug();
     if (!opDebug.classicEngineUsed) {
@@ -1309,7 +1201,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecu
     }
     auto ws = std::make_unique<WorkingSet>();
     ClassicPrepareExecutionHelper helper{
-        opCtx, collection, ws.get(), canonicalQuery.get(), nullptr, plannerOptions};
+        opCtx, collection, ws.get(), canonicalQuery.get(), nullptr, plannerParams};
     auto executionResult = helper.prepare();
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
@@ -1324,7 +1216,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecu
                                        std::move(root),
                                        &collection,
                                        yieldPolicy,
-                                       plannerOptions,
+                                       plannerParams.options,
                                        {},
                                        std::move(solution));
 }
@@ -1409,7 +1301,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<CanonicalQuery> cq,
     PlanYieldPolicy::YieldPolicy requestedYieldPolicy,
-    size_t plannerOptions) {
+    const QueryPlannerParams& plannerParams) {
     // Mark that this query uses the SBE engine, unless this has already been set.
     OpDebug& opDebug = CurOp::get(opCtx)->debug();
     if (!opDebug.classicEngineUsed) {
@@ -1422,7 +1314,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     auto nss = cq->nss();
     auto yieldPolicy = makeSbeYieldPolicy(opCtx, requestedYieldPolicy, mainColl, nss);
     SlotBasedPrepareExecutionHelper helper{
-        opCtx, collections, cq.get(), yieldPolicy.get(), plannerOptions};
+        opCtx, collections, cq.get(), yieldPolicy.get(), plannerParams.options};
     auto planningResultWithStatus = helper.prepare();
     if (!planningResultWithStatus.isOK()) {
         return planningResultWithStatus.getStatus();
@@ -1439,7 +1331,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                                   planningResult->decisionWorks(),
                                                   planningResult->needsSubplanning(),
                                                   yieldPolicy.get(),
-                                                  plannerOptions)) {
+                                                  plannerParams.options)) {
         // Do the runtime planning and pick the best candidate plan.
         auto candidates = planner->plan(std::move(solutions), std::move(roots));
 
@@ -1447,7 +1339,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                            std::move(cq),
                                            std::move(candidates),
                                            collections,
-                                           plannerOptions,
+                                           plannerParams.options,
                                            std::move(nss),
                                            std::move(yieldPolicy));
     }
@@ -1478,7 +1370,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                        std::move(roots[0]),
                                        {},
                                        collections,
-                                       plannerOptions,
+                                       plannerParams.options,
                                        std::move(nss),
                                        std::move(yieldPolicy));
 }
@@ -1490,11 +1382,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    size_t plannerOptions) {
+    const QueryPlannerParams& plannerParams) {
     invariant(canonicalQuery);
     const auto& mainColl = collections.getMainCollection();
     canonicalQuery->setSbeCompatible(
-        sbe::isQuerySbeCompatible(&mainColl, canonicalQuery.get(), plannerOptions));
+        sbe::isQuerySbeCompatible(&mainColl, canonicalQuery.get(), plannerParams.options));
 
     // Use SBE if 'canonicalQuery' is SBE compatible.
     if (!canonicalQuery->getForceClassicEngine() && canonicalQuery->isSbeCompatible()) {
@@ -1508,12 +1400,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
             canonicalQuery->setSbeCompatible(false);
         } else {
             return getSlotBasedExecutor(
-                opCtx, collections, std::move(canonicalQuery), yieldPolicy, plannerOptions);
+                opCtx, collections, std::move(canonicalQuery), yieldPolicy, plannerParams);
         }
     }
 
     return getClassicExecutor(
-        opCtx, mainColl, std::move(canonicalQuery), yieldPolicy, plannerOptions);
+        opCtx, mainColl, std::move(canonicalQuery), yieldPolicy, plannerParams);
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
@@ -1529,7 +1421,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
                        std::move(canonicalQuery),
                        extractAndAttachPipelineStages,
                        yieldPolicy,
-                       plannerOptions);
+                       QueryPlannerParams{plannerOptions});
 }
 
 //
@@ -1542,13 +1434,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     bool permitYield,
-    size_t plannerOptions) {
+    QueryPlannerParams plannerParams) {
     auto yieldPolicy = (permitYield && !opCtx->inMultiDocumentTransaction())
         ? PlanYieldPolicy::YieldPolicy::YIELD_AUTO
         : PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY;
 
     if (OperationShardingState::isComingFromRouter(opCtx)) {
-        plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+        plannerParams.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
 
     return getExecutor(opCtx,
@@ -1556,7 +1448,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                        std::move(canonicalQuery),
                        extractAndAttachPipelineStages,
                        yieldPolicy,
-                       plannerOptions);
+                       plannerParams);
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
@@ -1572,7 +1464,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                            std::move(canonicalQuery),
                            extractAndAttachPipelineStages,
                            permitYield,
-                           plannerOptions);
+                           QueryPlannerParams{plannerOptions});
 }
 
 namespace {
