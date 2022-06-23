@@ -1183,6 +1183,57 @@ buildvariants:
       - name: tpch_10_denormalized
       - name: column_store_index_charts_events_1G
 
+  - name: linux-standalone-classic-query-engine
+    display_name: Linux Standalone (Classic Query Engine)
+    cron: "0 0 * * 4" # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup: standalone-classic-query-engine
+      infrastructure_provisioning: single
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: &classic_engine_tasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: crud_workloads
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: cursor_manager
+      - name: map_reduce_workloads
+      - name: tpcc
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
+
+  - name: linux-1-node-replSet-classic-query-engine
+    display_name: Linux 1-Node ReplSet (Classic Query Engine)
+    cron: "0 0 * * 4" # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup: single-replica-classic-query-engine
+      infrastructure_provisioning: single
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks:
+      - name: linkbench
+      - name: linkbench2
+
   - name: compile-rhel70
     display_name: Compile for Atlas-like
     modules: *modules
