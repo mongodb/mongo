@@ -1031,7 +1031,7 @@ Status runAggregate(OperationContext* opCtx,
             // yet.
             invariant(ctx);
             Explain::explainStages(explainExecutor,
-                                   ctx->getCollection(),
+                                   collections,
                                    *(expCtx->explain),
                                    BSON("optimizedPipeline" << true),
                                    cmdObj,

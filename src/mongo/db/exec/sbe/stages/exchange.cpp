@@ -171,8 +171,9 @@ ExchangeConsumer::ExchangeConsumer(std::unique_ptr<PlanStage> input,
                                    ExchangePolicy policy,
                                    std::unique_ptr<EExpression> partition,
                                    std::unique_ptr<EExpression> orderLess,
-                                   PlanNodeId planNodeId)
-    : PlanStage("exchange"_sd, planNodeId) {
+                                   PlanNodeId planNodeId,
+                                   bool participateInTrialRunTracking)
+    : PlanStage("exchange"_sd, planNodeId, participateInTrialRunTracking) {
     _children.emplace_back(std::move(input));
     _state = std::make_shared<ExchangeState>(
         numOfProducers, std::move(fields), policy, std::move(partition), std::move(orderLess));
@@ -186,13 +187,16 @@ ExchangeConsumer::ExchangeConsumer(std::unique_ptr<PlanStage> input,
         uassert(5922202, "partition expression must not be present", !_state->partitionExpr());
     }
 }
-ExchangeConsumer::ExchangeConsumer(std::shared_ptr<ExchangeState> state, PlanNodeId planNodeId)
-    : PlanStage("exchange"_sd, planNodeId), _state(state) {
+ExchangeConsumer::ExchangeConsumer(std::shared_ptr<ExchangeState> state,
+                                   PlanNodeId planNodeId,
+                                   bool participateInTrialRunTracking)
+    : PlanStage("exchange"_sd, planNodeId, participateInTrialRunTracking), _state(state) {
     _tid = _state->addConsumer(this);
     _orderPreserving = _state->isOrderPreserving();
 }
 std::unique_ptr<PlanStage> ExchangeConsumer::clone() const {
-    return std::make_unique<ExchangeConsumer>(_state, _commonStats.nodeId);
+    return std::make_unique<ExchangeConsumer>(
+        _state, _commonStats.nodeId, _participateInTrialRunTracking);
 }
 void ExchangeConsumer::prepare(CompileCtx& ctx) {
     for (size_t idx = 0; idx < _state->fields().size(); ++idx) {
@@ -486,8 +490,9 @@ void ExchangeProducer::closePipes() {
 
 ExchangeProducer::ExchangeProducer(std::unique_ptr<PlanStage> input,
                                    std::shared_ptr<ExchangeState> state,
-                                   PlanNodeId planNodeId)
-    : PlanStage("exchangep"_sd, planNodeId), _state(state) {
+                                   PlanNodeId planNodeId,
+                                   bool participateInTrialRunTracking)
+    : PlanStage("exchangep"_sd, planNodeId, participateInTrialRunTracking), _state(state) {
     _children.emplace_back(std::move(input));
 
     _tid = _state->addProducer(this);

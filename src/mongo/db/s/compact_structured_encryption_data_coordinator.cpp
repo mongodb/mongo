@@ -187,43 +187,16 @@ void doDropOperation(const CompactStructuredEncryptionDataState& state) {
 boost::optional<BSONObj> CompactStructuredEncryptionDataCoordinator::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-    BSONObjBuilder bob;
+    auto bob = basicReportBuilder();
 
-    CompactStructuredEncryptionDataPhaseEnum currPhase;
-    std::string nss;
-    std::string escNss;
-    std::string eccNss;
-    std::string ecoNss;
-    std::string ecocNss;
-    std::string ecocRenameUuid;
-    std::string ecocUiid;
-    std::string ecocRenameNss;
-    {
-        stdx::lock_guard l{_docMutex};
-        currPhase = _doc.getPhase();
-        nss = _doc.getId().getNss().ns();
-        escNss = _doc.getEscNss().ns();
-        eccNss = _doc.getEccNss().ns();
-        ecoNss = _doc.getEcocNss().ns();
-        ecocNss = _doc.getEcocNss().ns();
-        ecocRenameUuid =
-            _doc.getEcocRenameUuid() ? _doc.getEcocRenameUuid().value().toString() : "none";
-        ecocUiid = _doc.getEcocUuid() ? _doc.getEcocUuid().value().toString() : "none";
-        ecocRenameNss = _doc.getEcocRenameNss().ns();
-    }
-
-    bob.append("type", "op");
-    bob.append("desc", "CompactStructuredEncryptionDataCoordinator");
-    bob.append("op", "command");
-    bob.append("nss", nss);
-    bob.append("escNss", escNss);
-    bob.append("eccNss", eccNss);
-    bob.append("ecocNss", ecocNss);
-    bob.append("ecocUuid", ecocUiid);
-    bob.append("ecocRenameNss", ecocRenameNss);
-    bob.append("ecocRenameUuid", ecocRenameUuid);
-    bob.append("currentPhase", currPhase);
-    bob.append("active", true);
+    stdx::lock_guard lg{_docMutex};
+    bob.append("escNss", _doc.getEscNss().ns());
+    bob.append("eccNss", _doc.getEccNss().ns());
+    bob.append("ecocNss", _doc.getEcocNss().ns());
+    bob.append("ecocUuid", _doc.getEcocUuid() ? _doc.getEcocUuid().value().toString() : "none");
+    bob.append("ecocRenameNss", _doc.getEcocRenameNss().ns());
+    bob.append("ecocRenameUuid",
+               _doc.getEcocRenameUuid() ? _doc.getEcocRenameUuid().value().toString() : "none");
     return bob.obj();
 }
 

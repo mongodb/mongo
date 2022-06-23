@@ -46,6 +46,7 @@
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_ranker_util.h"
@@ -280,8 +281,12 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         }
     }
 
-    plan_cache_util::updatePlanCache(
-        expCtx()->opCtx, collection(), _cachingMode, *_query, std::move(ranking), _candidates);
+    plan_cache_util::updatePlanCache(expCtx()->opCtx,
+                                     MultipleCollectionAccessor(collection()),
+                                     _cachingMode,
+                                     *_query,
+                                     std::move(ranking),
+                                     _candidates);
 
     return Status::OK();
 }

@@ -2998,6 +2998,7 @@ tasks:
           working_dir: "wiredtiger"
           shell: bash
           script: |
+            t=__wt.$$
             set -o verbose
 
             # Install Metrix++, ensuring it is outside the 'src' directory
@@ -3013,8 +3014,14 @@ tasks:
             python "../metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:20
 
             # Fail if there are functions with cyclomatic complexity larger than 91
-            set -o errexit
-            python "../metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:91
+            python "../metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:91 > $t
+            if grep -q 'exceeds' $t; then 
+                echo "[ERROR]:complexity:cyclomatic: Complexity limit exceeded."
+                cat $t
+                echo "[ERROR]:complexity:cyclomatic: Finished " && rm $t && exit 1
+            else
+                cat $t && rm $t 
+            fi
 
     #############################
     # Performance Tests for lsm #

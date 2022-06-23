@@ -58,7 +58,6 @@ typedef std::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
 class DBClientReplicaSet : public DBClientBase {
 public:
     using DBClientBase::find;
-    using DBClientBase::query_DEPRECATED;
 
     /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet
      * connections. */
@@ -92,18 +91,6 @@ public:
     std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
                                          const ReadPreferenceSetting& readPref,
                                          ExhaustMode exhaustMode) override;
-
-    /** throws userassertion "no primary found" */
-    std::unique_ptr<DBClientCursor> query_DEPRECATED(
-        const NamespaceStringOrUUID& nsOrUuid,
-        const BSONObj& filter,
-        const client_deprecated::Query& querySettings,
-        int limit = 0,
-        int nToSkip = 0,
-        const BSONObj* fieldsToReturn = nullptr,
-        int queryOptions = 0,
-        int batchSize = 0,
-        boost::optional<BSONObj> readConcernObj = boost::none) override;
 
     void insert(const std::string& ns,
                 BSONObj obj,

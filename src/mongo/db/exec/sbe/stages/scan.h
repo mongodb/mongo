@@ -108,7 +108,8 @@ public:
               PlanYieldPolicy* yieldPolicy,
               PlanNodeId nodeId,
               ScanCallbacks scanCallbacks,
-              bool useRandomCursor = false);
+              bool useRandomCursor = false,
+              bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -227,7 +228,8 @@ public:
                       value::SlotVector vars,
                       PlanYieldPolicy* yieldPolicy,
                       PlanNodeId nodeId,
-                      ScanCallbacks callbacks);
+                      ScanCallbacks callbacks,
+                      bool participateInTrialRunTracking = true);
 
     ParallelScanStage(const std::shared_ptr<ParallelState>& state,
                       const UUID& collectionUuid,
@@ -241,7 +243,8 @@ public:
                       value::SlotVector vars,
                       PlanYieldPolicy* yieldPolicy,
                       PlanNodeId nodeId,
-                      ScanCallbacks callbacks);
+                      ScanCallbacks callbacks,
+                      bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 

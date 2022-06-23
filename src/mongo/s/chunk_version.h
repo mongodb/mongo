@@ -124,10 +124,6 @@ public:
 
     ChunkVersion() : ChunkVersion({OID(), Timestamp()}, {0, 0}) {}
 
-    // TODO: Do not add any new usages of this constructor. Use the one above instead.
-    ChunkVersion(uint32_t major, uint32_t minor, OID epoch, Timestamp timestamp)
-        : CollectionGeneration(epoch, timestamp), CollectionPlacement(major, minor) {}
-
     /**
      * Indicates that the collection is not sharded.
      */

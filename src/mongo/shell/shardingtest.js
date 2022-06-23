@@ -725,8 +725,13 @@ var ShardingTest = function(params) {
         var result;
         for (var i = 0; i < 5; i++) {
             var otherShard = this.getOther(this.getPrimaryShard(dbName)).name;
-            result = this.s.adminCommand(
-                {movechunk: c, find: move, to: otherShard, _waitForDelete: waitForDelete});
+            let cmd = {movechunk: c, find: move, to: otherShard};
+
+            if (waitForDelete != null) {
+                cmd._waitForDelete = waitForDelete;
+            }
+
+            result = this.s.adminCommand(cmd);
             if (result.ok)
                 break;
 

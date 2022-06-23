@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -79,7 +77,7 @@ protected:
             boost::none,
             true,
             [&] {
-                ChunkVersion version(1, 0, epoch, Timestamp(1, 1));
+                ChunkVersion version({epoch, Timestamp(1, 1)}, {1, 0});
 
                 ChunkType chunk1(uuid,
                                  {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},

@@ -103,7 +103,7 @@ std::pair<std::vector<mongo::ChunkType>, mongo::ChunkManager> createChunks(
     for (uint32_t i = 0; i < nChunks; ++i) {
         chunks.emplace_back(collIdentifier,
                             getRangeForChunk(i, nChunks),
-                            ChunkVersion{i + 1, 0, collEpoch, collTimestamp},
+                            ChunkVersion({collEpoch, collTimestamp}, {i + 1, 0}),
                             pessimalShardSelector(i, nShards, nChunks));
     }
 

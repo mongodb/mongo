@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
 #include "mongo/bson/json.h"
 #include "mongo/db/ops/write_ops_parsers_test_helpers.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -76,7 +72,7 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
 
         ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest().getNamespace().ns());
         ASSERT(insertRequest.hasShardVersion());
-        ASSERT_EQ(ChunkVersion(1, 2, epoch, timestamp).toString(),
+        ASSERT_EQ(ChunkVersion({epoch, timestamp}, {1, 2}).toString(),
                   insertRequest.getShardVersion().toString());
     }
 }

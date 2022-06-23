@@ -624,16 +624,17 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         return;
     }
 
-    PartialSchemaReqConversion conversion = convertExprToPartialSchemaReq(filterNode.getFilter());
-    if (!conversion._success) {
+    auto conversion =
+        convertExprToPartialSchemaReq(filterNode.getFilter(), true /*isFilterContext*/);
+    if (!conversion) {
         return;
     }
-    if (conversion._hasEmptyInterval) {
+    if (conversion->_hasEmptyInterval) {
         addEmptyValueScanNode(ctx);
         return;
     }
 
-    for (const auto& entry : conversion._reqMap) {
+    for (const auto& entry : conversion->_reqMap) {
         uassert(6624111,
                 "Filter partial schema requirement must contain a variable name.",
                 !entry.first._projectionName.empty());
@@ -648,29 +649,29 @@ static void convertFilterToSargableNode(ABT::reference_type node,
     // If in substitution mode, disallow retaining original predicate. If in exploration mode, only
     // allow retaining the original predicate and if we have at least one index available.
     if constexpr (isSubstitution) {
-        if (conversion._retainPredicate) {
+        if (conversion->_retainPredicate) {
             return;
         }
-    } else if (!conversion._retainPredicate || scanDef.getIndexDefs().empty()) {
+    } else if (!conversion->_retainPredicate || scanDef.getIndexDefs().empty()) {
         return;
     }
 
     bool hasEmptyInterval = false;
     auto candidateIndexMap = computeCandidateIndexMap(ctx.getPrefixId(),
                                                       indexingAvailability.getScanProjection(),
-                                                      conversion._reqMap,
+                                                      conversion->_reqMap,
                                                       scanDef,
                                                       hasEmptyInterval);
 
     if (hasEmptyInterval) {
         addEmptyValueScanNode(ctx);
     } else {
-        ABT sargableNode = make<SargableNode>(std::move(conversion._reqMap),
+        ABT sargableNode = make<SargableNode>(std::move(conversion->_reqMap),
                                               std::move(candidateIndexMap),
                                               IndexReqTarget::Complete,
                                               filterNode.getChild());
 
-        if (conversion._retainPredicate) {
+        if (conversion->_retainPredicate) {
             const GroupIdType childGroupId =
                 filterNode.getChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
             if (childGroupId == indexingAvailability.getScanGroupId()) {
@@ -813,22 +814,24 @@ struct SubstituteConvert<EvaluationNode> {
         }
 
         // We still want to extract sargable nodes from EvalNode to use for PhysicalScans.
-        PartialSchemaReqConversion conversion =
-            convertExprToPartialSchemaReq(evalNode.getProjection());
+        auto conversion =
+            convertExprToPartialSchemaReq(evalNode.getProjection(), false /*isFilterContext*/);
+        if (!conversion) {
+            return;
+        }
         uassert(6624165,
                 "Should not be getting retainPredicate set for EvalNodes",
-                !conversion._retainPredicate);
-
-        if (!conversion._success || conversion._reqMap.size() != 1) {
+                !conversion->_retainPredicate);
+        if (conversion->_reqMap.size() != 1) {
             // For evaluation nodes we expect to create a single entry.
             return;
         }
-        if (conversion._hasEmptyInterval) {
+        if (conversion->_hasEmptyInterval) {
             addEmptyValueScanNode(ctx);
             return;
         }
 
-        for (auto& entry : conversion._reqMap) {
+        for (auto& entry : conversion->_reqMap) {
             PartialSchemaRequirement& req = entry.second;
             req.setBoundProjectionName(evalNode.getProjectionName());
 
@@ -842,12 +845,12 @@ struct SubstituteConvert<EvaluationNode> {
 
         bool hasEmptyInterval = false;
         auto candidateIndexMap = computeCandidateIndexMap(
-            ctx.getPrefixId(), scanProjName, conversion._reqMap, scanDef, hasEmptyInterval);
+            ctx.getPrefixId(), scanProjName, conversion->_reqMap, scanDef, hasEmptyInterval);
 
         if (hasEmptyInterval) {
             addEmptyValueScanNode(ctx);
         } else {
-            ABT newNode = make<SargableNode>(std::move(conversion._reqMap),
+            ABT newNode = make<SargableNode>(std::move(conversion->_reqMap),
                                              std::move(candidateIndexMap),
                                              IndexReqTarget::Complete,
                                              evalNode.getChild());

@@ -10,8 +10,8 @@ phantoms are possible.
 Transactions cannot see changes made by other transactions before those
 transactions are committed.  Dirty reads are not possible;
 non-repeatable reads and phantoms are possible.  Committed changes from
-concurrent transactions become visible when no cursor is positioned in
-the read-committed transaction.
+concurrent transactions become visible periodically during the lifecycle
+of the transaction.
 
 - <code>snapshot</code>:
 Transactions read the versions of records committed before the transaction

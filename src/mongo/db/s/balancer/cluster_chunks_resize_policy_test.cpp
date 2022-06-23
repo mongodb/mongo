@@ -30,6 +30,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/balancer/cluster_chunks_resize_policy_impl.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
+
 namespace mongo {
 namespace {
 
@@ -37,7 +38,7 @@ class ClusterChunksResizePolicyTest : public ConfigServerTestFixture {
 protected:
     const NamespaceString kNss{"testDb.testColl"};
     const UUID kUuid = UUID::gen();
-    const ChunkVersion kCollectionVersion = ChunkVersion(1, 1, OID::gen(), Timestamp(10));
+    const ChunkVersion kCollectionVersion = ChunkVersion({OID::gen(), Timestamp(10)}, {1, 1});
 
     const ShardId kShardId0 = ShardId("shard0");
     const ShardId kShardId1 = ShardId("shard1");

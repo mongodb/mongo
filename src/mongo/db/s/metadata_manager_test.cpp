@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <boost/optional.hpp>
 
 #include "mongo/bson/bsonobjbuilder.h"
@@ -93,7 +91,7 @@ protected:
             boost::none,
             boost::none /* chunkSizeBytes */,
             true,
-            {ChunkType{uuid, range, ChunkVersion(1, 0, epoch, Timestamp(1, 1)), kOtherShard}});
+            {ChunkType{uuid, range, ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}), kOtherShard}});
 
         return CollectionMetadata(ChunkManager(kThisShard,
                                                DatabaseVersion(UUID::gen(), Timestamp(1, 1)),

@@ -42,8 +42,9 @@ TraverseStage::TraverseStage(std::unique_ptr<PlanStage> outer,
                              std::unique_ptr<EExpression> foldExpr,
                              std::unique_ptr<EExpression> finalExpr,
                              PlanNodeId planNodeId,
-                             boost::optional<size_t> nestedArraysDepth)
-    : PlanStage("traverse"_sd, planNodeId),
+                             boost::optional<size_t> nestedArraysDepth,
+                             bool participateInTrialRunTracking)
+    : PlanStage("traverse"_sd, planNodeId, participateInTrialRunTracking),
       _inField(inField),
       _outField(outField),
       _outFieldInner(outFieldInner),
@@ -69,7 +70,8 @@ std::unique_ptr<PlanStage> TraverseStage::clone() const {
                                            _fold ? _fold->clone() : nullptr,
                                            _final ? _final->clone() : nullptr,
                                            _commonStats.nodeId,
-                                           _nestedArraysDepth);
+                                           _nestedArraysDepth,
+                                           _participateInTrialRunTracking);
 }
 
 void TraverseStage::prepare(CompileCtx& ctx) {

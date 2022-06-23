@@ -59,8 +59,9 @@ ColumnScanStage::ColumnScanStage(UUID collectionUuid,
                                  std::vector<std::unique_ptr<EExpression>> pathExprs,
                                  value::SlotId rowStoreSlot,
                                  PlanYieldPolicy* yieldPolicy,
-                                 PlanNodeId nodeId)
-    : PlanStage("columnscan"_sd, yieldPolicy, nodeId),
+                                 PlanNodeId nodeId,
+                                 bool participateInTrialRunTracking)
+    : PlanStage("columnscan"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
       _collUuid(collectionUuid),
       _columnIndexName(columnIndexName),
       _fieldSlots(std::move(fieldSlots)),
@@ -89,7 +90,8 @@ std::unique_ptr<PlanStage> ColumnScanStage::clone() const {
                                              std::move(pathExprs),
                                              _rowStoreSlot,
                                              _yieldPolicy,
-                                             _commonStats.nodeId);
+                                             _commonStats.nodeId,
+                                             _participateInTrialRunTracking);
 }
 
 void ColumnScanStage::prepare(CompileCtx& ctx) {

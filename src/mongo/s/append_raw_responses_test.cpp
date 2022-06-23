@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/unittest/unittest.h"
-
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -39,6 +35,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -200,7 +197,7 @@ protected:
                                              Timestamp timestamp{1, 0};
                                              return StaleConfigInfo(
                                                  NamespaceString("Foo.Bar"),
-                                                 ChunkVersion(1, 0, epoch, timestamp),
+                                                 ChunkVersion({epoch, timestamp}, {1, 0}),
                                                  boost::none,
                                                  ShardId{"dummy"});
                                          }(),

@@ -35,7 +35,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/client_api_version_parameters_gen.h"
-#include "mongo/client/client_deprecated.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/index_spec.h"
@@ -576,29 +575,6 @@ public:
      * results.
      */
     BSONObj findOne(const NamespaceStringOrUUID& nssOrUuid, BSONObj filter);
-
-    /**
-     * Legacy find API. Do not add new callers! Use the 'find*()' methods above instead.
-     */
-    virtual std::unique_ptr<DBClientCursor> query_DEPRECATED(
-        const NamespaceStringOrUUID& nsOrUuid,
-        const BSONObj& filter,
-        const client_deprecated::Query& querySettings = client_deprecated::Query(),
-        int limit = 0,
-        int nToSkip = 0,
-        const BSONObj* fieldsToReturn = nullptr,
-        int queryOptions = 0,
-        int batchSize = 0,
-        boost::optional<BSONObj> readConcernObj = boost::none);
-    virtual unsigned long long query_DEPRECATED(
-        std::function<void(DBClientCursorBatchIterator&)> f,
-        const NamespaceStringOrUUID& nsOrUuid,
-        const BSONObj& filter,
-        const client_deprecated::Query& querySettings = client_deprecated::Query(),
-        const BSONObj* fieldsToReturn = nullptr,
-        int queryOptions = QueryOption_Exhaust,
-        int batchSize = 0,
-        boost::optional<BSONObj> readConcernObj = boost::none);
 
     /**
      * Don't use this - called automatically by DBClientCursor for you.

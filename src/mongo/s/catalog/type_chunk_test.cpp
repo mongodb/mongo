@@ -47,7 +47,7 @@ TEST(ChunkType, MissingConfigRequiredFields) {
     const auto collEpoch = OID::gen();
     const auto collTimestamp = Timestamp(1, 1);
 
-    ChunkVersion chunkVersion(1, 2, collEpoch, collTimestamp);
+    ChunkVersion chunkVersion({collEpoch, collTimestamp}, {1, 2});
 
     BSONObj objModNS =
         BSON(ChunkType::name(OID::gen())
@@ -81,7 +81,7 @@ TEST(ChunkType, MissingConfigRequiredFields) {
 TEST(ChunkType, MissingShardRequiredFields) {
     const OID epoch = OID::gen();
     const Timestamp timestamp(1, 1);
-    ChunkVersion chunkVersion(1, 2, epoch, timestamp);
+    ChunkVersion chunkVersion({epoch, timestamp}, {1, 2});
     const auto lastmod = Timestamp(chunkVersion.toLong());
 
     BSONObj objModMin =
@@ -109,15 +109,16 @@ TEST(ChunkType, MissingShardRequiredFields) {
 }
 
 TEST(ChunkType, ToFromShardBSON) {
-    const OID epoch = OID::gen();
-    const Timestamp timestamp(1, 1);
-    ChunkVersion chunkVersion(1, 2, epoch, timestamp);
+    const OID collEpoch = OID::gen();
+    const Timestamp collTimestamp(1, 1);
+
+    ChunkVersion chunkVersion({collEpoch, collTimestamp}, {1, 2});
     auto lastmod = Timestamp(chunkVersion.toLong());
 
     BSONObj obj = BSON(ChunkType::minShardID(kMin)
                        << ChunkType::max(kMax) << ChunkType::shard(kShard.toString()) << "lastmod"
                        << lastmod);
-    ChunkType shardChunk = assertGet(ChunkType::parseFromShardBSON(obj, epoch, timestamp));
+    ChunkType shardChunk = assertGet(ChunkType::parseFromShardBSON(obj, collEpoch, collTimestamp));
 
     ASSERT_BSONOBJ_EQ(obj, shardChunk.toShardBSON());
 
@@ -132,7 +133,7 @@ TEST(ChunkType, MinAndMaxShardKeysDifferInNumberOfKeys) {
     const auto collEpoch = OID::gen();
     const auto collTimestamp = Timestamp(1);
 
-    ChunkVersion chunkVersion(1, 2, collEpoch, collTimestamp);
+    ChunkVersion chunkVersion({collEpoch, collTimestamp}, {1, 2});
     BSONObj obj = BSON(
         ChunkType::name(OID::gen())
         << ChunkType::collectionUUID() << collUuid << ChunkType::min(BSON("a" << 10 << "b" << 10))
@@ -149,7 +150,7 @@ TEST(ChunkType, MinAndMaxShardKeysDifferInKeyNames) {
     const auto collEpoch = OID::gen();
     const auto collTimestamp = Timestamp(1);
 
-    ChunkVersion chunkVersion(1, 2, collEpoch, collTimestamp);
+    ChunkVersion chunkVersion({collEpoch, collTimestamp}, {1, 2});
     BSONObj obj =
         BSON(ChunkType::name(OID::gen())
              << ChunkType::collectionUUID() << collUuid << ChunkType::min(BSON("a" << 10))
@@ -166,7 +167,7 @@ TEST(ChunkType, MinToMaxNotAscending) {
     const auto collEpoch = OID::gen();
     const auto collTimestamp = Timestamp(1);
 
-    ChunkVersion chunkVersion(1, 2, collEpoch, collTimestamp);
+    ChunkVersion chunkVersion({collEpoch, collTimestamp}, {1, 2});
     BSONObj obj =
         BSON(ChunkType::name(OID::gen())
              << ChunkType::collectionUUID() << collUuid << ChunkType::min(BSON("a" << 20))
@@ -182,7 +183,7 @@ TEST(ChunkType, ToFromConfigBSON) {
     const auto collTimestamp = Timestamp(1);
 
     const auto chunkID = OID::gen();
-    ChunkVersion chunkVersion(1, 2, collEpoch, collTimestamp);
+    ChunkVersion chunkVersion({collEpoch, collTimestamp}, {1, 2});
     BSONObj obj = BSON(ChunkType::name(chunkID)
                        << ChunkType::collectionUUID() << collUuid << ChunkType::min(BSON("a" << 10))
                        << ChunkType::max(BSON("a" << 20)) << ChunkType::shard("shard0001")
@@ -217,7 +218,7 @@ TEST(ChunkType, BothNsAndUUID) {
     const auto collEpoch = OID::gen();
     const auto collTimestamp = Timestamp(1);
 
-    ChunkVersion chunkVersion(1, 2, collEpoch, collTimestamp);
+    ChunkVersion chunkVersion({collEpoch, collTimestamp}, {1, 2});
 
     BSONObj objModNS =
         BSON(ChunkType::name(OID::gen())
@@ -235,7 +236,7 @@ TEST(ChunkType, UUIDPresentAndNsMissing) {
     const auto collEpoch = OID::gen();
     const auto collTimestamp = Timestamp(1);
 
-    ChunkVersion chunkVersion(1, 2, collEpoch, collTimestamp);
+    ChunkVersion chunkVersion({collEpoch, collTimestamp}, {1, 2});
 
     BSONObj objModNS = BSON(
         ChunkType::name(OID::gen())
@@ -249,7 +250,10 @@ TEST(ChunkType, UUIDPresentAndNsMissing) {
 }
 
 TEST(ChunkType, ParseFromNetworkRequest) {
-    ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp(1, 0));
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = Timestamp(1, 0);
+
+    ChunkVersion chunkVersion({collEpoch, collTimestamp}, {1, 2});
 
     auto chunk = assertGet(ChunkType::parseFromNetworkRequest(
         BSON(ChunkType::name(OID::gen())

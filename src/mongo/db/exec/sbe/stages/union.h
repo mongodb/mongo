@@ -53,7 +53,8 @@ public:
     UnionStage(PlanStage::Vector inputStages,
                std::vector<value::SlotVector> inputVals,
                value::SlotVector outputVals,
-               PlanNodeId planNodeId);
+               PlanNodeId planNodeId,
+               bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 

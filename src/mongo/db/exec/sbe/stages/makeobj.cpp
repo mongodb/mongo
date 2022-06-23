@@ -46,8 +46,11 @@ MakeObjStageBase<O>::MakeObjStageBase(std::unique_ptr<PlanStage> input,
                                       value::SlotVector projectVars,
                                       bool forceNewObject,
                                       bool returnOldObject,
-                                      PlanNodeId planNodeId)
-    : PlanStage(O == MakeObjOutputType::object ? "mkobj"_sd : "mkbson"_sd, planNodeId),
+                                      PlanNodeId planNodeId,
+                                      bool participateInTrialRunTracking)
+    : PlanStage(O == MakeObjOutputType::object ? "mkobj"_sd : "mkbson"_sd,
+                planNodeId,
+                participateInTrialRunTracking),
       _objSlot(objSlot),
       _rootSlot(rootSlot),
       _fieldBehavior(fieldBehavior),
@@ -95,7 +98,8 @@ std::unique_ptr<PlanStage> MakeObjStageBase<O>::clone() const {
                                                  _projectVars,
                                                  _forceNewObject,
                                                  _returnOldObject,
-                                                 _commonStats.nodeId);
+                                                 _commonStats.nodeId,
+                                                 _participateInTrialRunTracking);
 }
 
 template <MakeObjOutputType O>

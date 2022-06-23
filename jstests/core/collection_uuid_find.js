@@ -56,13 +56,15 @@ assert.eq(res.actualCollection, null);
 
 // The command fails when the provided UUID corresponds to a different collection, even if the
 // provided namespace does not exist.
-coll2.drop();
+assert.commandWorkedOrFailedWithCode(testDB.runCommand({drop: coll2.getName()}),
+                                     ErrorCodes.NamespaceNotFound);
 res = assert.commandFailedWithCode(testDB.runCommand({find: coll2.getName(), collectionUUID: uuid}),
                                    ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.db, testDB.getName());
 assert.eq(res.collectionUUID, uuid);
 assert.eq(res.expectedCollection, coll2.getName());
 assert.eq(res.actualCollection, coll.getName());
+assert(!testDB.getCollectionNames().includes(coll2.getName()));
 
 // The command fails when the provided UUID corresponds to a different collection, even if the
 // provided namespace is a view.

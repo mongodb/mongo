@@ -571,27 +571,6 @@ std::unique_ptr<DBClientCursor> EncryptedDBClientBase::find(FindCommandRequest f
     return _conn->find(std::move(findRequest), readPref, exhaustMode);
 }
 
-std::unique_ptr<DBClientCursor> EncryptedDBClientBase::query_DEPRECATED(
-    const NamespaceStringOrUUID& nsOrUuid,
-    const BSONObj& filter,
-    const client_deprecated::Query& querySettings,
-    int limit,
-    int nToSkip,
-    const BSONObj* fieldsToReturn,
-    int queryOptions,
-    int batchSize,
-    boost::optional<BSONObj> readConcernObj) {
-    return _conn->query_DEPRECATED(nsOrUuid,
-                                   filter,
-                                   querySettings,
-                                   limit,
-                                   nToSkip,
-                                   fieldsToReturn,
-                                   queryOptions,
-                                   batchSize,
-                                   readConcernObj);
-}
-
 bool EncryptedDBClientBase::isFailed() const {
     return _conn->isFailed();
 }

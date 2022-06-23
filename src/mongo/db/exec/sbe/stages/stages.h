@@ -254,7 +254,9 @@ protected:
 template <typename T>
 class CanTrackStats {
 public:
-    CanTrackStats(StringData stageType, PlanNodeId nodeId) : _commonStats(stageType, nodeId) {}
+    CanTrackStats(StringData stageType, PlanNodeId nodeId, bool participateInTrialRunTracking)
+        : _commonStats(stageType, nodeId),
+          _participateInTrialRunTracking(participateInTrialRunTracking) {}
 
     /**
      * Returns a tree of stats. If the stage has any children it must propagate the request for
@@ -414,6 +416,12 @@ protected:
 
     CommonStats _commonStats;
 
+    // Flag which determines whether this node and its children can participate in trial run
+    // tracking. A stage and its children are not eligible for trial run tracking when they are
+    // planned deterministically (that is, the amount of work they perform is independent of
+    // other parts of the tree which are multiplanned).
+    bool _participateInTrialRunTracking{true};
+
 private:
     /**
      * In general, accessors can be accessed only after getNext returns a row. It is most definitely
@@ -422,14 +430,6 @@ private:
      * that feature is retired we can then simply revisit all stages and simplify them.
      */
     bool _slotsAccessible{false};
-
-    /**
-     * Flag which determines whether this node and its children can participate in trial run
-     * tracking. A stage and its children are not eligible for trial run tracking when they are
-     * planned deterministically (that is, the amount of work they perform is independent of
-     * other parts of the tree which are multiplanned).
-     */
-    bool _participateInTrialRunTracking{true};
 };
 
 /**
@@ -496,10 +496,15 @@ class PlanStage : public CanSwitchOperationContext<PlanStage>,
 public:
     using Vector = absl::InlinedVector<std::unique_ptr<PlanStage>, 2>;
 
-    PlanStage(StringData stageType, PlanYieldPolicy* yieldPolicy, PlanNodeId nodeId)
-        : CanTrackStats{stageType, nodeId}, CanInterrupt{yieldPolicy} {}
+    PlanStage(StringData stageType,
+              PlanYieldPolicy* yieldPolicy,
+              PlanNodeId nodeId,
+              bool participateInTrialRunTracking)
+        : CanTrackStats{stageType, nodeId, participateInTrialRunTracking},
+          CanInterrupt{yieldPolicy} {}
 
-    PlanStage(StringData stageType, PlanNodeId nodeId) : PlanStage(stageType, nullptr, nodeId) {}
+    PlanStage(StringData stageType, PlanNodeId nodeId, bool participateInTrialRunTracking)
+        : PlanStage(stageType, nullptr, nodeId, participateInTrialRunTracking) {}
 
     virtual ~PlanStage() = default;
 

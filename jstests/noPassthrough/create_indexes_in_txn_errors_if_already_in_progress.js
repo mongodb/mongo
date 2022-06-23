@@ -76,14 +76,15 @@ try {
         "Starting a parallel shell to run a transaction with a second index build request...");
     joinSecondIndexBuild = startParallelShell(
         funWithArgs(runFailedIndexBuildInTxn, dbName, collName, indexSpecB, 2), primary.port);
-
+    // We wait to observe the second attempt to build the index fails while the
+    // hangAfterSettingUpIndexBuild is preventing the first attempt from completing successfully.
+    joinSecondIndexBuild();
 } finally {
     assert.commandWorked(
         testDB.adminCommand({configureFailPoint: 'hangAfterSettingUpIndexBuild', mode: 'off'}));
 }
 
 joinFirstIndexBuild();
-joinSecondIndexBuild();
 
 // We should have the _id index and the 'the_b_1_index' index just built.
 assert.eq(testColl.getIndexes().length, 2);

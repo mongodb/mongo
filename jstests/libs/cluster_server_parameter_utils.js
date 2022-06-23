@@ -6,13 +6,13 @@
  *    it to the end of nonTestClusterParameterNames.
  * 2. Add the clusterParameter document that's expected as default to the end of
  * testOnlyClusterParametersDefault if it's test-only. Otherwise, add it to the end of
- * nonTestOnlyClusterParametersDefault.
+ * nonTestClusterParametersDefault.
  * 3. Add the clusterParameter document that setClusterParameter is expected to insert after its
  *    first invocation to the end of testOnlyClusterParametersInsert if it's test-only. Otherwise,
- *    add it to the end of nonTestOnlyClusterParametersInsert.
+ *    add it to the end of nonTestClusterParametersInsert.
  * 4. Add the clusterParameter document that setClusterParameter is expected to update to after its
  *    second invocation to the end of testOnlyClusterParametersUpdate if it's test-only. Otherwise,
- *    add it to the end of nonTestOnlyClusterParametersUpdate.
+ *    add it to the end of nonTestClusterParametersUpdate.
  *
  */
 
@@ -21,9 +21,7 @@ const testOnlyClusterParameterNames = [
     "testIntClusterParameter",
     "testBoolClusterParameter",
 ];
-const nonTestClusterParameterNames = [
-    "changeStreamOptions",
-];
+const nonTestClusterParameterNames = ["changeStreamOptions", "changeStreams"];
 const clusterParameterNames = testOnlyClusterParameterNames.concat(nonTestClusterParameterNames);
 
 const testOnlyClusterParametersDefault = [
@@ -40,12 +38,15 @@ const testOnlyClusterParametersDefault = [
         boolData: false,
     },
 ];
-const nonTestClusterParametersDefault = [{
-    _id: "changeStreamOptions",
-    preAndPostImages: {
-        expireAfterSeconds: "off",
+const nonTestClusterParametersDefault = [
+    {
+        _id: "changeStreamOptions",
+        preAndPostImages: {
+            expireAfterSeconds: "off",
+        },
     },
-}];
+    {_id: "changeStreams", enabled: false, expireAfterSeconds: NumberLong(0)}
+];
 const clusterParametersDefault =
     testOnlyClusterParametersDefault.concat(nonTestClusterParametersDefault);
 
@@ -63,12 +64,19 @@ const testOnlyClusterParametersInsert = [
         boolData: true,
     },
 ];
-const nonTestClusterParametersInsert = [{
-    _id: "changeStreamOptions",
-    preAndPostImages: {
-        expireAfterSeconds: 30,
+const nonTestClusterParametersInsert = [
+    {
+        _id: "changeStreamOptions",
+        preAndPostImages: {
+            expireAfterSeconds: 30,
+        },
     },
-}];
+    {
+        _id: "changeStreams",
+        enabled: true,
+        expireAfterSeconds: 30,
+    }
+];
 const clusterParametersInsert =
     testOnlyClusterParametersInsert.concat(nonTestClusterParametersInsert);
 
@@ -86,12 +94,15 @@ const testOnlyClusterParametersUpdate = [
         boolData: false,
     },
 ];
-const nonTestClusterParametersUpdate = [{
-    _id: "changeStreamOptions",
-    preAndPostImages: {
-        expireAfterSeconds: "off",
+const nonTestClusterParametersUpdate = [
+    {
+        _id: "changeStreamOptions",
+        preAndPostImages: {
+            expireAfterSeconds: "off",
+        },
     },
-}];
+    {_id: "changeStreams", enabled: false, expireAfterSeconds: NumberLong(0)}
+];
 const clusterParametersUpdate =
     testOnlyClusterParametersUpdate.concat(nonTestClusterParametersUpdate);
 

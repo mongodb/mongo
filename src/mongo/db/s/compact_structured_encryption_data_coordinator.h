@@ -50,7 +50,8 @@ public:
 
     CompactStructuredEncryptionDataCoordinator(ShardingDDLCoordinatorService* service,
                                                const BSONObj& doc)
-        : RecoverableShardingDDLCoordinator(service, doc) {}
+        : RecoverableShardingDDLCoordinator(
+              service, "CompactStructuredEncryptionDataCoordinator", doc) {}
 
     boost::optional<BSONObj> reportForCurrentOp(
         MongoProcessInterface::CurrentOpConnectionsMode connMode,

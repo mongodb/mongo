@@ -3,7 +3,8 @@
  *
  * @tags: [
  *   does_not_support_stepdowns,
- *   requires_replication
+ *   requires_replication,
+ *   multiversion_incompatible
  *  ]
  */
 (function() {

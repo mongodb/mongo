@@ -130,13 +130,13 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
         winner.root->open(false);
     }
 
-    // Writes a cache entry for the winning plan to the plan cache if possible.
-    plan_cache_util::updatePlanCache(_opCtx,
-                                     _collections.getMainCollection(),
-                                     _cachingMode,
-                                     _cq,
-                                     std::move(decision),
-                                     candidates);
+    // If there is a pushed down pipeline that cannot use SBE plan cache, then write a cache entry
+    // before extending the pipeline.
+    // TODO SERVER-61507: Remove this block once $group pushdown is integrated with SBE plan cache.
+    if (!canonical_query_encoder::canUseSbePlanCache(_cq)) {
+        plan_cache_util::updatePlanCache(
+            _opCtx, _collections, _cachingMode, _cq, std::move(decision), candidates);
+    }
 
     // Extend the winning candidate with the agg pipeline and rebuild the execution tree. Because
     // the trial was done with find-only part of the query, we cannot reuse the results. The
@@ -152,10 +152,16 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
         // The winner might have been replanned. So, pass through the replanning reason to the new
         // plan.
         data.replanReason = std::move(winner.data.replanReason);
+
+        // We need to clone the plan here for the plan cache to use. The clone will be stored in the
+        // cache prior to preparation, whereas the original copy of the tree will be prepared and
+        // used to execute this query.
+        auto clonedPlan = std::make_pair(rootStage->clone(), stage_builder::PlanStageData(data));
         stage_builder::prepareSlotBasedExecutableTree(
             _opCtx, rootStage.get(), &data, _cq, _collections, _yieldPolicy);
         candidates[winnerIdx] = sbe::plan_ranker::CandidatePlan{
             std::move(solution), std::move(rootStage), std::move(data)};
+        candidates[winnerIdx].clonedPlan.emplace(std::move(clonedPlan));
         candidates[winnerIdx].root->open(false);
 
         if (_cq.getExplain()) {
@@ -171,6 +177,16 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
                     std::move(solution), std::move(rootStage), std::move(data)};
             }
         }
+    }
+
+    // If pipeline can use SBE plan cache or there is no pushed down pipeline, then write a cache
+    // entry after extending the pipeline.
+    // TODO SERVER-61507: Remove canUseSbePlanCache check once $group pushdown is
+    // integrated with SBE plan cache.
+    if (canonical_query_encoder::canUseSbePlanCache(_cq)) {
+        // Writes a cache entry for the winning plan to the plan cache if possible.
+        plan_cache_util::updatePlanCache(
+            _opCtx, _collections, _cachingMode, _cq, std::move(decision), candidates);
     }
 
     return {std::move(candidates), winnerIdx};

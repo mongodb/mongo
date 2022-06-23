@@ -80,7 +80,7 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
         chunk.setName(OID::gen());
         chunk.setCollectionUUID(collUuid);
 
-        auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+        auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
         chunk.setVersion(origVersion);
         chunk.setShard(ShardId(_shardName));
 
@@ -112,8 +112,9 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
         ASSERT_EQ(collVersion, shardVersion);
 
         // Check for increment on mergedChunk's minor version
-        auto expectedShardVersion = ChunkVersion(
-            origVersion.majorVersion(), origVersion.minorVersion() + 2, collEpoch, collTimestamp);
+        auto expectedShardVersion =
+            ChunkVersion({collEpoch, collTimestamp},
+                         {origVersion.majorVersion(), origVersion.minorVersion() + 2});
         ASSERT_EQ(expectedShardVersion, shardVersion);
         ASSERT_EQ(shardVersion, collVersion);
 
@@ -163,7 +164,7 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
         chunk.setName(OID::gen());
         chunk.setCollectionUUID(collUuid);
 
-        auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+        auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
         chunk.setVersion(origVersion);
         chunk.setShard(ShardId(_shardName));
 
@@ -255,7 +256,7 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
         chunk2.setCollectionUUID(collUuid);
 
         // set up first chunk
-        auto origVersion = ChunkVersion(1, 2, collEpoch, collTimestamp);
+        auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 2});
         chunk.setVersion(origVersion);
         chunk.setShard(ShardId(_shardName));
 
@@ -269,7 +270,7 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
         splitPoints.push_back(chunkSplitPoint);
 
         // set up second chunk (chunk2)
-        auto competingVersion = ChunkVersion(2, 1, collEpoch, collTimestamp);
+        auto competingVersion = ChunkVersion({collEpoch, collTimestamp}, {2, 1});
         chunk2.setVersion(competingVersion);
         chunk2.setShard(ShardId(_shardName));
         chunk2.setMin(BSON("a" << 10));
@@ -323,7 +324,7 @@ TEST_F(SplitChunkTest, PreConditionFailErrors) {
         chunk.setName(OID::gen());
         chunk.setCollectionUUID(UUID::gen());
 
-        auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+        auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
         chunk.setVersion(origVersion);
         chunk.setShard(ShardId(_shardName));
 
@@ -361,7 +362,7 @@ TEST_F(SplitChunkTest, NonExisingNamespaceErrors) {
         ChunkType chunk;
         chunk.setCollectionUUID(UUID::gen());
 
-        auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+        auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
         chunk.setVersion(origVersion);
         chunk.setShard(ShardId(_shardName));
 
@@ -397,7 +398,7 @@ TEST_F(SplitChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
         ChunkType chunk;
         chunk.setCollectionUUID(UUID::gen());
 
-        auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+        auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
         chunk.setVersion(origVersion);
         chunk.setShard(ShardId(_shardName));
 
@@ -433,7 +434,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfOrderShouldFail) {
         chunk.setName(OID::gen());
         chunk.setCollectionUUID(UUID::gen());
 
-        auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+        auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
         chunk.setVersion(origVersion);
         chunk.setShard(ShardId(_shardName));
 
@@ -469,7 +470,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMinShouldFail) {
         ChunkType chunk;
         chunk.setCollectionUUID(UUID::gen());
 
-        auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+        auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
         chunk.setVersion(origVersion);
         chunk.setShard(ShardId(_shardName));
 
@@ -506,7 +507,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMaxShouldFail) {
         chunk.setName(OID::gen());
         chunk.setCollectionUUID(UUID::gen());
 
-        auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+        auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
         chunk.setVersion(origVersion);
         chunk.setShard(ShardId(_shardName));
 
@@ -542,7 +543,7 @@ TEST_F(SplitChunkTest, SplitPointsWithDollarPrefixShouldFail) {
         ChunkType chunk;
         chunk.setCollectionUUID(UUID::gen());
 
-        auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+        auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
         chunk.setVersion(origVersion);
         chunk.setShard(ShardId(_shardName));
 
@@ -587,7 +588,7 @@ TEST_F(SplitChunkTest, CantCommitSplitFromChunkSplitterDuringDefragmentation) {
     chunk.setName(OID::gen());
     chunk.setCollectionUUID(collUuid);
 
-    auto version = ChunkVersion(1, 0, collEpoch, collTimestamp);
+    auto version = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
     chunk.setVersion(version);
     chunk.setShard(ShardId(_shardName));
 

@@ -293,11 +293,11 @@ void Balancer::initiateBalancer(OperationContext* opCtx) {
 
 void Balancer::interruptBalancer() {
     stdx::lock_guard<Latch> scopedLock(_mutex);
-    if (_state != kRunning)
+    if (_state != kRunning) {
         return;
+    }
 
     _state = kStopping;
-    _thread.detach();
 
     // Interrupt the balancer thread if it has been started. We are guaranteed that the operation
     // context of that thread is still alive, because we hold the balancer mutex.
@@ -312,8 +312,10 @@ void Balancer::interruptBalancer() {
 
 void Balancer::waitForBalancerToStop() {
     stdx::unique_lock<Latch> scopedLock(_mutex);
-
     _joinCond.wait(scopedLock, [this] { return _state == kStopped; });
+    if (_thread.joinable()) {
+        _thread.join();
+    }
 }
 
 void Balancer::joinCurrentRound(OperationContext* opCtx) {
@@ -612,12 +614,12 @@ void Balancer::_consumeActionStreamLoop() {
 
 void Balancer::_mainThread() {
     ON_BLOCK_EXIT([this] {
-        stdx::lock_guard<Latch> scopedLock(_mutex);
-
-        _state = kStopped;
+        {
+            stdx::lock_guard<Latch> scopedLock(_mutex);
+            _state = kStopped;
+            LOGV2_DEBUG(21855, 1, "Balancer thread terminated");
+        }
         _joinCond.notify_all();
-
-        LOGV2_DEBUG(21855, 1, "Balancer thread terminated");
     });
 
     Client::initThread("Balancer");
@@ -984,15 +986,6 @@ int Balancer::_moveChunks(OperationContext* opCtx,
                 opCtx, migrateInfo.nss, repl::ReadConcernLevel::kMajorityReadConcern);
             return coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
         }();
-
-        if (serverGlobalParams.featureCompatibility.isLessThan(
-                multiversion::FeatureCompatibilityVersion::kVersion_6_0)) {
-            // TODO SERVER-65322 only use `moveRange` once v6.0 branches out
-            MoveChunkSettings settings(maxChunkSizeBytes,
-                                       balancerConfig->getSecondaryThrottle(),
-                                       balancerConfig->waitForDelete());
-            return _commandScheduler->requestMoveChunk(opCtx, migrateInfo, settings);
-        }
 
         MoveRangeRequestBase requestBase(migrateInfo.to);
         requestBase.setWaitForDelete(balancerConfig->waitForDelete());

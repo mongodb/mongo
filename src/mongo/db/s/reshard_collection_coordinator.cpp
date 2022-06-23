@@ -107,7 +107,7 @@ ReshardCollectionCoordinator::ReshardCollectionCoordinator(ShardingDDLCoordinato
 ReshardCollectionCoordinator::ReshardCollectionCoordinator(ShardingDDLCoordinatorService* service,
                                                            const BSONObj& initialState,
                                                            bool persistCoordinatorDocument)
-    : RecoverableShardingDDLCoordinator(service, initialState),
+    : RecoverableShardingDDLCoordinator(service, "ReshardCollectionCoordinator", initialState),
       _request(_doc.getReshardCollectionRequest()),
       _persistCoordinatorDocument(persistCoordinatorDocument) {}
 
@@ -122,23 +122,8 @@ void ReshardCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) co
                 _request.toBSON() == otherDoc.getReshardCollectionRequest().toBSON()));
 }
 
-boost::optional<BSONObj> ReshardCollectionCoordinator::reportForCurrentOp(
-    MongoProcessInterface::CurrentOpConnectionsMode connMode,
-    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-    BSONObjBuilder cmdBob;
-    if (const auto& optComment = getForwardableOpMetadata().getComment()) {
-        cmdBob.append(optComment.get().firstElement());
-    }
-    cmdBob.appendElements(_request.toBSON());
-
-    BSONObjBuilder bob;
-    bob.append("type", "op");
-    bob.append("desc", "ReshardCollectionCoordinator");
-    bob.append("op", "command");
-    bob.append("ns", nss().toString());
-    bob.append("command", cmdBob.obj());
-    bob.append("active", true);
-    return bob.obj();
+void ReshardCollectionCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
+    cmdInfoBuilder->appendElements(_request.toBSON());
 }
 
 void ReshardCollectionCoordinator::_enterPhase(Phase newPhase) {

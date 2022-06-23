@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/catalog_cache_test_fixture.h"
-
-#include <memory>
-#include <set>
-#include <vector>
 
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
@@ -130,7 +124,7 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
     bool unique,
     const std::vector<BSONObj>& splitPoints,
     boost::optional<ReshardingFields> reshardingFields) {
-    ChunkVersion version(1, 0, OID::gen(), Timestamp(42) /* timestamp */);
+    ChunkVersion version({OID::gen(), Timestamp(42)}, {1, 0});
 
     DatabaseType db(nss.db().toString(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp()));
 
@@ -270,7 +264,7 @@ ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsI
         CollectionType collType(
             nss, epoch, timestamp, Date_t::now(), uuid, shardKeyPattern.toBSON());
 
-        ChunkVersion version(1, 0, epoch, timestamp);
+        ChunkVersion version({epoch, timestamp}, {1, 0});
 
         ChunkType chunk1(
             uuid, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"0"});

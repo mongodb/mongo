@@ -184,12 +184,16 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
 
             // TODO: simplify expression.
 
-            PartialSchemaReqConversion conversion = convertExprToPartialSchemaReq(exprABT);
-            if (!conversion._success || conversion._hasEmptyInterval) {
+            auto conversion = convertExprToPartialSchemaReq(exprABT, true /*isFilterContext*/);
+            if (!conversion || conversion->_hasEmptyInterval) {
                 // Unsatisfiable partial index filter?
                 continue;
             }
-            partialIndexReqMap = std::move(conversion._reqMap);
+            tassert(6624257,
+                    "Should not be seeing a partial index filter where we need to over-approximate",
+                    !conversion->_retainPredicate);
+
+            partialIndexReqMap = std::move(conversion->_reqMap);
         }
 
         // For now we assume distribution is Centralized.

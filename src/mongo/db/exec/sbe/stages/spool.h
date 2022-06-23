@@ -56,7 +56,8 @@ public:
     SpoolEagerProducerStage(std::unique_ptr<PlanStage> input,
                             SpoolId spoolId,
                             value::SlotVector vals,
-                            PlanNodeId planNodeId);
+                            PlanNodeId planNodeId,
+                            bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -109,7 +110,8 @@ public:
                            SpoolId spoolId,
                            value::SlotVector vals,
                            std::unique_ptr<EExpression> predicate,
-                           PlanNodeId planNodeId);
+                           PlanNodeId planNodeId,
+                           bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -165,13 +167,17 @@ private:
 template <bool IsStack>
 class SpoolConsumerStage final : public PlanStage {
 public:
-    SpoolConsumerStage(SpoolId spoolId, value::SlotVector vals, PlanNodeId planNodeId)
-        : PlanStage{IsStack ? "sspool"_sd : "cspool"_sd, planNodeId},
+    SpoolConsumerStage(SpoolId spoolId,
+                       value::SlotVector vals,
+                       PlanNodeId planNodeId,
+                       bool participateInTrialRunTracking = true)
+        : PlanStage{IsStack ? "sspool"_sd : "cspool"_sd, planNodeId, participateInTrialRunTracking},
           _spoolId{spoolId},
           _vals{std::move(vals)} {}
 
     std::unique_ptr<PlanStage> clone() const {
-        return std::make_unique<SpoolConsumerStage<IsStack>>(_spoolId, _vals, _commonStats.nodeId);
+        return std::make_unique<SpoolConsumerStage<IsStack>>(
+            _spoolId, _vals, _commonStats.nodeId, _participateInTrialRunTracking);
     }
 
     void prepare(CompileCtx& ctx) {

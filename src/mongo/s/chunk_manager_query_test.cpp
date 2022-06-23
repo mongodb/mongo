@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <set>
 
 #include "mongo/db/catalog/catalog_test_fixture.h"
@@ -41,7 +38,6 @@
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
 
 namespace mongo {
 namespace {
@@ -506,7 +502,7 @@ TEST_F(ChunkManagerQueryTest, SimpleCollationNumbersMultiShard) {
 TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
     const auto uuid = UUID::gen();
     const auto epoch = OID::gen();
-    ChunkVersion version(1, 0, epoch, Timestamp(1, 1));
+    ChunkVersion version({epoch, Timestamp(1, 1)}, {1, 0});
 
     ChunkType chunk0(uuid, {BSON("x" << MINKEY), BSON("x" << 0)}, version, ShardId("0"));
     chunk0.setName(OID::gen());

@@ -70,7 +70,8 @@ public:
               size_t limit,
               size_t memoryLimit,
               bool allowDiskUse,
-              PlanNodeId planNodeId);
+              PlanNodeId planNodeId,
+              bool participateInTrialRunTracking = true);
 
     ~SortStage();
 

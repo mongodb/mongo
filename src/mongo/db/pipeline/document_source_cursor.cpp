@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -225,15 +226,20 @@ Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity>
 
     {
         auto opCtx = pExpCtx->opCtx;
-        auto lockMode = getLockModeForQuery(opCtx, _exec->nss());
-        AutoGetDb dbLock(opCtx, _exec->nss().db(), lockMode);
-        Lock::CollectionLock collLock(opCtx, _exec->nss(), lockMode);
-        auto collection = dbLock.getDb()
-            ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, _exec->nss())
-            : nullptr;
+        auto secondaryNssList = _exec->getSecondaryNamespaces();
+        AutoGetCollectionForReadMaybeLockFree readLock(opCtx,
+                                                       _exec->nss(),
+                                                       AutoGetCollectionViewMode::kViewsForbidden,
+                                                       Date_t::max(),
+                                                       secondaryNssList);
+        MultipleCollectionAccessor collections(opCtx,
+                                               &readLock.getCollection(),
+                                               readLock.getNss(),
+                                               readLock.isAnySecondaryNamespaceAViewOrSharded(),
+                                               secondaryNssList);
 
         Explain::explainStages(_exec.get(),
-                               collection,
+                               collections,
                                verbosity.get(),
                                _execStatus,
                                _winningPlanTrialStats,

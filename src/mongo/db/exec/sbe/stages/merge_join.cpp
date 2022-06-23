@@ -76,8 +76,9 @@ MergeJoinStage::MergeJoinStage(std::unique_ptr<PlanStage> outer,
                                value::SlotVector innerKeys,
                                value::SlotVector innerProjects,
                                std::vector<value::SortDirection> sortDirs,
-                               PlanNodeId planNodeId)
-    : PlanStage("mj"_sd, planNodeId),
+                               PlanNodeId planNodeId,
+                               bool participateInTrialRunTracking)
+    : PlanStage("mj"_sd, planNodeId, participateInTrialRunTracking),
       _outerKeys(std::move(outerKeys)),
       _outerProjects(std::move(outerProjects)),
       _innerKeys(std::move(innerKeys)),
@@ -104,7 +105,8 @@ std::unique_ptr<PlanStage> MergeJoinStage::clone() const {
                                             _innerKeys,
                                             _innerProjects,
                                             _dirs,
-                                            _commonStats.nodeId);
+                                            _commonStats.nodeId,
+                                            _participateInTrialRunTracking);
 }
 
 void MergeJoinStage::prepare(CompileCtx& ctx) {

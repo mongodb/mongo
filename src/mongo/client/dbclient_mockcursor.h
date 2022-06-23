@@ -35,9 +35,6 @@
 
 namespace mongo {
 
-// DBClientMockCursor supports only a small subset of DBClientCursor operations.
-// It supports only iteration, including use of DBClientCursorBatchIterator.  If a batchsize
-// is given, iteration is broken up into multiple batches at batchSize boundaries.
 class DBClientMockCursor : public DBClientCursor {
 public:
     DBClientMockCursor(mongo::DBClientBase* client,

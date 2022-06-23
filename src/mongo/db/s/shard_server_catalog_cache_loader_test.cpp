@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <boost/optional/optional_io.hpp>
 
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
@@ -203,7 +201,7 @@ CollectionType ShardServerCatalogCacheLoaderTest::makeCollectionType(
 
 std::pair<CollectionType, vector<ChunkType>>
 ShardServerCatalogCacheLoaderTest::setUpChunkLoaderWithFiveChunks() {
-    ChunkVersion collectionVersion(1, 0, OID::gen(), Timestamp(1, 1));
+    ChunkVersion collectionVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
 
     CollectionType collectionType = makeCollectionType(collectionVersion);
     vector<ChunkType> chunks = makeFiveChunks(collectionVersion);
@@ -371,7 +369,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindNewEpoch)
 
     // Then refresh again and find that the collection has been dropped and recreated.
 
-    ChunkVersion collVersionWithNewEpoch(1, 0, OID::gen(), Timestamp(2, 0));
+    ChunkVersion collVersionWithNewEpoch({OID::gen(), Timestamp(2, 0)}, {1, 0});
     CollectionType collectionTypeWithNewEpoch = makeCollectionType(collVersionWithNewEpoch);
     vector<ChunkType> chunksWithNewEpoch = makeFiveChunks(collVersionWithNewEpoch);
     _remoteLoaderMock->setCollectionRefreshReturnValue(collectionTypeWithNewEpoch);
@@ -398,7 +396,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindMixedChun
     // Then refresh again and retrieve chunks from the config server that have mixed epoches, like
     // as if the chunks read yielded around a drop and recreate of the collection.
 
-    ChunkVersion collVersionWithNewEpoch(1, 0, OID::gen(), Timestamp(2, 0));
+    ChunkVersion collVersionWithNewEpoch({OID::gen(), Timestamp(2, 0)}, {1, 0});
     CollectionType collectionTypeWithNewEpoch = makeCollectionType(collVersionWithNewEpoch);
     vector<ChunkType> chunksWithNewEpoch = makeFiveChunks(collVersionWithNewEpoch);
     vector<ChunkType> mixedChunks;
@@ -441,7 +439,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindMixedChun
 }
 
 TEST_F(ShardServerCatalogCacheLoaderTest, TimeseriesFieldsAreProperlyPropagatedOnSSCCL) {
-    ChunkVersion collectionVersion(1, 0, OID::gen(), Timestamp(1, 1));
+    ChunkVersion collectionVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
 
     CollectionType collectionType = makeCollectionType(collectionVersion);
     vector<ChunkType> chunks = makeFiveChunks(collectionVersion);
@@ -483,7 +481,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, TimeseriesFieldsAreProperlyPropagatedO
 }
 
 void ShardServerCatalogCacheLoaderTest::refreshCollectionEpochOnRemoteLoader() {
-    ChunkVersion collectionVersion(1, 2, OID::gen(), Timestamp(1, 1));
+    ChunkVersion collectionVersion({OID::gen(), Timestamp(1, 1)}, {1, 2});
     CollectionType collectionType = makeCollectionType(collectionVersion);
     vector<ChunkType> chunks = makeFiveChunks(collectionVersion);
     _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);

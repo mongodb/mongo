@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <boost/optional/optional_io.hpp>
 
 #include "mongo/s/catalog/type_database_gen.h"
@@ -264,7 +261,7 @@ TEST_F(CatalogCacheTest, OnStaleDatabaseVersionNoVersion) {
 
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
-    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen(), Timestamp(1, 1));
+    const auto cachedCollVersion = ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
     loadCollection(cachedCollVersion);
@@ -275,7 +272,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
 
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
-    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen(), Timestamp(1, 1));
+    const auto cachedCollVersion = ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
     loadCollection(cachedCollVersion);
@@ -288,9 +285,9 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
 
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithGraterVersion) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
-    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen(), Timestamp(1, 1));
+    const auto cachedCollVersion = ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
     const auto wantedCollVersion =
-        ChunkVersion(2, 0, cachedCollVersion.epoch(), cachedCollVersion.getTimestamp());
+        ChunkVersion({cachedCollVersion.epoch(), cachedCollVersion.getTimestamp()}, {2, 0});
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
     loadCollection(cachedCollVersion);
@@ -304,7 +301,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithGraterVersion) {
 TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     const auto epoch = OID::gen();
-    const auto version = ChunkVersion(1, 0, epoch, Timestamp(42));
+    const auto version = ChunkVersion({epoch, Timestamp(42)}, {1, 0});
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
 
@@ -360,7 +357,7 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
 TEST_F(CatalogCacheTest, LookupCollectionWithInvalidOptions) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     const auto epoch = OID::gen();
-    const auto version = ChunkVersion(1, 0, epoch, Timestamp(42));
+    const auto version = ChunkVersion({epoch, Timestamp(42)}, {1, 0});
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
 

@@ -64,23 +64,9 @@ void SetAllowMigrationsCoordinator::checkIfOptionsConflict(const BSONObj& doc) c
                 otherDoc.getSetAllowMigrationsRequest().toBSON()));
 }
 
-boost::optional<BSONObj> SetAllowMigrationsCoordinator::reportForCurrentOp(
-    MongoProcessInterface::CurrentOpConnectionsMode connMode,
-    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-    BSONObjBuilder cmdBob;
-    if (const auto& optComment = getForwardableOpMetadata().getComment()) {
-        cmdBob.append(optComment.get().firstElement());
-    }
-    cmdBob.appendElements(_doc.getSetAllowMigrationsRequest().toBSON());
-
-    BSONObjBuilder bob;
-    bob.append("type", "op");
-    bob.append("desc", "SetAllowMigrationsCoordinator");
-    bob.append("op", "command");
-    bob.append("ns", nss().toString());
-    bob.append("command", cmdBob.obj());
-    bob.append("active", true);
-    return bob.obj();
+void SetAllowMigrationsCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
+    stdx::lock_guard lk{_docMutex};
+    cmdInfoBuilder->appendElements(_doc.getSetAllowMigrationsRequest().toBSON());
 }
 
 ExecutorFuture<void> SetAllowMigrationsCoordinator::_runImpl(

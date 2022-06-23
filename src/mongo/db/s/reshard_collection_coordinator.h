@@ -46,9 +46,7 @@ public:
 
     void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
 
-    boost::optional<BSONObj> reportForCurrentOp(
-        MongoProcessInterface::CurrentOpConnectionsMode connMode,
-        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
+    void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
 
 protected:
     ReshardCollectionCoordinator(ShardingDDLCoordinatorService* service,

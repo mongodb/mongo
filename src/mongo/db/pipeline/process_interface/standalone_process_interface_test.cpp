@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
 #include "mongo/unittest/unittest.h"
@@ -67,7 +65,7 @@ TEST_F(ProcessInterfaceStandaloneTest,
        FailsToEnsureFieldsUniqueIfTargetCollectionVersionIsSpecifiedOnMongos) {
     auto expCtx = getExpCtx();
     auto targetCollectionVersion =
-        boost::make_optional(ChunkVersion(0, 0, OID::gen(), Timestamp(1, 1)));
+        boost::make_optional(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {0, 0}));
     auto processInterface = makeProcessInterface();
 
     // Test that 'targetCollectionVersion' is not accepted if not from mongos.
@@ -90,7 +88,7 @@ TEST_F(ProcessInterfaceStandaloneTest,
 TEST_F(ProcessInterfaceStandaloneTest, FailsToEnsureFieldsUniqueIfJoinFieldsAreNotSentFromMongos) {
     auto expCtx = getExpCtx();
     auto targetCollectionVersion =
-        boost::make_optional(ChunkVersion(0, 0, OID::gen(), Timestamp(1, 1)));
+        boost::make_optional(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {0, 0}));
     auto processInterface = makeProcessInterface();
 
     expCtx->fromMongos = true;

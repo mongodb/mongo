@@ -37,8 +37,10 @@ namespace mongo {
 namespace sbe {
 ProjectStage::ProjectStage(std::unique_ptr<PlanStage> input,
                            value::SlotMap<std::unique_ptr<EExpression>> projects,
-                           PlanNodeId nodeId)
-    : PlanStage("project"_sd, nodeId), _projects(std::move(projects)) {
+                           PlanNodeId nodeId,
+                           bool participateInTrialRunTracking)
+    : PlanStage("project"_sd, nodeId, participateInTrialRunTracking),
+      _projects(std::move(projects)) {
     _children.emplace_back(std::move(input));
 }
 
@@ -47,8 +49,10 @@ std::unique_ptr<PlanStage> ProjectStage::clone() const {
     for (auto& [k, v] : _projects) {
         projects.emplace(k, v->clone());
     }
-    return std::make_unique<ProjectStage>(
-        _children[0]->clone(), std::move(projects), _commonStats.nodeId);
+    return std::make_unique<ProjectStage>(_children[0]->clone(),
+                                          std::move(projects),
+                                          _commonStats.nodeId,
+                                          _participateInTrialRunTracking);
 }
 
 void ProjectStage::prepare(CompileCtx& ctx) {

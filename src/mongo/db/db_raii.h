@@ -311,6 +311,7 @@ public:
     const CollectionPtr& getCollection() const;
     const ViewDefinition* getView() const;
     const NamespaceString& getNss() const;
+    bool isAnySecondaryNamespaceAViewOrSharded() const;
 
 private:
     boost::optional<AutoGetCollectionForRead> _autoGet;

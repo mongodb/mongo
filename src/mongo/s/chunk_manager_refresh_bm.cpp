@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <benchmark/benchmark.h>
 
 #include "mongo/base/init.h"
@@ -77,7 +75,7 @@ CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
     for (uint32_t i = 0; i < nChunks; ++i) {
         chunks.emplace_back(collUuid,
                             getRangeForChunk(i, nChunks),
-                            ChunkVersion{i + 1, 0, collEpoch, Timestamp(1, 0)},
+                            ChunkVersion({collEpoch, Timestamp(1, 0)}, {i + 1, 0}),
                             selectShard(i, nShards, nChunks));
     }
 
@@ -169,7 +167,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
     for (uint32_t i = 0; i < nChunks; ++i) {
         chunks.emplace_back(collUuid,
                             getRangeForChunk(i, nChunks),
-                            ChunkVersion{i + 1, 0, collEpoch, Timestamp(1, 0)},
+                            ChunkVersion({collEpoch, Timestamp(1, 0)}, {i + 1, 0}),
                             selectShard(i, nShards, nChunks));
     }
 

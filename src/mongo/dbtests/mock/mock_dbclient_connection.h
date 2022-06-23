@@ -104,7 +104,6 @@ public:
     // DBClientBase methods
     //
     using DBClientBase::find;
-    using DBClientBase::query_DEPRECATED;
 
     bool connect(const char* hostName, StringData applicationName, std::string& errmsg);
 
@@ -124,17 +123,6 @@ public:
     std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
                                          const ReadPreferenceSetting& /*unused*/,
                                          ExhaustMode /*unused*/) override;
-
-    std::unique_ptr<mongo::DBClientCursor> query_DEPRECATED(
-        const NamespaceStringOrUUID& nsOrUuid,
-        const BSONObj& filter = BSONObj{},
-        const client_deprecated::Query& querySettings = client_deprecated::Query(),
-        int limit = 0,
-        int nToSkip = 0,
-        const mongo::BSONObj* fieldsToReturn = nullptr,
-        int queryOptions = 0,
-        int batchSize = 0,
-        boost::optional<BSONObj> readConcernObj = boost::none) override;
 
     uint64_t getSockCreationMicroSec() const override;
 

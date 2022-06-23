@@ -269,6 +269,7 @@ bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
     return isSystemDotViews() || isServerConfigurationCollection() || isPrivilegeCollection() ||
         _ns == kDonorReshardingOperationsNamespace.ns() ||
         _ns == kForceOplogBatchBoundaryNamespace.ns() ||
+        _ns == kTenantMigrationDonorsNamespace.ns() ||
         _ns == kTenantMigrationRecipientsNamespace.ns() || _ns == kConfigsvrShardsNamespace.ns();
 }
 

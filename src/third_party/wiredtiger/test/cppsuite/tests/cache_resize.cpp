@@ -45,12 +45,21 @@ class operation_tracker_cache_resize : public operation_tracker {
     }
 
     void
-    set_tracking_cursor(const uint64_t txn_id, const tracking_operation &operation,
-      const uint64_t &, const std::string &, const std::string &value, wt_timestamp_t ts,
+    set_tracking_cursor(WT_SESSION *session, const tracking_operation &operation, const uint64_t &,
+      const std::string &, const std::string &value, wt_timestamp_t ts,
       scoped_cursor &op_track_cursor) override final
     {
+        uint64_t txn_id = ((WT_SESSION_IMPL *)session)->txn->id;
+        /*
+         * The cache_size may have been changed between the time we make an insert to the DB and
+         * when we write the details to the tracking table, as such we can't take cache_size from
+         * the connection. Instead, write the cache size as part of the atomic insert into the DB
+         * and when populating the tracking table take it from there.
+         */
+        uint64_t cache_size = std::stoull(value);
+
         op_track_cursor->set_key(op_track_cursor.get(), ts, txn_id);
-        op_track_cursor->set_value(op_track_cursor.get(), operation, value.c_str());
+        op_track_cursor->set_value(op_track_cursor.get(), operation, cache_size);
     }
 };
 
@@ -103,12 +112,9 @@ class cache_resize : public test {
             const std::string key;
             const std::string value = std::to_string(new_cache_size);
 
-            /* Retrieve the current transaction id. */
-            uint64_t txn_id = ((WT_SESSION_IMPL *)tc->session.get())->txn->id;
-
             /* Save the change of cache size in the tracking table. */
             tc->txn.begin();
-            int ret = tc->op_tracker->save_operation(txn_id, tracking_operation::CUSTOM,
+            int ret = tc->op_tracker->save_operation(tc->session.get(), tracking_operation::CUSTOM,
               collection_id, key, value, tc->tsm->get_next_ts(), tc->op_track_cursor);
 
             if (ret == 0)
@@ -188,7 +194,7 @@ class cache_resize : public test {
 
             uint64_t tracked_ts, tracked_txn_id;
             int tracked_op_type;
-            const char *tracked_cache_size;
+            uint64_t tracked_cache_size;
 
             testutil_check(cursor->get_key(cursor.get(), &tracked_ts, &tracked_txn_id));
             testutil_check(cursor->get_value(cursor.get(), &tracked_op_type, &tracked_cache_size));
@@ -196,7 +202,7 @@ class cache_resize : public test {
             logger::log_msg(LOG_TRACE,
               "Timestamp: " + std::to_string(tracked_ts) +
                 ", transaction id: " + std::to_string(tracked_txn_id) +
-                ", cache size: " + std::to_string(std::stoull(tracked_cache_size)));
+                ", cache size: " + std::to_string(tracked_cache_size));
 
             tracking_operation op_type = static_cast<tracking_operation>(tracked_op_type);
             /* There are only two types of operation tracked. */
@@ -226,7 +232,7 @@ class cache_resize : public test {
             /*
              * FIXME-WT-9339 - Save the last cache size seen by the transaction.
              *
-             * cache_size = std::stoull(tracked_cache_size);
+             * cache_size = tracked_cache_size;
              */
             ++num_records;
         }

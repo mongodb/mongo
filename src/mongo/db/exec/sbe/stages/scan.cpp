@@ -56,8 +56,10 @@ ScanStage::ScanStage(UUID collectionUuid,
                      PlanYieldPolicy* yieldPolicy,
                      PlanNodeId nodeId,
                      ScanCallbacks scanCallbacks,
-                     bool useRandomCursor)
-    : PlanStage(seekKeySlot ? "seek"_sd : "scan"_sd, yieldPolicy, nodeId),
+                     bool useRandomCursor,
+                     bool participateInTrialRunTracking)
+    : PlanStage(
+          seekKeySlot ? "seek"_sd : "scan"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
       _collUuid(collectionUuid),
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
@@ -98,7 +100,9 @@ std::unique_ptr<PlanStage> ScanStage::clone() const {
                                        _forward,
                                        _yieldPolicy,
                                        _commonStats.nodeId,
-                                       _scanCallbacks);
+                                       _scanCallbacks,
+                                       _useRandomCursor,
+                                       _participateInTrialRunTracking);
 }
 
 void ScanStage::prepare(CompileCtx& ctx) {
@@ -592,8 +596,9 @@ ParallelScanStage::ParallelScanStage(UUID collectionUuid,
                                      value::SlotVector vars,
                                      PlanYieldPolicy* yieldPolicy,
                                      PlanNodeId nodeId,
-                                     ScanCallbacks callbacks)
-    : PlanStage("pscan"_sd, yieldPolicy, nodeId),
+                                     ScanCallbacks callbacks,
+                                     bool participateInTrialRunTracking)
+    : PlanStage("pscan"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
       _collUuid(collectionUuid),
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
@@ -621,8 +626,9 @@ ParallelScanStage::ParallelScanStage(const std::shared_ptr<ParallelState>& state
                                      value::SlotVector vars,
                                      PlanYieldPolicy* yieldPolicy,
                                      PlanNodeId nodeId,
-                                     ScanCallbacks callbacks)
-    : PlanStage("pscan"_sd, yieldPolicy, nodeId),
+                                     ScanCallbacks callbacks,
+                                     bool participateInTrialRunTracking)
+    : PlanStage("pscan"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
       _collUuid(collectionUuid),
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
@@ -650,7 +656,8 @@ std::unique_ptr<PlanStage> ParallelScanStage::clone() const {
                                                _vars,
                                                _yieldPolicy,
                                                _commonStats.nodeId,
-                                               _scanCallbacks);
+                                               _scanCallbacks,
+                                               _participateInTrialRunTracking);
 }
 
 void ParallelScanStage::prepare(CompileCtx& ctx) {

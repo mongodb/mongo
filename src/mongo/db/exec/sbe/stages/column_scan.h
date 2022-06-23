@@ -53,7 +53,8 @@ public:
                     std::vector<std::unique_ptr<EExpression>> pathExprs,
                     value::SlotId internalSlot,
                     PlanYieldPolicy* yieldPolicy,
-                    PlanNodeId nodeId);
+                    PlanNodeId planNodeId,
+                    bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 

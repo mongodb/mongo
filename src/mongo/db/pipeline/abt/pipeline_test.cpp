@@ -2326,13 +2326,15 @@ TEST(ABTTranslate, PartialIndex) {
 
     // The expression matches the pipeline.
     // By default the constant is translated as "int32".
-    auto conversionResult = convertExprToPartialSchemaReq(make<EvalFilter>(
-        make<PathGet>("b",
-                      make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int32(2)))),
-        make<Variable>(scanProjName)));
-    ASSERT_TRUE(conversionResult._success);
-    ASSERT_FALSE(conversionResult._hasEmptyInterval);
-    ASSERT_FALSE(conversionResult._retainPredicate);
+    auto conversionResult = convertExprToPartialSchemaReq(
+        make<EvalFilter>(
+            make<PathGet>(
+                "b", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int32(2)))),
+            make<Variable>(scanProjName)),
+        true /*isFilterContext*/);
+    ASSERT_TRUE(conversionResult.has_value());
+    ASSERT_FALSE(conversionResult->_hasEmptyInterval);
+    ASSERT_FALSE(conversionResult->_retainPredicate);
 
     Metadata metadata = {
         {{scanDefName,
@@ -2341,7 +2343,7 @@ TEST(ABTTranslate, PartialIndex) {
                            IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending}},
                                            true /*multiKey*/,
                                            {DistributionType::Centralized},
-                                           std::move(conversionResult._reqMap)}}}}}}};
+                                           std::move(conversionResult->_reqMap)}}}}}}};
 
     ABT translated = translatePipeline(
         metadata, "[{$match: {'a': 3, 'b': 2}}]", scanProjName, scanDefName, prefixId);
@@ -2394,13 +2396,15 @@ TEST(ABTTranslate, PartialIndexNegative) {
     ProjectionName scanProjName = prefixId.getNextId("scan");
 
     // The expression does not match the pipeline.
-    auto conversionResult = convertExprToPartialSchemaReq(make<EvalFilter>(
-        make<PathGet>("b",
-                      make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int32(2)))),
-        make<Variable>(scanProjName)));
-    ASSERT_TRUE(conversionResult._success);
-    ASSERT_FALSE(conversionResult._hasEmptyInterval);
-    ASSERT_FALSE(conversionResult._retainPredicate);
+    auto conversionResult = convertExprToPartialSchemaReq(
+        make<EvalFilter>(
+            make<PathGet>(
+                "b", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int32(2)))),
+            make<Variable>(scanProjName)),
+        true /*isFilterContext*/);
+    ASSERT_TRUE(conversionResult.has_value());
+    ASSERT_FALSE(conversionResult->_hasEmptyInterval);
+    ASSERT_FALSE(conversionResult->_retainPredicate);
 
     Metadata metadata = {
         {{scanDefName,
@@ -2409,7 +2413,7 @@ TEST(ABTTranslate, PartialIndexNegative) {
                            IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending}},
                                            true /*multiKey*/,
                                            {DistributionType::Centralized},
-                                           std::move(conversionResult._reqMap)}}}}}}};
+                                           std::move(conversionResult->_reqMap)}}}}}}};
 
     ABT translated = translatePipeline(
         metadata, "[{$match: {'a': 3, 'b': 3}}]", scanProjName, scanDefName, prefixId);

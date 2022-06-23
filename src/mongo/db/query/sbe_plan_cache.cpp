@@ -160,8 +160,17 @@ void clearPlanCacheEntriesWith(ServiceContext* serviceCtx,
             sbe::getPlanCache(serviceCtx)
                 .removeIf([&collectionUuid, collectionVersion](const PlanCacheKey& key,
                                                                const sbe::PlanCacheEntry& entry) {
-                    return key.getCollectionVersion() == collectionVersion &&
-                        key.getCollectionUuid() == collectionUuid;
+                    if (key.getMainCollectionState().version == collectionVersion &&
+                        key.getMainCollectionState().uuid == collectionUuid) {
+                        return true;
+                    }
+                    for (auto& collectionState : key.getSecondaryCollectionStates()) {
+                        if (collectionState.version == collectionVersion &&
+                            collectionState.uuid == collectionUuid) {
+                            return true;
+                        }
+                    }
+                    return false;
                 });
 
         LOGV2_DEBUG(6006600,

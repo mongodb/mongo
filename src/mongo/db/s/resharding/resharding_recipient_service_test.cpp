@@ -83,7 +83,7 @@ public:
         std::vector<ChunkType> chunks = {ChunkType{
             _sourceUUID,
             ChunkRange{BSON(_currentShardKey << MINKEY), BSON(_currentShardKey << MAXKEY)},
-            ChunkVersion(100, 0, epoch, Timestamp(1, 1)),
+            ChunkVersion({epoch, Timestamp(1, 1)}, {100, 0}),
             _someDonorId}};
 
         auto rt = RoutingTableHistory::makeNew(_sourceNss,

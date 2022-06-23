@@ -27,14 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_id.h"
-
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -48,7 +45,7 @@ const KeyPattern kShardKeyPattern(BSON("a" << 1));
 TEST(ChunkTest, HasMovedSincePinnedTimestamp) {
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
-    ChunkVersion version{1, 0, epoch, Timestamp(1, 1)};
+    ChunkVersion version({epoch, Timestamp(1, 1)}, {1, 0});
 
     ChunkType chunkType(uuid,
                         ChunkRange{kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax()},
@@ -65,7 +62,7 @@ TEST(ChunkTest, HasMovedSincePinnedTimestamp) {
 TEST(ChunkTest, HasMovedAndReturnedSincePinnedTimestamp) {
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
-    ChunkVersion version{1, 0, epoch, Timestamp(1, 1)};
+    ChunkVersion version({epoch, Timestamp(1, 1)}, {1, 0});
 
     ChunkType chunkType(uuid,
                         ChunkRange{kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax()},
@@ -83,7 +80,7 @@ TEST(ChunkTest, HasMovedAndReturnedSincePinnedTimestamp) {
 TEST(ChunkTest, HasNotMovedSincePinnedTimestamp) {
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
-    ChunkVersion version{1, 0, epoch, Timestamp(1, 1)};
+    ChunkVersion version({epoch, Timestamp(1, 1)}, {1, 0});
 
     ChunkType chunkType(uuid,
                         ChunkRange{kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax()},
@@ -101,7 +98,7 @@ TEST(ChunkTest, HasNotMovedSincePinnedTimestamp) {
 TEST(ChunkTest, HasNoHistoryValidForPinnedTimestamp_OneEntry) {
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
-    ChunkVersion version{1, 0, epoch, Timestamp(1, 1)};
+    ChunkVersion version({epoch, Timestamp(1, 1)}, {1, 0});
 
     ChunkType chunkType(uuid,
                         ChunkRange{kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax()},
@@ -117,7 +114,7 @@ TEST(ChunkTest, HasNoHistoryValidForPinnedTimestamp_OneEntry) {
 TEST(ChunkTest, HasNoHistoryValidForPinnedTimestamp_MoreThanOneEntry) {
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
-    ChunkVersion version{1, 0, epoch, Timestamp(1, 1)};
+    ChunkVersion version({epoch, Timestamp(1, 1)}, {1, 0});
 
     ChunkType chunkType(uuid,
                         ChunkRange{kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax()},

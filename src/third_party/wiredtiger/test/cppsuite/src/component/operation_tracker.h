@@ -75,11 +75,11 @@ class operation_tracker : public component {
     void save_schema_operation(
       const tracking_operation &operation, const uint64_t &collection_id, wt_timestamp_t ts);
 
-    virtual void set_tracking_cursor(const uint64_t txn_id, const tracking_operation &operation,
+    virtual void set_tracking_cursor(WT_SESSION *session, const tracking_operation &operation,
       const uint64_t &collection_id, const std::string &key, const std::string &value,
       wt_timestamp_t ts, scoped_cursor &op_track_cursor);
 
-    int save_operation(const uint64_t txn_id, const tracking_operation &operation,
+    int save_operation(WT_SESSION *session, const tracking_operation &operation,
       const uint64_t &collection_id, const std::string &key, const std::string &value,
       wt_timestamp_t ts, scoped_cursor &op_track_cursor);
 

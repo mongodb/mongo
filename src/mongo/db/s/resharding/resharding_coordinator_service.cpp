@@ -1858,30 +1858,8 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllParticipantShardsD
                 const auto cmdObj =
                     ShardsvrDropCollectionIfUUIDNotMatchingRequest(nss, notMatchingThisUUID)
                         .toBSON({});
-
-                try {
-                    sharding_ddl_util::sendAuthenticatedCommandToShards(
-                        opCtx.get(), nss.db(), cmdObj, allShardIds, **executor);
-                } catch (const DBException& ex) {
-                    if (ex.code() == ErrorCodes::CommandNotFound) {
-                        // TODO SERVER-60531 get rid of the catch logic
-                        // Cleanup failed because at least one shard could is using a binary
-                        // not supporting the ShardsvrDropCollectionIfUUIDNotMatching command.
-                        LOGV2_INFO(5423100,
-                                   "Resharding coordinator couldn't guarantee older incarnations "
-                                   "of the collection were dropped. A chunk migration to a shard "
-                                   "with an older incarnation of the collection will fail",
-                                   "namespace"_attr = nss.ns());
-                    } else if (opCtx->checkForInterruptNoAssert().isOK()) {
-                        LOGV2_INFO(
-                            5423101,
-                            "Resharding coordinator failed while trying to drop possible older "
-                            "incarnations of the collection. A chunk migration to a shard with "
-                            "an older incarnation of the collection will fail",
-                            "namespace"_attr = nss.ns(),
-                            "error"_attr = redact(ex.toStatus()));
-                    }
-                }
+                _reshardingCoordinatorExternalState->sendCommandToShards(
+                    opCtx.get(), nss.db(), cmdObj, allShardIds, **executor);
             }
 
             reshardingPauseCoordinatorBeforeRemovingStateDoc.pauseWhileSetAndNotCanceled(

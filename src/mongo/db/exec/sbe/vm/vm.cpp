@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -213,17 +212,13 @@ std::string CodeFragment::toString() const {
             case Instruction::cmp3w:
             case Instruction::collCmp3w:
             case Instruction::fillEmpty:
-            case Instruction::fillEmptyConst:
             case Instruction::getField:
-            case Instruction::getFieldConst:
             case Instruction::getElement:
             case Instruction::getArraySize:
             case Instruction::collComparisonKey:
             case Instruction::getFieldOrElement:
             case Instruction::traverseP:
-            case Instruction::traversePConst:
             case Instruction::traverseF:
-            case Instruction::traverseFConst:
             case Instruction::setField:
             case Instruction::aggSum:
             case Instruction::aggMin:
@@ -251,9 +246,15 @@ std::string CodeFragment::toString() const {
                 break;
             }
             // Instructions with a single integer argument.
+            case Instruction::pushLocalLambda:
+            case Instruction::traversePConst: {
+                auto offset = readFromMemory<int>(pcPointer);
+                pcPointer += sizeof(offset);
+                ss << "offset: " << offset;
+                break;
+            }
             case Instruction::pushLocalVal:
-            case Instruction::pushMoveLocalVal:
-            case Instruction::pushLocalLambda: {
+            case Instruction::pushMoveLocalVal: {
                 auto arg = readFromMemory<int>(pcPointer);
                 pcPointer += sizeof(arg);
                 ss << "arg: " << arg;
@@ -268,6 +269,21 @@ std::string CodeFragment::toString() const {
                 break;
             }
             // Instructions with other kinds of arguments.
+            case Instruction::traverseFConst: {
+                auto k = readFromMemory<Instruction::Constants>(pcPointer);
+                pcPointer += sizeof(k);
+                auto offset = readFromMemory<int>(pcPointer);
+                pcPointer += sizeof(offset);
+                ss << "k: " << Instruction::toStringConstants(k) << ", offset: " << offset;
+                break;
+            }
+            case Instruction::fillEmptyConst: {
+                auto k = readFromMemory<Instruction::Constants>(pcPointer);
+                pcPointer += sizeof(k);
+                ss << "k: " << Instruction::toStringConstants(k);
+                break;
+            }
+            case Instruction::getFieldConst:
             case Instruction::pushConstVal: {
                 auto tag = readFromMemory<value::TypeTags>(pcPointer);
                 pcPointer += sizeof(tag);
