@@ -511,6 +511,7 @@ const docs = [
     {a: {b: [{c: [1, 2]}]}},
     {a: {b: {c: [1, 2]}}},
     {a: [[1, 2], [{b: [[1, 2], [{c: [[1, 2], [{}], 2]}], 2]}], 2]},
+    {a: [{m: 1, n: 2}, {m: 2, o: 1}]},
 ];
 
 let docNum = 0;
@@ -537,7 +538,7 @@ const kProjection = {
 };
 
 // Run an explain.
-const explain = coll.find({}, kProjection).explain();
+let explain = coll.find({}, kProjection).explain();
 assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
 
 // Run a query getting all of the results using the column index.
@@ -546,6 +547,26 @@ assert.gt(results.length, 0);
 
 for (let res of results) {
     const trueResult = coll.find({num: res.num}, kProjection).hint({$natural: 1}).toArray()[0];
+    const originalDoc = coll.findOne({num: res.num});
+    assert.eq(res, trueResult, originalDoc);
+}
+
+// Run a similar query that projects multiple fields with a shared parent object.
+const kSiblingProjection = {
+    _id: 0,
+    "a.m": 1,
+    "a.n": 1,
+    num: 1
+};
+
+explain = coll.find({}, kSiblingProjection).explain();
+assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
+
+results = coll.find({}, kSiblingProjection).toArray();
+assert.gt(results.length, 0);
+for (let res of results) {
+    const trueResult =
+        coll.find({num: res.num}, kSiblingProjection).hint({$natural: 1}).toArray()[0];
     const originalDoc = coll.findOne({num: res.num});
     assert.eq(res, trueResult, originalDoc);
 }

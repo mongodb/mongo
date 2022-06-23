@@ -201,6 +201,42 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
             {b: 1},
         ]
     });
+
+    // Test the case where two paths in a projection go through the same parent object.
+    const testIncludeOnlyADotBAndADotC = (input, output) => testInputOutput({
+        input: input,
+        projection: {'a.b': 1, 'a.c': 1, _id: 0},
+        expectedOutput: output,
+        interestingIndexes:
+            [{a: 1}, {'a.b': 1}, {'a.c': 1}, {'a.b': 1, 'a.c': 1}, {'a.b': 1, 'a.c': -1}]
+    });
+    testIncludeOnlyADotBAndADotC({_id: 0, a: {b: "scalar", c: "scalar", d: "extra"}},
+                                 {a: {b: "scalar", c: "scalar"}});
+    testIncludeOnlyADotBAndADotC({_id: 1, a: [{b: 1, c: 2, d: 3}, {b: 4, c: 5, d: 6}]},
+                                 {a: [{b: 1, c: 2}, {b: 4, c: 5}]});
+
+    // Array cases where one or both of the paths don't exist.
+    testIncludeOnlyADotBAndADotC({_id: 5, a: [{b: 1, c: 2}, {b: 3, d: 4}]},
+                                 {a: [{b: 1, c: 2}, {b: 3}]});
+    testIncludeOnlyADotBAndADotC({_id: 6, a: [{c: 1, d: 2}, {b: 3, d: 4}]}, {a: [{c: 1}, {b: 3}]});
+    testIncludeOnlyADotBAndADotC({_id: 7, a: []}, {a: []});
+    testIncludeOnlyADotBAndADotC({_id: 8, a: [{b: 1, c: 2}, "extra", {b: 3, c: 4}]},
+                                 {a: [{b: 1, c: 2}, {b: 3, c: 4}]});
+
+    // Non-array cases where one or both of the paths don't exist.
+    //
+    // TODO SERVER-23229: This will return different results if there is a covering index, so here
+    // but not elsewhere we don't use any "interestingIndexes" in test cases.
+    const testIncludeADotBAndCNoIndexes = (input, output) => testInputOutput({
+        input: input,
+        projection: {'a.b': 1, 'a.c': 1, _id: 0},
+        expectedOutput: output,
+        interestingIndexes: []
+    });
+
+    testIncludeADotBAndCNoIndexes({_id: 2, a: {b: "scalar", d: "extra"}}, {a: {b: "scalar"}});
+    testIncludeADotBAndCNoIndexes({_id: 3, a: {c: "scalar", d: "extra"}}, {a: {c: "scalar"}});
+    testIncludeADotBAndCNoIndexes({_id: 4, a: {d: "extra"}}, {a: {}});
 }());
 
 (function testInclusionLevelsOfNesting() {
