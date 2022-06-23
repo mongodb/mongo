@@ -60,13 +60,19 @@ public:
         result.append("configsvrConnectionString",
                       shardRegistry->getConfigServerConnectionString().toString());
 
+        const auto vcTime = VectorClock::get(opCtx)->getTime();
+
         const auto configOpTime = [&]() {
-            const auto vcTime = VectorClock::get(opCtx)->getTime();
             const auto vcConfigTimeTs = vcTime.configTime().asTimestamp();
             return mongo::repl::OpTime(vcConfigTimeTs, mongo::repl::OpTime::kUninitializedTerm);
         }();
-
         configOpTime.append(&result, "lastSeenConfigServerOpTime");
+
+        const auto topologyOpTime = [&]() {
+            const auto vcTopologyTimeTs = vcTime.topologyTime().asTimestamp();
+            return mongo::repl::OpTime(vcTopologyTimeTs, mongo::repl::OpTime::kUninitializedTerm);
+        }();
+        topologyOpTime.append(&result, "lastSeenTopologyOpTime");
 
         const long long maxChunkSizeInBytes =
             grid->getBalancerConfiguration()->getMaxChunkSizeBytes();
