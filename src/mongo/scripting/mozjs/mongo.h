@@ -39,7 +39,10 @@ using EncryptedDBClientCallback = std::unique_ptr<DBClientBase>(std::unique_ptr<
                                                                 JS::HandleValue,
                                                                 JS::HandleObject,
                                                                 JSContext*);
-void setEncryptedDBClientCallback(EncryptedDBClientCallback* callback);
+
+using GetNestedConnectionCallback = DBClientBase*(DBClientBase*);
+void setEncryptedDBClientCallbacks(EncryptedDBClientCallback* encCallback,
+                                   GetNestedConnectionCallback* getCallback);
 
 /**
  * Shared code for the "Mongo" javascript object.

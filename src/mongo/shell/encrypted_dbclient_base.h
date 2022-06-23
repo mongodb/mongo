@@ -102,7 +102,11 @@ public:
 
     using DBClientBase::runCommandWithTarget;
     virtual std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(
-        OpMsgRequest request) override;
+        OpMsgRequest request) final;
+
+    std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> runCommandWithTarget(
+        OpMsgRequest request, std::shared_ptr<DBClientBase>) final;
+
     std::string toString() const final;
 
     int getMinWireVersion() final;
@@ -153,6 +157,8 @@ public:
 
     bool isMongos() const final;
 
+    DBClientBase* getRawConnection();
+
 #ifdef MONGO_CONFIG_SSL
     const SSLConfiguration* getSSLConfiguration() override;
 
@@ -164,16 +170,54 @@ public:
 protected:
     BSONObj _decryptResponsePayload(BSONObj& reply, StringData databaseName, bool isFLE2);
 
-    std::pair<rpc::UniqueReply, DBClientBase*> processResponseFLE1(rpc::UniqueReply result,
-                                                                   StringData databaseName);
+    enum class RunCommandConnectionType { rawPtr, sharedPtr };
 
-    std::pair<rpc::UniqueReply, DBClientBase*> processResponseFLE2(rpc::UniqueReply result,
-                                                                   StringData databaseName);
+    struct RunCommandParams {
+        OpMsgRequest request;
+        std::shared_ptr<DBClientBase> conn;
+        RunCommandConnectionType type;
 
-    std::pair<rpc::UniqueReply, DBClientBase*> prepareReply(rpc::UniqueReply result,
-                                                            StringData databaseName,
-                                                            BSONObj decryptedDoc);
+        RunCommandParams(OpMsgRequest request)
+            : request(std::move(request)), type(RunCommandConnectionType::rawPtr){};
 
+        RunCommandParams(OpMsgRequest request, std::shared_ptr<DBClientBase> base)
+            : request(std::move(request)), conn(base), type(RunCommandConnectionType::sharedPtr){};
+
+        RunCommandParams(OpMsgRequest request, RunCommandParams params)
+            : request(std::move(request)), type(params.type) {
+            if (type == RunCommandConnectionType::sharedPtr) {
+                conn = params.conn;
+            };
+        };
+    };
+
+    using RunCommandReturnConn = stdx::variant<DBClientBase*, std::shared_ptr<DBClientBase>>;
+
+    struct RunCommandReturn {
+        rpc::UniqueReply returnReply;
+        RunCommandReturnConn returnConn;
+
+        RunCommandReturn(std::pair<rpc::UniqueReply, DBClientBase*> pair)
+            : returnReply(std::move(std::get<0>(pair))), returnConn(std::get<1>(pair)) {}
+
+        RunCommandReturn(std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> pair)
+            : returnReply(std::move(std::get<0>(pair))), returnConn(std::get<1>(pair)) {}
+
+        RunCommandReturn(rpc::UniqueReply reply, RunCommandReturn& result)
+            : returnReply(std::move(reply)), returnConn(result.returnConn) {}
+    };
+
+    RunCommandReturn doRunCommand(RunCommandParams params);
+
+    virtual RunCommandReturn handleEncryptionRequest(RunCommandParams params);
+
+    RunCommandReturn processResponseFLE1(RunCommandReturn result, StringData databaseName);
+
+    RunCommandReturn processResponseFLE2(RunCommandReturn result, StringData DatabaseName);
+
+    RunCommandReturn prepareReply(RunCommandReturn result,
+                                  StringData databaseName,
+                                  BSONObj decryptedDoc);
 
     BSONObj encryptDecryptCommand(const BSONObj& object, bool encrypt, StringData databaseName);
 

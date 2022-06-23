@@ -199,22 +199,24 @@ void EncryptedDBClientBase::decryptPayload(ConstDataRange data,
     }
 }
 
-std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::processResponseFLE1(
-    rpc::UniqueReply result, const StringData databaseName) {
-    auto rawReply = result->getCommandReply();
+EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::processResponseFLE1(
+    EncryptedDBClientBase::RunCommandReturn result, const StringData databaseName) {
+    auto rawReply = result.returnReply->getCommandReply();
     return prepareReply(
         std::move(result), databaseName, encryptDecryptCommand(rawReply, false, databaseName));
 }
 
-std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::processResponseFLE2(
-    rpc::UniqueReply result, const StringData databaseName) {
-    auto rawReply = result->getCommandReply();
+EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::processResponseFLE2(
+    EncryptedDBClientBase::RunCommandReturn result, const StringData databaseName) {
+    auto rawReply = result.returnReply->getCommandReply();
     return prepareReply(
         std::move(result), databaseName, FLEClientCrypto::decryptDocument(rawReply, this));
 }
 
-std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::prepareReply(
-    rpc::UniqueReply result, const StringData databaseName, BSONObj decryptedDoc) {
+EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::prepareReply(
+    EncryptedDBClientBase::RunCommandReturn result,
+    const StringData databaseName,
+    BSONObj decryptedDoc) {
     rpc::OpMsgReplyBuilder replyBuilder;
     replyBuilder.setCommandReply(StatusWith<BSONObj>(decryptedDoc));
     auto msg = replyBuilder.done();
@@ -222,22 +224,49 @@ std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::prepareReply(
     auto host = _conn->getServerAddress();
     auto reply = _conn->parseCommandReplyMessage(host, msg);
 
-    return {std::move(reply), this};
+    return EncryptedDBClientBase::RunCommandReturn({std::move(reply), result});
+}
+
+EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::doRunCommand(
+    EncryptedDBClientBase::RunCommandParams params) {
+    if (params.type == EncryptedDBClientBase::RunCommandConnectionType::rawPtr) {
+        return EncryptedDBClientBase::RunCommandReturn(
+            _conn->runCommandWithTarget(std::move(params.request)));
+    }
+    invariant(params.conn);
+    return EncryptedDBClientBase::RunCommandReturn(
+        _conn->runCommandWithTarget(std::move(params.request), params.conn));
+}
+
+EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::handleEncryptionRequest(
+    EncryptedDBClientBase::RunCommandParams params) {
+    auto commandName = params.request.getCommandName().toString();
+    auto databaseName = params.request.getDatabase().toString();
+
+    if (std::find(kEncryptedCommands.begin(), kEncryptedCommands.end(), StringData(commandName)) ==
+        std::end(kEncryptedCommands)) {
+        return doRunCommand(std::move(params));
+    }
+
+    EncryptedDBClientBase::RunCommandReturn result(doRunCommand(std::move(params)));
+    return processResponseFLE1(processResponseFLE2(std::move(result), databaseName), databaseName);
 }
 
 std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::runCommandWithTarget(
     OpMsgRequest request) {
-    std::string commandName = request.getCommandName().toString();
-    std::string databaseName = request.getDatabase().toString();
+    EncryptedDBClientBase::RunCommandParams params(request);
+    auto result = handleEncryptionRequest(std::move(params));
+    auto returnConn = stdx::get<DBClientBase*>(result.returnConn);
+    return {std::move(result.returnReply), returnConn};
+}
 
-    if (std::find(kEncryptedCommands.begin(), kEncryptedCommands.end(), StringData(commandName)) ==
-        std::end(kEncryptedCommands)) {
-        return _conn->runCommandWithTarget(std::move(request));
-    }
-
-    auto result = _conn->runCommandWithTarget(std::move(request)).first;
-    return processResponseFLE1(processResponseFLE2(std::move(result), databaseName).first,
-                               databaseName);
+std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>>
+EncryptedDBClientBase::runCommandWithTarget(OpMsgRequest request,
+                                            std::shared_ptr<DBClientBase> conn) {
+    EncryptedDBClientBase::RunCommandParams params(request, conn);
+    auto result = handleEncryptionRequest(std::move(params));
+    auto returnConn = stdx::get<std::shared_ptr<DBClientBase>>(result.returnConn);
+    return {std::move(result.returnReply), returnConn};
 }
 
 /**
@@ -686,6 +715,10 @@ std::shared_ptr<SymmetricKey> EncryptedDBClientBase::getDataKey(const UUID& uuid
     return key;
 }
 
+DBClientBase* EncryptedDBClientBase::getRawConnection() {
+    return _conn.get();
+}
+
 SecureVector<uint8_t> EncryptedDBClientBase::getKeyMaterialFromDisk(const UUID& uuid) {
     NamespaceString fullNameNS = getCollectionNS();
     FindCommandRequest findCmd{fullNameNS};
@@ -866,8 +899,16 @@ std::unique_ptr<DBClientBase> createEncryptedDBClientBase(std::unique_ptr<DBClie
     return std::move(base);
 }
 
+DBClientBase* getNestedConnection(DBClientBase* conn) {
+    auto* encryptedConn = dynamic_cast<EncryptedDBClientBase*>(conn);
+    if (!encryptedConn) {
+        return nullptr;
+    }
+    return encryptedConn->getRawConnection();
+}
+
 MONGO_INITIALIZER(setCallbacksForEncryptedDBClientBase)(InitializerContext*) {
-    mongo::mozjs::setEncryptedDBClientCallback(createEncryptedDBClientBase);
+    mongo::mozjs::setEncryptedDBClientCallbacks(createEncryptedDBClientBase, getNestedConnection);
 }
 
 }  // namespace
