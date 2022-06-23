@@ -57,8 +57,9 @@ joinMoveChunk1();
 // Start a second migration on a different collection, wait until it persists it's recovery document
 // and then step down the donor.
 var moveChunkHangAtStep3Failpoint = configureFailPoint(st.rs0.getPrimary(), "moveChunkHangAtStep3");
-var joinMoveChunk2 =
-    moveChunkParallel(staticMongod, st.s0.host, {_id: 0}, null, nsB, st.shard1.shardName);
+// NOTE: The test doesn't join this parallel migration to avoid the check on its outcome,
+// which is not deterministic when executed in a configsvr stepdown suite (SERVER-62419)
+moveChunkParallel(staticMongod, st.s0.host, {_id: 0}, null, nsB, st.shard1.shardName);
 
 moveChunkHangAtStep3Failpoint.wait();
 
@@ -73,9 +74,6 @@ assert.eq(2, st.rs0.getPrimary().getDB('config')['migrationCoordinators'].countD
 // Stepdown the donor shard
 assert.commandWorked(st.rs0.getPrimary().adminCommand({replSetStepDown: 5, force: true}));
 moveChunkHangAtStep3Failpoint.off();
-// NOTE: checkExitSuccess is false because the outcome is not deterministic when executed in a
-// configsvr stepdown suite (SERVER-62419)
-joinMoveChunk2({checkExitSuccess: false});
 
 // Check that the donor shard has been able to recover the shard version for both collections.
 assert.eq(0, collA.find().itcount());

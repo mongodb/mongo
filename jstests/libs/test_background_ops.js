@@ -76,7 +76,29 @@ var getResult = function(mongo, name) {
     return mongo.getCollection("config.testResult").findOne({_id: name});
 };
 
-var startParallelOps = function(mongo, proc, args, context) {
+/**
+ * Overrides the parallel shell code in mongo
+ */
+function startParallelShell(jsCode, port) {
+    if (TestData) {
+        jsCode = "TestData = " + tojson(TestData) + ";" + jsCode;
+    }
+
+    var x;
+    if (port) {
+        x = startMongoProgramNoConnect("mongo", "--port", port, "--eval", jsCode);
+    } else {
+        x = startMongoProgramNoConnect("mongo", "--eval", jsCode, db ? db.getMongo().host : null);
+    }
+
+    return function() {
+        jsTestLog("Waiting for shell " + x + "...");
+        waitProgram(x);
+        jsTestLog("Shell " + x + " finished.");
+    };
+}
+
+startParallelOps = function(mongo, proc, args, context) {
     var procName = proc.name + "-" + new ObjectId();
     var seed = new ObjectId(new ObjectId().valueOf().split("").reverse().join(""))
                    .getTimestamp()
@@ -179,24 +201,31 @@ var startParallelOps = function(mongo, proc, args, context) {
 
     db = oldDB;
 
-    var join = function(options = {}) {
-        const {checkExitSuccess = true} = options;
-        delete options.checkExitSuccess;
+    var join = function() {
         setFinished(mongo, procName, true);
 
-        rawJoin(options);
-
+        rawJoin();
         result = getResult(mongo, procName);
 
         assert.neq(result, null);
 
-        if (!checkExitSuccess) {
-            return result;
-        } else if (checkExitSuccess && result.err) {
+        if (result.err)
             throw Error("Error in parallel ops " + procName + " : " + tojson(result.err));
-        } else {
+
+        else
             return result.result;
-        }
+    };
+
+    join.isFinished = function() {
+        return isFinished(mongo, procName);
+    };
+
+    join.setFinished = function(finished) {
+        return setFinished(mongo, procName, finished);
+    };
+
+    join.waitForLock = function(name) {
+        return waitForLock(mongo, name);
     };
 
     return join;
