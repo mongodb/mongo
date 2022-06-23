@@ -44,7 +44,7 @@ function assertConstantFoldingResults(input, addOutput, multiplyOutput, message)
     assertConstantFoldingResultForOp("$add", input, addOutput, message);
     assertConstantFoldingResultForOp("$multiply", input, multiplyOutput, message);
 }
-/*
+
 // Totally fold constants.
 assertConstantFoldingResults([1, 2, 3], 6, 6, "All constants should fold.");
 assertConstantFoldingResults(
@@ -90,8 +90,20 @@ assertArrayEq({
         {"_id": NumberDecimal("905721242210.0453137831269007622941"), "sum": 1}
     ]
 });
+}());
 
-*/
+// Randomized property testing.
+(function() {
+load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers
+load("jstests/aggregation/extras/utils.js");  // For assertErrorCode() and assertArrayEq().
+
+const collName = "jstests_aggregation_add";
+const coll = db["collName"];
+coll.drop();
+
+// TODO: SERVER-67282 Randomized property testing should work after SBE is updated to match classic
+// engine.
+db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true})
 
 function assertPipelineCorrect(pipeline, v) {
     let optimizedResults = coll.aggregate(pipeline).toArray();
@@ -163,71 +175,7 @@ function runRandomizedPropertyTest({op, min, max}) {
 }
 
 for (let i = 0; i < 100; i++) {
-    // runRandomizedPropertyTest({op: "$add", min: -314159255, max: 314159255});
+    runRandomizedPropertyTest({op: "$add", min: -314159255, max: 314159255});
     runRandomizedPropertyTest({op: "$multiply", min: -31415, max: 31415});
 }
-
-// coll.drop();
-// const v = NumberLong(-165920709);
-// coll.insert({v});
-// const failingPipeline = [{
-//     "$group": {
-//         "_id": {
-//             "$add": [
-//                 -127634651.75010383,
-//                 -42470286.927390575,
-//                 NumberInt(-23124488),
-//                 -307746827.02983755,
-//                 16356215.01332593,
-//                 -150531428.49670622,
-//                 NumberInt(-226364290),
-//                 181297936.56230265,
-//                 "$v",
-//                 109560746.75857013,
-//                 136774220.7681843
-//             ]
-//         },
-//         "sum": {"$sum": 1}
-//     }
-// }];
-
-// const makePipeline = (id) => [{"$group": {"_id": id, "sum": {"$sum": 1}}}];
-
-// print("DAVISDEBUG unfolded addition")
-// printjson(getExplainedPipelineFromAggregation(
-//     db,
-//     coll,
-//     makePipeline({
-//         $add: [
-//             -127634651.75010383,
-//             -42470286.927390575,
-//             NumberInt(-23124488),
-//             -307746827.02983755,
-//             16356215.01332593,
-//             -150531428.49670622,
-//             NumberInt(-226364290),
-//             181297936.56230265,
-//             NumberLong(-165920709),  // $v
-//             // 109560746.75857013,
-//             // 136774220.7681843
-
-//             246334967.52675444  // sum of two constants above this
-//         ]
-//     }),
-//     ));
-// print("DAVISDEBUG folded addition")
-// printjson(getExplainedPipelineFromAggregation(
-//     db,
-//     coll,
-//     makePipeline({
-//         $add: [
-//             {"$const": -680217820.6284096},
-//             NumberLong(-165920709),  // $v
-//             // {"$const": 109560746.75857013},
-//             // {"$const": 136774220.7681843}
-
-//             {"$const": 246334967.52675444}  // sum of two constants above this
-//         ]
-//     }),
-//     ));
 })();
