@@ -4,7 +4,8 @@
  * @tags: [
  *   does_not_support_stepdowns,
  *   requires_replication,
- *   requires_sharding
+ *   requires_sharding,
+ *   multiversion_incompatible
  *  ]
  */
 (function() {

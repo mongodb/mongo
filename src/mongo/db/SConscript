@@ -510,6 +510,14 @@ env.Library(
 )
 
 env.Library(
+    target='change_streams_cluster_parameter',
+    source=['change_streams_cluster_parameter.idl', 'change_streams_cluster_parameter.cpp'],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/cluster_server_parameter',
+    ],
+)
+
+env.Library(
     target='change_stream_change_collection_manager',
     source=[
         'change_stream_change_collection_manager.cpp',
@@ -2508,6 +2516,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
         '$BUILD_DIR/mongo/db/change_stream_options_manager',
+        '$BUILD_DIR/mongo/db/change_streams_cluster_parameter',
         '$BUILD_DIR/mongo/db/pipeline/change_stream_expired_pre_image_remover',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter_op_observer',
@@ -2680,6 +2689,7 @@ if wiredtiger:
         source=[
             'cancelable_operation_context_test.cpp',
             'catalog_raii_test.cpp',
+            'change_streams_cluster_parameter_test.cpp',
             'client_strand_test.cpp',
             'client_context_test.cpp',
             'collection_index_usage_tracker_test.cpp',
@@ -2755,6 +2765,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',
             '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
             '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
+            '$BUILD_DIR/mongo/db/change_streams_cluster_parameter',
             '$BUILD_DIR/mongo/db/mongohasher',
             '$BUILD_DIR/mongo/db/pipeline/change_stream_expired_pre_image_remover',
             '$BUILD_DIR/mongo/db/query/common_query_enums_and_helpers',
