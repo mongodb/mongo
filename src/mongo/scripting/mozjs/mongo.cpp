@@ -86,6 +86,7 @@ const JSFunctionSpec MongoBase::methods[] = {
 const char* const MongoBase::className = "Mongo";
 
 EncryptedDBClientCallback* encryptedDBClientCallback = nullptr;
+GetNestedConnectionCallback* getNestedConnectionCallback = nullptr;
 
 const JSFunctionSpec MongoExternalInfo::freeFunctions[4] = {
     MONGO_ATTACH_JS_FUNCTION(_forgetReplSet),
@@ -532,9 +533,16 @@ void MongoBase::Functions::_markNodeAsFailed::call(JSContext* cx, JS::CallArgs a
                   "third argument to _markNodeAsFailed must be a stringified reason");
     }
 
-    auto* rsConn = dynamic_cast<DBClientReplicaSet*>(getConnection(args));
+    DBClientReplicaSet* rsConn = dynamic_cast<DBClientReplicaSet*>(getConnection(args));
+    if (!rsConn && getNestedConnectionCallback) {
+        DBClientBase* base = getNestedConnectionCallback(getConnection(args));
+        if (base) {
+            rsConn = dynamic_cast<DBClientReplicaSet*>(base);
+        }
+    }
+
     if (!rsConn) {
-        uasserted(ErrorCodes::BadValue, "connection object isn't a replica set connection");
+        uasserted(ErrorCodes::BadValue, "connection object is not a replica set object");
     }
 
     auto hostAndPort = ValueWriter(cx, args.get(0)).toString();
@@ -559,8 +567,10 @@ std::unique_ptr<DBClientBase> runEncryptedDBClientCallback(std::unique_ptr<DBCli
     return conn;
 }
 
-void setEncryptedDBClientCallback(EncryptedDBClientCallback* callback) {
-    encryptedDBClientCallback = callback;
+void setEncryptedDBClientCallbacks(EncryptedDBClientCallback* encCallback,
+                                   GetNestedConnectionCallback* getCallback) {
+    encryptedDBClientCallback = encCallback;
+    getNestedConnectionCallback = getCallback;
 }
 
 // "new Mongo(uri, encryptedDBClientCallback, {options...})"
