@@ -91,7 +91,7 @@ protected:
      * @return The result of a complete health check
      */
     virtual Future<HealthCheckStatus> periodicCheckImpl(
-        PeriodicHealthCheckContext&& periodicCheckContext) noexcept = 0;
+        PeriodicHealthCheckContext&& periodicCheckContext) = 0;
 
     HealthObserverLivenessStats getStatsLocked(WithLock) const;
 
