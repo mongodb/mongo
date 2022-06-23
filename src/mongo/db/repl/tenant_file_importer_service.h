@@ -33,9 +33,8 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
-#include "mongo/executor/scoped_task_executor.h"
-#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
@@ -49,107 +48,84 @@ public:
     void startMigration(const UUID& migrationId, const StringData& donorConnectionString);
     void learnedFilename(const UUID& migrationId, const BSONObj& metadataDoc);
     void learnedAllFilenames(const UUID& migrationId);
-    void reset(const UUID& migrationId);
+    void interrupt(const UUID& migrationId);
+    void interruptAll();
 
 private:
-    void onStartup(OperationContext* opCtx) final;
-
-    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
+    void onInitialDataAvailable(OperationContext*, bool) final {}
 
     void onShutdown() final {
-        stdx::lock_guard lk(_mutex);
+        stdx::unique_lock<Latch> lk(_mutex);
+        _interrupt(lk);
         _reset(lk);
     }
 
-    void onStepUpBegin(OperationContext* opCtx, long long term) final {
-        stdx::lock_guard lk(_mutex);
-        _reset(lk);
-    }
+    void onStartup(OperationContext*) final {}
 
-    void onStepUpComplete(OperationContext* opCtx, long long term) final {
-        stdx::lock_guard lk(_mutex);
-        _reset(lk);
-    }
+    void onStepUpBegin(OperationContext*, long long) final {}
 
-    void onStepDown() final {
-        stdx::lock_guard lk(_mutex);
-        _reset(lk);
-    }
+    void onStepUpComplete(OperationContext*, long long) final {}
 
-    void onBecomeArbiter() final {
-        stdx::lock_guard lk(_mutex);
-        _reset(lk);
-    }
+    void onStepDown() final {}
 
-    void _voteImportedFiles(const UUID& migrationId, WithLock);
+    void onBecomeArbiter() final {}
+
+    void _handleEvents(OperationContext* opCtx);
+
+    void _voteImportedFiles(OperationContext* opCtx);
+
+    void _interrupt(WithLock);
 
     void _reset(WithLock);
 
-    // Lasts for the lifetime of the process.
-    std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
-    // Wraps _executor. Created by learnedFilename and destroyed by _reset.
-    std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;
+    std::unique_ptr<stdx::thread> _thread;
     boost::optional<UUID> _migrationId;
     std::string _donorConnectionString;
     Mutex _mutex = MONGO_MAKE_LATCH("TenantFileImporterService::_mutex");
 
-    class ImporterState {
-    public:
-        enum class State { kUninitialized, kCopyingFiles, kCopiedFiles, kImportedFiles };
-
-        void setState(State nextState) {
-            tassert(6114403,
-                    str::stream() << "current state: " << toString(_state)
-                                  << ", new state: " << toString(nextState),
-                    isValidTransition(nextState));
-            _state = nextState;
-        }
-
-        bool is(State state) const {
-            return _state == state;
-        }
-
-        StringData toString() const {
-            return toString(_state);
-        }
-
-    private:
-        static StringData toString(State value) {
-            switch (value) {
-                case State::kUninitialized:
-                    return "uninitialized";
-                case State::kCopyingFiles:
-                    return "copying files";
-                case State::kCopiedFiles:
-                    return "copied files";
-                case State::kImportedFiles:
-                    return "imported files";
-            }
-            MONGO_UNREACHABLE;
-            return StringData();
-        }
-
-        bool isValidTransition(State newState) {
-            if (_state == newState) {
-                return true;
-            }
-
-            switch (_state) {
-                case State::kUninitialized:
-                    return newState == State::kCopyingFiles;
-                case State::kCopyingFiles:
-                    return newState == State::kCopiedFiles || newState == State::kUninitialized;
-                case State::kCopiedFiles:
-                    return newState == State::kImportedFiles || newState == State::kUninitialized;
-                case State::kImportedFiles:
-                    return newState == State::kUninitialized;
-            }
-            MONGO_UNREACHABLE;
-        }
-
-        State _state = State::kUninitialized;
+    // Explicit State enum ordering defined here because we rely on comparison
+    // operators for state checking in various TenantFileImporterService methods.
+    enum class State {
+        kUninitialized = 0,
+        kStarted = 1,
+        kLearnedFilename = 2,
+        kLearnedAllFilenames = 3,
+        kInterrupted = 4
     };
 
-    ImporterState _state;
+    static StringData stateToString(State state) {
+        switch (state) {
+            case State::kUninitialized:
+                return "uninitialized";
+            case State::kStarted:
+                return "started";
+            case State::kLearnedFilename:
+                return "learned filename";
+            case State::kLearnedAllFilenames:
+                return "learned all filenames";
+            case State::kInterrupted:
+                return "interrupted";
+        }
+        MONGO_UNREACHABLE;
+        return StringData();
+    }
+
+    State _state;
+
+    struct ImporterEvent {
+        enum class Type { kNone, kLearnedFileName, kLearnedAllFilenames };
+        Type type;
+        UUID migrationId;
+        BSONObj metadataDoc;
+
+        ImporterEvent(Type _type, const UUID& _migrationId)
+            : type(_type), migrationId(_migrationId) {}
+    };
+
+    using Queue =
+        MultiProducerSingleConsumerQueue<ImporterEvent,
+                                         producer_consumer_queue_detail::DefaultCostFunction>;
+
+    std::shared_ptr<Queue> _eventQueue;
 };
 }  // namespace mongo::repl
