@@ -252,11 +252,14 @@ public:
                     const std::function<transport::Session::TagMask(transport::Session::TagMask)>&
                         mutateFunc) override;
 
-    SemiFuture<ConnectionHandle> get(const HostAndPort& hostAndPort,
-                                     transport::ConnectSSLMode sslMode,
-                                     Milliseconds timeout);
+    SemiFuture<ConnectionHandle> get(
+        const HostAndPort& hostAndPort,
+        transport::ConnectSSLMode sslMode,
+        Milliseconds timeout,
+        ErrorCodes::Error timeoutCode = ErrorCodes::NetworkInterfaceExceededTimeLimit);
     void get_forTest(const HostAndPort& hostAndPort,
                      Milliseconds timeout,
+                     ErrorCodes::Error timeoutCode,
                      GetConnectionCallback cb);
 
     void appendConnectionStats(ConnectionPoolStats* stats) const;

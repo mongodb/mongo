@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/max_time_ms_parser.h"
 
+#include <fmt/format.h>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
 
@@ -45,13 +47,14 @@ StatusWith<int> parseMaxTimeMS(BSONElement maxTimeMSElt) {
     const long long maxVal = maxTimeMSElt.fieldNameStringData() == kMaxTimeMSOpOnlyField
         ? (long long)(INT_MAX) + kMaxTimeMSOpOnlyMaxPadding
         : INT_MAX;
-    if (maxTimeMSLongLong < 0 || maxTimeMSLongLong > maxVal) {
-        return StatusWith<int>(ErrorCodes::BadValue,
-                               (StringBuilder()
-                                << maxTimeMSLongLong << " value for "
-                                << maxTimeMSElt.fieldNameStringData() << " is out of range")
-                                   .str());
-    }
+
+    using namespace fmt::literals;
+
+    if (maxTimeMSLongLong < 0 || maxTimeMSLongLong > maxVal)
+        return Status(ErrorCodes::BadValue,
+                      "{} value for {} is out of range [{}, {}]"_format(
+                          maxTimeMSLongLong, maxTimeMSElt.fieldNameStringData(), 0, maxVal));
+
     double maxTimeMSDouble = maxTimeMSElt.numberDouble();
     if (maxTimeMSElt.type() == mongo::NumberDouble && floor(maxTimeMSDouble) != maxTimeMSDouble) {
         return StatusWith<int>(

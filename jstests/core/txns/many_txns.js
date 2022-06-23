@@ -74,7 +74,16 @@ for (let txnNr = 0; txnNr < numTxns; ++txnNr) {
         continue;
     }
     assert.commandWorked(commitRes, "couldn't commit transaction " + txnNr);
-    assert.commandFailedWithCode(insertRes, ErrorCodes.MaxTimeMSExpired, tojson({insertCmd}));
+    // This assertion relies on the fact a previous transaction with the same insertion
+    // has started and is still pending.
+    // The test assumes inserting the same record will invariably return `MaxTimeMSExpired`
+    // but errors might be raised.
+    // `NetworkInterfaceExceededTimeLimit` is raised in the case the process runs out of
+    // resources to either create or repurpose a network connection for this operation.
+    assert.commandFailedWithCode(
+        insertRes,
+        [ErrorCodes.MaxTimeMSExpired, ErrorCodes.NetworkInterfaceExceededTimeLimit],
+        tojson({insertCmd}));
 
     // Read with default read concern sees the committed transaction.
     assert.eq(doc(1), coll.findOne(doc(1)));

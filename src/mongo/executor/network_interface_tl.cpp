@@ -623,7 +623,8 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
 
     // Attempt to get a connection to every target host
     for (size_t idx = 0; idx < request.target.size(); ++idx) {
-        auto connFuture = _pool->get(request.target[idx], request.sslMode, request.timeout);
+        auto connFuture =
+            _pool->get(request.target[idx], request.sslMode, request.timeout, request.timeoutCode);
 
         // If connection future is ready or requests should be sent in order, send the request
         // immediately.

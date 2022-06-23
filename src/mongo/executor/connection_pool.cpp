@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/executor/connection_pool.h"
 
 #include <fmt/format.h>
@@ -66,6 +64,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(refreshConnectionAfterEveryCommand);
+MONGO_FAIL_POINT_DEFINE(forceExecutorConnectionPoolTimeout);
 
 auto makeSeveritySuppressor() {
     return std::make_unique<logv2::KeyedSeveritySuppressor<HostAndPort>>(
@@ -279,7 +278,7 @@ public:
      * Gets a connection from the specific pool. Sinks a unique_lock from the
      * parent to preserve the lock on _mutex
      */
-    Future<ConnectionHandle> getConnection(Milliseconds timeout);
+    Future<ConnectionHandle> getConnection(Milliseconds timeout, ErrorCodes::Error timeoutCode);
 
     /**
      * Triggers the shutdown procedure. This function sets isShutdown to true
@@ -386,10 +385,15 @@ private:
     using OwnedConnection = std::shared_ptr<ConnectionInterface>;
     using OwnershipPool = stdx::unordered_map<ConnectionInterface*, OwnedConnection>;
     using LRUOwnershipPool = LRUCache<OwnershipPool::key_type, OwnershipPool::mapped_type>;
-    using Request = std::pair<Date_t, Promise<ConnectionHandle>>;
+    struct Request {
+        Date_t expiration;
+        Promise<ConnectionHandle> promise;
+        ErrorCodes::Error timeoutCode;
+    };
+
     struct RequestComparator {
-        bool operator()(const Request& a, const Request& b) {
-            return a.first > b.first;
+        bool operator()(const Request& a, const Request& b) const {
+            return a.expiration > b.expiration;
         }
     };
 
@@ -600,19 +604,22 @@ void ConnectionPool::mutateTags(
 
 void ConnectionPool::get_forTest(const HostAndPort& hostAndPort,
                                  Milliseconds timeout,
+                                 ErrorCodes::Error timeoutCode,
                                  GetConnectionCallback cb) {
     // We kick ourselves onto the executor queue to prevent us from deadlocking with our own thread
-    auto getConnectionFunc = [this, hostAndPort, timeout, cb = std::move(cb)](Status&&) mutable {
-        get(hostAndPort, transport::kGlobalSSLMode, timeout)
-            .thenRunOn(_factory->getExecutor())
-            .getAsync(std::move(cb));
-    };
+    auto getConnectionFunc =
+        [this, hostAndPort, timeout, timeoutCode, cb = std::move(cb)](Status&&) mutable {
+            get(hostAndPort, transport::kGlobalSSLMode, timeout, timeoutCode)
+                .thenRunOn(_factory->getExecutor())
+                .getAsync(std::move(cb));
+        };
     _factory->getExecutor()->schedule(std::move(getConnectionFunc));
 }
 
 SemiFuture<ConnectionPool::ConnectionHandle> ConnectionPool::get(const HostAndPort& hostAndPort,
                                                                  transport::ConnectSSLMode sslMode,
-                                                                 Milliseconds timeout) {
+                                                                 Milliseconds timeout,
+                                                                 ErrorCodes::Error timeoutCode) {
     auto connRequestedAt = _factory->now();
 
     stdx::lock_guard lk(_mutex);
@@ -626,7 +633,7 @@ SemiFuture<ConnectionPool::ConnectionHandle> ConnectionPool::get(const HostAndPo
 
     invariant(pool);
 
-    auto connFuture = pool->getConnection(timeout);
+    auto connFuture = pool->getConnection(timeout, timeoutCode);
     pool->updateState();
 
     if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV()) {
@@ -724,11 +731,37 @@ size_t ConnectionPool::SpecificPool::requestsPending() const {
 }
 
 Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnection(
-    Milliseconds timeout) {
+    Milliseconds timeout, ErrorCodes::Error timeoutCode) {
 
     // Reset our activity timestamp
     auto now = _parent->_factory->now();
     _lastActiveTime = now;
+
+    auto pendingTimeout = _parent->_controller->pendingTimeout();
+    if (timeout < Milliseconds(0) || timeout > pendingTimeout) {
+        timeout = pendingTimeout;
+        // If controller's pending timeout is closest, timeoutCode is rewritten to the internal time
+        // limit error
+        timeoutCode = ErrorCodes::NetworkInterfaceExceededTimeLimit;
+    }
+
+    if (auto sfp = forceExecutorConnectionPoolTimeout.scoped(); MONGO_unlikely(sfp.isActive())) {
+        if (const Milliseconds failpointTimeout{sfp.getData()["timeout"].numberInt()};
+            failpointTimeout > Milliseconds{0}) {
+            auto pf = makePromiseFuture<ConnectionHandle>();
+            auto request = std::make_shared<Request>();
+            request->expiration = now + failpointTimeout;
+            request->promise = std::move(pf.promise);
+            request->timeoutCode = timeoutCode;
+            auto timeoutTimer = _parent->_factory->makeTimer();
+            timeoutTimer->setTimeout(failpointTimeout, [request, timeoutTimer]() mutable {
+                request->promise.setError(Status(
+                    request->timeoutCode,
+                    "Connection timed out due to forceExecutorConnectionPoolTimeout failpoint"));
+            });
+            return std::move(pf.future);
+        }
+    }
 
     // If we do not have requests, then we can fulfill immediately
     if (_requests.size() == 0) {
@@ -744,10 +777,6 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
         }
     }
 
-    auto pendingTimeout = _parent->_controller->pendingTimeout();
-    if (timeout < Milliseconds(0) || timeout > pendingTimeout) {
-        timeout = pendingTimeout;
-    }
     LOGV2_DEBUG(22560,
                 kDiagnosticLogLevel,
                 "Requesting new connection to {hostAndPort} with timeout {timeout}",
@@ -758,7 +787,7 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
     const auto expiration = now + timeout;
     auto pf = makePromiseFuture<ConnectionHandle>();
 
-    _requests.push_back(make_pair(expiration, std::move(pf.promise)));
+    _requests.push_back({expiration, std::move(pf.promise), timeoutCode});
     std::push_heap(begin(_requests), end(_requests), RequestComparator{});
 
     return std::move(pf.future);
@@ -1044,7 +1073,7 @@ void ConnectionPool::SpecificPool::processFailure(const Status& status) {
     }
 
     for (auto& request : _requests) {
-        request.second.setError(status);
+        request.promise.setError(status);
     }
 
     LOGV2_DEBUG(22573,
@@ -1073,7 +1102,7 @@ void ConnectionPool::SpecificPool::fulfillRequests() {
         }
 
         // Grab the request and callback
-        auto promise = std::move(_requests.front().second);
+        auto promise = std::move(_requests.front().promise);
         std::pop_heap(begin(_requests), end(_requests), RequestComparator{});
         _requests.pop_back();
 
@@ -1208,8 +1237,8 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
     }
 
     // If a request would timeout before the next event, then it is the next event
-    if (_requests.size() && (_requests.front().first < nextEventTime)) {
-        nextEventTime = _requests.front().first;
+    if (_requests.size() && (_requests.front().expiration < nextEventTime)) {
+        nextEventTime = _requests.front().expiration;
     }
 
     // Clamp next event time to be either now or in the future. Next event time
@@ -1237,12 +1266,12 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
 
         _health.isFailed = false;
 
-        while (_requests.size() && (_requests.front().first <= now)) {
+        while (_requests.size() && (_requests.front().expiration <= now)) {
             std::pop_heap(begin(_requests), end(_requests), RequestComparator{});
 
             auto& request = _requests.back();
-            request.second.setError(Status(ErrorCodes::NetworkInterfaceExceededTimeLimit,
-                                           "Couldn't get a connection within the time limit"));
+            request.promise.setError(
+                Status(request.timeoutCode, "Couldn't get a connection within the time limit"));
             _requests.pop_back();
 
             // Since we've failed a request, we've interacted with external users
