@@ -63,6 +63,7 @@ server_parameters:
       data: # string
       override_ctor: # bool
       override_set: # bool
+      override_validate: # bool
     redact: # bool
     test_only: # bool
     default: # string or expression map
@@ -82,10 +83,12 @@ server_parameters:
 Each entry in the `server_parameters` map represents one server parameter. The name of the parameter 
 must be unique across the server instance. More information on the specific fields:
 
-* `set_at` (required): Must contain one or both of the values `startup` and/or `runtime`. If runtime 
-is specified along with `cpp_varname`, then `decltype(cpp_varname)` must refer to a thread-safe 
-storage type, specifically: `AtomicWord<T>`, `AtomicDouble`, `std::atomic<T>`, or 
-`boost::synchronized<T>`. 
+* `set_at` (required): Must contain the value `startup`, `runtime`, [`startup`, `runtime`], or 
+`cluster`. If `runtime` is specified along with `cpp_varname`, then `decltype(cpp_varname)` must 
+refer to a thread-safe storage type, specifically: `AtomicWord<T>`, `AtomicDouble`, `std::atomic<T>`, 
+or `boost::synchronized<T>`. If `cluster` is specified along with `cpp_varname`, then 
+`decltype(cpp_varname)` must refer to an IDL-defined type that has `ClusterServerParameter` attached 
+as an inline chained struct.
 
 * `description` (required): Free-form text field currently used only for commenting the generated C++ 
 code. Future uses may preserve this value for a possible `{listSetParameters:1}` command or other 
@@ -171,6 +174,13 @@ Otherwise the base class implementation `ServerParameter::set` is used. It
 invokes `setFromString` using a string representation of `val`, if the `val` is
 holding one of the supported types.
 
+`override_validate`: If `true`, the implementer must provide a `validate` member function as:
+```cpp
+Status {name}::validate(const BSONElement& newValueElement);
+```
+Otherwise, the base class implementation `ServerParameter::validate` is used. This simply returns
+`Status::OK()` without performing any kind of validation of the new BSON element.
+
 If `param.redact` was specified as `true`, then a standard append method will be provided which 
 injects a placeholder value. If `param.redact` was not specified as `true`, then an implementation 
 must be provided with the following signature: 
@@ -205,6 +215,69 @@ MONGO_COMPILER_VARIABLE_UNUSED auto* scp_unique_ident = [] {
 Any additional validator and callback would be set on `ret` as determined by the server parameter 
 configuration block.
 
+### Cluster Server Parameters
+As indicated earlier, one of the options for the `set_at` field is `cluster`. If this value is 
+selected, then the generated server parameter will be known as a cluster server parameter. These 
+server parameters are persisted on a cluster-wide basis via the `setClusterParameter` and 
+`getClusterParameter` commands. Cluster server parameters should be used instead of implementing 
+custom commands to propagate an option cluster-wide, whenever possible.
+
+`setClusterParameter` persists the new value of the indicated cluster server parameter onto a 
+majority of nodes on non-sharded replica sets. On sharded clusters, it majority-writes the new value 
+onto every shard and the config server. This ensures that every mongod in the cluster will be able 
+to recover the most recently written value for all cluster server parameters on restart. 
+Additionally, `setClusterParameter` blocks until the majority write has succeeded on every replica 
+set in the cluster, which guarantees that the parameter value will not be rolled back after being 
+set. Mongoses poll the config server for updated cluster server parameter values every `clusterServerParameterRefreshIntervalSecs`.
+
+`getClusterParameter` returns the cached value of the requested cluster server parameter on the node
+that it is run on. It can accept a single cluster server parameter name, a list of names, or `*` to 
+return all cluster server parameter values on the node.
+
+As indicated in the [Server Parameters Syntax](#server-parameters-syntax) section above, specifying
+`cpp_vartype` for cluster server parameters must result in the usage of an IDL-defined type that has
+`ClusterServerParameter` listed as a chained struct. It is also highly recommended to implement a 
+validator callback function and register it to the cluster server parameter via the `validator` 
+field. These validators are called before the new value of the cluster server parameter is written 
+to disk during `setClusterParameter`. 
+See [server_parameter_with_storage_test.idl][cluster-server-param-with-storage-test] and
+[server_parameter_with_storage_test_structs.idl][cluster-server-param-with-storage-test-structs] for
+examples.
+
+Cluster server parameters can also be specified as specialized server parameters. The chart below
+helps depict how base `ServerParameter` methods can be handled:
+
+| `ServerParameter` method    | Override            | Default Behavior                            |
+| --------------------------- | ------------------- | --------------------------------------------|
+| constructor                 | `override_ctor`     | Instantiates only the name and type.        |                 
+| `set()`                     | Required            | None, won't compile without implementation. |
+| `setFromString()`           | Prohibited          | Returns `ErrorCodes::BadValue`.             |
+| `append()`                  | Required            | None, won't compile without implementation. |
+| `validate()`                | `override_validate` | Return `Status::OK()` without any checks.   |
+| `reset()`                   | Required            | None, won't compile without implementation. |
+| `getClusterParameterTime()` | Required            | Return `LogicalTime::kUninitialized`.       |
+
+ 
+* Specifying `override_ctor` to true is optional. If the cluster server parameter needs to have any
+storage initialized at the same time as parameter registration, then an overridden constructor could
+be useful. Otherwise, the default likely suffices provided that all storage modified via `set()` is
+instantiated in another way.
+* It is highly recommended to specify `override_validate` to true and provide a custom implementation
+of the `validate` method. This ensures that cluster parameters do not get set to nonsensical values.
+* `set()` must be implemented in order to update in-memory parameter storage. It will be called from
+an `OpObserver` after observing a change to the cluster parameter document on-disk.
+* `append()` must be implemented in order to serialize the parameter into BSON for use in 
+`getClusterParameter`.
+* `setFromString()` must never be implemented as cluster server parameters are only set via BSON
+during runtime.  
+* `getClusterParameterTime` must be implemented and should return a `LogicalTime` corresponding to 
+the current version of the cluster server parameter.
+* `reset()` must be implemented and should update the cluster server parameter back to its default
+value.  
+
+See [server_parameter_specialized_test.idl][specialized-cluster-server-param-test-idl] and 
+[server_parameter_specialized_test.h][specialized-cluster-server-param-test-data] for examples.
+
 ### String or Expression Map
 The default and implicit fields above, as well as the `gt`, `lt`, `gte`, and `lte` validators accept 
 either a simple scalar string which is treated as a literal value, or a yaml map containing an 
@@ -236,3 +309,7 @@ that it does not rely on runtime information.
 [get-parameter]: https://docs.mongodb.com/manual/reference/command/getParameter/#getparameter
 [quiet-param]: https://github.com/mongodb/mongo/search?q=serverGlobalParams+quiet+extension:idl&type=code
 [ftdc-file-size-param]: ../src/mongo/db/ftdc/ftdc_server.idl
+[cluster-server-param-with-storage-test]: ../src/mongo/idl/server_parameter_with_storage_test.idl
+[cluster-server-param-with-storage-test-structs]: ../src/mongo/idl/server_parameter_with_storage_test_structs.idl
+[specialized-cluster-server-param-test-idl]: ../src/mongo/idl/server_parameter_specialized_test.idl
+[specialized-cluster-server-param-test-data]: ../src/mongo/idl/server_parameter_specialized_test.h
