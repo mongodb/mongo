@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/executor/connection_pool_test_fixture.h"
 
 #include <algorithm>
@@ -104,6 +102,38 @@ protected:
     template <typename Ptr>
     void dropConnectionsTest(std::shared_ptr<ConnectionPool> const& pool, Ptr t);
 
+    /**
+     * Helper for asserting the various connection pool time-out behaviours.
+     *
+     * Gets a connection from a new pool with a different timeout duration and code,
+     * asserting the connection times out with the appropriate code.
+     *
+     * The controller's refresh timeout is set to 250ms.
+     */
+    void assertTimeoutHelper(Milliseconds hostTimeout,
+                             ErrorCodes::Error expectedErrorCode,
+                             ErrorCodes::Error timeoutCode) {
+        ConnectionPool::Options options;
+        options.refreshTimeout = Milliseconds{250};
+        auto pool = makePool(options);
+        auto now = Date_t::now();
+
+        PoolImpl::setNow(now);
+
+        StatusWith<ConnectionPool::ConnectionHandle> connectionHandle{nullptr};
+        pool->get_forTest(HostAndPort(),
+                          hostTimeout,
+                          timeoutCode,
+                          [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                              connectionHandle = std::move(swConn);
+                          });
+
+        PoolImpl::setNow(now + hostTimeout);
+
+        ASSERT(!connectionHandle.isOK());
+        ASSERT_EQ(connectionHandle.getStatus(), expectedErrorCode);
+    }
+
 private:
     std::shared_ptr<OutOfLineExecutor> _executor = InlineQueuedCountingExecutor::make();
     std::shared_ptr<ConnectionPool> _pool;
@@ -121,6 +151,7 @@ TEST_F(ConnectionPoolTest, SameConn) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           conn1Id = verifyAndGetId(swConn);
                           doneWith(swConn.getValue());
@@ -131,6 +162,7 @@ TEST_F(ConnectionPoolTest, SameConn) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           conn2Id = verifyAndGetId(swConn);
                           doneWith(swConn.getValue());
@@ -172,6 +204,7 @@ TEST_F(ConnectionPoolTest, ConnectionsAreAcquiredInMRUOrder) {
         ConnectionImpl::pushSetup(Status::OK());
         pool->get_forTest(HostAndPort(),
                           Milliseconds(5000),
+                          ErrorCodes::NetworkInterfaceExceededTimeLimit,
                           [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                               ASSERT(swConn.isOK());
                               connections.push_back(std::move(swConn.getValue()));
@@ -200,6 +233,7 @@ TEST_F(ConnectionPoolTest, ConnectionsAreAcquiredInMRUOrder) {
         ConnectionImpl::pushSetup(Status::OK());
         pool->get_forTest(HostAndPort(),
                           Milliseconds(5000),
+                          ErrorCodes::NetworkInterfaceExceededTimeLimit,
                           [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                               ASSERT(swConn.isOK());
                               const auto id = verifyAndGetId(swConn);
@@ -253,6 +287,7 @@ TEST_F(ConnectionPoolTest, ConnectionsNotUsedRecentlyArePurged) {
         ConnectionImpl::pushSetup(Status::OK());
         pool->get_forTest(HostAndPort(),
                           Milliseconds(5000),
+                          ErrorCodes::NetworkInterfaceExceededTimeLimit,
                           [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                               ASSERT(swConn.isOK());
                               original_ids.insert(verifyAndGetId(swConn));
@@ -285,6 +320,7 @@ TEST_F(ConnectionPoolTest, ConnectionsNotUsedRecentlyArePurged) {
         ConnectionImpl::pushSetup(Status::OK());
         pool->get_forTest(HostAndPort(),
                           Milliseconds(5000),
+                          ErrorCodes::NetworkInterfaceExceededTimeLimit,
                           [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                               ASSERT(swConn.isOK());
                               reacquired_ids.insert(verifyAndGetId(swConn));
@@ -325,6 +361,7 @@ TEST_F(ConnectionPoolTest, FailedConnDifferentConn) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           conn1Id = verifyAndGetId(swConn);
                           swConn.getValue()->indicateFailure(Status(ErrorCodes::BadValue, "error"));
@@ -335,6 +372,7 @@ TEST_F(ConnectionPoolTest, FailedConnDifferentConn) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           conn2Id = verifyAndGetId(swConn);
                           doneWith(swConn.getValue());
@@ -358,6 +396,7 @@ TEST_F(ConnectionPoolTest, DifferentHostDifferentConn) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort("localhost:30000"),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           conn1Id = verifyAndGetId(swConn);
                           doneWith(swConn.getValue());
@@ -368,6 +407,7 @@ TEST_F(ConnectionPoolTest, DifferentHostDifferentConn) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort("localhost:30001"),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           conn2Id = verifyAndGetId(swConn);
                           doneWith(swConn.getValue());
@@ -390,6 +430,7 @@ TEST_F(ConnectionPoolTest, DifferentConnWithoutReturn) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
                           conn1 = std::move(swConn.getValue());
@@ -400,6 +441,7 @@ TEST_F(ConnectionPoolTest, DifferentConnWithoutReturn) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
                           conn2 = std::move(swConn.getValue());
@@ -413,30 +455,40 @@ TEST_F(ConnectionPoolTest, DifferentConnWithoutReturn) {
 }
 
 /**
- * Verify that timing out on setup works as expected (a bad status is
- * returned).
- *
- * Note that the lack of pushSetup() calls delays the get.
+ * When the timeout duration comes from the parameter, and no timeout code is specified the
+ * connection timeout status should always be `NetworkInterfaceExceededTimeLimit`
  */
 TEST_F(ConnectionPoolTest, TimeoutOnSetup) {
-    auto pool = makePool();
+    assertTimeoutHelper(
+        /* timeout duration */ Milliseconds{100},
+        /* expected timeout code */ ErrorCodes::NetworkInterfaceExceededTimeLimit,
+        /* user-defined timeout code */ ErrorCodes::NetworkInterfaceExceededTimeLimit);
+}
 
-    auto now = Date_t::now();
+/**
+ * When the timeout duration and timeout code come from the parameters, the connection timeout
+ * status should be the same as specified.
+ */
+TEST_F(ConnectionPoolTest, TimeoutOnSetupWithErrorCode) {
+    assertTimeoutHelper(
+        /* timeout duration */ Milliseconds{100},
+        /* expected timeout code */ ErrorCodes::MaxTimeMSExpired,
+        /* user-defined timeout code */ ErrorCodes::MaxTimeMSExpired);
+}
 
-    Milliseconds hostTimeout = Milliseconds(5000);
-
-    PoolImpl::setNow(now);
-
-    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> conn;
-    pool->get_forTest(
-        HostAndPort(), hostTimeout, [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-            conn = std::move(swConn);
-        });
-
-    PoolImpl::setNow(now + hostTimeout);
-
-    ASSERT(!conn->isOK());
-    ASSERT_EQ(conn->getStatus(), ErrorCodes::NetworkInterfaceExceededTimeLimit);
+/**
+ * When the timeout duration comes from controller, the connection timeout status should always
+ * be `NetworkInterfaceExceededTimeLimit`.
+ *
+ * This test verifies that for a duration longer than what is specified in the connection pool
+ * controller, the controller timeout duration takes precendence over what was requested and
+ * the returned status is always `NetworkInterfaceExceededTimeLimit`
+ */
+TEST_F(ConnectionPoolTest, ControllerTimeoutOnSetup) {
+    assertTimeoutHelper(
+        /* timeout duration */ Milliseconds{500},
+        /* expected timeout code */ ErrorCodes::NetworkInterfaceExceededTimeLimit,
+        /* user-defined timeout code */ ErrorCodes::MaxTimeMSExpired);
 }
 
 /**
@@ -467,6 +519,7 @@ TEST_F(ConnectionPoolTest, refreshHappens) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
                           doneWith(swConn.getValue());
@@ -505,6 +558,7 @@ TEST_F(ConnectionPoolTest, refreshTimeoutHappens) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           conn1Id = verifyAndGetId(swConn);
                           doneWith(swConn.getValue());
@@ -516,6 +570,7 @@ TEST_F(ConnectionPoolTest, refreshTimeoutHappens) {
     // Make sure we still get the first one
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           conn2Id = verifyAndGetId(swConn);
                           doneWith(swConn.getValue());
@@ -532,6 +587,7 @@ TEST_F(ConnectionPoolTest, refreshTimeoutHappens) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(1000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(!swConn.isOK());
 
@@ -548,6 +604,7 @@ TEST_F(ConnectionPoolTest, refreshTimeoutHappens) {
     // Make sure we can get a new connection
     pool->get_forTest(HostAndPort(),
                       Milliseconds(1000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT_NE(verifyAndGetId(swConn), conn1Id);
                           reachedB = true;
@@ -571,6 +628,7 @@ TEST_F(ConnectionPoolTest, requestsServedByUrgency) {
 
     pool->get_forTest(HostAndPort(),
                       Milliseconds(2000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
 
@@ -580,6 +638,7 @@ TEST_F(ConnectionPoolTest, requestsServedByUrgency) {
 
     pool->get_forTest(HostAndPort(),
                       Milliseconds(1000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
 
@@ -618,6 +677,7 @@ TEST_F(ConnectionPoolTest, maxPoolRespected) {
     // the pool)
     pool->get_forTest(HostAndPort(),
                       Milliseconds(3000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
 
@@ -625,6 +685,7 @@ TEST_F(ConnectionPoolTest, maxPoolRespected) {
                       });
     pool->get_forTest(HostAndPort(),
                       Milliseconds(2000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
 
@@ -632,6 +693,7 @@ TEST_F(ConnectionPoolTest, maxPoolRespected) {
                       });
     pool->get_forTest(HostAndPort(),
                       Milliseconds(1000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
 
@@ -675,6 +737,7 @@ TEST_F(ConnectionPoolTest, maxConnectingRespected) {
     // the pool)
     pool->get_forTest(HostAndPort(),
                       Milliseconds(3000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
 
@@ -682,6 +745,7 @@ TEST_F(ConnectionPoolTest, maxConnectingRespected) {
                       });
     pool->get_forTest(HostAndPort(),
                       Milliseconds(2000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
 
@@ -689,6 +753,7 @@ TEST_F(ConnectionPoolTest, maxConnectingRespected) {
                       });
     pool->get_forTest(HostAndPort(),
                       Milliseconds(1000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
 
@@ -734,6 +799,7 @@ TEST_F(ConnectionPoolTest, maxConnectingWithRefresh) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
                           doneWith(swConn.getValue());
@@ -750,6 +816,7 @@ TEST_F(ConnectionPoolTest, maxConnectingWithRefresh) {
     // Try to get another connection
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
                           doneWith(swConn.getValue());
@@ -780,6 +847,7 @@ TEST_F(ConnectionPoolTest, maxConnectingWithMultipleRefresh) {
     // Get us spun up to 3 connections in the pool
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
                           doneWith(swConn.getValue());
@@ -801,6 +869,7 @@ TEST_F(ConnectionPoolTest, maxConnectingWithMultipleRefresh) {
     for (size_t i = 0; i < conns.size(); ++i) {
         pool->get_forTest(HostAndPort(),
                           Milliseconds(static_cast<int>(1000 + i)),
+                          ErrorCodes::NetworkInterfaceExceededTimeLimit,
                           [&conns, i](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                               ASSERT(swConn.isOK());
                               conns[i] = std::move(swConn.getValue());
@@ -876,6 +945,7 @@ TEST_F(ConnectionPoolTest, minPoolRespected) {
     // Grab one connection without returning it
     pool->get_forTest(HostAndPort(),
                       Milliseconds(1000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
 
@@ -908,6 +978,7 @@ TEST_F(ConnectionPoolTest, minPoolRespected) {
     // Two more get's without returns
     pool->get_forTest(HostAndPort(),
                       Milliseconds(2000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
 
@@ -915,6 +986,7 @@ TEST_F(ConnectionPoolTest, minPoolRespected) {
                       });
     pool->get_forTest(HostAndPort(),
                       Milliseconds(3000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(swConn.isOK());
 
@@ -982,6 +1054,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappens) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           connId = verifyAndGetId(swConn);
                           reachedA = true;
@@ -999,6 +1072,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappens) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT_NE(connId, verifyAndGetId(swConn));
                           reachedB = true;
@@ -1032,6 +1106,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensMoreGetsDelay) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           connId = verifyAndGetId(swConn);
                           reachedA = true;
@@ -1046,6 +1121,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensMoreGetsDelay) {
     // Same connection
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT_EQ(connId, verifyAndGetId(swConn));
                           reachedB = true;
@@ -1059,6 +1135,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensMoreGetsDelay) {
     bool reachedB2 = false;
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT_EQ(connId, verifyAndGetId(swConn));
                           reachedB2 = true;
@@ -1074,6 +1151,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensMoreGetsDelay) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT_NE(connId, verifyAndGetId(swConn));
                           reachedC = true;
@@ -1107,6 +1185,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensCheckoutDelays) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           conn1Id = verifyAndGetId(swConn);
                           conn1 = std::move(swConn.getValue());
@@ -1118,6 +1197,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensCheckoutDelays) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           conn2Id = verifyAndGetId(swConn);
                           doneWith(swConn.getValue());
@@ -1133,6 +1213,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensCheckoutDelays) {
     // conn 2 is still there
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT_EQ(conn2Id, verifyAndGetId(swConn));
                           reachedA = true;
@@ -1153,6 +1234,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensCheckoutDelays) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT_NE(conn1Id, verifyAndGetId(swConn));
                           ASSERT_NE(conn2Id, verifyAndGetId(swConn));
@@ -1182,6 +1264,7 @@ TEST_F(ConnectionPoolTest, dropConnections) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           conn1Id = verifyAndGetId(swConn);
                           doneWith(swConn.getValue());
@@ -1192,6 +1275,7 @@ TEST_F(ConnectionPoolTest, dropConnections) {
     ConnectionPool::ConnectionHandle handle;
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT_EQ(verifyAndGetId(swConn), conn1Id);
                           handle = std::move(swConn.getValue());
@@ -1205,6 +1289,7 @@ TEST_F(ConnectionPoolTest, dropConnections) {
     // will fail.
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT(!swConn.isOK());
                           reachedA = true;
@@ -1225,6 +1310,7 @@ TEST_F(ConnectionPoolTest, dropConnections) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           conn2Id = verifyAndGetId(swConn);
                           ASSERT_NE(conn2Id, conn1Id);
@@ -1247,6 +1333,7 @@ TEST_F(ConnectionPoolTest, dropConnections) {
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                           ASSERT_NE(verifyAndGetId(swConn), conn2Id);
                           reachedB = true;
@@ -1271,9 +1358,10 @@ TEST_F(ConnectionPoolTest, SetupTimeoutsDontTimeoutUnrelatedRequests) {
 
     boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> conn1;
     pool->get_forTest(
-        HostAndPort(), Seconds(10), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-            conn1 = std::move(swConn);
-        });
+        HostAndPort(),
+        Seconds(10),
+        ErrorCodes::NetworkInterfaceExceededTimeLimit,
+        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { conn1 = std::move(swConn); });
 
     // initially we haven't called our callback
     ASSERT(!conn1);
@@ -1284,10 +1372,12 @@ TEST_F(ConnectionPoolTest, SetupTimeoutsDontTimeoutUnrelatedRequests) {
     ASSERT(!conn1);
 
     // Get conn2 (which should have an extra second before the timeout)
-    pool->get_forTest(
-        HostAndPort(), Seconds(10), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-            ASSERT_EQ(swConn.getStatus(), ErrorCodes::ShutdownInProgress);
-        });
+    pool->get_forTest(HostAndPort(),
+                      Seconds(10),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
+                      [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                          ASSERT_EQ(swConn.getStatus(), ErrorCodes::ShutdownInProgress);
+                      });
 
     PoolImpl::setNow(now + Seconds(2));
 
@@ -1313,11 +1403,13 @@ TEST_F(ConnectionPoolTest, RefreshTimeoutsDontTimeoutRequests) {
     // Successfully get a new connection
     size_t conn1Id = 0;
     ConnectionImpl::pushSetup(Status::OK());
-    pool->get_forTest(
-        HostAndPort(), Seconds(1), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-            conn1Id = verifyAndGetId(swConn);
-            doneWith(swConn.getValue());
-        });
+    pool->get_forTest(HostAndPort(),
+                      Seconds(1),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
+                      [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                          conn1Id = verifyAndGetId(swConn);
+                          doneWith(swConn.getValue());
+                      });
     ASSERT(conn1Id);
 
     // Force it into refresh
@@ -1325,9 +1417,10 @@ TEST_F(ConnectionPoolTest, RefreshTimeoutsDontTimeoutRequests) {
 
     boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> conn1;
     pool->get_forTest(
-        HostAndPort(), Seconds(10), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-            conn1 = std::move(swConn);
-        });
+        HostAndPort(),
+        Seconds(10),
+        ErrorCodes::NetworkInterfaceExceededTimeLimit,
+        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { conn1 = std::move(swConn); });
 
     // initially we haven't called our callback
     ASSERT(!conn1);
@@ -1337,10 +1430,12 @@ TEST_F(ConnectionPoolTest, RefreshTimeoutsDontTimeoutRequests) {
     ASSERT(!conn1);
 
     // Get conn2 (which should have an extra second before the timeout)
-    pool->get_forTest(
-        HostAndPort(), Seconds(10), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-            ASSERT_EQ(swConn.getStatus(), ErrorCodes::ShutdownInProgress);
-        });
+    pool->get_forTest(HostAndPort(),
+                      Seconds(10),
+                      ErrorCodes::NetworkInterfaceExceededTimeLimit,
+                      [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                          ASSERT_EQ(swConn.getStatus(), ErrorCodes::ShutdownInProgress);
+                      });
 
     PoolImpl::setNow(now + Seconds(5));
 
@@ -1361,19 +1456,25 @@ void ConnectionPoolTest::dropConnectionsTest(std::shared_ptr<ConnectionPool> con
 
     // Successfully get connections to two hosts
     ConnectionImpl::pushSetup(Status::OK());
-    pool->get_forTest(hap1, Seconds(1), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-        doneWith(swConn.getValue());
-    });
+    pool->get_forTest(
+        hap1,
+        Seconds(1),
+        ErrorCodes::NetworkInterfaceExceededTimeLimit,
+        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { doneWith(swConn.getValue()); });
 
     ConnectionImpl::pushSetup(Status::OK());
-    pool->get_forTest(hap2, Seconds(1), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-        doneWith(swConn.getValue());
-    });
+    pool->get_forTest(
+        hap2,
+        Seconds(1),
+        ErrorCodes::NetworkInterfaceExceededTimeLimit,
+        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { doneWith(swConn.getValue()); });
 
     ConnectionImpl::pushSetup(Status::OK());
-    pool->get_forTest(hap3, Seconds(1), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-        doneWith(swConn.getValue());
-    });
+    pool->get_forTest(
+        hap3,
+        Seconds(1),
+        ErrorCodes::NetworkInterfaceExceededTimeLimit,
+        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { doneWith(swConn.getValue()); });
 
     ASSERT_EQ(1ul, pool->getNumConnectionsPerHost(hap1));
     ASSERT_EQ(1ul, pool->getNumConnectionsPerHost(hap2));
@@ -1408,9 +1509,11 @@ void ConnectionPoolTest::dropConnectionsTest(std::shared_ptr<ConnectionPool> con
     ASSERT_EQ(0ul, pool->getNumConnectionsPerHost(hap3));
 
     ConnectionImpl::pushSetup(Status::OK());
-    pool->get_forTest(hap4, Seconds(1), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-        doneWith(swConn.getValue());
-    });
+    pool->get_forTest(
+        hap4,
+        Seconds(1),
+        ErrorCodes::NetworkInterfaceExceededTimeLimit,
+        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { doneWith(swConn.getValue()); });
 
     // drop connections by hostAndPort
     t->dropConnections(hap1);
