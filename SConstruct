@@ -3559,7 +3559,8 @@ def doConfigure(myenv):
 
     if myenv.ToolchainIs('msvc'):
         if get_option('cxx-std') == "17":
-            myenv.AppendUnique(CCFLAGS=['/std:c++17'])
+            myenv.AppendUnique(CCFLAGS=['/std:c++17',
+                                        '/Zc:lambda'])  # /Zc:lambda is implied by /std:c++20
         elif get_option('cxx-std') == "20":
             myenv.AppendUnique(CCFLAGS=['/std:c++20'])
     else:
