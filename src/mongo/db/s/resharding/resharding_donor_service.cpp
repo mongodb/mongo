@@ -414,6 +414,14 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
 
 Status ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(
     Status status, const CancellationToken& stepdownToken) {
+    _metrics->onStateTransition(toMetricsState(_donorCtx.getState()), boost::none);
+
+    // Destroy metrics early so it's lifetime will not be tied to the lifetime of this state
+    // machine. This is because we have future callbacks copy shared pointers to this state machine
+    // that causes it to live longer than expected and potentially overlap with a newer instance
+    // when stepping up.
+    _metrics.reset();
+
     if (!status.isOK()) {
         // If the stepdownToken was triggered, it takes priority in order to make sure that
         // the promise is set with an error that can be retried with. If it ran into an
@@ -430,8 +438,6 @@ Status ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(
         ensureFulfilledPromise(lk, _critSecWasPromoted, statusForPromise);
         ensureFulfilledPromise(lk, _completionPromise, statusForPromise);
     }
-
-    _metrics->onStateTransition(toMetricsState(_donorCtx.getState()), boost::none);
 
     return status;
 }

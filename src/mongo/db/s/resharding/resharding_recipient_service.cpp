@@ -421,6 +421,12 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMand
                        isCanceled = stepdownToken.isCanceled()](Status dataReplicationHaltStatus) {
             _metrics->onStateTransition(toMetricsState(_recipientCtx.getState()), boost::none);
 
+            // Destroy metrics early so it's lifetime will not be tied to the lifetime of this
+            // state machine. This is because we have future callbacks copy shared pointers to this
+            // state machine that causes it to live longer than expected and potentially overlap
+            // with a newer instance when stepping up.
+            _metrics.reset();
+
             // If the stepdownToken was triggered, it takes priority in order to make sure that
             // the promise is set with an error that the coordinator can retry with. If it ran into
             // an unrecoverable error, it would have fasserted earlier.
@@ -434,7 +440,6 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMand
             // replication errors because resharding is known to have failed already.
             stdx::lock_guard<Latch> lk(_mutex);
             ensureFulfilledPromise(lk, _completionPromise, outerStatus);
-
             return outerStatus;
         });
 }

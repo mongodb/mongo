@@ -1399,6 +1399,14 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
                 .onCompletion([outerStatus](Status) { return outerStatus; });
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
+            _metrics->onStateTransition(toMetricsState(_coordinatorDoc.getState()), boost::none);
+
+            // Destroy metrics early so it's lifetime will not be tied to the lifetime of this
+            // state machine. This is because we have future callbacks copy shared pointers to this
+            // state machine that causes it to live longer than expected and potentially overlap
+            // with a newer instance when stepping up.
+            _metrics.reset();
+
             if (!status.isOK()) {
                 {
                     auto lg = stdx::lock_guard(_fulfillmentMutex);
@@ -1412,8 +1420,6 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
                 }
                 _reshardingCoordinatorObserver->interrupt(status);
             }
-
-            _metrics->onStateTransition(toMetricsState(_coordinatorDoc.getState()), boost::none);
         })
         .semi();
 }
