@@ -82,6 +82,13 @@ public:
     }
 };
 
+auto makeLookUpFromBson(BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto docSource = DocumentSourceLookUp::createFromBson(elem, expCtx);
+    auto lookup = static_cast<DocumentSourceLookUp*>(docSource.detach());
+    return std::unique_ptr<DocumentSourceLookUp, DocumentSourceDeleter>(lookup,
+                                                                        DocumentSourceDeleter());
+}
+
 // A 'let' variable defined in a $lookup stage is expected to be available to all sub-pipelines. For
 // sub-pipelines below the immediate one, they are passed to via ExpressionContext. This test
 // confirms that variables defined in the ExpressionContext are captured by the $lookup stage.
@@ -869,9 +876,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
                                          {"foreignField", "_id"_sd},
                                          {"as", "foreignDocs"_sd}}}}
                           .toBson();
-    auto parsed = DocumentSourceLookUp::createFromBson(lookupSpec.firstElement(), expCtx);
-    auto lookup = static_cast<DocumentSourceLookUp*>(parsed.get());
-
+    auto lookup = makeLookUpFromBson(lookupSpec.firstElement(), expCtx);
     lookup->setSource(mockLocalSource.get());
 
     auto next = lookup->getNext();
@@ -890,7 +895,6 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
 
     ASSERT_TRUE(lookup->getNext().isEOF());
     ASSERT_TRUE(lookup->getNext().isEOF());
-    lookup->dispose();
 }
 
 TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
@@ -905,21 +909,6 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
     expCtx->mongoProcessInterface =
         std::make_shared<MockMongoInterface>(std::move(mockForeignContents));
 
-    // Set up the $lookup stage.
-    auto lookupSpec = Document{{"$lookup",
-                                Document{{"from", fromNs.coll()},
-                                         {"localField", "foreignId"_sd},
-                                         {"foreignField", "_id"_sd},
-                                         {"as", "foreignDoc"_sd}}}}
-                          .toBson();
-    auto parsed = DocumentSourceLookUp::createFromBson(lookupSpec.firstElement(), expCtx);
-    auto lookup = static_cast<DocumentSourceLookUp*>(parsed.get());
-
-    const bool preserveNullAndEmptyArrays = false;
-    const boost::optional<std::string> includeArrayIndex = boost::none;
-    lookup->setUnwindStage(DocumentSourceUnwind::create(
-        expCtx, "foreignDoc", preserveNullAndEmptyArrays, includeArrayIndex));
-
     // Mock its input, pausing every other result.
     auto mockLocalSource =
         DocumentSourceMock::createForTest({Document{{"foreignId", 0}},
@@ -927,6 +916,21 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
                                            Document{{"foreignId", 1}},
                                            DocumentSource::GetNextResult::makePauseExecution()},
                                           expCtx);
+
+    // Set up the $lookup stage.
+    auto lookupSpec = Document{{"$lookup",
+                                Document{{"from", fromNs.coll()},
+                                         {"localField", "foreignId"_sd},
+                                         {"foreignField", "_id"_sd},
+                                         {"as", "foreignDoc"_sd}}}}
+                          .toBson();
+    auto lookup = makeLookUpFromBson(lookupSpec.firstElement(), expCtx);
+
+    const bool preserveNullAndEmptyArrays = false;
+    const boost::optional<std::string> includeArrayIndex = boost::none;
+    lookup->setUnwindStage(DocumentSourceUnwind::create(
+        expCtx, "foreignDoc", preserveNullAndEmptyArrays, includeArrayIndex));
+
     lookup->setSource(mockLocalSource.get());
 
     auto next = lookup->getNext();
@@ -945,7 +949,6 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
 
     ASSERT_TRUE(lookup->getNext().isEOF());
     ASSERT_TRUE(lookup->getNext().isEOF());
-    lookup->dispose();
 }
 
 TEST_F(DocumentSourceLookUpTest, LookupReportsAsFieldIsModified) {
@@ -961,14 +964,12 @@ TEST_F(DocumentSourceLookUpTest, LookupReportsAsFieldIsModified) {
                                          {"foreignField", "_id"_sd},
                                          {"as", "foreignDocs"_sd}}}}
                           .toBson();
-    auto parsed = DocumentSourceLookUp::createFromBson(lookupSpec.firstElement(), expCtx);
-    auto lookup = static_cast<DocumentSourceLookUp*>(parsed.get());
+    auto lookup = makeLookUpFromBson(lookupSpec.firstElement(), expCtx);
 
     auto modifiedPaths = lookup->getModifiedPaths();
     ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
     ASSERT_EQ(1U, modifiedPaths.paths.size());
     ASSERT_EQ(1U, modifiedPaths.paths.count("foreignDocs"));
-    lookup->dispose();
 }
 
 TEST_F(DocumentSourceLookUpTest, LookupReportsFieldsModifiedByAbsorbedUnwind) {
@@ -984,8 +985,7 @@ TEST_F(DocumentSourceLookUpTest, LookupReportsFieldsModifiedByAbsorbedUnwind) {
                                          {"foreignField", "_id"_sd},
                                          {"as", "foreignDoc"_sd}}}}
                           .toBson();
-    auto parsed = DocumentSourceLookUp::createFromBson(lookupSpec.firstElement(), expCtx);
-    auto lookup = static_cast<DocumentSourceLookUp*>(parsed.get());
+    auto lookup = makeLookUpFromBson(lookupSpec.firstElement(), expCtx);
 
     const bool preserveNullAndEmptyArrays = false;
     const boost::optional<std::string> includeArrayIndex = std::string("arrIndex");
@@ -997,7 +997,6 @@ TEST_F(DocumentSourceLookUpTest, LookupReportsFieldsModifiedByAbsorbedUnwind) {
     ASSERT_EQ(2U, modifiedPaths.paths.size());
     ASSERT_EQ(1U, modifiedPaths.paths.count("foreignDoc"));
     ASSERT_EQ(1U, modifiedPaths.paths.count("arrIndex"));
-    lookup->dispose();
 }
 
 BSONObj sequentialCacheStageObj(const StringData status = "kBuilding"_sd,
