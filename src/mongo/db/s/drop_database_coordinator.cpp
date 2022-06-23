@@ -144,30 +144,6 @@ void DropDatabaseCoordinator::_dropShardedCollection(
         opCtx, nss, {primaryShardId}, **executor, getCurrentSession());
 }
 
-boost::optional<BSONObj> DropDatabaseCoordinator::reportForCurrentOp(
-    MongoProcessInterface::CurrentOpConnectionsMode connMode,
-    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-    BSONObjBuilder cmdBob;
-    if (const auto& optComment = getForwardableOpMetadata().getComment()) {
-        cmdBob.append(optComment.get().firstElement());
-    }
-
-    const auto currPhase = [&]() {
-        stdx::lock_guard l{_docMutex};
-        return _doc.getPhase();
-    }();
-
-    BSONObjBuilder bob;
-    bob.append("type", "op");
-    bob.append("desc", "DropDatabaseCoordinator");
-    bob.append("op", "command");
-    bob.append("ns", nss().toString());
-    bob.append("command", cmdBob.obj());
-    bob.append("currentPhase", currPhase);
-    bob.append("active", true);
-    return bob.obj();
-}
-
 void DropDatabaseCoordinator::_clearDatabaseInfoOnPrimary(OperationContext* opCtx) {
     Lock::DBLock dbLock(opCtx, _dbName, MODE_X);
     auto dss = DatabaseShardingState::get(opCtx, _dbName);

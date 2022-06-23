@@ -77,7 +77,7 @@ bool hasTimeSeriesGranularityUpdate(const CollModRequest& request) {
 
 CollModCoordinator::CollModCoordinator(ShardingDDLCoordinatorService* service,
                                        const BSONObj& initialState)
-    : RecoverableShardingDDLCoordinator(service, initialState),
+    : RecoverableShardingDDLCoordinator(service, "CollModCoordinator", initialState),
       _request{_doc.getCollModRequest()} {}
 
 void CollModCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
@@ -93,31 +93,9 @@ void CollModCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
             SimpleBSONObjComparator::kInstance.evaluate(selfReq == otherReq));
 }
 
-boost::optional<BSONObj> CollModCoordinator::reportForCurrentOp(
-    MongoProcessInterface::CurrentOpConnectionsMode connMode,
-    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-
-    BSONObjBuilder cmdBob;
-    if (const auto& optComment = getForwardableOpMetadata().getComment()) {
-        cmdBob.append(optComment.get().firstElement());
-    }
-
-    const auto currPhase = [&]() {
-        stdx::lock_guard l{_docMutex};
-        return _doc.getPhase();
-    }();
-
-    cmdBob.appendElements(_request.toBSON());
-    BSONObjBuilder bob;
-    bob.append("type", "op");
-    bob.append("desc", "CollModCoordinator");
-    bob.append("op", "command");
-    bob.append("ns", nss().toString());
-    bob.append("command", cmdBob.obj());
-    bob.append("currentPhase", currPhase);
-    bob.append("active", true);
-    return bob.obj();
-}
+void CollModCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
+    cmdInfoBuilder->appendElements(_request.toBSON());
+};
 
 void CollModCoordinator::_performNoopRetryableWriteOnParticipants(
     OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor) {

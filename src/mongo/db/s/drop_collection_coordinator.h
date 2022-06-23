@@ -43,15 +43,11 @@ public:
     using Phase = DropCollectionCoordinatorPhaseEnum;
 
     DropCollectionCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
-        : RecoverableShardingDDLCoordinator(service, initialState) {}
+        : RecoverableShardingDDLCoordinator(service, "DropCollectionCoordinator", initialState) {}
 
     ~DropCollectionCoordinator() = default;
 
     void checkIfOptionsConflict(const BSONObj& doc) const override {}
-
-    boost::optional<BSONObj> reportForCurrentOp(
-        MongoProcessInterface::CurrentOpConnectionsMode connMode,
-        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
     /**
      * Locally drops a collection, cleans its CollectionShardingRuntime metadata and refreshes the

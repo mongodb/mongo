@@ -44,14 +44,12 @@ class SetAllowMigrationsCoordinator final
 public:
     SetAllowMigrationsCoordinator(ShardingDDLCoordinatorService* service,
                                   const BSONObj& initialState)
-        : ShardingDDLCoordinatorImpl(service, initialState),
+        : ShardingDDLCoordinatorImpl(service, "SetAllowMigrationsCoordinator", initialState),
           _allowMigrations(_doc.getAllowMigrations()) {}
 
     void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
 
-    boost::optional<BSONObj> reportForCurrentOp(
-        MongoProcessInterface::CurrentOpConnectionsMode connMode,
-        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
+    void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
 
     bool canAlwaysStartWhenUserWritesAreDisabled() const override {
         return true;

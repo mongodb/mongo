@@ -90,7 +90,7 @@ boost::optional<UUID> getCollectionUUID(OperationContext* opCtx,
 
 RenameCollectionCoordinator::RenameCollectionCoordinator(ShardingDDLCoordinatorService* service,
                                                          const BSONObj& initialState)
-    : RecoverableShardingDDLCoordinator(service, initialState),
+    : RecoverableShardingDDLCoordinator(service, "RenameCollectionCoordinator", initialState),
       _request(_doc.getRenameCollectionRequest()) {}
 
 void RenameCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
@@ -111,30 +111,8 @@ std::vector<StringData> RenameCollectionCoordinator::_acquireAdditionalLocks(
     return {_request.getTo().ns()};
 }
 
-boost::optional<BSONObj> RenameCollectionCoordinator::reportForCurrentOp(
-    MongoProcessInterface::CurrentOpConnectionsMode connMode,
-    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-
-    BSONObjBuilder cmdBob;
-    if (const auto& optComment = getForwardableOpMetadata().getComment()) {
-        cmdBob.append(optComment.get().firstElement());
-    }
-    cmdBob.appendElements(_request.toBSON());
-
-    const auto currPhase = [&]() {
-        stdx::lock_guard l{_docMutex};
-        return _doc.getPhase();
-    }();
-
-    BSONObjBuilder bob;
-    bob.append("type", "op");
-    bob.append("desc", "RenameCollectionCoordinator");
-    bob.append("op", "command");
-    bob.append("ns", nss().toString());
-    bob.append("command", cmdBob.obj());
-    bob.append("currentPhase", currPhase);
-    bob.append("active", true);
-    return bob.obj();
+void RenameCollectionCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
+    cmdInfoBuilder->appendElements(_request.toBSON());
 }
 
 ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(

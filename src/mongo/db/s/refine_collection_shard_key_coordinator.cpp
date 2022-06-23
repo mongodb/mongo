@@ -86,7 +86,8 @@ void notifyChangeStreamsOnRefineCollectionShardKeyComplete(OperationContext* opC
 
 RefineCollectionShardKeyCoordinator::RefineCollectionShardKeyCoordinator(
     ShardingDDLCoordinatorService* service, const BSONObj& initialState)
-    : RecoverableShardingDDLCoordinator(service, initialState),
+    : RecoverableShardingDDLCoordinator(
+          service, "RefineCollectionShardKeyCoordinator", initialState),
       _request(_doc.getRefineCollectionShardKeyRequest()),
       _newShardKey(_doc.getNewShardKey()) {}
 
@@ -102,23 +103,8 @@ void RefineCollectionShardKeyCoordinator::checkIfOptionsConflict(const BSONObj& 
                 _request.toBSON() == otherDoc.getRefineCollectionShardKeyRequest().toBSON()));
 }
 
-boost::optional<BSONObj> RefineCollectionShardKeyCoordinator::reportForCurrentOp(
-    MongoProcessInterface::CurrentOpConnectionsMode connMode,
-    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-    BSONObjBuilder cmdBob;
-    if (const auto& optComment = getForwardableOpMetadata().getComment()) {
-        cmdBob.append(optComment.get().firstElement());
-    }
-    cmdBob.appendElements(_request.toBSON());
-
-    BSONObjBuilder bob;
-    bob.append("type", "op");
-    bob.append("desc", "RefineCollectionShardKeyCoordinator");
-    bob.append("op", "command");
-    bob.append("ns", nss().toString());
-    bob.append("command", cmdBob.obj());
-    bob.append("active", true);
-    return bob.obj();
+void RefineCollectionShardKeyCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
+    cmdInfoBuilder->appendElements(_request.toBSON());
 }
 
 ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(

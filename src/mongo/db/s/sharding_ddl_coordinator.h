@@ -174,11 +174,19 @@ private:
 
 template <class StateDoc>
 class ShardingDDLCoordinatorImpl : public ShardingDDLCoordinator {
+public:
+    boost::optional<BSONObj> reportForCurrentOp(
+        MongoProcessInterface::CurrentOpConnectionsMode connMode,
+        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override {
+        return basicReportBuilder().obj();
+    }
 
 protected:
     ShardingDDLCoordinatorImpl(ShardingDDLCoordinatorService* service,
+                               const std::string& name,
                                const BSONObj& initialStateDoc)
         : ShardingDDLCoordinator(service, initialStateDoc),
+          _coordinatorName(name),
           _initialState(initialStateDoc.getOwned()),
           _doc(StateDoc::parse(IDLParserErrorContext("CoordinatorDocument"), _initialState)) {}
 
@@ -186,6 +194,34 @@ protected:
         return _doc.getShardingDDLCoordinatorMetadata();
     }
 
+
+    virtual void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {};
+
+    virtual BSONObjBuilder basicReportBuilder() const noexcept {
+        BSONObjBuilder bob;
+
+        // Append static info
+        bob.append("type", "op");
+        bob.append("ns", nss().toString());
+        bob.append("desc", _coordinatorName);
+        bob.append("op", "command");
+        bob.append("active", true);
+
+        // Create command description
+        BSONObjBuilder cmdInfoBuilder;
+        {
+            stdx::lock_guard lk{_docMutex};
+            if (const auto& optComment = getForwardableOpMetadata().getComment()) {
+                cmdInfoBuilder.append(optComment.get().firstElement());
+            }
+        }
+        appendCommandInfo(&cmdInfoBuilder);
+        bob.append("command", cmdInfoBuilder.obj());
+
+        return bob;
+    }
+
+    const std::string _coordinatorName;
     const BSONObj _initialState;
     mutable Mutex _docMutex = MONGO_MAKE_LATCH("ShardingDDLCoordinator::_docMutex");
     StateDoc _doc;
@@ -193,14 +229,14 @@ protected:
 
 template <class StateDoc, class Phase>
 class RecoverableShardingDDLCoordinator : public ShardingDDLCoordinatorImpl<StateDoc> {
-
 protected:
     using ShardingDDLCoordinatorImpl<StateDoc>::_doc;
     using ShardingDDLCoordinatorImpl<StateDoc>::_docMutex;
 
     RecoverableShardingDDLCoordinator(ShardingDDLCoordinatorService* service,
+                                      const std::string& name,
                                       const BSONObj& initialStateDoc)
-        : ShardingDDLCoordinatorImpl<StateDoc>(service, initialStateDoc) {}
+        : ShardingDDLCoordinatorImpl<StateDoc>(service, name, initialStateDoc) {}
 
     virtual StringData serializePhase(const Phase& phase) const = 0;
 
@@ -243,6 +279,18 @@ protected:
         } else {
             _updateStateDocument(opCtx.get(), std::move(newDoc));
         }
+    }
+
+    BSONObjBuilder basicReportBuilder() const noexcept override {
+        auto baseReportBuilder = ShardingDDLCoordinatorImpl<StateDoc>::basicReportBuilder();
+
+        const auto currPhase = [&]() {
+            stdx::lock_guard l{_docMutex};
+            return _doc.getPhase();
+        }();
+
+        baseReportBuilder.append("currentPhase", serializePhase(currPhase));
+        return baseReportBuilder;
     }
 
     void _insertStateDocument(OperationContext* opCtx, StateDoc&& newDoc) {

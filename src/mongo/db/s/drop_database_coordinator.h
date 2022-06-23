@@ -43,14 +43,11 @@ public:
     using Phase = DropDatabaseCoordinatorPhaseEnum;
 
     DropDatabaseCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
-        : RecoverableShardingDDLCoordinator(service, initialState), _dbName(nss().db()) {}
+        : RecoverableShardingDDLCoordinator(service, "DropDatabaseCoordinator", initialState),
+          _dbName(nss().db()) {}
     ~DropDatabaseCoordinator() = default;
 
     void checkIfOptionsConflict(const BSONObj& doc) const override {}
-
-    boost::optional<BSONObj> reportForCurrentOp(
-        MongoProcessInterface::CurrentOpConnectionsMode connMode,
-        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
 private:
     StringData serializePhase(const Phase& phase) const override {
