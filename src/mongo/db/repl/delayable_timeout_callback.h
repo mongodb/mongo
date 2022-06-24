@@ -102,7 +102,7 @@ protected:
 
 private:
     void _handleTimeout(const executor::TaskExecutor::CallbackArgs& cbData);
-    Status _reschedule(WithLock);
+    Status _reschedule(WithLock, Date_t when);
 
     executor::TaskExecutor* _executor;
     executor::TaskExecutor::CallbackHandle _cbHandle;

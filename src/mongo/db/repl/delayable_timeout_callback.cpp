@@ -88,8 +88,7 @@ Status DelayableTimeoutCallback::delayUntil(Date_t when) {
 Status DelayableTimeoutCallback::_delayUntil(WithLock lk, Date_t when) {
     if (!_cbHandle) {
         // No timeout is active; just schedule it
-        _nextCall = when;
-        return _reschedule(lk);
+        return _reschedule(lk, when);
     }
     if (when == _nextCall) {
         LOGV2_DEBUG(6602301,
@@ -124,10 +123,8 @@ void DelayableTimeoutCallback::_handleTimeout(const executor::TaskExecutor::Call
             _nextCall = Date_t();
             return;
         } else if (_nextCall > now) {
-            Status status = _reschedule(lk);
+            Status status = _reschedule(lk, _nextCall);
             if (!status.isOK()) {
-                _cbHandle = executor::TaskExecutor::CallbackHandle();
-                _nextCall = Date_t();
                 LOGV2_DEBUG(6602303,
                             2,
                             "DelayableTimeoutCallback::_handleTimeout unable to schedule",
@@ -143,13 +140,18 @@ void DelayableTimeoutCallback::_handleTimeout(const executor::TaskExecutor::Call
     _callback(args);
 }
 
-Status DelayableTimeoutCallback::_reschedule(WithLock) {
+Status DelayableTimeoutCallback::_reschedule(WithLock, Date_t when) {
+    // We clear _cbHandle and _nextCall in advance so if scheduleWorkAt fails for any reason
+    // (including by exception), the invariant that _cbHandle and _nextCall are clear when no
+    // callback is scheduled is maintained.
+    _cbHandle = executor::TaskExecutor::CallbackHandle();
+    _nextCall = Date_t();
     auto cbh = _executor->scheduleWorkAt(
-        _nextCall,
-        [this](const executor::TaskExecutor::CallbackArgs& args) { _handleTimeout(args); });
+        when, [this](const executor::TaskExecutor::CallbackArgs& args) { _handleTimeout(args); });
     if (cbh == ErrorCodes::ShutdownInProgress) {
         return cbh.getStatus();
     }
+    _nextCall = when;
     _cbHandle = fassert(6602304, cbh);
     return Status::OK();
 }
