@@ -318,8 +318,8 @@ generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
                                                  indexSnapshotSlot,
                                                  indexKeysToInclude,
                                                  std::move(indexKeySlots),
-                                                 lowKeySlot,
-                                                 highKeySlot,
+                                                 makeVariable(lowKeySlot),
+                                                 makeVariable(highKeySlot),
                                                  yieldPolicy,
                                                  planNodeId);
 
@@ -453,8 +453,8 @@ makeRecursiveBranchForGenericIndexScan(const CollectionPtr& collection,
                                                   snapshotIdSlot,
                                                   indexKeysToInclude,
                                                   std::move(savedIndexKeySlots),
-                                                  lowKeySlot,
-                                                  boost::none,
+                                                  makeVariable(lowKeySlot),
+                                                  nullptr /* seekKeyHigh */,
                                                   yieldPolicy,
                                                   planNodeId);
 
@@ -873,22 +873,30 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
     // are present. Otherwise the low and high keys will be obtained via variable references to
     // runtime environment slots.
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
-    auto makeKeySlot = [&](std::unique_ptr<KeyString::Value> key) {
+    auto makeKeyExpr = [&](std::unique_ptr<KeyString::Value> key)
+        -> std::pair<std::unique_ptr<sbe::EExpression>, boost::optional<sbe::value::SlotId>> {
         if (key) {
-            auto keySlot = slotIdGenerator->generate();
-            projects.emplace(
-                keySlot,
+            return std::pair{
                 makeConstant(sbe::value::TypeTags::ksValue,
-                             sbe::value::bitcastFrom<KeyString::Value*>(key.release())));
-            return keySlot;
+                             sbe::value::bitcastFrom<KeyString::Value*>(key.release())),
+                boost::none};
         } else {
             auto keySlot = state.data->env->registerSlot(
                 sbe::value::TypeTags::Nothing, 0, true /* owned */, slotIdGenerator);
-            return keySlot;
+            return std::pair{makeVariable(keySlot), keySlot};
         }
     };
-    auto lowKeySlot = makeKeySlot(std::move(lowKey));
-    auto highKeySlot = makeKeySlot(std::move(highKey));
+
+    std::unique_ptr<sbe::EExpression> lowKeyExpr;
+    std::unique_ptr<sbe::EExpression> highKeyExpr;
+    boost::optional<sbe::value::SlotId> lowKeySlot;
+    boost::optional<sbe::value::SlotId> highKeySlot;
+    std::tie(lowKeyExpr, lowKeySlot) = makeKeyExpr(std::move(lowKey));
+    std::tie(highKeyExpr, highKeySlot) = makeKeyExpr(std::move(highKey));
+    tassert(0000000,
+            "Either both lowKeySlot and highKeySlot will exist or none of them will exist",
+            (lowKeySlot && highKeySlot) || (!lowKeySlot && !highKeySlot));
+
 
     if (indexIdSlot) {
         // Construct a copy of 'indexName' to project for use in the index consistency check.
@@ -924,8 +932,8 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
         return sbe::makeS<sbe::FilterStage</* IsConst */ true, /* IsEof */ false>>(
             std::move(childStage),
             makeBinaryOp(sbe::EPrimBinary::logicAnd,
-                         makeFunction("exists", makeVariable(lowKeySlot)),
-                         makeFunction("exists", makeVariable(highKeySlot))),
+                         makeFunction("exists", lowKeyExpr->clone()),
+                         makeFunction("exists", highKeyExpr->clone())),
             planNodeId);
     }();
 
@@ -948,8 +956,8 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
                                                  indexSnapshotSlot,
                                                  indexKeysToInclude,
                                                  std::move(indexKeySlots),
-                                                 lowKeySlot,
-                                                 highKeySlot,
+                                                 std::move(lowKeyExpr),
+                                                 std::move(highKeyExpr),
                                                  yieldPolicy,
                                                  planNodeId);
 
@@ -975,11 +983,11 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
             sbe::makeS<sbe::LoopJoinStage>(std::move(lowHighKeyBranch),
                                            std::move(stage),
                                            std::move(outerSv),
-                                           sbe::makeSV(lowKeySlot, highKeySlot),
+                                           sbe::makeSV(),
                                            nullptr,
                                            planNodeId),
             boost::make_optional(shouldRegisterLowHighKeyInRuntimeEnv,
-                                 std::pair(lowKeySlot, highKeySlot))};
+                                 std::pair(*lowKeySlot, *highKeySlot))};
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(

@@ -41,14 +41,14 @@
 namespace mongo::sbe {
 /**
  * A stage that iterates the entries of a collection index, starting from a bound specified by the
- * value in 'seekKeySlotLow' and ending (via IS_EOF) with the 'seekKeySlotHigh' bound. (An
- * unspecified 'seekKeySlotHigh' scans to the end of the index. Leaving both bounds unspecified
+ * value in 'seekKeyLow' and ending (via IS_EOF) with the 'seekKeyHigh' bound. (An
+ * unspecified 'seekKeyHigh' scans to the end of the index. Leaving both bounds unspecified
  * scans the index from beginning to end.)
  *
- * The input 'seekKeySlotLow' and 'seekKeySlotHigh' slots get read as part of the open (or re-open)
- * call. A common use case for an IndexScanStage is to place it as the inner child of LoopJoinStage.
- * The outer side of the LoopJoinStage determines the bounds, and the inner IndexScanStage iterates
- * through all the entries within those bounds.
+ * The input 'seekKeyLow' and 'seekKeyHigh' EExpressions get evaluated as part of the open
+ * (or re-open) call. A common use case for an IndexScanStage is to place it as the inner child of
+ * LoopJoinStage. The outer side of the LoopJoinStage determines the bounds, and the inner
+ * IndexScanStage iterates through all the entries within those bounds.
  *
  * The "output" slots are
  *   - 'recordSlot': the "KeyString" representing the index entry,
@@ -82,21 +82,8 @@ public:
                    boost::optional<value::SlotId> snapshotIdSlot,
                    IndexKeysInclusionSet indexKeysToInclude,
                    value::SlotVector vars,
-                   boost::optional<value::SlotId> seekKeySlotLow,
-                   boost::optional<value::SlotId> seekKeySlotHigh,
-                   PlanYieldPolicy* yieldPolicy,
-                   PlanNodeId nodeId);
-
-    IndexScanStage(UUID collUuid,
-                   StringData indexName,
-                   bool forward,
-                   boost::optional<value::SlotId> recordSlot,
-                   boost::optional<value::SlotId> recordIdSlot,
-                   boost::optional<value::SlotId> snapshotIdSlot,
-                   IndexKeysInclusionSet indexKeysToInclude,
-                   value::SlotVector vars,
-                   std::unique_ptr<EExpression> seekKeyLowVar,
-                   std::unique_ptr<EExpression> seekKeyHighVar,
+                   std::unique_ptr<EExpression> seekKeyLow,
+                   std::unique_ptr<EExpression> seekKeyHigh,
                    PlanYieldPolicy* yieldPolicy,
                    PlanNodeId nodeId);
 
@@ -142,18 +129,15 @@ private:
     const boost::optional<value::SlotId> _snapshotIdSlot;
     const IndexKeysInclusionSet _indexKeysToInclude;
     const value::SlotVector _vars;
-    const boost::optional<value::SlotId> _seekKeySlotLow;
-    const boost::optional<value::SlotId> _seekKeySlotHigh;
 
-    std::unique_ptr<EExpression> _seekKeyLowVar;
-    std::unique_ptr<EExpression> _seekKeyHighVar;
+    std::unique_ptr<EExpression> _seekKeyLow;
+    std::unique_ptr<EExpression> _seekKeyHigh;
 
-    // For the EExpression overload for seek keys.
+    // Carries the compiled bytecode for the above '_seekKeyLow' and '_seekKeyHigh'.
     std::unique_ptr<vm::CodeFragment> _seekKeyLowCodes;
     std::unique_ptr<vm::CodeFragment> _seekKeyHighCodes;
 
     vm::ByteCode _bytecode;
-
 
     // These members are default constructed to boost::none and are initialized when 'prepare()'
     // is called. Once they are set, they are never modified again.

@@ -804,8 +804,8 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                                              snapshotIdSlot,
                                              IndexKeysInclusionSet{} /* indexKeysToInclude */,
                                              makeSV() /* vars */,
-                                             lowKeySlot,
-                                             highKeySlot,
+                                             makeVariable(lowKeySlot),
+                                             makeVariable(highKeySlot),
                                              yieldPolicy,
                                              nodeId);
 
