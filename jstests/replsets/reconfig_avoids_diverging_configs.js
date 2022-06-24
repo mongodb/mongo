@@ -87,6 +87,8 @@ C3.version++;
 
 assert.commandWorked(node1.adminCommand({replSetReconfig: C3}));
 assert.soon(() => isConfigCommitted(node1));
+// Make sure all nodes, including the once-removed node2, have the final config.
+rst.waitForConfigReplication(node1);
 rst.awaitNodesAgreeOnPrimary();
 parallelShell();
 rst.stopSet();
