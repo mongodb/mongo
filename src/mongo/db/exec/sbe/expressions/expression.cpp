@@ -607,7 +607,7 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
             uassert(4822844,
                     str::stream() << "aggregate function call: " << _name
                                   << " occurs in the non-aggregate context.",
-                    ctx.aggExpression);
+                    ctx.aggExpression && ctx.accumulator);
 
             code.appendMoveVal(ctx.accumulator);
             ++arity;
@@ -630,7 +630,7 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
             uassert(4822846,
                     str::stream() << "aggregate function call: " << _name
                                   << " occurs in the non-aggregate context.",
-                    ctx.aggExpression);
+                    ctx.aggExpression && ctx.accumulator);
 
             code.appendAccessVal(ctx.accumulator);
         }
