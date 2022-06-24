@@ -170,8 +170,8 @@ TEST_F(PlanSizeTest, IndexScan) {
                                        generateSlotId(),
                                        IndexKeysInclusionSet(1),
                                        mockSV(),
-                                       generateSlotId(),
-                                       generateSlotId(),
+                                       makeE<EVariable>(generateSlotId()),
+                                       makeE<EVariable>(generateSlotId()),
                                        nullptr,
                                        kEmptyPlanNodeId);
     assertPlanSize(*stage);
