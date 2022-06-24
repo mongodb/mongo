@@ -870,9 +870,9 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
 
     // Construct a constant table scan to deliver a single row with two fields 'lowKeySlot' and
     // 'highKeySlot', representing seek boundaries, into the index scan if 'lowKey' and 'highKey'
-    // are present. Otherwise the low and high keys will be obtained via variable references to
-    // runtime environment slots.
-    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
+    // are present. If 'lowKey' and 'highKey' are present they will be presented to the index scan
+    // stage as a constant expression. Otherwise the low and high keys will be obtained via variable
+    // references to runtime environment slots.
     auto makeKeyExpr = [&](std::unique_ptr<KeyString::Value> key)
         -> std::pair<std::unique_ptr<sbe::EExpression>, boost::optional<sbe::value::SlotId>> {
         if (key) {
@@ -888,16 +888,17 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
     };
 
     std::unique_ptr<sbe::EExpression> lowKeyExpr;
-    std::unique_ptr<sbe::EExpression> highKeyExpr;
     boost::optional<sbe::value::SlotId> lowKeySlot;
-    boost::optional<sbe::value::SlotId> highKeySlot;
     std::tie(lowKeyExpr, lowKeySlot) = makeKeyExpr(std::move(lowKey));
+
+    std::unique_ptr<sbe::EExpression> highKeyExpr;
+    boost::optional<sbe::value::SlotId> highKeySlot;
     std::tie(highKeyExpr, highKeySlot) = makeKeyExpr(std::move(highKey));
     tassert(0000000,
             "Either both lowKeySlot and highKeySlot will exist or none of them will exist",
             (lowKeySlot && highKeySlot) || (!lowKeySlot && !highKeySlot));
 
-
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
     if (indexIdSlot) {
         // Construct a copy of 'indexName' to project for use in the index consistency check.
         projects.emplace(*indexIdSlot, makeConstant(indexName));
