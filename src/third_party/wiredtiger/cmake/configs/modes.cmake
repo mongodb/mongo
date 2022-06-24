@@ -130,6 +130,9 @@ else()
     endif()
 endif()
 
+# Sanitizer builds should have debug info available and optimization off
+set(san_debug_flags "-O1 -g ${no_omit_frame_flag}")
+
 # UBSAN build variant flags.
 set(ubsan_link_flags "-fsanitize=undefined")
 set(ubsan_compiler_c_flag "-fsanitize=undefined")
@@ -147,22 +150,22 @@ set(tsan_compiler_cxx_flag "-fsanitize=thread")
 
 # Define our custom build variants.
 define_build_mode(ASan
-    C_COMPILER_FLAGS ${asan_compiler_c_flag} ${no_omit_frame_flag}
-    CXX_COMPILER_FLAGS ${asan_compiler_cxx_flag} ${no_omit_frame_flag}
+    C_COMPILER_FLAGS ${asan_compiler_c_flag} ${san_debug_flags}
+    CXX_COMPILER_FLAGS ${asan_compiler_cxx_flag} ${san_debug_flags}
     LINK_FLAGS ${asan_link_flags}
     LIBS ${asan_lib_flags}
 )
 
 define_build_mode(UBSan
-    C_COMPILER_FLAGS ${ubsan_compiler_c_flag} ${no_omit_frame_flag}
-    CXX_COMPILER_FLAGS ${ubsan_compiler_cxx_flag} ${no_omit_frame_flag}
+    C_COMPILER_FLAGS ${ubsan_compiler_c_flag} ${san_debug_flags}
+    CXX_COMPILER_FLAGS ${ubsan_compiler_cxx_flag} ${san_debug_flags}
     LINK_FLAGS ${ubsan_link_flags}
     # Disable UBSan on MSVC compilers (unsupported).
     DEPENDS "NOT MSVC"
 )
 
 define_build_mode(MSan
-    C_COMPILER_FLAGS ${msan_compiler_c_flag} ${no_omit_frame_flag}
+    C_COMPILER_FLAGS ${msan_compiler_c_flag} ${san_debug_flags}
     CXX_COMPILER_FLAGS ${msan_compiler_cxx_flag}
     LINK_FLAGS ${msan_link_flags}
     # Disable MSan on MSVC and GNU compilers (unsupported).
@@ -170,7 +173,7 @@ define_build_mode(MSan
 )
 
 define_build_mode(TSan
-    C_COMPILER_FLAGS ${tsan_compiler_c_flag} ${no_omit_frame_flag}
+    C_COMPILER_FLAGS ${tsan_compiler_c_flag} ${san_debug_flags}
     CXX_COMPILER_FLAGS ${tsan_compiler_cxx_flag}
     LINK_FLAGS ${tsan_link_flags}
     # Disable TSan on MSVC compilers (unsupported).

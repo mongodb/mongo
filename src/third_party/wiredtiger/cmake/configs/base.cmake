@@ -212,11 +212,26 @@ config_bool(
     DEFAULT OFF
 )
 
+# Setup the WiredTiger build to use Debug settings as unless the build type was explicitly
+# configured. Primary users of the build are our developers, who want as much help diagnosing
+# issues as possible. Builds targeted for release to customers should switch to a "Release" setting.
+set(default_build_type "Debug")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  # Notify callers that our build chooses Debug, not the default empty
+  message(STATUS "Defaulting build type to '${default_build_type}'.")
+  set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
+      STRING "Type of build selected." FORCE)
+endif()
+
 set(default_optimize_level)
 if("${WT_OS}" STREQUAL "windows")
-    set(default_optimize_level "/O2")
+    set(default_optimize_level "/Od")
 else()
-    set(default_optimize_level "-O3")
+    # Ideally this would choose an optimization level of Og. Which is the recommended configuration
+    # for build-debug cycles when using GCC and is a synonym in clang for O1.
+    # Unfortunately at the moment, WiredTiger code generates compiler warnings (as errors) when
+    # built with Og.
+    set(default_optimize_level "-O1")
 endif()
 config_string(
     CC_OPTIMIZE_LEVEL
