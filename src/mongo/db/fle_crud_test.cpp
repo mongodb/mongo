@@ -193,6 +193,8 @@ protected:
 
     ECCDocument getECCDocument(ECCDerivedFromDataTokenAndContentionFactorToken token, int position);
 
+    void assertECOCDocumentCountByField(StringData fieldName, uint64_t expect);
+
     std::vector<char> generatePlaceholder(UUID keyId, BSONElement value);
 
 protected:
@@ -337,6 +339,11 @@ ECCDocument FleCrudTest::getECCDocument(ECCDerivedFromDataTokenAndContentionFact
     return uassertStatusOK(ECCCollection::decryptDocument(value, doc));
 }
 
+void FleCrudTest::assertECOCDocumentCountByField(StringData fieldName, uint64_t expect) {
+    auto query = BSON(EcocDocument::kFieldNameFieldName << fieldName);
+    auto results = _queryImpl->findDocuments(_ecocNs, query);
+    ASSERT_EQ(results.size(), expect);
+}
 
 std::vector<char> FleCrudTest::generatePlaceholder(UUID keyId, BSONElement value) {
     FLE2EncryptionPlaceholder ep;
@@ -658,6 +665,7 @@ TEST_F(FleCrudTest, InsertOne) {
     doSingleInsert(1, element);
 
     assertDocumentCounts(1, 1, 0, 1);
+    assertECOCDocumentCountByField("encrypted", 1);
 
     ASSERT_FALSE(_queryImpl->getById(_escNs, ESCCollection::generateId(getTestESCToken(element), 1))
                      .isEmpty());
@@ -673,6 +681,7 @@ TEST_F(FleCrudTest, InsertTwoSame) {
     doSingleInsert(2, element);
 
     assertDocumentCounts(2, 2, 0, 2);
+    assertECOCDocumentCountByField("encrypted", 2);
 
     ASSERT_FALSE(_queryImpl->getById(_escNs, ESCCollection::generateId(getTestESCToken(element), 1))
                      .isEmpty());
@@ -691,6 +700,7 @@ TEST_F(FleCrudTest, InsertTwoDifferent) {
                         << "topsecret"));
 
     assertDocumentCounts(2, 2, 0, 2);
+    assertECOCDocumentCountByField("encrypted", 2);
 
     ASSERT_FALSE(_queryImpl
                      ->getById(_escNs,
@@ -719,6 +729,8 @@ TEST_F(FleCrudTest, Insert100Fields) {
 
     for (uint64_t field = 0; field < fieldCount; field++) {
         auto fieldName = fieldNameFromInt(field);
+
+        assertECOCDocumentCountByField(fieldName, 1);
 
         ASSERT_FALSE(
             _queryImpl
@@ -753,6 +765,7 @@ TEST_F(FleCrudTest, Insert20Fields50Rows) {
 
             int count = (row / 7) + 1;
 
+            assertECOCDocumentCountByField(fieldName, rowCount);
             ASSERT_FALSE(
                 _queryImpl
                     ->getById(_escNs,
@@ -789,6 +802,7 @@ TEST_F(FleCrudTest, InsertAndDeleteOne) {
     doSingleDelete(1);
 
     assertDocumentCounts(0, 1, 1, 2);
+    assertECOCDocumentCountByField("encrypted", 2);
 
     getECCDocument(getTestECCToken(element), 1);
 }
@@ -811,7 +825,7 @@ TEST_F(FleCrudTest, InsertTwoSamAndDeleteTwo) {
     doSingleDelete(1);
 
     assertDocumentCounts(0, 2, 2, 4);
-
+    assertECOCDocumentCountByField("encrypted", 4);
     ASSERT_ECC_DOC(element, 1, 2, 2);
     ASSERT_ECC_DOC(element, 2, 1, 1);
 }
@@ -832,6 +846,7 @@ TEST_F(FleCrudTest, InsertTwoDifferentAndDeleteTwo) {
     doSingleDelete(1);
 
     assertDocumentCounts(0, 2, 2, 4);
+    assertECOCDocumentCountByField("encrypted", 4);
 
     ASSERT_ECC_DOC(BSON("encrypted"
                         << "secret")
@@ -858,6 +873,7 @@ TEST_F(FleCrudTest, InsertOneButDeleteAnother) {
     doSingleDelete(2);
 
     assertDocumentCounts(1, 1, 0, 1);
+    assertECOCDocumentCountByField("encrypted", 1);
 }
 
 // Update one document
@@ -874,6 +890,7 @@ TEST_F(FleCrudTest, UpdateOne) {
                         << "top secret"));
 
     assertDocumentCounts(1, 2, 1, 3);
+    assertECOCDocumentCountByField("encrypted", 3);
 
     validateDocument(1,
                      BSON("_id" << 1 << "counter" << 2 << "plainText"
@@ -896,6 +913,7 @@ TEST_F(FleCrudTest, UpdateOneSameValue) {
                         << "secret"));
 
     assertDocumentCounts(1, 2, 1, 3);
+    assertECOCDocumentCountByField("encrypted", 3);
 
     validateDocument(1,
                      BSON("_id" << 1 << "counter" << 2 << "plainText"
@@ -931,6 +949,7 @@ TEST_F(FleCrudTest, UpdateOneReplace) {
 
 
     assertDocumentCounts(1, 2, 1, 3);
+    assertECOCDocumentCountByField("encrypted", 3);
 
     validateDocument(1,
                      BSON("_id" << 1 << "plainText"
@@ -1009,6 +1028,7 @@ TEST_F(FleCrudTest, FindAndModify_UpdateOne) {
     doFindAndModify(req);
 
     assertDocumentCounts(1, 2, 1, 3);
+    assertECOCDocumentCountByField("encrypted", 3);
 
     validateDocument(1,
                      BSON("_id" << 1 << "counter" << 2 << "plainText"
@@ -1027,13 +1047,13 @@ TEST_F(FleCrudTest, FindAndModify_InsertAndDeleteOne) {
 
     assertDocumentCounts(1, 1, 0, 1);
 
-
     write_ops::FindAndModifyCommandRequest req(_edcNs);
     req.setQuery(BSON("_id" << 1));
     req.setRemove(true);
     doFindAndModify(req);
 
     assertDocumentCounts(0, 1, 1, 2);
+    assertECOCDocumentCountByField("encrypted", 2);
 
     getECCDocument(getTestECCToken(element), 1);
 }
