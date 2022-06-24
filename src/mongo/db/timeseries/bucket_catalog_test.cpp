@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <boost/optional/optional_io.hpp>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/create_collection.h"
@@ -48,6 +50,7 @@ constexpr StringData kNumBucketsReopened = "numBucketsReopened"_sd;
 constexpr StringData kNumArchivedDueToTimeForward = "numBucketsArchivedDueToTimeForward"_sd;
 constexpr StringData kNumArchivedDueToTimeBackward = "numBucketsArchivedDueToTimeBackward"_sd;
 constexpr StringData kNumArchivedDueToMemoryThreshold = "numBucketsArchivedDueToMemoryThreshold"_sd;
+constexpr StringData kNumArchivedDueToReopening = "numBucketsArchivedDueToReopening"_sd;
 constexpr StringData kNumClosedDueToTimeForward = "numBucketsClosedDueToTimeForward"_sd;
 constexpr StringData kNumClosedDueToTimeBackward = "numBucketsClosedDueToTimeBackward"_sd;
 constexpr StringData kNumClosedDueToMemoryThreshold = "numBucketsClosedDueToMemoryThreshold"_sd;
@@ -983,6 +986,9 @@ TEST_F(BucketCatalogTest, SchemaChanges) {
 }
 
 TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
+                                                     true};
+
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
             "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
@@ -1074,6 +1080,9 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
 }
 
 TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
+                                                     true};
+
     // Bucket document to reopen.
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
@@ -1124,6 +1133,9 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
 }
 
 TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertIncompatibleMeasurement) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
+                                                     true};
+
     // Bucket document to reopen.
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
@@ -1168,6 +1180,9 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertIncompatibleMeasureme
 }
 
 TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
+                                                     true};
+
     // Bucket document to reopen.
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
@@ -1227,6 +1242,9 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
 }
 
 TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
+                                                     true};
+
     // Bucket document to reopen.
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
@@ -1428,6 +1446,209 @@ TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
 
     // We should have closed some (additional) buckets by now.
     ASSERT_LT(numClosedInFirstRound, _getExecutionStat(_ns1, kNumClosedDueToMemoryThreshold));
+}
+
+TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
+    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
+                                                    true};
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+
+    // Try to insert with no open bucket. Should hint to re-open.
+    auto result = _bucketCatalog->tryInsert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"}})"),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result.getStatus());
+    ASSERT(result.getValue().closedBuckets.empty());
+    ASSERT(!result.getValue().batch);
+    ASSERT_EQ(result.getValue().candidate, boost::none);
+
+    // Actually insert so we do have an open bucket to test against.
+    result = _bucketCatalog->insert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"}})"),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result.getStatus());
+    auto batch = result.getValue().batch;
+    ASSERT(batch);
+    auto bucketId = batch->bucket().id;
+    ASSERT(batch->claimCommitRights());
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch));
+    ASSERT_EQ(batch->measurements().size(), 1);
+    _bucketCatalog->finish(batch, {});
+
+    // Time backwards should hint to re-open.
+    result = _bucketCatalog->tryInsert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"}})"),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result.getStatus());
+    ASSERT(result.getValue().closedBuckets.empty());
+    ASSERT(!result.getValue().batch);
+    ASSERT_EQ(result.getValue().candidate, boost::none);
+
+    // So should time forward.
+    result = _bucketCatalog->tryInsert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-07T15:34:40.000Z"}})"),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result.getStatus());
+    ASSERT(result.getValue().closedBuckets.empty());
+    ASSERT(!result.getValue().batch);
+    ASSERT_EQ(result.getValue().candidate, boost::none);
+
+    // Now let's insert something so we archive the existing bucket.
+    result = _bucketCatalog->insert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-07T15:34:40.000Z"}})"),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result.getStatus());
+    batch = result.getValue().batch;
+    ASSERT_NE(batch->bucket().id, bucketId);
+    ASSERT(batch);
+    ASSERT(batch->claimCommitRights());
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch));
+    ASSERT_EQ(batch->measurements().size(), 1);
+    _bucketCatalog->finish(batch, {});
+
+    // If we try to insert something that could fit in the archived bucket, we should get it back as
+    // a candidate.
+    result = _bucketCatalog->tryInsert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}})"),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result.getStatus());
+    ASSERT(result.getValue().closedBuckets.empty());
+    ASSERT(!result.getValue().batch);
+    ASSERT(result.getValue().candidate.has_value());
+    ASSERT_EQ(result.getValue().candidate.value(), bucketId);
+}
+
+TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket) {
+    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
+                                                    true};
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+
+    // Insert a document so we have a base bucket
+    auto result = _bucketCatalog->insert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"}, "a": true})"),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result.getStatus());
+    auto batch = result.getValue().batch;
+    ASSERT(batch);
+    auto bucketId = batch->bucket().id;
+    ASSERT(batch->claimCommitRights());
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch));
+    ASSERT_EQ(batch->measurements().size(), 1);
+    _bucketCatalog->finish(batch, {});
+
+    // Incompatible schema would close the existing bucket, so we should expect to open a new bucket
+    // and proceed to insert the document.
+    result = _bucketCatalog->tryInsert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}, "a": {}})"),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result.getStatus());
+    batch = result.getValue().batch;
+    ASSERT(batch);
+    ASSERT_NE(batch->bucket().id, bucketId);
+    ASSERT(batch->claimCommitRights());
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch));
+    ASSERT_EQ(batch->measurements().size(), 1);
+    _bucketCatalog->finish(batch, {});
+}
+
+TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
+    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
+                                                    true};
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+
+    // Insert a document so we have a base bucket and we can test that we archive it when we reopen
+    // a conflicting bucket.
+    auto result = _bucketCatalog->insert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"}})"),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result.getStatus());
+    auto batch = result.getValue().batch;
+    ASSERT(batch);
+    auto oldBucketId = batch->bucket().id;
+    ASSERT(batch->claimCommitRights());
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch));
+    ASSERT_EQ(batch->measurements().size(), 1);
+    _bucketCatalog->finish(batch, {});
+
+    BSONObj bucketDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"}},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"}}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}}}})");
+    ASSERT_NE(bucketDoc["_id"].OID(), oldBucketId);
+    auto validator = [&](OperationContext * opCtx, const BSONObj& bucketDoc) -> auto {
+        return autoColl->checkValidation(opCtx, bucketDoc);
+    };
+
+    // We should be able to pass in a valid bucket and insert into it.
+    result = _bucketCatalog->insert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}})"),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow,
+        BucketCatalog::BucketToReopen{bucketDoc, validator});
+    ASSERT_OK(result.getStatus());
+    batch = result.getValue().batch;
+    ASSERT(batch);
+    ASSERT_EQ(batch->bucket().id, bucketDoc["_id"].OID());
+    ASSERT(batch->claimCommitRights());
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch));
+    ASSERT_EQ(batch->measurements().size(), 1);
+    _bucketCatalog->finish(batch, {});
+    ASSERT_EQ(1, _getExecutionStat(_ns1, kNumArchivedDueToReopening));
+    ASSERT_EQ(1, _getExecutionStat(_ns1, kNumBucketsReopened));
+
+    // Verify the old bucket was archived and we'll get it back as a candidate.
+    result = _bucketCatalog->tryInsert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:35:40.000Z"}})"),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result.getStatus());
+    ASSERT(result.getValue().closedBuckets.empty());
+    ASSERT(!result.getValue().batch);
+    ASSERT(result.getValue().candidate.has_value());
+    ASSERT_EQ(result.getValue().candidate.value(), oldBucketId);
 }
 
 }  // namespace
