@@ -820,10 +820,6 @@ if [ "$newer" = true ]; then
         [[ $((i+1)) < ${#newer_release_branches[@]} ]] && \
         (verify_test_format ${newer_release_branches[$((i+1))]} ${newer_release_branches[$i]} "row" false)
     done
-    for i in ${!test_checkpoint_release_branches[@]}; do
-        [[ $((i+1)) < ${#test_checkpoint_release_branches[@]} ]] && \
-        (verify_test_checkpoint ${test_checkpoint_release_branches[$((i+1))]} ${test_checkpoint_release_branches[$i]} "row")
-    done
 fi
 
 # Upgrade/downgrade testing for supported access methods.
