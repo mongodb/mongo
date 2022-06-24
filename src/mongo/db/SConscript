@@ -948,9 +948,9 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/fle_crypto',
+        '$BUILD_DIR/mongo/db/ops/write_ops',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
         'fle_crud',
-        'write_ops',
     ],
 )
 
@@ -996,10 +996,10 @@ env.Library(
         'db_raii',
         'index/index_access_method',
         'query_exec',
-        'write_ops',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/ops/write_ops',
         'record_id_helpers',
     ],
 )
@@ -1303,11 +1303,12 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',
         'dbdirectclient',
         'repl/isself',
-        'write_ops',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/authentication',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
+        '$BUILD_DIR/mongo/db/ops/write_ops',
+        '$BUILD_DIR/mongo/db/s/sharding_api_d',
         'catalog/database_holder',
         'commands/list_collections_filter',
         'index_builds_coordinator_interface',
@@ -1435,6 +1436,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/fsync_locked',
+        '$BUILD_DIR/mongo/db/ops/write_ops',
         '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_access_blocker',
         '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
@@ -1442,7 +1444,6 @@ env.Library(
         'catalog/database_holder',
         'commands/server_status_core',
         'service_context',
-        'write_ops',
     ],
 )
 
@@ -2292,34 +2293,6 @@ asioEnv = env.Clone()
 asioEnv.InjectThirdParty('asio')
 
 env.Library(
-    target='write_ops',
-    source=[
-        'ops/delete.cpp',
-        'ops/insert.cpp',
-        'ops/update.cpp',
-        'ops/write_ops_retryability.cpp',
-        'ops/single_write_result.idl',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'catalog_raii',
-        'concurrency/lock_manager',
-        'introspect',
-        'matcher/expressions_mongod_only',
-        'query/command_request_response',
-        'query_exec',
-        'repl/repl_coordinator_interface',
-        'service_context',
-        'update/update_driver',
-    ],
-    LIBDEPS_PRIVATE=[
-        'concurrency/exception_util',
-        'curop',
-        'repl/image_collection_entry',
-    ],
-)
-
-env.Library(
     target='traffic_recorder',
     source=[
         'traffic_recorder.cpp',
@@ -2767,6 +2740,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
             '$BUILD_DIR/mongo/db/change_streams_cluster_parameter',
             '$BUILD_DIR/mongo/db/mongohasher',
+            '$BUILD_DIR/mongo/db/ops/write_ops',
             '$BUILD_DIR/mongo/db/pipeline/change_stream_expired_pre_image_remover',
             '$BUILD_DIR/mongo/db/query/common_query_enums_and_helpers',
             '$BUILD_DIR/mongo/db/query/query_test_service_context',
@@ -2848,7 +2822,6 @@ if wiredtiger:
             'vector_clock',
             'vector_clock_test_fixture',
             'write_concern_options',
-            'write_ops',
         ],
     )
 

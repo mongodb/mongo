@@ -41,7 +41,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/transaction',
-        '$BUILD_DIR/mongo/db/write_ops',
         'common_process_interface',
     ],
     LIBDEPS_PRIVATE=[
@@ -54,6 +53,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/operation_time_tracker',
+        '$BUILD_DIR/mongo/db/ops/write_ops',
         '$BUILD_DIR/mongo/db/repl/primary_only_service',
         '$BUILD_DIR/mongo/db/session_catalog',
         '$BUILD_DIR/mongo/db/stats/fill_locker_info',
@@ -71,6 +71,8 @@ env.Library(
         'mongod_process_interfaces',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/db/s/sharding_api_d',
         '$BUILD_DIR/mongo/s/sharding_api',
     ],
 )
@@ -91,6 +93,7 @@ env.Library(
         'mongod_process_interface_factory.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/s/sharding_api_d',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         'mongod_process_interfaces',
         'shardsvr_process_interface',

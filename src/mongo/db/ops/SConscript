@@ -5,6 +5,32 @@ Import("env")
 env = env.Clone()
 
 env.Library(
+    target='write_ops',
+    source=[
+        'delete.cpp',
+        'insert.cpp',
+        'update.cpp',
+        'write_ops_retryability.cpp',
+        'single_write_result.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog_raii',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/introspect',
+        '$BUILD_DIR/mongo/db/matcher/expressions_mongod_only',
+        '$BUILD_DIR/mongo/db/query/command_request_response',
+        '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/db/repl/image_collection_entry',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/update/update_driver',
+    ],
+)
+
+env.Library(
     target='write_ops_exec',
     source=[
         'write_ops_exec.cpp',
@@ -18,6 +44,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/curop_metrics',
         '$BUILD_DIR/mongo/db/dbhelpers',
+        '$BUILD_DIR/mongo/db/introspect',
         '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
@@ -25,9 +52,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/server_read_concern_write_concern_metrics',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/transaction',
-        '$BUILD_DIR/mongo/db/write_ops',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/log_and_backoff',
+        'write_ops',
     ],
 )
 
@@ -94,7 +121,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
         '$BUILD_DIR/mongo/db/transaction',
-        '$BUILD_DIR/mongo/db/write_ops',
+        'write_ops',
         'write_ops_exec',
         'write_ops_parsers',
         'write_ops_parsers_test_helpers',
