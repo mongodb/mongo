@@ -1866,12 +1866,12 @@ if link_model.startswith('dynamic') and get_option('install-action') == 'symlink
         f"Options '--link-model={link_model}' not supported with '--install-action={get_option('install-action')}'."
     )
 
-if link_model.startswith('dynamic') and env.TargetOSIs(
+if link_model == 'dynamic' and env.TargetOSIs(
         'darwin') and not get_option('force-macos-dynamic-link'):
 
     macos_version_message = textwrap.dedent("""\
         link-model=dynamic us only supported on macos version 12 or higher.
-        This is due to a 512 dylib limit on older macos. See this post for
+        This is due to a 512 dylib RUNTIME limit on older macos. See this post for
         more information: https://developer.apple.com/forums//thread/708366?login=true&page=1#717495022
         Use '--force-macos-dynamic-link' to bypass this check.
         """)

@@ -2390,6 +2390,7 @@ tasks:
     vars:
       task_compile_flags: >-
         --link-model=dynamic
+        --force-macos-dynamic-link
         --build-tools=next
       targets:
         generate-libdeps-graph
@@ -2626,6 +2627,7 @@ tasks:
         --dbg=on
         --opt=on
         --link-model=dynamic
+        --force-macos-dynamic-link
         --visibility-support=on
 
   - command: s3.put
@@ -2718,6 +2720,7 @@ tasks:
       task_compile_flags: *embedded_sdk_compile_flags
       task_compile_flags_extra: >-
         --link-model=dynamic
+        --force-macos-dynamic-link
       # Unlike static builds, dynamic builds have no need to
       # constrain the number of link jobs. Unfortunately, --jlink=1
       # means one link job, not 100%. So this is a bit gross but set
