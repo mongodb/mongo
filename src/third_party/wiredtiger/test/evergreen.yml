@@ -370,10 +370,20 @@ functions:
     - command: perf.send
       params:
         file: ./wiredtiger/cmake_build/test/cppsuite/${test_name}.json
+    # Delete unnecessary data from the upload.
+    - command: shell.exec
+      params:
+        script: |
+          rm -rf wiredtiger/cmake_build/examples
+          rm -rf wiredtiger/cmake_build/bench
+          mv wiredtiger/cmake_build/test/cppsuite wiredtiger/cmake_build/
+          rm -rf wiredtiger/cmake_build/test/
+          mkdir wiredtiger/cmake_build/test/
+          mv wiredtiger/cmake_build/cppsuite wiredtiger/cmake_build/test/cppsuite
     - command: archive.targz_pack
       params:
         target: archive.tgz
-        source_dir: wiredtiger/cmake_build/test/cppsuite
+        source_dir: wiredtiger/cmake_build/
         include:
           - "./**"
     - command: s3.put
