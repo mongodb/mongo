@@ -939,6 +939,12 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("protocol", getProtoString(networkOp));
     }
 
+    if (const auto& invocation = CommandInvocation::get(opCtx);
+        invocation && invocation->isMirrored()) {
+        const bool mirrored = true;
+        OPDEBUG_TOATTR_HELP_BOOL(mirrored);
+    }
+
     if (remoteOpWaitTime) {
         pAttrs->add("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
     }

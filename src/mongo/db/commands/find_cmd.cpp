@@ -92,6 +92,11 @@ std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(Operation
         processFLEFindD(opCtx, findCommand->getNamespaceOrUUID().nss().get(), findCommand.get());
     }
 
+    if (findCommand->getMirrored().value_or(false)) {
+        const auto& invocation = CommandInvocation::get(opCtx);
+        invocation->markMirrored();
+    }
+
     return findCommand;
 }
 

@@ -231,6 +231,11 @@ public:
         auto parsedDistinct = uassertStatusOK(
             ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, false, defaultCollation));
 
+        if (parsedDistinct.isMirrored()) {
+            const auto& invocation = CommandInvocation::get(opCtx);
+            invocation->markMirrored();
+        }
+
         if (ctx->getView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
             ctx.reset();

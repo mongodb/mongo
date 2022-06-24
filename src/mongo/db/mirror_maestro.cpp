@@ -72,6 +72,7 @@ constexpr auto kMirroredReadsParamName = "mirrorReads"_sd;
 
 constexpr auto kMirroredReadsSeenKey = "seen"_sd;
 constexpr auto kMirroredReadsSentKey = "sent"_sd;
+constexpr auto kMirroredReadsReceivedKey = "received"_sd;
 constexpr auto kMirroredReadsResolvedKey = "resolved"_sd;
 constexpr auto kMirroredReadsResolvedBreakdownKey = "resolvedBreakdown"_sd;
 constexpr auto kMirroredReadsPendingKey = "pending"_sd;
@@ -82,17 +83,17 @@ MONGO_FAIL_POINT_DEFINE(mirrorMaestroTracksPending);
 class MirrorMaestroImpl {
 public:
     /**
-     * Make the TaskExecutor and initialize other components
+     * Make the TaskExecutor and initialize other components.
      */
     void init(ServiceContext* serviceContext) noexcept;
 
     /**
-     * Shutdown the TaskExecutor and cancel any outstanding work
+     * Shutdown the TaskExecutor and cancel any outstanding work.
      */
     void shutdown() noexcept;
 
     /**
-     * Mirror only if this maestro has been initialized
+     * Mirror only if this maestro has been initialized.
      */
     void tryMirror(std::shared_ptr<CommandInvocation> invocation) noexcept;
 
@@ -184,6 +185,7 @@ public:
         BSONObjBuilder section;
         section.append(kMirroredReadsSeenKey, seen.loadRelaxed());
         section.append(kMirroredReadsSentKey, sent.loadRelaxed());
+        section.append(kMirroredReadsReceivedKey, received.loadRelaxed());
 
         if (MONGO_unlikely(mirrorMaestroExpectsResponse.shouldFail())) {
             // We only can see if the command resolved if we got a response
@@ -235,6 +237,8 @@ public:
     AtomicWord<CounterT> resolved;
     // Counts the number of operations that are scheduled to be mirrored, but haven't yet been sent.
     AtomicWord<CounterT> pending;
+    // Counts the number of mirrored operations received by this node as a secondary.
+    AtomicWord<CounterT> received;
 } gMirroredReadsSection;
 
 auto parseMirroredReadsParameters(const BSONObj& obj) {
@@ -294,6 +298,13 @@ void MirrorMaestro::tryMirrorRequest(OperationContext* opCtx) noexcept {
     auto invocation = CommandInvocation::get(opCtx);
 
     impl.tryMirror(std::move(invocation));
+}
+
+void MirrorMaestro::onReceiveMirroredRead(OperationContext* opCtx) noexcept {
+    const auto& invocation = CommandInvocation::get(opCtx);
+    if (MONGO_unlikely(invocation->isMirrored())) {
+        gMirroredReadsSection.received.fetchAndAddRelaxed(1);
+    }
 }
 
 void MirrorMaestroImpl::tryMirror(std::shared_ptr<CommandInvocation> invocation) noexcept {
@@ -371,6 +382,9 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
 
         // Limit the maxTimeMS
         bob.append("maxTimeMS", params.getMaxTimeMS());
+
+        // Indicate that this is a mirrored read.
+        bob.append("mirrored", true);
 
         {
             // Set secondaryPreferred read preference

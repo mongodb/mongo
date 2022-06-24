@@ -315,6 +315,7 @@ void initializeCommandHooks(ServiceContext* serviceContext) {
 
         void onAfterRun(OperationContext* opCtx, const OpMsgRequest&, CommandInvocation*) {
             MirrorMaestro::tryMirrorRequest(opCtx);
+            MirrorMaestro::onReceiveMirroredRead(opCtx);
         }
     };
 

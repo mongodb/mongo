@@ -126,3 +126,7 @@ commands:
                 type: EncryptionInformation
                 optional: true
                 unstable: true
+            mirrored:
+                description: "Indicates whether the operation is a mirrored read"
+                type: optionalBool
+                unstable: true

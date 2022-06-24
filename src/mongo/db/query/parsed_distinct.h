@@ -53,8 +53,10 @@ public:
     static const char kCommentField[];
     static const char kUnwoundArrayFieldForViewUnwind[];
 
-    ParsedDistinct(std::unique_ptr<CanonicalQuery> query, const std::string key)
-        : _query(std::move(query)), _key(std::move(key)) {}
+    ParsedDistinct(std::unique_ptr<CanonicalQuery> query,
+                   const std::string key,
+                   const bool mirrored = false)
+        : _query(std::move(query)), _key(std::move(key)), _mirrored(std::move(mirrored)) {}
 
     const CanonicalQuery* getQuery() const {
         return _query.get();
@@ -70,6 +72,10 @@ public:
 
     const std::string& getKey() const {
         return _key;
+    }
+
+    bool isMirrored() const {
+        return _mirrored;
     }
 
     /**
@@ -93,6 +99,9 @@ private:
 
     // The field for which we are getting distinct values.
     const std::string _key;
+
+    // Indicates that this was a mirrored operation.
+    bool _mirrored = false;
 };
 
 }  // namespace mongo

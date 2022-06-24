@@ -757,6 +757,20 @@ public:
     }
 
     /**
+     * Returns if this invocation is a mirrored read.
+     */
+    bool isMirrored() const {
+        return _mirrored;
+    }
+
+    /**
+     * Sets that this operation is a mirrored read.
+     */
+    void markMirrored() {
+        _mirrored = true;
+    }
+
+    /**
      * Returns true if command allows afterClusterTime in its readConcern. The command may not allow
      * it if it is specifically intended not to take any LockManager locks. Waiting for
      * afterClusterTime takes the MODE_IS lock.
@@ -814,6 +828,8 @@ private:
     virtual void doCheckAuthorization(OperationContext* opCtx) const = 0;
 
     const Command* const _definition;
+
+    bool _mirrored = false;
 };
 
 /**

@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_replication,
+ *   requires_fcv_61
  * ]
  */
 
@@ -17,12 +18,19 @@ const kBurstCount = 1000;
 const kDbName = "mirrored_reads_test";
 const kCollName = "test";
 
-function getMirroredReadsStats(rst) {
-    return rst.getPrimary().getDB(kDbName).serverStatus({mirroredReads: 1}).mirroredReads;
+function getMirroredReadsStats(node) {
+    return node.getDB(kDbName).serverStatus({mirroredReads: 1}).mirroredReads;
 }
 
 function sendAndCheckReads({rst, cmd, minRate, maxRate}) {
-    let startMirroredReads = getMirroredReadsStats(rst);
+    const primary = rst.getPrimary();
+    const secondaries = rst.getSecondaries();
+    let initialPrimaryStats = getMirroredReadsStats(primary);
+    let initialSecondariesReceived = [];
+    for (const secondary of rst.getSecondaries()) {
+        let secondaryMirroredReadsReceived = getMirroredReadsStats(secondary).received;
+        initialSecondariesReceived.push(secondaryMirroredReadsReceived);
+    }
 
     jsTestLog(`Sending ${kBurstCount} request burst of ${tojson(cmd)} to primary`);
 
@@ -34,42 +42,52 @@ function sendAndCheckReads({rst, cmd, minRate, maxRate}) {
 
     // Verify that the commands have been observed on the primary
     {
-        let currentMirroredReads = getMirroredReadsStats(rst);
-        assert.lte(startMirroredReads.seen + kBurstCount, currentMirroredReads.seen);
+        const currentPrimaryStats = getMirroredReadsStats(primary);
+        assert.lte(initialPrimaryStats.seen + kBurstCount, currentPrimaryStats.seen);
     }
 
-    // Verify that the reads mirrored to the secondaries have responded
+    // Verify that the reads mirrored to the secondaries have responded and secondaries receive the
+    // same amount of mirrored reads that were sent by the primary.
+    let currentPrimaryMirroredReadsStats;
+    let readsSent;
     assert.soon(() => {
-        let currentMirroredReads = getMirroredReadsStats(rst);
-
-        let readsSent = currentMirroredReads.sent - startMirroredReads.sent;
-        let readsResolved = currentMirroredReads.resolved - startMirroredReads.resolved;
+        currentPrimaryMirroredReadsStats = getMirroredReadsStats(primary);
+        readsSent = currentPrimaryMirroredReadsStats.sent - initialPrimaryStats.sent;
+        let readsResolved =
+            currentPrimaryMirroredReadsStats.resolved - initialPrimaryStats.resolved;
         // The number of reads the primary has decided to mirror to secondaries, but hasn't yet
         // sent.
-        let readsPending = currentMirroredReads.pending;
-        let readsSeen = currentMirroredReads.seen - startMirroredReads.seen;
+        let readsPending = currentPrimaryMirroredReadsStats.pending;
+        let readsSeen = currentPrimaryMirroredReadsStats.seen - initialPrimaryStats.seen;
 
-        jsTestLog(
-            "Verifying that all mirrored reads sent from primary have been recieved by secondaries: " +
-            tojson({
-                sent: readsSent,
-                resolved: readsResolved,
-                pending: readsPending,
-                seen: readsSeen
-            }));
-
-        return ((readsPending == 0) && (readsSent == readsResolved));
+        jsTestLog("Verifying that all mirrored reads sent from primary have been resolved: " +
+                  tojson({
+                      sent: readsSent,
+                      resolved: readsResolved,
+                      pending: readsPending,
+                      seen: readsSeen
+                  }));
+        return ((readsPending == 0) && (readsSent === readsResolved));
     }, "Did not resolve all requests within time limit", 10000);
 
-    let currentMirroredReads = getMirroredReadsStats(rst);
+    // The number of mirrored reads received across all secondaries.
+    let readsReceived = 0;
+    for (let i = 0; i < secondaries.length; i++) {
+        const currentSecondaryMirroredReadsStats = getMirroredReadsStats(secondaries[i]);
+        const received =
+            currentSecondaryMirroredReadsStats.received - initialSecondariesReceived[i];
+        jsTestLog("Verifying number of reads received by secondary " + secondaries[i] + ": " +
+                  tojson({received: received}));
+        readsReceived += received;
+    }
+    assert.eq(readsReceived, readsSent);
 
-    jsTestLog("Verifying statistics: " +
-              tojson({current: currentMirroredReads, start: startMirroredReads}));
+    jsTestLog("Verifying primary statistics: " +
+              tojson({current: currentPrimaryMirroredReadsStats, start: initialPrimaryStats}));
 
-    let readsSeen = currentMirroredReads.seen - startMirroredReads.seen;
-    let readsSent = currentMirroredReads.sent - startMirroredReads.sent;
-    let readsMirrored = currentMirroredReads.resolved - startMirroredReads.resolved;
-    let numNodes = rst.getSecondaries().length;
+    let readsSeen = currentPrimaryMirroredReadsStats.seen - initialPrimaryStats.seen;
+    let readsMirrored = currentPrimaryMirroredReadsStats.resolved - initialPrimaryStats.resolved;
+    let numNodes = secondaries.length;
     let rate = readsMirrored / readsSeen / numNodes;
 
     // Check that the primary has seen all the mirrored-read supporting operations we've sent it
@@ -201,11 +219,11 @@ function verifyMirroringDistribution(rst) {
     jsTestLog(`Running test with sampling rate = ${samplingRate}`);
     assert.commandWorked(setParameter({rst: rst, value: {samplingRate: samplingRate}}));
 
-    let before = getMirroredReadsStats(rst);
+    let before = getMirroredReadsStats(rst.getPrimary());
 
     sendAndCheckReads({rst: rst, cmd: {find: kCollName, filter: {}}, minRate: min, maxRate: max});
 
-    let after = getMirroredReadsStats(rst);
+    let after = getMirroredReadsStats(rst.getPrimary());
 
     let mean = computeMean(before, after);
     let std = computeSTD(before, after, mean);

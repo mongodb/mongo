@@ -638,6 +638,11 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
         return processFLEFindAndModify(opCtx, req);
     }
 
+    if (req.getMirrored().value_or(false)) {
+        const auto& invocation = CommandInvocation::get(opCtx);
+        invocation->markMirrored();
+    }
+
     const NamespaceString& nsString = req.getNamespace();
     uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
     auto const curOp = CurOp::get(opCtx);

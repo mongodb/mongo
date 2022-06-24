@@ -242,6 +242,10 @@ public:
         if (shouldDoFLERewrite(request)) {
             processFLECountD(opCtx, nss, &request);
         }
+        if (request.getMirrored().value_or(false)) {
+            const auto& invocation = CommandInvocation::get(opCtx);
+            invocation->markMirrored();
+        }
 
         if (ctx->getView()) {
             auto viewAggregation = countCommandAsAggregationCommand(request, nss);

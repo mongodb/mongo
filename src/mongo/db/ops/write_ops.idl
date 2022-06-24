@@ -382,6 +382,10 @@ commands:
                 type: LegacyRuntimeConstants
                 optional: true
                 unstable: false
+            mirrored:
+                description: "Indicates whether the operation is a mirrored read"
+                type: optionalBool
+                unstable: true
 
     delete:
         description: "Parser for the 'delete' command."
@@ -530,4 +534,8 @@ commands:
                 description: "Encryption Information schema and other tokens for CRUD commands"
                 type: EncryptionInformation
                 optional: true
+                unstable: true
+            mirrored:
+                description: "Indicates whether the operation is a mirrored read"
+                type: optionalBool
                 unstable: true

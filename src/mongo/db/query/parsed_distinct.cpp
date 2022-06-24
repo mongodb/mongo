@@ -320,7 +320,9 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
         cq.getValue()->setCollator(defaultCollator->clone());
     }
 
-    return ParsedDistinct(std::move(cq.getValue()), parsedDistinct.getKey().toString());
+    return ParsedDistinct(std::move(cq.getValue()),
+                          parsedDistinct.getKey().toString(),
+                          parsedDistinct.getMirrored().value_or(false));
 }
 
 }  // namespace mongo

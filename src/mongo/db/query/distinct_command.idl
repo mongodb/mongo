@@ -53,3 +53,6 @@ commands:
                 description: "Optional collation for the command."
                 type: object
                 optional: true
+            mirrored:
+                description: "Indicates whether the operation is a mirrored read"
+                type: optionalBool
