@@ -62,6 +62,13 @@ bool DepsTracker::_appendMetaProjections(BSONObjBuilder* projectionBuilder) cons
     return (_needTextScore || _needSortKey || _needGeoNearDistance || _needGeoNearPoint);
 }
 
+std::list<std::string> DepsTracker::sortedFields() const {
+    // Use a special comparator to put parent fieldpaths before their children.
+    std::list<std::string> sortedFields(fields.begin(), fields.end());
+    sortedFields.sort(PathPrefixComparator());
+    return sortedFields;
+}
+
 BSONObj DepsTracker::toProjection() const {
     BSONObjBuilder bb;
 
@@ -83,21 +90,23 @@ BSONObj DepsTracker::toProjection() const {
         return bb.obj();
     }
 
-    bool needId = false;
+    // Go through dependency fieldpaths to find the minimal set of projections that cover the
+    // dependencies. For example, the dependencies ["a.b", "a.b.c.g", "c", "c.d", "f"] would be
+    // minimally covered by the projection {"a.b": 1, "c": 1, "f": 1}. The key operation here is
+    // folding dependencies into ancestor dependencies, wherever possible. This is assisted by a
+    // special sort in DepsTracker::sortedFields that treats '.' as the first char and thus places
+    // parent paths directly before their children.
+    bool idSpecified = false;
     std::string last;
-    for (const auto& field : fields) {
+    for (const auto& field : sortedFields()) {
         if (str::startsWith(field, "_id") && (field.size() == 3 || field[3] == '.')) {
             // _id and subfields are handled specially due in part to SERVER-7502
-            needId = true;
+            idSpecified = true;
             continue;
         }
 
         if (!last.empty() && str::startsWith(field, last)) {
-            // we are including a parent of *it so we don't need to include this field
-            // explicitly. In fact, due to SERVER-6527 if we included this field, the parent
-            // wouldn't be fully included.  This logic relies on on set iterators going in
-            // lexicographic order so that a string is always directly before of all fields it
-            // prefixes.
+            // We are including a parent of this field, so we can skip this field.
             continue;
         }
 
@@ -110,7 +119,7 @@ BSONObj DepsTracker::toProjection() const {
         bb.append(field, 1);
     }
 
-    if (needId)  // we are explicit either way
+    if (idSpecified)  // we are explicit either way
         bb.append("_id", 1);
     else
         bb.append("_id", 0);
@@ -287,4 +296,36 @@ Document documentHelper(const BSONObj& bson, const Document& neededFields, int n
 Document ParsedDeps::extractFields(const BSONObj& input) const {
     return documentHelper(input, _fields, _nFields);
 }
+
+// Returns true if the lhs value should sort before the rhs, false otherwise.
+bool PathPrefixComparator::operator()(const std::string& lhs, const std::string& rhs) const {
+    constexpr char dot = '.';
+
+    for (size_t pos = 0, len = std::min(lhs.size(), rhs.size()); pos < len; ++pos) {
+        // Below, we explicitly choose unsigned char because the usual const char& returned by
+        // operator[] is actually signed on x86 and will incorrectly order unicode characters.
+        unsigned char lchar = lhs[pos], rchar = rhs[pos];
+        if (lchar == rchar) {
+            continue;
+        }
+
+        // Consider the path delimiter '.' as being less than all other characters, so that
+        // paths sort directly before any paths they prefix and directly after any paths
+        // which prefix them.
+        if (lchar == dot) {
+            return true;
+        } else if (rchar == dot) {
+            return false;
+        }
+
+        // Otherwise, default to normal character comparison.
+        return lchar < rchar;
+    }
+
+    // If we get here, then we have reached the end of lhs and/or rhs and all of their path
+    // segments up to this point match. If lhs is shorter than rhs, then lhs prefixes rhs
+    // and should sort before it.
+    return lhs.size() < rhs.size();
+}
+
 }  // namespace mongo

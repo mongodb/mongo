@@ -170,6 +170,11 @@ struct DepsTracker {
      */
     std::vector<MetadataType> getAllRequiredMetadataTypes() const;
 
+    /**
+     * Return fieldpaths ordered such that a parent is immediately before its children.
+     */
+    std::list<std::string> sortedFields() const;
+
     std::set<std::string> fields;    // Names of needed fields in dotted notation.
     std::set<Variables::Id> vars;    // IDs of referenced variables.
     bool needWholeDocument = false;  // If true, ignore 'fields'; the whole document is needed.
@@ -204,5 +209,14 @@ private:
 
     Document _fields;
     int _nFields;  // Cache the number of top-level fields needed.
+};
+
+
+/** Custom comparator that orders fieldpath strings by path prefix first, then by field.
+ * This ensures that a parent field is ordered directly before its children.
+ */
+struct PathPrefixComparator {
+    /* Returns true if the lhs value should sort before the rhs, false otherwise. */
+    bool operator()(const std::string& lhs, const std::string& rhs) const;
 };
 }  // namespace mongo
