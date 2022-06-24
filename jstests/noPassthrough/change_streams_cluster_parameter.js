@@ -5,7 +5,7 @@
 //  requires_replication,
 //  requires_sharding,
 //  multiversion_incompatible,
-//  featureFlagServerlessChangeStreams
+//  featureFlagServerlessChangeStreams,
 //  featureFlagMongoStore
 // ]
 (function() {
