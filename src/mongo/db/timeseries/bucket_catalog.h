@@ -349,6 +349,11 @@ public:
          */
         bool allCommitted() const;
 
+        /**
+         * Retrieve the time associated with the bucket
+         */
+        Date_t getTime() const;
+
     private:
         /**
          * Determines the effect of adding 'doc' to this bucket. If adding 'doc' causes this bucket
@@ -392,6 +397,9 @@ public:
 
         // Top-level field names of the measurements that have been inserted into the bucket.
         StringSet _fieldNames;
+
+        // Minimum timestamp over contained measurements
+        Date_t _minTime;
 
         // The minimum and maximum values for each field in the bucket.
         timeseries::MinMax _minmax;
@@ -574,9 +582,6 @@ private:
          * this BucketAccess instance, with the bucket locked.
          */
         void rollover(const std::function<bool(BucketAccess*)>& isBucketFull);
-
-        // Retrieve the time associated with the bucket (id)
-        Date_t getTime() const;
 
     private:
         /**

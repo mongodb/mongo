@@ -166,7 +166,7 @@ std::pair<OID, Date_t> generateBucketId(const Date_t& time, const TimeseriesOpti
     // together into predictable chunks for sharding. This way we know from a measurement timestamp
     // what the bucket timestamp will be, so we can route measurements to the right shard chunk.
     auto roundedTime = timeseries::roundTimestampToGranularity(time, options.getGranularity());
-    uint64_t const roundedSeconds = durationCount<Seconds>(roundedTime.toDurationSinceEpoch());
+    int64_t const roundedSeconds = durationCount<Seconds>(roundedTime.toDurationSinceEpoch());
     bucketId.setTimestamp(roundedSeconds);
 
     // Now, if we stopped here we could end up with bucket OID collisions. Consider the case where
@@ -265,7 +265,7 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
             stats->numBucketsClosedDueToSize.fetchAndAddRelaxed(1);
             return true;
         }
-        auto bucketTime = (*bucket).getTime();
+        auto bucketTime = (*bucket)->getTime();
         if (time - bucketTime >= Seconds(*options.getBucketMaxSpanSeconds())) {
             stats->numBucketsClosedDueToTimeForward.fetchAndAddRelaxed(1);
             return true;
@@ -671,6 +671,8 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(const BucketKey& key,
         stats->numBucketsOpenedDueToMetadata.fetchAndAddRelaxed(1);
     }
 
+    bucket->_minTime = roundedTime;
+
     // Make sure we set the control.min time field to match the rounded _id timestamp.
     auto controlDoc = buildControlMinTimestampDoc(options.getTimeField(), roundedTime);
     bucket->_minmax.update(
@@ -849,6 +851,10 @@ bool BucketCatalog::Bucket::_hasBeenCommitted() const {
 
 bool BucketCatalog::Bucket::allCommitted() const {
     return _batches.empty() && !_preparedBatch;
+}
+
+Date_t BucketCatalog::Bucket::getTime() const {
+    return _minTime;
 }
 
 std::shared_ptr<BucketCatalog::WriteBatch> BucketCatalog::Bucket::_activeBatch(
@@ -1124,10 +1130,6 @@ void BucketCatalog::BucketAccess::rollover(const std::function<bool(BucketAccess
 
         _create(hashedNormalizedKey, hashedKey, false /* openedDueToMetadata */);
     }
-}
-
-Date_t BucketCatalog::BucketAccess::getTime() const {
-    return _bucket->id().asDateT();
 }
 
 BucketCatalog::WriteBatch::WriteBatch(const OID& bucketId,
