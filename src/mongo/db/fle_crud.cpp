@@ -833,7 +833,7 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
         auto updateModifier = updateModification.getUpdateModifier();
         auto setObject = updateModifier.getObjectField("$set");
         EDCServerCollection::validateEncryptedFieldInfo(setObject, efc, bypassDocumentValidation);
-        serverPayload = EDCServerCollection::getEncryptedFieldInfo(updateModifier);
+        serverPayload = EDCServerCollection::getEncryptedFieldInfo(setObject);
 
         processFieldsForInsert(
             queryImpl, edcNss, serverPayload, efc, &stmtId, bypassDocumentValidation);
@@ -1081,7 +1081,7 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
             auto setObject = updateModifier.getObjectField("$set");
             EDCServerCollection::validateEncryptedFieldInfo(
                 setObject, efc, bypassDocumentValidation);
-            serverPayload = EDCServerCollection::getEncryptedFieldInfo(updateModifier);
+            serverPayload = EDCServerCollection::getEncryptedFieldInfo(setObject);
             processFieldsForInsert(
                 queryImpl, edcNss, serverPayload, efc, &stmtId, bypassDocumentValidation);
 
