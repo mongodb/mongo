@@ -65,7 +65,6 @@ types:
         serializer: "::mongo::write_ops::opTimeSerializerWithTermCheck"
         deserializer: "::mongo::write_ops::opTimeParser"
 
-    # TODO (SERVER-64449): Use IDL directly instead of this custom parser/serialiser
     write_error:
         bson_serialization_type: object
         description: "Structure used to report a single error entry resulting from a batch write

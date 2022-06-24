@@ -79,8 +79,6 @@ var $config = extendWorkload($config, function($config, $super) {
         // filter out those errors.
         let skippableErrors = [
             ErrorCodes.StaleConfig,
-            // TODO (SERVER-64449): Get rid of this exception
-            ErrorCodes.OBSOLETE_StaleShardVersion,
             ErrorCodes.WriteConflict,
             ErrorCodes.LockTimeout,
             ErrorCodes.PreparedTransactionInProgress,

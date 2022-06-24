@@ -205,13 +205,13 @@ private:
 };
 
 /**
- * Class to abstract the vagaries of how write errors are reported in write commands, which is not
- * consistent between the different errors. Specifically, errors such as StaleShardVersion report
- * their extraInfo in a field called errInfo, which is not consistent with how Status(es) are
- * serialised and parsed.
+ * This class is IDL-looking and it abstracts the vagaries of how write errors are reported in write
+ * commands, which is not consistent across different errors.
  *
- * TODO (SERVER-64449): The purpose of this class is to unify that reporting in subsequent versions
- * after which it can become a proper IDL type.
+ * Specifically, certain errors (such as DuplicateKey, StaleConfig) store the error information
+ * inline with the write error object's BSON, whereas others place it under an errInfo field. This
+ * model doesn't fit with IDL, which does not have support for placing fields at the same level as
+ * the owning object.
  */
 class WriteError {
 public:

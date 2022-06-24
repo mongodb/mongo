@@ -294,9 +294,7 @@ WriteError WriteError::parse(const BSONObj& obj) {
         auto code = ErrorCodes::Error(obj[WriteError::kCodeFieldName].Int());
         auto errmsg = obj[WriteError::kErrmsgFieldName].valueStringDataSafe();
 
-        // All remaining errors have the error stored at the same level as the code and errmsg (in
-        // the same way that Status is serialised as part of regular command response)
-        return Status(code, std::move(errmsg), obj);
+        return Status(code, errmsg, obj);
     }();
 
     return WriteError(index, std::move(status));

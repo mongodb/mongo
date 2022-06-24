@@ -88,8 +88,6 @@ assert.commandWorked(mongosColl.insert({_id: 150}));
 
 const shardExceptions = [
     ErrorCodes.StaleConfig,
-    // TODO (SERVER-64449): Get rid of this exception
-    ErrorCodes.OBSOLETE_StaleShardVersion,
     ErrorCodes.StaleEpoch,
 ];
 

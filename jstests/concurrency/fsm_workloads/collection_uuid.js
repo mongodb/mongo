@@ -51,8 +51,6 @@ const runCommandInLoop = function(
         ErrorCodes.ConflictingOperationInProgress,
         ErrorCodes.BackgroundOperationInProgressForNamespace,
         ErrorCodes.ReshardCollectionInProgress,
-        // TODO (SERVER-64449): Get rid of this exception
-        ErrorCodes.OBSOLETE_StaleShardVersion,
         ErrorCodes.QueryPlanKilled,
         // StaleConfig is usually retried by the mongos, but in situations where multiple errors
         // have ocurred on the same batch and MultipleErrorsOcurred is returned, one of the errors
