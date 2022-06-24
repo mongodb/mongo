@@ -8,7 +8,8 @@
  * @tags: [
  *  requires_fcv_60,
  *  requires_sharding,
- *  uses_transactions
+ *  uses_transactions,
+ *  antithesis_incompatible
  * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');
@@ -25,10 +26,6 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.shardKeys = [];
     $config.data.currentShardKeyIndex = -1;
     $config.data.reshardingCount = 0;
-
-    // TODO SERVER-67076: Investigate segfault in resharding image collection agg stage with
-    // concurrent reaps.
-    $config.data.overrideReapThreshold = false;
 
     $config.data.getQueryForDocument = function getQueryForDocument(doc) {
         // The query for a write command against a sharded collection must contain the shard key.

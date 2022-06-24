@@ -39,7 +39,6 @@
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/index_spec.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/client/query.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/config.h"
 #include "mongo/db/dbmessage.h"
@@ -71,6 +70,15 @@ std::string nsGetDB(const std::string& ns);
  * Returns the collection name portion of an ns std::string.
  */
 std::string nsGetCollection(const std::string& ns);
+
+/**
+ * Allows callers of the internal client 'find()' API below to request an exhaust cursor.
+ *
+ * Such cursors use a special OP_MSG facility under the hood. When exhaust is requested, the server
+ * writes the full results of the query into the socket (split into getMore batches), without
+ * waiting for explicit getMore requests from the client.
+ */
+enum class ExhaustMode { kOn, kOff };
 
 /**
  * Abstract class that implements the core db operations.
@@ -507,15 +515,21 @@ public:
      * Issues a find command described by 'findRequest', and returns the resulting cursor.
      */
     virtual std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
-                                                 const ReadPreferenceSetting& readPref);
+                                                 const ReadPreferenceSetting& readPref,
+                                                 ExhaustMode exhaustMode);
 
     /**
-     * Identical to the 'find()' overload above, but uses a default value of "primary" for the read
-     * preference.
+     * Convenience overloads. Identical to the 'find()' overload above, but default values of
+     * "primary" read preference and 'ExhaustMode::kOff' are used when not supplied by the caller.
      */
     std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest) {
         ReadPreferenceSetting defaultReadPref{};
-        return find(std::move(findRequest), defaultReadPref);
+        return find(std::move(findRequest), defaultReadPref, ExhaustMode::kOff);
+    }
+
+    std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
+                                         const ReadPreferenceSetting& readPref) {
+        return find(std::move(findRequest), readPref, ExhaustMode::kOff);
     }
 
     /**
@@ -523,8 +537,16 @@ public:
      * returning a cursor to the caller, iterates the cursor under the hood and calls the provided
      * 'callback' function against each of the documents produced by the cursor.
      */
+    void find(FindCommandRequest findRequest, std::function<void(const BSONObj&)> callback) {
+        find(std::move(findRequest),
+             ReadPreferenceSetting{},
+             ExhaustMode::kOff,
+             std::move(callback));
+    }
+
     void find(FindCommandRequest findRequest,
               const ReadPreferenceSetting& readPref,
+              ExhaustMode exhaustMode,
               std::function<void(const BSONObj&)> callback);
 
     /**
@@ -553,29 +575,6 @@ public:
      * results.
      */
     BSONObj findOne(const NamespaceStringOrUUID& nssOrUuid, BSONObj filter);
-
-    /**
-     * Legacy find API. Do not add new callers! Use the 'find*()' methods above instead.
-     */
-    virtual std::unique_ptr<DBClientCursor> query_DEPRECATED(
-        const NamespaceStringOrUUID& nsOrUuid,
-        const BSONObj& filter,
-        const Query& querySettings = Query(),
-        int limit = 0,
-        int nToSkip = 0,
-        const BSONObj* fieldsToReturn = nullptr,
-        int queryOptions = 0,
-        int batchSize = 0,
-        boost::optional<BSONObj> readConcernObj = boost::none);
-    virtual unsigned long long query_DEPRECATED(
-        std::function<void(DBClientCursorBatchIterator&)> f,
-        const NamespaceStringOrUUID& nsOrUuid,
-        const BSONObj& filter,
-        const Query& querySettings = Query(),
-        const BSONObj* fieldsToReturn = nullptr,
-        int queryOptions = QueryOption_Exhaust,
-        int batchSize = 0,
-        boost::optional<BSONObj> readConcernObj = boost::none);
 
     /**
      * Don't use this - called automatically by DBClientCursor for you.

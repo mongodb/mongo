@@ -55,7 +55,7 @@ using IET =
  *  ConstNode is a node that represents an interval with constant bounds, such as (MinKey,
  * MaxKey).
  */
-class ConstNode : public optimizer::algebra::OpSpecificArity<IET, ConstNode, 0> {
+class ConstNode : public optimizer::algebra::OpSpecificArity<IET, 0> {
 public:
     explicit ConstNode(const OrderedIntervalList& oil) : oil{oil} {}
 
@@ -66,7 +66,7 @@ public:
  * EvalNode is a node that evaluates an interval from a simple predicate such as {$gt: p1} where
  * p1 is a parameter value known at runtime.
  */
-class EvalNode : public optimizer::algebra::OpSpecificArity<IET, EvalNode, 0> {
+class EvalNode : public optimizer::algebra::OpSpecificArity<IET, 0> {
 public:
     using InputParamId = MatchExpression::InputParamId;
 
@@ -89,9 +89,9 @@ private:
 /**
  * IntersectNode is a node that represents an intersection of two intervals.
  */
-class IntersectNode : public optimizer::algebra::OpSpecificArity<IET, IntersectNode, 2> {
+class IntersectNode : public optimizer::algebra::OpSpecificArity<IET, 2> {
 public:
-    using Base = optimizer::algebra::OpSpecificArity<IET, IntersectNode, 2>;
+    using Base = optimizer::algebra::OpSpecificArity<IET, 2>;
 
     IntersectNode(IET lhs, IET rhs) : Base(std::move(lhs), std::move(rhs)) {}
 };
@@ -99,9 +99,9 @@ public:
 /**
  * UnionNode is a node that represents a union of two intervals.
  */
-class UnionNode : public optimizer::algebra::OpSpecificArity<IET, UnionNode, 2> {
+class UnionNode : public optimizer::algebra::OpSpecificArity<IET, 2> {
 public:
-    using Base = optimizer::algebra::OpSpecificArity<IET, UnionNode, 2>;
+    using Base = optimizer::algebra::OpSpecificArity<IET, 2>;
 
     UnionNode(IET lhs, IET rhs) : Base(std::move(lhs), std::move(rhs)) {}
 };
@@ -109,9 +109,9 @@ public:
 /**
  * ComplementNode is a node that complements its child.
  */
-class ComplementNode : public optimizer::algebra::OpSpecificArity<IET, ComplementNode, 1> {
+class ComplementNode : public optimizer::algebra::OpSpecificArity<IET, 1> {
 public:
-    using Base = optimizer::algebra::OpSpecificArity<IET, ComplementNode, 1>;
+    using Base = optimizer::algebra::OpSpecificArity<IET, 1>;
 
     ComplementNode(IET child) : Base(std::move(child)) {}
 };

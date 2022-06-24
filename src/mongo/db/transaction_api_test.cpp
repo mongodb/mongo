@@ -142,7 +142,8 @@ class MockTransactionClient : public SEPTransactionClient {
 public:
     using SEPTransactionClient::SEPTransactionClient;
 
-    virtual void injectHooks(std::unique_ptr<TxnMetadataHooks> hooks) override {
+    virtual void initialize(std::unique_ptr<TxnMetadataHooks> hooks,
+                            const CancellationToken& token) override {
         _hooks = std::move(hooks);
     }
 
@@ -205,6 +206,7 @@ private:
     mutable StatusWith<BSONObj> _lastResponse{BSONObj()};
     mutable std::queue<StatusWith<BSONObj>> _responses;
     mutable std::vector<BSONObj> _sentRequests;
+    bool _runningLocalTransaction{false};
 };
 
 }  // namespace txn_api::details
@@ -329,9 +331,15 @@ protected:
         _mockClient = mockClient.get();
         _txnWithRetries = std::make_unique<txn_api::SyncTransactionWithRetries>(
             opCtx(), _executor, nullptr /* resourceYielder */, std::move(mockClient));
+
+        // The bulk of the API tests are for the non-local transaction cases, so set isMongos=true
+        // by default.
+        setMongos(true);
     }
 
     void tearDown() override {
+        setMongos(false);
+
         _executor->shutdown();
         _executor->join();
         _executor.reset();
@@ -406,7 +414,8 @@ private:
 
 class MockClusterOperationTransactionClient : public txn_api::TransactionClient {
 public:
-    virtual void injectHooks(std::unique_ptr<txn_api::details::TxnMetadataHooks> hooks) {}
+    virtual void initialize(std::unique_ptr<txn_api::details::TxnMetadataHooks> hooks,
+                            const CancellationToken& token) {}
 
     virtual SemiFuture<BSONObj> runCommand(StringData dbName, BSONObj cmd) const {
         MONGO_UNREACHABLE;
@@ -1944,6 +1953,9 @@ TEST_F(TxnAPITest, CanBeUsedWithinShardedOperationsIfClientSupportsIt) {
 }
 
 TEST_F(TxnAPITest, DoNotAllowCrossShardTransactionsOnShardWhenInClientTransaction) {
+    setMongos(false);
+    ON_BLOCK_EXIT([&] { setMongos(true); });
+
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
     opCtx()->setTxnNumber(5);
     opCtx()->setInMultiDocumentTransaction();
@@ -1954,6 +1966,9 @@ TEST_F(TxnAPITest, DoNotAllowCrossShardTransactionsOnShardWhenInClientTransactio
 }
 
 TEST_F(TxnAPITest, DoNotAllowCrossShardTransactionsOnShardWhenInRetryableWrite) {
+    setMongos(false);
+    ON_BLOCK_EXIT([&] { setMongos(true); });
+
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
     opCtx()->setTxnNumber(5);
     ASSERT_THROWS_CODE(
@@ -1963,21 +1978,170 @@ TEST_F(TxnAPITest, DoNotAllowCrossShardTransactionsOnShardWhenInRetryableWrite) 
 }
 
 TEST_F(TxnAPITest, AllowCrossShardTransactionsOnMongosWhenInRetryableWrite) {
+    setMongos(true);
+    ON_BLOCK_EXIT([&] { setMongos(false); });
+
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
     opCtx()->setTxnNumber(5);
-    setMongos(true);
     resetTxnWithRetriesWithClient(std::make_unique<MockClusterOperationTransactionClient>());
-    setMongos(false);
 }
 
 TEST_F(TxnAPITest, AllowCrossShardTransactionsOnMongosWhenInClientTransaction) {
+    setMongos(true);
+    ON_BLOCK_EXIT([&] { setMongos(false); });
+
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
     opCtx()->setTxnNumber(5);
     opCtx()->setInMultiDocumentTransaction();
-    setMongos(true);
     resetTxnWithRetriesWithClient(std::make_unique<MockClusterOperationTransactionClient>());
-    setMongos(false);
 }
 
+TEST_F(TxnAPITest, FailoverAndShutdownErrorsAreFatalForLocalTransactionBodyError) {
+    setMongos(false);
+    ON_BLOCK_EXIT([&] { setMongos(true); });
+    auto runTest = [&](bool expectSuccess, Status status) {
+        resetTxnWithRetries();
+
+        int attempt = -1;
+        auto swResult = txnWithRetries().runNoThrow(
+            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                attempt += 1;
+
+                mockClient()->setNextCommandResponse(kOKInsertResponse);
+                auto insertRes = txnClient
+                                     .runCommand("user"_sd,
+                                                 BSON("insert"
+                                                      << "foo"
+                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                     .get();
+                ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
+
+                // Only throw once to verify the API gives up right away.
+                if (attempt == 0) {
+                    uassertStatusOK(status);
+                }
+                // The commit response.
+                mockClient()->setNextCommandResponse(kOKCommandResponse);
+                return SemiFuture<void>::makeReady();
+            });
+        if (!expectSuccess) {
+            ASSERT_EQ(swResult.getStatus(), status);
+
+            // The API should have returned without trying to abort.
+            auto lastRequest = mockClient()->getLastSentRequest();
+            ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "insert"_sd);
+        } else {
+            ASSERT(swResult.getStatus().isOK());
+            ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+            auto lastRequest = mockClient()->getLastSentRequest();
+            ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
+        }
+    };
+
+    runTest(false, Status(ErrorCodes::InterruptedDueToReplStateChange, "mock repl change error"));
+    runTest(false, Status(ErrorCodes::InterruptedAtShutdown, "mock shutdown error"));
+
+    // Verify the fatal for local logic doesn't apply to all transient or retriable errors.
+    runTest(true, Status(ErrorCodes::HostUnreachable, "mock transient error"));
+}
+
+TEST_F(TxnAPITest, FailoverAndShutdownErrorsAreFatalForLocalTransactionCommandError) {
+    setMongos(false);
+    ON_BLOCK_EXIT([&] { setMongos(true); });
+    auto runTest = [&](bool expectSuccess, Status status) {
+        resetTxnWithRetries();
+
+        int attempt = -1;
+        auto swResult = txnWithRetries().runNoThrow(
+            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                attempt += 1;
+
+                mockClient()->setNextCommandResponse(kOKInsertResponse);
+                auto insertRes = txnClient
+                                     .runCommand("user"_sd,
+                                                 BSON("insert"
+                                                      << "foo"
+                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                     .get();
+                ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
+
+                // The commit response.
+                mockClient()->setNextCommandResponse(BSON("ok" << 0 << "code" << status.code()));
+                mockClient()->setNextCommandResponse(kOKCommandResponse);
+                return SemiFuture<void>::makeReady();
+            });
+        if (!expectSuccess) {
+            ASSERT(swResult.getStatus().isOK());
+            ASSERT_EQ(swResult.getValue().cmdStatus, status);
+            ASSERT(swResult.getValue().wcError.toStatus().isOK());
+
+            // The API should have returned without trying to abort.
+            auto lastRequest = mockClient()->getLastSentRequest();
+            ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
+        } else {
+            ASSERT(swResult.getStatus().isOK());
+            ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+            auto lastRequest = mockClient()->getLastSentRequest();
+            ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
+        }
+    };
+
+    runTest(false, Status(ErrorCodes::InterruptedDueToReplStateChange, "mock repl change error"));
+    runTest(false, Status(ErrorCodes::InterruptedAtShutdown, "mock shutdown error"));
+
+    // Verify the fatal for local logic doesn't apply to all transient or retriable errors.
+    runTest(true, Status(ErrorCodes::HostUnreachable, "mock retriable error"));
+}
+
+TEST_F(TxnAPITest, FailoverAndShutdownErrorsAreFatalForLocalTransactionWCError) {
+    setMongos(false);
+    ON_BLOCK_EXIT([&] { setMongos(true); });
+    auto runTest = [&](bool expectSuccess, Status status) {
+        resetTxnWithRetries();
+
+        int attempt = -1;
+        auto swResult = txnWithRetries().runNoThrow(
+            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                attempt += 1;
+
+                mockClient()->setNextCommandResponse(kOKInsertResponse);
+                auto insertRes = txnClient
+                                     .runCommand("user"_sd,
+                                                 BSON("insert"
+                                                      << "foo"
+                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                     .get();
+                ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
+
+                // The commit response.
+                auto wcError = BSON("code" << status.code() << "errmsg"
+                                           << "mock");
+                auto resWithWCError = BSON("ok" << 1 << "writeConcernError" << wcError);
+                mockClient()->setNextCommandResponse(resWithWCError);
+                mockClient()->setNextCommandResponse(kOKCommandResponse);
+                return SemiFuture<void>::makeReady();
+            });
+        if (!expectSuccess) {
+            ASSERT(swResult.getStatus().isOK());
+            ASSERT(swResult.getValue().cmdStatus.isOK());
+            ASSERT_EQ(swResult.getValue().wcError.toStatus(), status);
+
+            // The API should have returned without trying to abort.
+            auto lastRequest = mockClient()->getLastSentRequest();
+            ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
+        } else {
+            ASSERT(swResult.getStatus().isOK());
+            ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+            auto lastRequest = mockClient()->getLastSentRequest();
+            ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
+        }
+    };
+
+    runTest(false, Status(ErrorCodes::InterruptedDueToReplStateChange, "mock repl change error"));
+    runTest(false, Status(ErrorCodes::InterruptedAtShutdown, "mock shutdown error"));
+
+    // Verify the fatal for local logic doesn't apply to all transient or retriable errors.
+    runTest(true, Status(ErrorCodes::HostUnreachable, "mock retriable error"));
+}
 }  // namespace
 }  // namespace mongo

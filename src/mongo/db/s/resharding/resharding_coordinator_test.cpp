@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/resharding/coordinator_document_gen.h"
-
-#include "mongo/platform/basic.h"
-
 #include <boost/optional.hpp>
 
 #include "mongo/client/remote_command_targeter_mock.h"
@@ -40,6 +36,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/index_on_config.h"
+#include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -51,7 +48,6 @@
 #include "mongo/util/clock_source_mock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -85,13 +81,12 @@ protected:
         TransactionCoordinatorService::get(operationContext())
             ->onShardingInitialization(operationContext(), true);
 
-        _metrics =
-            ReshardingMetricsNew::makeInstance(_originalUUID,
-                                               _newShardKey.toBSON(),
-                                               _originalNss,
-                                               ReshardingMetricsNew::Role::kCoordinator,
-                                               getServiceContext()->getFastClockSource()->now(),
-                                               getServiceContext());
+        _metrics = ReshardingMetrics::makeInstance(_originalUUID,
+                                                   _newShardKey.toBSON(),
+                                                   _originalNss,
+                                                   ReshardingMetrics::Role::kCoordinator,
+                                                   getServiceContext()->getFastClockSource()->now(),
+                                                   getServiceContext());
     }
 
     void tearDown() override {
@@ -180,7 +175,7 @@ protected:
             _newShardKey.isShardKey(shardKey.toBSON()) ? _newChunkRanges : _oldChunkRanges;
 
         // Create two chunks, one on each shard with the given namespace and epoch
-        ChunkVersion version(1, 0, epoch, Timestamp(1, 2));
+        ChunkVersion version({epoch, Timestamp(1, 2)}, {1, 0});
         ChunkType chunk1(uuid, chunkRanges[0], version, ShardId("shard0000"));
         chunk1.setName(ids[0]);
         version.incMinor();
@@ -227,7 +222,7 @@ protected:
         client.insert(CollectionType::ConfigNS.ns(), originalNssCatalogEntry.toBSON());
 
         auto tempNssCatalogEntry = createTempReshardingCollectionType(
-            opCtx, coordinatorDoc, ChunkVersion(1, 1, OID::gen(), Timestamp(1, 2)), BSONObj());
+            opCtx, coordinatorDoc, ChunkVersion({OID::gen(), Timestamp(1, 2)}, {1, 1}), BSONObj());
         client.insert(CollectionType::ConfigNS.ns(), tempNssCatalogEntry.toBSON());
 
         return coordinatorDoc;
@@ -519,11 +514,11 @@ protected:
         // collection should have been removed.
         boost::optional<CollectionType> expectedTempCollType = boost::none;
         if (expectedCoordinatorDoc.getState() < CoordinatorStateEnum::kCommitting) {
-            expectedTempCollType =
-                createTempReshardingCollectionType(opCtx,
-                                                   expectedCoordinatorDoc,
-                                                   ChunkVersion(1, 1, OID::gen(), Timestamp(1, 2)),
-                                                   BSONObj());
+            expectedTempCollType = createTempReshardingCollectionType(
+                opCtx,
+                expectedCoordinatorDoc,
+                ChunkVersion({OID::gen(), Timestamp(1, 2)}, {1, 1}),
+                BSONObj());
 
             // It's necessary to add the userCanceled field because the call into
             // createTempReshardingCollectionType assumes that the collection entry is
@@ -723,7 +718,7 @@ protected:
     ShardKeyPattern _oldShardKey = ShardKeyPattern(BSON("oldSK" << 1));
     ShardKeyPattern _newShardKey = ShardKeyPattern(BSON("newSK" << 1));
 
-    std::unique_ptr<ReshardingMetricsNew> _metrics;
+    std::unique_ptr<ReshardingMetrics> _metrics;
 
     const std::vector<ChunkRange> _oldChunkRanges = {
         ChunkRange(_oldShardKey.getKeyPattern().globalMin(), BSON("oldSK" << 12345)),

@@ -1421,7 +1421,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardBegin) {
 TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUpLegacyFormat) {
     auto existingUuid = UUID::gen();
     auto reshardingUuid = UUID::gen();
-    auto temporaryNs = constructTemporaryReshardingNss(nss.db(), existingUuid);
+    auto temporaryNs = resharding::constructTemporaryReshardingNss(nss.db(), existingUuid);
 
     const auto o2FieldInLegacyFormat = BSON("type"
                                             << "reshardDoneCatchUp"
@@ -1460,7 +1460,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUpLegacyFormat) {
 TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUp) {
     auto existingUuid = UUID::gen();
     auto reshardingUuid = UUID::gen();
-    auto temporaryNs = constructTemporaryReshardingNss(nss.db(), existingUuid);
+    auto temporaryNs = resharding::constructTemporaryReshardingNss(nss.db(), existingUuid);
 
     ReshardDoneCatchUpChangeEventO2Field o2Field{temporaryNs, reshardingUuid};
     auto reshardDoneCatchUp = makeOplogEntry(OpTypeEnum::kNoop,

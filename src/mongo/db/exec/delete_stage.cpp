@@ -180,23 +180,38 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
 
     bool writeToOrphan = false;
     if (!_params->isExplain && !_params->fromMigrate) {
-        const auto action = _preWriteFilter.computeAction(member->doc.value());
-        if (action == write_stage_common::PreWriteFilter::Action::kSkip) {
-            LOGV2_DEBUG(5983201,
-                        3,
-                        "Skipping delete operation to orphan document to prevent a wrong change "
-                        "stream event",
-                        "namespace"_attr = collection()->ns(),
-                        "record"_attr = member->doc.value());
-            return PlanStage::NEED_TIME;
-        } else if (action == write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate) {
-            LOGV2_DEBUG(6184700,
-                        3,
-                        "Marking delete operation to orphan document with the fromMigrate flag "
-                        "to prevent a wrong change stream event",
-                        "namespace"_attr = collection()->ns(),
-                        "record"_attr = member->doc.value());
-            writeToOrphan = true;
+        try {
+            const auto action = _preWriteFilter.computeAction(member->doc.value());
+            if (action == write_stage_common::PreWriteFilter::Action::kSkip) {
+                LOGV2_DEBUG(
+                    5983201,
+                    3,
+                    "Skipping delete operation to orphan document to prevent a wrong change "
+                    "stream event",
+                    "namespace"_attr = collection()->ns(),
+                    "record"_attr = member->doc.value());
+                return PlanStage::NEED_TIME;
+            } else if (action == write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate) {
+                LOGV2_DEBUG(6184700,
+                            3,
+                            "Marking delete operation to orphan document with the fromMigrate flag "
+                            "to prevent a wrong change stream event",
+                            "namespace"_attr = collection()->ns(),
+                            "record"_attr = member->doc.value());
+                writeToOrphan = true;
+            }
+        } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
+            if (ex->getVersionReceived() == ChunkVersion::IGNORED() &&
+                ex->getCriticalSectionSignal()) {
+                // If ChunkVersion is IGNORED and we encountered a critical section, then yield,
+                // wait for the critical section to finish and then we'll resume the write from the
+                // point we had left. We do this to prevent large multi-writes from repeatedly
+                // failing due to StaleConfig and exhausting the mongos retry attempts.
+                planExecutorShardingCriticalSectionFuture(opCtx()) = ex->getCriticalSectionSignal();
+                memberFreer.dismiss();  // Keep this member around so we can retry deleting it.
+                return prepareToRetryWSM(id, out);
+            }
+            throw;
         }
     }
 
@@ -237,6 +252,18 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         } catch (const WriteConflictException&) {
             memberFreer.dismiss();  // Keep this member around so we can retry deleting it.
             return prepareToRetryWSM(id, out);
+        } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
+            if (ex->getVersionReceived() == ChunkVersion::IGNORED() &&
+                ex->getCriticalSectionSignal()) {
+                // If ChunkVersion is IGNORED and we encountered a critical section, then yield,
+                // wait for the critical section to finish and then we'll resume the write from the
+                // point we had left. We do this to prevent large multi-writes from repeatedly
+                // failing due to StaleConfig and exhausting the mongos retry attempts.
+                planExecutorShardingCriticalSectionFuture(opCtx()) = ex->getCriticalSectionSignal();
+                memberFreer.dismiss();  // Keep this member around so we can retry deleting it.
+                return prepareToRetryWSM(id, out);
+            }
+            throw;
         }
     }
     _specificStats.docsDeleted += _params->numStatsForDoc ? _params->numStatsForDoc(bsonObjDoc) : 1;

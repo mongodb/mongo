@@ -128,9 +128,8 @@ public:
     BSONObj getPostBatchResumeToken() const override;
 
     /**
-     * Even though the leaves of '_root' will acquire AutoGet objects, the caller must acquire a top
-     * level AutoGet object outside of this PlanExecutor in order to open a storage transaction and
-     * establish a consistent view of the catalog.
+     * The caller must acquire a top level AutoGet object outside of this PlanExecutor in order to
+     * open a storage transaction and establish a consistent view of the catalog.
      */
     LockPolicy lockPolicy() const override {
         return LockPolicy::kLockExternally;

@@ -82,8 +82,16 @@ protected:
             return std::move(*this);
         }
 
+        Options ephemeral(bool ephemeral) {
+            _ephemeral = ephemeral;
+            return std::move(*this);
+        }
+
     private:
         std::string _engine = "wiredTiger";
+        // We use ephemeral instances by default to advise Storage Engines (in particular
+        // WiredTiger) not to perform Disk I/O.
+        bool _ephemeral = true;
         RepairAction _repair = RepairAction::kNoRepair;
         StorageEngineInitFlags _initFlags = kDefaultStorageEngineInitFlags;
         bool _useReplSettings = false;

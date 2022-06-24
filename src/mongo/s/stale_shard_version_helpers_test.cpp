@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/logv2/log.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/stale_shard_version_helpers.h"
@@ -37,7 +34,6 @@
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -98,8 +94,8 @@ TEST_F(AsyncShardVersionRetry, LimitedStaleErrorsShouldReturnCorrectValue) {
         service(), nss(), catalogCache, desc(), getExecutor(), token, [&](OperationContext*) {
             if (++tries < 5) {
                 uassert(StaleConfigInfo(nss(),
-                                        ChunkVersion(5, 23, OID::gen(), {}),
-                                        ChunkVersion(6, 99, OID::gen(), {}),
+                                        ChunkVersion({OID::gen(), Timestamp(1, 0)}, {5, 23}),
+                                        ChunkVersion({OID::gen(), Timestamp(1, 0)}, {6, 99}),
                                         ShardId("sB")),
                         "testX",
                         false);

@@ -69,7 +69,7 @@ subtest_error_handler(
     (void)(handler);
     (void)(session);
     (void)(error);
-    fprintf(stderr, "%s", message);
+    fprintf(stderr, "%s\n", message);
     return (0);
 }
 

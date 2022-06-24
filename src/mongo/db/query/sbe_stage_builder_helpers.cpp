@@ -1015,4 +1015,93 @@ sbe::value::SlotId StageBuilderState::registerInputParamSlot(
     return slotId;
 }
 
+
+/**
+ * Given a key pattern and an array of slots of equal size, builds an IndexKeyPatternTreeNode
+ * representing the mapping between key pattern component and slot.
+ *
+ * Note that this will "short circuit" in cases where the index key pattern contains two components
+ * where one is a subpath of the other. For example with the key pattern {a:1, a.b: 1}, the "a.b"
+ * component will not be represented in the output tree. For the purpose of rehydrating index keys,
+ * this is fine (and actually preferable).
+ */
+std::unique_ptr<IndexKeyPatternTreeNode> buildKeyPatternTree(const BSONObj& keyPattern,
+                                                             const sbe::value::SlotVector& slots) {
+    size_t i = 0;
+
+    auto root = std::make_unique<IndexKeyPatternTreeNode>();
+    for (auto&& elem : keyPattern) {
+        auto* node = root.get();
+        bool skipElem = false;
+
+        FieldRef fr(elem.fieldNameStringData());
+        for (FieldIndex j = 0; j < fr.numParts(); ++j) {
+            const auto part = fr.getPart(j);
+            if (auto it = node->children.find(part); it != node->children.end()) {
+                node = it->second.get();
+                if (node->indexKeySlot) {
+                    // We're processing the a sub-path of a path that's already indexed.  We can
+                    // bail out here since we won't use the sub-path when reconstructing the
+                    // object.
+                    skipElem = true;
+                    break;
+                }
+            } else {
+                node = node->emplace(part);
+            }
+        }
+
+        if (!skipElem) {
+            node->indexKeySlot = slots[i];
+        }
+
+        ++i;
+    }
+
+    return root;
+}
+
+/**
+ * Given a root IndexKeyPatternTreeNode, this function will construct an SBE expression for
+ * producing a partial object from an index key.
+ *
+ * For example, given the index key pattern {a.b: 1, x: 1, a.c: 1} and the index key
+ * {"": 1, "": 2, "": 3}, the SBE expression would produce the object {a: {b:1, c: 3}, x: 2}.
+ */
+std::unique_ptr<sbe::EExpression> buildNewObjExpr(const IndexKeyPatternTreeNode* kpTree) {
+
+    sbe::EExpression::Vector args;
+    for (auto&& fieldName : kpTree->childrenOrder) {
+        auto it = kpTree->children.find(fieldName);
+
+        args.emplace_back(makeConstant(fieldName));
+        if (it->second->indexKeySlot) {
+            args.emplace_back(makeVariable(*it->second->indexKeySlot));
+        } else {
+            // The reason this is in an else branch is that in the case where we have an index key
+            // like {a.b: ..., a: ...}, we've already made the logic for reconstructing the 'a'
+            // portion, so the 'a.b' subtree can be skipped.
+            args.push_back(buildNewObjExpr(it->second.get()));
+        }
+    }
+
+    return sbe::makeE<sbe::EFunction>("newObj", std::move(args));
+}
+
+/**
+ * Given a stage, and index key pattern a corresponding array of slot IDs, this function
+ * add a ProjectStage to the tree which rehydrates the index key and stores the result in
+ * 'resultSlot.'
+ */
+std::unique_ptr<sbe::PlanStage> rehydrateIndexKey(std::unique_ptr<sbe::PlanStage> stage,
+                                                  const BSONObj& indexKeyPattern,
+                                                  PlanNodeId nodeId,
+                                                  const sbe::value::SlotVector& indexKeySlots,
+                                                  sbe::value::SlotId resultSlot) {
+    auto kpTree = buildKeyPatternTree(indexKeyPattern, indexKeySlots);
+    auto keyExpr = buildNewObjExpr(kpTree.get());
+
+    return sbe::makeProjectStage(std::move(stage), nodeId, resultSlot, std::move(keyExpr));
+}
+
 }  // namespace mongo::stage_builder

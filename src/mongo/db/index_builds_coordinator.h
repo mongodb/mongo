@@ -489,9 +489,9 @@ public:
      */
     static int getNumIndexesTotal(OperationContext* opCtx, const CollectionPtr& collection);
 
-    class ActiveIndexBuildsSSS : public ServerStatusSection {
+    class IndexBuildsSSS : public ServerStatusSection {
     public:
-        ActiveIndexBuildsSSS();
+        IndexBuildsSSS();
 
         bool includeByDefault() const final {
             return true;
@@ -504,10 +504,7 @@ public:
             BSONObjBuilder indexBuilds;
             BSONObjBuilder phases;
 
-            indexBuilds.append(
-                "total",
-                static_cast<int>(
-                    IndexBuildsCoordinator::get(opCtx)->activeIndexBuilds.getActiveIndexBuilds()));
+            indexBuilds.append("total", registered.loadRelaxed());
 
             phases.append("scanCollection", scanCollection.loadRelaxed());
             phases.append("drainSideWritesTable", drainSideWritesTable.loadRelaxed());
@@ -525,6 +522,7 @@ public:
             return indexBuilds.obj();
         }
 
+        AtomicWord<int> registered;
         AtomicWord<int> scanCollection;
         AtomicWord<int> drainSideWritesTable;
         AtomicWord<int> drainSideWritesTablePreCommit;
@@ -532,7 +530,7 @@ public:
         AtomicWord<int> drainSideWritesTableOnCommit;
         AtomicWord<int> processConstraintsViolatonTableOnCommit;
         AtomicWord<int> commit;
-    } activeIndexBuildsSSS;
+    } indexBuildsSSS;
 
 private:
     /**

@@ -52,7 +52,8 @@ public:
                 value::SlotId outField,
                 value::SlotId outIndex,
                 bool preserveNullAndEmptyArrays,
-                PlanNodeId planNodeId);
+                PlanNodeId planNodeId,
+                bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 

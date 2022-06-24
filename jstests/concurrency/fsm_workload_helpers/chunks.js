@@ -70,13 +70,16 @@ var ChunkHelper = (function() {
             moveChunk: db[collName].getFullName(),
             bounds: bounds,
             to: toShard,
-            _waitForDelete: waitForDelete
         };
+
+        if (waitForDelete != null) {
+            cmd._waitForDelete = waitForDelete;
+        }
 
         // Using _secondaryThrottle adds coverage for additional waits for write concern on the
         // recipient during cloning.
-        if (secondaryThrottle) {
-            cmd._secondaryThrottle = true;
+        if (secondaryThrottle != null) {
+            cmd._secondaryThrottle = secondaryThrottle;
             cmd.writeConcern = {w: "majority"};  // _secondaryThrottle requires a write concern.
         }
 

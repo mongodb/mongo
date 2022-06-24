@@ -20,6 +20,6 @@ assert.commandWorked(db.foo.insert({a: [1, 2]}, {writeConcern: {w: 3}}));
 
 var res = db.runCommand(
     {aggregate: 'foo', pipeline: [{$project: {total: {'$add': ['$a', 1]}}}], cursor: {}});
-assert.commandFailedWithCode(res, 16554);
+assert.commandFailedWithCode(res, [16554, ErrorCodes.TypeMismatch]);
 st.stop();
 }());

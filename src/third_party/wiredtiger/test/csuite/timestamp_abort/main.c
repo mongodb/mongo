@@ -224,7 +224,7 @@ thread_ckpt_run(void *arg)
     (void)unlink(ckpt_file);
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
     first_ckpt = true;
-    for (i = 0;; ++i) {
+    for (i = 1;; ++i) {
         sleep_time = __wt_random(&rnd) % MAX_CKPT_INVL;
         sleep(sleep_time);
         /*

@@ -307,7 +307,7 @@ void ClientMetadata::serialize(StringData driverName,
     ProcessInfo processInfo;
 
     std::string appName;
-    if (kDebugBuild) {
+    if (TestingProctor::instance().isEnabled()) {
         appName = processInfo.getProcessName();
         if (appName.length() > kMaxApplicationNameByteLength) {
             static constexpr auto kEllipsis = "..."_sd;
@@ -368,7 +368,7 @@ Status ClientMetadata::serializePrivate(StringData driverName,
         if (!appName.empty()) {
             BSONObjBuilder subObjBuilder(metaObjBuilder.subobjStart(kApplication));
             subObjBuilder.append(kName, appName);
-            if (kDebugBuild) {
+            if (TestingProctor::instance().isEnabled()) {
                 subObjBuilder.append(kPid, ProcessId::getCurrent().toString());
             }
         }

@@ -263,6 +263,11 @@ BSONObj makeTimeseriesInsertDocument(std::shared_ptr<BucketCatalog::WriteBatch> 
                                     kTimeseriesControlDefaultVersion);
         bucketControlBuilder.append(kBucketControlMinFieldName, batch->min());
         bucketControlBuilder.append(kBucketControlMaxFieldName, batch->max());
+
+        if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            bucketControlBuilder.append(kBucketControlClosedFieldName, false);
+        }
     }
     if (metadataElem) {
         builder.appendAs(metadataElem, kBucketMetaFieldName);
@@ -511,6 +516,13 @@ public:
         return false;
     }
 
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
+    }
     class Invocation final : public InvocationBaseGen {
     public:
         Invocation(OperationContext* opCtx,
@@ -531,7 +543,8 @@ public:
         write_ops::InsertCommandReply typedRun(OperationContext* opCtx) final try {
             transactionChecks(opCtx, ns());
 
-            if (request().getEncryptionInformation().has_value()) {
+            if (request().getEncryptionInformation().has_value() &&
+                !request().getEncryptionInformation()->getCrudProcessed()) {
                 write_ops::InsertCommandReply insertReply;
                 auto batch = processFLEInsert(opCtx, request(), &insertReply);
                 if (batch == FLEBatchResult::kProcessed) {
@@ -720,8 +733,11 @@ public:
                 beforeSize = bucketDoc.objsize();
                 // Reset every time we run to ensure we never use a stale value
                 compressionStats = {};
-                auto compressed = timeseries::compressBucket(
-                    bucketDoc, closedBucket.timeField, ns(), validateCompression);
+                auto compressed = timeseries::compressBucket(bucketDoc,
+                                                             closedBucket.timeField,
+                                                             ns(),
+                                                             closedBucket.eligibleForReopening,
+                                                             validateCompression);
                 if (compressed.compressedBucket) {
                     // If compressed object size is larger than uncompressed, skip compression
                     // update.
@@ -1386,6 +1402,15 @@ public:
     bool shouldAffectCommandCounter() const final {
         return false;
     }
+
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBaseGen {
     public:
         Invocation(OperationContext* opCtx,
@@ -1458,7 +1483,8 @@ public:
             write_ops::UpdateCommandReply updateReply;
             OperationSource source = OperationSource::kStandard;
 
-            if (request().getEncryptionInformation().has_value()) {
+            if (request().getEncryptionInformation().has_value() &&
+                !request().getEncryptionInformation().get().getCrudProcessed()) {
                 return processFLEUpdate(opCtx, request());
             }
 
@@ -1621,6 +1647,14 @@ public:
 
     bool shouldAffectCommandCounter() const final {
         return false;
+    }
+
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
     }
 
     class Invocation final : public InvocationBaseGen {

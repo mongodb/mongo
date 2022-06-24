@@ -301,7 +301,7 @@ private:
      * storage engine snapshot.
      */
     void performYield(OperationContext* opCtx,
-                      const Yieldable* yieldable,
+                      const Yieldable& yieldable,
                       std::function<void()> whileYieldingFn);
 
     const YieldPolicy _policy;

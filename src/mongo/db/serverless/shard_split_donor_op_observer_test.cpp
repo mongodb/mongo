@@ -35,6 +35,7 @@
 #include "mongo/db/serverless/shard_split_donor_op_observer.h"
 #include "mongo/db/serverless/shard_split_state_machine_gen.h"
 #include "mongo/db/serverless/shard_split_test_utils.h"
+#include "mongo/db/serverless/shard_split_utils.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 
@@ -129,7 +130,8 @@ protected:
     std::vector<std::shared_ptr<TenantMigrationDonorAccessBlocker>>
     createBlockersAndStartBlockingWrites(const std::vector<std::string>& tenants,
                                          OperationContext* opCtx,
-                                         const std::string& connectionStr) {
+                                         const std::string& connectionStr,
+                                         bool isSecondary = false) {
         auto uuid = UUID::gen();
         std::vector<std::shared_ptr<TenantMigrationDonorAccessBlocker>> blockers;
         for (const auto& tenant : tenants) {
@@ -141,7 +143,10 @@ protected:
                 _connectionStr);
 
             blockers.push_back(mtab);
-            mtab->startBlockingWrites();
+            if (!isSecondary) {
+                mtab->startBlockingWrites();
+            }
+
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext()).add(tenant, mtab);
         }
 
@@ -160,7 +165,7 @@ protected:
         MockReplicaSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
     MockReplicaSet _recipientReplSet =
         MockReplicaSet("recipientSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
-    const NamespaceString _nss = NamespaceString::kTenantSplitDonorsNamespace;
+    const NamespaceString _nss = NamespaceString::kShardSplitDonorsNamespace;
     std::vector<std::string> _tenantIds = {"tenant1", "tenantAB"};
     std::string _connectionStr = _replSet.getConnectionString();
     UUID _uuid = UUID::gen();
@@ -253,7 +258,30 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertValidAbortedDocument) {
     }
 }
 
-TEST_F(ShardSplitDonorOpObserverTest, InsertBlockingDocumentPrimary) {
+TEST_F(ShardSplitDonorOpObserverTest, InsertAbortingIndexDocumentPrimary) {
+    test::shard_split::reconfigToAddRecipientNodes(
+        getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientReplSet.getHosts());
+
+    auto stateDocument = defaultStateDocument();
+    stateDocument.setState(ShardSplitDonorStateEnum::kAbortingIndexBuilds);
+    stateDocument.setRecipientConnectionString(mongo::serverless::makeRecipientConnectionString(
+        repl::ReplicationCoordinator::get(_opCtx.get())->getConfig(),
+        _recipientTagName,
+        _recipientSetName));
+
+    auto mtabVerifier = [opCtx = _opCtx.get()](std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
+        ASSERT_TRUE(mtab);
+        // The OpObserver does not set the mtab to blocking for primaries.
+        ASSERT_OK(mtab->checkIfCanWrite(Timestamp(1, 1)));
+        ASSERT_OK(mtab->checkIfCanWrite(Timestamp(1, 3)));
+        ASSERT_OK(mtab->checkIfLinearizableReadWasAllowed(opCtx));
+        ASSERT_EQ(mtab->checkIfCanBuildIndex().code(), ErrorCodes::TenantMigrationConflict);
+    };
+
+    runInsertTestCase(stateDocument, _tenantIds, mtabVerifier);
+}
+
+TEST_F(ShardSplitDonorOpObserverTest, UpdateBlockingDocumentPrimary) {
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientReplSet.getHosts());
 
@@ -274,15 +302,16 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertBlockingDocumentPrimary) {
         ASSERT_EQ(mtab->checkIfCanBuildIndex().code(), ErrorCodes::TenantMigrationConflict);
     };
 
-    runInsertTestCase(stateDocument, _tenantIds, mtabVerifier);
+    runUpdateTestCase(stateDocument, _tenantIds, mtabVerifier);
 }
 
-TEST_F(ShardSplitDonorOpObserverTest, InsertBlockingDocumentSecondary) {
+TEST_F(ShardSplitDonorOpObserverTest, UpdateBlockingDocumentSecondary) {
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientReplSet.getHosts());
 
     // This indicates the instance is secondary for the OpObserver.
     repl::UnreplicatedWritesBlock setSecondary(_opCtx.get());
+    createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get(), _connectionStr, true);
 
     auto stateDocument = defaultStateDocument();
     stateDocument.setState(ShardSplitDonorStateEnum::kBlocking);
@@ -299,18 +328,15 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertBlockingDocumentSecondary) {
         ASSERT_EQ(mtab->checkIfCanBuildIndex().code(), ErrorCodes::TenantMigrationConflict);
     };
 
-    runInsertTestCase(stateDocument, _tenantIds, mtabVerifier);
+    runUpdateTestCase(stateDocument, _tenantIds, mtabVerifier);
 }
 
-
-TEST_F(ShardSplitDonorOpObserverTest, TransitionToBlockingFail) {
+TEST_F(ShardSplitDonorOpObserverTest, TransitionToAbortingIndexBuildsFail) {
     // This indicates the instance is secondary for the OpObserver.
     repl::UnreplicatedWritesBlock setSecondary(_opCtx.get());
 
     auto stateDocument = defaultStateDocument();
-    stateDocument.setState(ShardSplitDonorStateEnum::kBlocking);
-    stateDocument.setBlockTimestamp(Timestamp(1, 1));
-
+    stateDocument.setState(ShardSplitDonorStateEnum::kAbortingIndexBuilds);
 
     CollectionUpdateArgs updateArgs;
     updateArgs.stmtIds = {};

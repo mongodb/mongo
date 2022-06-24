@@ -110,12 +110,8 @@ assertChangeEvent(() => assert.commandWorked(coll.update({_id: 0}, {$inc: {a: 1}
     ns,
     operationType: 'update',
     documentKey: {_id: 0},
-    updateDescription: {
-        removedFields: [],
-        updatedFields: {a: 3},
-        truncatedArrays: [],
-        specialFields: {arrayIndices: {}, dottedFields: {}}
-    },
+    updateDescription:
+        {removedFields: [], updatedFields: {a: 3}, truncatedArrays: [], disambiguatedPaths: {}},
 });
 
 // Test change stream event for 'remove' operation.

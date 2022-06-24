@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/commands.h"
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy_impl.h"
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
@@ -133,7 +131,7 @@ TEST_F(BalancerChunkSelectionTest, TagRangesOverlap) {
 
     // Set up a database and a sharded collection in the metadata.
     const auto collUUID = UUID::gen();
-    ChunkVersion version(2, 0, OID::gen(), Timestamp(42));
+    ChunkVersion version({OID::gen(), Timestamp(42)}, {2, 0});
     setUpDatabase(kDbName, kShardId0);
     setUpCollection(kNamespace, collUUID, version);
 
@@ -192,7 +190,7 @@ TEST_F(BalancerChunkSelectionTest, TagRangeMaxNotAlignedWithChunkMax) {
 
     // Set up a database and a sharded collection in the metadata.
     const auto collUUID = UUID::gen();
-    ChunkVersion version(2, 0, OID::gen(), Timestamp(42));
+    ChunkVersion version({OID::gen(), Timestamp(42)}, {2, 0});
     setUpDatabase(kDbName, kShardId0);
     setUpCollection(kNamespace, collUUID, version);
 
@@ -251,7 +249,7 @@ TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCanBeAutoSplitted
 
     // Set up a database and a sharded collection in the metadata.
     const auto collUUID = UUID::gen();
-    ChunkVersion version(2, 0, OID::gen(), Timestamp(42));
+    ChunkVersion version({OID::gen(), Timestamp(42)}, {2, 0});
     setUpDatabase(kDbName, kShardId0);
 
     TypeCollectionTimeseriesFields tsFields;
@@ -302,7 +300,7 @@ TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCanBeBalanced) {
 
     // Set up a database and a sharded collection in the metadata.
     const auto collUUID = UUID::gen();
-    ChunkVersion version(2, 0, OID::gen(), Timestamp(42));
+    ChunkVersion version({OID::gen(), Timestamp(42)}, {2, 0});
     setUpDatabase(kDbName, kShardId0);
 
     TypeCollectionTimeseriesFields tsFields;

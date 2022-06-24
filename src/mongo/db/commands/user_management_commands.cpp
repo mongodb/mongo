@@ -236,7 +236,7 @@ Status queryAuthzDocument(OperationContext* opCtx,
         FindCommandRequest findRequest{collectionName};
         findRequest.setFilter(query);
         findRequest.setProjection(projection);
-        client.find(std::move(findRequest), ReadPreferenceSetting{}, resultProcessor);
+        client.find(std::move(findRequest), resultProcessor);
         return Status::OK();
     } catch (const DBException& e) {
         return e.toStatus();
@@ -1461,8 +1461,11 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
         CommandHelpers::appendSimpleCommandStatus(bodyBuilder, true);
         bodyBuilder.doneFast();
         auto response = CursorResponse::parseFromBSONThrowing(replyBuilder.releaseBody());
-        DBClientCursor cursor(
-            &client, response.getNSS(), response.getCursorId(), 0, 0, response.releaseBatch());
+        DBClientCursor cursor(&client,
+                              response.getNSS(),
+                              response.getCursorId(),
+                              false /*isExhaust*/,
+                              response.releaseBatch());
 
         while (cursor.more()) {
             users.push_back(cursor.next().getOwned());

@@ -39,10 +39,8 @@ metrics_writer::add_stat(const std::string &stat_string)
 void
 metrics_writer::output_perf_file(const std::string &test_name)
 {
-    std::ofstream perf_file;
+    std::ofstream perf_file(test_name + ".json");
     std::string stat_info = "[{\"info\":{\"test_name\": \"" + test_name + "\"},\"metrics\": [";
-
-    perf_file.open(test_name + ".json");
 
     for (const auto &stat : _stats)
         stat_info += stat + ",";

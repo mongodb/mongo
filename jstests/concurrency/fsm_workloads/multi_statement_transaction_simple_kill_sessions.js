@@ -5,7 +5,7 @@
  * transactions with two writes, which will require two phase commit in a sharded cluster if each
  * write targets a different shard.
  *
- * @tags: [uses_transactions, assumes_snapshot_transactions]
+ * @tags: [uses_transactions, assumes_snapshot_transactions, kills_random_sessions]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload

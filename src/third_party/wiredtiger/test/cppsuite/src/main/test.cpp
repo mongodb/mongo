@@ -94,9 +94,8 @@ test::run()
     bool enable_logging, statistics_logging;
     configuration *statistics_config;
     std::string statistics_type;
-    /* Build the database creation config string. */
-    std::string db_create_config = CONNECTION_CREATE;
-
+    /* Build the database creation config string. Allow for a maximum 1024 sessions. */
+    std::string db_create_config = CONNECTION_CREATE + ",session_max=1024";
     /* Enable snappy compression or reverse collator if required. */
     if (_config->get_bool(COMPRESSION_ENABLED) || _config->get_bool(REVERSE_COLLATOR)) {
         db_create_config += ",extensions=[";

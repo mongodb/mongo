@@ -108,37 +108,10 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "command " << command->getName() << " requires authentication",
             !command->requiresAuth() || authzSession->isAuthenticated() ||
-                request.securityToken.nFields());
+                (request.validatedTenancyScope &&
+                 request.validatedTenancyScope->hasAuthenticatedUser()));
     return false;
 }
-
-// TODO SERVER-65101: Replace this with a property on each command.
-// The command names that are allowed in a multi-document transaction.
-const StringMap<int> txnCmdAllowlist = {{"abortTransaction", 1},
-                                        {"aggregate", 1},
-                                        {"clusterAbortTransaction", 1},
-                                        {"clusterAggregate", 1},
-                                        {"clusterCommitTransaction", 1},
-                                        {"clusterDelete", 1},
-                                        {"clusterFind", 1},
-                                        {"clusterGetMore", 1},
-                                        {"clusterInsert", 1},
-                                        {"clusterUpdate", 1},
-                                        {"commitTransaction", 1},
-                                        {"coordinateCommitTransaction", 1},
-                                        {"create", 1},
-                                        {"createIndexes", 1},
-                                        {"delete", 1},
-                                        {"distinct", 1},
-                                        {"find", 1},
-                                        {"findandmodify", 1},
-                                        {"findAndModify", 1},
-                                        {"getMore", 1},
-                                        {"insert", 1},
-                                        {"killCursors", 1},
-                                        {"prepareTransaction", 1},
-                                        {"testInternalTransactions", 1},
-                                        {"update", 1}};
 
 auto getCommandInvocationHooks =
     ServiceContext::declareDecoration<std::unique_ptr<CommandInvocationHooks>>();
@@ -577,11 +550,15 @@ void CommandHelpers::canUseTransactions(const NamespaceString& nss,
             "http://dochub.mongodb.org/core/transaction-count for a recommended alternative.",
             cmdName != "count"_sd);
 
-    auto inTxnAllowlist = txnCmdAllowlist.find(cmdName) != txnCmdAllowlist.cend();
+    auto command = findCommand(cmdName);
+    uassert(ErrorCodes::CommandNotFound,
+            str::stream() << "Encountered unknown command during check if can run in transactions: "
+                          << cmdName,
+            command);
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot run '" << cmdName << "' in a multi-document transaction.",
-            inTxnAllowlist);
+            command->allowedInTransactions());
 
     const auto dbName = nss.db();
 

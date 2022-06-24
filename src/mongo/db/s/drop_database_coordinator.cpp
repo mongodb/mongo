@@ -122,11 +122,11 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
         opCtx, coll, ShardingCatalogClient::kMajorityWriteConcern);
 
-    _doc = _updateSession(opCtx, _doc);
-    sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss, getCurrentSession(_doc));
+    _updateSession(opCtx);
+    sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss, getCurrentSession());
 
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-    _doc = _updateSession(opCtx, _doc);
+    _updateSession(opCtx);
 
     // We need to send the drop to all the shards because both movePrimary and
     // moveChunk leave garbage behind for sharded collections.
@@ -135,67 +135,13 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
                        participants.end());
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx, nss, participants, **executor, getCurrentSession(_doc));
+        opCtx, nss, participants, **executor, getCurrentSession());
 
     // The sharded collection must be dropped on the primary shard after it has been dropped on all
     // of the other shards to ensure it can only be re-created as unsharded with a higher optime
     // than all of the drops.
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx, nss, {primaryShardId}, **executor, getCurrentSession(_doc));
-}
-
-DropDatabaseCoordinator::DropDatabaseCoordinator(ShardingDDLCoordinatorService* service,
-                                                 const BSONObj& initialState)
-    : ShardingDDLCoordinator(service, initialState),
-      _doc(DropDatabaseCoordinatorDocument::parse(
-          IDLParserErrorContext("DropDatabaseCoordinatorDocument"), initialState)),
-      _dbName(nss().db()) {}
-
-boost::optional<BSONObj> DropDatabaseCoordinator::reportForCurrentOp(
-    MongoProcessInterface::CurrentOpConnectionsMode connMode,
-    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-    BSONObjBuilder cmdBob;
-    if (const auto& optComment = getForwardableOpMetadata().getComment()) {
-        cmdBob.append(optComment.get().firstElement());
-    }
-
-    const auto currPhase = [&]() {
-        stdx::lock_guard l{_docMutex};
-        return _doc.getPhase();
-    }();
-
-    BSONObjBuilder bob;
-    bob.append("type", "op");
-    bob.append("desc", "DropDatabaseCoordinator");
-    bob.append("op", "command");
-    bob.append("ns", nss().toString());
-    bob.append("command", cmdBob.obj());
-    bob.append("currentPhase", currPhase);
-    bob.append("active", true);
-    return bob.obj();
-}
-
-void DropDatabaseCoordinator::_enterPhase(Phase newPhase) {
-    StateDoc newDoc(_doc);
-    newDoc.setPhase(newPhase);
-
-    LOGV2_DEBUG(5494501,
-                2,
-                "Drop database coordinator phase transition",
-                "db"_attr = _dbName,
-                "newPhase"_attr = DropDatabaseCoordinatorPhase_serializer(newDoc.getPhase()),
-                "oldPhase"_attr = DropDatabaseCoordinatorPhase_serializer(_doc.getPhase()));
-
-    if (_doc.getPhase() == Phase::kUnset) {
-        newDoc = _insertStateDocument(std::move(newDoc));
-    } else {
-        newDoc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
-    }
-
-    {
-        stdx::unique_lock ul{_docMutex};
-        _doc = std::move(newDoc);
-    }
+        opCtx, nss, {primaryShardId}, **executor, getCurrentSession());
 }
 
 void DropDatabaseCoordinator::_clearDatabaseInfoOnPrimary(OperationContext* opCtx) {
@@ -238,9 +184,9 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     // Perform a noop write on the participants in order to advance the txnNumber
                     // for this coordinator's lsid so that requests with older txnNumbers can no
                     // longer execute.
-                    _doc = _updateSession(opCtx, _doc);
+                    _updateSession(opCtx);
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getCurrentSession(_doc), **executor);
+                        opCtx, getCurrentSession(), **executor);
                 }
 
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase.start", _dbName);
@@ -284,7 +230,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
 
                     auto newStateDoc = _doc;
                     newStateDoc.setCollInfo(coll);
-                    _doc = _updateStateDocument(opCtx, std::move(newStateDoc));
+                    _updateStateDocument(opCtx, std::move(newStateDoc));
 
                     _dropShardedCollection(opCtx, coll, executor);
                 }

@@ -85,7 +85,7 @@ static const std::set<StringData> allowedClusteredIndexFieldNames = {
     ClusteredIndexSpec::kVFieldName,
     ClusteredIndexSpec::kKeyFieldName,
     // This is for indexSpec creation only.
-    "clustered",
+    IndexDescriptor::kClusteredFieldName,
 };
 
 /**
@@ -268,7 +268,8 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
              IndexDescriptor::kUniqueFieldName == fieldName ||
              IndexDescriptor::kSparseFieldName == fieldName ||
              IndexDescriptor::kDropDuplicatesFieldName == fieldName ||
-             IndexDescriptor::kPrepareUniqueFieldName == fieldName || "clustered" == fieldName) &&
+             IndexDescriptor::kPrepareUniqueFieldName == fieldName ||
+             IndexDescriptor::kClusteredFieldName == fieldName) &&
             !indexSpecElem.isNumber() && !indexSpecElem.isBoolean() && indexSpecElem.trueValue()) {
             LOGV2_WARNING(6444400,
                           "Fixing boolean field from index spec",
@@ -293,7 +294,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
     bool hasOriginalSpecField = false;
     bool unique = false;
     bool prepareUnique = false;
-    auto clusteredField = indexSpec["clustered"];
+    auto clusteredField = indexSpec[IndexDescriptor::kClusteredFieldName];
     bool apiStrict = opCtx && APIParameters::get(opCtx).getAPIStrict().value_or(false);
 
     auto fieldNamesValidStatus = validateIndexSpecFieldNames(indexSpec);
@@ -500,11 +501,9 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
         } else if ((IndexDescriptor::kBackgroundFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::kUniqueFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::kSparseFieldName == indexSpecElemFieldName ||
-                    IndexDescriptor::k2dsphereCoarsestIndexedLevel == indexSpecElemFieldName ||
-                    IndexDescriptor::k2dsphereFinestIndexedLevel == indexSpecElemFieldName ||
                     IndexDescriptor::kDropDuplicatesFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::kPrepareUniqueFieldName == indexSpecElemFieldName ||
-                    "clustered" == indexSpecElemFieldName)) {
+                    IndexDescriptor::kClusteredFieldName == indexSpecElemFieldName)) {
             if (!indexSpecElem.isNumber() && !indexSpecElem.isBoolean()) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream()
@@ -528,7 +527,9 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                     IndexDescriptor::kTextVersionFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::k2dIndexBitsFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::k2dIndexMinFieldName == indexSpecElemFieldName ||
-                    IndexDescriptor::k2dIndexMaxFieldName == indexSpecElemFieldName) &&
+                    IndexDescriptor::k2dIndexMaxFieldName == indexSpecElemFieldName ||
+                    IndexDescriptor::k2dsphereCoarsestIndexedLevel == indexSpecElemFieldName ||
+                    IndexDescriptor::k2dsphereFinestIndexedLevel == indexSpecElemFieldName) &&
                    !indexSpecElem.isNumber()) {
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "The field '" << indexSpecElemFieldName
@@ -629,7 +630,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
 }
 
 Status validateIdIndexSpec(const BSONObj& indexSpec) {
-    bool isClusteredIndexSpec = indexSpec.hasField("clustered");
+    bool isClusteredIndexSpec = indexSpec.hasField(IndexDescriptor::kClusteredFieldName);
 
     if (!isClusteredIndexSpec) {
         // Field names for a 'clustered' index spec have already been validated through
@@ -691,7 +692,7 @@ Status validateIndexSpecFieldNames(const BSONObj& indexSpec) {
         return Status::OK();
     }
 
-    if (indexSpec.hasField("clustered")) {
+    if (indexSpec.hasField(IndexDescriptor::kClusteredFieldName)) {
         return validateClusteredSpecFieldNames(indexSpec);
     }
 

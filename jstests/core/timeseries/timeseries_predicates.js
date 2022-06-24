@@ -39,7 +39,7 @@ function checkPredicateResult(predicate, documents) {
 function checkAllBucketings(predicate, documents) {
     for (const doc of documents) {
         doc._id = ObjectId();
-        doc.time = ISODate();
+        doc.time = doc.time || ISODate();
     }
 
     // For N documents, there are 2^N ways to assign them to buckets A and B.
@@ -231,5 +231,128 @@ checkAllBucketings({
                        {meta: {a: +1, b: -1}, time: ISODate('2019-12-31')},
                        {meta: {a: +1, b: -1}, x: 'asdf', time: ISODate('2020-02-01')},
                        {meta: {a: +1, b: -1}, x: 'asdf', time: ISODate('2019-12-31')},
+                   ]);
+
+// Test $exists on meta, inside $or.
+checkAllBucketings({
+    $or: [
+        {"meta.a": {$exists: true}},
+        {"x": {$gt: 2}},
+    ]
+},
+                   [
+                       {meta: {a: 1}, x: 1},
+                       {meta: {a: 2}, x: 2},
+                       {meta: {a: 3}, x: 3},
+                       {meta: {a: 4}, x: 4},
+                       {meta: {}, x: 1},
+                       {meta: {}, x: 2},
+                       {meta: {}, x: 3},
+                       {meta: {}, x: 4},
+                   ]);
+
+// Test $in on meta, inside $or.
+checkAllBucketings({
+    $or: [
+        {"meta.a": {$in: [1, 3]}},
+        {"x": {$gt: 2}},
+    ]
+},
+                   [
+                       {meta: {a: 1}, x: 1},
+                       {meta: {a: 2}, x: 2},
+                       {meta: {a: 3}, x: 3},
+                       {meta: {a: 4}, x: 4},
+                       {meta: {}, x: 1},
+                       {meta: {}, x: 2},
+                       {meta: {}, x: 3},
+                       {meta: {}, x: 4},
+                   ]);
+
+// Test geo predicates on meta, inside $or.
+for (const pred of ['$geoWithin', '$geoIntersects']) {
+    checkAllBucketings({
+        $or: [
+            {
+                "meta.location": {
+                    [pred]: {
+                        $geometry: {
+                            type: "Polygon",
+                            coordinates: [[
+                                [0, 0],
+                                [0, 3],
+                                [3, 3],
+                                [3, 0],
+                                [0, 0],
+                            ]]
+                        }
+                    }
+                }
+            },
+            {x: {$gt: 2}},
+        ]
+    },
+                       [
+                           {meta: {location: [1, 1]}, x: 1},
+                           {meta: {location: [1, 1]}, x: 2},
+                           {meta: {location: [1, 1]}, x: 3},
+                           {meta: {location: [1, 1]}, x: 4},
+                           {meta: {location: [5, 5]}, x: 1},
+                           {meta: {location: [5, 5]}, x: 2},
+                           {meta: {location: [5, 5]}, x: 3},
+                           {meta: {location: [5, 5]}, x: 4},
+                       ]);
+}
+
+// Test $mod on meta, inside $or.
+// $mod is an example of a predicate that we don't handle specially in time-series optimizations:
+// it can be pushed down if and only if it's on a metadata field.
+checkAllBucketings({
+    $or: [
+        {"meta.a": {$mod: [2, 0]}},
+        {"x": {$gt: 4}},
+    ]
+},
+                   [
+                       {meta: {a: 1}, x: 1},
+                       {meta: {a: 2}, x: 2},
+                       {meta: {a: 3}, x: 3},
+                       {meta: {a: 4}, x: 4},
+                       {meta: {a: 5}, x: 5},
+                       {meta: {a: 6}, x: 6},
+                       {meta: {a: 7}, x: 7},
+                       {meta: {a: 8}, x: 8},
+                   ]);
+
+// Test $elemMatch on meta, inside $or.
+checkAllBucketings({
+    $or: [
+        {"meta.a": {$elemMatch: {b: 3}}},
+        {"x": {$gt: 4}},
+    ]
+},
+                   [
+                       {x: 1, meta: {a: []}},
+                       {x: 2, meta: {a: [{b: 2}]}},
+                       {x: 3, meta: {a: [{b: 3}]}},
+                       {x: 4, meta: {a: [{b: 2}, {b: 3}]}},
+                       {x: 5, meta: {a: []}},
+                       {x: 6, meta: {a: [{b: 2}]}},
+                       {x: 7, meta: {a: [{b: 3}]}},
+                       {x: 8, meta: {a: [{b: 2}, {b: 3}]}},
+                   ]);
+checkAllBucketings({
+    $or: [
+        {"meta.a": {$elemMatch: {b: 2, c: 3}}},
+        {"x": {$gt: 3}},
+    ]
+},
+                   [
+                       {x: 1, meta: {a: []}},
+                       {x: 2, meta: {a: [{b: 2, c: 3}]}},
+                       {x: 3, meta: {a: [{b: 2}, {c: 3}]}},
+                       {x: 4, meta: {a: []}},
+                       {x: 5, meta: {a: [{b: 2, c: 3}]}},
+                       {x: 6, meta: {a: [{b: 2}, {c: 3}]}},
                    ]);
 })();

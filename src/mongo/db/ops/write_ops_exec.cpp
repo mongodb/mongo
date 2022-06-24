@@ -452,8 +452,13 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                 opCtx,
                 wholeOp.getNamespace(),
                 fixLockModeForSystemDotViewsChanges(wholeOp.getNamespace(), MODE_IX));
-            if (*collection)
+            checkCollectionUUIDMismatch(opCtx,
+                                        wholeOp.getNamespace(),
+                                        collection->getCollection(),
+                                        wholeOp.getCollectionUUID());
+            if (*collection) {
                 break;
+            }
 
             if (source == OperationSource::kTimeseriesInsert) {
                 assertTimeseriesBucketsCollectionNotFound(wholeOp.getNamespace());
@@ -499,11 +504,6 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     if (shouldProceedWithBatchInsert) {
         try {
             if (!collection->getCollection()->isCapped() && !inTxn && batch.size() > 1) {
-                checkCollectionUUIDMismatch(opCtx,
-                                            wholeOp.getNamespace(),
-                                            collection->getCollection(),
-                                            wholeOp.getCollectionUUID());
-
                 // First try doing it all together. If all goes well, this is all we need to do.
                 // See Collection::_insertDocuments for why we do all capped inserts one-at-a-time.
                 lastOpFixer->startingOp();
@@ -546,10 +546,6 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                     // Transactions are not allowed to operate on capped collections.
                     uassertStatusOK(
                         checkIfTransactionOnCappedColl(opCtx, collection->getCollection()));
-                    checkCollectionUUIDMismatch(opCtx,
-                                                wholeOp.getNamespace(),
-                                                collection->getCollection(),
-                                                wholeOp.getCollectionUUID());
                     lastOpFixer->startingOp();
                     insertDocuments(opCtx,
                                     collection->getCollection(),
@@ -604,11 +600,36 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
     return res;
 }
 
+
+// Returns the flags that determine the type of document validation we want to
+// perform. First item in the tuple determines whether to bypass document validation altogether,
+// second item determines if _safeContent_ array can be modified in an encrypted collection.
+std::tuple<bool, bool> getDocumentValidationFlags(OperationContext* opCtx,
+                                                  const write_ops::WriteCommandRequestBase& req) {
+    auto& encryptionInfo = req.getEncryptionInformation();
+    const bool fleCrudProcessed = getFleCrudProcessed(opCtx, encryptionInfo);
+    return std::make_tuple(req.getBypassDocumentValidation(), fleCrudProcessed);
+}
 }  // namespace
+
+bool getFleCrudProcessed(OperationContext* opCtx,
+                         const boost::optional<EncryptionInformation>& encryptionInfo) {
+    if (encryptionInfo && encryptionInfo->getCrudProcessed().value_or(false)) {
+        uassert(6666201,
+                "External users cannot have crudProcessed enabled",
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                       ActionType::internal));
+
+        return true;
+    }
+    return false;
+}
 
 WriteResult performInserts(OperationContext* opCtx,
                            const write_ops::InsertCommandRequest& wholeOp,
                            OperationSource source) {
+
     // Insert performs its own retries, so we should only be within a WriteUnitOfWork when run in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -643,8 +664,15 @@ WriteResult performInserts(OperationContext* opCtx,
         uassertStatusOK(userAllowedWriteNS(opCtx, wholeOp.getNamespace()));
     }
 
-    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
-        opCtx, wholeOp.getWriteCommandRequestBase().getBypassDocumentValidation());
+    const auto [disableDocumentValidation, fleCrudProcessed] =
+        getDocumentValidationFlags(opCtx, wholeOp.getWriteCommandRequestBase());
+
+    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
+                                                                      disableDocumentValidation);
+
+    DisableSafeContentValidationIfTrue safeContentValidationDisabler(
+        opCtx, disableDocumentValidation, fleCrudProcessed);
+
     LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
 
     WriteResult out;
@@ -766,6 +794,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     boost::optional<AutoGetCollection> collection;
     while (true) {
         collection.emplace(opCtx, ns, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
+        checkCollectionUUIDMismatch(opCtx, ns, collection->getCollection(), opCollectionUUID);
         if (*collection) {
             break;
         }
@@ -829,8 +858,6 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         // Transactions are not allowed to operate on capped collections.
         uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));
     }
-
-    checkCollectionUUIDMismatch(opCtx, ns, collection->getCollection(), opCollectionUUID);
 
     const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest->getNamespaceString());
     ParsedUpdate parsedUpdate(opCtx, updateRequest, extensionsCallback, forgoOpCounterIncrements);
@@ -1003,8 +1030,15 @@ WriteResult performUpdates(OperationContext* opCtx,
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
-    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
-        opCtx, wholeOp.getWriteCommandRequestBase().getBypassDocumentValidation());
+    const auto [disableDocumentValidation, fleCrudProcessed] =
+        getDocumentValidationFlags(opCtx, wholeOp.getWriteCommandRequestBase());
+
+    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
+                                                                      disableDocumentValidation);
+
+    DisableSafeContentValidationIfTrue safeContentValidationDisabler(
+        opCtx, disableDocumentValidation, fleCrudProcessed);
+
     LastOpFixer lastOpFixer(opCtx, ns);
 
     bool containsRetry = false;
@@ -1231,8 +1265,15 @@ WriteResult performDeletes(OperationContext* opCtx,
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
-    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
-        opCtx, wholeOp.getWriteCommandRequestBase().getBypassDocumentValidation());
+    const auto [disableDocumentValidation, fleCrudProcessed] =
+        getDocumentValidationFlags(opCtx, wholeOp.getWriteCommandRequestBase());
+
+    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
+                                                                      disableDocumentValidation);
+
+    DisableSafeContentValidationIfTrue safeContentValidationDisabler(
+        opCtx, disableDocumentValidation, fleCrudProcessed);
+
     LastOpFixer lastOpFixer(opCtx, ns);
 
     bool containsRetry = false;

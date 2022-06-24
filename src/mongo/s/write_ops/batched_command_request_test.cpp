@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
 #include "mongo/bson/json.h"
 #include "mongo/db/ops/write_ops_parsers_test_helpers.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -60,14 +56,15 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
     BSONArray insertArray = BSON_ARRAY(BSON("a" << 1) << BSON("b" << 1));
 
     const OID epoch = OID::gen();
-    const Timestamp majorAndMinor(1, 2);
     const Timestamp timestamp(2, 2);
+    const Timestamp majorAndMinor(1, 2);
 
     BSONObj origInsertRequestObj = BSON("insert"
                                         << "test"
                                         << "documents" << insertArray << "writeConcern"
                                         << BSON("w" << 1) << "ordered" << true << "shardVersion"
-                                        << BSON_ARRAY(majorAndMinor << epoch << timestamp));
+                                        << BSON("e" << epoch << "t" << timestamp << "v"
+                                                    << majorAndMinor));
 
     for (auto docSeq : {false, true}) {
         const auto opMsgRequest(toOpMsg("TestDB", origInsertRequestObj, docSeq));
@@ -75,7 +72,7 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
 
         ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest().getNamespace().ns());
         ASSERT(insertRequest.hasShardVersion());
-        ASSERT_EQ(ChunkVersion(1, 2, epoch, timestamp).toString(),
+        ASSERT_EQ(ChunkVersion({epoch, timestamp}, {1, 2}).toString(),
                   insertRequest.getShardVersion().toString());
     }
 }

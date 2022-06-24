@@ -2644,42 +2644,6 @@ TEST_F(OplogApplierImplWithSlowAutoAdvancingClockTest, DoNotLogNonSlowOpApplicat
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining(expected.str()));
 }
 
-TEST_F(OplogApplierImplTest, SerializeOplogApplicationOfWritesToTenantMigrationNamespaces) {
-    auto writerPool = makeReplWriterPool();
-    NoopOplogApplierObserver observer;
-    TrackOpsAppliedApplier oplogApplier(
-        nullptr,  // executor
-        nullptr,  // oplogBuffer
-        &observer,
-        ReplicationCoordinator::get(_opCtx.get()),
-        getConsistencyMarkers(),
-        getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
-        writerPool.get());
-
-    const auto donorNss = NamespaceString::kTenantMigrationDonorsNamespace;
-    const auto recipientNss = NamespaceString::kTenantMigrationRecipientsNamespace;
-
-    std::vector<OplogEntry> opsToApply;
-    opsToApply.push_back(
-        makeDeleteDocumentOplogEntry({Timestamp(Seconds(2), 0), 1LL}, donorNss, BSON("_id" << 2)));
-    opsToApply.push_back(makeInsertDocumentOplogEntry(
-        {Timestamp(Seconds(3), 0), 1LL}, recipientNss, BSON("_id" << 3)));
-    opsToApply.push_back(makeDeleteDocumentOplogEntry(
-        {Timestamp(Seconds(4), 0), 1LL}, recipientNss, BSON("_id" << 3)));
-    opsToApply.push_back(
-        makeInsertDocumentOplogEntry({Timestamp(Seconds(5), 0), 1LL}, donorNss, BSON("_id" << 4)));
-
-    ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), opsToApply));
-    const auto applied = oplogApplier.getOperationsApplied();
-    ASSERT_EQ(4U, applied.size());
-    ASSERT_BSONOBJ_EQ(opsToApply[0].getEntry().toBSON(), applied[0].getEntry().toBSON());
-    ASSERT_BSONOBJ_EQ(opsToApply[1].getEntry().toBSON(), applied[1].getEntry().toBSON());
-    ASSERT_BSONOBJ_EQ(opsToApply[2].getEntry().toBSON(), applied[2].getEntry().toBSON());
-    ASSERT_BSONOBJ_EQ(opsToApply[3].getEntry().toBSON(), applied[3].getEntry().toBSON());
-}
-
-
 class OplogApplierImplTxnTableTest : public OplogApplierImplTest {
 public:
     void setUp() override {
@@ -3319,10 +3283,7 @@ TEST_F(IdempotencyTest, EmptyCappedNamespaceNotFound) {
     ASSERT_OK(runOpInitialSync(emptyCappedOp));
 
     AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
-
-    // Ensure that autoColl.getCollection() and autoColl.getDb() are both null.
-    ASSERT_FALSE(autoColl.getCollection());
-    ASSERT_FALSE(autoColl.getDb());
+    ASSERT_FALSE(autoColl);
 }
 
 TEST_F(IdempotencyTest, UpdateTwoFields) {

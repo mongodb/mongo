@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <fmt/format.h>
 
 #include "mongo/db/cancelable_operation_context.h"
@@ -63,7 +60,6 @@
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -158,13 +154,12 @@ public:
 
         _cm = createChunkManagerForOriginalColl();
 
-        _metrics =
-            ReshardingMetricsNew::makeInstance(kCrudUUID,
-                                               BSON("y" << 1),
-                                               kCrudNs,
-                                               ReshardingMetricsNew::Role::kRecipient,
-                                               getServiceContext()->getFastClockSource()->now(),
-                                               getServiceContext());
+        _metrics = ReshardingMetrics::makeInstance(kCrudUUID,
+                                                   BSON("y" << 1),
+                                                   kCrudNs,
+                                                   ReshardingMetrics::Role::kRecipient,
+                                                   getServiceContext()->getFastClockSource()->now(),
+                                                   getServiceContext());
         _applierMetrics =
             std::make_unique<ReshardingOplogApplierMetrics>(_metrics.get(), boost::none);
 
@@ -195,17 +190,17 @@ public:
                 kCrudUUID,
                 ChunkRange{BSON(kOriginalShardKey << MINKEY),
                            BSON(kOriginalShardKey << -std::numeric_limits<double>::infinity())},
-                ChunkVersion(1, 0, epoch, Timestamp(1, 1)),
+                ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
                 _sourceId.getShardId()},
             ChunkType{
                 kCrudUUID,
                 ChunkRange{BSON(kOriginalShardKey << -std::numeric_limits<double>::infinity()),
                            BSON(kOriginalShardKey << 0)},
-                ChunkVersion(1, 0, epoch, Timestamp(1, 1)),
+                ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
                 kOtherShardId},
             ChunkType{kCrudUUID,
                       ChunkRange{BSON(kOriginalShardKey << 0), BSON(kOriginalShardKey << MAXKEY)},
-                      ChunkVersion(1, 0, epoch, Timestamp(1, 1)),
+                      ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
                       _sourceId.getShardId()}};
 
         auto rt = RoutingTableHistory::makeNew(kCrudNs,
@@ -363,7 +358,7 @@ protected:
     boost::optional<ChunkManager> _cm;
 
     const ReshardingSourceId _sourceId{UUID::gen(), kMyShardId};
-    std::unique_ptr<ReshardingMetricsNew> _metrics;
+    std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingOplogApplierMetrics> _applierMetrics;
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;

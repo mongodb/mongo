@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -54,7 +51,6 @@
 #include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -164,11 +160,11 @@ protected:
                                         const std::string& shardKey) {
         auto range1 = ChunkRange(BSON(shardKey << MINKEY), BSON(shardKey << 5));
         ChunkType chunk1(
-            uuid, range1, ChunkVersion(1, 0, epoch, timestamp), kShardList[0].getName());
+            uuid, range1, ChunkVersion({epoch, timestamp}, {1, 0}), kShardList[0].getName());
 
         auto range2 = ChunkRange(BSON(shardKey << 5), BSON(shardKey << MAXKEY));
         ChunkType chunk2(
-            uuid, range2, ChunkVersion(1, 0, epoch, timestamp), kShardList[1].getName());
+            uuid, range2, ChunkVersion({epoch, timestamp}, {1, 0}), kShardList[1].getName());
 
         return {chunk1, chunk2};
     }
@@ -199,7 +195,7 @@ protected:
 
         ReshardingEnv env(CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, kNss).value());
         env.destShard = kShardList[1].getName();
-        env.version = ChunkVersion(1, 0, OID::gen(), Timestamp(1, 1));
+        env.version = ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
         env.tempNss =
             NamespaceString(kNss.db(),
                             fmt::format("{}{}",

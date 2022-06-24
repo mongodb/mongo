@@ -48,23 +48,35 @@
 namespace mongo {
 namespace record_id_helpers {
 
-StatusWith<RecordId> keyForOptime(const Timestamp& opTime) {
-    // Make sure secs and inc wouldn't be negative if treated as signed. This ensures that they
-    // don't sort differently when put in a RecordId. It also avoids issues with Null/Invalid
-    // RecordIds
-    if (opTime.getSecs() > uint32_t(std::numeric_limits<int32_t>::max()))
-        return {ErrorCodes::BadValue, "ts secs too high"};
+StatusWith<RecordId> keyForOptime(const Timestamp& opTime, const KeyFormat keyFormat) {
+    switch (keyFormat) {
+        case KeyFormat::Long: {
+            // Make sure secs and inc wouldn't be negative if treated as signed. This ensures that
+            // they don't sort differently when put in a RecordId. It also avoids issues with
+            // Null/Invalid RecordIds
+            if (opTime.getSecs() > uint32_t(std::numeric_limits<int32_t>::max()))
+                return {ErrorCodes::BadValue, "ts secs too high"};
 
-    if (opTime.getInc() > uint32_t(std::numeric_limits<int32_t>::max()))
-        return {ErrorCodes::BadValue, "ts inc too high"};
+            if (opTime.getInc() > uint32_t(std::numeric_limits<int32_t>::max()))
+                return {ErrorCodes::BadValue, "ts inc too high"};
 
-    const auto out = RecordId(opTime.getSecs(), opTime.getInc());
-    if (out <= RecordId::minLong())
-        return {ErrorCodes::BadValue, "ts too low"};
-    if (out >= RecordId::maxLong())
-        return {ErrorCodes::BadValue, "ts too high"};
+            const auto out = RecordId(opTime.getSecs(), opTime.getInc());
+            if (out <= RecordId::minLong())
+                return {ErrorCodes::BadValue, "ts too low"};
+            if (out >= RecordId::maxLong())
+                return {ErrorCodes::BadValue, "ts too high"};
 
-    return out;
+            return out;
+        }
+        case KeyFormat::String: {
+            KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
+            keyBuilder.appendTimestamp(opTime);
+            return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
+        }
+        default: { MONGO_UNREACHABLE_TASSERT(6521004); }
+    }
+
+    MONGO_UNREACHABLE_TASSERT(6521005);
 }
 
 
@@ -84,7 +96,7 @@ StatusWith<RecordId> extractKeyOptime(const char* data, int len) {
     if (elem.type() != bsonTimestamp)
         return {ErrorCodes::BadValue, "ts must be a Timestamp"};
 
-    return keyForOptime(elem.timestamp());
+    return keyForOptime(elem.timestamp(), KeyFormat::Long);
 }
 
 StatusWith<RecordId> keyForDoc(const BSONObj& doc,

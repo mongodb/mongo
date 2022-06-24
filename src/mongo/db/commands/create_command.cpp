@@ -89,6 +89,10 @@ public:
         return kCreateCommandHelp.toString();
     }
 
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;

@@ -78,7 +78,6 @@ var $config = extendWorkload($config, function($config, $super) {
     // The reap threshold is overriden to get coverage for when it schedules reaps during an active
     // workload.
     $config.data.originalInternalSessionReapThreshold = {};
-    $config.data.overrideReapThreshold = true;
 
     // This workload supports setting the 'transactionLifetimeLimitSeconds' to 45 seconds
     // (configurable) during setup() and restoring the original value during teardown().
@@ -547,6 +546,12 @@ var $config = extendWorkload($config, function($config, $super) {
         });
     };
 
+    $config.data.killAllSessions = function killAllSessions(cluster) {
+        cluster.executeOnMongodNodes((db) => {
+            assert.commandWorked(db.adminCommand({killAllSessions: []}));
+        });
+    };
+
     $config.setup = function setup(db, collName, cluster) {
         assert.commandWorked(db.createCollection(collName, {writeConcern: {w: "majority"}}));
         if (this.insertInitialDocsOnSetUp) {
@@ -556,9 +561,7 @@ var $config = extendWorkload($config, function($config, $super) {
                 this.insertInitialDocuments(db, collName, tid);
             }
         }
-        if (this.overrideReapThreshold) {
-            this.overrideInternalTransactionsReapThreshold(cluster);
-        }
+        this.overrideInternalTransactionsReapThreshold(cluster);
         this.overrideStoreFindAndModifyImagesInSideCollection(cluster);
         if (this.lowerTransactionLifetimeLimitSeconds) {
             this.overrideTransactionLifetimeLimit(cluster);
@@ -566,9 +569,7 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
-        if (this.overrideReapThreshold) {
-            this.restoreInternalTransactionsReapThreshold(cluster);
-        }
+        this.restoreInternalTransactionsReapThreshold(cluster);
         this.restoreStoreFindAndModifyImagesInSideCollection(cluster);
         if (this.lowerTransactionLifetimeLimitSeconds) {
             this.restoreTransactionLifetimeLimit(cluster);

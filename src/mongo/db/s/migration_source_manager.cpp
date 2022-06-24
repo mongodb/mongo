@@ -39,6 +39,7 @@
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/auto_split_vector.h"
+#include "mongo/db/s/commit_chunk_migration_gen.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/migration_util.h"
@@ -59,8 +60,6 @@
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
-#include "mongo/s/request_types/commit_chunk_migration_request_type.h"
-#include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/elapsed_tracker.h"
@@ -93,12 +92,10 @@ void refreshRecipientRoutingTable(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   const HostAndPort& toShardHost,
                                   const ChunkVersion& newCollVersion) {
-    SetShardVersionRequest ssv(nss, newCollVersion, false);
-
     const executor::RemoteCommandRequest request(
         toShardHost,
         NamespaceString::kAdminDb.toString(),
-        ssv.toBSON(),
+        BSON("_flushRoutingTableCacheUpdates" << nss.ns()),
         ReadPreferenceSetting{ReadPreference::PrimaryOnly}.toContainingBSON(),
         opCtx,
         executor::RemoteCommandRequest::kNoTimeout);
@@ -560,20 +557,18 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     {
         const auto metadata = _getCurrentMetadataAndCheckEpoch();
 
-        ChunkType migratedChunkType;
-        migratedChunkType.setMin(*_args.getMin());
-        migratedChunkType.setMax(*_args.getMax());
-        migratedChunkType.setVersion(*_chunkVersion);
+        auto migratedChunk = MigratedChunkType(*_chunkVersion, *_args.getMin(), *_args.getMax());
 
         const auto currentTime = VectorClock::get(_opCtx)->getTime();
-        CommitChunkMigrationRequest::appendAsCommand(&builder,
-                                                     nss(),
-                                                     _args.getFromShard(),
-                                                     _args.getToShard(),
-                                                     migratedChunkType,
-                                                     metadata.getCollVersion(),
-                                                     currentTime.clusterTime().asTimestamp());
 
+        CommitChunkMigrationRequest request(nss(),
+                                            _args.getFromShard(),
+                                            _args.getToShard(),
+                                            migratedChunk,
+                                            metadata.getCollVersion(),
+                                            currentTime.clusterTime().asTimestamp());
+
+        request.serialize({}, &builder);
         builder.append(kWriteConcernField, kMajorityWriteConcern.toBSON());
     }
 

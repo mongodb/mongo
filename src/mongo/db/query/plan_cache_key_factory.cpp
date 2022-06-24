@@ -89,12 +89,6 @@ PlanCacheKeyInfo makePlanCacheKeyInfo(const CanonicalQuery& query,
     return PlanCacheKeyInfo(shapeString, indexabilityKeyBuilder.str());
 }
 
-PlanCacheKey make(const CanonicalQuery& query,
-                  const CollectionPtr& collection,
-                  PlanCacheKeyTag<PlanCacheKey>) {
-    return {makePlanCacheKeyInfo(query, collection)};
-}
-
 namespace {
 /**
  * Returns the highest index commit timestamp associated with an index on 'collection' that is
@@ -129,24 +123,62 @@ boost::optional<Timestamp> computeNewestVisibleIndexTimestamp(OperationContext* 
 
     return currentNewestVisible.isNull() ? boost::optional<Timestamp>{} : currentNewestVisible;
 }
+
+sbe::PlanCacheKeyCollectionState computeCollectionState(OperationContext* opCtx,
+                                                        const CollectionPtr& collection,
+                                                        bool isSecondaryColl) {
+    boost::optional<sbe::PlanCacheKeyShardingEpoch> keyShardingEpoch;
+    // We don't version secondary collections in the current shard versioning protocol. Also, since
+    // currently we only push down $lookup to SBE when secondary collections (and main collection)
+    // are unsharded, it's OK to not encode the sharding information here.
+    if (!isSecondaryColl) {
+        const auto shardVersion{
+            OperationShardingState::get(opCtx).getShardVersion(collection->ns())};
+        if (shardVersion) {
+            keyShardingEpoch =
+                sbe::PlanCacheKeyShardingEpoch{shardVersion->epoch(), shardVersion->getTimestamp()};
+        }
+    }
+    return {collection->uuid(),
+            CollectionQueryInfo::get(collection).getPlanCacheInvalidatorVersion(),
+            plan_cache_detail::computeNewestVisibleIndexTimestamp(opCtx, collection),
+            keyShardingEpoch};
+}
 }  // namespace
+
+PlanCacheKey make(const CanonicalQuery& query,
+                  const CollectionPtr& collection,
+                  PlanCacheKeyTag<PlanCacheKey> tag) {
+    return {plan_cache_detail::makePlanCacheKeyInfo(query, collection)};
+}
 
 sbe::PlanCacheKey make(const CanonicalQuery& query,
                        const CollectionPtr& collection,
-                       PlanCacheKeyTag<sbe::PlanCacheKey>) {
-    OperationContext* opCtx = query.getOpCtx();
-    auto collectionVersion = CollectionQueryInfo::get(collection).getPlanCacheInvalidatorVersion();
-    const auto shardVersion{OperationShardingState::get(opCtx).getShardVersion(collection->ns())};
-    const auto keyShardingEpoch = shardVersion
-        ? boost::make_optional(
-              sbe::PlanCacheKeyShardingEpoch{shardVersion->epoch(), shardVersion->getTimestamp()})
-        : boost::none;
-
-    return {makePlanCacheKeyInfo(query, collection),
-            collection->uuid(),
-            collectionVersion,
-            computeNewestVisibleIndexTimestamp(opCtx, collection),
-            keyShardingEpoch};
+                       PlanCacheKeyTag<sbe::PlanCacheKey> tag) {
+    return plan_cache_key_factory::make(query, MultipleCollectionAccessor(collection));
 }
 }  // namespace plan_cache_detail
+
+namespace plan_cache_key_factory {
+sbe::PlanCacheKey make(const CanonicalQuery& query, const MultipleCollectionAccessor& collections) {
+    OperationContext* opCtx = query.getOpCtx();
+    auto mainCollectionState = plan_cache_detail::computeCollectionState(
+        opCtx, collections.getMainCollection(), false /* isSecondaryColl */);
+    std::vector<sbe::PlanCacheKeyCollectionState> secondaryCollectionStates;
+    secondaryCollectionStates.reserve(collections.getSecondaryCollections().size());
+    // We always use the collection order saved in MultipleCollectionAccessor to populate the plan
+    // cache key, which is ordered by the secondary collection namespaces.
+    for (auto& [_, collection] : collections.getSecondaryCollections()) {
+        if (collection) {
+            secondaryCollectionStates.emplace_back(plan_cache_detail::computeCollectionState(
+                opCtx, collection, true /* isSecondaryColl */));
+        }
+    }
+
+    return {plan_cache_detail::makePlanCacheKeyInfo(query, collections.getMainCollection()),
+            std::move(mainCollectionState),
+            std::move(secondaryCollectionStates)};
+}
+}  // namespace plan_cache_key_factory
+
 }  // namespace mongo

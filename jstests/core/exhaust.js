@@ -71,5 +71,14 @@ assert.eq(
 assert.eq(
     numDocs - 1,
     coll.find().addOption(DBQuery.Option.exhaust).limit(numDocs - 1).batchSize(100).itcount());
+
+// Test that exhaust with negative limit is allowed. A negative limit means "single batch": the
+// server will return just a single batch and then close the cursor, even if the limit has not yet
+// been reached. When the batchSize is not specified explicitly, we expect the default initial batch
+// size of 101 to be used.
+assert.eq(101, coll.find().addOption(DBQuery.Option.exhaust).limit(-numDocs).itcount());
+assert.eq(50,
+          coll.find().addOption(DBQuery.Option.exhaust).limit(-numDocs).batchSize(50).itcount());
+assert.eq(1, coll.find().addOption(DBQuery.Option.exhaust).limit(-1).itcount());
 }());
 }());

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 

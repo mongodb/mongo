@@ -55,12 +55,12 @@ public:
      */
     static const TenantId kSystemTenantId;
 
-    explicit TenantId(const OID& oid) : _oid(oid), _idStr(oid.toString()) {}
+    explicit TenantId(const OID& oid) : _oid(oid) {}
 
     TenantId() = delete;
 
-    const std::string& toString() const {
-        return _idStr;
+    std::string toString() const {
+        return _oid.toString();
     }
 
     /**
@@ -105,7 +105,6 @@ public:
 
 private:
     OID _oid;
-    std::string _idStr;
 };
 
 inline bool operator==(const TenantId& lhs, const TenantId& rhs) {

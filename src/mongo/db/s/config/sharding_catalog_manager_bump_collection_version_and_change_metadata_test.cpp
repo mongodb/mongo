@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_cache_noop.h"
@@ -42,7 +40,6 @@
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -121,17 +118,17 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
     const auto collUUID = UUID::gen();
 
     const auto shard0Chunk0 = generateChunkType(collUUID,
-                                                ChunkVersion(10, 1, collEpoch, collTimestamp),
+                                                ChunkVersion({collEpoch, collTimestamp}, {10, 1}),
                                                 kShard0.getName(),
                                                 BSON("a" << 1),
                                                 BSON("a" << 10));
     const auto shard0Chunk1 = generateChunkType(collUUID,
-                                                ChunkVersion(11, 2, collEpoch, collTimestamp),
+                                                ChunkVersion({collEpoch, collTimestamp}, {11, 2}),
                                                 kShard0.getName(),
                                                 BSON("a" << 11),
                                                 BSON("a" << 20));
     const auto shard1Chunk0 = generateChunkType(collUUID,
-                                                ChunkVersion(8, 1, collEpoch, collTimestamp),
+                                                ChunkVersion({collEpoch, collTimestamp}, {8, 1}),
                                                 kShard1.getName(),
                                                 BSON("a" << 21),
                                                 BSON("a" << 100));
@@ -157,7 +154,7 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest, NoChunk
     const auto collUUID = UUID::gen();
 
     const auto shard0Chunk0 = generateChunkType(collUUID,
-                                                ChunkVersion(10, 1, collEpoch, collTimestamp),
+                                                ChunkVersion({collEpoch, collTimestamp}, {10, 1}),
                                                 kShard0.getName(),
                                                 BSON("a" << 1),
                                                 BSON("a" << 10));
@@ -182,12 +179,12 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
     const auto collUUID = UUID::gen();
 
     const auto shard0Chunk0 = generateChunkType(collUUID,
-                                                ChunkVersion(10, 1, collEpoch, collTimestamp),
+                                                ChunkVersion({collEpoch, collTimestamp}, {10, 1}),
                                                 kShard0.getName(),
                                                 BSON("a" << 1),
                                                 BSON("a" << 10));
     const auto shard1Chunk0 = generateChunkType(collUUID,
-                                                ChunkVersion(11, 2, collEpoch, collTimestamp),
+                                                ChunkVersion({collEpoch, collTimestamp}, {11, 2}),
                                                 kShard1.getName(),
                                                 BSON("a" << 11),
                                                 BSON("a" << 20));
@@ -244,12 +241,12 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
     const auto collUUID = UUID::gen();
 
     const auto shard0Chunk0 = generateChunkType(collUUID,
-                                                ChunkVersion(10, 1, collEpoch, collTimestamp),
+                                                ChunkVersion({collEpoch, collTimestamp}, {10, 1}),
                                                 kShard0.getName(),
                                                 BSON("a" << 1),
                                                 BSON("a" << 10));
     const auto shard1Chunk0 = generateChunkType(collUUID,
-                                                ChunkVersion(11, 2, collEpoch, collTimestamp),
+                                                ChunkVersion({collEpoch, collTimestamp}, {11, 2}),
                                                 kShard1.getName(),
                                                 BSON("a" << 11),
                                                 BSON("a" << 20));

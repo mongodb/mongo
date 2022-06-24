@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
@@ -48,7 +46,6 @@
 #include "mongo/s/client/shard_registry.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -104,7 +101,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
 
     ChunkType migratedChunk, controlChunk;
     {
-        ChunkVersion origVersion(12, 7, collEpoch, collTimestamp);
+        ChunkVersion origVersion({collEpoch, collTimestamp}, {12, 7});
 
         migratedChunk.setName(OID::gen());
         migratedChunk.setCollectionUUID(collUUID);
@@ -140,15 +137,14 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
                                                             validAfter));
 
     // Verify the versions returned match expected values.
-    auto mver = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["shardVersion"]);
-    ASSERT_EQ(ChunkVersion(migratedChunk.getVersion().majorVersion() + 1,
-                           1,
-                           migratedChunk.getVersion().epoch(),
-                           migratedChunk.getVersion().getTimestamp()),
+    auto mver = ChunkVersion::parse(versions["shardVersion"]);
+    ASSERT_EQ(ChunkVersion(
+                  {migratedChunk.getVersion().epoch(), migratedChunk.getVersion().getTimestamp()},
+                  {migratedChunk.getVersion().majorVersion() + 1, 1}),
               mver);
 
     // Verify that a collection version is returned
-    auto cver = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["collectionVersion"]);
+    auto cver = ChunkVersion::parse(versions["collectionVersion"]);
     ASSERT_TRUE(mver.isOlderOrEqualThan(cver));
 
     // Verify the chunks ended up in the right shards.
@@ -188,8 +184,8 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
 
     setupShards({shard0, shard1});
 
-    int origMajorVersion = 15;
-    auto const origVersion = ChunkVersion(origMajorVersion, 4, collEpoch, collTimestamp);
+    uint32_t origMajorVersion = 15;
+    auto const origVersion = ChunkVersion({collEpoch, collTimestamp}, {origMajorVersion, 4});
 
     ChunkType chunk0;
     chunk0.setName(OID::gen());
@@ -222,12 +218,12 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
 
     // Verify the version returned matches expected value.
     BSONObj versions = resultBSON.getValue();
-    auto mver = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["shardVersion"]);
-    ASSERT_EQ(ChunkVersion(0, 0, origVersion.epoch(), origVersion.getTimestamp()), mver);
+    auto mver = ChunkVersion::parse(versions["shardVersion"]);
+    ASSERT_EQ(ChunkVersion({origVersion.epoch(), origVersion.getTimestamp()}, {0, 0}), mver);
 
     // Verify that a collection version is returned
-    auto cver = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["collectionVersion"]);
-    ASSERT_EQ(ChunkVersion(origMajorVersion + 1, 0, collEpoch, collTimestamp), cver);
+    auto cver = ChunkVersion::parse(versions["collectionVersion"]);
+    ASSERT_EQ(ChunkVersion({collEpoch, collTimestamp}, {origMajorVersion + 1, 0}), cver);
 
     // Verify the chunk ended up in the right shard.
     auto chunkDoc0 =
@@ -253,8 +249,8 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
 
     setupShards({shard0, shard1});
 
-    int origMajorVersion = 15;
-    auto const origVersion = ChunkVersion(origMajorVersion, 4, collEpoch, collTimestamp);
+    uint32_t origMajorVersion = 15;
+    auto const origVersion = ChunkVersion({collEpoch, collTimestamp}, {origMajorVersion, 4});
 
     ChunkType chunk0;
     chunk0.setName(OID::gen());
@@ -288,8 +284,8 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
 
     // Verify the version returned matches expected value.
     BSONObj versions = resultBSON.getValue();
-    auto mver = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["shardVersion"]);
-    ASSERT_EQ(ChunkVersion(0, 0, origVersion.epoch(), origVersion.getTimestamp()), mver);
+    auto mver = ChunkVersion::parse(versions["shardVersion"]);
+    ASSERT_EQ(ChunkVersion({origVersion.epoch(), origVersion.getTimestamp()}, {0, 0}), mver);
 
     // Verify the chunk ended up in the right shard.
     auto chunkDoc0 =
@@ -314,9 +310,8 @@ TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
 
     setupShards({shard0, shard1});
 
-    int origMajorVersion = 15;
-    auto const origVersion =
-        ChunkVersion(origMajorVersion, 4, OID::gen(), Timestamp(42) /* timestamp */);
+    uint32_t origMajorVersion = 15;
+    auto const origVersion = ChunkVersion({OID::gen(), Timestamp(42)}, {origMajorVersion, 4});
 
     ChunkType chunk0;
     chunk0.setName(OID::gen());
@@ -362,9 +357,8 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
 
     setupShards({shard0, shard1});
 
-    int origMajorVersion = 12;
-    auto const origVersion =
-        ChunkVersion(origMajorVersion, 7, OID::gen(), Timestamp(42) /* timestamp */);
+    uint32_t origMajorVersion = 12;
+    auto const origVersion = ChunkVersion({OID::gen(), Timestamp(42)}, {origMajorVersion, 7});
 
     ChunkType chunk0;
     chunk0.setName(OID::gen());
@@ -418,11 +412,9 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
 
     setupShards({shard0, shard1});
 
-    int origMajorVersion = 12;
-    auto const origVersion =
-        ChunkVersion(origMajorVersion, 7, OID::gen(), Timestamp(42) /* timestamp */);
-    auto const otherVersion =
-        ChunkVersion(origMajorVersion, 7, OID::gen(), Timestamp(42) /* timestamp */);
+    uint32_t origMajorVersion = 12;
+    auto const origVersion = ChunkVersion({OID::gen(), Timestamp(42)}, {origMajorVersion, 7});
+    auto const otherVersion = ChunkVersion({OID::gen(), Timestamp(42)}, {origMajorVersion, 7});
 
     ChunkType chunk0;
     chunk0.setName(OID::gen());
@@ -479,8 +471,8 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
 
     setupShards({shard0, shard1});
 
-    int origMajorVersion = 12;
-    auto const origVersion = ChunkVersion(origMajorVersion, 7, collEpoch, collTimestamp);
+    uint32_t origMajorVersion = 12;
+    auto const origVersion = ChunkVersion({collEpoch, collTimestamp}, {origMajorVersion, 7});
 
     ChunkType chunk0;
     chunk0.setName(OID::gen());
@@ -525,8 +517,8 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
 
     // Verify the versions returned match expected values.
     BSONObj versions = resultBSON.getValue();
-    auto mver = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["shardVersion"]);
-    ASSERT_EQ(ChunkVersion(0, 0, origVersion.epoch(), origVersion.getTimestamp()), mver);
+    auto mver = ChunkVersion::parse(versions["shardVersion"]);
+    ASSERT_EQ(ChunkVersion({origVersion.epoch(), origVersion.getTimestamp()}, {0, 0}), mver);
 
     // Verify the chunks ended up in the right shards.
     auto chunkDoc0 =
@@ -560,7 +552,7 @@ TEST_F(CommitChunkMigrate, RejectMissingChunkVersion) {
 
     setupShards({shard0, shard1});
 
-    ChunkVersion origVersion(12, 7, OID::gen(), Timestamp(42) /* timestamp */);
+    ChunkVersion origVersion({OID::gen(), Timestamp(42)}, {12, 7});
 
     // Create migrate chunk with no chunk version set.
     ChunkType migratedChunk;
@@ -610,7 +602,7 @@ TEST_F(CommitChunkMigrate, RejectOlderChunkVersion) {
     setupShards({shard0, shard1});
 
     auto epoch = OID::gen();
-    ChunkVersion origVersion(12, 7, epoch, Timestamp(42) /* timestamp */);
+    ChunkVersion origVersion({epoch, Timestamp(42)}, {12, 7});
 
     ChunkType migratedChunk;
     migratedChunk.setName(OID::gen());
@@ -621,7 +613,7 @@ TEST_F(CommitChunkMigrate, RejectOlderChunkVersion) {
     migratedChunk.setMin(BSON("a" << 1));
     migratedChunk.setMax(BSON("a" << 10));
 
-    ChunkVersion currentChunkVersion(14, 7, epoch, Timestamp(42) /* timestamp */);
+    ChunkVersion currentChunkVersion({epoch, Timestamp(42)}, {14, 7});
 
     ChunkType currentChunk;
     currentChunk.setName(OID::gen());
@@ -662,7 +654,7 @@ TEST_F(CommitChunkMigrate, RejectMismatchedEpoch) {
 
     setupShards({shard0, shard1});
 
-    ChunkVersion origVersion(12, 7, OID::gen(), Timestamp(42) /* timestamp */);
+    ChunkVersion origVersion({OID::gen(), Timestamp(42)}, {12, 7});
 
     ChunkType migratedChunk;
     migratedChunk.setName(OID::gen());
@@ -673,7 +665,7 @@ TEST_F(CommitChunkMigrate, RejectMismatchedEpoch) {
     migratedChunk.setMin(BSON("a" << 1));
     migratedChunk.setMax(BSON("a" << 10));
 
-    ChunkVersion currentChunkVersion(12, 7, OID::gen(), Timestamp(42) /* timestamp */);
+    ChunkVersion currentChunkVersion({OID::gen(), Timestamp(42)}, {12, 7});
 
     ChunkType currentChunk;
     currentChunk.setName(OID::gen());
@@ -730,7 +722,7 @@ public:
     void setupCollectionWithNChunks(int numberOfChunks) {
         invariant(numberOfChunks > 0);
 
-        int currentMajorVersion = 1;
+        uint32_t currentMajorVersion = 1;
         int historyTimestampSecond = 100;
 
         std::vector<ChunkHistory> history;
@@ -745,7 +737,7 @@ public:
             const auto max = chunksMin.at(i + 1);      // Max key of the chunk being created
             const auto shardId = _shardIds.at(i % 2);  // Shard owning the chunk
             ChunkVersion version =
-                ChunkVersion(currentMajorVersion++, 0, _collEpoch, _collTimestamp);
+                ChunkVersion({_collEpoch, _collTimestamp}, {currentMajorVersion++, 0});
             history.insert(history.begin(),
                            {ChunkHistory(Timestamp(historyTimestampSecond++, 0), shardId)});
             ChunkType chunk = createChunk(_collUUID, min, max, version, shardId, history);

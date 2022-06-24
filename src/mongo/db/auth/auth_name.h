@@ -39,6 +39,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/variant.h"
 
@@ -70,6 +71,10 @@ public:
 
         _tenant = std::move(tenant);
     }
+
+    template <typename Name>
+    AuthName(Name name, const DatabaseName& dbname)
+        : AuthName(name, dbname.db(), dbname.tenantId()) {}
 
     /**
      * Parses a string of the form "db.name" into an AuthName object with an optional tenant.
@@ -103,6 +108,10 @@ public:
      */
     const std::string& getDB() const {
         return _db;
+    }
+
+    DatabaseName getDatabaseName() const {
+        return DatabaseName(_tenant, _db);
     }
 
     /**

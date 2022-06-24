@@ -43,7 +43,7 @@ MONGO_FAIL_POINT_DEFINE(testHealthObserver);
 MONGO_FAIL_POINT_DEFINE(badConfigTestHealthObserver);
 MONGO_FAIL_POINT_DEFINE(statusFailureTestHealthObserver);
 Future<HealthCheckStatus> TestHealthObserver::periodicCheckImpl(
-    PeriodicHealthCheckContext&& periodicCheckContext) noexcept {
+    PeriodicHealthCheckContext&& periodicCheckContext) {
     LOGV2_DEBUG(5936801, 2, "Test health observer executing");
     hangTestHealthObserver.pauseWhileSet();
 

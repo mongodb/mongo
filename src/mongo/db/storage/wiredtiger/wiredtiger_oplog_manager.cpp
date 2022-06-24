@@ -239,8 +239,6 @@ void WiredTigerOplogManager::_updateOplogVisibilityLoop(WiredTigerSessionCache* 
         invariant(_triggerOplogVisibilityUpdate);
         _triggerOplogVisibilityUpdate = false;
 
-        lk.unlock();
-
         // Fetch the all_durable timestamp from the storage engine, which is guaranteed not to have
         // any holes behind it in-memory.
         const uint64_t newTimestamp = sessionCache->getKVEngine()->getAllDurableTimestamp().asULL();
@@ -256,7 +254,6 @@ void WiredTigerOplogManager::_updateOplogVisibilityLoop(WiredTigerSessionCache* 
             continue;
         }
 
-        lk.lock();
         // Publish the new timestamp value. Avoid going backward.
         auto currentVisibleTimestamp = getOplogReadTimestamp();
         if (newTimestamp > currentVisibleTimestamp) {

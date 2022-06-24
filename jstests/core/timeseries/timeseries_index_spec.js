@@ -1,15 +1,13 @@
 /**
  * Tests that the original user index definition is stored on the transformed index definition on
- * the buckets collection for newly supported index types. Indexes created directly on the buckets
- * collection do not have an original user index definition and rely on the reverse mapping
- * mechanism.
+ * the buckets collection for newly supported index types introduced in v6.0. Indexes created
+ * directly on the buckets collection do not have an original user index definition and rely on the
+ * reverse mapping mechanism.
  *
  * @tags: [
  *     does_not_support_stepdowns,
  *     does_not_support_transactions,
- *     requires_fcv_51,
  *     requires_find_command,
- *     requires_getmore,
  * ]
  */
 (function() {
@@ -30,7 +28,7 @@ TimeseriesTest.run(() => {
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
-    const checkIndexSpec = function(spec, userIndex, isDowngradeCompatible) {
+    const checkIndexSpec = function(spec, userIndex, shouldHaveOriginalSpec) {
         assert(spec.hasOwnProperty("v"));
         assert(spec.hasOwnProperty("name"));
         assert(spec.hasOwnProperty("key"));
@@ -40,7 +38,7 @@ TimeseriesTest.run(() => {
             return;
         }
 
-        if (!isDowngradeCompatible) {
+        if (shouldHaveOriginalSpec) {
             assert(spec.hasOwnProperty("originalSpec"));
             assert.eq(spec.v, spec.originalSpec.v);
             assert.eq(spec.name, spec.originalSpec.name);
@@ -50,14 +48,14 @@ TimeseriesTest.run(() => {
         }
     };
 
-    const verifyAndDropIndex = function(isDowngradeCompatible, indexName) {
+    const verifyAndDropIndex = function(shouldHaveOriginalSpec, indexName) {
         let sawIndex = false;
 
         let userIndexes = coll.getIndexes();
         for (const index of userIndexes) {
             if (index.name === indexName) {
                 sawIndex = true;
-                checkIndexSpec(index, /*userIndex=*/true, isDowngradeCompatible);
+                checkIndexSpec(index, /*userIndex=*/true, shouldHaveOriginalSpec);
             }
         }
 
@@ -65,7 +63,7 @@ TimeseriesTest.run(() => {
         for (const index of bucketIndexes) {
             if (index.name === indexName) {
                 sawIndex = true;
-                checkIndexSpec(index, /*userIndex=*/false, isDowngradeCompatible);
+                checkIndexSpec(index, /*userIndex=*/false, shouldHaveOriginalSpec);
             }
         }
 
@@ -76,35 +74,35 @@ TimeseriesTest.run(() => {
     };
 
     assert.commandWorked(coll.createIndex({[timeFieldName]: 1}, {name: "timefield_downgradable"}));
-    verifyAndDropIndex(/*isDowngradeCompatible=*/true, "timefield_downgradable");
+    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/false, "timefield_downgradable");
 
     assert.commandWorked(coll.createIndex({[metaFieldName]: 1}, {name: "metafield_downgradable"}));
-    verifyAndDropIndex(/*isDowngradeCompatible=*/true, "metafield_downgradable");
+    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/false, "metafield_downgradable");
 
     assert.commandWorked(coll.createIndex({[timeFieldName]: 1, [metaFieldName]: 1},
                                           {name: "time_meta_field_downgradable"}));
-    verifyAndDropIndex(/*isDowngradeCompatible=*/true, "time_meta_field_downgradable");
+    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/false, "time_meta_field_downgradable");
 
     if (TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
         assert.commandWorked(coll.createIndex({x: 1}, {name: "x_1"}));
-        verifyAndDropIndex(/*isDowngradeCompatible=*/false, "x_1");
+        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/true, "x_1");
 
         assert.commandWorked(
             coll.createIndex({x: 1}, {name: "x_partial", partialFilterExpression: {x: {$gt: 5}}}));
-        verifyAndDropIndex(/*isDowngradeCompatible=*/false, "x_partial");
+        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/true, "x_partial");
 
         assert.commandWorked(coll.createIndex(
             {[timeFieldName]: 1}, {name: "time_partial", partialFilterExpression: {x: {$gt: 5}}}));
-        verifyAndDropIndex(/*isDowngradeCompatible=*/false, "time_partial");
+        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/true, "time_partial");
 
         assert.commandWorked(coll.createIndex(
             {[metaFieldName]: 1}, {name: "meta_partial", partialFilterExpression: {x: {$gt: 5}}}));
-        verifyAndDropIndex(/*isDowngradeCompatible=*/false, "meta_partial");
+        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/true, "meta_partial");
 
         assert.commandWorked(
             coll.createIndex({[metaFieldName]: 1, x: 1},
                              {name: "meta_x_partial", partialFilterExpression: {x: {$gt: 5}}}));
-        verifyAndDropIndex(/*isDowngradeCompatible=*/false, "meta_x_partial");
+        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/true, "meta_x_partial");
     }
 
     // Creating an index directly on the buckets collection is permitted. However, these types of

@@ -474,36 +474,42 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::queryStage() {
 }
 
 void TenantCollectionCloner::runQuery() {
-    const BSONObj& filter = _lastDocId.isEmpty()
-        ? BSONObj{}  // Use $expr and the aggregation version of $gt to avoid type bracketing.
-        : BSON("$expr" << BSON("$gt" << BSON_ARRAY("$_id" << _lastDocId["_id"])));
+    FindCommandRequest findCmd{_sourceDbAndUuid};
 
-    auto query = _collectionOptions.clusteredIndex
-        // RecordIds are _id values and has no separate _id index
-        ? Query().hint(BSON("$natural" << 1))
-        : Query().hint(BSON("_id" << 1));
+    findCmd.setFilter(
+        _lastDocId.isEmpty()
+            ? BSONObj{}  // Use $expr and the aggregation version of $gt to avoid type bracketing.
+            : BSON("$expr" << BSON("$gt" << BSON_ARRAY("$_id" << _lastDocId["_id"]))));
 
+    if (_collectionOptions.clusteredIndex) {
+        findCmd.setHint(BSON("$natural" << 1));
+    } else {
+        findCmd.setHint(BSON("_id" << 1));
+    }
 
-    // Any errors that are thrown here (including NamespaceNotFound) will be handled on the stage
-    // level.
-    getClient()->query_DEPRECATED(
-        [this](DBClientCursorBatchIterator& iter) { handleNextBatch(iter); },
-        _sourceDbAndUuid,
-        filter,
-        query,
-        nullptr /* fieldsToReturn */,
-        QueryOption_NoCursorTimeout | QueryOption_SecondaryOk |
-            (collectionClonerUsesExhaust ? QueryOption_Exhaust : 0),
-        _collectionClonerBatchSize,
-        ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    findCmd.setNoCursorTimeout(true);
+    findCmd.setReadConcern(ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    if (_collectionClonerBatchSize) {
+        findCmd.setBatchSize(_collectionClonerBatchSize);
+    }
+
+    ExhaustMode exhaustMode = collectionClonerUsesExhaust ? ExhaustMode::kOn : ExhaustMode::kOff;
+
+    auto cursor = getClient()->find(
+        std::move(findCmd), ReadPreferenceSetting{ReadPreference::SecondaryPreferred}, exhaustMode);
+
+    // Process the results of the cursor one batch at a time.
+    while (cursor->more()) {
+        handleNextBatch(*cursor);
+    }
 }
 
-void TenantCollectionCloner::handleNextBatch(DBClientCursorBatchIterator& iter) {
+void TenantCollectionCloner::handleNextBatch(DBClientCursor& cursor) {
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _stats.receivedBatches++;
-        while (iter.moreInCurrentBatch()) {
-            _documentsToInsert.emplace_back(iter.nextSafe());
+        while (cursor.moreInCurrentBatch()) {
+            _documentsToInsert.emplace_back(cursor.nextSafe());
         }
     }
 

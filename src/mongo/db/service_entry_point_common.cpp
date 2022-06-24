@@ -41,7 +41,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/impersonation_session.h"
 #include "mongo/db/auth/ldap_cumulative_operation_stats.h"
-#include "mongo/db/auth/security_token.h"
+#include "mongo/db/auth/security_token_authentication_guard.h"
 #include "mongo/db/client.h"
 #include "mongo/db/command_can_run_here.h"
 #include "mongo/db/commands.h"
@@ -654,6 +654,7 @@ private:
         CommandHelpers::uassertShouldAttemptParse(opCtx, command, request);
         _startOperationTime = getClientOperationTime(opCtx);
 
+        rpc::readRequestMetadata(opCtx, request, command->requiresAuth());
         _invocation = command->parse(opCtx, request);
         CommandInvocation::set(opCtx, _invocation);
 
@@ -1244,7 +1245,7 @@ Future<void> RunCommandImpl::_runImpl() {
 
 Future<void> RunCommandImpl::_runCommand() {
     auto shouldCheckoutSession = _ecd->getSessionOptions().getTxnNumber() &&
-        !shouldCommandSkipSessionCheckout(_ecd->getInvocation()->definition()->getName());
+        _ecd->getInvocation()->definition()->shouldCheckoutSession();
     if (shouldCheckoutSession) {
         return future_util::makeState<CheckoutSessionAndInvokeCommand>(_ecd).thenWithState(
             [](auto* path) { return path->run(); });
@@ -1276,8 +1277,7 @@ void RunCommandAndWaitForWriteConcern::_waitForWriteConcern(BSONObjBuilder& bb) 
     }
 
     CurOp::get(opCtx)->debug().writeConcern.emplace(opCtx->getWriteConcern());
-    _execContext->behaviors->waitForWriteConcern(
-        opCtx, invocation, repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(), bb);
+    _execContext->behaviors->waitForWriteConcern(opCtx, invocation, _ecd->getLastOpBeforeRun(), bb);
 }
 
 Future<void> RunCommandAndWaitForWriteConcern::_runImpl() {
@@ -1309,7 +1309,7 @@ void RunCommandAndWaitForWriteConcern::_setup() {
         // server defaults.  So, warn if the operation has not specified writeConcern and is on
         // a shard/config server.
         if (!opCtx->getClient()->isInDirectClient() &&
-            (!opCtx->inMultiDocumentTransaction() || isTransactionCommand(command->getName()))) {
+            (!opCtx->inMultiDocumentTransaction() || command->isTransactionCommand())) {
             if (_isInternalClient()) {
                 // WriteConcern should always be explicitly specified by operations received
                 // from internal clients (ie. from a mongos or mongod), even if it is empty
@@ -1406,6 +1406,14 @@ void ExecCommandDatabase::_initiateCommand() {
 
     Client* client = opCtx->getClient();
 
+    if (auto scope = request.validatedTenancyScope; scope && scope->hasAuthenticatedUser()) {
+        uassert(ErrorCodes::Unauthorized,
+                str::stream() << "Command " << command->getName()
+                              << " is not supported in multitenancy mode",
+                command->allowedWithSecurityToken());
+        _tokenAuthorizationSessionGuard.emplace(opCtx, request.validatedTenancyScope.get());
+    }
+
     if (isHello()) {
         // Preload generic ClientMetadata ahead of our first hello request. After the first
         // request, metaElement should always be empty.
@@ -1429,13 +1437,6 @@ void ExecCommandDatabase::_initiateCommand() {
         }
     });
 
-    rpc::readRequestMetadata(opCtx, request, command->requiresAuth());
-    uassert(ErrorCodes::Unauthorized,
-            str::stream() << "Command " << command->getName()
-                          << " is not supported in multitenancy mode",
-            command->allowedWithSecurityToken() || auth::getSecurityToken(opCtx) == boost::none);
-    _tokenAuthorizationSessionGuard.emplace(opCtx);
-
     rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -1449,7 +1450,6 @@ void ExecCommandDatabase::_initiateCommand() {
 
     // Start authz contract tracking before we evaluate failpoints
     auto authzSession = AuthorizationSession::get(client);
-
     authzSession->startContractTracking();
 
     CommandHelpers::evaluateFailCommandFailPoint(opCtx, _invocation.get());
@@ -1683,7 +1683,7 @@ void ExecCommandDatabase::_initiateCommand() {
 
         boost::optional<ChunkVersion> shardVersion;
         if (auto shardVersionElem = request.body[ChunkVersion::kShardVersionField]) {
-            shardVersion = ChunkVersion::fromBSONPositionalOrNewerFormat(shardVersionElem);
+            shardVersion = ChunkVersion::parse(shardVersionElem);
         }
 
         boost::optional<DatabaseVersion> databaseVersion;
@@ -1950,10 +1950,11 @@ void curOpCommandSetup(OperationContext* opCtx, const OpMsgRequest& request) {
 
 Future<void> parseCommand(std::shared_ptr<HandleRequest::ExecutionContext> execContext) try {
     const auto& msg = execContext->getMessage();
-    auto opMsgReq = rpc::opMsgRequestFromAnyProtocol(msg);
+    auto client = execContext->getOpCtx()->getClient();
+    auto opMsgReq = rpc::opMsgRequestFromAnyProtocol(msg, client);
+
     if (msg.operation() == dbQuery) {
-        checkAllowedOpQueryCommand(*(execContext->getOpCtx()->getClient()),
-                                   opMsgReq.getCommandName());
+        checkAllowedOpQueryCommand(*client, opMsgReq.getCommandName());
     }
     execContext->setRequest(opMsgReq);
     return Status::OK();

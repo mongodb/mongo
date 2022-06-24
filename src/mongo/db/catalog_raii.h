@@ -56,16 +56,10 @@ class AutoGetDb {
     AutoGetDb& operator=(const AutoGetDb&) = delete;
 
 public:
-    /**
-     * Database locks are also acquired for any 'secondaryDbNames' database names provided. Only
-     * MODE_IS is supported when 'secondaryDbNames' are provided. It is safe to repeat 'dbName' in
-     * 'secondaryDbNames'.
-     */
     AutoGetDb(OperationContext* opCtx,
               StringData dbName,
               LockMode mode,
-              Date_t deadline = Date_t::max(),
-              const std::set<StringData>& secondaryDbNames = {});
+              Date_t deadline = Date_t::max());
 
     AutoGetDb(AutoGetDb&&) = default;
 
@@ -386,7 +380,7 @@ public:
 
     // Returns writable Collection, any previous Collection that has been returned may be
     // invalidated.
-    Collection* getWritableCollection();
+    Collection* getWritableCollection(OperationContext* opCtx);
 
 private:
     // If this class is instantiated with the constructors that take UUID or nss we need somewhere
@@ -397,7 +391,6 @@ private:
     const CollectionPtr* _collection = nullptr;
     CollectionPtr _storedCollection;
     Collection* _writableCollection = nullptr;
-    OperationContext* _opCtx = nullptr;
 
     // Indicates if this instance is managing Collection pointers through commit and rollback.
     bool _managed;
@@ -475,6 +468,33 @@ private:
     boost::optional<Lock::GlobalLock> _globalLock;
     LocalOplogInfo* _oplogInfo;
     const CollectionPtr* _oplog;
+};
+
+/**
+ * A RAII-style class to acquire lock to a particular tenant's change collection.
+ *
+ * A change collection can be accessed in the following modes:
+ *   kWrite - This mode assumes that the global IX lock is already held before writing to the change
+ *            collection.
+ */
+class AutoGetChangeCollection {
+public:
+    enum class AccessMode { kWrite };
+
+    AutoGetChangeCollection(OperationContext* opCtx,
+                            AccessMode mode,
+                            boost::optional<TenantId> tenantId,
+                            Date_t deadline = Date_t::max());
+
+    AutoGetChangeCollection(const AutoGetChangeCollection&) = delete;
+    AutoGetChangeCollection& operator=(const AutoGetChangeCollection&) = delete;
+
+    const Collection* operator->() const;
+    const CollectionPtr& operator*() const;
+    explicit operator bool() const;
+
+private:
+    boost::optional<AutoGetCollection> _coll;
 };
 
 }  // namespace mongo

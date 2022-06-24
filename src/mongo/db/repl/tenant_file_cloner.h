@@ -160,7 +160,7 @@ private:
     /**
      * Put all results from a query batch into a buffer, and schedule it to be written to disk.
      */
-    void handleNextBatch(DBClientCursorBatchIterator& iter);
+    void handleNextBatch(DBClientCursor& cursor);
 
     /**
      * Called whenever there is a new batch of documents ready from the DBClientConnection.

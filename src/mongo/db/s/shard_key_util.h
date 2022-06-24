@@ -51,7 +51,8 @@ public:
     virtual void verifyUsefulNonMultiKeyIndex(const NamespaceString& nss,
                                               const BSONObj& proposedKey) const = 0;
 
-    virtual void verifyCanCreateShardKeyIndex(const NamespaceString& nss) const = 0;
+    virtual void verifyCanCreateShardKeyIndex(const NamespaceString& nss,
+                                              std::string* errMsg) const = 0;
 
     virtual void createShardKeyIndex(const NamespaceString& nss,
                                      const BSONObj& proposedKey,
@@ -72,7 +73,8 @@ public:
     void verifyUsefulNonMultiKeyIndex(const NamespaceString& nss,
                                       const BSONObj& proposedKey) const override;
 
-    void verifyCanCreateShardKeyIndex(const NamespaceString& nss) const override;
+    void verifyCanCreateShardKeyIndex(const NamespaceString& nss,
+                                      std::string* errMsg) const override;
 
     void createShardKeyIndex(const NamespaceString& nss,
                              const BSONObj& proposedKey,
@@ -95,7 +97,8 @@ public:
     void verifyUsefulNonMultiKeyIndex(const NamespaceString& nss,
                                       const BSONObj& proposedKey) const override;
 
-    void verifyCanCreateShardKeyIndex(const NamespaceString& nss) const override;
+    void verifyCanCreateShardKeyIndex(const NamespaceString& nss,
+                                      std::string* errMsg) const override;
 
     void createShardKeyIndex(const NamespaceString& nss,
                              const BSONObj& proposedKey,
@@ -165,7 +168,8 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
                               const ShardKeyPattern& shardKeyPattern,
                               const boost::optional<BSONObj>& defaultCollation,
                               bool requiresUnique,
-                              const ShardKeyValidationBehaviors& behaviors);
+                              const ShardKeyValidationBehaviors& behaviors,
+                              std::string* errMsg = nullptr);
 
 void validateShardKeyIsNotEncrypted(OperationContext* opCtx,
                                     const NamespaceString& nss,

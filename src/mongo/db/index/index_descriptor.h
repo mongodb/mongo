@@ -89,6 +89,7 @@ public:
     static constexpr StringData kWeightsFieldName = "weights"_sd;
     static constexpr StringData kOriginalSpecFieldName = "originalSpec"_sd;
     static constexpr StringData kPrepareUniqueFieldName = "prepareUnique"_sd;
+    static constexpr StringData kClusteredFieldName = "clustered"_sd;
 
     /**
      * infoObj is a copy of the index-describing BSONObj contained in the catalog.

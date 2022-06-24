@@ -58,7 +58,7 @@ auto gInitialThreadingModel = ServiceExecutor::ThreadingModel::kDedicated;
 auto getServiceExecutorStats =
     ServiceContext::declareDecoration<synchronized_value<ServiceExecutorStats>>();
 auto getServiceExecutorContext =
-    Client::declareDecoration<boost::optional<ServiceExecutorContext>>();
+    Client::declareDecoration<std::unique_ptr<ServiceExecutorContext>>();
 }  // namespace
 
 StringData toString(ServiceExecutor::ThreadingModel threadingModel) {
@@ -97,17 +97,13 @@ ServiceExecutorStats ServiceExecutorStats::get(ServiceContext* ctx) noexcept {
 }
 
 ServiceExecutorContext* ServiceExecutorContext::get(Client* client) noexcept {
-    auto& serviceExecutorContext = getServiceExecutorContext(client);
-
-    if (!serviceExecutorContext) {
-        // Service worker Clients will never have a ServiceExecutorContext.
-        return nullptr;
-    }
-
-    return &serviceExecutorContext.get();
+    // Service worker Clients will never have a ServiceExecutorContext.
+    return getServiceExecutorContext(client).get();
 }
 
-void ServiceExecutorContext::set(Client* client, ServiceExecutorContext seCtx) noexcept {
+void ServiceExecutorContext::set(Client* client,
+                                 std::unique_ptr<ServiceExecutorContext> seCtxPtr) noexcept {
+    auto& seCtx = *seCtxPtr;
     auto& serviceExecutorContext = getServiceExecutorContext(client);
     invariant(!serviceExecutorContext);
 
@@ -138,7 +134,7 @@ void ServiceExecutorContext::set(Client* client, ServiceExecutorContext seCtx) n
                 "client"_attr = client->desc(),
                 "threadingModel"_attr = seCtx._threadingModel,
                 "canUseReserved"_attr = seCtx._canUseReserved);
-    serviceExecutorContext = std::move(seCtx);
+    serviceExecutorContext = std::move(seCtxPtr);
 }
 
 void ServiceExecutorContext::reset(Client* client) noexcept {

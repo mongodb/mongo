@@ -124,6 +124,8 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
 
     storageGlobalParams.dbpath = _tempDir.path();
 
+    storageGlobalParams.ephemeral = options._ephemeral;
+
     // Since unit tests start in their own directories, by default skip lock file and metadata file
     // for faster startup.
     auto opCtx = serviceContext->makeOperationContext(getClient());

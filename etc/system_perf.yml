@@ -21,6 +21,11 @@ variables:
         variant: compile-rhel70
       - name: schedule_global_auto_tasks
         variant: task_generation
+  _real_compile_amazon_linux2_arm64: &_real_compile_amazon_linux2_arm64
+      - name: compile
+        variant: compile-amazon-linux2-arm64
+      - name: schedule_global_auto_tasks
+        variant: task_generation
   _real_expansions: &_expansion_updates
       []
   ###
@@ -33,6 +38,9 @@ variables:
 #  _skip_compile_rhel70: &_compile_rhel70
 #      - name: schedule_global_auto_tasks
 #        variant: task_generation
+# _skip_compile_amazon_linux2_arm64: &_real_compile_amazon_linux2_arm64
+#     - name: schedule_global_auto_tasks
+#       variant: task_generation
 #  _skip_expansions: &_expansion_updates
 #      # This is the normal (amazon2) "compile" artifact from https://evergreen.mongodb.com/version/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9
 #      - key: mdb_binary_for_client
@@ -266,11 +274,16 @@ functions:
           set -o errexit
           set -o verbose
 
+          mkdir -p mongodb/bin
+
           /opt/mongodbtoolchain/v3/bin/virtualenv --python /opt/mongodbtoolchain/v3/bin/python3 "${workdir}/compile_venv"
           source "${workdir}/compile_venv/bin/activate"
 
           python -m pip install -r etc/pip/compile-requirements.txt
-
+    - command: expansions.write
+      params:
+         file: expansions.yml
+         redacted: true
     - command: shell.exec
       params:
         working_dir: src
@@ -278,10 +291,10 @@ functions:
           set -o errexit
           set -o verbose
 
-          mkdir -p mongodb/bin
+          source "${workdir}/compile_venv/bin/activate"
 
           # We get the raw version string (r1.2.3-45-gabcdef) from git
-          MONGO_VERSION=$(git describe --abbrev=7)
+          export MONGO_VERSION=$(git describe --abbrev=7)
 
           # If this is a patch build, we add the patch version id to the version string so we know
           # this build was a patch, and which evergreen task it came from
@@ -289,10 +302,25 @@ functions:
             MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
           fi
 
-          # This script converts the generated version string into a sanitized version string for
-          # use by scons and uploading artifacts as well as information about for the scons cache.
+          # This script handles sanitizing the version string for use during SCons build
+          # and when pushing artifacts up to S3.
+          IS_PATCH=${is_patch|false} IS_COMMIT_QUEUE=${is_commit_queue|false} \
+            buildscripts/generate_version_expansions.py --out version_expansions.yml
+    - command: expansions.update
+      params:
+        file: src/version_expansions.yml
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          # This script handles whether the SCons cache should be used
           source "${workdir}/compile_venv/bin/activate"
-          MONGO_VERSION=$MONGO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+          SCONS_CACHE_MODE=${scons_cache_mode|} USE_SCONS_CACHE=${use_scons_cache|false} \
+            IS_PATCH=${is_patch|false} IS_COMMIT_QUEUE=${is_commit_queue|false} \
+            python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
     - command: expansions.update
       params:
         file: src/compile_expansions.yml
@@ -830,12 +858,13 @@ tasks:
             {scale: 10,
              schema: denormalized}
 
-  - name: queries_on_columnstore_indexes
+# TODO PERF-3094: Remove this task.
+  - name: column_store_index_charts_events_1G
     priority: 5
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: "columnstore"
+          test_control: "charts_events_1G"
 
   - name: non_sharded_workloads
     priority: 5
@@ -1080,6 +1109,19 @@ buildvariants:
     tasks:
       - name: compile
 
+  - &compile-amazon-linux2-arm64
+    name: compile-amazon-linux2-arm64
+    display_name: Compile for Amazon Linux 2 arm64
+    modules: *modules
+    cron: "0 0 * * *" # Everyday at 00:00
+    expansions:
+      <<: *compile-expansions
+      compile-variant: -arm64
+    run_on:
+      - "amazon2-arm64"
+    tasks:
+      - name: compile
+
   - name: linux-standalone
     display_name: Linux Standalone
     cron: "0 0 * * *" # Everyday at 00:00
@@ -1139,7 +1181,58 @@ buildvariants:
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
-      - name: queries_on_columnstore_indexes
+      - name: column_store_index_charts_events_1G
+
+  - name: linux-standalone-classic-query-engine
+    display_name: Linux Standalone (Classic Query Engine)
+    cron: "0 0 * * 4" # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup: standalone-classic-query-engine
+      infrastructure_provisioning: single
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: &classic_engine_tasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: crud_workloads
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: cursor_manager
+      - name: map_reduce_workloads
+      - name: tpcc
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
+
+  - name: linux-1-node-replSet-classic-query-engine
+    display_name: Linux 1-Node ReplSet (Classic Query Engine)
+    cron: "0 0 * * 4" # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup: single-replica-classic-query-engine
+      infrastructure_provisioning: single
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks:
+      - name: linkbench
+      - name: linkbench2
 
   - name: compile-rhel70
     display_name: Compile for Atlas-like

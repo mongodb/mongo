@@ -3,15 +3,6 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 
 set -euo pipefail
 
-cd src
-commit_date=$(date -d "$(git log -1 -s --format=%ci)" "+%s")
-last_run_date=$(cat ../antithesis_last_push.txt || echo 0)
-if [ "${is_patch}" != "true" ] && [ "${last_run_date}" -gt "${commit_date}" ]; then
-  echo -e "Refusing to push new antithesis images because this commit is older\nthan the last pushed commit"
-  exit 0
-fi
-cd ..
-
 # check that the binaries in dist-test are linked to libvoidstar
 ldd src/dist-test/bin/mongod | grep libvoidstar
 ldd src/dist-test/bin/mongos | grep libvoidstar
@@ -75,27 +66,3 @@ sudo docker build . -t repl-set-config:$tag
 cd ../sharded_cluster
 sed -i s/evergreen-latest-master/$tag/ docker-compose.yml
 sudo docker build . -t sharded-cluster-config:$tag
-
-# login, push, and logout
-echo "${antithesis_repo_key}" > mongodb.key.json
-cat mongodb.key.json | sudo docker login -u _json_key https://us-central1-docker.pkg.dev --password-stdin
-rm mongodb.key.json
-
-# tag and push to the registry
-sudo docker tag "mongo-binaries:$tag" "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/mongo-binaries:$tag"
-sudo docker push "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/mongo-binaries:$tag"
-
-sudo docker tag "workload:$tag" "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/workload:$tag"
-sudo docker push "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/workload:$tag"
-
-sudo docker tag "repl-set-config:$tag" "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/repl-set-config:$tag"
-sudo docker push "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/repl-set-config:$tag"
-
-sudo docker tag "sharded-cluster-config:$tag" "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/sharded-cluster-config:$tag"
-sudo docker push "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/sharded-cluster-config:$tag"
-
-sudo docker logout https://us-central1-docker.pkg.dev
-
-if [ "${is_patch}" != "true" ]; then
-  echo "$commit_date" > antithesis_next_push.txt
-fi

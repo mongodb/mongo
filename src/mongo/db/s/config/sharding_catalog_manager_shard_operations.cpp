@@ -1201,9 +1201,6 @@ void ShardingCatalogManager::_pushClusterParametersToNewShard(
 
 void ShardingCatalogManager::_standardizeClusterParameters(OperationContext* opCtx,
                                                            RemoteCommandTargeter* targeter) {
-    if (!gFeatureFlagClusterWideConfig.isEnabled(serverGlobalParams.featureCompatibility))
-        return;
-
     auto clusterParameterDocs =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
             opCtx,

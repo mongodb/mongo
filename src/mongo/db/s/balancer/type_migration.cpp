@@ -113,8 +113,7 @@ StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
     }
 
     try {
-        auto chunkVersionStatus =
-            ChunkVersion::fromBSONPositionalOrNewerFormat(source[chunkVersion.name()]);
+        auto chunkVersionStatus = ChunkVersion::parse(source[chunkVersion.name()]);
         migrationType._chunkVersion = chunkVersionStatus;
     } catch (const DBException& ex) {
         return ex.toStatus();

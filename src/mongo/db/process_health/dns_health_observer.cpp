@@ -47,8 +47,9 @@ namespace process_health {
 MONGO_FAIL_POINT_DEFINE(dnsHealthObserverFp);
 
 Future<HealthCheckStatus> DnsHealthObserver::periodicCheckImpl(
-    PeriodicHealthCheckContext&& periodicCheckContext) noexcept {
+    PeriodicHealthCheckContext&& periodicCheckContext) {
     LOGV2_DEBUG(5938401, 2, "DNS health observer executing");
+
 
     auto makeFailedHealthCheckFuture = [this](const Status& status) {
         return Future<HealthCheckStatus>::makeReady(
@@ -101,13 +102,17 @@ Future<HealthCheckStatus> DnsHealthObserver::periodicCheckImpl(
     auto status = periodicCheckContext.taskExecutor->scheduleWork(
         [this, servers, promise = std::move(completionPf.promise)](
             const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
-            auto statusWith =
-                getHostFQDNs(servers.front().host(), HostnameCanonicalizationMode::kForward);
-            if (statusWith.isOK() && !statusWith.getValue().empty()) {
-                promise.emplaceValue(makeHealthyStatus());
-            } else {
-                promise.emplaceValue(
-                    makeSimpleFailedStatus(Severity::kFailure, {statusWith.getStatus()}));
+            try {
+                auto statusWith =
+                    getHostFQDNs(servers.front().host(), HostnameCanonicalizationMode::kForward);
+                if (statusWith.isOK() && !statusWith.getValue().empty()) {
+                    promise.emplaceValue(makeHealthyStatus());
+                } else {
+                    promise.emplaceValue(
+                        makeSimpleFailedStatus(Severity::kFailure, {statusWith.getStatus()}));
+                }
+            } catch (const DBException& e) {
+                promise.emplaceValue(makeSimpleFailedStatus(Severity::kFailure, {e.toStatus()}));
             }
         });
 

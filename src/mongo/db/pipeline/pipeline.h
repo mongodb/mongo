@@ -291,11 +291,6 @@ public:
     static std::vector<Value> serializeContainer(
         const SourceContainer& container, boost::optional<ExplainOptions::Verbosity> = boost::none);
 
-    /**
-     * Serializes the pipeline into BSON for explain/debug logging purposes.
-     */
-    std::vector<BSONObj> serializeToBSONForDebug() const;
-
     // The initial source is special since it varies between mongos and mongod.
     void addInitialSource(boost::intrusive_ptr<DocumentSource> source);
 

@@ -40,15 +40,13 @@
 
 namespace mongo {
 
-class QueryMessage;
 class Status;
-class Query;
 template <typename T>
 class StatusWith;
 
 /**
- * Parses the QueryMessage or find command received from the user and makes the various fields
- * more easily accessible.
+ * Parses the find command received from the user and makes the various fields more easily
+ * accessible.
  */
 namespace query_request_helper {
 

@@ -39,21 +39,26 @@
 
 namespace mongo {
 
-class CreateCollectionCoordinator : public ShardingDDLCoordinator {
+class CreateCollectionCoordinator
+    : public RecoverableShardingDDLCoordinator<CreateCollectionCoordinatorDocument,
+                                               CreateCollectionCoordinatorPhaseEnum> {
 public:
     using CoordDoc = CreateCollectionCoordinatorDocument;
     using Phase = CreateCollectionCoordinatorPhaseEnum;
 
-    CreateCollectionCoordinator(ShardingDDLCoordinatorService* service,
-                                const BSONObj& initialState);
+    CreateCollectionCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
+        : RecoverableShardingDDLCoordinator(service, "CreateCollectionCoordinator", initialState),
+          _request(_doc.getCreateCollectionRequest()),
+          _critSecReason(BSON("command"
+                              << "createCollection"
+                              << "ns" << nss().toString())) {}
+
     ~CreateCollectionCoordinator() = default;
 
 
     void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
 
-    boost::optional<BSONObj> reportForCurrentOp(
-        MongoProcessInterface::CurrentOpConnectionsMode connMode,
-        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
+    void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
 
     /**
      * Waits for the termination of the parent DDLCoordinator (so all the resources are liberated)
@@ -66,37 +71,15 @@ public:
     }
 
 protected:
-    mutable Mutex _docMutex = MONGO_MAKE_LATCH("CreateCollectionCoordinator::_docMutex");
-    CoordDoc _doc;
-
     const mongo::CreateCollectionRequest _request;
 
 private:
-    ShardingDDLCoordinatorMetadata const& metadata() const override {
-        return _doc.getShardingDDLCoordinatorMetadata();
+    StringData serializePhase(const Phase& phase) const override {
+        return CreateCollectionCoordinatorPhase_serializer(phase);
     }
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
-
-    template <typename Func>
-    auto _executePhase(const Phase& newPhase, Func&& func) {
-        return [=] {
-            const auto& currPhase = _doc.getPhase();
-
-            if (currPhase > newPhase) {
-                // Do not execute this phase if we already reached a subsequent one.
-                return;
-            }
-            if (currPhase < newPhase) {
-                // Persist the new phase if this is the first time we are executing it.
-                _enterPhase(newPhase);
-            }
-            return func();
-        };
-    };
-
-    void _enterPhase(Phase newState);
 
     /**
      * Performs all required checks before holding the critical sections.
@@ -128,7 +111,7 @@ private:
      * participant shards.
      */
     void _createCollectionOnNonPrimaryShards(OperationContext* opCtx,
-                                             const boost::optional<OperationSessionInfo>& osi);
+                                             const OperationSessionInfo& osi);
 
     /**
      * Does the following writes:
@@ -146,16 +129,6 @@ private:
      * Helper function to log the end of the shard collection event.
      */
     void _logEndCreateCollection(OperationContext* opCtx);
-
-    /**
-     * Returns the BSONObj used as critical section reason
-     *
-     * TODO SERVER-64720 remove this function, directly access _critSecReason
-     *
-     */
-    virtual const BSONObj& _getCriticalSectionReason() const {
-        return _critSecReason;
-    };
 
     const BSONObj _critSecReason;
 
@@ -175,34 +148,6 @@ private:
     std::unique_ptr<InitialSplitPolicy> _splitPolicy;
     boost::optional<InitialSplitPolicy::ShardCollectionConfig> _initialChunks;
     boost::optional<bool> _collectionEmpty;
-};
-
-class CreateCollectionCoordinatorDocumentPre60Compatible final
-    : public CreateCollectionCoordinatorDocument {
-    // TODO SERVER-64720 remove once 6.0 becomes last LTS
-public:
-    using CreateCollectionCoordinatorDocument::CreateCollectionCoordinatorDocument;
-
-    static const BSONObj kPre60IncompatibleFields;
-    void serialize(BSONObjBuilder* builder) const;
-    BSONObj toBSON() const;
-};
-
-class CreateCollectionCoordinatorPre60Compatible final : public CreateCollectionCoordinator {
-    // TODO SERVER-64720 remove once 6.0 becomes last LTS
-public:
-    using CreateCollectionCoordinator::CreateCollectionCoordinator;
-    using CoordDoc = CreateCollectionCoordinatorDocumentPre60Compatible;
-
-    CreateCollectionCoordinatorPre60Compatible(ShardingDDLCoordinatorService* service,
-                                               const BSONObj& initialState);
-
-    virtual const BSONObj& _getCriticalSectionReason() const override {
-        return _critSecReason;
-    };
-
-private:
-    const BSONObj _critSecReason;
 };
 
 }  // namespace mongo

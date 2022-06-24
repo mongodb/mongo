@@ -103,7 +103,10 @@ public:
             Cursor cursor = {_data, _data + _maxLength};
             int32_t len = cursor.template read<int32_t>();
             uassert(InvalidBSON, "BSON data has to be at least 5 bytes", len >= 5);
-            uassert(InvalidBSON, "Incorrect BSON length", static_cast<size_t>(len) <= _maxLength);
+            uassert(InvalidBSON,
+                    str::stream() << "Incorrect BSON length " << static_cast<size_t>(len)
+                                  << " should be less or equal to " << _maxLength,
+                    static_cast<size_t>(len) <= _maxLength);
             const char* end = _currFrame->end = _data + len;
             uassert(InvalidBSON, "BSON object not terminated with EOO", end[-1] == 0);
             _validateIterative(Cursor{cursor.ptr, end});

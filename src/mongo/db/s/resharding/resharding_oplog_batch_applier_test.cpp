@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <boost/optional/optional_io.hpp>
 #include <memory>
 #include <vector>
@@ -46,7 +43,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
-#include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_oplog_batch_applier.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
@@ -65,7 +62,6 @@
 #include "mongo/util/concurrency/thread_pool.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -111,15 +107,15 @@ public:
                     opCtx.get(), nss, CollectionOptions{});
             }
 
-            _metricsNew =
-                ReshardingMetricsNew::makeInstance(UUID::gen(),
-                                                   BSON("y" << 1),
-                                                   _outputNss,
-                                                   ShardingDataTransformMetrics::Role::kRecipient,
-                                                   serviceContext->getFastClockSource()->now(),
-                                                   serviceContext);
+            _metrics =
+                ReshardingMetrics::makeInstance(UUID::gen(),
+                                                BSON("y" << 1),
+                                                _outputNss,
+                                                ShardingDataTransformMetrics::Role::kRecipient,
+                                                serviceContext->getFastClockSource()->now(),
+                                                serviceContext);
             _applierMetrics =
-                std::make_unique<ReshardingOplogApplierMetrics>(_metricsNew.get(), boost::none);
+                std::make_unique<ReshardingOplogApplierMetrics>(_metrics.get(), boost::none);
             _crudApplication = std::make_unique<ReshardingOplogApplicationRules>(
                 _outputNss,
                 std::vector<NamespaceString>{_myStashNss, _otherStashNss},
@@ -318,7 +314,7 @@ private:
         std::vector<ChunkType> chunks = {ChunkType{
             _sourceUUID,
             ChunkRange{BSON(_currentShardKey << MINKEY), BSON(_currentShardKey << MAXKEY)},
-            ChunkVersion(100, 0, epoch, Timestamp(1, 1)),
+            ChunkVersion({epoch, Timestamp(1, 1)}, {100, 0}),
             _myDonorId}};
 
         auto rt = RoutingTableHistory::makeNew(_sourceNss,
@@ -356,13 +352,15 @@ private:
     const ShardId _otherDonorId{"otherDonorId"};
 
     const NamespaceString _outputNss =
-        constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
-    const NamespaceString _myStashNss = getLocalConflictStashNamespace(_sourceUUID, _myDonorId);
+        resharding::constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
+    const NamespaceString _myStashNss =
+        resharding::getLocalConflictStashNamespace(_sourceUUID, _myDonorId);
     const NamespaceString _otherStashNss =
-        getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
-    const NamespaceString _myOplogBufferNss = getLocalOplogBufferNamespace(_sourceUUID, _myDonorId);
+        resharding::getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
+    const NamespaceString _myOplogBufferNss =
+        resharding::getLocalOplogBufferNamespace(_sourceUUID, _myDonorId);
 
-    std::unique_ptr<ReshardingMetricsNew> _metricsNew;
+    std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingOplogApplierMetrics> _applierMetrics;
 
     std::unique_ptr<ReshardingOplogApplicationRules> _crudApplication;

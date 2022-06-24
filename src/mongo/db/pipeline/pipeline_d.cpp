@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 
 #include "mongo/base/exact_cast.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -84,9 +85,11 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/record_store.h"
@@ -115,13 +118,11 @@ namespace {
  * Group stages are extracted from the pipeline when all of the following conditions are met:
  *    - When the 'internalQueryForceClassicEngine' feature flag is 'false'.
  *    - When the 'internalQuerySlotBasedExecutionDisableGroupPushdown' query knob is 'false'.
- *    - When the 'featureFlagSBEGroupPushdown' feature flag is 'true'.
  *    - When the DocumentSourceGroup has 'doingMerge=false'.
  *
  * Lookup stages are extracted from the pipeline when all of the following conditions are met:
  *    - When the 'internalQueryForceClassicEngine' feature flag is 'false'.
  *    - When the 'internalQuerySlotBasedExecutionDisableLookupPushdown' query knob is 'false'.
- *    - When the 'featureFlagSBELookupPushdown' feature flag is 'true'.
  *    - The $lookup uses only the 'localField'/'foreignField' syntax (no pipelines).
  *    - The foreign collection is neither sharded nor a view.
  */
@@ -146,12 +147,6 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
 
     auto&& sources = pipeline->getSources();
 
-    const auto disallowGroupPushdown =
-        !(serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-          feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
-              serverGlobalParams.featureCompatibility)) ||
-        internalQuerySlotBasedExecutionDisableGroupPushdown.load();
-
     bool isMainCollectionSharded = false;
     if (const auto& mainColl = collections.getMainCollection()) {
         isMainCollectionSharded = mainColl.isSharded();
@@ -165,7 +160,6 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
     // sharded and which ones aren't. As such, if any secondary collection is a view or is sharded,
     // no $lookup will be eligible for pushdown.
     const bool disallowLookupPushdown =
-        !feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV() ||
         internalQuerySlotBasedExecutionDisableLookupPushdown.load() || isMainCollectionSharded ||
         collections.isAnySecondaryNamespaceAViewOrSharded();
 
@@ -175,7 +169,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
 
         // $group pushdown logic.
         if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(itr->get())) {
-            if (disallowGroupPushdown) {
+            if (internalQuerySlotBasedExecutionDisableGroupPushdown.load()) {
                 break;
             }
 
@@ -244,7 +238,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     SkipThenLimit skipThenLimit,
     boost::optional<std::string> groupIdForDistinctScan,
     const AggregateCommandRequest* aggRequest,
-    const size_t plannerOpts,
+    const QueryPlannerParams& plannerOpts,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
     Pipeline* pipeline) {
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
@@ -313,7 +307,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         // index would produce one result for '1' and another for '2', which would be incorrect.
         auto distinctExecutor =
             getExecutorDistinct(&collections.getMainCollection(),
-                                plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY,
+                                plannerOpts.options | QueryPlannerParams::STRICT_DISTINCT_ONLY,
                                 &parsedDistinct);
         if (!distinctExecutor.isOK()) {
             return distinctExecutor.getStatus().withContext(
@@ -1111,6 +1105,41 @@ bool PipelineD::sortAndKeyPatternPartAgreeAndOnMeta(const BucketUnpacker& bucket
     return (keyPatternFieldPath.tail() == sortFieldPath.tail());
 }
 
+boost::optional<TraversalPreference> createTimeSeriesTraversalPreference(
+    DocumentSourceInternalUnpackBucket* unpack, DocumentSourceSort* sort) {
+    const auto metaField = unpack->bucketUnpacker().getMetaField();
+    BSONObjBuilder builder;
+    // Reverse the sort pattern so we can look for indexes that match.
+    for (const auto& sortPart : sort->getSortKeyPattern()) {
+        if (!sortPart.fieldPath) {
+            return boost::none;
+        }
+        const int reversedDirection = sortPart.isAscending ? -1 : 1;
+        const auto& path = sortPart.fieldPath->fullPath();
+        if (metaField.has_value() &&
+            (expression::isPathPrefixOf(*metaField, path) || *metaField == path)) {
+            std::string rewrittenField =
+                std::string{timeseries::kBucketMetaFieldName} + path.substr(metaField->size());
+            builder.append(rewrittenField, reversedDirection);
+        } else if (path == unpack->bucketUnpacker().getTimeField()) {
+            if (reversedDirection == 1) {
+                builder.append(unpack->bucketUnpacker().getMinField(path), reversedDirection);
+            } else {
+                builder.append(unpack->bucketUnpacker().getMaxField(path), reversedDirection);
+            }
+        } else {
+            // The field wasn't meta or time, so no direction preference should be made.
+            return boost::none;
+        }
+    }
+
+    TraversalPreference traversalPreference;
+    traversalPreference.sortPattern = builder.obj();
+    traversalPreference.clusterField = unpack->getMinTimeField();
+    traversalPreference.direction = -1;
+    return traversalPreference;
+}
+
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
 PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& collections,
                                           const NamespaceString& nss,
@@ -1166,6 +1195,19 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
         ? DepsTracker::kDefaultUnavailableMetadata & ~DepsTracker::kOnlyTextScore
         : DepsTracker::kDefaultUnavailableMetadata;
 
+    // If this is a query on a time-series collection then it may be eligible for a post-planning
+    // sort optimization. We check eligibility and perform the rewrite here.
+    auto [unpack, sort] = findUnpackThenSort(pipeline->_sources);
+    QueryPlannerParams plannerOpts;
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+            multiversion::FeatureCompatibilityVersion::kVersion_6_0) &&
+        feature_flags::gFeatureFlagBucketUnpackWithSort.isEnabled(
+            serverGlobalParams.featureCompatibility) &&
+        unpack && sort) {
+        plannerOpts.traversalPreference = createTimeSeriesTraversalPreference(unpack, sort);
+    }
+
     // Create the PlanExecutor.
     bool shouldProduceEmptyDocs = false;
     auto exec = uassertStatusOK(prepareExecutor(expCtx,
@@ -1179,11 +1221,11 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
                                                 skipThenLimit,
                                                 aggRequest,
                                                 Pipeline::kAllowedMatcherFeatures,
-                                                &shouldProduceEmptyDocs));
+                                                &shouldProduceEmptyDocs,
+                                                std::move(plannerOpts)));
 
     // If this is a query on a time-series collection then it may be eligible for a post-planning
     // sort optimization. We check eligibility and perform the rewrite here.
-    auto [unpack, sort] = findUnpackThenSort(pipeline->_sources);
     if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
             multiversion::FeatureCompatibilityVersion::kVersion_6_0) &&
@@ -1192,7 +1234,6 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
         unpack && sort) {
         auto execImpl = dynamic_cast<PlanExecutorImpl*>(exec.get());
         if (execImpl) {
-
             // Get source stage
             PlanStage* rootStage = execImpl->getRootStage();
             while (rootStage &&
@@ -1205,28 +1246,27 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
                     case STAGE_SHARDING_FILTER:
                         rootStage = rootStage->child().get();
                         break;
-                    case STAGE_MULTI_PLAN:
-                        if (auto mps = static_cast<MultiPlanStage*>(rootStage)) {
-                            if (mps->bestPlanChosen() && mps->bestPlanIdx()) {
-                                rootStage = (mps->getChildren())[*(mps->bestPlanIdx())].get();
-                            } else {
-                                rootStage = nullptr;
-                                tasserted(6655801,
-                                          "Expected multiplanner to have selected a bestPlan.");
-                            }
+                    case STAGE_MULTI_PLAN: {
+                        auto mps = static_cast<MultiPlanStage*>(rootStage);
+                        if (mps->bestPlanChosen() && mps->bestPlanIdx()) {
+                            rootStage = (mps->getChildren())[*(mps->bestPlanIdx())].get();
+                        } else {
+                            rootStage = nullptr;
+                            tasserted(6655801,
+                                      "Expected multiplanner to have selected a bestPlan.");
                         }
                         break;
-                    case STAGE_CACHED_PLAN:
-                        if (auto cp = static_cast<CachedPlanStage*>(rootStage)) {
-                            if (cp->bestPlanChosen()) {
-                                rootStage = rootStage->child().get();
-                            } else {
-                                rootStage = nullptr;
-                                tasserted(6655802,
-                                          "Expected cached plan to have selected a bestPlan.");
-                            }
+                    }
+                    case STAGE_CACHED_PLAN: {
+                        auto cp = static_cast<CachedPlanStage*>(rootStage);
+                        if (cp->bestPlanChosen()) {
+                            rootStage = rootStage->child().get();
+                        } else {
+                            rootStage = nullptr;
+                            tasserted(6655802, "Expected cached plan to have selected a bestPlan.");
                         }
                         break;
+                    }
                     default:
                         rootStage = nullptr;
                 }
@@ -1358,8 +1398,9 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
                                 sort->getSortKeyPattern(),
                                 (indexOrderedByMinTime ? DocumentSourceSort::kMin
                                                        : DocumentSourceSort::kMax),
-                                ((indexOrderedByMinTime) ? unpack->getBucketMaxSpanSeconds()
-                                                         : -unpack->getBucketMaxSpanSeconds()) *
+                                static_cast<long long>((indexOrderedByMinTime)
+                                                           ? unpack->getBucketMaxSpanSeconds()
+                                                           : -unpack->getBucketMaxSpanSeconds()) *
                                     1000,
                                 sort->getLimit(),
                                 expCtx));
@@ -1399,7 +1440,9 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
                                     // This produces {$const: maxBucketSpanSeconds}
                                     make_intrusive<ExpressionConstant>(
                                         expCtx.get(),
-                                        Value{unpack->getBucketMaxSpanSeconds() * 1000}))),
+                                        Value{static_cast<long long>(
+                                                  unpack->getBucketMaxSpanSeconds()) *
+                                              1000}))),
                             expCtx);
                         pipeline->_sources.insert(
                             unpackIter,
@@ -1513,24 +1556,22 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     SkipThenLimit skipThenLimit,
     const AggregateCommandRequest* aggRequest,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
-    bool* hasNoRequirements) {
+    bool* hasNoRequirements,
+    QueryPlannerParams plannerOpts) {
     invariant(hasNoRequirements);
-
-    // Any data returned from the inner executor must be owned.
-    size_t plannerOpts = QueryPlannerParams::DEFAULT;
 
     bool isChangeStream =
         pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage();
     if (isChangeStream) {
         invariant(expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData);
-        plannerOpts |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |
-                        QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
+        plannerOpts.options |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |
+                                QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
     }
 
     // The $_requestReshardingResumeToken parameter is only valid for an oplog scan.
     if (aggRequest && aggRequest->getRequestReshardingResumeToken()) {
-        plannerOpts |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |
-                        QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
+        plannerOpts.options |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |
+                                QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
     }
 
     // If there is a sort stage eligible for pushdown, serialize its SortPattern to a BSONObj. The
@@ -1570,7 +1611,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     if (*hasNoRequirements) {
         // This query might be eligible for count optimizations, since the remaining stages in the
         // pipeline don't actually need to read any data produced by the query execution layer.
-        plannerOpts |= QueryPlannerParams::IS_COUNT;
+        plannerOpts.options |= QueryPlannerParams::IS_COUNT;
     } else {
         // Build a BSONObj representing a projection eligible for pushdown. If there is an inclusion
         // projection at the front of the pipeline, it will be removed and handled by the PlanStage
@@ -1588,7 +1629,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
         // top-k sort, which both sorts and limits.)
         bool allowExpressions = !sortStage && !skipThenLimit.getSkip() && !skipThenLimit.getLimit();
         projObj = buildProjectionForPushdown(deps, pipeline, allowExpressions);
-        plannerOpts |= QueryPlannerParams::RETURN_OWNED_DATA;
+        plannerOpts.options |= QueryPlannerParams::RETURN_OWNED_DATA;
     }
 
     if (rewrittenGroupStage) {

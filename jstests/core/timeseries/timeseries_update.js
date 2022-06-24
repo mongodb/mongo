@@ -3,8 +3,7 @@
  * @tags: [
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
- *   requires_getmore,
- *   requires_fcv_51,
+ *   tenant_migration_incompatible,
  * ]
  */
 (function() {

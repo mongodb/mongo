@@ -35,30 +35,25 @@
 
 namespace mongo {
 
-class MovePrimaryCoordinator final : public ShardingDDLCoordinator {
+class MovePrimaryCoordinator final
+    : public ShardingDDLCoordinatorImpl<MovePrimaryCoordinatorDocument> {
 public:
-    MovePrimaryCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState);
+    MovePrimaryCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
+        : ShardingDDLCoordinatorImpl(service, "MovePrimaryCoordinator", initialState) {}
+
     ~MovePrimaryCoordinator() = default;
 
     void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
 
-    boost::optional<BSONObj> reportForCurrentOp(
-        MongoProcessInterface::CurrentOpConnectionsMode connMode,
-        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
+    void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
 
     bool canAlwaysStartWhenUserWritesAreDisabled() const override {
         return true;
     }
 
 private:
-    ShardingDDLCoordinatorMetadata const& metadata() const override {
-        return _doc.getShardingDDLCoordinatorMetadata();
-    }
-
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
-
-    MovePrimaryCoordinatorDocument _doc;
 };
 
 }  // namespace mongo

@@ -38,12 +38,9 @@ tenantIds.forEach(id => {
         [{_id: 0, x: 0}, {_id: 1, x: 1}, {_id: 2, x: 2}], {writeConcern: {w: "majority"}}));
 });
 
-const operation = test.createSplitOperation(tenantIds);
-
 const blockingFP = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterBlocking");
-
+const operation = test.createSplitOperation(tenantIds);
 const splitThread = operation.commitAsync();
-
 blockingFP.wait();
 
 const donorRst = createRstArgs(test.donor);

@@ -37,7 +37,6 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/index_spec.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/client/query.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/config.h"
 #include "mongo/db/dbmessage.h"
@@ -63,7 +62,6 @@ struct RemoteCommandResponse;
 }
 
 class DBClientCursor;
-class DBClientCursorBatchIterator;
 
 /**
  *  A basic connection to the database.
@@ -142,38 +140,6 @@ public:
      *     compatibility with mongo shell)
      */
     void logout(const std::string& dbname, BSONObj& info) override;
-
-    std::unique_ptr<DBClientCursor> query_DEPRECATED(
-        const NamespaceStringOrUUID& nsOrUuid,
-        const BSONObj& filter,
-        const Query& querySettings = Query(),
-        int limit = 0,
-        int nToSkip = 0,
-        const BSONObj* fieldsToReturn = nullptr,
-        int queryOptions = 0,
-        int batchSize = 0,
-        boost::optional<BSONObj> readConcernObj = boost::none) override {
-        checkConnection();
-        return DBClientBase::query_DEPRECATED(nsOrUuid,
-                                              filter,
-                                              querySettings,
-                                              limit,
-                                              nToSkip,
-                                              fieldsToReturn,
-                                              queryOptions,
-                                              batchSize,
-                                              readConcernObj);
-    }
-
-    unsigned long long query_DEPRECATED(
-        std::function<void(DBClientCursorBatchIterator&)>,
-        const NamespaceStringOrUUID& nsOrUuid,
-        const BSONObj& filter,
-        const Query& querySettings,
-        const BSONObj* fieldsToReturn,
-        int queryOptions,
-        int batchSize = 0,
-        boost::optional<BSONObj> readConcernObj = boost::none) override;
 
     using DBClientBase::runCommandWithTarget;
     std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;

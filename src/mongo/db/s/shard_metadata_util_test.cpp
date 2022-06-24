@@ -27,14 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/s/shard_metadata_util.h"
-
-#include "mongo/base/status.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/type_shard_collection.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -159,7 +155,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
         }
     }
 
-    ChunkVersion maxCollVersion{0, 0, OID::gen(), Timestamp(1, 1)};
+    ChunkVersion maxCollVersion{{OID::gen(), Timestamp(1, 1)}, {0, 0}};
     const KeyPattern keyPattern{BSON("a" << 1)};
     const BSONObj defaultCollation{BSON("locale"
                                         << "fr_CA")};
@@ -216,7 +212,7 @@ TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
     ASSERT(state.generation.isSameCollection(maxCollVersion));
     ASSERT_EQUALS(state.refreshing, true);
     ASSERT_EQUALS(state.lastRefreshedCollectionVersion,
-                  ChunkVersion(0, 0, maxCollVersion.epoch(), maxCollVersion.getTimestamp()));
+                  ChunkVersion({maxCollVersion.epoch(), maxCollVersion.getTimestamp()}, {0, 0}));
 
     // Signal refresh finish
     ASSERT_OK(unsetPersistedRefreshFlags(operationContext(), kNss, maxCollVersion));
@@ -235,7 +231,7 @@ TEST_F(ShardMetadataUtilTest, WriteAndReadChunks) {
 
     // read all the chunks
     QueryAndSort allChunkDiff = createShardChunkDiffQuery(
-        ChunkVersion(0, 0, maxCollVersion.epoch(), maxCollVersion.getTimestamp()));
+        ChunkVersion({maxCollVersion.epoch(), maxCollVersion.getTimestamp()}, {0, 0}));
     std::vector<ChunkType> readChunks = assertGet(readShardChunks(operationContext(),
                                                                   kNss,
                                                                   allChunkDiff.query,

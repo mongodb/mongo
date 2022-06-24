@@ -14,6 +14,7 @@
 'use strict';
 
 load("jstests/libs/discover_topology.js");
+load('jstests/sharding/internal_txns/libs/fixture_helpers.js');
 load("jstests/sharding/libs/resharding_test_fixture.js");
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
@@ -324,38 +325,25 @@ function InternalTransactionReshardingTest(
         testCase.setUpFunc();
 
         const lsid = getTransactionSessionId(txnType, testCase);
-
-        while (true) {
+        runTxnRetryOnTransientError(() => {
             const txnNumber = getNextTxnNumber(txnType, testCase);
 
-            try {
-                for (let i = 0; i < testCase.commands.length; i++) {
-                    const command = testCase.commands[i];
-                    const cmdObj =
-                        Object.assign({}, command.cmdObj, {lsid, txnNumber, autocommit: false});
-                    if (i == 0) {
-                        cmdObj.startTransaction = true;
-                    }
-                    const res = assert.commandWorked(mongosConn.getDB(kDbName).runCommand(cmdObj));
-                    command.checkResponseFunc(res);
+            for (let i = 0; i < testCase.commands.length; i++) {
+                const command = testCase.commands[i];
+                const cmdObj =
+                    Object.assign({}, command.cmdObj, {lsid, txnNumber, autocommit: false});
+                if (i == 0) {
+                    cmdObj.startTransaction = true;
                 }
-
-                if (testCase.abortOnInitialTry) {
-                    abortTransaction(lsid, txnNumber, testCase.isPreparedTxn);
-                } else {
-                    commitTransaction(lsid, txnNumber);
-                }
-                break;
-            } catch (e) {
-                if (e.hasOwnProperty('errorLabels') &&
-                    e.errorLabels.includes('TransientTransactionError') &&
-                    e.code != ErrorCodes.NoSuchTransaction) {
-                    jsTest.log("Failed to run transaction due to a transient error " + tojson(e));
-                } else {
-                    throw e;
-                }
+                const res = assert.commandWorked(mongosConn.getDB(kDbName).runCommand(cmdObj));
+                command.checkResponseFunc(res);
             }
-        }
+            if (testCase.abortOnInitialTry) {
+                abortTransaction(lsid, txnNumber, testCase.isPreparedTxn);
+            } else {
+                commitTransaction(lsid, txnNumber);
+            }
+        });
 
         testCase.checkDocsFunc(!testCase.abortOnInitialTry /* isTxnCommitted */);
     }
@@ -381,50 +369,36 @@ function InternalTransactionReshardingTest(
         const lsid = getTransactionSessionId(txnType, testCase);
         // Give the session a different txnUUID to simulate a retry from a different mongos.
         lsid.txnUUID = UUID();
-
-        while (true) {
+        runTxnRetryOnTransientError(() => {
             const txnNumber = getNextTxnNumber(txnType, testCase);
 
-            try {
-                for (let i = 0; i < testCase.commands.length; i++) {
-                    const command = testCase.commands[i];
+            for (let i = 0; i < testCase.commands.length; i++) {
+                const command = testCase.commands[i];
 
-                    if (!isRetryAfterAbort && command.cmdObj.stmtId == -1) {
-                        // The transaction has already committed and the statement in this command
-                        // is not retryable so do not retry it.
-                        continue;
-                    }
-
-                    const cmdObj =
-                        Object.assign({}, command.cmdObj, {lsid, txnNumber, autocommit: false});
-                    if (i == 0) {
-                        cmdObj.startTransaction = true;
-                    }
-                    const res = mongosConn.getDB(kDbName).runCommand(cmdObj);
-
-                    if (expectRetryToSucceed) {
-                        assert.commandWorked(res);
-                        command.checkResponseFunc(res);
-                    } else {
-                        assert.commandFailedWithCode(res, ErrorCodes.IncompleteTransactionHistory);
-                        return;
-                    }
+                if (!isRetryAfterAbort && command.cmdObj.stmtId == -1) {
+                    // The transaction has already committed and the statement in this command
+                    // is not retryable so do not retry it.
+                    continue;
                 }
 
-                commitTransaction(lsid, txnNumber);
-                break;
-            } catch (e) {
-                if (e.hasOwnProperty('errorLabels') &&
-                    e.errorLabels.includes('TransientTransactionError') &&
-                    e.code != ErrorCodes.NoSuchTransaction) {
-                    jsTest.log("Failed to run transaction due to a transient error " + tojson(e));
+                const cmdObj =
+                    Object.assign({}, command.cmdObj, {lsid, txnNumber, autocommit: false});
+                if (i == 0) {
+                    cmdObj.startTransaction = true;
+                }
+                const res = mongosConn.getDB(kDbName).runCommand(cmdObj);
+
+                if (expectRetryToSucceed) {
+                    assert.commandWorked(res);
+                    command.checkResponseFunc(res);
                 } else {
-                    throw e;
+                    assert.commandFailedWithCode(res, ErrorCodes.IncompleteTransactionHistory);
+                    return;
                 }
             }
-        }
-
-        testCase.checkDocsFunc(true /* isTxnCommitted */);
+            commitTransaction(lsid, txnNumber);
+            testCase.checkDocsFunc(true /* isTxnCommitted */);
+        });
     }
 
     /*

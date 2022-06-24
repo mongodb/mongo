@@ -168,8 +168,8 @@ functions:
             mkdir -p cmake_build
             cd cmake_build
             $CMAKE -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_clang.cmake -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1 \
-              -DHAVE_DIAGNOSTIC=1 ${NON_BARRIER_DIAGNOSTIC_YIELDS|} -DCMAKE_BUILD_TYPE=ASan \
-              -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 ${configure_python_setting|} \
+              -DENABLE_STRICT=1 -DHAVE_DIAGNOSTIC=1 ${NON_BARRIER_DIAGNOSTIC_YIELDS|} -DCMAKE_BUILD_TYPE=ASan \
+              -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 -DHAVE_BUILTIN_EXTENSION_ZSTD=1 ${configure_python_setting|} \
               -G "${cmake_generator|Ninja}" ../.
           fi
     - *make_wiredtiger
@@ -347,15 +347,68 @@ functions:
         ${test_env_vars|} $CTEST -L check ${smp_command|} --output-on-failure ${check_args|} 2>&1
 
   "cppsuite test":
-    command: shell.exec
-    params:
-      # The tests need to be executed in the cppsuite directory as some required libraries have
-      # their paths defined relative to this directory.
-      working_dir: "wiredtiger/cmake_build/test/cppsuite"
-      script: |
-        set -o errexit
-        set -o verbose
-        ${test_env_vars|} ./run -t ${test_name} -C '${test_config}' -f ${test_config_filename} -l 2
+    - command: shell.exec
+      params:
+        # The tests need to be executed in the cppsuite directory as some required libraries have
+        # their paths defined relative to this directory.
+        # The below script saves the exit code from the test to use it later in this function. By
+        # doing this we can define our own custom artifact upload task without it being cancelled by
+        # the test failing.
+        # Additionally if the test fails perf statistics won't be uploaded as they may be invalid
+        # due to the test failure.
+        working_dir: "wiredtiger/cmake_build/test/cppsuite"
+        shell: bash
+        script: |
+          set -o verbose
+          ${test_env_vars|} ./run -t ${test_name} -C '${test_config}' -f ${test_config_filename} -l 2
+          exit_code=$?
+          echo "$exit_code" > cppsuite_exit_code
+          if [ "$exit_code" != 0 ]; then
+            echo "[{\"info\":{\"test_name\": \"${test_name}\"},\"metrics\": []}]" > ${test_name}.json
+          fi
+          exit 0
+    - command: perf.send
+      params:
+        file: ./wiredtiger/cmake_build/test/cppsuite/${test_name}.json
+    # Delete unnecessary data from the upload.
+    - command: shell.exec
+      params:
+        script: |
+          rm -rf wiredtiger/cmake_build/examples
+          rm -rf wiredtiger/cmake_build/bench
+          mv wiredtiger/cmake_build/test/cppsuite wiredtiger/cmake_build/
+          rm -rf wiredtiger/cmake_build/test/
+          mkdir wiredtiger/cmake_build/test/
+          mv wiredtiger/cmake_build/cppsuite wiredtiger/cmake_build/test/cppsuite
+    - command: archive.targz_pack
+      params:
+        target: archive.tgz
+        source_dir: wiredtiger/cmake_build/
+        include:
+          - "./**"
+    - command: s3.put
+      params:
+        aws_secret: ${aws_secret}
+        aws_key: ${aws_key}
+        local_file: archive.tgz
+        bucket: build_external
+        permissions: public-read
+        content_type: application/tar
+        display_name: cppsuite-test
+        remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}${postfix|}.tgz
+    # We remove the wiredtiger directory here to avoid to getting archived again by post tasks.
+    - command: shell.exec
+      params:
+        shell: bash
+        script: |
+          set -o verbose
+          if [ -f wiredtiger/cmake_build/test/cppsuite/cppsuite_exit_code ]; then
+            exit_code=`cat wiredtiger/cmake_build/test/cppsuite/cppsuite_exit_code`
+          else
+            exit_code=0
+          fi
+          rm -rf wiredtiger
+          exit "$exit_code"
 
   "wt2853_perf test":
     command: shell.exec
@@ -749,9 +802,7 @@ variables:
     exec_timeout_secs: 25200
     commands:
       - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          posix_configure_flags: -DENABLE_STRICT=1 -DHAVE_DIAGNOSTIC=1 -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 -DHAVE_BUILTIN_EXTENSION_ZSTD=1
+      - func: "compile wiredtiger address sanitizer"
       - func: "format test script"
         vars:
           format_test_script_args: -R -t 360
@@ -1067,9 +1118,6 @@ tasks:
           test_config: debug_mode=(cursor_copy=true)
           test_config_filename: configs/operations_test_default.txt
           test_name: operations_test
-      - func: "upload test stats"
-        vars:
-          test_path: test/cppsuite/operations_test
 
   - name: cppsuite-hs-cleanup-default
     tags: ["pull_request"]
@@ -1082,9 +1130,18 @@ tasks:
           test_config: debug_mode=(cursor_copy=true)
           test_config_filename: configs/hs_cleanup_default.txt
           test_name: hs_cleanup
-      - func: "upload test stats"
+
+  - name: cppsuite-burst-inserts-default
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "cppsuite test"
         vars:
-          test_path: test/cppsuite/hs_cleanup
+          test_config: debug_mode=(cursor_copy=true)
+          test_config_filename: configs/burst_inserts_default.txt
+          test_name: burst_inserts
 
   - name: cppsuite-search-near-01-default
     tags: ["pull_request"]
@@ -1096,9 +1153,6 @@ tasks:
         vars:
           test_config_filename: configs/search_near_01_default.txt
           test_name: search_near_01
-      - func: "upload test stats"
-        vars:
-          test_path: test/cppsuite/search_near_01
 
   - name: cppsuite-search-near-02-default
     tags: ["pull_request"]
@@ -1110,9 +1164,6 @@ tasks:
         vars:
           test_config_filename: configs/search_near_02_default.txt
           test_name: search_near_02
-      - func: "upload test stats"
-        vars:
-          test_path: test/cppsuite/search_near_02
 
   - name: cppsuite-search-near-03-default
     tags: ["pull_request"]
@@ -1124,9 +1175,6 @@ tasks:
         vars:
           test_config_filename: configs/search_near_03_default.txt
           test_name: search_near_03
-      - func: "upload test stats"
-        vars:
-          test_path: test/cppsuite/search_near_03
 
   - name: cppsuite-bounded-cursor-perf-default
     tags: ["pull_request"]
@@ -1148,9 +1196,6 @@ tasks:
         vars:
           test_config_filename: configs/operations_test_stress.txt
           test_name: operations_test
-      - func: "upload test stats"
-        vars:
-          test_path: test/cppsuite/operations_test
 
   - name: cppsuite-hs-cleanup-stress
     depends_on:
@@ -1161,9 +1206,16 @@ tasks:
         vars:
           test_config_filename: configs/hs_cleanup_stress.txt
           test_name: hs_cleanup
-      - func: "upload test stats"
+
+  - name: cppsuite-burst-inserts-stress
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "cppsuite test"
         vars:
-          test_path: test/cppsuite/hs_cleanup
+          test_config_filename: configs/burst_inserts_stress.txt
+          test_name: burst_inserts
 
   - name: cppsuite-search-near-01-stress
     depends_on:
@@ -1174,9 +1226,6 @@ tasks:
         vars:
           test_config_filename: configs/search_near_01_stress.txt
           test_name: search_near_01
-      - func: "upload test stats"
-        vars:
-          test_path: test/cppsuite/search_near_01
 
   - name: cppsuite-search-near-02-stress
     depends_on:
@@ -1187,9 +1236,6 @@ tasks:
         vars:
           test_config_filename: configs/search_near_02_stress.txt
           test_name: search_near_02
-      - func: "upload test stats"
-        vars:
-          test_path: test/cppsuite/search_near_02
 
   - name: cppsuite-search-near-03-stress
     depends_on:
@@ -1200,9 +1246,6 @@ tasks:
         vars:
           test_config_filename: configs/search_near_03_stress.txt
           test_name: search_near_03
-      - func: "upload test stats"
-        vars:
-          test_path: test/cppsuite/search_near_03
 
   - name: cppsuite-bounded-cursor-perf-stress
     depends_on:
@@ -1213,9 +1256,6 @@ tasks:
         vars:
           test_config_filename: configs/bounded_cursor_perf_stress.txt
           test_name: bounded_cursor_perf
-      - func: "upload test stats"
-        vars:
-          test_path: test/cppsuite/bounded_cursor_perf
 
   # End of cppsuite test tasks.
   # Start of csuite test tasks
@@ -2753,6 +2793,7 @@ tasks:
             -DCMAKE_C_FLAGS="-ggdb"
             -DENABLE_PYTHON=1
             -DWITH_PIC=1
+            -DENABLE_STRICT=1
       - command: shell.exec
         params:
           working_dir: "wiredtiger/bench/workgen/runner"
@@ -2882,9 +2923,9 @@ tasks:
     exec_timeout_secs: 25200
     commands:
       - func: "get project"
-      - func: "compile wiredtiger"
+      - func: "compile wiredtiger address sanitizer"
         vars: 
-          posix_configure_flags: -DENABLE_STRICT=1 -DHAVE_DIAGNOSTIC=1 -DNON_BARRIER_DIAGNOSTIC_YIELDS=1 -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 -DHAVE_BUILTIN_EXTENSION_ZSTD=1
+          NON_BARRIER_DIAGNOSTIC_YIELDS: -DNON_BARRIER_DIAGNOSTIC_YIELDS=1
       - func: "format test script"
         vars:
           format_test_script_args: -R -t 360
@@ -2959,6 +3000,7 @@ tasks:
             ./upload-results-atlas.py ${atlas_wt_perf_test_user} ${atlas_wt_perf_pass} wt-perf-tests many-collection-test ${branch_name} $res_dir/results/results.json
 
   - name: cyclomatic-complexity
+    tags: ["pull_request"]
     commands:
       - func: "get project"
       - command: shell.exec
@@ -2966,6 +3008,7 @@ tasks:
           working_dir: "wiredtiger"
           shell: bash
           script: |
+            t=__wt.$$
             set -o verbose
 
             # Install Metrix++, ensuring it is outside the 'src' directory
@@ -2980,9 +3023,15 @@ tasks:
             # Set the cyclomatic complexity limit to 20
             python "../metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:20
 
-            # Fail if there are functions with cyclomatic complexity larger than 95
-            set -o errexit
-            python "../metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:95
+            # Fail if there are functions with cyclomatic complexity larger than 91
+            python "../metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:91 > $t
+            if grep -q 'exceeds' $t; then 
+                echo "[ERROR]:complexity:cyclomatic: Complexity limit exceeded."
+                cat $t
+                echo "[ERROR]:complexity:cyclomatic: Finished " && rm $t && exit 1
+            else
+                cat $t && rm $t 
+            fi
 
     #############################
     # Performance Tests for lsm #
@@ -4189,9 +4238,9 @@ buildvariants:
 
 - name: cppsuite-stress-tests
   display_name: "Cppsuite Stress Tests"
-  batchtime: 480 # 3 times a day
+  batchtime: 960 # Twice a day
   run_on:
-  - ubuntu2004-test
+  - ubuntu2004-medium
   expansions:
     test_env_vars:
       WT_TOPDIR=$(git rev-parse --show-toplevel)
@@ -4212,6 +4261,7 @@ buildvariants:
   tasks:
     - name: compile
     - name: cppsuite-operations-test-stress
+    - name: cppsuite-burst-inserts-stress
     - name: cppsuite-hs-cleanup-stress
     - name: cppsuite-search-near-01-stress
     - name: cppsuite-search-near-02-stress

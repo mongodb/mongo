@@ -149,7 +149,7 @@ repl::ReplSetConfig makeSplitConfig(const repl::ReplSetConfig& config,
 }
 
 Status insertStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& stateDoc) {
-    const auto nss = NamespaceString::kTenantSplitDonorsNamespace;
+    const auto nss = NamespaceString::kShardSplitDonorsNamespace;
     AutoGetCollection collection(opCtx, nss, MODE_IX);
 
     uassert(ErrorCodes::PrimarySteppedDown,
@@ -176,7 +176,7 @@ Status insertStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& st
 }
 
 Status updateStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& stateDoc) {
-    const auto nss = NamespaceString::kTenantSplitDonorsNamespace;
+    const auto nss = NamespaceString::kShardSplitDonorsNamespace;
     AutoGetCollection collection(opCtx, nss, MODE_IX);
 
     if (!collection) {
@@ -198,7 +198,7 @@ Status updateStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& st
 }
 
 StatusWith<bool> deleteStateDoc(OperationContext* opCtx, const UUID& shardSplitId) {
-    const auto nss = NamespaceString::kTenantSplitDonorsNamespace;
+    const auto nss = NamespaceString::kShardSplitDonorsNamespace;
     AutoGetCollection collection(opCtx, nss, MODE_IX);
 
     if (!collection) {

@@ -41,7 +41,9 @@
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/commands/cqf/cqf_aggregate.h"
+#include "mongo/db/commands/cqf/cqf_command_utils.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
@@ -686,12 +688,8 @@ Status runAggregate(OperationContext* opCtx,
 
     // Determine if this aggregation has foreign collections that the execution subsystem needs
     // to be aware of.
-    std::vector<NamespaceStringOrUUID> secondaryExecNssList;
-
-    // Taking locks over multiple collections is not supported outside of $lookup pushdown.
-    if (feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV()) {
-        secondaryExecNssList = liteParsedPipeline.getForeignExecutionNamespaces();
-    }
+    std::vector<NamespaceStringOrUUID> secondaryExecNssList =
+        liteParsedPipeline.getForeignExecutionNamespaces();
 
     // The collation to use for this aggregation. boost::optional to distinguish between the case
     // where the collation has not yet been resolved, and where it has been resolved to nullptr.
@@ -752,8 +750,20 @@ Status runAggregate(OperationContext* opCtx,
                                   << " is not supported for a change stream",
                     !request.getCollectionUUID());
 
-            // Replace the execution namespace with that of the oplog.
+            // Replace the execution namespace with the oplog.
             nss = NamespaceString::kRsOplogNamespace;
+
+            // In case of serverless the change stream will be opened on the change collection. We
+            // should first check if the change collection for the particular tenant exists and then
+            // replace the namespace with the change collection.
+            if (ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive()) {
+                auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
+                uassert(ErrorCodes::ChangeStreamNotEnabled,
+                        "Change streams must be enabled before being used.",
+                        changeCollectionManager.hasChangeCollection(opCtx, origNss.tenantId()));
+
+                nss = NamespaceString::makeChangeCollectionNSS(origNss.tenantId());
+            }
 
             // Upgrade and wait for read concern if necessary.
             _adjustChangeStreamReadConcern(opCtx);
@@ -940,9 +950,7 @@ Status runAggregate(OperationContext* opCtx,
         constexpr bool alreadyOptimized = true;
         pipeline->validateCommon(alreadyOptimized);
 
-        if (feature_flags::gfeatureFlagCommonQueryFramework.isEnabled(
-                serverGlobalParams.featureCompatibility) &&
-            internalQueryEnableCascadesOptimizer.load()) {
+        if (isEligibleForBonsai(request, *pipeline, opCtx, collections.getMainCollection())) {
             uassert(6624344,
                     "Exchanging is not supported in the Cascades optimizer",
                     !request.getExchange().has_value());
@@ -1023,7 +1031,7 @@ Status runAggregate(OperationContext* opCtx,
             // yet.
             invariant(ctx);
             Explain::explainStages(explainExecutor,
-                                   ctx->getCollection(),
+                                   collections,
                                    *(expCtx->explain),
                                    BSON("optimizedPipeline" << true),
                                    cmdObj,

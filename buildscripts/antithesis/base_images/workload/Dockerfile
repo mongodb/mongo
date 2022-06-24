@@ -14,7 +14,7 @@ RUN debconf-set-selections /tmp/preseed.txt
 RUN rm /tmp/preseed.txt
 
 RUN apt-get update
-RUN apt-get install -qy libcurl4 libgssapi-krb5-2 libldap-2.4-2 libwrap0 libsasl2-2 libsasl2-modules libsasl2-modules-gssapi-mit snmp openssl liblzma5 libssl-dev build-essential software-properties-common
+RUN apt-get install -qy libcurl4 libgssapi-krb5-2 libldap-2.4-2 libwrap0 libsasl2-2 libsasl2-modules libsasl2-modules-gssapi-mit openssl liblzma5 libssl-dev build-essential software-properties-common
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt-get update
 
@@ -30,8 +30,12 @@ COPY src /resmoke
 
 RUN bash -c "cd /resmoke && python3.9 -m venv python3-venv && . python3-venv/bin/activate && pip install --upgrade pip wheel && pip install -r ./buildscripts/requirements.txt && ./buildscripts/antithesis_suite.py generate-all"
 
+# copy the run_suite.py script & mongo binary -- make sure they are executable
+COPY run_suite.py /resmoke
+
 COPY mongo /usr/bin
 RUN chmod +x /usr/bin/mongo
+
 COPY libvoidstar.so /usr/lib/libvoidstar.so
 
 RUN /usr/bin/mongo --version

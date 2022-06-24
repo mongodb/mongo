@@ -35,7 +35,6 @@
 #include <vector>
 
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/client/query.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"

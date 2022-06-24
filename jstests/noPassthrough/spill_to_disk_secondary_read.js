@@ -35,7 +35,7 @@ const readColl = secondary.getDB("test").foo;
  * Test spilling of $group, when explicitly run on a secondary.
  */
 (function testGroupSpilling() {
-    if (!checkSBEEnabled(secondary.getDB("test"), ["featureFlagSBEGroupPushdown"])) {
+    if (!checkSBEEnabled(secondary.getDB("test"))) {
         jsTestLog("Skipping test for HashAgg stage: $group lowering into SBE isn't enabled");
         return;
     }
@@ -100,7 +100,7 @@ const readColl = secondary.getDB("test").foo;
  * Test spilling of $lookup when explicitly run on a secondary.
  */
 (function testLookupSpillingInSbe() {
-    if (!checkSBEEnabled(secondary.getDB("test"), ["featureFlagSBELookupPushdown"])) {
+    if (!checkSBEEnabled(secondary.getDB("test"))) {
         jsTestLog("Skipping test for HashLookup stage: $lookup lowering into SBE isn't enabled");
         return;
     }

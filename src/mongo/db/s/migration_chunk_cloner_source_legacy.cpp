@@ -300,12 +300,12 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
         opCtx->recoveryUnit()->setPrepareConflictBehavior(
             PrepareConflictBehavior::kIgnoreConflicts);
 
-        auto storeCurrentLocsStatus = _storeCurrentLocs(opCtx);
-        if (storeCurrentLocsStatus == ErrorCodes::ChunkTooBig && _forceJumbo) {
+        auto storeCurrentRecordIdStatus = _storeCurrentRecordId(opCtx);
+        if (storeCurrentRecordIdStatus == ErrorCodes::ChunkTooBig && _forceJumbo) {
             stdx::lock_guard<Latch> sl(_mutex);
             _jumboChunkCloneState.emplace();
-        } else if (!storeCurrentLocsStatus.isOK()) {
-            return storeCurrentLocsStatus;
+        } else if (!storeCurrentRecordIdStatus.isOK()) {
+            return storeCurrentRecordIdStatus;
         }
     }
 
@@ -381,7 +381,7 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::commitClone(OperationConte
             }
         } else {
             invariant(PlanExecutor::IS_EOF == _jumboChunkCloneState->clonerState);
-            invariant(_cloneLocs.empty());
+            invariant(_cloneRecordIds.empty());
         }
     }
 
@@ -680,17 +680,16 @@ void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromIndexScan(OperationCon
     _jumboChunkCloneState->clonerExec->detachFromOperationContext();
 }
 
-void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromCloneLocs(OperationContext* opCtx,
-                                                                    const CollectionPtr& collection,
-                                                                    BSONArrayBuilder* arrBuilder) {
+void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromCloneRecordIds(
+    OperationContext* opCtx, const CollectionPtr& collection, BSONArrayBuilder* arrBuilder) {
     ElapsedTracker tracker(opCtx->getServiceContext()->getFastClockSource(),
                            internalQueryExecYieldIterations.load(),
                            Milliseconds(internalQueryExecYieldPeriodMS.load()));
 
     stdx::unique_lock<Latch> lk(_mutex);
-    auto iter = _cloneLocs.begin();
+    auto iter = _cloneRecordIds.begin();
 
-    for (; iter != _cloneLocs.end(); ++iter) {
+    for (; iter != _cloneRecordIds.end(); ++iter) {
         // We must always make progress in this method by at least one document because empty
         // return indicates there is no more initial clone data.
         if (arrBuilder->arrSize() && tracker.intervalHasElapsed()) {
@@ -718,7 +717,7 @@ void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromCloneLocs(OperationCon
         lk.lock();
     }
 
-    _cloneLocs.erase(_cloneLocs.begin(), iter);
+    _cloneRecordIds.erase(_cloneRecordIds.begin(), iter);
 }
 
 uint64_t MigrationChunkClonerSourceLegacy::getCloneBatchBufferAllocationSize() {
@@ -727,7 +726,7 @@ uint64_t MigrationChunkClonerSourceLegacy::getCloneBatchBufferAllocationSize() {
         return static_cast<uint64_t>(BSONObjMaxUserSize);
 
     return std::min(static_cast<uint64_t>(BSONObjMaxUserSize),
-                    _averageObjectSizeForCloneLocs * _cloneLocs.size());
+                    _averageObjectSizeForCloneRecordIds * _cloneRecordIds.size());
 }
 
 Status MigrationChunkClonerSourceLegacy::nextCloneBatch(OperationContext* opCtx,
@@ -735,8 +734,8 @@ Status MigrationChunkClonerSourceLegacy::nextCloneBatch(OperationContext* opCtx,
                                                         BSONArrayBuilder* arrBuilder) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(nss(), MODE_IS));
 
-    // If this chunk is too large to store records in _cloneLocs and the command args specify to
-    // attempt to move it, scan the collection directly.
+    // If this chunk is too large to store records in _cloneRecordIds and the command args specify
+    // to attempt to move it, scan the collection directly.
     if (_jumboChunkCloneState && _forceJumbo) {
         try {
             _nextCloneBatchFromIndexScan(opCtx, collection, arrBuilder);
@@ -746,12 +745,11 @@ Status MigrationChunkClonerSourceLegacy::nextCloneBatch(OperationContext* opCtx,
         }
     }
 
-    _nextCloneBatchFromCloneLocs(opCtx, collection, arrBuilder);
+    _nextCloneBatchFromCloneRecordIds(opCtx, collection, arrBuilder);
     return Status::OK();
 }
 
 Status MigrationChunkClonerSourceLegacy::nextModsBatch(OperationContext* opCtx,
-                                                       Database* db,
                                                        BSONObjBuilder* builder) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(nss(), MODE_IS));
 
@@ -761,7 +759,7 @@ Status MigrationChunkClonerSourceLegacy::nextModsBatch(OperationContext* opCtx,
     {
         // All clone data must have been drained before starting to fetch the incremental changes.
         stdx::unique_lock<Latch> lk(_mutex);
-        invariant(_cloneLocs.empty());
+        invariant(_cloneRecordIds.empty());
 
         // The "snapshot" for delete and update list must be taken under a single lock. This is to
         // ensure that we will preserve the causal order of writes. Always consume the delete
@@ -784,8 +782,8 @@ Status MigrationChunkClonerSourceLegacy::nextModsBatch(OperationContext* opCtx,
 
     if (deleteList.empty()) {
         BSONArrayBuilder arrUpd(builder->subarrayStart("reload"));
-        auto findByIdWrapper = [opCtx, db, ns](BSONObj idDoc, BSONObj* fullDoc) {
-            return Helpers::findById(opCtx, db, ns, idDoc, *fullDoc);
+        auto findByIdWrapper = [opCtx, ns](BSONObj idDoc, BSONObj* fullDoc) {
+            return Helpers::findById(opCtx, ns, idDoc, *fullDoc);
         };
         totalDocSize = xferMods(&arrUpd, &updateList, totalDocSize, findByIdWrapper);
         arrUpd.done();
@@ -874,7 +872,7 @@ MigrationChunkClonerSourceLegacy::_getIndexScanExecutor(
     if (!shardKeyIdx) {
         return {ErrorCodes::IndexNotFound,
                 str::stream() << "can't find index with prefix " << _shardKeyPattern.toBSON()
-                              << " in storeCurrentLocs for " << nss().ns()};
+                              << " in storeCurrentRecordId for " << nss().ns()};
     }
 
     // Assume both min and max non-empty, append MinKey's to make them fit chosen index
@@ -896,7 +894,7 @@ MigrationChunkClonerSourceLegacy::_getIndexScanExecutor(
                                               scanOption);
 }
 
-Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opCtx) {
+Status MigrationChunkClonerSourceLegacy::_storeCurrentRecordId(OperationContext* opCtx) {
     AutoGetCollection collection(opCtx, nss(), MODE_IS);
     if (!collection) {
         return {ErrorCodes::NamespaceNotFound,
@@ -948,14 +946,14 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
 
             if (!isLargeChunk) {
                 stdx::lock_guard<Latch> lk(_mutex);
-                _cloneLocs.insert(recordId);
+                _cloneRecordIds.insert(recordId);
             }
 
             if (++recCount > maxRecsWhenFull) {
                 isLargeChunk = true;
 
                 if (_forceJumbo) {
-                    _cloneLocs.clear();
+                    _cloneRecordIds.clear();
                     break;
                 }
             }
@@ -975,7 +973,7 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
         const auto idIdx = collection->getIndexCatalog()->findIdIndex(opCtx)->getEntry();
         if (!idIdx) {
             return {ErrorCodes::IndexNotFound,
-                    str::stream() << "can't find index '_id' in storeCurrentLocs for "
+                    str::stream() << "can't find index '_id' in storeCurrentRecordId for "
                                   << nss().ns()};
         }
         averageObjectIdSize = idIdx->accessMethod()->getSpaceUsedBytes(opCtx) / totalRecs;
@@ -992,7 +990,7 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
     }
 
     stdx::lock_guard<Latch> lk(_mutex);
-    _averageObjectSizeForCloneLocs = collectionAverageObjectSize + defaultObjectIdSize;
+    _averageObjectSizeForCloneRecordIds = collectionAverageObjectSize + defaultObjectIdSize;
     _averageObjectIdSize = std::max(averageObjectIdSize, defaultObjectIdSize);
     return Status::OK();
 }
@@ -1057,9 +1055,9 @@ Status MigrationChunkClonerSourceLegacy::_checkRecipientCloningStatus(OperationC
 
         stdx::lock_guard<Latch> sl(_mutex);
 
-        const std::size_t cloneLocsRemaining = _cloneLocs.size();
+        const std::size_t cloneRecordIdsRemaining = _cloneRecordIds.size();
         int64_t untransferredModsSizeBytes = _untransferredDeletesCounter * _averageObjectIdSize +
-            _untransferredUpsertsCounter * _averageObjectSizeForCloneLocs;
+            _untransferredUpsertsCounter * _averageObjectSizeForCloneRecordIds;
 
         if (_forceJumbo && _jumboChunkCloneState) {
             LOGV2(21992,
@@ -1079,13 +1077,13 @@ Status MigrationChunkClonerSourceLegacy::_checkRecipientCloningStatus(OperationC
                   "moveChunk data transfer progress",
                   "response"_attr = redact(res),
                   "memoryUsedBytes"_attr = _memoryUsed,
-                  "docsRemainingToClone"_attr = cloneLocsRemaining,
+                  "docsRemainingToClone"_attr = cloneRecordIdsRemaining,
                   "untransferredModsSizeBytes"_attr = untransferredModsSizeBytes);
         }
 
         if (res["state"].String() == "steady" && sessionCatalogSourceInCatchupPhase &&
             estimateUntransferredSessionsSize == 0) {
-            if (cloneLocsRemaining != 0 ||
+            if (cloneRecordIdsRemaining != 0 ||
                 (_jumboChunkCloneState && _forceJumbo &&
                  PlanExecutor::IS_EOF != _jumboChunkCloneState->clonerState)) {
                 return {ErrorCodes::OperationIncomplete,
@@ -1124,7 +1122,8 @@ Status MigrationChunkClonerSourceLegacy::_checkRecipientCloningStatus(OperationC
                       "moveChunk data transfer within threshold to allow write blocking",
                       "_untransferredUpsertsCounter"_attr = _untransferredUpsertsCounter,
                       "_untransferredDeletesCounter"_attr = _untransferredDeletesCounter,
-                      "_averageObjectSizeForCloneLocs"_attr = _averageObjectSizeForCloneLocs,
+                      "_averageObjectSizeForCloneRecordIds"_attr =
+                          _averageObjectSizeForCloneRecordIds,
                       "_averageObjectIdSize"_attr = _averageObjectIdSize,
                       "untransferredModsSizeBytes"_attr = untransferredModsSizeBytes,
                       "untransferredSessionDataInBytes"_attr = estimateUntransferredSessionsSize,

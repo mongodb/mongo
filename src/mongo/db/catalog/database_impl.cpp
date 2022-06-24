@@ -59,6 +59,7 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -92,6 +93,17 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
 MONGO_FAIL_POINT_DEFINE(hangAndFailAfterCreateCollectionReservesOpTime);
 MONGO_FAIL_POINT_DEFINE(openCreateCollectionWindowFp);
 MONGO_FAIL_POINT_DEFINE(allowSystemViewsDrop);
+
+// When active, a column index will be created for all new collections. This is used for the column
+// index JS test passthrough suite. Other passthroughs work by overriding javascript methods on the
+// client side, but this approach often requires the drop() function to create the collection. This
+// behavior is confusing, and requires a large number of tests to be re-written to accommodate this
+// passthrough behavior. In case you're wondering, this failpoint approach would not work as well
+// for the sharded collections task, since mongos and the config servers are generally unaware of
+// when a collection is created. There isn't a great server-side hook we can use to auto-shard a
+// collection, and it is more complex technically to drive this process from one shard in the
+// cluster. For column store indexes, we just need to change local state on each mongod.
+MONGO_FAIL_POINT_DEFINE(createColumnIndexOnAllCollections);
 
 Status validateDBNameForWindows(StringData dbname) {
     const std::vector<std::string> windowsReservedNames = {
@@ -132,6 +144,12 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const&
     }
 }
 
+static const BSONObj kColumnStoreSpec = BSON("name"
+                                             << "$**_columnstore"
+                                             << "key"
+                                             << BSON("$**"
+                                                     << "columnstore")
+                                             << "v" << 2);
 }  // namespace
 
 Status DatabaseImpl::validateDBName(StringData dbname) {
@@ -176,7 +194,7 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
         // If this is called from the repair path, the collection is already initialized.
         if (!collection->isInitialized()) {
             WriteUnitOfWork wuow(opCtx);
-            collection.getWritableCollection()->init(opCtx);
+            collection.getWritableCollection(opCtx)->init(opCtx);
             wuow.commit();
         }
     }
@@ -450,6 +468,16 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
 
     invariant(nss.db() == _name.db());
 
+    // Returns true if the supplied namespace 'nss' is a system collection that can be dropped,
+    // false otherwise.
+    auto isDroppableSystemCollection = [](const auto& nss) {
+        return nss.isHealthlog() || nss == NamespaceString::kLogicalSessionsNamespace ||
+            nss == NamespaceString::kKeysCollectionNamespace ||
+            nss.isTemporaryReshardingCollection() || nss.isTimeseriesBucketsCollection() ||
+            nss.isChangeStreamPreImagesCollection() ||
+            nss == NamespaceString::kConfigsvrRestoreNamespace || nss.isChangeCollection();
+    };
+
     if (nss.isSystem()) {
         if (nss.isSystemDotProfile()) {
             if (catalog->getDatabaseProfileLevel(_name) != 0)
@@ -463,11 +491,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
                                       << " when time-series collections are present.",
                         viewStats && viewStats->userTimeseries == 0);
             }
-        } else if (!(nss.isHealthlog() || nss == NamespaceString::kLogicalSessionsNamespace ||
-                     nss == NamespaceString::kKeysCollectionNamespace ||
-                     nss.isTemporaryReshardingCollection() || nss.isTimeseriesBucketsCollection() ||
-                     nss.isChangeStreamPreImagesCollection() ||
-                     nss == NamespaceString::kConfigsvrRestoreNamespace)) {
+        } else if (!isDroppableSystemCollection(nss)) {
             return Status(ErrorCodes::IllegalOperation,
                           str::stream() << "can't drop system collection " << nss);
         }
@@ -520,14 +544,14 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     auto opObserver = serviceContext->getOpObserver();
     auto isOplogDisabledForNamespace = replCoord->isOplogDisabledFor(opCtx, nss);
     if (dropOpTime.isNull() && isOplogDisabledForNamespace) {
-        _dropCollectionIndexes(opCtx, nss, collection.getWritableCollection());
+        _dropCollectionIndexes(opCtx, nss, collection.getWritableCollection(opCtx));
         opObserver->onDropCollection(opCtx,
                                      nss,
                                      uuid,
                                      numRecords,
                                      OpObserver::CollectionDropType::kOnePhase,
                                      markFromMigrate);
-        return _finishDropCollection(opCtx, nss, collection.getWritableCollection());
+        return _finishDropCollection(opCtx, nss, collection.getWritableCollection(opCtx));
     }
 
     // Replicated collections should be dropped in two phases.
@@ -536,7 +560,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     // storage engine and will no longer be visible at the catalog layer with 3.6-style
     // <db>.system.drop.* namespaces.
     if (serviceContext->getStorageEngine()->supportsPendingDrops()) {
-        _dropCollectionIndexes(opCtx, nss, collection.getWritableCollection());
+        _dropCollectionIndexes(opCtx, nss, collection.getWritableCollection(opCtx));
 
         auto commitTimestamp = opCtx->recoveryUnit()->getCommitTimestamp();
         LOGV2(20314,
@@ -572,7 +596,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
                       str::stream() << "OpTime is not null. OpTime: " << opTime.toString());
         }
 
-        return _finishDropCollection(opCtx, nss, collection.getWritableCollection());
+        return _finishDropCollection(opCtx, nss, collection.getWritableCollection(opCtx));
     }
 
     // Old two-phase drop: Replicated collections will be renamed with a special drop-pending
@@ -706,7 +730,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     // Set the namespace of 'collToRename' from within the CollectionCatalog. This is necessary
     // because the CollectionCatalog manages the necessary isolation for this Collection until the
     // WUOW commits.
-    auto writableCollection = collToRename.getWritableCollection();
+    auto writableCollection = collToRename.getWritableCollection(opCtx);
     Status status = writableCollection->rename(opCtx, toNss, stayTemp);
     if (!status.isOK())
         return status;
@@ -884,23 +908,30 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 
     BSONObj fullIdIndexSpec;
 
-    if (createIdIndex) {
-        if (collection->requiresIdIndex()) {
-            if (optionsWithUUID.autoIndexId == CollectionOptions::YES ||
-                optionsWithUUID.autoIndexId == CollectionOptions::DEFAULT) {
-                IndexCatalog* ic = collection->getIndexCatalog();
-                fullIdIndexSpec = uassertStatusOK(ic->createIndexOnEmptyCollection(
-                    opCtx,
-                    collection,
-                    !idIndex.isEmpty() ? idIndex : ic->getDefaultIdIndexSpec(collection)));
-            } else {
-                // autoIndexId: false is only allowed on unreplicated collections.
-                uassert(50001,
-                        str::stream() << "autoIndexId:false is not allowed for collection " << nss
-                                      << " because it can be replicated",
-                        !nss.isReplicated());
-            }
+    bool createColumnIndex = false;
+    if (createIdIndex && collection->requiresIdIndex()) {
+        if (optionsWithUUID.autoIndexId == CollectionOptions::YES ||
+            optionsWithUUID.autoIndexId == CollectionOptions::DEFAULT) {
+            auto* ic = collection->getIndexCatalog();
+            fullIdIndexSpec = uassertStatusOK(ic->createIndexOnEmptyCollection(
+                opCtx,
+                collection,
+                !idIndex.isEmpty() ? idIndex : ic->getDefaultIdIndexSpec(collection)));
+            createColumnIndex = createColumnIndexOnAllCollections.shouldFail();
+        } else {
+            // autoIndexId: false is only allowed on unreplicated collections.
+            uassert(50001,
+                    str::stream() << "autoIndexId:false is not allowed for collection " << nss
+                                  << " because it can be replicated",
+                    !nss.isReplicated());
         }
+    }
+
+    if (MONGO_unlikely(createColumnIndex)) {
+        invariant(!internalQueryForceClassicEngine.load(),
+                  "Column Store Indexes failpoint in use without enabling SBE engine");
+        uassertStatusOK(collection->getIndexCatalog()->createIndexOnEmptyCollection(
+            opCtx, collection, kColumnStoreSpec));
     }
 
     hangBeforeLoggingCreateCollection.pauseWhileSet();

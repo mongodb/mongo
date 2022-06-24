@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/op_observer_util.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -59,8 +57,10 @@ protected:
         const UUID uuid = UUID::gen();
         const OID epoch = OID::gen();
         auto range = ChunkRange(BSON("key" << MINKEY), BSON("key" << MAXKEY));
-        auto chunk = ChunkType(
-            uuid, std::move(range), ChunkVersion(1, 0, epoch, Timestamp(1, 1)), ShardId("other"));
+        auto chunk = ChunkType(uuid,
+                               std::move(range),
+                               ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
+                               ShardId("other"));
         auto rt = RoutingTableHistory::makeNew(kTestNss,
                                                uuid,
                                                KeyPattern(keyPattern),

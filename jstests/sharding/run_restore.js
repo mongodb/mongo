@@ -16,7 +16,7 @@ const s =
 
 let mongos = s.s0;
 let db = s.getDB("test");
-if (!FeatureFlagUtil.isEnabled(db, "SelectiveBackup")) {
+if (!FeatureFlagUtil.isEnabled(s.configRS.getPrimary().getDB("test"), "SelectiveBackup")) {
     jsTestLog("Skipping as featureFlagSelectiveBackup is not enabled");
     s.stop();
     return;

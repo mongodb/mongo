@@ -289,13 +289,6 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
     // build entry from the config db collection.
     hangBeforeGettingIndexBuildEntry.pauseWhileSet(Interruptible::notInterruptible());
 
-    if (!collection.getDb()) {
-        str::stream ss;
-        ss << "Cannot read " << NamespaceString::kIndexBuildEntryNamespace.ns()
-           << ". Database not found: " << NamespaceString::kIndexBuildEntryNamespace.db();
-        return Status(ErrorCodes::NamespaceNotFound, ss);
-    }
-
     if (!collection) {
         str::stream ss;
         ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();

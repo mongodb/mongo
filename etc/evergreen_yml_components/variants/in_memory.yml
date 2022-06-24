@@ -21,7 +21,7 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: .aggfuzzer .common
-  - name: .aggregation !.unwind !.encrypt
+  - name: .aggregation !.unwind !.encrypt !.feature_flag_guarded
   - name: audit
   - name: .auth !.multiversion
   - name: .causally_consistent !.wo_snapshot !.durable_history

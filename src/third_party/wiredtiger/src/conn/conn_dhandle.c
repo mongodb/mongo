@@ -970,12 +970,13 @@ restart:
  *     Update the open dhandles write generation, run write generation and base write generation
  *     number.
  */
-void
+int
 __wt_dhandle_update_write_gens(WT_SESSION_IMPL *session)
 {
     WT_BTREE *btree;
     WT_CONNECTION_IMPL *conn;
     WT_DATA_HANDLE *dhandle;
+    WT_DECL_RET;
 
     conn = S2C(session);
 
@@ -988,15 +989,26 @@ __wt_dhandle_update_write_gens(WT_SESSION_IMPL *session)
             continue;
         btree = (WT_BTREE *)dhandle->handle;
 
-        WT_ASSERT(session, btree != NULL);
-
         /*
          * Initialize the btree write generation numbers after rollback to stable so that the
          * transaction ids of the pages will be reset when loaded from disk to memory.
          */
         btree->write_gen = btree->base_write_gen = btree->run_write_gen =
           WT_MAX(btree->write_gen, conn->base_write_gen);
+
+        /*
+         * Clear out any transaction IDs that might have been already loaded and cached, as they are
+         * now outdated. Currently this is only known to happen in the page_del structure associated
+         * with truncated pages.
+         */
+        if (btree->root.page == NULL)
+            continue;
+
+        WT_WITH_BTREE(session, btree, ret = __wt_delete_redo_window_cleanup(session));
+        WT_RET(ret);
     }
+
+    return (0);
 }
 
 /*

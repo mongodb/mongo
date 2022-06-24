@@ -116,7 +116,7 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
                         {"command.shardVersion.0": {"$exists": true}},
                         {
                             "command.shardVersion.0":
-                                {$ne: ShardVersioningUtil.kIgnoredShardVersion[0]}
+                                {$ne: ShardVersioningUtil.kIgnoredShardVersion.v}
                         },
                     ]
                 },
@@ -125,7 +125,7 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
                         {"command.shardVersion.v": {"$exists": true}},
                         {
                             "command.shardVersion.v":
-                                {$ne: ShardVersioningUtil.kIgnoredShardVersion[0]}
+                                {$ne: ShardVersioningUtil.kIgnoredShardVersion.v}
                         },
                     ]
                 },
@@ -144,8 +144,8 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
             filter = {
                 [queryField]: cmdCollName,
                 "$or": [
-                    {"command.shardVersion.0": ShardVersioningUtil.kIgnoredShardVersion[0]},
-                    {"command.shardVersion.v": ShardVersioningUtil.kIgnoredShardVersion[0]},
+                    {"command.shardVersion.0": ShardVersioningUtil.kIgnoredShardVersion.v},
+                    {"command.shardVersion.v": ShardVersioningUtil.kIgnoredShardVersion.v},
                 ]
             };
         }

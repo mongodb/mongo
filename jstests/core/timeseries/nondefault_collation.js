@@ -5,7 +5,6 @@
  * @tags: [
  *   requires_non_retryable_writes,
  *   requires_pipeline_optimization,
- *   requires_getmore,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   multiversion_incompatible,

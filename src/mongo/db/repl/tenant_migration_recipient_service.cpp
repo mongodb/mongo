@@ -43,6 +43,7 @@
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
@@ -213,7 +214,7 @@ public:
 
     // Tenant migration does not require the metadata from the oplog query.
     void processMetadata(const rpc::ReplSetMetadata& replMetadata,
-                         rpc::OplogQueryMetadata oqMetadata) final {}
+                         const rpc::OplogQueryMetadata& oqMetadata) final {}
 
     // Tenant migration does not change sync source depending on metadata.
     ChangeSyncSourceAction shouldStopFetching(const HostAndPort& source,
@@ -2516,7 +2517,8 @@ void TenantMigrationRecipientService::Instance::_startOplogApplier() {
 }
 
 void TenantMigrationRecipientService::Instance::_setup() {
-    auto opCtx = cc().makeOperationContext();
+    auto uniqueOpCtx = cc().makeOperationContext();
+    auto opCtx = uniqueOpCtx.get();
     {
         stdx::lock_guard lk(_mutex);
         // Do not set the internal states if the migration is already interrupted.
@@ -2543,12 +2545,23 @@ void TenantMigrationRecipientService::Instance::_setup() {
         _sharedData = std::make_unique<TenantMigrationSharedData>(
             getGlobalServiceContext()->getFastClockSource(), getMigrationUUID(), resumePhase);
 
-        _createOplogBuffer(lk, opCtx.get());
+        _createOplogBuffer(lk, opCtx);
     }
 
     // Start the oplog buffer outside the mutex to avoid deadlock on a concurrent stepdown.
     try {
-        _donorOplogBuffer->startup(opCtx.get());
+        // It is illegal to start the replicated donor buffer when the node is not primary.
+        // So ensure we are primary before trying to startup the oplog buffer.
+        repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+
+        auto oplogBufferNS = getOplogBufferNs(getMigrationUUID());
+        if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
+                opCtx, oplogBufferNS.db())) {
+            uassertStatusOK(
+                Status(ErrorCodes::NotWritablePrimary, "Recipient node is no longer a primary."));
+        }
+
+        _donorOplogBuffer->startup(opCtx);
     } catch (DBException& ex) {
         ex.addContext("Failed to create oplog buffer collection.");
         throw;

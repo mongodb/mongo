@@ -468,6 +468,12 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         ss << WiredTigerUtil::generateRestoreConfig() << ",";
     }
 
+    // If we've requested an ephemeral instance we store everything into memory instead of backing
+    // it onto disk. Logging is not supported in this instance, thus we also have to disable it.
+    if (_ephemeral) {
+        ss << "in_memory=true,log=(enabled=false),";
+    }
+
     string config = ss.str();
     LOGV2(22315, "Opening WiredTiger", "config"_attr = config);
     auto startTime = Date_t::now();
@@ -1994,6 +2000,11 @@ bool WiredTigerKVEngine::supportsDirectoryPerDB() const {
 }
 
 void WiredTigerKVEngine::_checkpoint(WT_SESSION* session) {
+    // Ephemeral WiredTiger instances cannot do a checkpoint to disk as there is no disk backing
+    // the data.
+    if (_ephemeral) {
+        return;
+    }
     // TODO: SERVER-64507: Investigate whether we can smartly rely on one checkpointer if two or
     // more threads checkpoint at the same time.
     stdx::lock_guard lk(_checkpointMutex);

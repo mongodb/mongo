@@ -92,7 +92,7 @@ private:
 
         DBDirectClient client(opCtx);
         FindCommandRequest findRequest{NamespaceString::kClusterParametersNamespace};
-        client.find(std::move(findRequest), ReadPreferenceSetting{}, [&](BSONObj doc) {
+        client.find(std::move(findRequest), [&](BSONObj doc) {
             try {
                 onEntry(opCtx, doc, mode);
             } catch (const DBException& ex) {

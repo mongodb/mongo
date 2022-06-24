@@ -569,6 +569,27 @@ testCases.forEach(function(testCase) {
 });
 
 /* --------------------------------------------------------------------------------------- */
+/* Tests for textual month. */
+
+testCases = [
+    {inputString: "2017, July 4", format: "%Y, %B %d", expect: "2017-07-04T00:00:00Z"},
+    {inputString: "oct 20 2020", format: "%b %d %Y", expect: "2020-10-20T00:00:00Z"},
+];
+testCases.forEach(function(testCase) {
+    assert.eq(
+        [{_id: 0, date: ISODate(testCase.expect)}],
+        coll.aggregate({
+                $project: {
+                    date: {
+                        $dateFromString: {dateString: testCase.inputString, format: testCase.format}
+                    }
+                }
+            })
+            .toArray(),
+        tojson(testCase));
+});
+
+/* --------------------------------------------------------------------------------------- */
 /* Testing whether it throws the right assert for missing elements of a date/time string. */
 
 coll.drop();
@@ -762,6 +783,11 @@ assertErrCodeAndErrMsgContains(coll,
                                pipeline,
                                ErrorCodes.ConversionFailure,
                                "Mixing of ISO dates with natural dates is not allowed");
+
+pipeline =
+    [{$project: {date: {$dateFromString: {dateString: "Dece 31 2018", format: "%b %d %Y"}}}}];
+assertErrCodeAndErrMsgContains(
+    coll, pipeline, ErrorCodes.ConversionFailure, "Error parsing date string");
 
 // Test embedded null bytes in the 'dateString' and 'format' fields.
 pipeline =

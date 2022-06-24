@@ -99,7 +99,7 @@ void removePlanCacheEntriesByIndexFilterKeys(const stdx::unordered_set<uint32_t>
                                              sbe::PlanCache* planCache) {
     planCache->removeIf([&](const sbe::PlanCacheKey& key, const sbe::PlanCacheEntry& entry) {
         return indexFilterKeys.contains(entry.indexFilterKey) &&
-            key.getCollectionUuid() == collectionUuid;
+            key.getMainCollectionState().uuid == collectionUuid;
     });
 }
 }  // namespace

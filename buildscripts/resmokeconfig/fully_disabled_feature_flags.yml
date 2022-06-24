@@ -8,3 +8,7 @@
 # Disable featureFlagRequireTenantID until all paths pass tenant id to TenantNamespace
 # and TenantDatabase constructors.
 - featureFlagRequireTenantID
+# This flag exists to help users in managed environments that upgraded to 6.0 before 6.0.0-rc8 was
+# released create the transactions collection index and is only meant to be enabled adhoc, so only
+# its targeted tests should enable it.
+- featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp

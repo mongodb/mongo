@@ -1,0 +1,10 @@
+{
+    "type" : "object",
+    "properties" : {
+        "start_time" : {"type" : "integer"},
+        "end_time" : {"type" : "integer"},
+        "evg_id" : {"type" : "string"},
+        "variant" : {"type" : "string"},
+        "scons_command" : {"type" : "string"}
+    }
+}

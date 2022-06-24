@@ -257,6 +257,16 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
         timeInBatch = _commitBatch(out, &recordsToSkip, &docsDeleted, &bufferOffset);
     } catch (const WriteConflictException&) {
         return _prepareToRetryDrainAfterWCE(out, recordsToSkip);
+    } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
+        if (ex->getVersionReceived() == ChunkVersion::IGNORED() && ex->getCriticalSectionSignal()) {
+            // If ChunkVersion is IGNORED and we encountered a critical section, then yield, wait
+            // for critical section to finish and then we'll resume the write from the point we had
+            // left. We do this to prevent large multi-writes from repeatedly failing due to
+            // StaleConfig and exhausting the mongos retry attempts.
+            planExecutorShardingCriticalSectionFuture(opCtx()) = ex->getCriticalSectionSignal();
+            return _prepareToRetryDrainAfterWCE(out, recordsToSkip);
+        }
+        throw;
     }
 
     incrementSSSMetricNoOverflow(batchedDeletesSSS.docs, docsDeleted);

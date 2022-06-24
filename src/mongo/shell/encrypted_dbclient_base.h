@@ -87,7 +87,6 @@ class EncryptedDBClientBase : public DBClientBase,
                               public FLEKeyVault {
 public:
     using DBClientBase::find;
-    using DBClientBase::query_DEPRECATED;
 
     EncryptedDBClientBase(std::unique_ptr<DBClientBase> conn,
                           ClientSideFLEOptions encryptionOptions,
@@ -128,18 +127,8 @@ public:
     void trace(JSTracer* trc) final;
 
     std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
-                                         const ReadPreferenceSetting& readPref) final;
-
-    std::unique_ptr<DBClientCursor> query_DEPRECATED(
-        const NamespaceStringOrUUID& nsOrUuid,
-        const BSONObj& filter,
-        const Query& querySettings,
-        int limit,
-        int nToSkip,
-        const BSONObj* fieldsToReturn,
-        int queryOptions,
-        int batchSize,
-        boost::optional<BSONObj> readConcernObj = boost::none) final;
+                                         const ReadPreferenceSetting& readPref,
+                                         ExhaustMode exhaustMode) final;
 
     bool isFailed() const final;
 

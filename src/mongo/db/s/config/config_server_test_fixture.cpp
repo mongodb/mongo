@@ -70,7 +70,6 @@
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
-#include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/clock_source_mock.h"
@@ -450,30 +449,6 @@ std::vector<KeysCollectionDocument> ConfigServerTestFixture::getKeys(OperationCo
     }
 
     return keys;
-}
-
-void ConfigServerTestFixture::expectSetShardVersion(
-    const HostAndPort& expectedHost,
-    const ShardType& expectedShard,
-    const NamespaceString& expectedNs,
-    boost::optional<ChunkVersion> expectedChunkVersion) {
-    onCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQ(expectedHost, request.target);
-        ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(),
-                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
-
-        SetShardVersionRequest ssv =
-            assertGet(SetShardVersionRequest::parseFromBSON(request.cmdObj));
-
-        ASSERT(ssv.isAuthoritative());
-        ASSERT_EQ(expectedNs.toString(), ssv.getNS().ns());
-
-        if (expectedChunkVersion) {
-            ASSERT_EQ(*expectedChunkVersion, ssv.getNSVersion());
-        }
-
-        return BSON("ok" << true);
-    });
 }
 
 void ConfigServerTestFixture::setupOpObservers() {

@@ -238,6 +238,7 @@ bool isQuerySbeCompatible(const CollectionPtr* collection,
     const bool allExpressionsSupported = expCtx && expCtx->sbeCompatible;
     const bool isNotCount = !(plannerOptions & QueryPlannerParams::IS_COUNT);
     const bool isNotOplog = !cq->nss().isOplog();
+    const bool isNotChangeCollection = !cq->nss().isChangeCollection();
     const bool doesNotContainMetadataRequirements = cq->metadataDeps().none();
     const bool doesNotSortOnMetaOrPathWithNumericComponents =
         !sortPattern || std::all_of(sortPattern->begin(), sortPattern->end(), [](auto&& part) {
@@ -253,9 +254,15 @@ bool isQuerySbeCompatible(const CollectionPtr* collection,
     const bool isQueryNotAgainstClusteredCollection =
         !(collection->get() && collection->get()->isClustered());
 
+    const bool doesNotRequireMatchDetails =
+        !cq->getProj() || !cq->getProj()->requiresMatchDetails();
+
+    const bool doesNotHaveElemMatchProject = !cq->getProj() || !cq->getProj()->containsElemMatch();
+
     return allExpressionsSupported && isNotCount && doesNotContainMetadataRequirements &&
         isQueryNotAgainstTimeseriesCollection && isQueryNotAgainstClusteredCollection &&
-        doesNotSortOnMetaOrPathWithNumericComponents && isNotOplog;
+        doesNotSortOnMetaOrPathWithNumericComponents && isNotOplog && doesNotRequireMatchDetails &&
+        doesNotHaveElemMatchProject && isNotChangeCollection;
 }
 
 bool validateInputParamsBindings(

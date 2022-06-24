@@ -55,6 +55,10 @@ public:
                     OID id,
                     int currentSyncSourceIndex,
                     bool isPrimary);
+    explicit ReplSetMetadata(const ReplSetMetadata&) = default;
+    ReplSetMetadata(ReplSetMetadata&&) = default;
+    ReplSetMetadata& operator=(const ReplSetMetadata&) = delete;
+    ReplSetMetadata& operator=(ReplSetMetadata&&) = default;
 
     /**
      * format:

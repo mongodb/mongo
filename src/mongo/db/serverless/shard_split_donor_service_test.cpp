@@ -90,11 +90,11 @@ StatusWith<ShardSplitDonorDocument> getStateDocument(OperationContext* opCtx,
                                                      const UUID& shardSplitId) {
     // Use kLastApplied so that we can read the state document as a secondary.
     ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kLastApplied);
-    AutoGetCollectionForRead collection(opCtx, NamespaceString::kTenantSplitDonorsNamespace);
+    AutoGetCollectionForRead collection(opCtx, NamespaceString::kShardSplitDonorsNamespace);
     if (!collection) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "Collection not found looking for state document: "
-                                    << NamespaceString::kTenantSplitDonorsNamespace.ns());
+                                    << NamespaceString::kShardSplitDonorsNamespace.ns());
     }
 
     BSONObj result;
@@ -191,6 +191,9 @@ std::ostringstream& operator<<(std::ostringstream& builder,
     switch (state) {
         case mongo::ShardSplitDonorStateEnum::kUninitialized:
             builder << "kUninitialized";
+            break;
+        case mongo::ShardSplitDonorStateEnum::kAbortingIndexBuilds:
+            builder << "kAbortingIndexBuilds";
             break;
         case mongo::ShardSplitDonorStateEnum::kAborted:
             builder << "kAborted";
@@ -348,8 +351,7 @@ public:
         // The database needs to be open before using shard split donor service.
         {
             auto opCtx = cc().makeOperationContext();
-            AutoGetDb autoDb(
-                opCtx.get(), NamespaceString::kTenantSplitDonorsNamespace.db(), MODE_X);
+            AutoGetDb autoDb(opCtx.get(), NamespaceString::kShardSplitDonorsNamespace.db(), MODE_X);
             auto db = autoDb.ensureDbExists(opCtx.get());
             ASSERT_TRUE(db);
         }
@@ -484,18 +486,14 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
     ASSERT_EQ(_uuid, serviceInstance->getId());
 
     waitForMonitorAndProcessHello();
-
     waitForReplSetStepUp(Status(ErrorCodes::OK, ""));
 
     auto result = serviceInstance->decisionFuture().get();
-
     ASSERT_TRUE(hasActiveSplitForTenants(opCtx.get(), _tenantIds));
-
     ASSERT(!result.abortReason);
     ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
 
     serviceInstance->tryForget();
-
     auto completionFuture = serviceInstance->completionFuture();
     completionFuture.wait();
 
@@ -692,7 +690,7 @@ TEST_F(ShardSplitDonorServiceTest, ReconfigToRemoveSplitConfig) {
 }
 
 // Abort scenario : abortSplit called before startSplit.
-TEST_F(ShardSplitDonorServiceTest, CreateInstanceInAbortState) {
+TEST_F(ShardSplitDonorServiceTest, CreateInstanceInAbortedState) {
     auto opCtx = makeOperationContext();
     auto serviceContext = getServiceContext();
 
@@ -1065,6 +1063,51 @@ TEST_F(ShardSplitRecipientCleanupTest, ShardSplitRecipientCleanup) {
     // deleted the local state doc so this should return NoMatchingDocument
     ASSERT_EQ(getStateDocument(opCtx.get(), _uuid).getStatus().code(),
               ErrorCodes::NoMatchingDocument);
+}
+
+class ShardSplitAbortedStepUpTest : public ShardSplitPersistenceTest {
+public:
+    repl::ReplSetConfig initialDonorConfig() override {
+        BSONArrayBuilder members;
+        members.append(BSON("_id" << 1 << "host"
+                                  << "node1"));
+
+        return repl::ReplSetConfig::parse(BSON("_id"
+                                               << "donorSetName"
+                                               << "version" << 1 << "protocolVersion" << 1
+                                               << "members" << members.arr()));
+    }
+
+    ShardSplitDonorDocument initialStateDocument() override {
+
+        auto stateDocument = defaultStateDocument();
+
+        stateDocument.setState(mongo::ShardSplitDonorStateEnum::kAborted);
+        stateDocument.setBlockTimestamp(Timestamp(1, 1));
+        stateDocument.setCommitOrAbortOpTime(repl::OpTime(Timestamp(1, 1), 1));
+
+        Status status(ErrorCodes::InternalError, abortReason);
+        BSONObjBuilder bob;
+        status.serializeErrorToBSON(&bob);
+        stateDocument.setAbortReason(bob.obj());
+
+        return stateDocument;
+    }
+
+    std::string abortReason{"Testing simulated error"};
+};
+
+TEST_F(ShardSplitAbortedStepUpTest, ShardSplitAbortedStepUp) {
+    auto opCtx = makeOperationContext();
+    auto splitService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                            ->lookupServiceByName(ShardSplitDonorService::kServiceName);
+    auto optionalDonor = ShardSplitDonorService::DonorStateMachine::lookup(
+        opCtx.get(), splitService, BSON("_id" << _uuid));
+
+    ASSERT(optionalDonor);
+    auto result = optionalDonor->get()->decisionFuture().get();
+
+    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kAborted);
 }
 
 }  // namespace mongo

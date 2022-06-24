@@ -80,13 +80,13 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(overrideBalanceRoundInterval);
 
-const Seconds kBalanceRoundDefaultInterval(10);
+const Milliseconds kBalanceRoundDefaultInterval(10 * 1000);
 
 // Sleep between balancer rounds in the case where the last round found some chunks which needed to
 // be balanced. This value should be set sufficiently low so that imbalanced clusters will quickly
 // reach balanced state, but setting it too low may cause CRUD operations to start failing due to
 // not being able to establish a stable shard version.
-const Seconds kShortBalanceRoundInterval(1);
+const Milliseconds kBalancerMigrationsThrottling(1 * 1000);
 
 /**
  * Balancer status response
@@ -293,11 +293,11 @@ void Balancer::initiateBalancer(OperationContext* opCtx) {
 
 void Balancer::interruptBalancer() {
     stdx::lock_guard<Latch> scopedLock(_mutex);
-    if (_state != kRunning)
+    if (_state != kRunning) {
         return;
+    }
 
     _state = kStopping;
-    _thread.detach();
 
     // Interrupt the balancer thread if it has been started. We are guaranteed that the operation
     // context of that thread is still alive, because we hold the balancer mutex.
@@ -312,8 +312,10 @@ void Balancer::interruptBalancer() {
 
 void Balancer::waitForBalancerToStop() {
     stdx::unique_lock<Latch> scopedLock(_mutex);
-
     _joinCond.wait(scopedLock, [this] { return _state == kStopped; });
+    if (_thread.joinable()) {
+        _thread.join();
+    }
 }
 
 void Balancer::joinCurrentRound(OperationContext* opCtx) {
@@ -612,12 +614,12 @@ void Balancer::_consumeActionStreamLoop() {
 
 void Balancer::_mainThread() {
     ON_BLOCK_EXIT([this] {
-        stdx::lock_guard<Latch> scopedLock(_mutex);
-
-        _state = kStopped;
+        {
+            stdx::lock_guard<Latch> scopedLock(_mutex);
+            _state = kStopped;
+            LOGV2_DEBUG(21855, 1, "Balancer thread terminated");
+        }
         _joinCond.notify_all();
-
-        LOGV2_DEBUG(21855, 1, "Balancer thread terminated");
     });
 
     Client::initThread("Balancer");
@@ -664,6 +666,7 @@ void Balancer::_mainThread() {
     LOGV2(6036606, "Balancer worker thread initialised. Entering main loop.");
 
     // Main balancer loop
+    auto lastMigrationTime = Date_t::fromMillisSinceEpoch(0);
     while (!_stopRequested()) {
         BalanceRoundDetails roundDetails;
 
@@ -690,6 +693,14 @@ void Balancer::_mainThread() {
                 _endRound(opCtx.get(), kBalanceRoundDefaultInterval);
                 continue;
             }
+
+            boost::optional<Milliseconds> forcedBalancerRoundInterval(boost::none);
+            overrideBalanceRoundInterval.execute([&](const BSONObj& data) {
+                forcedBalancerRoundInterval = Milliseconds(data["intervalMs"].numberInt());
+                LOGV2(21864,
+                      "overrideBalanceRoundInterval: using customized balancing interval",
+                      "balancerInterval"_attr = *forcedBalancerRoundInterval);
+            });
 
             // The current configuration is allowing the balancer to perform operations.
             // Unblock the secondary thread if needed.
@@ -739,9 +750,20 @@ void Balancer::_mainThread() {
                 if (chunksToRebalance.empty() && chunksToDefragment.empty()) {
                     LOGV2_DEBUG(21862, 1, "No need to move any chunk");
                     _balancedLastTime = 0;
+                    LOGV2_DEBUG(21863, 1, "End balancing round");
+                    _endRound(opCtx.get(),
+                              forcedBalancerRoundInterval ? *forcedBalancerRoundInterval
+                                                          : kBalanceRoundDefaultInterval);
                 } else {
+                    auto timeSinceLastMigration = Date_t::now() - lastMigrationTime;
+                    _sleepFor(opCtx.get(),
+                              forcedBalancerRoundInterval
+                                  ? *forcedBalancerRoundInterval - timeSinceLastMigration
+                                  : kBalancerMigrationsThrottling - timeSinceLastMigration);
+
                     _balancedLastTime =
                         _moveChunks(opCtx.get(), chunksToRebalance, chunksToDefragment);
+                    lastMigrationTime = Date_t::now();
 
                     roundDetails.setSucceeded(
                         static_cast<int>(chunksToRebalance.size() + chunksToDefragment.size()),
@@ -750,24 +772,13 @@ void Balancer::_mainThread() {
                     ShardingLogging::get(opCtx.get())
                         ->logAction(opCtx.get(), "balancer.round", "", roundDetails.toBSON())
                         .ignore();
+
+                    LOGV2_DEBUG(6679500, 1, "End balancing round");
+                    // Migration throttling of kBalancerMigrationsThrottling will be applied before
+                    // the next call to _moveChunks, so don't sleep here.
+                    _endRound(opCtx.get(), Milliseconds(0));
                 }
-
-                LOGV2_DEBUG(21863, 1, "End balancing round");
             }
-
-            Milliseconds balancerInterval =
-                _balancedLastTime ? kShortBalanceRoundInterval : kBalanceRoundDefaultInterval;
-
-            overrideBalanceRoundInterval.execute([&](const BSONObj& data) {
-                balancerInterval = Milliseconds(data["intervalMs"].numberInt());
-                LOGV2(21864,
-                      "overrideBalanceRoundInterval: using shorter balancing interval: "
-                      "{balancerInterval}",
-                      "overrideBalanceRoundInterval: using shorter balancing interval",
-                      "balancerInterval"_attr = balancerInterval);
-            });
-
-            _endRound(opCtx.get(), balancerInterval);
         } catch (const DBException& e) {
             LOGV2(21865,
                   "caught exception while doing balance: {error}",
@@ -976,15 +987,6 @@ int Balancer::_moveChunks(OperationContext* opCtx,
             return coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
         }();
 
-        if (serverGlobalParams.featureCompatibility.isLessThan(
-                multiversion::FeatureCompatibilityVersion::kVersion_6_0)) {
-            // TODO SERVER-65322 only use `moveRange` once v6.0 branches out
-            MoveChunkSettings settings(maxChunkSizeBytes,
-                                       balancerConfig->getSecondaryThrottle(),
-                                       balancerConfig->waitForDelete());
-            return _commandScheduler->requestMoveChunk(opCtx, migrateInfo, settings);
-        }
-
         MoveRangeRequestBase requestBase(migrateInfo.to);
         requestBase.setWaitForDelete(balancerConfig->waitForDelete());
         requestBase.setMin(migrateInfo.minKey);
@@ -1086,7 +1088,7 @@ SharedSemiFuture<void> Balancer::applyLegacyChunkSizeConstraintsOnClusterData(
             NamespaceString::kLogicalSessionsNamespace,
             0,
             boost::none /*defragmentCollection*/,
-            boost::none /*enableAutoSplitter*/);
+            false /*enableAutoSplitter*/);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
         // config.system.collections does not appear in config.collections; continue.
     }

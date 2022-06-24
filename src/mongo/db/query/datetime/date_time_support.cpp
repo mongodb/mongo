@@ -76,6 +76,8 @@ long long seconds(Date_t date) {
 // Format specifier map when parsing a date from a string with a required format.
 //
 const std::vector<timelib_format_specifier> kDateFromStringFormatMap = {
+    {'b', TIMELIB_FORMAT_TEXTUAL_MONTH_3_LETTER},
+    {'B', TIMELIB_FORMAT_TEXTUAL_MONTH_FULL},
     {'d', TIMELIB_FORMAT_DAY_TWO_DIGIT},
     {'G', TIMELIB_FORMAT_YEAR_ISO},
     {'H', TIMELIB_FORMAT_HOUR_TWO_DIGIT_24_MAX},
@@ -775,6 +777,7 @@ static const StringMap<DayOfWeek> dayOfWeekNameToDayOfWeekMap{
     {"sunday", DayOfWeek::sunday},
     {"sun", DayOfWeek::sunday},
 };
+
 }  // namespace
 
 long long dateDiff(Date_t startDate,

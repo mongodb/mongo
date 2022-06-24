@@ -36,7 +36,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/client/query.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbmessage.h"
 

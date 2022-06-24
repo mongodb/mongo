@@ -3961,7 +3961,8 @@ public:
 
             auto& indexMetadata = collMetadata->indexes[offset];
             indexMetadata.multikeyPaths = {};
-            writer.getWritableCollection()->replaceMetadata(&_opCtx, std::move(collMetadata));
+            writer.getWritableCollection(&_opCtx)->replaceMetadata(&_opCtx,
+                                                                   std::move(collMetadata));
             wunit.commit();
         }
 
@@ -3969,9 +3970,9 @@ public:
         auto descriptor = coll()->getIndexCatalog()->findIndexByName(&_opCtx, indexName);
         {
             WriteUnitOfWork wunit(&_opCtx);
-            auto writableCatalog = writer.getWritableCollection()->getIndexCatalog();
+            auto writableCatalog = writer.getWritableCollection(&_opCtx)->getIndexCatalog();
             descriptor = writableCatalog->refreshEntry(&_opCtx,
-                                                       writer.getWritableCollection(),
+                                                       writer.getWritableCollection(&_opCtx),
                                                        descriptor,
                                                        CreateIndexEntryFlags::kIsReady);
             wunit.commit();

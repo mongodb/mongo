@@ -78,10 +78,11 @@ can traverse through is particularly useful when there are a larger number
 of records present outside of the key range which are not visible to the
 search_near caller.
 
-Cursor positions do not survive transactions: cursors that are open during
-WT_SESSION::begin_transaction, WT_SESSION::commit_transaction or
-WT_SESSION::rollback_transaction will lose their position as if
-WT_CURSOR::reset was called.
+After a transaction is successfully committed, cursors in the session retain
+their position, as well as any currently set keys or values they may have.
+If a transaction is rolled back for any reason, cursors in the session are
+reset (as if the WT_CURSOR::reset method was called), discarding any cursor
+position as well as any currently set keys or values.
 
 Cursors can be configured to move to a random position with WT_CURSOR::next
 is called, see @subpage cursor_random for details.
@@ -146,7 +147,7 @@ WT_CURSOR::search and WT_CURSOR::search_near; the operations that modify
 the underlying data are WT_CURSOR::insert, WT_CURSOR::update and
 WT_CURSOR::remove.
 
-If a cursor operation fails (for example, due to a ::WT_ROLLBACK error),
+If a cursor operation fails (for example, due to a ::WT_NOTFOUND error),
 it may be retried without calling WT_CURSOR::set_key or
 WT_CURSOR::set_value again.  That is, the cursor may still reference the
 application-supplied memory until the cursor is successfully positioned,

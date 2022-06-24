@@ -63,11 +63,6 @@ class test_alter03(TieredConfigMixin, wttest.WiredTigerTestCase):
             # should contain the provided file meta string.
             if self.is_tiered_scenario():
                 c.set_key('file:' + self.name + '-0000000001.wtobj')
-                
-                # Removing quotes wrapping app metadata value just to make the test pass.
-                # FIXME: WT-9036
-                if (file_metastr == 'app_metadata="meta_data_1",'):
-                    file_metastr = 'app_metadata=meta_data_1,'
             else:
                 c.set_key('file:' + self.name + '.wt')
 

@@ -91,6 +91,14 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
+    bool shouldCheckoutSession() const final {
+        return false;
+    }
+
     bool errmsgRun(OperationContext* opCtx,
                    const std::string& dbname,
                    const BSONObj& cmdObj,

@@ -6,11 +6,11 @@
  *   # The test assumes no index exists on the time field. shardCollection implicitly creates an
  *   # index.
  *   assumes_unsharded_collection,
+ *   does_not_support_stepdowns,
  *   does_not_support_transactions,
- *   requires_getmore,
- *   requires_fcv_52,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
+ *   tenant_migration_incompatible,
  * ]
  */
 (function() {

@@ -326,6 +326,7 @@ env.Library(
     source=[
         "count_cmd.cpp",
         "cqf/cqf_aggregate.cpp",
+        "cqf/cqf_command_utils.cpp",
         "create_command.cpp",
         "create_indexes.cpp",
         "current_op.cpp",
@@ -369,6 +370,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/catalog/index_key_validate',
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',
+        '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
         '$BUILD_DIR/mongo/db/command_can_run_here',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',

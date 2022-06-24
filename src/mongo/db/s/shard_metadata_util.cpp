@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/shard_metadata_util.h"
-
-#include <memory>
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
@@ -48,7 +43,6 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace shardmetadatautil {
@@ -105,8 +99,9 @@ Status unsetPersistedRefreshFlags(OperationContext* opCtx,
     // Set 'refreshing' to false and update the last refreshed collection version.
     BSONObjBuilder updateBuilder;
     updateBuilder.append(ShardCollectionType::kRefreshingFieldName, false);
-    updateBuilder.appendTimestamp(ShardCollectionType::kLastRefreshedCollectionVersionFieldName,
-                                  refreshedVersion.toLong());
+    updateBuilder.appendTimestamp(
+        ShardCollectionType::kLastRefreshedCollectionMajorMinorVersionFieldName,
+        refreshedVersion.toLong());
 
     return updateShardCollectionsEntry(opCtx,
                                        BSON(ShardCollectionType::kNssFieldName << nss.ns()),
@@ -141,12 +136,11 @@ StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
                         entry.getRefreshing() ? *entry.getRefreshing() : true,
                         entry.getLastRefreshedCollectionVersion()
                             ? *entry.getLastRefreshedCollectionVersion()
-                            : ChunkVersion(0, 0, entry.getEpoch(), entry.getTimestamp())};
+                            : ChunkVersion({entry.getEpoch(), entry.getTimestamp()}, {0, 0})};
 }
 
 StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
-
     try {
         DBDirectClient client(opCtx);
         FindCommandRequest findRequest{NamespaceString::kShardConfigCollectionsNamespace};
@@ -211,7 +205,8 @@ Status updateShardCollectionsEntry(OperationContext* opCtx,
     if (upsert) {
         // If upserting, this should be an update from the config server that does not have shard
         // refresh / migration inc signal information.
-        invariant(!update.hasField(ShardCollectionType::kLastRefreshedCollectionVersionFieldName));
+        invariant(!update.hasField(
+            ShardCollectionType::kLastRefreshedCollectionMajorMinorVersionFieldName));
     }
 
     try {

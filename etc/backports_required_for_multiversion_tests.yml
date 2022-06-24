@@ -68,7 +68,7 @@ last-continuous:
       test_file: jstests/replsets/sessions_collection_reaping.js
     - ticket: SERVER-58203
       test_file: jstests/sharding/query/pipeline_length_limit.js
-    - ticket: SERVER-56887
+    - ticket: SERVER-65101
       test_file: jstests/sharding/database_versioning_all_commands.js
     - ticket: SERVER-57617
       test_file: jstests/replsets/tenant_migration_recipient_fetches_retryable_writes_oplog_entries.js
@@ -260,6 +260,10 @@ last-continuous:
       test_file: jstests/core/or_to_in.js
     - ticket: SERVER-66422
       test_file: jstests/sharding/resharding_metrics.js
+    - ticket: SERVER-50792
+      test_file: jstests/core/check_shard_index.js
+    - ticket: SERVER-50792
+      test_file: jstests/sharding/refine_collection_shard_key_basic.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -291,7 +295,7 @@ last-lts:
       test_file: jstests/replsets/check_replication_hello_response_fields.js
     - ticket: SERVER-50640
       test_file: jstests/core/views/views_all_commands.js
-    - ticket: SERVER-56887
+    - ticket: SERVER-65101
       test_file: jstests/sharding/database_versioning_all_commands.js
     - ticket: SERVER-49988
       test_file: jstests/sharding/hello_response_validation.js
@@ -653,6 +657,10 @@ last-lts:
       test_file: jstests/core/or_to_in.js
     - ticket: SERVER-66422
       test_file: jstests/sharding/resharding_metrics.js
+    - ticket: SERVER-50792
+      test_file: jstests/core/check_shard_index.js
+    - ticket: SERVER-50792
+      test_file: jstests/sharding/refine_collection_shard_key_basic.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

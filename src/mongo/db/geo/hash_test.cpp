@@ -148,6 +148,74 @@ TEST(GeoHash, UnhashFastMatchesUnhashSlow) {
     }
 }
 
+TEST(GeoHash, HashAndUnhash) {
+    PseudoRandom random(12345);
+    for (int i = 0; i < 1'000; i++) {
+        auto x = random.nextInt32();
+        auto y = random.nextInt32();
+        auto hash = GeoHash(x, y, 32);
+        unsigned int unhashedX, unhashedY;
+        hash.unhash(&unhashedX, &unhashedY);
+        ASSERT_EQ(x, unhashedX);
+        ASSERT_EQ(y, unhashedY);
+    }
+}
+
+TEST(GeoHash, HashCropsBits) {
+    // The following numbers were generated with this code snippet on Linux and hardcoded.
+    // PseudoRandom random(12345);
+    {
+        auto x = -2067174821;
+        auto y = 1127948890;
+        auto bits = 1;
+        auto hash = GeoHash(x, y, bits);
+        ASSERT_EQ(hash.toString(), "10");
+    }
+    {
+        auto x = -847616485;
+        auto y = -2132331508;
+        auto bits = 3;
+        auto hash = GeoHash(x, y, bits);
+        ASSERT_EQ(hash.toString(), "111000");
+    }
+    {
+        auto x = -818733575;
+        auto y = -721367113;
+        auto bits = 6;
+        auto hash = GeoHash(x, y, bits);
+        ASSERT_EQ(hash.toString(), "111100011011");
+    }
+    {
+        auto x = 1272197554;
+        auto y = 1923758992;
+        auto bits = 15;
+        auto hash = GeoHash(x, y, bits);
+        ASSERT_EQ(hash.toString(), "001101011000111011100110011001");
+    }
+    {
+        auto x = -1516163863;
+        auto y = -158391651;
+        auto bits = 23;
+        auto hash = GeoHash(x, y, bits);
+        ASSERT_EQ(hash.toString(), "1101110100110110110010000101011100001100101001");
+    }
+    {
+        auto x = -1665346465;
+        auto y = 1063852771;
+        auto bits = 30;
+        auto hash = GeoHash(x, y, bits);
+        ASSERT_EQ(hash.toString(), "100001111111010110011110111000011010001101100100011101101010");
+    }
+    {
+        auto x = 327397251;
+        auto y = 471329956;
+        auto bits = 32;
+        auto hash = GeoHash(x, y, bits);
+        ASSERT_EQ(hash.toString(),
+                  "0000001101011010100000010001111111011100111110101100010000011010");
+    }
+}
+
 TEST(GeoHashConvertor, EdgeLength) {
     const double kError = 10E-15;
     GeoHashConverter::Parameters params{};

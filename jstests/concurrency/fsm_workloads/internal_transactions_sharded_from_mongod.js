@@ -8,7 +8,8 @@
  * @tags: [
  *  requires_fcv_60,
  *  requires_sharding,
- *  uses_transactions
+ *  uses_transactions,
+ *  antithesis_incompatible
  * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');
@@ -111,21 +112,16 @@ var $config = extendWorkload($config, function($config, $super) {
         }
     };
 
-    $config.data.killAllSessions = function killAllSessions(cluster) {
-        cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(db.adminCommand({killAllSessions: []}));
-        });
-    };
-
     $config.teardown = function teardown(db, collName, cluster) {
         $super.teardown.apply(this, arguments);
 
         // If a shard node that is acting as a router for an internal transaction is
-        // killed/terminated/stepped down, the transaction would be left in-progress since nothing
+        // killed/terminated/stepped down or the transaction's session is killed while running a
+        // non-retryable transaction, the transaction would be left in-progress since nothing
         // would aborted it. Such dangling transactions can cause the CheckReplDBHash hook to hang
         // as the fsyncLock command requires taking the global S lock and it cannot do that while
         // there is an in-progress transaction.
-        if (TestData.runningWithShardStepdowns) {
+        if (TestData.runningWithShardStepdowns || this.retryOnKilledSession) {
             this.killAllSessions(cluster);
         }
     };

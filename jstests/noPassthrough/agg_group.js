@@ -18,23 +18,12 @@
 
 load("jstests/libs/analyze_plan.js");
 
-// As of now, $group pushdown to SBE feature is not enabled by default. So, enables it with a
-// minimal configuration of a sharded cluster.
-//
-// TODO Remove {setParameter: "featureFlagSBEGroupPushdown=true"} when the feature is enabled by
-// default.
-const st = new ShardingTest(
-    {config: 1, shards: 1, shardOptions: {setParameter: "featureFlagSBEGroupPushdown=true"}});
+const st = new ShardingTest({config: 1, shards: 1});
 
 // This database name can provide multiple similar test cases with a good separate namespace and
 // each test case may create a separate collection for its own dataset.
 const db = st.getDB(jsTestName());
 const dbAtShard = st.shard0.getDB(jsTestName());
-
-// Makes sure that $group pushdown to SBE feature is enabled.
-assert(
-    assert.commandWorked(dbAtShard.adminCommand({getParameter: 1, featureFlagSBEGroupPushdown: 1}))
-        .featureFlagSBEGroupPushdown.value);
 
 // Makes sure that the test db is sharded and the data is stored into the only shard.
 assert.commandWorked(st.s0.adminCommand({enableSharding: db.getName()}));

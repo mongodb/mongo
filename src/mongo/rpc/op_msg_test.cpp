@@ -34,7 +34,15 @@
 
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/auth/authorization_manager_impl.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/authorization_session_impl.h"
+#include "mongo/db/auth/authz_manager_external_state_mock.h"
+#include "mongo/db/auth/security_token_gen.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
@@ -44,6 +52,26 @@
 
 
 namespace mongo {
+
+class AuthorizationSessionImplTestHelper {
+public:
+    /**
+     * Synthesize a user with the useTenant privilege and add them to the authorization session.
+     */
+    static void grantUseTenant(Client& client) {
+        User user(UserName("useTenant", "admin"));
+        user.setPrivileges(
+            {Privilege(ResourcePattern::forClusterResource(), ActionType::useTenant)});
+        auto* as = dynamic_cast<AuthorizationSessionImpl*>(AuthorizationSession::get(client));
+        if (as->_authenticatedUser != boost::none) {
+            as->logoutAllDatabases(&client, "AuthorizationSessionImplTestHelper"_sd);
+        }
+        as->_authenticatedUser = std::move(user);
+        as->_authenticationMode = AuthorizationSession::AuthenticationMode::kConnection;
+        as->_updateInternalAuthorizationState();
+    }
+};
+
 namespace rpc {
 namespace test {
 namespace {
@@ -761,6 +789,122 @@ TEST(OpMsgSerializer, SetFlagWorks) {
             ASSERT_EQ(OpMsg::flags(msg), ~0u) << flags;
         }
     }
+}
+
+class OpMsgWithAuth : public mongo::ScopedGlobalServiceContextForTest, public unittest::Test {
+protected:
+    void setUp() final {
+        auto authzManagerState = std::make_unique<AuthzManagerExternalStateMock>();
+        auto authzManager = std::make_unique<AuthorizationManagerImpl>(
+            getServiceContext(), std::move(authzManagerState));
+        authzManager->setAuthEnabled(true);
+        AuthorizationManager::set(getServiceContext(), std::move(authzManager));
+
+        client = getServiceContext()->makeClient("test");
+    }
+
+    BSONObj makeSecurityToken(const UserName& userName) {
+        constexpr auto authUserFieldName = auth::SecurityToken::kAuthenticatedUserFieldName;
+        auto authUser = userName.toBSON(true /* serialize token */);
+        ASSERT_EQ(authUser["tenant"_sd].type(), jstOID);
+        using VTS = auth::ValidatedTenancyScope;
+        return VTS(BSON(authUserFieldName << authUser), VTS::TokenForTestingTag{})
+            .getOriginalToken();
+    }
+
+    ServiceContext::UniqueClient client;
+};
+
+TEST_F(OpMsgWithAuth, ParseValidatedTenancyScopeFromSecurityToken) {
+    gMultitenancySupport = true;
+
+    const auto kTenantId = TenantId(OID::gen());
+    const auto token = makeSecurityToken(UserName("user", "admin", kTenantId));
+    auto msg =
+        OpMsgBytes{
+            kNoFlags,  //
+            kBodySection,
+            fromjson("{ping: 1}"),
+
+            kDocSequenceSection,
+            Sized{
+                "docs",  //
+                fromjson("{a: 1}"),
+                fromjson("{a: 2}"),
+            },
+
+            kSecurityTokenSection,
+            token,
+        }
+            .parse(client.get());
+
+    auto body = BSON("ping" << 1);
+
+    ASSERT(msg.validatedTenancyScope);
+    ASSERT_EQ(msg.validatedTenancyScope->tenantId(), kTenantId);
+}
+
+TEST_F(OpMsgWithAuth, ParseValidatedTenancyScopeFromDollarTenant) {
+    gMultitenancySupport = true;
+    AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
+
+    const auto kTenantId = TenantId(OID::gen());
+    const auto body = BSON("ping" << 1 << "$tenant" << kTenantId);
+    auto msg =
+        OpMsgBytes{
+            kNoFlags,  //
+            kBodySection,
+            body,
+
+            kDocSequenceSection,
+            Sized{
+                "docs",  //
+                fromjson("{a: 1}"),
+                fromjson("{a: 2}"),
+            },
+        }
+            .parse(client.get());
+
+    ASSERT(msg.validatedTenancyScope);
+    ASSERT_EQ(msg.validatedTenancyScope->tenantId(), kTenantId);
+}
+
+TEST_F(OpMsgWithAuth, ValidatedTenancyScopeShouldNotBeSerialized) {
+    gMultitenancySupport = true;
+    AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
+
+    const auto kTenantId = TenantId(OID::gen());
+    const auto body = BSON("ping" << 1 << "$tenant" << kTenantId);
+    auto msgBytes = OpMsgBytes{
+        kNoFlags,  //
+        kBodySection,
+        body,
+
+        kDocSequenceSection,
+        Sized{
+            "docs",  //
+            fromjson("{a: 1}"),
+            fromjson("{a: 2}"),
+        },
+    };
+    auto msg = msgBytes.parse(client.get());
+    ASSERT(msg.validatedTenancyScope);
+
+    auto serializedMsg = msg.serialize();
+    testSerializer(serializedMsg,
+                   OpMsgBytes{
+                       kNoFlags,  //
+
+                       kDocSequenceSection,
+                       Sized{
+                           "docs",  //
+                           fromjson("{a: 1}"),
+                           fromjson("{a: 2}"),
+                       },
+
+                       kBodySection,
+                       body,
+                   });
 }
 
 TEST(OpMsgRequest, GetDatabaseWorks) {

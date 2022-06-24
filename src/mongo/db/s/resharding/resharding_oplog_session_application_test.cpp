@@ -705,6 +705,16 @@ TEST_F(ReshardingOplogSessionApplicationTest,
     TxnNumber internalTxnTxnNumber = 1;
     StmtId stmtId = 2;
 
+    // Make two in progress transactions so the one started by resharding must block.
+    {
+        auto newClientOwned = getServiceContext()->makeClient("newClient");
+        AlternativeClientRegion acr(newClientOwned);
+        auto newOpCtx = cc().makeOperationContext();
+        makeInProgressTxn(newOpCtx.get(),
+                          makeLogicalSessionIdWithTxnNumberAndUUIDForTest(retryableWriteLsid,
+                                                                          retryableWriteTxnNumber),
+                          internalTxnTxnNumber);
+    }
     {
         auto opCtx = makeOperationContext();
         makeInProgressTxn(opCtx.get(), internalTxnLsid, internalTxnTxnNumber);

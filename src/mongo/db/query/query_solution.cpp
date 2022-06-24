@@ -332,7 +332,7 @@ std::unique_ptr<QuerySolutionNode> CollectionScanNode::clone() const {
     copy->tailable = this->tailable;
     copy->direction = this->direction;
     copy->shouldTrackLatestOplogTimestamp = this->shouldTrackLatestOplogTimestamp;
-    copy->assertTsHasNotFallenOffOplog = this->assertTsHasNotFallenOffOplog;
+    copy->assertTsHasNotFallenOff = this->assertTsHasNotFallenOff;
     copy->shouldWaitForOplogVisibility = this->shouldWaitForOplogVisibility;
     copy->clusteredIndex = this->clusteredIndex;
     copy->hasCompatibleCollation = this->hasCompatibleCollation;

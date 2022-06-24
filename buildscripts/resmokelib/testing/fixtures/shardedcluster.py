@@ -8,6 +8,7 @@ import pymongo
 import pymongo.errors
 
 import buildscripts.resmokelib.testing.fixtures.interface as interface
+import buildscripts.resmokelib.testing.fixtures.external as external
 
 
 class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-instance-attributes
@@ -376,6 +377,53 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         connection_string = shard.get_internal_connection_string()
         self.logger.info("Adding %s as a shard...", connection_string)
         client.admin.command({"addShard": connection_string})
+
+
+class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixture):
+    """Fixture to interact with external sharded cluster fixture."""
+
+    REGISTERED_NAME = "ExternalShardedClusterFixture"
+
+    def __init__(self, logger, job_num, fixturelib, shell_conn_string):
+        """Initialize ExternalShardedClusterFixture."""
+        external.ExternalFixture.__init__(self, logger, job_num, fixturelib, shell_conn_string)
+        ShardedClusterFixture.__init__(self, logger, job_num, fixturelib, mongod_options={})
+
+    def setup(self):
+        """Use ExternalFixture method."""
+        return external.ExternalFixture.setup(self)
+
+    def pids(self):
+        """Use ExternalFixture method."""
+        return external.ExternalFixture.pids(self)
+
+    def await_ready(self):
+        """Use ExternalFixture method."""
+        return external.ExternalFixture.await_ready(self)
+
+    def _do_teardown(self, mode=None):
+        """Use ExternalFixture method."""
+        return external.ExternalFixture._do_teardown(self)
+
+    def _is_process_running(self):
+        """Use ExternalFixture method."""
+        return external.ExternalFixture._is_process_running(self)
+
+    def is_running(self):
+        """Use ExternalFixture method."""
+        return external.ExternalFixture.is_running(self)
+
+    def get_internal_connection_string(self):
+        """Use ExternalFixture method."""
+        return external.ExternalFixture.get_internal_connection_string(self)
+
+    def get_driver_connection_url(self):
+        """Use ExternalFixture method."""
+        return external.ExternalFixture.get_driver_connection_url(self)
+
+    def get_node_info(self):
+        """Use ExternalFixture method."""
+        return external.ExternalFixture.get_node_info(self)
 
 
 class _MongoSFixture(interface.Fixture):

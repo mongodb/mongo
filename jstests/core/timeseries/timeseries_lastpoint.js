@@ -2,13 +2,14 @@
  * Tests the optimization of "lastpoint"-type queries on time-series collections.
  *
  * @tags: [
+ *   # This test depends on certain writes ending up in the same bucket. Stepdowns may result in
+ *   # writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
+ *   # Same goes for tenant migrations.
+ *   tenant_migration_incompatible,
  *   does_not_support_transactions,
  *   requires_timeseries,
  *   requires_pipeline_optimization,
- *   requires_fcv_53,
- *   # TODO (SERVER-63590): Investigate presence of getmore tag in timeseries jstests.
- *   requires_getmore,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
  * ]

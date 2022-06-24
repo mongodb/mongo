@@ -1640,6 +1640,15 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
         if (op->type == WT_TXN_OP_REF_DELETE) {
             WT_REF_LOCK(session, op->u.ref, &previous_state);
+
+            /*
+             * Only two cases are possible. First: the state is WT_REF_DELETED. In this case
+             * ft_info.del cannot be NULL yet because an uncommitted operation cannot have reached
+             * global visibility. Otherwise: there is an uncommitted delete operation we're
+             * handling, so the page can't be in a non-deleted state, and the tree can't be
+             * readonly. Therefore the page must have been instantiated, the state must be
+             * WT_REF_MEM, and there should be an update list in ft_info.update.
+             */
             if (previous_state == WT_REF_DELETED)
                 op->u.ref->ft_info.del->committed = true;
             else
@@ -1852,7 +1861,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
                 }
             break;
         case WT_TXN_OP_REF_DELETE:
-            __wt_txn_op_apply_prepare_state(session, op->u.ref, false);
+            __wt_txn_op_delete_apply_prepare_state(session, op->u.ref, false);
             break;
         case WT_TXN_OP_TRUNCATE_COL:
         case WT_TXN_OP_TRUNCATE_ROW:

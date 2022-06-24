@@ -203,13 +203,14 @@ __wt_txn_unmodify(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_txn_op_apply_prepare_state --
+ * __wt_txn_op_delete_apply_prepare_state --
  *     Apply the correct prepare state and the timestamp to the ref and to any updates in the page
  *     del update list.
  */
 static inline void
-__wt_txn_op_apply_prepare_state(WT_SESSION_IMPL *session, WT_REF *ref, bool commit)
+__wt_txn_op_delete_apply_prepare_state(WT_SESSION_IMPL *session, WT_REF *ref, bool commit)
 {
+    WT_PAGE_DELETED *page_del;
     WT_TXN *txn;
     WT_UPDATE **updp;
     wt_timestamp_t ts;
@@ -230,24 +231,41 @@ __wt_txn_op_apply_prepare_state(WT_SESSION_IMPL *session, WT_REF *ref, bool comm
 
     /*
      * Timestamps and prepare state are in the page deleted structure for truncates, or in the
-     * updates in the case of instantiated pages.
+     * updates in the case of instantiated pages. In the case of instantiated pages we may also need
+     * to update the page deleted structure saved in page->modify.
+     *
+     * Only two cases are possible. First: the state is WT_REF_DELETED. In this case ft_info.del
+     * cannot be NULL yet because an uncommitted operation cannot have reached global visibility.
+     * Otherwise: there is an uncommitted delete operation we're handling, so the page can't be in a
+     * non-deleted state, and the tree can't be readonly. Therefore the page must have been
+     * instantiated, the state must be WT_REF_MEM, and there should be an update list in
+     * ft_info.update. (But just in case, allow the update list to be null. Perhaps the page was
+     * truncated when all items on it were already deleted, so no tombstones were created during
+     * instantiation.)
      */
-    if (previous_state == WT_REF_DELETED) {
-        ref->ft_info.del->timestamp = ts;
+    if (previous_state == WT_REF_DELETED)
+        page_del = ref->ft_info.del;
+    else {
+        if ((updp = ref->ft_info.update) != NULL)
+            for (; *updp != NULL; ++updp) {
+                (*updp)->start_ts = ts;
+                /*
+                 * Holding the ref locked means we have exclusive access, so if we are committing we
+                 * don't need to use the prepare locked transition state.
+                 */
+                (*updp)->prepare_state = prepare_state;
+                if (commit)
+                    (*updp)->durable_ts = txn->durable_timestamp;
+            }
+        WT_ASSERT(session, ref->page != NULL && ref->page->modify != NULL);
+        page_del = ref->page->modify->page_del;
+    }
+    if (page_del != NULL) {
+        page_del->timestamp = ts;
         if (commit)
-            ref->ft_info.del->durable_timestamp = txn->durable_timestamp;
-        WT_PUBLISH(ref->ft_info.del->prepare_state, prepare_state);
-    } else if ((updp = ref->ft_info.update) != NULL)
-        for (; *updp != NULL; ++updp) {
-            (*updp)->start_ts = ts;
-            /*
-             * Holding the ref locked means we have exclusive access, so if we are committing we
-             * don't need to use the prepare locked transition state.
-             */
-            (*updp)->prepare_state = prepare_state;
-            if (commit)
-                (*updp)->durable_ts = txn->durable_timestamp;
-        }
+            page_del->durable_timestamp = txn->durable_timestamp;
+        WT_PUBLISH(page_del->prepare_state, prepare_state);
+    }
 
     WT_REF_UNLOCK(ref, previous_state);
 }
@@ -259,6 +277,7 @@ __wt_txn_op_apply_prepare_state(WT_SESSION_IMPL *session, WT_REF *ref, bool comm
 static inline void
 __wt_txn_op_delete_commit_apply_timestamps(WT_SESSION_IMPL *session, WT_REF *ref)
 {
+    WT_PAGE_DELETED *page_del;
     WT_TXN *txn;
     WT_UPDATE **updp;
     uint8_t previous_state;
@@ -271,17 +290,31 @@ __wt_txn_op_delete_commit_apply_timestamps(WT_SESSION_IMPL *session, WT_REF *ref
     /*
      * Timestamps are in the page deleted structure for truncates, or in the updates in the case of
      * instantiated pages. Both commit and durable timestamps need to be updated.
+     *
+     * Only two cases are possible. First: the state is WT_REF_DELETED. In this case ft_info.del
+     * cannot be NULL yet because an uncommitted operation cannot have reached global visibility.
+     * Otherwise: there is an uncommitted delete operation we're handling, so the page can't be in a
+     * non-deleted state, and the tree can't be readonly. Therefore the page must have been
+     * instantiated, the state must be WT_REF_MEM, and there should be an update list in
+     * ft_info.update. (But just in case, allow the update list to be null. Perhaps the page was
+     * truncated when all items on it were already deleted, so no tombstones were created during
+     * instantiation.)
      */
-    if (previous_state == WT_REF_DELETED) {
-        if (ref->ft_info.del->timestamp == WT_TS_NONE) {
-            ref->ft_info.del->timestamp = txn->commit_timestamp;
-            ref->ft_info.del->durable_timestamp = txn->durable_timestamp;
-        }
-    } else if ((updp = ref->ft_info.update) != NULL)
-        for (; *updp != NULL; ++updp) {
-            (*updp)->start_ts = txn->commit_timestamp;
-            (*updp)->durable_ts = txn->durable_timestamp;
-        }
+    if (previous_state == WT_REF_DELETED)
+        page_del = ref->ft_info.del;
+    else {
+        if ((updp = ref->ft_info.update) != NULL)
+            for (; *updp != NULL; ++updp) {
+                (*updp)->start_ts = txn->commit_timestamp;
+                (*updp)->durable_ts = txn->durable_timestamp;
+            }
+        WT_ASSERT(session, ref->page != NULL && ref->page->modify != NULL);
+        page_del = ref->page->modify->page_del;
+    }
+    if (page_del != NULL && page_del->timestamp == WT_TS_NONE) {
+        page_del->timestamp = txn->commit_timestamp;
+        page_del->durable_timestamp = txn->durable_timestamp;
+    }
 
     WT_REF_UNLOCK(ref, previous_state);
 }
@@ -317,7 +350,7 @@ __wt_txn_op_set_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op)
          * transaction commit call.
          */
         if (op->type == WT_TXN_OP_REF_DELETE)
-            __wt_txn_op_apply_prepare_state(session, op->u.ref, true);
+            __wt_txn_op_delete_apply_prepare_state(session, op->u.ref, true);
         else {
             upd = op->u.op_upd;
 
@@ -400,7 +433,10 @@ __wt_txn_modify_page_delete(WT_SESSION_IMPL *session, WT_REF *ref)
     op->type = WT_TXN_OP_REF_DELETE;
     op->u.ref = ref;
 
-    /* This access to the WT_PAGE_DELETED structure is safe, caller has the WT_REF locked. */
+    /*
+     * This access to the WT_PAGE_DELETED structure is safe; caller has the WT_REF locked, and in
+     * fact just allocated the structure to fill in.
+     */
     ref->ft_info.del->txnid = txn->id;
     __wt_txn_op_set_timestamp(session, op);
 
@@ -519,6 +555,11 @@ __txn_visible_all_id(WT_SESSION_IMPL *session, uint64_t id)
 
     txn = session->txn;
 
+    /* Make sure that checkpoint cursor transactions only read checkpoints, except for metadata. */
+    WT_ASSERT(session,
+      (session->dhandle != NULL && WT_IS_METADATA(session->dhandle)) ||
+        WT_READING_CHECKPOINT(session) == F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT));
+
     /*
      * When reading from a checkpoint, all readers use the same snapshot, so a transaction is
      * globally visible if it is visible in that snapshot. Note that this can cause things that were
@@ -528,8 +569,17 @@ __txn_visible_all_id(WT_SESSION_IMPL *session, uint64_t id)
      * was taken becomes not globally visible in the checkpoint) never happen as this violates basic
      * assumptions about visibility. (And, concretely, it can cause stale history store entries to
      * come back to life and produce wrong answers.)
+     *
+     * Note: we use the transaction to check this rather than testing WT_READING_CHECKPOINT because
+     * reading the metadata while working with a checkpoint cursor will borrow the transaction; it
+     * then ends up using it to read a non-checkpoint tree. This is believed to be ok because the
+     * metadata is always read-uncommitted, but we want to still use the checkpoint-cursor
+     * visibility logic. Using the regular visibility logic with a checkpoint cursor transaction can
+     * be logically invalid (it is possible that way for something to be globally visible but
+     * specifically invisible) and also can end up comparing transaction ids from different database
+     * opens.
      */
-    if (WT_READING_CHECKPOINT(session))
+    if (F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT))
         return (__wt_txn_visible_id_snapshot(
           id, txn->snap_min, txn->snap_max, txn->snapshot, txn->snapshot_count));
     oldest_id = __wt_txn_oldest_id(session);
@@ -568,8 +618,13 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t times
     if (timestamp == WT_TS_NONE)
         return (true);
 
+    /* Make sure that checkpoint cursor transactions only read checkpoints, except for metadata. */
+    WT_ASSERT(session,
+      (session->dhandle != NULL && WT_IS_METADATA(session->dhandle)) ||
+        WT_READING_CHECKPOINT(session) == F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT));
+
     /* When reading a checkpoint, use the checkpoint state instead of the current state. */
-    if (WT_READING_CHECKPOINT(session))
+    if (F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT))
         return (session->txn->checkpoint_oldest_timestamp != WT_TS_NONE &&
           timestamp <= session->txn->checkpoint_oldest_timestamp);
 
@@ -1139,9 +1194,8 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
             WT_RET(__wt_session_copy_values(session));
 
         /*
-         * Stall here if the cache is completely full. We have allocated a transaction ID which
-         * makes it possible for eviction to decide we're contributing to the problem and return
-         * WT_ROLLBACK. The WT_SESSION.begin_transaction API can't return rollback, continue on.
+         * Stall here if the cache is completely full. Eviction check can return rollback, but the
+         * WT_SESSION.begin_transaction API can't, continue on.
          */
         WT_RET_ERROR_OK(__wt_cache_eviction_check(session, false, true, NULL), WT_ROLLBACK);
 

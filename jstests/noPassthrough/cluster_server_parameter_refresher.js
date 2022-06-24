@@ -2,9 +2,8 @@
  * Checks that the mongos cluster server parameter refresh job runs as expected.
  *
  * @tags: [
- *   # Requires all nodes to be running the latest binary.
+ *   # Requires all nodes to be running at least 6.1.
  *   requires_fcv_61,
- *   featureFlagClusterWideConfig,
  *   featureFlagClusterWideConfigM2,
  *   does_not_support_stepdowns,
  *   requires_replication,

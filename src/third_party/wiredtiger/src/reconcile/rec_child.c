@@ -13,39 +13,46 @@
  *     Handle pages with leaf pages in the WT_REF_DELETED state.
  */
 static int
-__rec_child_deleted(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_CHILD_MODIFY_STATE *cmsp)
+__rec_child_deleted(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref,
+  WT_PAGE_DELETED *page_del, WT_CHILD_MODIFY_STATE *cmsp)
 {
-    WT_PAGE_DELETED *page_del;
-    WT_TXN *txn;
     uint8_t prepare_state;
 
     cmsp->state = WT_CHILD_IGNORE;
 
-    txn = session->txn;
-
     /*
-     * The complicated case is a fast-delete which may not be visible or stable. Otherwise, discard
-     * any underlying disk blocks and don't write anything.
+     * If there's no page-delete structure, the truncate must be globally visible. Discard any
+     * underlying disk blocks and don't write anything in the internal page.
      */
-    page_del = ref->ft_info.del;
     if (page_del == NULL)
-        return (ref->addr == NULL ? 0 : __wt_ref_block_free(session, ref));
+        return (__wt_ref_block_free(session, ref));
 
     /*
-     * The fast-delete may not yet be visible to us. In that case, we proceed as with any change not
+     * The truncate may not yet be visible to us. In that case, we proceed as with any change not
      * visible during reconciliation by ignoring the change for the purposes of writing the internal
      * page.
      *
      * We expect the page to be clean after reconciliation. If there are invisible updates, abort
      * eviction.
+     *
+     * We must have reconciliation leave the page dirty in this case, because the truncation hasn't
+     * been written to disk yet; if the page gets marked clean it might be discarded and then the
+     * truncation is lost.
      */
-    if (__wt_page_del_active(session, ref, !F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))) {
+    if (!__wt_page_del_visible(session, page_del, !F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))) {
         if (F_ISSET(r, WT_REC_VISIBILITY_ERR))
             WT_RET_PANIC(session, EINVAL, "reconciliation illegally skipped an update");
-        if (F_ISSET(r, WT_REC_CLEAN_AFTER_REC))
+        /*
+         * In addition to the WT_REC_CLEAN_AFTER_REC case, fail if we're trying to evict an internal
+         * page and we can't see the update to it. There's not much point continuing; unlike with a
+         * leaf page, rewriting the page image and keeping the modification doesn't accomplish a
+         * great deal. Also currently code elsewhere assumes that evicting (vs. checkpointing)
+         * internal pages shouldn't leave them dirty.
+         */
+        if (F_ISSET(r, WT_REC_CLEAN_AFTER_REC | WT_REC_EVICT))
             return (__wt_set_return(session, EBUSY));
         cmsp->state = WT_CHILD_ORIGINAL;
+        r->leave_dirty = true;
         return (0);
     }
 
@@ -57,12 +64,18 @@ __rec_child_deleted(
      * We should never see an in-progress prepare in eviction: when we check to see if an internal
      * page can be evicted, we check for an unresolved fast-truncate, which includes a fast-truncate
      * in a prepared state, so it's an error to see that during eviction.
+     *
+     * As in the previous case, leave the page dirty. This is not strictly necessary as the prepared
+     * truncation will also prevent eviction; but if we don't do it and someone adds the ability to
+     * evict prepared truncates, the page apparently being clean might lead to truncations being
+     * lost in hard-to-debug ways.
      */
     WT_ORDERED_READ(prepare_state, page_del->prepare_state);
     if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED) {
         WT_ASSERT(session, !F_ISSET(r, WT_REC_EVICT));
 
         cmsp->state = WT_CHILD_ORIGINAL;
+        r->leave_dirty = true;
         return (0);
     }
 
@@ -74,22 +87,30 @@ __rec_child_deleted(
      * We have the WT_REF locked, but that lock is released before returning to the function writing
      * cells to the page. Copy out the current fast-truncate information for that function.
      */
-    if (__wt_page_del_active(session, ref, true)) {
-        cmsp->del = *ref->ft_info.del;
+    if (!__wt_page_del_visible(session, page_del, true)) {
+        cmsp->del = *page_del;
         cmsp->state = WT_CHILD_PROXY;
         return (0);
     }
 
     /*
-     * Otherwise, we can discard the leaf page to the block manager and no cell needs to be written.
-     * Done outside of the underlying tracking routines because this action is permanent and
-     * irrevocable. (Clearing the address means we've lost track of the disk address in a permanent
-     * way. This is safe because there's no path to reading the leaf page again: if there's ever a
-     * read into this part of the name space again, the cache read function instantiates an entirely
-     * new page.)
+     * Globally visible truncate, discard the leaf page to the block manager and no cell needs to be
+     * written. Done outside of the underlying tracking routines because this action is permanent
+     * and irrevocable. (Clearing the address means we've lost track of the disk address in a
+     * permanent way. This is safe because there's no path to reading the leaf page again: if there
+     * is ever a read into this part of the name space again, the cache read function instantiates
+     * an entirely new page.)
      */
     WT_RET(__wt_ref_block_free(session, ref));
-    __wt_overwrite_and_free(session, ref->ft_info.del);
+
+    /*
+     * Globally visible fast-truncate information is never used again, a NULL value is identical.
+     * Fast-truncate information in the page-modify structure can be used more than once if this
+     * reconciliation of the internal page were to fail.
+     */
+    if (page_del == ref->ft_info.del)
+        __wt_overwrite_and_free(session, ref->ft_info.del);
+
     return (0);
 }
 
@@ -125,6 +146,8 @@ __wt_rec_child_modify(
         case WT_REF_DISK:
             /* On disk, not modified by definition. */
             WT_ASSERT(session, ref->addr != NULL);
+            /* DISK pages do not have fast-truncate info. */
+            WT_ASSERT(session, ref->ft_info.del == NULL);
             goto done;
 
         case WT_REF_DELETED:
@@ -137,7 +160,7 @@ __wt_rec_child_modify(
              */
             if (!WT_REF_CAS_STATE(session, ref, WT_REF_DELETED, WT_REF_LOCKED))
                 break;
-            ret = __rec_child_deleted(session, r, ref, cmsp);
+            ret = __rec_child_deleted(session, r, ref, ref->ft_info.del, cmsp);
             WT_REF_SET_STATE(ref, WT_REF_DELETED);
             goto done;
 
@@ -193,7 +216,56 @@ __wt_rec_child_modify(
             }
             WT_RET(ret);
             cmsp->hazard = true;
-            goto in_memory;
+
+            /*
+             * The child is potentially modified if the page's modify structure has been created. If
+             * the modify structure exists and the page has been reconciled, set that state.
+             */
+            mod = ref->page->modify;
+            if (mod != NULL && mod->rec_result != 0) {
+                cmsp->state = WT_CHILD_MODIFIED;
+                goto done;
+            }
+
+            /*
+             * Deleted page instantiation can happen at any time during a checkpoint. If we found
+             * the instantiated page in the first checkpoint pass, it will have been reconciled and
+             * dealt with normally. However, if that didn't happen, we get here with a page that has
+             * been modified and never reconciled.
+             *
+             * Ordinarily in that situation we'd write a reference to the original child page, and
+             * in the ordinary case where the modifications were applied after the checkpoint
+             * started that would be fine. However, for a deleted page it's possible that the
+             * deletion predates the checkpoint and is visible, and only the instantiation happened
+             * after the checkpoint started. In that case we need the modifications to appear in the
+             * checkpoint, but if we didn't already reconcile the page it's too late to do it now.
+             * Depending on visibility, we may need to write the original page, or write a proxy
+             * (deleted-address) cell with the pre-instantiation page-delete information, or we may
+             * be able to ignore the page entirely. We keep the original fast-truncate information
+             * in the modify structure after instantiation to make the visibility check possible.
+             *
+             * The key is the page-modify.instantiated flag, removed during page reconciliation. If
+             * it's set, instantiation happened after checkpoint passed the leaf page and we treat
+             * this page like a WT_REF_DELETED page, evaluating it as it was before instantiation.
+             *
+             * We do not need additional locking: with a hazard pointer the page can't be evicted,
+             * and reconciliation is the only thing that can clear the page-modify info.
+             */
+            if (mod != NULL && mod->instantiated) {
+                WT_RET(__rec_child_deleted(session, r, ref, mod->page_del, cmsp));
+                goto done;
+            }
+
+            /*
+             * Insert splits are permitted during checkpoint. Checkpoints first walk the internal
+             * page's page-index and write out any dirty pages we find, then we write out the
+             * internal page in post-order traversal. If we found the split page in the first step,
+             * it will have an address; if we didn't find the split page in the first step, it won't
+             * have an address and we ignore it, it's not part of the checkpoint.
+             */
+            if (ref->addr == NULL)
+                cmsp->state = WT_CHILD_IGNORE;
+            goto done;
 
         case WT_REF_SPLIT:
             /*
@@ -215,31 +287,6 @@ __wt_rec_child_modify(
             return (__wt_illegal_value(session, r->tested_ref_state));
         }
         WT_STAT_CONN_INCR(session, child_modify_blocked_page);
-    }
-
-in_memory:
-    /*
-     * In-memory states: the child is potentially modified if the page's modify structure has been
-     * instantiated. If the modify structure exists and the page has actually been modified, set
-     * that state. If that's not the case, we would normally use the original cell's disk address as
-     * our reference, however there are two special cases, both flagged by a missing block address.
-     *
-     * First, if forced to instantiate a deleted child page and it's never modified, we end up here
-     * with a page that has a modify structure, no modifications, and no disk address. Ignore those
-     * pages, they're not modified and there is no reason to write the cell.
-     *
-     * Second, insert splits are permitted during checkpoint. When doing the final checkpoint pass,
-     * we first walk the internal page's page-index and write out any dirty pages we find, then we
-     * write out the internal page in post-order traversal. If we found the split page in the first
-     * step, it will have an address; if we didn't find the split page in the first step, it won't
-     * have an address and we ignore it, it's not part of the checkpoint.
-     */
-    mod = ref->page->modify;
-    if (mod != NULL && mod->rec_result != 0)
-        cmsp->state = WT_CHILD_MODIFIED;
-    else if (ref->addr == NULL) {
-        cmsp->state = WT_CHILD_IGNORE;
-        WT_CHILD_RELEASE(session, cmsp->hazard, ref);
     }
 
 done:

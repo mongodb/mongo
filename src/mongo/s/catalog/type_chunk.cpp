@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/catalog/type_chunk.h"
-
-#include <cstring>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -45,7 +40,6 @@
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 
@@ -64,8 +58,6 @@ const BSONField<BSONObj> ChunkType::max("max");
 const BSONField<std::string> ChunkType::shard("shard");
 const BSONField<bool> ChunkType::jumbo("jumbo");
 const BSONField<Date_t> ChunkType::lastmod("lastmod");
-const BSONField<OID> ChunkType::epoch("lastmodEpoch");
-const BSONField<Timestamp> ChunkType::timestamp("lastmodTimestamp");
 const BSONField<BSONObj> ChunkType::history("history");
 const BSONField<int64_t> ChunkType::estimatedSizeBytes("estimatedDataSizeBytes");
 const BSONField<bool> ChunkType::historyIsAt40("historyIsAt40");
@@ -298,7 +290,7 @@ StatusWith<ChunkType> ChunkType::parseFromConfigBSON(const BSONObj& source,
         if (versionElem.type() == bsonTimestamp || versionElem.type() == Date) {
             auto chunkLastmod = Timestamp(versionElem._numberLong());
             chunk._version =
-                ChunkVersion(chunkLastmod.getSecs(), chunkLastmod.getInc(), epoch, timestamp);
+                ChunkVersion({epoch, timestamp}, {chunkLastmod.getSecs(), chunkLastmod.getInc()});
         } else {
             return {ErrorCodes::BadValue,
                     str::stream() << "The field " << ChunkType::lastmod() << " cannot be parsed."};
@@ -383,7 +375,7 @@ StatusWith<ChunkType> ChunkType::parseFromShardBSON(const BSONObj& source,
         if (lastmodElem.type() == bsonTimestamp || lastmodElem.type() == Date) {
             auto chunkLastmod = Timestamp(lastmodElem._numberLong());
             chunk._version =
-                ChunkVersion(chunkLastmod.getSecs(), chunkLastmod.getInc(), epoch, timestamp);
+                ChunkVersion({epoch, timestamp}, {chunkLastmod.getSecs(), chunkLastmod.getInc()});
         } else {
             return {ErrorCodes::NoSuchKey,
                     str::stream() << "Expected field " << ChunkType::lastmod() << " not found."};
@@ -393,7 +385,7 @@ StatusWith<ChunkType> ChunkType::parseFromShardBSON(const BSONObj& source,
     return chunk;
 }
 
-StatusWith<ChunkType> ChunkType::parseFromNetworkRequest(const BSONObj& source, bool requireUUID) {
+StatusWith<ChunkType> ChunkType::parseFromNetworkRequest(const BSONObj& source) {
     // Parse history and shard.
     StatusWith<ChunkType> chunkStatus = _parseChunkBase(source);
     if (!chunkStatus.isOK()) {
@@ -413,14 +405,10 @@ StatusWith<ChunkType> ChunkType::parseFromNetworkRequest(const BSONObj& source, 
             }
             chunk._collectionUUID = swUUID.getValue();
         } else if (status == ErrorCodes::NoSuchKey) {
-            // Ignore NoSuchKey because before 5.0 chunks don't include a collectionUUID
+            return {ErrorCodes::FailedToParse, str::stream() << "There must be a UUID present"};
         } else {
             return status;
         }
-    }
-
-    if (requireUUID && !chunk._collectionUUID) {
-        return {ErrorCodes::FailedToParse, str::stream() << "There must be a UUID present"};
     }
 
     // Parse min and max.
@@ -448,7 +436,7 @@ StatusWith<ChunkType> ChunkType::parseFromNetworkRequest(const BSONObj& source, 
     }
 
     // Parse version.
-    chunk._version = ChunkVersion::fromBSONLegacyOrNewerFormat(source, ChunkType::lastmod());
+    chunk._version = ChunkVersion::parse(source[ChunkType::lastmod()]);
 
     return chunk;
 }

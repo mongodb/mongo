@@ -8,7 +8,6 @@ load("jstests/serverless/libs/basic_serverless_test.js");
 load("jstests/replsets/rslib.js");
 
 const kBlockStart = "Entering 'blocking' state.";
-const kAbortingIndex = "Aborting index build for shard split.";
 const kReconfig = "Applying the split config";
 const kWaitForRecipients = "Waiting for recipient to accept the split.";
 const kEndMsg = "Shard split decision reached";
@@ -82,18 +81,15 @@ function runOneSplit() {
     assertMigrationState(test.donor.getPrimary(), operation.migrationId, "committed");
 
     const blockTS = extractTs(checkLog.getLogMessage(primary, kBlockStart));
-    const abortingTS = extractTs(checkLog.getLogMessage(primary, kAbortingIndex));
     const reconfigTS = extractTs(checkLog.getLogMessage(primary, kReconfig));
     const waitForRecipientsTS = extractTs(checkLog.getLogMessage(primary, kWaitForRecipients));
     const endTS = extractTs(checkLog.getLogMessage(primary, kEndMsg));
 
     const blockDurationMs = endTS - blockTS;
-    const abortingIndexDurationMs = endTS - abortingTS;
     const waitForRecipientsDurationMs = endTS - waitForRecipientsTS;
     const reconfigDurationMs = endTS - reconfigTS;
 
-    const splitResult =
-        {blockDurationMs, abortingIndexDurationMs, reconfigDurationMs, waitForRecipientsDurationMs};
+    const splitResult = {blockDurationMs, reconfigDurationMs, waitForRecipientsDurationMs};
 
     jsTestLog(`Performance result of shard split: ${tojson(splitResult)}`);
     const maximumReconfigDuration = 500;

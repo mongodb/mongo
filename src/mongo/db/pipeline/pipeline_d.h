@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/bucket_unpacker.h"
+#include "mongo/db/query/query_planner_params.h"
 #include <boost/intrusive_ptr.hpp>
 #include <memory>
 
@@ -44,6 +45,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/query_planner.h"
 
 namespace mongo {
 class Collection;
@@ -202,7 +204,8 @@ private:
         SkipThenLimit skipThenLimit,
         const AggregateCommandRequest* aggRequest,
         const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
-        bool* hasNoRequirements);
+        bool* hasNoRequirements,
+        QueryPlannerParams plannerOpts = QueryPlannerParams{});
 
     /**
      * Build a PlanExecutor and prepare a callback to create a special DocumentSourceGeoNearCursor

@@ -39,6 +39,9 @@
 #include <utility>
 #include <vector>
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -46,6 +49,7 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_parser_gen.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/sort_pattern.h"
@@ -304,111 +308,173 @@ const char* ExpressionAbs::getOpName() const {
 
 /* ------------------------- ExpressionAdd ----------------------------- */
 
-StatusWith<Value> ExpressionAdd::apply(Value lhs, Value rhs) {
-    BSONType diffType = Value::getWidestNumeric(rhs.getType(), lhs.getType());
+namespace {
 
-    if (diffType == NumberDecimal) {
-        Decimal128 left = lhs.coerceToDecimal();
-        Decimal128 right = rhs.coerceToDecimal();
-        return Value(left.add(right));
-    } else if (diffType == NumberDouble) {
-        double right = rhs.coerceToDouble();
-        double left = lhs.coerceToDouble();
-        return Value(left + right);
-    } else if (diffType == NumberLong) {
-        long long result;
+/**
+ * We'll try to return the narrowest possible result value while avoiding overflow or implicit use
+ * of decimal types. To do that, compute separate sums for long, double and decimal values, and
+ * track the current widest type. The long sum will be converted to double when the first double
+ * value is seen or when long arithmetic would overflow.
+ */
+class AddState {
+    long long longTotal = 0;
+    double doubleTotal = 0;
+    Decimal128 decimalTotal;
+    BSONType widestType = NumberInt;
+    bool isDate = false;
 
-        // If there is an overflow, convert the values to doubles.
-        if (overflow::add(lhs.coerceToLong(), rhs.coerceToLong(), &result)) {
-            return Value(lhs.coerceToDouble() + rhs.coerceToDouble());
+public:
+    /**
+     * Update the internal state with another operand. It is up to the caller to validate that the
+     * operand is of a proper type.
+     */
+    void operator+=(const Value& operand) {
+        auto oldWidestType = widestType;
+        // Dates are represented by the long number of milliseconds since the unix epoch, so we can
+        // treat them as regular numeric values for the purposes of addition after making sure that
+        // only one date is present in the operand list.
+        Value valToAdd;
+        if (operand.getType() == Date) {
+            uassert(16612, "only one date allowed in an $add expression", !isDate);
+            isDate = true;
+            valToAdd = Value(operand.getDate().toMillisSinceEpoch());
+        } else {
+            widestType = Value::getWidestNumeric(widestType, operand.getType());
+            valToAdd = operand;
         }
-        return Value(result);
-    } else if (diffType == NumberInt) {
-        long long right = rhs.coerceToLong();
-        long long left = lhs.coerceToLong();
-        return Value::createIntOrLong(left + right);
-    } else if (lhs.nullish() || rhs.nullish()) {
-        return Value(BSONNULL);
-    } else {
-        return Status(ErrorCodes::TypeMismatch,
-                      str::stream() << "cannot $add a" << typeName(rhs.getType()) << " from a "
-                                    << typeName(lhs.getType()));
+
+        // If this operation widens the return type, perform any necessary type conversions.
+        if (oldWidestType != widestType) {
+            switch (widestType) {
+                case NumberLong:
+                    // Int -> Long is handled by the same sum.
+                    break;
+                case NumberDouble:
+                    // Int/Long -> Double converts the existing longTotal to a doubleTotal.
+                    doubleTotal = longTotal;
+                    break;
+                case NumberDecimal:
+                    // Convert the right total to NumberDecimal by looking at the old widest type.
+                    switch (oldWidestType) {
+                        case NumberInt:
+                        case NumberLong:
+                            decimalTotal = Decimal128(longTotal);
+                            break;
+                        case NumberDouble:
+                            decimalTotal = Decimal128(doubleTotal, Decimal128::kRoundTo34Digits);
+                            break;
+                        default:
+                            MONGO_UNREACHABLE;
+                    }
+                    break;
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        }
+
+        // Perform the add operation.
+        switch (widestType) {
+            case NumberInt:
+            case NumberLong:
+                // If the long long arithmetic overflows, promote the result to a NumberDouble and
+                // start incrementing the doubleTotal.
+                long long newLongTotal;
+                if (overflow::add(longTotal, valToAdd.coerceToLong(), &newLongTotal)) {
+                    widestType = NumberDouble;
+                    doubleTotal = longTotal + valToAdd.coerceToDouble();
+                } else {
+                    longTotal = newLongTotal;
+                }
+                break;
+            case NumberDouble:
+                doubleTotal += valToAdd.coerceToDouble();
+                break;
+            case NumberDecimal:
+                decimalTotal = decimalTotal.add(valToAdd.coerceToDecimal());
+                break;
+            default:
+                uasserted(ErrorCodes::TypeMismatch,
+                          str::stream() << "$add only supports numeric or date types, not "
+                                        << typeName(valToAdd.getType()));
+        }
     }
+
+    Value getValue() const {
+        // If one of the operands was a date, then convert the result to a date.
+        if (isDate) {
+            switch (widestType) {
+                case NumberInt:
+                case NumberLong:
+                    return Value(Date_t::fromMillisSinceEpoch(longTotal));
+                case NumberDouble:
+                    using limits = std::numeric_limits<long long>;
+                    uassert(ErrorCodes::Overflow,
+                            "date overflow in $add",
+                            // The upper bound is exclusive because it rounds up when it is cast to
+                            // a double.
+                            doubleTotal >= limits::min() &&
+                                doubleTotal < static_cast<double>(limits::max()));
+                    return Value(Date_t::fromMillisSinceEpoch(llround(doubleTotal)));
+                case NumberDecimal:
+                    // Decimal dates are not checked for overflow.
+                    return Value(Date_t::fromMillisSinceEpoch(decimalTotal.toLong()));
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        } else {
+            switch (widestType) {
+                case NumberInt:
+                    return Value::createIntOrLong(longTotal);
+                case NumberLong:
+                    return Value(longTotal);
+                case NumberDouble:
+                    return Value(doubleTotal);
+                case NumberDecimal:
+                    return Value(decimalTotal);
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        }
+    }
+};
+
+Status checkAddOperandType(Value val) {
+    if (!val.numeric() && val.getType() != Date) {
+        return Status(ErrorCodes::TypeMismatch,
+                      str::stream() << "$add only supports numeric or date types, not "
+                                    << typeName(val.getType()));
+    }
+
+    return Status::OK();
+}
+}  // namespace
+
+StatusWith<Value> ExpressionAdd::apply(Value lhs, Value rhs) {
+    if (lhs.nullish())
+        return Value(BSONNULL);
+    if (Status s = checkAddOperandType(lhs); !s.isOK())
+        return s;
+    if (rhs.nullish())
+        return Value(BSONNULL);
+    if (Status s = checkAddOperandType(rhs); !s.isOK())
+        return s;
+
+    AddState state;
+    state += lhs;
+    state += rhs;
+    return state.getValue();
 }
 
 Value ExpressionAdd::evaluate(const Document& root, Variables* variables) const {
-    // We'll try to return the narrowest possible result value while avoiding overflow, loss
-    // of precision due to intermediate rounding or implicit use of decimal types. To do that,
-    // compute a compensated sum for non-decimal values and a separate decimal sum for decimal
-    // values, and track the current narrowest type.
-    DoubleDoubleSummation nonDecimalTotal;
-    Decimal128 decimalTotal;
-    BSONType totalType = NumberInt;
-    bool haveDate = false;
-
-    const size_t n = _children.size();
-    for (size_t i = 0; i < n; ++i) {
-        Value val = _children[i]->evaluate(root, variables);
-
-        switch (val.getType()) {
-            case NumberDecimal:
-                decimalTotal = decimalTotal.add(val.getDecimal());
-                totalType = NumberDecimal;
-                break;
-            case NumberDouble:
-                nonDecimalTotal.addDouble(val.getDouble());
-                if (totalType != NumberDecimal)
-                    totalType = NumberDouble;
-                break;
-            case NumberLong:
-                nonDecimalTotal.addLong(val.getLong());
-                if (totalType == NumberInt)
-                    totalType = NumberLong;
-                break;
-            case NumberInt:
-                nonDecimalTotal.addDouble(val.getInt());
-                break;
-            case Date:
-                uassert(16612, "only one date allowed in an $add expression", !haveDate);
-                haveDate = true;
-                nonDecimalTotal.addLong(val.getDate().toMillisSinceEpoch());
-                break;
-            default:
-                uassert(16554,
-                        str::stream() << "$add only supports numeric or date types, not "
-                                      << typeName(val.getType()),
-                        val.nullish());
-                return Value(BSONNULL);
-        }
+    AddState state;
+    for (auto&& child : _children) {
+        Value val = child->evaluate(root, variables);
+        if (val.nullish())
+            return Value(BSONNULL);
+        uassertStatusOK(checkAddOperandType(val));
+        state += val;
     }
-
-    if (haveDate) {
-        int64_t longTotal;
-        if (totalType == NumberDecimal) {
-            longTotal = decimalTotal.add(nonDecimalTotal.getDecimal()).toLong();
-        } else {
-            uassert(ErrorCodes::Overflow, "date overflow in $add", nonDecimalTotal.fitsLong());
-            longTotal = nonDecimalTotal.getLong();
-        }
-        return Value(Date_t::fromMillisSinceEpoch(longTotal));
-    }
-    switch (totalType) {
-        case NumberDecimal:
-            return Value(decimalTotal.add(nonDecimalTotal.getDecimal()));
-        case NumberLong:
-            dassert(nonDecimalTotal.isInteger());
-            if (nonDecimalTotal.fitsLong())
-                return Value(nonDecimalTotal.getLong());
-            [[fallthrough]];
-        case NumberInt:
-            if (nonDecimalTotal.fitsLong())
-                return Value::createIntOrLong(nonDecimalTotal.getLong());
-            [[fallthrough]];
-        case NumberDouble:
-            return Value(nonDecimalTotal.getDouble());
-        default:
-            massert(16417, "$add resulted in a non-numeric type", false);
-    }
+    return state.getValue();
 }
 
 REGISTER_STABLE_EXPRESSION(add, ExpressionAdd::parse);
@@ -3253,7 +3319,7 @@ Value ExpressionMultiply::evaluate(const Document& root, Variables* variables) c
         if (val.nullish())
             return Value(BSONNULL);
         uassertStatusOK(checkMultiplyNumeric(val));
-        state *= child->evaluate(root, variables);
+        state *= val;
     }
     return state.getValue();
 }
@@ -3740,6 +3806,123 @@ Value ExpressionLog10::evaluateNumericArg(const Value& numericArg) const {
 REGISTER_STABLE_EXPRESSION(log10, ExpressionLog10::parse);
 const char* ExpressionLog10::getOpName() const {
     return "$log10";
+}
+
+/* ----------------------- ExpressionInternalFLEEqual ---------------------------- */
+constexpr auto kInternalFleEq = "$_internalFleEq"_sd;
+
+ExpressionInternalFLEEqual::ExpressionInternalFLEEqual(ExpressionContext* const expCtx,
+                                                       boost::intrusive_ptr<Expression> field,
+                                                       ConstDataRange serverToken,
+                                                       int64_t contentionFactor,
+                                                       ConstDataRange edcToken)
+    : Expression(expCtx, {std::move(field)}),
+      _serverToken(PrfBlockfromCDR(serverToken)),
+      _edcToken(PrfBlockfromCDR(edcToken)),
+      _contentionFactor(contentionFactor) {
+    expCtx->sbeCompatible = false;
+
+    auto tokens =
+        EDCServerCollection::generateEDCTokens(ConstDataRange(_edcToken), _contentionFactor);
+
+    for (auto& token : tokens) {
+        _cachedEDCTokens.insert(std::move(token.data));
+    }
+}
+
+void ExpressionInternalFLEEqual::_doAddDependencies(DepsTracker* deps) const {
+    for (auto&& operand : _children) {
+        operand->addDependencies(deps);
+    }
+}
+
+REGISTER_EXPRESSION_WITH_MIN_VERSION(_internalFleEq,
+                                     ExpressionInternalFLEEqual::parse,
+                                     AllowedWithApiStrict::kAlways,
+                                     AllowedWithClientType::kAny,
+                                     multiversion::FeatureCompatibilityVersion::kVersion_6_0);
+
+intrusive_ptr<Expression> ExpressionInternalFLEEqual::parse(ExpressionContext* const expCtx,
+                                                            BSONElement expr,
+                                                            const VariablesParseState& vps) {
+
+    IDLParserErrorContext ctx(kInternalFleEq);
+    auto fleEq = InternalFleEqStruct::parse(ctx, expr.Obj());
+
+    auto fieldExpr = Expression::parseOperand(expCtx, fleEq.getField().getElement(), vps);
+
+    auto serverTokenPair = fromEncryptedConstDataRange(fleEq.getServerEncryptionToken());
+
+    uassert(6672405,
+            "Invalid server token",
+            serverTokenPair.first == EncryptedBinDataType::kFLE2TransientRaw &&
+                serverTokenPair.second.length() == sizeof(PrfBlock));
+
+    auto edcTokenPair = fromEncryptedConstDataRange(fleEq.getEdcDerivedToken());
+
+    uassert(6672406,
+            "Invalid edc token",
+            edcTokenPair.first == EncryptedBinDataType::kFLE2TransientRaw &&
+                edcTokenPair.second.length() == sizeof(PrfBlock));
+
+
+    auto cf = fleEq.getMaxCounter();
+    uassert(6672408, "Contention factor must be between 0 and 10000", cf >= 0 && cf < 10000);
+
+    return new ExpressionInternalFLEEqual(expCtx,
+                                          std::move(fieldExpr),
+                                          serverTokenPair.second,
+                                          fleEq.getMaxCounter(),
+                                          edcTokenPair.second);
+}
+
+Value toValue(const std::array<std::uint8_t, 32>& buf) {
+    auto vec = toEncryptedVector(EncryptedBinDataType::kFLE2TransientRaw, buf);
+    return Value(BSONBinData(vec.data(), vec.size(), BinDataType::Encrypt));
+}
+
+Value ExpressionInternalFLEEqual::serialize(bool explain) const {
+    return Value(Document{{kInternalFleEq,
+                           Document{{"field", _children[0]->serialize(explain)},
+                                    {"edc", toValue(_edcToken)},
+                                    {"counter", Value(static_cast<long long>(_contentionFactor))},
+                                    {"server", toValue(_serverToken)}}}});
+}
+
+Value ExpressionInternalFLEEqual::evaluate(const Document& root, Variables* variables) const {
+    // Inputs
+    // 1. Value for FLE2IndexedEqualityEncryptedValue field
+
+    Value fieldValue = _children[0]->evaluate(root, variables);
+
+    if (fieldValue.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    if (fieldValue.getType() != BinData) {
+        return Value(false);
+    }
+
+    auto fieldValuePair = fromEncryptedBinData(fieldValue);
+
+    uassert(6672407,
+            "Invalid encrypted indexed field",
+            fieldValuePair.first == EncryptedBinDataType::kFLE2EqualityIndexedValue);
+
+    // Value matches if
+    // 1. Decrypt field is successful
+    // 2. EDC_u Token is in GenTokens(EDC Token, ContentionFactor)
+    //
+    auto swIndexed =
+        EDCServerCollection::decryptAndParse(ConstDataRange(_serverToken), fieldValuePair.second);
+    uassertStatusOK(swIndexed);
+    auto indexed = swIndexed.getValue();
+
+    return Value(_cachedEDCTokens.count(indexed.edc.data) == 1);
+}
+
+const char* ExpressionInternalFLEEqual::getOpName() const {
+    return kInternalFleEq.rawData();
 }
 
 /* ------------------------ ExpressionNary ----------------------------- */

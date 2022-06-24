@@ -36,14 +36,12 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/database_name.h"
+#include "mongo/s/database_version.h"
 
 namespace mongo {
 
-class CollectionCatalogEntry;
 class Database;
 class OperationContext;
-class RecordStore;
-class ViewCatalog;
 
 /**
  * Registry of opened databases.
@@ -56,9 +54,8 @@ public:
     static DatabaseHolder* get(OperationContext* opCtx);
     static void set(ServiceContext* service, std::unique_ptr<DatabaseHolder> databaseHolder);
 
-    virtual ~DatabaseHolder() = default;
-
     DatabaseHolder() = default;
+    virtual ~DatabaseHolder() = default;
 
     /**
      * Retrieves an already opened database or returns nullptr. Must be called with the database

@@ -35,19 +35,19 @@
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 namespace mongo {
 
-class DropCollectionCoordinator final : public ShardingDDLCoordinator {
+class DropCollectionCoordinator final
+    : public RecoverableShardingDDLCoordinator<DropCollectionCoordinatorDocument,
+                                               DropCollectionCoordinatorPhaseEnum> {
 public:
     using StateDoc = DropCollectionCoordinatorDocument;
     using Phase = DropCollectionCoordinatorPhaseEnum;
 
-    DropCollectionCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState);
+    DropCollectionCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
+        : RecoverableShardingDDLCoordinator(service, "DropCollectionCoordinator", initialState) {}
+
     ~DropCollectionCoordinator() = default;
 
     void checkIfOptionsConflict(const BSONObj& doc) const override {}
-
-    boost::optional<BSONObj> reportForCurrentOp(
-        MongoProcessInterface::CurrentOpConnectionsMode connMode,
-        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
     /**
      * Locally drops a collection, cleans its CollectionShardingRuntime metadata and refreshes the
@@ -56,34 +56,12 @@ public:
     static DropReply dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss);
 
 private:
-    ShardingDDLCoordinatorMetadata const& metadata() const override {
-        return _doc.getShardingDDLCoordinatorMetadata();
+    StringData serializePhase(const Phase& phase) const override {
+        return DropCollectionCoordinatorPhase_serializer(phase);
     }
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
-
-    template <typename Func>
-    auto _executePhase(const Phase& newPhase, Func&& func) {
-        return [=] {
-            const auto& currPhase = _doc.getPhase();
-
-            if (currPhase > newPhase) {
-                // Do not execute this phase if we already reached a subsequent one.
-                return;
-            }
-            if (currPhase < newPhase) {
-                // Persist the new phase if this is the first time we are executing it.
-                _enterPhase(newPhase);
-            }
-            return func();
-        };
-    }
-
-    void _enterPhase(Phase newPhase);
-
-    mutable Mutex _docMutex = MONGO_MAKE_LATCH("DropCollectionCoordinator::_docMutex");
-    DropCollectionCoordinatorDocument _doc;
 };
 
 }  // namespace mongo

@@ -67,7 +67,6 @@ public:
     void setMaxMbPerSec(int maxMbPerSec);
 
     Date_t getTime();
-    int64_t getDifferenceInMillis(Date_t start, Date_t end);
     SortedDataInterfaceThrottleCursor getIdIndex(const CollectionPtr& coll);
 
     std::unique_ptr<DataThrottle> _dataThrottle;
@@ -114,10 +113,6 @@ Date_t ThrottleCursorTest::getTime() {
     return operationContext()->getServiceContext()->getFastClockSource()->now();
 }
 
-int64_t ThrottleCursorTest::getDifferenceInMillis(Date_t start, Date_t end) {
-    return end.toMillisSinceEpoch() - start.toMillisSinceEpoch();
-}
-
 SortedDataInterfaceThrottleCursor ThrottleCursorTest::getIdIndex(const CollectionPtr& coll) {
     const IndexDescriptor* idDesc = coll->getIndexCatalog()->findIdIndex(operationContext());
     const IndexCatalogEntry* idEntry = coll->getIndexCatalog()->getEntry(idDesc);
@@ -156,7 +151,7 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOff) {
     Date_t end = getTime();
 
     ASSERT_EQ(numRecords, 20);
-    ASSERT_EQ(getDifferenceInMillis(start, end), kTickDelay * numRecords + kTickDelay);
+    ASSERT_EQ(end - start, Milliseconds(kTickDelay * numRecords + kTickDelay));
 }
 
 TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
@@ -187,7 +182,7 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
         Date_t end = getTime();
 
         ASSERT_EQ(numRecords, 10);
-        ASSERT_TRUE(getDifferenceInMillis(start, end) >= 5000);
+        ASSERT_GTE(end - start, Milliseconds(5000));
     }
 
     // Using a throttle with a limit of 5MB per second, all operations should take at least 1
@@ -207,7 +202,7 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
         Date_t end = getTime();
 
         ASSERT_EQ(numRecords, 10);
-        ASSERT_TRUE(getDifferenceInMillis(start, end) >= 1000);
+        ASSERT_GTE(end - start, Milliseconds(1000));
     }
 }
 
@@ -239,7 +234,7 @@ TEST_F(ThrottleCursorTestFastClock, TestSeekableRecordThrottleCursorOnLargeDocs1
     Date_t end = getTime();
 
     ASSERT_EQ(scanRecords, 0);
-    ASSERT_GTE(getDifferenceInMillis(start, end), 10 * 1000);
+    ASSERT_GTE(end - start, Milliseconds(10 * 1000));
 }
 
 TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOnLargeDocs5MBps) {
@@ -270,7 +265,7 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOnLargeDocs5MBps) {
     Date_t end = getTime();
 
     ASSERT_EQ(scanRecords, 0);
-    ASSERT_GTE(getDifferenceInMillis(start, end), 2000);
+    ASSERT_GTE(end - start, Milliseconds(2000));
 }
 
 TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOff) {
@@ -297,7 +292,7 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOff) {
     Date_t end = getTime();
 
     ASSERT_EQ(numRecords, 10);
-    ASSERT_EQ(getDifferenceInMillis(start, end), kTickDelay * numRecords + kTickDelay);
+    ASSERT_EQ(end - start, Milliseconds(kTickDelay * numRecords + kTickDelay));
 }
 
 TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
@@ -327,7 +322,7 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
         Date_t end = getTime();
 
         ASSERT_EQ(numRecords, 10);
-        ASSERT_TRUE(getDifferenceInMillis(start, end) >= 5000);
+        ASSERT_GTE(end - start, Milliseconds(5000));
     }
 
     // Using a throttle with a limit of 5MB per second, all operations should take at least 1
@@ -347,7 +342,7 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
         Date_t end = getTime();
 
         ASSERT_EQ(numRecords, 10);
-        ASSERT_TRUE(getDifferenceInMillis(start, end) >= 1000);
+        ASSERT_GTE(end - start, Milliseconds(1000));
     }
 }
 
@@ -390,7 +385,7 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOff) {
     Date_t end = getTime();
 
     ASSERT_EQ(numRecords, 30);
-    ASSERT_EQ(getDifferenceInMillis(start, end), kTickDelay * numRecords + kTickDelay);
+    ASSERT_EQ(end - start, Milliseconds(kTickDelay * numRecords + kTickDelay));
 }
 
 TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
@@ -425,7 +420,7 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
         Date_t end = getTime();
 
         ASSERT_EQ(numRecords, 20);
-        ASSERT_TRUE(getDifferenceInMillis(start, end) >= 5000);
+        ASSERT_GTE(end - start, Milliseconds(5000));
     }
 
     // Using a throttle with a limit of 5MB per second, all operations should take at least 2
@@ -447,7 +442,7 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
         Date_t end = getTime();
 
         ASSERT_EQ(numRecords, 20);
-        ASSERT_TRUE(getDifferenceInMillis(start, end) >= 2000);
+        ASSERT_GTE(end - start, Milliseconds(2000));
     }
 }
 

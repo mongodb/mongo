@@ -53,9 +53,52 @@ public:
 
     std::string toString() const;
 
+    // TODO: Do not add any new usages of these methods. Use isSameCollection instead.
+
+    const OID& epoch() const {
+        return _epoch;
+    }
+
+    const Timestamp& getTimestamp() const {
+        return _timestamp;
+    }
+
 protected:
     OID _epoch;
     Timestamp _timestamp;
+};
+
+/**
+ * Reflects the placement information for a collection. An object of this class has no meaning on
+ * its own without the Generation component above, that's why most of its methods are protected and
+ * are exposed as semantic checks in ChunkVersion below.
+ */
+class CollectionPlacement {
+public:
+    CollectionPlacement(uint32_t major, uint32_t minor)
+        : _combined(static_cast<uint64_t>(minor) | (static_cast<uint64_t>(major) << 32)) {}
+
+    // TODO: Do not add any new usages of these methods. Use isSamePlacement instead.
+
+    uint32_t majorVersion() const {
+        return _combined >> 32;
+    }
+
+    uint32_t minorVersion() const {
+        return _combined & 0xFFFFFFFF;
+    }
+
+protected:
+    /**
+     * Returns whether two collection placements are compatible with each other (meaning that they
+     * refer to the same distribution of chunks across the cluster).
+     */
+    bool isSamePlacement(const CollectionPlacement& other) const {
+        return majorVersion() == other.majorVersion();
+    }
+
+    // The combined major/minor version, which exists as subordinate to the collection generation
+    uint64_t _combined;
 };
 
 /**
@@ -67,10 +110,8 @@ protected:
  * 2. (0, n), n > 0 - applicable only to shardVersion; shard has no chunk.
  * 3. (n, 0), n > 0 - invalid configuration.
  * 4. (n, m), n > 0, m > 0 - normal sharded collection version.
- *
- * TODO (SERVER-65530): Get rid of all the legacy format parsers/serialisers
  */
-class ChunkVersion : public CollectionGeneration {
+class ChunkVersion : public CollectionGeneration, public CollectionPlacement {
 public:
     /**
      * The name for the shard version information field, which shard-aware commands should include
@@ -78,28 +119,10 @@ public:
      */
     static constexpr StringData kShardVersionField = "shardVersion"_sd;
 
-    ChunkVersion(uint32_t major, uint32_t minor, const OID& epoch, const Timestamp& timestamp)
-        : CollectionGeneration(epoch, timestamp),
-          _combined(static_cast<uint64_t>(minor) | (static_cast<uint64_t>(major) << 32)) {}
+    ChunkVersion(CollectionGeneration geneneration, CollectionPlacement placement)
+        : CollectionGeneration(geneneration), CollectionPlacement(placement) {}
 
-    ChunkVersion() : ChunkVersion(0, 0, OID(), Timestamp()) {}
-
-    /**
-     * Allow parsing a chunk version with the following formats:
-     *  {<field>:(major, minor), <fieldEpoch>:epoch, <fieldTimestmap>:timestamp}
-     *  {<field>: {t:timestamp, e:epoch, v:(major, minor) }}
-     * TODO SERVER-63403: remove this function and only parse the new format.
-     */
-    static ChunkVersion fromBSONLegacyOrNewerFormat(const BSONObj& obj, StringData field = "");
-
-    /**
-     * Allow parsing a chunk version with the following formats:
-     *  [major, minor, epoch, <optional canThrowSSVOnIgnored>, timestamp]
-     *  {0:major, 1:minor, 2:epoch, 3:<optional canThrowSSVOnIgnored>, 4:timestamp}
-     *  {t:timestamp, e:epoch, v:(major, minor)}
-     * TODO SERVER-63403: remove this function and only parse the new format.
-     */
-    static ChunkVersion fromBSONPositionalOrNewerFormat(const BSONElement& element);
+    ChunkVersion() : ChunkVersion({OID(), Timestamp()}, {0, 0}) {}
 
     /**
      * Indicates that the collection is not sharded.
@@ -153,22 +176,6 @@ public:
         return _combined > 0;
     }
 
-    uint32_t majorVersion() const {
-        return _combined >> 32;
-    }
-
-    uint32_t minorVersion() const {
-        return _combined & 0xFFFFFFFF;
-    }
-
-    const OID& epoch() const {
-        return _epoch;
-    }
-
-    const Timestamp& getTimestamp() const {
-        return _timestamp;
-    }
-
     bool operator==(const ChunkVersion& otherVersion) const {
         return otherVersion.getTimestamp() == getTimestamp() && otherVersion._combined == _combined;
     }
@@ -179,7 +186,7 @@ public:
 
     // Can we write to this data and not have a problem?
     bool isWriteCompatibleWith(const ChunkVersion& other) const {
-        return isSameCollection(other) && majorVersion() == other.majorVersion();
+        return isSameCollection(other) && isSamePlacement(other);
     }
 
     // Unsharded timestamp cannot be compared with other timestamps
@@ -216,53 +223,7 @@ public:
     static ChunkVersion parse(const BSONElement& element);
     void serializeToBSON(StringData field, BSONObjBuilder* builder) const;
 
-    /**
-     * NOTE: This format is being phased out. Use serializeToBSON instead.
-     *
-     * Serializes the version held by this object to 'out' in the legacy form:
-     *  { ..., <field>: [ <combined major/minor> ],
-     *         <field>Epoch: [ <OID epoch> ],
-     *         <field>Timestamp: [ <Timestamp> ] ... }
-     *  or
-     *  { ..., <field> : {t: <Timestamp>, e: <OID>, v: <major/minor>}}.
-     *
-     * Depending on the FCV version
-     */
-    void appendLegacyWithField(BSONObjBuilder* out, StringData field) const;
-
     std::string toString() const;
-
-    // Methods that are here for the purposes of parsing of ShardCollectionType only
-    static ChunkVersion parseMajorMinorVersionOnlyFromShardCollectionType(
-        const BSONElement& element);
-    void serialiseMajorMinorVersionOnlyForShardCollectionType(StringData field,
-                                                              BSONObjBuilder* builder) const;
-
-private:
-    // The following static functions will be deprecated. Only one function should be used to parse
-    // ChunkVersion and is fromBSON.
-    /**
-     * The method below parse the "positional" formats of:
-     *
-     *  [major, minor, epoch, <optional canThrowSSVOnIgnored> timestamp]
-     *      OR
-     *  {0: major, 1:minor, 2:epoch, 3:<optional canThrowSSVOnIgnored>, 4:timestamp}
-     *
-     * The latter format was introduced by mistake in 4.4 and is no longer generated from 5.3
-     * onwards, but it is backwards compatible with the 5.2 and older binaries.
-     */
-    static ChunkVersion _parseArrayOrObjectPositionalFormat(const BSONObj& obj);
-
-    /**
-     * Parses the BSON formatted by appendLegacyWithField. If the field is missing, returns
-     * 'NoSuchKey', otherwise if the field is not properly formatted can return any relevant parsing
-     * error (BadValue, TypeMismatch, etc).
-     */
-    static StatusWith<ChunkVersion> _parseLegacyWithField(const BSONObj& obj, StringData field);
-
-private:
-    // The combined major/minor version, which exists as subordinate to the collection generation
-    uint64_t _combined;
 };
 
 inline std::ostream& operator<<(std::ostream& s, const ChunkVersion& v) {

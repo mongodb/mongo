@@ -625,67 +625,6 @@ uint64_t DBClientConnection::getSockCreationMicroSec() const {
     }
 }
 
-unsigned long long DBClientConnection::query_DEPRECATED(
-    std::function<void(DBClientCursorBatchIterator&)> f,
-    const NamespaceStringOrUUID& nsOrUuid,
-    const BSONObj& filter,
-    const Query& querySettings,
-    const BSONObj* fieldsToReturn,
-    int queryOptions,
-    int batchSize,
-    boost::optional<BSONObj> readConcernObj) {
-    if (!(queryOptions & QueryOption_Exhaust)) {
-        return DBClientBase::query_DEPRECATED(f,
-                                              nsOrUuid,
-                                              filter,
-                                              querySettings,
-                                              fieldsToReturn,
-                                              queryOptions,
-                                              batchSize,
-                                              readConcernObj);
-    }
-
-    // mask options
-    queryOptions &=
-        (int)(QueryOption_NoCursorTimeout | QueryOption_SecondaryOk | QueryOption_Exhaust);
-
-    unique_ptr<DBClientCursor> c(this->query_DEPRECATED(nsOrUuid,
-                                                        filter,
-                                                        querySettings,
-                                                        0,
-                                                        0,
-                                                        fieldsToReturn,
-                                                        queryOptions,
-                                                        batchSize,
-                                                        readConcernObj));
-    // Note that this->query will throw for network errors, so it is OK to return a numeric
-    // error code here.
-    uassert(13386, "socket error for mapping query", c.get());
-
-    unsigned long long n = 0;
-
-    try {
-        while (1) {
-            while (c->moreInCurrentBatch()) {
-                DBClientCursorBatchIterator i(*c);
-                f(i);
-                n += i.n();
-            }
-
-            if (!c->more())
-                break;
-        }
-    } catch (std::exception&) {
-        /* connection CANNOT be used anymore as more data may be on the way from the server.
-           we have to reconnect.
-           */
-        _markFailed(kEndSession);
-        throw;
-    }
-
-    return n;
-}
-
 DBClientConnection::DBClientConnection(bool _autoReconnect,
                                        double so_timeout,
                                        MongoURI uri,

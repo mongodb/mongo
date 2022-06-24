@@ -1,9 +1,3 @@
-/**
- * @tags: [
- *     operations_longer_than_stepdown_interval_in_txns,
- * ]
- */
-
 (function() {
 'use strict';
 

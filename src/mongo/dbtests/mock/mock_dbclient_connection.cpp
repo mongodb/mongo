@@ -143,7 +143,9 @@ std::unique_ptr<DBClientCursor> MockDBClientConnection::bsonArrayToCursor(BSONAr
 }
 
 std::unique_ptr<DBClientCursor> MockDBClientConnection::find(
-    FindCommandRequest findRequest, const ReadPreferenceSetting& readPref) {
+    FindCommandRequest findRequest,
+    const ReadPreferenceSetting& /*unused*/,
+    ExhaustMode /*unused*/) {
     checkConnection();
     try {
         int nToSkip = nToSkipFromResumeAfter(findRequest.getResumeAfter());
@@ -155,55 +157,6 @@ std::unique_ptr<DBClientCursor> MockDBClientConnection::find(
         _failed.store(true);
         throw;
     }
-    return nullptr;
-}
-
-std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query_DEPRECATED(
-    const NamespaceStringOrUUID& nsOrUuid,
-    const BSONObj& filter,
-    const Query& querySettings,
-    int limit,
-    int nToSkip,
-    const BSONObj* fieldsToReturn,
-    int queryOptions,
-    int batchSize,
-    boost::optional<BSONObj> readConcernObj) {
-    checkConnection();
-
-    try {
-        mongo::BSONArray result(_remoteServer->query(_remoteServerInstanceID,
-                                                     nsOrUuid,
-                                                     filter,
-                                                     querySettings,
-                                                     limit,
-                                                     nToSkip,
-                                                     fieldsToReturn,
-                                                     queryOptions,
-                                                     batchSize,
-                                                     readConcernObj));
-
-        BSONArray resultsInCursor;
-
-        // A simple mock implementation of a resumable query, where we skip the first 'n' fields
-        // where 'n' is given by the mock resume token.
-        auto nToSkip = 0;
-        BSONObj querySettingsAsBSON = querySettings.getFullSettingsDeprecated();
-        if (querySettingsAsBSON.hasField("$_resumeAfter")) {
-            nToSkip = nToSkipFromResumeAfter(querySettingsAsBSON.getField("$_resumeAfter").Obj());
-        }
-
-        bool provideResumeToken = false;
-        if (querySettingsAsBSON.hasField("$_requestResumeToken")) {
-            provideResumeToken = true;
-        }
-
-
-        return bsonArrayToCursor(std::move(result), nToSkip, provideResumeToken, batchSize);
-    } catch (const mongo::DBException&) {
-        _failed.store(true);
-        throw;
-    }
-
     return nullptr;
 }
 

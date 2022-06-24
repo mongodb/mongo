@@ -949,7 +949,7 @@ void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::str
               "indexName"_attr = indexName);
 
         WriteUnitOfWork wuow(opCtx);
-        dropIndex(opCtx, collection.getWritableCollection(), indexName, *nss);
+        dropIndex(opCtx, collection.getWritableCollection(opCtx), indexName, *nss);
         wuow.commit();
 
         LOGV2_DEBUG(21673,
@@ -1634,12 +1634,12 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
             WriteUnitOfWork wuow(opCtx);
 
             // Set collection to whatever temp status is on the sync source.
-            collection.getWritableCollection()->setIsTemp(opCtx, options.temp);
+            collection.getWritableCollection(opCtx)->setIsTemp(opCtx, options.temp);
 
             // Set any document validation options. We update the validator fields without
             // parsing/validation, since we fetched the options object directly from the sync
             // source, and we should set our validation options to match it exactly.
-            auto validatorStatus = collection.getWritableCollection()->updateValidator(
+            auto validatorStatus = collection.getWritableCollection(opCtx)->updateValidator(
                 opCtx, options.validator, options.validationLevel, options.validationAction);
             if (!validatorStatus.isOK()) {
                 throw RSFatalException(str::stream()
@@ -1811,16 +1811,16 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                                 // RecordId loc = Helpers::findById(nsd, pattern);
                                 if (!loc.isNull()) {
                                     try {
-                                        writeConflictRetry(opCtx,
-                                                           "cappedTruncateAfter",
-                                                           collection->ns().ns(),
-                                                           [&] {
-                                                               WriteUnitOfWork wunit(opCtx);
-                                                               collection.getWritableCollection()
-                                                                   ->cappedTruncateAfter(
-                                                                       opCtx, loc, true);
-                                                               wunit.commit();
-                                                           });
+                                        writeConflictRetry(
+                                            opCtx,
+                                            "cappedTruncateAfter",
+                                            collection->ns().ns(),
+                                            [&] {
+                                                WriteUnitOfWork wunit(opCtx);
+                                                collection.getWritableCollection(opCtx)
+                                                    ->cappedTruncateAfter(opCtx, loc, true);
+                                                wunit.commit();
+                                            });
                                     } catch (const DBException& e) {
                                         if (e.code() == 13415) {
                                             // hack: need to just make cappedTruncate do this...
@@ -1828,7 +1828,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                                                 opCtx, "truncate", collection->ns().ns(), [&] {
                                                     WriteUnitOfWork wunit(opCtx);
                                                     uassertStatusOK(
-                                                        collection.getWritableCollection()
+                                                        collection.getWritableCollection(opCtx)
                                                             ->truncate(opCtx));
                                                     wunit.commit();
                                                 });
@@ -2010,14 +2010,6 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
     if (auto validator = LogicalTimeValidator::get(opCtx)) {
         validator->resetKeyManagerCache();
-    }
-
-    // Force the config server to update its shard registry on next access. Otherwise it may have
-    // the stale data that has been just rolled back.
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        if (auto shardRegistry = Grid::get(opCtx)->shardRegistry()) {
-            shardRegistry->clearEntries();
-        }
     }
 
     // Force the default read/write concern cache to reload on next access in case the defaults

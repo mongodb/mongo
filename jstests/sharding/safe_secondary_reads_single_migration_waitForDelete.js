@@ -150,6 +150,7 @@ let testCases = {
     connPoolSync: {skip: "does not return user data"},
     connectionStatus: {skip: "does not return user data"},
     convertToCapped: {skip: "primary only"},
+    coordinateCommitTransaction: {skip: "unimplemented. Serves only as a stub."},
     count: {
         setUp: function(mongosConn) {
             assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
@@ -218,8 +219,6 @@ let testCases = {
     fsync: {skip: "does not return user data"},
     fsyncUnlock: {skip: "does not return user data"},
     getAuditConfig: {skip: "does not return user data"},
-    getChangeStreamOptions:
-        {skip: "does not return user data"},  // TODO SERVER-65353 remove in 6.1.
     getClusterParameter: {skip: "does not return user data"},
     getCmdLineOpts: {skip: "does not return user data"},
     getDefaultRWConcern: {skip: "does not return user data"},
@@ -331,7 +330,6 @@ let testCases = {
     serverStatus: {skip: "does not return user data"},
     setAllowMigrations: {skip: "primary only"},
     setAuditConfig: {skip: "does not return user data"},
-    setChangeStreamOptions: {skip: "primary only"},  // TODO SERVER-65353 remove in 6.1.
     setCommittedSnapshot: {skip: "does not return user data"},
     setDefaultRWConcern: {skip: "primary only"},
     setIndexCommitQuorum: {skip: "primary only"},
@@ -514,7 +512,7 @@ for (let command of commands) {
                                     {"command.shardVersion.0": {"$exists": true}},
                                     {
                                         "command.shardVersion.0":
-                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion[0]}
+                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion.v}
                                     },
                                 ]
                             },
@@ -523,7 +521,7 @@ for (let command of commands) {
                                     {"command.shardVersion.v": {"$exists": true}},
                                     {
                                         "command.shardVersion.v":
-                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion[0]}
+                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion.v}
                                     },
                                 ]
                             },
@@ -536,7 +534,7 @@ for (let command of commands) {
                                     {"command.shardVersion.1": {"$exists": true}},
                                     {
                                         "command.shardVersion.1":
-                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion[1]}
+                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion.e}
                                     },
                                 ]
                             },
@@ -545,7 +543,7 @@ for (let command of commands) {
                                     {"command.shardVersion.e": {"$exists": true}},
                                     {
                                         "command.shardVersion.e":
-                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion[1]}
+                                            {$ne: ShardVersioningUtil.kIgnoredShardVersion.e}
                                     },
                                 ]
                             },

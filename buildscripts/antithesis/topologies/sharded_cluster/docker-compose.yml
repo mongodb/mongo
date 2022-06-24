@@ -146,8 +146,14 @@ services:
                 volumes:
                   - ./logs/mongos:/var/log/mongodb/
                   - ./scripts:/scripts/
-                command: /bin/bash /scripts/mongos_init.sh
+                command: python3 /scripts/mongos_init.py
                 depends_on:
+                        - "database1"
+                        - "database2"
+                        - "database3"
+                        - "database4"
+                        - "database5"
+                        - "database6"
                         - "configsvr1"
                         - "configsvr2"
                         - "configsvr3"
@@ -163,17 +169,8 @@ services:
                 volumes:
                   - ./logs/workload:/var/log/resmoke/
                   - ./scripts:/scripts/
-                command: /bin/bash /scripts/workload_init.sh
+                command: python3 /scripts/workload_init.py
                 depends_on:
-                        - "database1"
-                        - "database2"
-                        - "database3"
-                        - "database4"
-                        - "database5"
-                        - "database6"
-                        - "configsvr1"
-                        - "configsvr2"
-                        - "configsvr3"
                         - "mongos"
                 networks:
                         antithesis-net:

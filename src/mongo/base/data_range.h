@@ -189,6 +189,10 @@ public:
         return !(lhs == rhs);
     }
 
+    std::ptrdiff_t debug_offset() const {
+        return _debug_offset;
+    }
+
 protected:
     // Shared implementation of split() logic between DataRange and ConstDataRange.
     template <typename RangeT,

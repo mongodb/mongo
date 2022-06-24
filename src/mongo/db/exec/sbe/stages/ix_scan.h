@@ -85,7 +85,8 @@ public:
                    std::unique_ptr<EExpression> seekKeyLow,
                    std::unique_ptr<EExpression> seekKeyHigh,
                    PlanYieldPolicy* yieldPolicy,
-                   PlanNodeId nodeId);
+                   PlanNodeId planNodeId,
+                   bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 

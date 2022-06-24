@@ -65,9 +65,10 @@ typedef struct {
     FILE *progress_fp; /* Progress tracking file */
     char *progress_file_name;
 
-    bool preserve;             /* Don't remove files on exit */
-    bool verbose;              /* Run in verbose mode */
     bool do_data_ops;          /* Have schema ops use data */
+    bool preserve;             /* Don't remove files on exit */
+    bool tiered;               /* Configure tiered storage */
+    bool verbose;              /* Run in verbose mode */
     uint64_t nrecords;         /* Number of records */
     uint64_t nops;             /* Number of operations */
     uint64_t nthreads;         /* Number of threads */

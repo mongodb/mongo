@@ -12,6 +12,13 @@ var TimeseriesTest = class {
     }
 
     /**
+     * Returns whether time-series scalability improvements (like bucket reopening) are enabled.
+     */
+    static timeseriesScalabilityImprovementsEnabled(conn) {
+        return FeatureFlagUtil.isEnabled(conn, "TimeseriesScalabilityImprovements");
+    }
+
+    /**
      * Returns whether time-series updates and deletes are supported.
      */
     static timeseriesUpdatesAndDeletesEnabled(conn) {

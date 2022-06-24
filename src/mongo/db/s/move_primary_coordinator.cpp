@@ -46,30 +46,10 @@
 
 namespace mongo {
 
-MovePrimaryCoordinator::MovePrimaryCoordinator(ShardingDDLCoordinatorService* service,
-                                               const BSONObj& initialState)
-    : ShardingDDLCoordinator(service, initialState),
-      _doc(MovePrimaryCoordinatorDocument::parse(
-          IDLParserErrorContext("MovePrimaryCoordinatorDocument"), initialState)) {}
-
-boost::optional<BSONObj> MovePrimaryCoordinator::reportForCurrentOp(
-    MongoProcessInterface::CurrentOpConnectionsMode connMode,
-    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-    BSONObjBuilder cmdBob;
-    if (const auto& optComment = getForwardableOpMetadata().getComment()) {
-        cmdBob.append(optComment.get().firstElement());
-    }
-    cmdBob.append("request", BSON(_doc.kToShardIdFieldName << _doc.getToShardId()));
-
-    BSONObjBuilder bob;
-    bob.append("type", "op");
-    bob.append("desc", "MovePrimaryCoordinator");
-    bob.append("op", "command");
-    bob.append("ns", nss().toString());
-    bob.append("command", cmdBob.obj());
-    bob.append("active", true);
-    return bob.obj();
-}
+void MovePrimaryCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
+    stdx::lock_guard lk{_docMutex};
+    cmdInfoBuilder->append("request", BSON(_doc.kToShardIdFieldName << _doc.getToShardId()));
+};
 
 void MovePrimaryCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     // If we have two shard collections on the same namespace, then the arguments must be the same.

@@ -188,8 +188,7 @@ void TenantFileCloner::runQuery() {
         getClient(), std::move(aggRequest), true /* secondaryOk */, useExhaust));
     try {
         while (cursor->more()) {
-            DBClientCursorBatchIterator iter(*cursor);
-            handleNextBatch(iter);
+            handleNextBatch(*cursor);
         }
     } catch (const DBException& e) {
         // We cannot continue after an error when processing exhaust cursors. Instead we must
@@ -207,7 +206,7 @@ void TenantFileCloner::runQuery() {
     }
 }
 
-void TenantFileCloner::handleNextBatch(DBClientCursorBatchIterator& iter) {
+void TenantFileCloner::handleNextBatch(DBClientCursor& cursor) {
     LOGV2_DEBUG(6113307,
                 3,
                 "TenantFileCloner handleNextBatch",
@@ -215,7 +214,7 @@ void TenantFileCloner::handleNextBatch(DBClientCursorBatchIterator& iter) {
                 "backupId"_attr = _backupId,
                 "remoteFile"_attr = _remoteFileName,
                 "fileOffset"_attr = getFileOffset(),
-                "moreInCurrentBatch"_attr = iter.moreInCurrentBatch());
+                "moreInCurrentBatch"_attr = cursor.moreInCurrentBatch());
     {
         stdx::lock_guard<TenantMigrationSharedData> lk(*getSharedData());
         if (!getSharedData()->getStatus(lk).isOK()) {
@@ -225,11 +224,11 @@ void TenantFileCloner::handleNextBatch(DBClientCursorBatchIterator& iter) {
                       str::stream() << message << ": " << getSharedData()->getStatus(lk));
         }
     }
-    while (iter.moreInCurrentBatch()) {
+    while (cursor.moreInCurrentBatch()) {
         stdx::lock_guard<Latch> lk(_mutex);
         _stats.receivedBatches++;
-        while (iter.moreInCurrentBatch()) {
-            _dataToWrite.emplace_back(iter.nextSafe());
+        while (cursor.moreInCurrentBatch()) {
+            _dataToWrite.emplace_back(cursor.nextSafe());
         }
     }
 

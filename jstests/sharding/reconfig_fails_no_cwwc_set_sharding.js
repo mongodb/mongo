@@ -58,7 +58,7 @@ let logPrefix = "While the shard is not part of a sharded cluster: ";
 let shardServer = new ReplSetTest(
     {name: "shardServer", nodes: 1, nodeOptions: {shardsvr: ""}, useHostName: true});
 shardServer.startSet();
-shardServer.initiate();
+shardServer.initiateWithHighElectionTimeout();
 
 jsTestLog(logPrefix + "Adding an arbiter node that will change IDWC to (w:1) should succeed.");
 let arbiter = shardServer.add();
@@ -78,7 +78,7 @@ logPrefix = "While the shard is part of a sharded cluster: ";
 shardServer = new ReplSetTest(
     {name: "shardServer", nodes: 1, nodeOptions: {shardsvr: ""}, useHostName: true});
 shardServer.startSet();
-shardServer.initiate();
+shardServer.initiateWithHighElectionTimeout();
 
 const st = new ShardingTest({shards: 0, mongos: 1});
 var admin = st.getDB('admin');

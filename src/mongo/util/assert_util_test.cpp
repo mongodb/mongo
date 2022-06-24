@@ -336,6 +336,16 @@ DEATH_TEST(TassertTerminationTest, mongoUnreachableNonFatal, "Hit a MONGO_UNREAC
     }
 }
 
+DEATH_TEST_REGEX(TassertTerminationTest,
+                 mongoUnimplementedNonFatal,
+                 "6634500.*Hit a MONGO_UNIMPLEMENTED_TASSERT!") {
+    try {
+        MONGO_UNIMPLEMENTED_TASSERT(6634500);
+    } catch (const DBException&) {
+        // Catch the DBException, to ensure that we eventually abort during clean exit.
+    }
+}
+
 // fassert and its friends
 DEATH_TEST(FassertionTerminationTest, fassert, "40206") {
     fassert(40206, false);
@@ -390,6 +400,10 @@ DEATH_TEST_REGEX(InvariantTerminationTest, invariant, "Invariant failure.*false.
 
 DEATH_TEST(InvariantTerminationTest, invariantOverload, "Terminating with invariant") {
     invariant(Status(ErrorCodes::InternalError, "Terminating with invariant"));
+}
+
+DEATH_TEST(InvariantTerminationTest, mongoUnimplementedFatal, "Hit a MONGO_UNIMPLEMENTED!") {
+    MONGO_UNIMPLEMENTED;
 }
 
 DEATH_TEST(InvariantTerminationTest, invariantStatusWithOverload, "Terminating with invariant") {

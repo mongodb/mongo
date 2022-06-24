@@ -82,75 +82,35 @@ private:
     boost::optional<UUID> _migrationId;
     std::string _donorConnectionString;
     Mutex _mutex = MONGO_MAKE_LATCH("TenantFileImporterService::_mutex");
-    class ImporterState {
-    public:
-        enum class State {
-            kUninitialized,
-            kStarted,
-            kLearnedFilename,
-            kLearnedAllFilenames,
-            kInterrupted
-        };
-        void setState(State nextState) {
-            tassert(6114403,
-                    str::stream() << "current state: " << toString(_state)
-                                  << ", new state: " << toString(nextState),
-                    isValidTransition(nextState));
-            _state = nextState;
-        }
 
-        bool is(State state) const {
-            return _state == state;
-        }
-
-        StringData toString() const {
-            return toString(_state);
-        }
-
-    private:
-        static StringData toString(State value) {
-            switch (value) {
-                case State::kUninitialized:
-                    return "uninitialized";
-                case State::kStarted:
-                    return "started";
-                case State::kLearnedFilename:
-                    return "learned filename";
-                case State::kLearnedAllFilenames:
-                    return "learned all filenames";
-                case State::kInterrupted:
-                    return "interrupted";
-            }
-            MONGO_UNREACHABLE;
-            return StringData();
-        }
-
-        bool isValidTransition(State newState) {
-            if (_state == newState) {
-                return true;
-            }
-
-            switch (_state) {
-                case State::kUninitialized:
-                    return newState == State::kStarted || newState == State::kInterrupted;
-                case State::kStarted:
-                    return newState == State::kInterrupted || newState == State::kLearnedFilename ||
-                        newState == State::kLearnedAllFilenames;
-                case State::kLearnedFilename:
-                    return newState == State::kInterrupted || newState == State::kLearnedFilename ||
-                        newState == State::kLearnedAllFilenames;
-                case State::kLearnedAllFilenames:
-                    return newState == State::kInterrupted;
-                case State::kInterrupted:
-                    return newState == State::kUninitialized || newState == State::kStarted;
-            }
-            MONGO_UNREACHABLE;
-        }
-
-        State _state = State::kUninitialized;
+    // Explicit State enum ordering defined here because we rely on comparison
+    // operators for state checking in various TenantFileImporterService methods.
+    enum class State {
+        kUninitialized = 0,
+        kStarted = 1,
+        kLearnedFilename = 2,
+        kLearnedAllFilenames = 3,
+        kInterrupted = 4
     };
 
-    ImporterState _state;
+    static StringData stateToString(State state) {
+        switch (state) {
+            case State::kUninitialized:
+                return "uninitialized";
+            case State::kStarted:
+                return "started";
+            case State::kLearnedFilename:
+                return "learned filename";
+            case State::kLearnedAllFilenames:
+                return "learned all filenames";
+            case State::kInterrupted:
+                return "interrupted";
+        }
+        MONGO_UNREACHABLE;
+        return StringData();
+    }
+
+    State _state;
 
     struct ImporterEvent {
         enum class Type { kNone, kLearnedFileName, kLearnedAllFilenames };
@@ -166,6 +126,6 @@ private:
         MultiProducerSingleConsumerQueue<ImporterEvent,
                                          producer_consumer_queue_detail::DefaultCostFunction>;
 
-    std::unique_ptr<Queue> _eventQueue;
+    std::shared_ptr<Queue> _eventQueue;
 };
 }  // namespace mongo::repl

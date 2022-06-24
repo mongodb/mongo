@@ -10,6 +10,7 @@
  *  requires_fcv_60,
  *  requires_sharding,
  *  uses_transactions,
+ *  antithesis_incompatible
  * ]
  */
 
@@ -25,11 +26,9 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.insertInitialDocsOnSetUp = true;
 
     // The transaction API does not abort internal transactions that are interrupted after they
-    // have started to commit. Lowering the transactionLifetimeLimitSeconds enables a retry of a
-    // retryable write that uses such an interrupted internal transaction to not get blocked
-    // indefinitely (24 hours) due to the RetryableTransactionInProgress error.
-    // TODO (SERVER-66725): Make incoming retryable transactions abort conflicting transactions
-    // once.
+    // have started to commit. The first retry of that transaction will abort the open transaction,
+    // but will block if it happens again on that retry, so we lower the
+    // transactionLifetimeLimitSeconds so subsequent retries do not block indefinitely (24 hours).
     $config.data.lowerTransactionLifetimeLimitSeconds = true;
 
     $config.data.expectDirtyDocs = {

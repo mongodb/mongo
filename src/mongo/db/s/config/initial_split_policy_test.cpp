@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/json.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/initial_split_policy.h"
@@ -39,7 +36,6 @@
 #include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -208,7 +204,7 @@ public:
         std::vector<ChunkType> chunks;
 
         for (unsigned long i = 0; i < chunkRanges.size(); ++i) {
-            ChunkVersion version(1, 0, OID::gen(), Timestamp(1, 1));
+            ChunkVersion version({OID::gen(), Timestamp(1, 1)}, {1, 0});
             ChunkType chunk(_uuid, chunkRanges[i], version, shardIds[i]);
             chunk.setHistory({ChunkHistory(timeStamp, shardIds[i])});
             chunks.push_back(chunk);

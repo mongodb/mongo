@@ -6,6 +6,7 @@ import errno
 import json
 import os
 import re
+import platform
 import shlex
 import shutil
 import stat
@@ -715,6 +716,19 @@ add_option(
 )
 
 add_option(
+    'build-metrics',
+    metavar="FILE",
+    const='build-metrics.json',
+    default='build-metrics.json',
+    help='Enable tracking of build performance and output data as json.'
+    ' Use "-" to output json to stdout, or supply a path to the desired'
+    ' file to output to. If no argument is supplied, the default log'
+    ' file will be "build-metrics.json".',
+    nargs='?',
+    type=str,
+)
+
+add_option(
     'visibility-support',
     choices=['auto', 'on', 'off'],
     const='auto',
@@ -722,6 +736,13 @@ add_option(
     help='Enable visibility annotations',
     nargs='?',
     type='choice',
+)
+
+add_option(
+    'force-macos-dynamic-link',
+    default=False,
+    action='store_true',
+    help='Bypass link-model=dynamic check for macos versions <12.',
 )
 
 try:
@@ -1307,6 +1328,12 @@ env_vars.Add(
         default='$BUILD_ROOT/tmp_test_data',
         validator=PathVariable.PathAccept,
     ), )
+
+env_vars.AddVariables(
+    ("BUILD_METRICS_EVG_TASK_ID", "Evergreen task ID to add to build metrics data."),
+    ("BUILD_METRICS_EVG_BUILD_VARIANT", "Evergreen build variant to add to build metrics data."),
+)
+
 # -- Validate user provided options --
 
 # A dummy environment that should *only* have the variables we have set. In practice it has
@@ -1327,7 +1354,7 @@ variables_only_env = Environment(
 if GetOption('help'):
     try:
         Help('\nThe following variables may also be set like scons VARIABLE=value\n', append=True)
-        Help(env_vars.GenerateHelpText(variables_only_env), append=True)
+        Help(env_vars.GenerateHelpText(variables_only_env, sort=True), append=True)
         Help(
             '\nThe \'list-targets\' target can be built to list useful comprehensive build targets\n',
             append=True)
@@ -1449,6 +1476,11 @@ if get_option('build-tools') == 'next':
 
 env = Environment(variables=env_vars, **envDict)
 del envDict
+
+if get_option('build-metrics'):
+    env.Tool('build_metrics')
+    env.AddBuildMetricsMetaData('evg_id', env.get("BUILD_METRICS_EVG_TASK_ID", "UNKNOWN"))
+    env.AddBuildMetricsMetaData('variant', env.get("BUILD_METRICS_EVG_BUILD_VARIANT", "UNKNOWN"))
 
 # TODO SERVER-42170 We can remove this Execute call
 # when support for PathIsDirCreate can be used as a validator
@@ -1833,6 +1865,29 @@ if link_model.startswith('dynamic') and get_option('install-action') == 'symlink
     env.FatalError(
         f"Options '--link-model={link_model}' not supported with '--install-action={get_option('install-action')}'."
     )
+
+if link_model == 'dynamic' and env.TargetOSIs(
+        'darwin') and not get_option('force-macos-dynamic-link'):
+
+    macos_version_message = textwrap.dedent("""\
+        link-model=dynamic us only supported on macos version 12 or higher.
+        This is due to a 512 dylib RUNTIME limit on older macos. See this post for
+        more information: https://developer.apple.com/forums//thread/708366?login=true&page=1#717495022
+        Use '--force-macos-dynamic-link' to bypass this check.
+        """)
+
+    try:
+        macos_version_major = int(platform.mac_ver()[0].split('.')[0])
+        if macos_version_major < 12:
+            env.FatalError(
+                textwrap.dedent(f"""\
+                Macos version detected: {macos_version_major}
+                """) + macos_version_message)
+    except (IndexError, TypeError) as exc:
+        env.FatalError(
+            textwrap.dedent(f"""\
+            Failed to detect macos version: {exc}
+            """) + macos_version_message)
 
 # libunwind configuration.
 # In which the following globals are set and normalized to bool:
@@ -2898,15 +2953,25 @@ if get_option("system-boost-lib-search-suffixes") is not None:
 # discover modules, and load the (python) module for each module's build.py
 mongo_modules = moduleconfig.discover_modules('src/mongo/db/modules', get_option('modules'))
 
-if get_option('ninja') != 'disabled':
-    for module in mongo_modules:
-        if hasattr(module, 'NinjaFile'):
-            env.FatalError(
-                textwrap.dedent("""\
-                ERROR: Ninja tool option '--ninja' should not be used with the ninja module.
-                    Remove the ninja module directory or use '--modules= ' to select no modules.
-                    If using enterprise module, explicitly set '--modules=<name-of-enterprise-module>' to exclude the ninja module."""
-                                ))
+has_ninja_module = False
+for module in mongo_modules:
+    if hasattr(module, 'NinjaFile'):
+        has_ninja_module = True
+        break
+
+if get_option('ninja') != 'disabled' and has_ninja_module:
+    env.FatalError(
+        textwrap.dedent("""\
+        ERROR: Ninja tool option '--ninja' should not be used with the ninja module.
+            Using both options simultaneously may clobber build.ninja files.
+            Remove the ninja module directory or use '--modules= ' to select no modules.
+            If using enterprise module, explicitly set '--modules=<name-of-enterprise-module>' to exclude the ninja module."""
+                        ))
+
+if has_ninja_module:
+    print(
+        "WARNING: You are attempting to use the unsupported/legacy ninja module, instead of the integrated ninja generator. You are strongly encouraged to remove the ninja module from your module list and invoke scons with --ninja generate-ninja"
+    )
 
 # --- check system ---
 ssl_provider = None
@@ -3525,7 +3590,8 @@ def doConfigure(myenv):
 
     if myenv.ToolchainIs('msvc'):
         if get_option('cxx-std') == "17":
-            myenv.AppendUnique(CCFLAGS=['/std:c++17'])
+            myenv.AppendUnique(CCFLAGS=['/std:c++17',
+                                        '/Zc:lambda'])  # /Zc:lambda is implied by /std:c++20
         elif get_option('cxx-std') == "20":
             myenv.AppendUnique(CCFLAGS=['/std:c++20'])
     else:
@@ -4012,7 +4078,17 @@ def doConfigure(myenv):
             # If anything is changed, added, or removed in either asan_options or
             # lsan_options, be sure to make the corresponding changes to the
             # appropriate build variants in etc/evergreen.yml
-            asan_options = "detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1"
+            asan_options_clear = [
+                "detect_leaks=1",
+                "check_initialization_order=true",
+                "strict_init_order=true",
+                "abort_on_error=1",
+                "disable_coredump=0",
+                "handle_abort=1",
+                "strict_string_checks=true",
+                "detect_invalid_pointer_pairs=1",
+            ]
+            asan_options = ":".join(asan_options_clear)
             lsan_options = f"report_objects=1:suppressions={myenv.File('#etc/lsan.suppressions').abspath}"
             env['ENV']['ASAN_OPTIONS'] = asan_options + symbolizer_option
             env['ENV']['LSAN_OPTIONS'] = lsan_options + symbolizer_option

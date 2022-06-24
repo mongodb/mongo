@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/timeseries/flat_bson.h"
 
 namespace mongo::timeseries {
@@ -43,7 +43,7 @@ namespace mongo::timeseries {
  * Returns a bad status if the bucket document is malformed.
  */
 StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
-                                               const CollatorInterface* collator);
+                                               const StringData::ComparatorInterface* comparator);
 
 /**
  * Generates and returns a Schema object from an existing bucket document. Avoids unpacking the
@@ -52,6 +52,6 @@ StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
  * Returns a bad status if the bucket document is malformed or contains mixed schema measurements.
  */
 StatusWith<Schema> generateSchemaFromBucketDoc(const BSONObj& bucketDoc,
-                                               const CollatorInterface* collator);
+                                               const StringData::ComparatorInterface* comparator);
 
 }  // namespace mongo::timeseries

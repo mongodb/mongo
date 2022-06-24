@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -47,9 +44,6 @@
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/stale_exception.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -168,7 +162,7 @@ public:
             reshardingFields.setRecipientFields(recipientFields);
             coll.setReshardingFields(reshardingFields);
 
-            ChunkVersion version(1, 0, epoch, timestamp);
+            ChunkVersion version({epoch, timestamp}, {1, 0});
 
             ChunkType chunk(uuid,
                             {skey.getKeyPattern().globalMin(), skey.getKeyPattern().globalMax()},
@@ -193,7 +187,7 @@ public:
             CollectionType coll(
                 origNss, epoch, timestamp, Date_t::now(), uuid, skey.getKeyPattern());
 
-            ChunkVersion version(2, 0, epoch, timestamp);
+            ChunkVersion version({epoch, timestamp}, {2, 0});
 
             ChunkType chunk(uuid,
                             {skey.getKeyPattern().globalMin(), skey.getKeyPattern().globalMax()},

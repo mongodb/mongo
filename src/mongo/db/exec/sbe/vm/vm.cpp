@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -153,6 +152,8 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,   // ret
 
     -1,  // fail
+
+    0,  // applyClassicMatcher
 };
 
 namespace {
@@ -211,17 +212,13 @@ std::string CodeFragment::toString() const {
             case Instruction::cmp3w:
             case Instruction::collCmp3w:
             case Instruction::fillEmpty:
-            case Instruction::fillEmptyConst:
             case Instruction::getField:
-            case Instruction::getFieldConst:
             case Instruction::getElement:
             case Instruction::getArraySize:
             case Instruction::collComparisonKey:
             case Instruction::getFieldOrElement:
             case Instruction::traverseP:
-            case Instruction::traversePConst:
             case Instruction::traverseF:
-            case Instruction::traverseFConst:
             case Instruction::setField:
             case Instruction::aggSum:
             case Instruction::aggMin:
@@ -249,9 +246,15 @@ std::string CodeFragment::toString() const {
                 break;
             }
             // Instructions with a single integer argument.
+            case Instruction::pushLocalLambda:
+            case Instruction::traversePConst: {
+                auto offset = readFromMemory<int>(pcPointer);
+                pcPointer += sizeof(offset);
+                ss << "offset: " << offset;
+                break;
+            }
             case Instruction::pushLocalVal:
-            case Instruction::pushMoveLocalVal:
-            case Instruction::pushLocalLambda: {
+            case Instruction::pushMoveLocalVal: {
                 auto arg = readFromMemory<int>(pcPointer);
                 pcPointer += sizeof(arg);
                 ss << "arg: " << arg;
@@ -266,6 +269,21 @@ std::string CodeFragment::toString() const {
                 break;
             }
             // Instructions with other kinds of arguments.
+            case Instruction::traverseFConst: {
+                auto k = readFromMemory<Instruction::Constants>(pcPointer);
+                pcPointer += sizeof(k);
+                auto offset = readFromMemory<int>(pcPointer);
+                pcPointer += sizeof(offset);
+                ss << "k: " << Instruction::toStringConstants(k) << ", offset: " << offset;
+                break;
+            }
+            case Instruction::fillEmptyConst: {
+                auto k = readFromMemory<Instruction::Constants>(pcPointer);
+                pcPointer += sizeof(k);
+                ss << "k: " << Instruction::toStringConstants(k);
+                break;
+            }
+            case Instruction::getFieldConst:
             case Instruction::pushConstVal: {
                 auto tag = readFromMemory<value::TypeTags>(pcPointer);
                 pcPointer += sizeof(tag);
@@ -279,6 +297,12 @@ std::string CodeFragment::toString() const {
                 auto accessor = readFromMemory<value::SlotAccessor*>(pcPointer);
                 pcPointer += sizeof(accessor);
                 ss << "accessor: " << static_cast<void*>(accessor);
+                break;
+            }
+            case Instruction::applyClassicMatcher: {
+                const auto* matcher = readFromMemory<const MatchExpression*>(pcPointer);
+                pcPointer += sizeof(matcher);
+                ss << "matcher: " << static_cast<const void*>(matcher);
                 break;
             }
             case Instruction::numConvert: {
@@ -444,6 +468,17 @@ void CodeFragment::appendNumericConvert(value::TypeTags targetTag) {
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, targetTag);
+}
+
+void CodeFragment::appendApplyClassicMatcher(const MatchExpression* matcher) {
+    Instruction i;
+    i.tag = Instruction::applyClassicMatcher;
+    adjustStackSimple(i);
+
+    auto offset = allocateSpace(sizeof(Instruction) + sizeof(matcher));
+
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, matcher);
 }
 
 void CodeFragment::appendSub() {
@@ -5846,6 +5881,31 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 
                     uasserted(code, message);
 
+                    break;
+                }
+                case Instruction::applyClassicMatcher: {
+                    const auto* matcher = readFromMemory<const MatchExpression*>(pcPointer);
+                    pcPointer += sizeof(matcher);
+
+                    auto [ownedObj, tagObj, valObj] = getFromStack(0);
+
+                    BSONObj bsonObjForMatching;
+                    if (tagObj == value::TypeTags::Object) {
+                        BSONObjBuilder builder;
+                        sbe::bson::convertToBsonObj(builder, sbe::value::getObjectView(valObj));
+                        bsonObjForMatching = builder.obj();
+                    } else if (tagObj == value::TypeTags::bsonObject) {
+                        auto bson = value::getRawPointerView(valObj);
+                        bsonObjForMatching = BSONObj(bson);
+                    } else {
+                        MONGO_UNREACHABLE_TASSERT(6681402);
+                    }
+
+                    bool res = matcher->matchesBSON(bsonObjForMatching);
+                    if (ownedObj) {
+                        value::releaseValue(tagObj, valObj);
+                    }
+                    topStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(res));
                     break;
                 }
                 default:

@@ -144,21 +144,11 @@ public:
                 FixedFCVRegion fixedFcvRegion(opCtx);
 
                 auto coordinatorDoc = [&] {
-                    if (serverGlobalParams.featureCompatibility.isLessThan(
-                            multiversion::FeatureCompatibilityVersion::kVersion_6_0)) {
-                        auto doc = CreateCollectionCoordinatorDocumentPre60Compatible();
-                        doc.setShardingDDLCoordinatorMetadata(
-                            {{std::move(nss),
-                              DDLCoordinatorTypeEnum::kCreateCollectionPre60Compatible}});
-                        doc.setCreateCollectionRequest(std::move(createCmdRequest));
-                        return doc.toBSON();
-                    } else {
-                        auto doc = CreateCollectionCoordinatorDocument();
-                        doc.setShardingDDLCoordinatorMetadata(
-                            {{std::move(nss), DDLCoordinatorTypeEnum::kCreateCollection}});
-                        doc.setCreateCollectionRequest(std::move(createCmdRequest));
-                        return doc.toBSON();
-                    }
+                    auto doc = CreateCollectionCoordinatorDocument();
+                    doc.setShardingDDLCoordinatorMetadata(
+                        {{std::move(nss), DDLCoordinatorTypeEnum::kCreateCollection}});
+                    doc.setCreateCollectionRequest(std::move(createCmdRequest));
+                    return doc.toBSON();
                 }();
 
                 auto service = ShardingDDLCoordinatorService::getService(opCtx);

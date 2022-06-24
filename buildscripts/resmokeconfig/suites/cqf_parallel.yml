@@ -28,4 +28,6 @@ executor:
         enableTestCommands: 1
         featureFlagCommonQueryFramework: true
         internalQueryEnableCascadesOptimizer: true
+        # This flag disables the fallback path that may hide bugs in CQF.
+        internalQueryForceCommonQueryFramework: true
         internalQueryDefaultDOP: 5

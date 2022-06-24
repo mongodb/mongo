@@ -2,6 +2,8 @@
  * Test that $unionWith works with $geoNear, $text, and $indexStats
  * Some of these stages cannot be used in facets.
  * @tags: [
+ *   # Asserts on the output of $indexStats.
+ *   assumes_no_implicit_index_creation,
  *   do_not_wrap_aggregations_in_facets,
  * ]
  */

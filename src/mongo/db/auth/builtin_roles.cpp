@@ -781,19 +781,19 @@ const std::map<StringData, BuiltinRoleDefinition> kBuiltinRoles({
 // $external is a virtual database used for X509, LDAP,
 // and other authentication mechanisms and not used for storage.
 // Therefore, granting privileges on this database does not make sense.
-bool isValidDB(StringData dbname) {
+bool isValidDB(const DatabaseName& dbname) {
     return NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow) &&
-        (dbname != NamespaceString::kExternalDb);
+        (dbname.db() != NamespaceString::kExternalDb);
 }
 
 }  // namespace
 
-stdx::unordered_set<RoleName> auth::getBuiltinRoleNamesForDB(StringData dbname) {
+stdx::unordered_set<RoleName> auth::getBuiltinRoleNamesForDB(const DatabaseName& dbname) {
     if (!isValidDB(dbname)) {
         return {};
     }
 
-    const bool isAdmin = dbname == ADMIN_DBNAME;
+    const bool isAdmin = dbname.db() == ADMIN_DBNAME;
 
     stdx::unordered_set<RoleName> roleNames;
     for (const auto& [role, def] : kBuiltinRoles) {
@@ -808,7 +808,7 @@ bool auth::addPrivilegesForBuiltinRole(const RoleName& roleName, PrivilegeVector
     auto role = roleName.getRole();
     auto dbname = roleName.getDB();
 
-    if (!isValidDB(dbname)) {
+    if (!isValidDB(roleName.getDatabaseName())) {
         return false;
     }
 
@@ -834,8 +834,7 @@ void auth::generateUniversalPrivileges(PrivilegeVector* privileges) {
 }
 
 bool auth::isBuiltinRole(const RoleName& role) {
-    auto dbname = role.getDB();
-    if (!isValidDB(dbname)) {
+    if (!isValidDB(role.getDatabaseName())) {
         return false;
     }
 
@@ -844,7 +843,7 @@ bool auth::isBuiltinRole(const RoleName& role) {
         return false;
     }
 
-    return !it->second.adminOnly() || (dbname == ADMIN_DBNAME);
+    return !it->second.adminOnly() || (role.getDB() == ADMIN_DBNAME);
 }
 
 }  // namespace mongo

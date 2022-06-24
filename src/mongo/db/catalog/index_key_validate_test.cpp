@@ -353,5 +353,42 @@ TEST(IndexKeyValidateTest, RepairIndexSpecs) {
                             "true, force: true}"))));
 }
 
+TEST(IndexKeyValidateTest, GeoIndexSpecs) {
+    ASSERT_OK(index_key_validate::validateIndexSpec(
+        nullptr,
+        fromjson("{'key':{'loc':'2dsphere'},'name':'loc_2dsphere','finestIndexedLevel':17,'"
+                 "coarsestIndexedLevel':5}")));
+
+    ASSERT_NOT_OK(index_key_validate::validateIndexSpec(
+        nullptr,
+        fromjson("{'key':{'loc':'2dsphere'},'name':'loc_2dsphere','finestIndexedLevel':'string','"
+                 "coarsestIndexedLevel':'string'}")));
+
+    ASSERT_NOT_OK(index_key_validate::validateIndexSpec(
+        nullptr,
+        fromjson("{'key':{'loc':'2dsphere'},'name':'loc_2dsphere','finestIndexedLevel':17,'"
+                 "coarsestIndexedLevel':'string'}")));
+
+    ASSERT_NOT_OK(index_key_validate::validateIndexSpec(
+        nullptr,
+        fromjson("{'key':{'loc':'2dsphere'},'name':'loc_2dsphere','finestIndexedLevel':'string','"
+                 "coarsestIndexedLevel':5}")));
+
+    ASSERT_NOT_OK(index_key_validate::validateIndexSpec(
+        nullptr,
+        fromjson("{'key':{'loc':'2dsphere'},'name':'loc_2dsphere','finestIndexedLevel':true,'"
+                 "coarsestIndexedLevel':true}")));
+
+    ASSERT_NOT_OK(index_key_validate::validateIndexSpec(
+        nullptr,
+        fromjson("{'key':{'loc':'2dsphere'},'name':'loc_2dsphere','finestIndexedLevel':17,'"
+                 "coarsestIndexedLevel':true}")));
+
+    ASSERT_NOT_OK(index_key_validate::validateIndexSpec(
+        nullptr,
+        fromjson("{'key':{'loc':'2dsphere'},'name':'loc_2dsphere','finestIndexedLevel':true,'"
+                 "coarsestIndexedLevel':5}")));
+}
+
 }  // namespace
 }  // namespace mongo

@@ -52,15 +52,6 @@ ShardCollectionType::ShardCollectionType(const BSONObj& obj) {
     uassert(ErrorCodes::ShardKeyNotFound,
             str::stream() << "Empty shard key. Failed to parse: " << obj.toString(),
             !getKeyPattern().toBSON().isEmpty());
-
-    // Last refreshed collection version is stored as a timestamp in the BSON representation of
-    // shard collection type for legacy reasons. We therefore explicitly convert this timestamp, if
-    // it exists, into a chunk version.
-    if (getLastRefreshedCollectionVersion()) {
-        ChunkVersion version = *getLastRefreshedCollectionVersion();
-        setLastRefreshedCollectionVersion(ChunkVersion(
-            version.majorVersion(), version.minorVersion(), getEpoch(), getTimestamp()));
-    }
 }
 
 BSONObj ShardCollectionType::toBSON() const {
@@ -81,6 +72,17 @@ void ShardCollectionType::setAllowMigrations(bool allowMigrations) {
         setPre50CompatibleAllowMigrations(boost::none);
     else
         setPre50CompatibleAllowMigrations(false);
+}
+
+boost::optional<ChunkVersion> ShardCollectionType::getLastRefreshedCollectionVersion() const {
+    // Last refreshed collection version is stored as a timestamp in the BSON representation of
+    // shard collection type for legacy reasons. We therefore explicitly convert this timestamp, if
+    // it exists, into a chunk version.
+    if (!getLastRefreshedCollectionMajorMinorVersion())
+        return boost::none;
+
+    Timestamp majorMinor = *getLastRefreshedCollectionMajorMinorVersion();
+    return ChunkVersion({getEpoch(), getTimestamp()}, {majorMinor.getSecs(), majorMinor.getInc()});
 }
 
 }  // namespace mongo

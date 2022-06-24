@@ -321,6 +321,8 @@ struct Instruction {
 
         fail,
 
+        applyClassicMatcher,  // Instruction which calls into the classic engine MatchExpression.
+
         lastInstruction  // this is just a marker used to calculate number of instructions
     };
 
@@ -329,6 +331,19 @@ struct Instruction {
         True,
         False,
     };
+
+    static const char* toStringConstants(Constants k) {
+        switch (k) {
+            case Null:
+                return "Null";
+            case True:
+                return "True";
+            case False:
+                return "False";
+            default:
+                return "unknown";
+        }
+    }
 
     // Make sure that values in this arrays are always in-sync with the enum.
     static int stackOffset[];
@@ -481,6 +496,8 @@ struct Instruction {
                 return "ret";
             case fail:
                 return "fail";
+            case applyClassicMatcher:
+                return "applyClassicMatcher";
             default:
                 return "unrecognized";
         }
@@ -769,8 +786,12 @@ public:
         appendSimpleInstruction(Instruction::fail);
     }
     void appendNumericConvert(value::TypeTags targetTag);
+    void appendApplyClassicMatcher(const MatchExpression*);
 
     void fixup(int offset);
+
+    // For printing from an interactive debugger.
+    std::string toString() const;
 
 private:
     void appendSimpleInstruction(Instruction::Tags tag);
@@ -784,9 +805,6 @@ private:
     void copyCodeAndFixup(CodeFragment&& from);
 
 private:
-    // For printing from an interactive debugger.
-    std::string toString() const;
-
     absl::InlinedVector<uint8_t, 16> _instrs;
 
     /**

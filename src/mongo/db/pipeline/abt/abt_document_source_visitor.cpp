@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/document_source_internal_inhibit_optimization.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_internal_split_pipeline.h"
+#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_list_cached_and_active_users.h"
 #include "mongo/db/pipeline/document_source_list_local_sessions.h"
@@ -178,11 +179,19 @@ private:
                                 << static_cast<int>(transformer->getType()) << ")");
     }
 
+    void assertSupportedPath(const std::string& path) {
+        uassert(ErrorCodes::InternalErrorNotSupported,
+                "Projection contains unsupported numeric path component",
+                !FieldRef(path).hasNumericPathComponents());
+    }
+
     void processProjectedPaths(const projection_executor::InclusionNode& node) {
         std::set<std::string> preservedPaths;
         node.reportProjectedPaths(&preservedPaths);
 
         for (const std::string& preservedPathStr : preservedPaths) {
+            assertSupportedPath(preservedPathStr);
+
             _builder.integrateFieldPath(FieldPath(preservedPathStr),
                                         [](const bool isLastElement, FieldMapEntry& entry) {
                                             entry._hasLeadingObj = true;
@@ -232,6 +241,8 @@ private:
 
         // Handle general expression projection.
         for (const std::string& computedPathStr : computedPaths) {
+            assertSupportedPath(computedPathStr);
+
             const FieldPath computedPath(computedPathStr);
 
             auto entry = _ctx.getNode();
@@ -272,6 +283,7 @@ private:
         node.reportProjectedPaths(&preservedPaths);
 
         for (const std::string& preservedPathStr : preservedPaths) {
+            assertSupportedPath(preservedPathStr);
             _builder.integrateFieldPath(FieldPath(preservedPathStr),
                                         [](const bool isLastElement, FieldMapEntry& entry) {
                                             if (isLastElement) {
@@ -326,6 +338,10 @@ public:
         unsupportedStage(source);
     }
 
+    void visit(const DocumentSourceInternalUnpackBucket* source) override {
+        unsupportedStage(source);
+    }
+
     void visit(const DocumentSourceGroup* source) override {
         const StringMap<boost::intrusive_ptr<Expression>>& idFields = source->getIdFields();
         uassert(6624201, "Empty idFields map", !idFields.empty());
@@ -334,6 +350,9 @@ public:
         for (const auto& [fieldName, expr] : idFields) {
             groupByFieldNames.push_back(fieldName);
         }
+        const bool isSingleIdField =
+            groupByFieldNames.size() == 1 && groupByFieldNames.front() == "_id";
+
         // Sort in order to generate consistent plans.
         std::sort(groupByFieldNames.begin(), groupByFieldNames.end());
 
@@ -434,11 +453,21 @@ public:
 
         ABT integrationPath = make<PathIdentity>();
         for (size_t i = 0; i < groupByFieldNames.size(); i++) {
+            std::string fieldName = std::move(groupByFieldNames.at(i));
+            if (!isSingleIdField) {
+                // Erase '_id.' prefix.
+                fieldName = fieldName.substr(strlen("_id."));
+            }
+
             maybeComposePath(integrationPath,
-                             make<PathField>(std::move(groupByFieldNames.at(i)),
+                             make<PathField>(std::move(fieldName),
                                              make<PathConstant>(make<Variable>(
                                                  std::move(groupByProjNames.at(i))))));
         }
+        if (!isSingleIdField) {
+            integrationPath = make<PathField>("_id", std::move(integrationPath));
+        }
+
         for (size_t i = 0; i < aggProjFieldNames.size(); i++) {
             maybeComposePath(
                 integrationPath,

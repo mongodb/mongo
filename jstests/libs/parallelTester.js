@@ -244,6 +244,10 @@ if (typeof _threadInject != "undefined") {
             "collmod_convert_to_unique_apply_ops.js",
             "collmod_convert_to_unique_violations.js",
             "collmod_convert_to_unique_violations_size_limit.js",
+
+            // TODO (SERVER-63228): Remove this exclusion once the feature flag is enabled by
+            // default.
+            "timeseries/timeseries_index_ttl_partial.js",
         ]);
 
         // Get files, including files in subdirectories.
@@ -311,7 +315,6 @@ if (typeof _threadInject != "undefined") {
             // run in parallel, they could interfere with the cache and cause failures.
             parallelFilesDir + "/list_all_local_sessions.js",
             parallelFilesDir + "/list_all_sessions.js",
-            parallelFilesDir + "/list_local_sessions.js",
             parallelFilesDir + "/list_sessions.js",
         ];
         var serialTests = makeKeys(serialTestsArr);

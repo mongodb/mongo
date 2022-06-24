@@ -261,7 +261,19 @@ __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile)
         WT_ERR(__wt_curhs_open(session, NULL, &ds->hs_cursor));
 
     if (ds->hs_cursor != NULL) {
-        F_SET(ds->hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
+        /*
+         * For debugging dumps, we want to see everything, not just what is currently visible in
+         * whatever arbitrary context we may have inherited. By default, however, suppress obsolete
+         * entries (those with globally visible stop times). For checkpoint cursors, dump those as
+         * well, not because they are more interesting when reading a checkpoint but because the
+         * visible-all test to hide them needs a copy of the checkpoint snapshot and that's not
+         * easily available. (If we are dumping pages from a checkpoint cursor, it is actually
+         * accessible in the cursor; but the logic for substituting it into the session is private
+         * to cur_file.c and I don't want to either change that or paste a second copy of it. Hiding
+         * a few obsolete history store entries isn't worth either of those changes.
+         */
+        F_SET(ds->hs_cursor,
+          WT_READING_CHECKPOINT(session) ? WT_CURSTD_HS_READ_ALL : WT_CURSTD_HS_READ_COMMITTED);
         WT_ERR(__wt_scr_alloc(session, 0, &ds->hs_key));
         WT_ERR(__wt_scr_alloc(session, 0, &ds->hs_value));
     }

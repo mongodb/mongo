@@ -39,6 +39,7 @@
 #include "mongo/db/exec/sbe/stages/makeobj.h"
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/stage_types.h"
 
@@ -947,5 +948,70 @@ struct StageBuilderState {
     // Key is expected to represent field paths in form CURRENT.<field_name>[.<field_name>]*.
     stdx::unordered_map<std::string /*field path*/, EvalExpr> preGeneratedExprs;
 };
+
+/**
+ * Tree representing index key pattern or a subset of it.
+ *
+ * For example, the key pattern {a.b: 1, x: 1, a.c: 1} would look like:
+ *
+ *         <root>
+ *         /   |
+ *        a    x
+ *       / \
+ *      b   c
+ *
+ * This tree is used for building SBE subtrees to re-hydrate index keys and for covered projections.
+ */
+struct IndexKeyPatternTreeNode {
+    IndexKeyPatternTreeNode* emplace(StringData fieldComponent) {
+        auto newNode = std::make_unique<IndexKeyPatternTreeNode>();
+        const auto newNodeRaw = newNode.get();
+        children.emplace(fieldComponent, std::move(newNode));
+        childrenOrder.push_back(fieldComponent.toString());
+
+        return newNodeRaw;
+    }
+
+    /**
+     * Returns leaf node matching field path. If the field path provided resolves to a non-leaf
+     * node, null will be returned.
+     *
+     * For example, if tree was built for key pattern {a: 1, a.b: 1}, this method will return
+     * nullptr for field path "a". On the other hand, this method will return corresponding node for
+     * field path "a.b".
+     */
+    IndexKeyPatternTreeNode* findLeafNode(const FieldRef& fieldRef, size_t currentIndex = 0) {
+        if (currentIndex == fieldRef.numParts()) {
+            if (children.empty()) {
+                return this;
+            }
+            return nullptr;
+        }
+
+        auto currentPart = fieldRef.getPart(currentIndex);
+        if (auto it = children.find(currentPart); it != children.end()) {
+            return it->second->findLeafNode(fieldRef, currentIndex + 1);
+        } else {
+            return nullptr;
+        }
+    }
+
+    StringMap<std::unique_ptr<IndexKeyPatternTreeNode>> children;
+    std::vector<std::string> childrenOrder;
+
+    // Which slot the index key for this component is stored in. May be boost::none for non-leaf
+    // nodes.
+    boost::optional<sbe::value::SlotId> indexKeySlot;
+};
+
+std::unique_ptr<IndexKeyPatternTreeNode> buildKeyPatternTree(const BSONObj& keyPattern,
+                                                             const sbe::value::SlotVector& slots);
+std::unique_ptr<sbe::EExpression> buildNewObjExpr(const IndexKeyPatternTreeNode* kpTree);
+
+std::unique_ptr<sbe::PlanStage> rehydrateIndexKey(std::unique_ptr<sbe::PlanStage> stage,
+                                                  const BSONObj& indexKeyPattern,
+                                                  PlanNodeId nodeId,
+                                                  const sbe::value::SlotVector& indexKeySlots,
+                                                  sbe::value::SlotId resultSlot);
 
 }  // namespace mongo::stage_builder

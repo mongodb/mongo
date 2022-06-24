@@ -473,7 +473,7 @@ class _ShardSplitThread(threading.Thread):  # pylint: disable=too-many-instance-
                 while True:
                     try:
                         res = donor_node_client.config.command({
-                            "count": "tenantSplitDonors",
+                            "count": "shardSplitDonors",
                             "query": {"tenantIds": split_opts.tenant_ids}
                         })
                         if res["n"] == 0:
@@ -502,7 +502,7 @@ class _ShardSplitThread(threading.Thread):  # pylint: disable=too-many-instance-
                 while True:
                     try:
                         res = recipient_node_client.config.command({
-                            "count": "tenantSplitDonors",
+                            "count": "shardSplitDonors",
                             "query": {"tenantIds": split_opts.tenant_ids}
                         })
                         if res["n"] == 0:

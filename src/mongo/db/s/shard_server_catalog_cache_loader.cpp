@@ -27,16 +27,7 @@
  *    it in the license file.
  */
 
-
-#define LOGV2_FOR_CATALOG_REFRESH(ID, DLEVEL, MESSAGE, ...) \
-    LOGV2_DEBUG_OPTIONS(                                    \
-        ID, DLEVEL, {logv2::LogComponent::kShardingCatalogRefresh}, MESSAGE, ##__VA_ARGS__)
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
-
-#include <memory>
 
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/client.h"
@@ -57,7 +48,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
 
 using namespace shardmetadatautil;
@@ -66,7 +56,6 @@ using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunk
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(hangPersistCollectionAndChangedChunksAfterDropChunks);
 MONGO_FAIL_POINT_DEFINE(hangCollectionFlush);
 
 AtomicWord<unsigned long long> taskIdGenerator{0};
@@ -84,11 +73,6 @@ void dropChunksIfEpochChanged(OperationContext* opCtx,
 
     // Drop the 'config.cache.chunks.<ns>' collection
     dropChunks(opCtx, nss);
-
-    if (MONGO_unlikely(hangPersistCollectionAndChangedChunksAfterDropChunks.shouldFail())) {
-        LOGV2(22093, "Hit hangPersistCollectionAndChangedChunksAfterDropChunks failpoint");
-        hangPersistCollectionAndChangedChunksAfterDropChunks.pauseWhileSet(opCtx);
-    }
 
     LOGV2(5990400,
           "Dropped persisted chunk metadata due to epoch change",
@@ -131,7 +115,6 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
         return status;
     }
 
-    // Update the chunk metadata.
     try {
         dropChunksIfEpochChanged(opCtx, maxLoaderVersion, collAndChunks.epoch, nss);
     } catch (const DBException& ex) {
@@ -211,13 +194,13 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
         return ChunkVersion::UNSHARDED();
     }
 
-    auto statusWithChunk = shardmetadatautil::readShardChunks(opCtx,
-                                                              nss,
-                                                              BSONObj(),
-                                                              BSON(ChunkType::lastmod() << -1),
-                                                              1LL,
-                                                              cachedCollection.getEpoch(),
-                                                              cachedCollection.getTimestamp());
+    auto statusWithChunk = readShardChunks(opCtx,
+                                           nss,
+                                           BSONObj(),
+                                           BSON(ChunkType::lastmod() << -1),
+                                           1LL,
+                                           cachedCollection.getEpoch(),
+                                           cachedCollection.getTimestamp());
     uassertStatusOKWithContext(
         statusWithChunk,
         str::stream() << "Failed to read highest version persisted chunk for collection '"
@@ -247,11 +230,9 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
     // If the epochs are the same we can safely take the timestamp from the shard coll entry.
     ChunkVersion startingVersion = version.isSameCollection({shardCollectionEntry.getEpoch(),
                                                              shardCollectionEntry.getTimestamp()})
-        ? ChunkVersion(version.majorVersion(),
-                       version.minorVersion(),
-                       version.epoch(),
-                       shardCollectionEntry.getTimestamp())
-        : ChunkVersion(0, 0, shardCollectionEntry.getEpoch(), shardCollectionEntry.getTimestamp());
+        ? version
+        : ChunkVersion({shardCollectionEntry.getEpoch(), shardCollectionEntry.getTimestamp()},
+                       {0, 0});
 
     QueryAndSort diff = createShardChunkDiffQuery(startingVersion);
 
@@ -647,7 +628,14 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_runSecond
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion) {
 
+    Timer t;
     forcePrimaryCollectionRefreshAndWaitForReplication(opCtx, nss);
+    LOGV2_FOR_CATALOG_REFRESH(5965800,
+                              2,
+                              "Cache loader on secondary successfully waited for primary refresh "
+                              "and replication of collection",
+                              "namespace"_attr = nss,
+                              "duration"_attr = Milliseconds(t.millis()));
 
     // Read the local metadata.
 
@@ -776,7 +764,14 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
 
 StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_runSecondaryGetDatabase(
     OperationContext* opCtx, StringData dbName) {
+    Timer t;
     forcePrimaryDatabaseRefreshAndWaitForReplication(opCtx, dbName);
+    LOGV2_FOR_CATALOG_REFRESH(5965801,
+                              2,
+                              "Cache loader on secondary successfully waited for primary refresh "
+                              "and replication of database",
+                              "db"_attr = dbName,
+                              "duration"_attr = Milliseconds(t.millis()));
     return readShardDatabasesEntry(opCtx, dbName);
 }
 
@@ -1280,16 +1275,7 @@ ShardServerCatalogCacheLoader::CollAndChunkTask::CollAndChunkTask(
     if (statusWithCollectionAndChangedChunks.isOK()) {
         collectionAndChangedChunks = std::move(statusWithCollectionAndChangedChunks.getValue());
         invariant(!collectionAndChangedChunks->changedChunks.empty());
-        const auto highestVersion = collectionAndChangedChunks->changedChunks.back().getVersion();
-        // Note that due to the way Phase 1 of the FCV upgrade writes timestamps to chunks
-        // (non-atomically), it is possible that chunks exist with timestamps, but the
-        // corresponding config.collections entry doesn't. In this case, the chunks timestamp
-        // should be ignored when computing the max query version and we should use the
-        // timestamp that comes from config.collections.
-        maxQueryVersion = ChunkVersion(highestVersion.majorVersion(),
-                                       highestVersion.minorVersion(),
-                                       highestVersion.epoch(),
-                                       collectionAndChangedChunks->timestamp);
+        maxQueryVersion = collectionAndChangedChunks->changedChunks.back().getVersion();
     } else {
         invariant(statusWithCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound);
         dropped = true;

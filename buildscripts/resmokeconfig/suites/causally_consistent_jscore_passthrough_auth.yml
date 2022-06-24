@@ -69,6 +69,10 @@ selector:
   # This test uses `benchRun` which spawns connections which do not inherit the causal session.
   - jstests/core/benchrun_pipeline_updates.js
 
+  # In the context of auth on mongos, illegal namespaces trigger a different error code than they do
+  # on mongod. To keep the test simple, we avoid running it against a mongos when auth is enabled.
+  - jstests/core/illegal_cmd_namespace.js
+
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   - assumes_standalone_mongod

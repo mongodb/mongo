@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/move_primary_source_manager.h"
 
 #include "mongo/client/connpool.h"
@@ -50,13 +47,10 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangInCloneStage);
 MONGO_FAIL_POINT_DEFINE(hangInCleanStaleDataStage);
-
-using namespace shardmetadatautil;
 
 MovePrimarySourceManager::MovePrimarySourceManager(OperationContext* opCtx,
                                                    ShardMovePrimary requestArgs,
@@ -192,7 +186,7 @@ Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
     // time inclusive of the move primary config commit update from accessing secondary data.
     // Note: this write must occur after the critSec flag is set, to ensure the secondary refresh
     // will stall behind the flag.
-    Status signalStatus = updateShardDatabasesEntry(
+    Status signalStatus = shardmetadatautil::updateShardDatabasesEntry(
         opCtx,
         BSON(ShardDatabaseType::kNameFieldName << getNss().toString()),
         BSONObj(),

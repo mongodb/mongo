@@ -11,6 +11,7 @@
   - [Cluster Authentication](#cluster-authentication)
   - [Localhost Auth Bypass](#localhost-auth-bypass)
 - [Authorization](#authorization)
+  - [AuthName](#authname) (`UserName` and `RoleName`)
   - [Users](#users)
     - [User Roles](#user-roles)
     - [User Credentials](#user-credentials)
@@ -21,6 +22,9 @@
     - [Role Authentication Restrictions](#role-authentication-restrictions)
   - [User and Role Management](#user-and-role-management)
     - [UMC Transactions](#umc-transactions)
+  - [Privilege](#privilege)
+    - [ResourcePattern](#resourcepattern)
+    - [ActionType](#actiontype)
   - [Command Execution](#command-execution)
   - [Authorization Caching](#authorization-caching)
   - [Authorization Manager External State](#authorization-manager-external-state)
@@ -294,23 +298,39 @@ execute commands.
 [Here](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_session_impl.cpp#L126)
 is the authorization session calling into the authorization manager to acquire a user.
 
-Clients are expected to authenticate at most one time on a connection, and a
-client which opts into API Version 1 will receive an error if it attempts to
-authenticate more than once.  However, legacy clients which have not opted into
-an API Version may authenticate multiple times.  If a legacy client
-authenticates as UserA on a database and then authenticates as UserB on the
-same database, its AuthorizationSession will implicitly logout UserA and
-replace its cached User object with that of UserB. Alternatively, if a legacy
-client authenticates as UserA on one database and then authenticates as UserB
-on a second database, its AuthorizationSession will store User objects for both
-UserA and UserB, and will consider itself authorized for the union of the two
-users' privileges.  Because modern drivers no longer allow applications to
-authenticate with multiple user identities, this behavior in
-AuthorizationSession is deprecated, and support for it will eventually be
-removed.
+Clients are expected to authenticate at most one time on a connection.
+Attempting to reauthenticate as the currently authenticated user results
+in a warning being emitted to the global log, but the operation succeeds.
+Attempting to authenticate as a new user on an already authenticated connection is an error.
 
+### AuthName
 
-### User
+The [AuthName](auth_name.h) template
+provides the generic implementation for `UserName` and `RoleName` implementations.
+Each of these objects is made up of three component pieces of information.
+
+| Field | Accessor | Use |
+| -- | -- | -- |
+| `_name` | `getName()` | The symbolic name associated with the user or role, (e.g. 'Alice') |
+| `_db` | `getDB()` | The authentication database associated with the named auth identifier (e.g. 'admin' or 'test') |
+| `_tenant` | `getTenant()` | When used in multitenancy mode, this value retains a `TenantId` for authorization checking. |
+
+[`UserName`](user_name.h) and [`RoleName`](role_name.h) specializations are CRTP defined
+to include additional `getUser()` and `getRole()` accessors which proxy to `getName()`,
+and provide a set of `constexpr StringData` identifiers relating to their type.
+
+#### Serializations
+
+* `getDisplayName()` and `toString()` create a new string of the form `name@db` for use in log messages.
+* `getUnambiguousName()` creates a new string of the form `db.name` for use in generating `_id` fields for authzn documents and generating unique hashes for logical session identifiers.
+
+#### Multitenancy
+
+`AuthName` objects may be associated with a `TenantId` either separately via `AuthName(StringData name, StringData db, boost::optional<TenantId> tenant = boost::none)` or using the compound `DatabaseName` type `AuthName(StringData name, DatabaseName db)`.
+
+When a `TenantId` is associated with an `AuthName`, it will NOT be included in `BSON` or `String` serializations unless explicitly requested with a boolean argument to these functions.
+
+### Users
 
 `User` objects contain authorization information with regards to a specific user in a database. The
 `AuthorizationManager` has control over creation, management, and deletion of a `UserHandle` object,
@@ -498,6 +518,48 @@ Authentication restrictions defined on a role have the same meaning as
 those defined directly on users.  The effective set of `authenticationRestrictions`
 imposed on a user is the union of all direct and indirect authentication restrictions.
 
+### Privilege
+
+A [Privilege](privilege.h) represents a tuple of [ResourcePattern](resource_pattern.h) and
+[set](action_set.h) of [ActionType](action_type.idl)s which describe the resources which
+may be acted upon by a user, and what actions they may perform, respectively.
+
+A [PrivilegeVector](privilege.h) is an alias for `std::vector<Privilege>` and represents
+the full set of privileges across all resource and actionype conbinations for the user or role.
+
+#### ResourcePattern
+
+A resource pattern is a combination of a [MatchType](action_type.idl) with a `NamespaceString` to possibly narrow the scope of that `MatchType`.  Most MatchTypes refer to some storage resource, such as a specific collection or database, however `kMatchClusterResource` refers to an entire host, replica set, or cluster.
+
+| MatchType | As encoded in a privilege doc | Usage |
+| -- | -- | -- |
+| `kMatchNever` | _Unexpressable_ | A base type only used internally to indicate that the privilege specified by the ResourcePattern can not match any real resource |
+| `kMatchClusterResource` | `{ cluster : true }` | Commonly used with host and cluster management actions such as `ActionType::addShard`, `ActionType::setParameter`, or `ActionType::shutdown`. |
+| `kMatchAnyResource` | `{ anyResource: true }` | Matches all storage resources, even [non-normal namespaces](#normal-namespace) such as `db.system.views`. |
+| `kMatchAnyNormalResource` | `{ db: '', collection: '' }` | Matches all [normal](#normal-namespace) storage resources. Used with [builtin role](builtin_roles.cpp) `readWriteAnyDatabase`. |
+| `kMatchDatabaseName` | `{ db: 'dbname', collection: '' }` | Matches all [normal](#normal-namespace) storage resources for a specific named database. Used with [builtin role](builtin_roles.cpp) `readWrite`. |
+| `kMatchCollectionName` | `{ db: '', collection: 'collname' }` | Matches all storage resources, normal or not, which have the exact collection suffix '`collname`'.  For example, to provide read-only access to `*.system.js`. |
+| `kMatchExactNamespace` | `{ db: 'dbname', collection: 'collname' }` | Matches the exact namespace '`dbname`.`collname`'. |
+| `kMatchAnySystemBucketResource` | `{ db: '', system_buckets: '' }` | Matches the namespace pattern `*.system.buckets.*`. |
+| `kMatchAnySystemBucketInDBResource` | `{ db: 'dbname', system_buckets: '' }` | Matches the namespace pattern `dbname.system.buckets.*`. |
+| `kMatchAnySystemBucketInAnyDBResource` | `{ db: '', system_buckets: 'suffix' }` | Matches the namespace pattern `*.system.buckets.suffix`. |
+| `kMatchExactSystemBucketResource` | `{ db: 'dbname', system_buckets: 'suffix' }` | Matches the exact namespace `dbname.system.buckets.suffix`. |
+
+##### Normal Namespace
+
+A "normal" resource is a `namespace` which does not match either of the following patterns:
+
+| Namespace pattern | Examples | Usage |
+| -- | -- | -- |
+| `local.replset.*` | `local.replset.initialSyncId` | Namespaces used by Replication to manage per-host state. |
+| `*.system.*` | `admin.system.version` `myDB.system.views` | Collections used by the database to support user collections. |
+
+See also: [NamespaceString::isNormalCollection()](../namespace_string.h)
+
+#### ActionType
+
+An [ActionType](action_type.idl) is a task which a client may be expected to perform.  These are combined with [ResourcePattern](#resourcepattern)s to produce a [Privilege](#privilege).  Note that not all `ActionType`s make sense with all `ResourcePattern`s (e.g. `ActionType::shutdown` applied to `ResourcePattern` `{ db: 'test', collection: 'my.awesome.collection' }`), however the system will generally not prohibit declaring these combinations.
+
 ### User and Role Management
 
 `User Management Commands`, sometimes referred to as `UMCs` provide an
@@ -529,6 +591,13 @@ these `UMC` commands leverage transactions through the `applyOps` command
 allowing a rollback.
 The [UMCTransaction](https://github.com/mongodb/mongo/blob/92cc84b0171942375ccbd2312a052bc7e9f159dd/src/mongo/db/commands/user_management_commands.cpp#L756)
 class provides an abstraction around this mechanism.
+
+#### Multitenancy
+
+When acting in multitenancy mode, each tenant uses distinct storage for their users and roles.
+For example, given a `TenantId` of `"012345678ABCDEF01234567"`, all users for that tenant will
+be found in the `012345678ABCDEF01234567_admin.system.users` collection, and all roles will be
+found in the `012345678ABCDEF01234567_admin.system.roles` collection.
 
 ### Command Execution
 

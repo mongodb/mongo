@@ -33,7 +33,10 @@
 #include "mongo/base/exact_cast.h"
 #include "mongo/db/query/projection_ast_path_tracking_visitor.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/tree_walker.h"
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
 
@@ -42,7 +45,38 @@
 
 namespace mongo {
 
-void QueryPlannerCommon::reverseScans(QuerySolutionNode* node) {
+bool QueryPlannerCommon::scanDirectionsEqual(QuerySolutionNode* node, int direction) {
+    StageType type = node->getType();
+
+    boost::optional<int> scanDir;
+    if (STAGE_IXSCAN == type) {
+        IndexScanNode* isn = static_cast<IndexScanNode*>(node);
+        scanDir = isn->direction;
+    } else if (STAGE_DISTINCT_SCAN == type) {
+        DistinctNode* dn = static_cast<DistinctNode*>(node);
+        scanDir = dn->direction;
+    } else if (STAGE_COLLSCAN == type) {
+        CollectionScanNode* collScan = static_cast<CollectionScanNode*>(node);
+        scanDir = collScan->direction;
+    } else {
+        // We shouldn't encounter a sort stage.
+        invariant(!isSortStageType(type));
+    }
+
+    // If we found something with a direction, and the direction doesn't match, we return false.
+    if (scanDir && scanDir != direction) {
+        return false;
+    }
+
+    for (size_t i = 0; i < node->children.size(); ++i) {
+        if (!scanDirectionsEqual(node->children[i].get(), direction)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void QueryPlannerCommon::reverseScans(QuerySolutionNode* node, bool reverseCollScans) {
     StageType type = node->getType();
 
     if (STAGE_IXSCAN == type) {
@@ -72,6 +106,9 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node) {
         // reverse direction of comparison for merge
         MergeSortNode* msn = static_cast<MergeSortNode*>(node);
         msn->sort = reverseSortObj(msn->sort);
+    } else if (reverseCollScans && STAGE_COLLSCAN == type) {
+        CollectionScanNode* collScan = static_cast<CollectionScanNode*>(node);
+        collScan->direction *= -1;
     } else {
         // Reversing scans is done in order to determine whether or not we need to add an explicit
         // SORT stage. There shouldn't already be one present in the plan.
@@ -79,7 +116,7 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node) {
     }
 
     for (size_t i = 0; i < node->children.size(); ++i) {
-        reverseScans(node->children[i].get());
+        reverseScans(node->children[i].get(), reverseCollScans);
     }
 }
 

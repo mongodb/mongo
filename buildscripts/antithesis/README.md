@@ -13,8 +13,8 @@ use Antithesis today.
 ## Base Images
 The `base_images` directory consists of the building blocks for creating a MongoDB test topology. 
 These images are uploaded to the Antithesis Docker registry weekly during the 
-`antithesis_image_build` task. For more visibility into how these images are built and uploaded to 
-the Antithesis Docker registry, please see `evergreen/antithesis_image_build.sh`.
+`antithesis_image_push` task. For more visibility into how these images are built and uploaded to 
+the Antithesis Docker registry, please see that task.
 
 ### mongo_binaries
 This image contains the latest `mongo`, `mongos` and `mongod` binaries. It can be used to 
@@ -27,7 +27,7 @@ container is not part of the actual toplogy. The purpose of a `workload` contain
 `mongo` commands to complete the topology setup, and to run a test suite on an existing topology 
 like so:
 ```shell
-buildscript/resmoke.py run --suite antithesis_concurrency_sharded_with_stepdowns_and_balancer --shellConnString "mongodb://mongos:27017"
+buildscript/resmoke.py run --suite antithesis_concurrency_sharded_with_stepdowns_and_balancer
 ```
 
 **Every topology must have 1 workload container.**
@@ -46,18 +46,19 @@ consists of a `docker-compose.yml`, a `logs` directory, a `scripts` directory an
 directory. If this is structured properly, you should be able to copy the files & directories 
 from this image and run `docker-compose up` to set up the desired topology.
 
-Example from `buildscripts/antithesis/topologies/replica_set/Dockerfile`:
+Example from `buildscripts/antithesis/topologies/sharded_cluster/Dockerfile`:
 ```Dockerfile
 FROM scratch
 COPY docker-compose.yml /
 ADD scripts /scripts
 ADD logs /logs
 ADD data /data
+ADD debug /debug
 ```
 
 All topology images are built and uploaded to the Antithesis Docker registry during the 
-`antithesis_image_build` task in the `evergreen/antithesis_image_build.sh` script. Some of these 
-directories are created in `evergreen/antithesis_image_build.sh` such as `/data` and `/logs`.
+`antithesis_image_push` task. Some of these directories are created during the 
+`evergreen/antithesis_image_build.sh` script such as `/data` and `/logs`.
 
 Note: These images serve solely as a filesystem containing all necessary files for a topology, 
 therefore use `FROM scratch`.
@@ -66,20 +67,38 @@ therefore use `FROM scratch`.
  This describes how to construct the corresponding topology using the 
  `mongo-binaries` and `workload` images.
 
-Example from `buildscripts/antithesis/topologies/replica_set/docker-compose.yml`:
+Example from `buildscripts/antithesis/topologies/sharded_cluster/docker-compose.yml`:
 ```yml
 version: '3.0'
 
 services:
-        database1:
+        configsvr1:
+                container_name: configsvr1
+                hostname: configsvr1
+                image: mongo-binaries:evergreen-latest-master
+                volumes:
+                  - ./logs/configsvr1:/var/log/mongodb/
+                  - ./scripts:/scripts/
+                  - ./data/configsvr1:/data/configdb/
+                command: /bin/bash /scripts/configsvr_init.sh
+                networks:
+                        antithesis-net:
+                                ipv4_address: 10.20.20.6
+                                # Set the an IPv4 with an address of 10.20.20.130 or higher
+                                # to be ignored by the fault injector
+                                #
+
+        configsvr2: ...
+        configsvr3: ...
+        database1: ...
                 container_name: database1
                 hostname: database1
                 image: mongo-binaries:evergreen-latest-master
-                command: /bin/bash /scripts/database_init.sh
                 volumes:
                   - ./logs/database1:/var/log/mongodb/
                   - ./scripts:/scripts/
                   - ./data/database1:/data/db/
+                command: /bin/bash /scripts/database_init.sh Shard1
                 networks:
                         antithesis-net:
                                 ipv4_address: 10.20.20.3
@@ -88,37 +107,59 @@ services:
                                 #
         database2: ...
         database3: ...
-        workload:
-                container_name: workload
-                hostname: workload
-                image: workload:evergreen-latest-master
-                command: /bin/bash /scripts/workload_init.sh
+        database4: ...
+        database5: ...
+        database6: ...
+        mongos:
+                container_name: mongos
+                hostname: mongos
+                image: mongo-binaries:evergreen-latest-master
                 volumes:
-                  - ./logs/workload:/var/log/resmoke/
+                  - ./logs/mongos:/var/log/mongodb/
                   - ./scripts:/scripts/
+                command: python3 /scripts/mongos_init.py
                 depends_on:
                         - "database1"
                         - "database2"
                         - "database3"
+                        - "database4"
+                        - "database5"
+                        - "database6"
+                        - "configsvr1"
+                        - "configsvr2"
+                        - "configsvr3"
+                networks:
+                        antithesis-net:
+                                ipv4_address: 10.20.20.9
+                                # The subnet provided here is an example
+                                # An alternative subnet can be used
+        workload:
+                container_name: workload
+                hostname: workload
+                image: workload:evergreen-latest-master
+                volumes:
+                  - ./logs/workload:/var/log/resmoke/
+                  - ./scripts:/scripts/
+                command: python3 /scripts/workload_init.py
+                depends_on:
+                        - "mongos"
                 networks:
                         antithesis-net:
                                 ipv4_address: 10.20.20.130
                                 # The subnet provided here is an example
                                 # An alternative subnet can be used
-
 networks:
         antithesis-net:
                 driver: bridge
                 ipam:
                         config:
                         - subnet: 10.20.20.0/24
-
 ```
 
-Each container must have a `command`in `docker-compose.yml` that runs an init script. The init 
+Each container must have a `command` in `docker-compose.yml` that runs an init script. The init 
 script belongs in the `scripts` directory, which is included as a volume. The `command` should be 
-set like so: `/bin/bash /scripts/[script_name].sh`. This is a requirement for the topology to start 
-up properly in Antithesis.
+set like so: `/bin/bash /scripts/[script_name].sh` or `python3 /scripts/[script_name].py`. This is 
+a requirement for the topology to start up properly in Antithesis.
 
 When creating `mongod` or `mongos` instances, route the logs like so: 
 `--logpath /var/log/mongodb/mongodb.log` and utilize `volumes` -- as in `database1`. 
@@ -133,28 +174,24 @@ Use the `evergreen-latest-master` tag for all images. This is updated automatica
 
 ### scripts
 
-Example from `buildscripts/antithesis/topologies/replica_set/scripts/workload_init.sh`:
-```shell
-sleep 5s
-mongo --host database1 --port 27017 --eval "config={\"_id\" : \"RollbackFuzzerTest\",\"protocolVersion\" : 1,\"members\" : [{\"_id\" : 0,\"host\" : \"database1:27017\"}, {\"_id\" : 1,\"host\" : \"database2:27017\"}, {\"_id\" : 2,\"host\" : \"database3:27017\"} ],\"settings\" : {\"chainingAllowed\" : false,\"electionTimeoutMillis\" : 500, \"heartbeatTimeoutSecs\" : 1, \"catchUpTimeoutMillis\": 700}}; rs.initiate(config)"
-
-# this cryptic statement keeps the workload container running.
-tail -f /dev/null
-```
-The `sleep` command can be useful to ensure that other containers have had a chance to start. In 
-this example, the `workload` container waits 5 seconds while the database containers start. 
-After that, it initiates the replica set. The `tail -f /dev/null` is required for `workload` 
-containers otherwise the container shuts down.
+Take a look at `buildscripts/antithesis/topologies/sharded_cluster/scripts/mongos_init.py` to see 
+how to use util methods from `buildscripts/antithesis/topologies/sharded_cluster/scripts/utils.py` 
+to set up the desired topology. You can also use simple shell scripts as in the case of 
+`buildscripts/antithesis/topologies/sharded_cluster/scripts/database_init.py`. These init scripts 
+must not end in order to keep the underlying container alive. You can use an infinite while 
+loop for `python` scripts or you can use `tail -f /dev/null` for shell scripts. 
 
 ## How do I create a new topology for Antithesis testing?
 To create a new topology for Antithesis testing is easy & requires a few simple steps. 
 1. Add a new directory in `buildscripts/antithesis/topologies` to represent your desired topology. 
 You can use existing topologies as an example.
-2. Update the `evergreen/antithesis_image_build.sh` file so that your new topology image is 
+2. Make sure that your workload test suite runs against your topology without any failures. This 
+may require tagging some tests as `antithesis-incompatible`.
+3. Update the `antithesis_image_push` task so that your new topology image is 
 uploaded to the Antithesis Docker registry.
-3. Reach out to #server-testing on Slack & provide the new topology image name as well as the 
+4. Reach out to #server-testing on Slack & provide the new topology image name as well as the 
    desired test suite to run.
-4. Include a member of the STM team on the code review.
+5. Include the SDP team on the code review.
    
 These are the required updates to `evergreen/antithesis_image_build.sh`:
 - Add the following command for each of your `mongos` and `mongod` containers in your topology to 
@@ -169,6 +206,7 @@ cd [your_topology_dir]
 sed -i s/evergreen-latest-master/$tag/ docker-compose.yml
 sudo docker build . -t [your-topology-name]-config:$tag
 ```
+These are the required updates to `evergreen/antithesis_image_push.sh`:
 - Push your new image to the Antithesis Docker registry
 ```shell
 sudo docker tag "[your-topology-name]-config:$tag" "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/[your-topology-name]-config:$tag"

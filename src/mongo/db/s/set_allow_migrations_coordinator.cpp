@@ -50,14 +50,6 @@ bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
     }
 }
 
-SetAllowMigrationsCoordinator::SetAllowMigrationsCoordinator(ShardingDDLCoordinatorService* service,
-                                                             const BSONObj& initialState)
-    : ShardingDDLCoordinator(service, initialState),
-      _doc(SetAllowMigrationsCoordinatorDocument::parse(
-          IDLParserErrorContext("SetAllowMigrationsCoordinatorDocument"), initialState)),
-      _allowMigrations(_doc.getAllowMigrations()) {}
-
-
 void SetAllowMigrationsCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     // If we have two set allow migrations on the same namespace, then the arguments must be the
     // same.
@@ -72,23 +64,9 @@ void SetAllowMigrationsCoordinator::checkIfOptionsConflict(const BSONObj& doc) c
                 otherDoc.getSetAllowMigrationsRequest().toBSON()));
 }
 
-boost::optional<BSONObj> SetAllowMigrationsCoordinator::reportForCurrentOp(
-    MongoProcessInterface::CurrentOpConnectionsMode connMode,
-    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-    BSONObjBuilder cmdBob;
-    if (const auto& optComment = getForwardableOpMetadata().getComment()) {
-        cmdBob.append(optComment.get().firstElement());
-    }
-    cmdBob.appendElements(_doc.getSetAllowMigrationsRequest().toBSON());
-
-    BSONObjBuilder bob;
-    bob.append("type", "op");
-    bob.append("desc", "SetAllowMigrationsCoordinator");
-    bob.append("op", "command");
-    bob.append("ns", nss().toString());
-    bob.append("command", cmdBob.obj());
-    bob.append("active", true);
-    return bob.obj();
+void SetAllowMigrationsCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
+    stdx::lock_guard lk{_docMutex};
+    cmdInfoBuilder->appendElements(_doc.getSetAllowMigrationsRequest().toBSON());
 }
 
 ExecutorFuture<void> SetAllowMigrationsCoordinator::_runImpl(

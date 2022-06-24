@@ -65,10 +65,9 @@ size_t roundUpToNextPow2(size_t v, size_t maxPower);
 std::vector<ABT::reference_type> collectComposed(const ABT& n);
 
 /**
- * Returns the path represented by 'node' as a simple dotted string. Returns an empty string if
- * 'node' is not a path.
+ * Returns true if the path represented by 'node' is of the form PathGet "field" PathId
  */
-FieldNameType getSimpleField(const ABT& node);
+bool isSimplePath(const ABT& node);
 
 template <class Element = PathComposeM>
 inline void maybeComposePath(ABT& composition, ABT child) {
@@ -155,12 +154,8 @@ private:
 };
 
 struct PartialSchemaReqConversion {
-    PartialSchemaReqConversion();
     PartialSchemaReqConversion(PartialSchemaRequirements reqMap);
     PartialSchemaReqConversion(ABT bound);
-
-    // Is our current bottom-up conversion successful. If not shortcut to top.
-    bool _success;
 
     // If set, contains a Constant or Variable bound of an (yet unknown) interval.
     boost::optional<ABT> _bound;
@@ -186,9 +181,11 @@ struct PartialSchemaReqConversion {
 /**
  * Takes an expression that comes from an Filter or Evaluation node, and attempt to convert
  * to a PartialSchemaReqConversion. This is done independent of the availability of indexes.
- * Essentially this means to extract intervals over paths whenever possible.
+ * Essentially this means to extract intervals over paths whenever possible. If the conversion is
+ * not possible, return empty result.
  */
-PartialSchemaReqConversion convertExprToPartialSchemaReq(const ABT& expr);
+boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(const ABT& expr,
+                                                                          bool isFilterContext);
 
 bool intersectPartialSchemaReq(PartialSchemaRequirements& target,
                                const PartialSchemaRequirements& source,

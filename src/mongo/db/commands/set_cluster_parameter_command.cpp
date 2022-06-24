@@ -75,12 +75,6 @@ public:
                     "setClusterParameter can only run on mongos in sharded clusters",
                     (serverGlobalParams.clusterRole == ClusterRole::None));
 
-            FixedFCVRegion fcvRegion(opCtx);
-            uassert(
-                ErrorCodes::IllegalOperation,
-                "Cannot set cluster parameter, gFeatureFlagClusterWideConfig is not enabled",
-                gFeatureFlagClusterWideConfig.isEnabled(serverGlobalParams.featureCompatibility));
-
             // TODO SERVER-65249: This will eventually be made specific to the parameter being set
             // so that some parameters will be able to use setClusterParameter even on standalones.
             uassert(ErrorCodes::IllegalOperation,

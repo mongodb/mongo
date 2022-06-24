@@ -29,67 +29,66 @@
 
 #pragma once
 
+#include <stddef.h>
+#include <utility>
 #include <vector>
 
-#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/util/concepts.h"
 
 namespace mongo::optimizer {
 namespace algebra {
 
+/**
+ * Concrete storage for 'S' items of type 'T'. This class is an alias for a static array, useful in
+ * a tree representation to store a node's children.
+ */
 template <typename T, int S>
 struct OpNodeStorage {
-    T _nodes[S];
-
     template <typename... Ts>
     OpNodeStorage(Ts&&... vals) : _nodes{std::forward<Ts>(vals)...} {}
+
+protected:
+    T _nodes[S];
 };
 
+/**
+ * Stub for nodes with no children.
+ */
 template <typename T>
 struct OpNodeStorage<T, 0> {};
 
-/*=====-----
- *
- * Arity of operator can be:
- * 1. statically known - A, A, A, ...
- * 2. dynamic prefix with optional statically know - vector<A>, A, A, A, ...
- *
- * Denotations map A to some B.
- * So static arity <A,A,A> is mapped to <B,B,B>.
- * Similarly, arity <vector<A>,A> is mapped to <vector<B>,B>
- *
- * There is a wrinkle when B is a reference (if allowed at all)
- * Arity <vector<A>, A, A> is mapped to <vector<B>&, B&, B&> - note that the reference is lifted
- * outside of the vector.
- *
+/**
+ * Nodes which have a specific arity (number of children) should derive from this class. The 'Slot'
+ * determines the generic type to hold for each child.
  */
-template <typename Slot, typename Derived, int Arity>
+template <typename Slot, int Arity>
 class OpSpecificArity : public OpNodeStorage<Slot, Arity> {
     using Base = OpNodeStorage<Slot, Arity>;
 
 public:
-    template <typename... Ts>
-    OpSpecificArity(Ts&&... vals) : Base({std::forward<Ts>(vals)...}) {
-        static_assert(sizeof...(Ts) == Arity, "constructor paramaters do not match");
-    }
+    TEMPLATE(typename... Ts)
+    REQUIRES(sizeof...(Ts) == Arity)
+    OpSpecificArity(Ts&&... vals) : Base({std::forward<Ts>(vals)...}) {}
 
-    template <int I, std::enable_if_t<(I >= 0 && I < Arity), int> = 0>
+    TEMPLATE(int I)
+    REQUIRES(I >= 0 && I < Arity)
     auto& get() noexcept {
         return this->_nodes[I];
     }
 
-    template <int I, std::enable_if_t<(I >= 0 && I < Arity), int> = 0>
+    TEMPLATE(int I)
+    REQUIRES(I >= 0 && I < Arity)
     const auto& get() const noexcept {
         return this->_nodes[I];
     }
 };
-/*=====-----
- *
- * Operator with dynamic arity
- *
+
+/**
+ * Nodes which have a known, minimum arity but may optionally contain more children.
  */
-template <typename Slot, typename Derived, int Arity>
-class OpSpecificDynamicArity : public OpSpecificArity<Slot, Derived, Arity> {
-    using Base = OpSpecificArity<Slot, Derived, Arity>;
+template <typename Slot, int Arity>
+class OpSpecificDynamicArity : public OpSpecificArity<Slot, Arity> {
+    using Base = OpSpecificArity<Slot, Arity>;
 
     std::vector<Slot> _dyNodes;
 
@@ -106,10 +105,8 @@ public:
     }
 };
 
-/*=====-----
- *
- * Semantic transport interface
- *
+/**
+ * Semantic transport interface.
  */
 namespace detail {
 template <typename D, typename T, typename... Args>
@@ -132,25 +129,35 @@ inline constexpr auto has_prepare_v =
                        has_prepare<void, call_prepare_slot_t, N, D, T, Args...>,
                        has_prepare<void, call_prepare_t, D, T, Args...>>::value;
 
-template <typename Slot, typename Derived, int Arity>
-inline constexpr int get_arity(const OpSpecificArity<Slot, Derived, Arity>*) {
+template <typename Slot, int Arity>
+inline constexpr int get_arity(const OpSpecificArity<Slot, Arity>*) {
     return Arity;
 }
 
-template <typename Slot, typename Derived, int Arity>
-inline constexpr bool is_dynamic(const OpSpecificArity<Slot, Derived, Arity>*) {
+template <typename Slot, int Arity>
+inline constexpr bool is_dynamic(const OpSpecificArity<Slot, Arity>*) {
     return false;
 }
 
-template <typename Slot, typename Derived, int Arity>
-inline constexpr bool is_dynamic(const OpSpecificDynamicArity<Slot, Derived, Arity>*) {
+template <typename Slot, int Arity>
+inline constexpr bool is_dynamic(const OpSpecificDynamicArity<Slot, Arity>*) {
     return true;
 }
 
 template <typename T>
 using OpConcreteType = typename std::remove_reference_t<T>::template get_t<0>;
+
 }  // namespace detail
 
+/**
+ * A transporter is similar to a tree walker that utilizes knowledge of the underlying Operator
+ * types to visit each node of an Operator tree in a bottom-up fashion. The Domain class
+ * 'D' is used as a callback mechanism by matching the relevant 'transport' overload with
+ * the particular node type and children results.
+ *
+ * The caller may optionally supply 'withSlot' to include a reference to the base PolyValue type as
+ * a first argument to the transport callbacks.
+ */
 template <typename D, bool withSlot>
 class OpTransporter {
     D& _domain;
@@ -271,6 +278,12 @@ public:
     }
 };
 
+/**
+ * Walker for the Operator* types. Accepts a domain 'D' of 'walk' callback overloads.
+ *
+ * The caller may optionally supply 'withSlot' to include a reference to base PolyValue as a first
+ * argument to the walk callbacks.
+ */
 template <typename D, bool withSlot>
 class OpWalker {
     D& _domain;
@@ -327,11 +340,31 @@ public:
     }
 };
 
+/**
+ * Post-order traversal over the tree given by 'node', with domain D of 'transport' callbacks for
+ * each node type. The domain may optionally contain 'prepare' method overloads to pre-visit a node
+ * before traversing its children.
+ *
+ * This method also allows propagating results from the traversal implicitly via the return type of
+ * the methods in D. For instance, to return an integer after traversal and a node which has two
+ * children, the signature would look something like this:
+ *
+ *      int transport(const NodeType&, int childResult0, int childResult1)
+ *
+ */
 template <bool withSlot = false, typename D, typename N, typename... Args>
 auto transport(N&& node, D& domain, Args&&... args) {
     return node.visit(OpTransporter<D, withSlot>{domain}, std::forward<Args>(args)...);
 }
 
+/**
+ * Visits 'node' by invoking the appropriate 'walk' overload in domain D. The 'walk' methods should
+ * accept the node as the first argument and its children as subsequent arguments with generic type
+ * N.
+ *
+ * Note that this method does not actually traverse the tree given in 'node'; the caller is
+ * responsible for manually walking.
+ */
 template <bool withSlot = false, typename D, typename N, typename... Args>
 auto walk(N&& node, D& domain, Args&&... args) {
     return node.visit(OpWalker<D, withSlot>{domain}, std::forward<Args>(args)...);

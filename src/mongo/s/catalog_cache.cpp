@@ -27,13 +27,6 @@
  *    it in the license file.
  */
 
-
-#define LOGV2_FOR_CATALOG_REFRESH(ID, DLEVEL, MESSAGE, ...) \
-    LOGV2_DEBUG_OPTIONS(                                    \
-        ID, DLEVEL, {logv2::LogComponent::kShardingCatalogRefresh}, MESSAGE, ##__VA_ARGS__)
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/catalog_cache.h"
 
 #include "mongo/bson/bsonobjbuilder.h"

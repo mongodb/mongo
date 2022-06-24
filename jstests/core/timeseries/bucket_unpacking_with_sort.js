@@ -25,6 +25,7 @@
 load("jstests/libs/fixture_helpers.js");             // For FixtureHelpers.
 load("jstests/aggregation/extras/utils.js");         // For getExplainedPipelineFromAggregation.
 load("jstests/core/timeseries/libs/timeseries.js");  // For TimeseriesTest
+load("jstests/libs/analyze_plan.js");                // For getAggPlanStage
 
 if (!TimeseriesTest.bucketUnpackWithSortEnabled(db.getMongo())) {
     jsTestLog("Skipping test because 'BucketUnpackWithSort' is disabled.");
@@ -133,8 +134,30 @@ const hasInternalBoundedSort = (pipeline) =>
 
 const findFirstMatch = (pipeline) => pipeline.find(stage => stage.hasOwnProperty("$match"));
 
+const getWinningPlan = (explain) => {
+    if (explain.hasOwnProperty("shards")) {
+        for (const shardName in explain.shards) {
+            return explain.shards[shardName].stages[0]["$cursor"].queryPlanner.winningPlan;
+        }
+    }
+    return explain.stages[0]["$cursor"].queryPlanner.winningPlan;
+};
+
+const getAccessPathFromWinningPlan = (winningPlan) => {
+    if (winningPlan.stage == "SHARDING_FILTER" || winningPlan.stage === "FETCH") {
+        return getAccessPathFromWinningPlan(winningPlan.inputStage);
+    } else if (winningPlan.stage === "COLLSCAN" || winningPlan.stage === "IXSCAN") {
+        return winningPlan;
+    }
+};
+
+const getAccessPath = (explain) => {
+    return getAccessPathFromWinningPlan(getWinningPlan(explain));
+};
+
 const setup = (coll, createIndex = null) => {
     if (createIndex) {
+        assert.commandWorked(coll.dropIndexes());
         assert.commandWorked(coll.createIndex(createIndex));
     }
 };
@@ -153,6 +176,7 @@ const setup = (coll, createIndex = null) => {
 const runRewritesTest = (sortSpec,
                          createIndex,
                          hint,
+                         expectedAccessPath,
                          testColl,
                          precise,
                          intermediaryStages = [],
@@ -161,6 +185,7 @@ const runRewritesTest = (sortSpec,
         sortSpec,
         createIndex,
         hint,
+        expectedAccessPath,
         testColl,
         precise,
         intermediaryStages,
@@ -211,7 +236,12 @@ const runRewritesTest = (sortSpec,
     // changing out from under us.
     const bucketSpanMatch = {
         $match: {
-            $expr: {$lte: [{$subtract: ["$control.max.t", "$control.min.t"]}, {$const: 3600000}]},
+            $expr: {
+                $lte: [
+                    {$subtract: ["$control.max.t", "$control.min.t"]},
+                    {$const: NumberLong(3600000)}
+                ]
+            },
         }
     };
     let foundMatch = findFirstMatch(optExplain);
@@ -223,6 +253,15 @@ const runRewritesTest = (sortSpec,
         assert.neq(sortDoc(foundMatch),
                    sortDoc(bucketSpanMatch),
                    'Did not expect an extra $match to check the bucket span');
+    }
+
+    if (expectedAccessPath) {
+        const paths = getAggPlanStages(optExplainFull, expectedAccessPath.stage);
+        for (const path of paths) {
+            for (const key in expectedAccessPath) {
+                assert.eq(path[key], expectedAccessPath[key]);
+            }
+        }
     }
 };
 
@@ -247,46 +286,75 @@ const runDoesntRewriteTest = (sortSpec, createIndex, hint, testColl, intermediar
     assert(!containsOptimization, optExplainFull);
 };
 
+const forwardCollscan = {
+    stage: "COLLSCAN",
+    direction: "forward"
+};
+const backwardCollscan = {
+    stage: "COLLSCAN",
+    direction: "backward"
+};
+// We drop all other indexes during runRewritesTest, so asserting that an IXSCAN is used is enough.
+const forwardIxscan = {
+    stage: "IXSCAN",
+    direction: "forward"
+};
+const backwardIxscan = {
+    stage: "IXSCAN",
+    direction: "backward"
+};
+
 // Collscan cases
-runRewritesTest({t: 1}, null, null, coll, true);
-runRewritesTest({t: -1}, null, {$natural: -1}, coll, false);
+runRewritesTest({t: 1}, null, null, forwardCollscan, coll, true);
+runRewritesTest({t: -1}, null, null, backwardCollscan, coll, false);
 
 // Indexed cases
-runRewritesTest({t: 1}, {t: 1}, {t: 1}, coll, true);
-runRewritesTest({t: -1}, {t: -1}, {t: -1}, coll, true);
-runRewritesTest({t: 1}, {t: 1}, {t: 1}, coll, true);
-runRewritesTest({m: 1, t: -1}, {m: 1, t: -1}, {m: 1, t: -1}, metaColl, true);
-runRewritesTest({m: -1, t: 1}, {m: -1, t: 1}, {m: -1, t: 1}, metaColl, true);
-runRewritesTest({m: -1, t: -1}, {m: -1, t: -1}, {m: -1, t: -1}, metaColl, true);
-runRewritesTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaColl, true);
+runRewritesTest({t: 1}, {t: 1}, null, null, coll, true);
+runRewritesTest({t: -1}, {t: -1}, {t: -1}, forwardIxscan, coll, true);
+runRewritesTest({t: 1}, {t: 1}, {t: 1}, forwardIxscan, coll, true);
+runRewritesTest({t: 1}, {t: -1}, {t: -1}, backwardIxscan, coll, false);
+runRewritesTest({t: -1}, {t: 1}, {t: 1}, backwardIxscan, coll, false);
+runRewritesTest({m: 1, t: -1}, {m: 1, t: -1}, {m: 1, t: -1}, forwardIxscan, metaColl, true);
+runRewritesTest({m: -1, t: 1}, {m: -1, t: 1}, {m: -1, t: 1}, forwardIxscan, metaColl, true);
+runRewritesTest({m: -1, t: -1}, {m: -1, t: -1}, {m: -1, t: -1}, forwardIxscan, metaColl, true);
+runRewritesTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, metaColl, true);
 
 // Intermediary projects that don't modify sorted fields are allowed.
-runRewritesTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaColl, true, [{$project: {a: 0}}]);
 runRewritesTest(
-    {m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaColl, true, [{$project: {m: 1, t: 1}}]);
-runRewritesTest({t: 1}, {t: 1}, {t: 1}, metaColl, true, [{$project: {m: 0, _id: 0}}]);
-runRewritesTest({'m.b': 1, t: 1}, {'m.b': 1, t: 1}, {'m.b': 1, t: 1}, metaCollSubFields, true, [
-    {$project: {'m.a': 0}}
+    {m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, metaColl, true, [{$project: {a: 0}}]);
+runRewritesTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, metaColl, true, [
+    {$project: {m: 1, t: 1}}
 ]);
+runRewritesTest(
+    {t: 1}, {t: 1}, {t: 1}, forwardIxscan, metaColl, true, [{$project: {m: 0, _id: 0}}]);
+runRewritesTest(
+    {'m.b': 1, t: 1}, {'m.b': 1, t: 1}, {'m.b': 1, t: 1}, forwardIxscan, metaCollSubFields, true, [
+        {$project: {'m.a': 0}}
+    ]);
 
 // Test multiple meta fields
 let metaIndexObj = Object.assign({}, ...subFields.map(field => ({[`m.${field}`]: 1})));
 Object.assign(metaIndexObj, {t: 1});
-runRewritesTest(metaIndexObj, metaIndexObj, metaIndexObj, metaCollSubFields, true);
-runRewritesTest(
-    metaIndexObj, metaIndexObj, metaIndexObj, metaCollSubFields, true, [{$project: {m: 1, t: 1}}]);
+runRewritesTest(metaIndexObj, metaIndexObj, metaIndexObj, forwardIxscan, metaCollSubFields, true);
+runRewritesTest(metaIndexObj, metaIndexObj, metaIndexObj, forwardIxscan, metaCollSubFields, true, [
+    {$project: {m: 1, t: 1}}
+]);
 
 // Check sort-limit optimization.
-runRewritesTest({t: 1}, {t: 1}, {t: 1}, coll, true, [], [{$limit: 10}]);
+runRewritesTest({t: 1}, {t: 1}, {t: 1}, null, coll, true, [], [{$limit: 10}]);
 
 // Check set window fields is optimized as well.
 // Since {k: 1} cannot provide a bounded sort we know if there's a bounded sort it comes form
 // setWindowFields.
-runRewritesTest({k: 1}, {m: 1, t: 1}, {m: 1, t: 1}, metaColl, true, [], [
+runRewritesTest({k: 1}, {m: 1, t: 1}, {m: 1, t: 1}, null, metaColl, true, [], [
     {$setWindowFields: {partitionBy: "$m", sortBy: {t: 1}, output: {arr: {$max: "$t"}}}}
 ]);
+// Test that when a collection scan is hinted, we rewrite to bounded sort even if the hint of
+// the direction is opposite to the sort.
+runRewritesTest({t: -1}, null, {$natural: 1}, backwardCollscan, coll, false, [], []);
+runRewritesTest({t: 1}, null, {$natural: -1}, forwardCollscan, coll, true, [], []);
 
-// Negative tests
+// Negative tests and backwards cases
 for (let m = -1; m < 2; m++) {
     for (let t = -1; t < 2; t++) {
         for (let k = -1; k < 2; k++) {
@@ -321,12 +389,7 @@ for (let m = -1; m < 2; m++) {
                 // For the meta case, negate the time order.
                 // For the non-meta case, use a collscan with a negated order.
                 if (m == 0) {
-                    if (t == 0) {
-                        // Do not execute a test run.
-                    } else {
-                        sort = {t: t};
-                        hint = {$natural: -t};
-                    }
+                    // Do not execute a test run.
                 } else {
                     if (t == 0) {
                         // Do not execute a test run.
@@ -338,8 +401,9 @@ for (let m = -1; m < 2; m++) {
                     }
                 }
 
-                if (sort)
+                if (sort) {
                     runDoesntRewriteTest(sort, createIndex, hint, usesMeta ? metaColl : coll);
+                }
 
                 sort = null;
                 hint = null;
@@ -348,13 +412,7 @@ for (let m = -1; m < 2; m++) {
                 // For the meta case, negate the meta order.
                 // For the non-meta case, use an index instead of a collscan.
                 if (m == 0) {
-                    if (t == 0) {
-                        // Do not execute a test run.
-                    } else {
-                        sort = {t: t};
-                        createIndex = {t: -t};
-                        hint = createIndex;
-                    }
+                    // Do not execute a test run.
                 } else {
                     if (t == 0) {
                         // Do not execute a test run.
@@ -366,8 +424,9 @@ for (let m = -1; m < 2; m++) {
                     }
                 }
 
-                if (sort)
+                if (sort) {
                     runDoesntRewriteTest(sort, createIndex, hint, usesMeta ? metaColl : coll);
+                }
 
                 sort = null;
                 hint = null;
@@ -392,7 +451,8 @@ for (let m = -1; m < 2; m++) {
                 }
 
                 if (sort)
-                    runDoesntRewriteTest(sort, createIndex, hint, usesMeta ? metaColl : coll);
+                    runRewritesTest(
+                        sort, createIndex, hint, backwardIxscan, usesMeta ? metaColl : coll);
             }
         }
     }
@@ -442,11 +502,13 @@ for (const sort of [-1, +1]) {
     for (const m of [-1, +1]) {
         for (const t of [-1, +1]) {
             const index = {m, t};
-            // TODO SERVER-64994 will allow reverse scan.
-            if (t === sort)
-                runRewritesTest({t: sort}, index, index, metaColl, true, [{$match: {m: 7}}]);
-            else
-                runDoesntRewriteTest({t: sort}, index, index, metaColl, [{$match: {m: 7}}]);
+            const expectedAccessPath = t === sort ? forwardIxscan : backwardIxscan;
+            runRewritesTest({t: sort}, index, index, expectedAccessPath, metaColl, t === sort, [
+                {$match: {m: 7}}
+            ]);
+            runRewritesTest({t: sort}, index, null, expectedAccessPath, metaColl, t === sort, [
+                {$match: {m: 7}}
+            ]);
         }
     }
 }
@@ -458,13 +520,16 @@ for (const sort of [-1, +1]) {
             for (const t of [-1, +1]) {
                 for (const trailing of [{}, {x: 1, y: -1}]) {
                     const index = Object.merge({'m.a': a, 'm.b': b, t: t}, trailing);
-                    // TODO SERVER-64994 will allow reverse scan.
-                    if (t === sort)
-                        runRewritesTest({t: sort}, index, index, metaCollSubFields, true, [
-                            {$match: {'m.a': 5, 'm.b': 5}}
-                        ]);
-                    else
-                        runDoesntRewriteTest({t: sort}, index, index, metaCollSubFields, [
+                    const expectedAccessPath = t === sort ? forwardIxscan : backwardIxscan;
+                    runRewritesTest({t: sort},
+                                    index,
+                                    index,
+                                    expectedAccessPath,
+                                    metaCollSubFields,
+                                    t === sort,
+                                    [{$match: {'m.a': 5, 'm.b': 5}}]);
+                    runRewritesTest(
+                        {t: sort}, index, null, expectedAccessPath, metaCollSubFields, t === sort, [
                             {$match: {'m.a': 5, 'm.b': 5}}
                         ]);
                 }
@@ -494,11 +559,15 @@ for (const ixA of [-1, +1]) {
                         // the index key. The index and sort are compatible iff they agree on
                         // whether or not these two fields are in the same direction.
                         if (ixB * ixT === sortB * sortT) {
-                            // TODO SERVER-64994 will allow reverse scan.
-                            if (ixT === sortT)
-                                runRewritesTest(sort, ix, ix, metaCollSubFields, true, predicate);
-                            else
-                                runDoesntRewriteTest(sort, ix, ix, metaCollSubFields, predicate);
+                            runRewritesTest(
+                                sort, ix, ix, null, metaCollSubFields, ixT === sortT, predicate);
+                            runRewritesTest(sort,
+                                            ix,
+                                            null,
+                                            ixT === sortT ? forwardIxscan : backwardIxscan,
+                                            metaCollSubFields,
+                                            ixT === sortT,
+                                            predicate);
                         } else {
                             runDoesntRewriteTest(sort, ix, ix, metaCollSubFields, predicate);
                         }
@@ -530,11 +599,15 @@ for (const ixA of [-1, +1]) {
                         // in the same direction.
                         const predicate = [{$match: {'m.a': {$gte: -999, $lte: 999}, 'm.b': 7}}];
                         if (ixA * ixT === sortA * sortT) {
-                            // TODO SERVER-64994 will allow reverse scan.
-                            if (ixT === sortT)
-                                runRewritesTest(sort, ix, ix, metaCollSubFields, true, predicate);
-                            else
-                                runDoesntRewriteTest(sort, ix, ix, metaCollSubFields, predicate);
+                            runRewritesTest(
+                                sort, ix, ix, null, metaCollSubFields, ixT === sortT, predicate);
+                            runRewritesTest(sort,
+                                            ix,
+                                            null,
+                                            ixT === sortT ? forwardIxscan : backwardIxscan,
+                                            metaCollSubFields,
+                                            ixT === sortT,
+                                            predicate);
                         } else {
                             runDoesntRewriteTest(sort, ix, ix, metaCollSubFields, predicate);
                         }
@@ -578,8 +651,12 @@ runDoesntRewriteTest({t: 1},
 {
     // When the collation of the query matches the index, an equality predicate in the query
     // becomes a 1-point interval in the index bounds.
-    runRewritesTest({t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, csStringColl, true, [{$match: {m: 'a'}}]);
-    runRewritesTest({t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, ciStringColl, true, [{$match: {m: 'a'}}]);
+    runRewritesTest({t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, csStringColl, true, [
+        {$match: {m: 'a'}}
+    ]);
+    runRewritesTest({t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, ciStringColl, true, [
+        {$match: {m: 'a'}}
+    ]);
     // When the collation doesn't match, then the equality predicate is not a 1-point interval
     // in the index.
     csStringColl.dropIndexes();

@@ -800,12 +800,6 @@ DB.prototype.hello = function() {
     return this.runCommand("hello");
 };
 
-var commandUnsupported = function(res) {
-    return (!res.ok &&
-            (res.errmsg.startsWith("no such cmd") || res.errmsg.startsWith("no such command") ||
-             res.code === 59 /* CommandNotFound */));
-};
-
 DB.prototype.currentOp = function(arg) {
     // TODO CLOUDP-89361: The shell is connected to the Atlas Proxy, which currently does not
     // support the $currentOp aggregation stage. Remove the legacy server command path once the
@@ -841,19 +835,7 @@ DB.prototype.currentOpLegacy = function(arg) {
 
     var commandObj = {"currentOp": 1};
     Object.extend(commandObj, q);
-    var res = this.adminCommand(commandObj);
-    if (commandUnsupported(res)) {
-        // always send legacy currentOp with default (null) read preference (SERVER-17951)
-        const session = this.getSession();
-        const readPreference = session.getOptions().getReadPreference();
-        try {
-            session.getOptions().setReadPreference(null);
-            res = this.getSiblingDB("admin").$cmd.sys.inprog.findOne(q);
-        } finally {
-            session.getOptions().setReadPreference(readPreference);
-        }
-    }
-    return res;
+    return this.adminCommand(commandObj);
 };
 
 DB.prototype.currentOpCursor = function(arg) {
@@ -898,19 +880,7 @@ DB.prototype.currentOpCursor = function(arg) {
 DB.prototype.killOp = function(op) {
     if (!op)
         throw Error("no opNum to kill specified");
-    var res = this.adminCommand({'killOp': 1, 'op': op});
-    if (commandUnsupported(res)) {
-        // fall back for old servers
-        const session = this.getSession();
-        const readPreference = session.getOptions().getReadPreference();
-        try {
-            session.getOptions().setReadPreference(null);
-            res = this.getSiblingDB("admin").$cmd.sys.killop.findOne({'op': op});
-        } finally {
-            session.getOptions().setReadPreference(readPreference);
-        }
-    }
-    return res;
+    return this.adminCommand({'killOp': 1, 'op': op});
 };
 DB.prototype.killOP = DB.prototype.killOp;
 
@@ -1200,18 +1170,7 @@ DB.prototype.fsyncLock = function() {
 };
 
 DB.prototype.fsyncUnlock = function() {
-    var res = this.adminCommand({fsyncUnlock: 1});
-    if (commandUnsupported(res)) {
-        const session = this.getSession();
-        const readPreference = session.getOptions().getReadPreference();
-        try {
-            session.getOptions().setReadPreference(null);
-            res = this.getSiblingDB("admin").$cmd.sys.unlock.findOne();
-        } finally {
-            session.getOptions().setReadPreference(readPreference);
-        }
-    }
-    return res;
+    return this.adminCommand({fsyncUnlock: 1});
 };
 
 DB.autocomplete = function(obj) {

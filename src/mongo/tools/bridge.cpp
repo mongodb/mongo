@@ -324,7 +324,7 @@ Future<DbResponse> ServiceEntryPointBridge::handleRequest(OperationContext* opCt
     if ((request.operation() == dbQuery &&
          NamespaceString(DbMessage(request).getns()).isCommand()) ||
         request.operation() == dbMsg) {
-        cmdRequest = rpc::opMsgRequestFromAnyProtocol(request);
+        cmdRequest = rpc::opMsgRequestFromAnyProtocol(request, opCtx->getClient());
 
         dest.extractHostInfo(*cmdRequest);
 

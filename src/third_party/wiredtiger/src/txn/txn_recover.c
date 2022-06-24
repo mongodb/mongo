@@ -997,7 +997,7 @@ done:
      * connection level base write generation number is updated at the end of the recovery
      * checkpoint.
      */
-    __wt_dhandle_update_write_gens(session);
+    WT_ERR(__wt_dhandle_update_write_gens(session));
 
     /*
      * If we're downgrading and have newer log files, force log removal, no matter what the remove

@@ -1240,16 +1240,21 @@ __rollback_to_stable_page_skip(
     *skipp = false; /* Default to reading */
 
     /*
-     * Skip fast-truncate operations durable at or before the RTS timestamp (reading the page will
-     * delete it). A page without fast-truncate timestamp information is an old format page: skip
-     * them as there's no way to get correct behavior, and skipping them matches historic behavior.
+     * Skip pages truncated at or before the RTS timestamp. (We could read the page, but that would
+     * unnecessarily instantiate it). If the page has no fast-delete information, that means either
+     * it was discarded because the delete is globally visible, or the internal page holding the
+     * cell was an old format page so none was loaded. In the latter case we should skip the page as
+     * there's no way to get correct behavior and skipping matches the historic behavior. Note that
+     * eviction is running; we must lock the WT_REF before examining the fast-delete information.
      */
-    if (ref->state == WT_REF_DELETED) {
+    if (ref->state == WT_REF_DELETED &&
+      WT_REF_CAS_STATE(session, ref, WT_REF_DELETED, WT_REF_LOCKED)) {
         page_del = ref->ft_info.del;
         if (page_del == NULL ||
           (__rollback_txn_visible_id(session, page_del->txnid) &&
             page_del->durable_timestamp <= rollback_timestamp))
             *skipp = true;
+        WT_REF_SET_STATE(ref, WT_REF_DELETED);
         return (0);
     }
 
@@ -1257,7 +1262,12 @@ __rollback_to_stable_page_skip(
     if (ref->state != WT_REF_DISK)
         return (0);
 
-    /* Check whether this on-disk page has any updates to be aborted. */
+    /*
+     * Check whether this on-disk page has any updates to be aborted. We are not holding a hazard
+     * reference on the page and so we rely on there being no other threads of control in the tree,
+     * that is, eviction ignores WT_REF_DISK pages and no other thread is reading pages, this page
+     * cannot change state from on-disk to something else.
+     */
     if (!__rollback_page_needs_abort(session, ref, rollback_timestamp)) {
         *skipp = true;
         __wt_verbose_multi(

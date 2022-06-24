@@ -58,7 +58,8 @@ public:
     using DBClientBase::update;
 
     std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
-                                         const ReadPreferenceSetting& readPref) override;
+                                         const ReadPreferenceSetting& readPref,
+                                         ExhaustMode exhaustMode) override;
 
     write_ops::FindAndModifyCommandReply findAndModify(
         const write_ops::FindAndModifyCommandRequest& findAndModify);

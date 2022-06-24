@@ -647,7 +647,7 @@ public:
             _cq->setCollator(mainColl->getDefaultCollator()->clone());
         }
 
-        auto planCacheKey = plan_cache_key_factory::make<KeyType>(*_cq, mainColl);
+        auto planCacheKey = buildPlanCacheKey();
         // Fill in some opDebug information, unless it has already been filled by an outer pipeline.
         OpDebug& opDebug = CurOp::get(_opCtx)->debug();
         if (!opDebug.queryHash) {
@@ -741,6 +741,11 @@ protected:
      * Constructs a PlanStage tree from the given query 'solution'.
      */
     virtual PlanStageType buildExecutableTree(const QuerySolution& solution) const = 0;
+
+    /**
+     * Constructs the plan cache key.
+     */
+    virtual KeyType buildPlanCacheKey() const = 0;
 
     /**
      * Either constructs a PlanStage tree from a cached plan (if exists in the plan cache), or
@@ -877,6 +882,10 @@ protected:
 
         result->emplace(std::move(stage), nullptr /* solution */);
         return result;
+    }
+
+    PlanCacheKey buildPlanCacheKey() const {
+        return plan_cache_key_factory::make<PlanCacheKey>(*_cq, _collection);
     }
 
     std::unique_ptr<ClassicPrepareExecutionResult> buildCachedPlan(
@@ -1083,13 +1092,17 @@ protected:
         return result;
     }
 
+    sbe::PlanCacheKey buildPlanCacheKey() const {
+        return plan_cache_key_factory::make(*_cq, _collections);
+    }
+
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildCachedPlan(
         const sbe::PlanCacheKey& planCacheKey) final {
         if (shouldCacheQuery(*_cq)) {
-            // TODO SERVER-61507: remove _cq->pipeline().empty() check when $group pushdown is
+            // TODO SERVER-61507: remove canUseSbePlanCache check when $group pushdown is
             // integrated with SBE plan cache.
             if (!feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() ||
-                !_cq->pipeline().empty()) {
+                !canonical_query_encoder::canUseSbePlanCache(*_cq)) {
                 // If the feature flag is off, we first try to build an "id hack" plan because the
                 // id hack plans are not cached in the classic cache. We then fall back to use the
                 // classic plan cache.
@@ -1346,18 +1359,19 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     // No need for runtime planning, just use the constructed plan stage tree.
     invariant(solutions.size() == 1);
     invariant(roots.size() == 1);
-    if (!cq->pipeline().empty()) {
-        // Need to extend the solution with the agg pipeline and rebuild the execution tree.
-        solutions[0] = QueryPlanner::extendWithAggPipeline(
-            *cq,
-            std::move(solutions[0]),
-            fillOutSecondaryCollectionsInformation(opCtx, collections, cq.get()));
-        roots[0] = helper.buildExecutableTree(*(solutions[0]));
-    }
     auto&& [root, data] = roots[0];
+
     if (!planningResult->recoveredPinnedCacheEntry()) {
-        plan_cache_util::updatePlanCache(
-            opCtx, collections.getMainCollection(), *cq, *solutions[0], *root, data);
+        if (!cq->pipeline().empty()) {
+            // Need to extend the solution with the agg pipeline and rebuild the execution tree.
+            solutions[0] = QueryPlanner::extendWithAggPipeline(
+                *cq,
+                std::move(solutions[0]),
+                fillOutSecondaryCollectionsInformation(opCtx, collections, cq.get()));
+            roots[0] = helper.buildExecutableTree(*(solutions[0]));
+        }
+
+        plan_cache_util::updatePlanCache(opCtx, collections, *cq, *solutions[0], *root, data);
     }
 
     // Prepare the SBE tree for execution.

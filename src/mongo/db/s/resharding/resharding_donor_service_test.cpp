@@ -85,7 +85,9 @@ public:
                                    const BSONObj& query,
                                    const BSONObj& update) override {}
 
-    void clearFilteringMetadata(OperationContext* opCtx) override {}
+    void clearFilteringMetadata(OperationContext* opCtx,
+                                const NamespaceString& sourceNss,
+                                const NamespaceString& tempReshardingNss) override {}
 };
 
 class DonorOpObserverForTest : public OpObserverForTest {
@@ -148,12 +150,12 @@ public:
 
         NamespaceString sourceNss("sourcedb.sourcecollection");
         auto sourceUUID = UUID::gen();
-        auto commonMetadata =
-            CommonReshardingMetadata(UUID::gen(),
-                                     sourceNss,
-                                     sourceUUID,
-                                     constructTemporaryReshardingNss(sourceNss.db(), sourceUUID),
-                                     BSON("newKey" << 1));
+        auto commonMetadata = CommonReshardingMetadata(
+            UUID::gen(),
+            sourceNss,
+            sourceUUID,
+            resharding::constructTemporaryReshardingNss(sourceNss.db(), sourceUUID),
+            BSON("newKey" << 1));
         commonMetadata.setStartTime(getServiceContext()->getFastClockSource()->now());
 
         doc.setCommonReshardingMetadata(std::move(commonMetadata));
@@ -348,7 +350,7 @@ TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBl
 
     DBDirectClient client(opCtx.get());
     FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
-    findRequest.setFilter(BSON("o2.type" << kReshardFinalOpLogType));
+    findRequest.setFilter(BSON("o2.type" << resharding::kReshardFinalOpLogType));
     auto cursor = client.find(std::move(findRequest));
 
     ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";
@@ -710,7 +712,7 @@ TEST_F(ReshardingDonorServiceTest, TruncatesXLErrorOnDonorDocument) {
             // to the primitive truncation algorithm - Check that the total size is less than
             // kReshardErrorMaxBytes + a couple additional bytes to provide a buffer for the field
             // name sizes.
-            int maxReshardErrorBytesCeiling = kReshardErrorMaxBytes + 200;
+            int maxReshardErrorBytesCeiling = resharding::kReshardErrorMaxBytes + 200;
             ASSERT_LT(persistedAbortReasonBSON->objsize(), maxReshardErrorBytesCeiling);
             ASSERT_EQ(persistedAbortReasonBSON->getIntField("code"),
                       ErrorCodes::ReshardCollectionTruncatedError);

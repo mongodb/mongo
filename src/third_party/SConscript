@@ -32,6 +32,15 @@ thirdPartyEnvironmentModifications = {
     'timelib': {'CPPPATH': ['#/src/third_party/timelib' + timelibSuffix], },
     'unwind': {},
     'variant': {'CPPPATH': ['#src/third_party/variant' + variantSuffix + '/include'], },
+    'mozjs': {
+        'CPPPATH': [
+            '#/src/third_party/mozjs/include',
+            '#/src/third_party/mozjs/mongo_sources',
+            '#/src/third_party/mozjs/platform/' + env["TARGET_ARCH"] + "/" + env["TARGET_OS"] +
+            "/include",
+        ],
+        'FORCEINCLUDES': ['js-config.h', ],
+    }
 }
 
 
@@ -73,7 +82,7 @@ if not use_system_version_of_library('pcre'):
 
 if not use_system_version_of_library('pcre2'):
     thirdPartyEnvironmentModifications['pcre2'] = {
-        'CPPPATH': ['#/src/third_party/pcre2'],
+        'CPPPATH': ['#/src/third_party/pcre2/src'],
     }
 
 if not use_system_version_of_library('boost'):
@@ -122,21 +131,6 @@ if not use_system_version_of_library('zstd'):
 if not use_system_version_of_library('google-benchmark'):
     thirdPartyEnvironmentModifications['benchmark'] = {
         'CPPPATH': ['#/src/third_party/benchmark/dist/include'],
-    }
-
-# TODO: figure out if we want to offer system versions of mozjs.  Mozilla
-# hasn't offered a source tarball since 24, but in theory they could.
-#
-#if not use_system_version_of_library('mozjs'):
-if True:
-    thirdPartyEnvironmentModifications['mozjs'] = {
-        'CPPPATH': [
-            '#/src/third_party/mozjs/include',
-            '#/src/third_party/mozjs/mongo_sources',
-            '#/src/third_party/mozjs/platform/' + env["TARGET_ARCH"] + "/" + env["TARGET_OS"] +
-            "/include",
-        ],
-        'FORCEINCLUDES': ['js-config.h', ],
     }
 
 if "tom" in env["MONGO_CRYPTO"]:
@@ -268,6 +262,10 @@ s2Env.InjectThirdParty(libraries=[
 ])
 s2Env.InjectMongoIncludePaths()
 s2Env.SConscript('s2/SConscript', exports={'env': s2Env})
+
+if jsEngine:
+    mozjsEnv = env.Clone()
+    mozjsEnv.SConscript('mozjs/SConscript', exports={'env': mozjsEnv})
 
 if use_libunwind:
     unwindEnv = env.Clone(LIBDEPS_NO_INHERIT=[
@@ -447,16 +445,6 @@ else:
     ])
 
 benchmarkEnv.ShimLibrary(name="benchmark")
-
-if jsEngine:
-    mozjsEnv = env.Clone()
-    mozjsEnv.SConscript('mozjs/SConscript', exports={'env': mozjsEnv})
-    mozjsEnv = mozjsEnv.Clone(LIBDEPS_INTERFACE=[
-        'mozjs/mozjs',
-        'shim_zlib',
-    ])
-
-    mozjsEnv.ShimLibrary(name="mozjs")
 
 if "tom" in env["MONGO_CRYPTO"]:
     tomcryptEnv = env.Clone()

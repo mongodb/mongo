@@ -80,6 +80,7 @@ boost::optional<repl::OplogEntry> forgeNoopImageOplogEntry(
                     "Not forging no-op image oplog entry because no image document found with "
                     "sessionId",
                     "sessionId"_attr = sessionId);
+        return boost::none;
     }
 
     auto image = repl::ImageEntry::parse(IDLParserErrorContext("image entry"), imageDoc->toBson());

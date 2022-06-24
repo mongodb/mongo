@@ -969,6 +969,30 @@ done:
 }
 
 /*
+ * __cell_page_del_window_cleanup --
+ *     Clean up a page_del structure loaded from a previous run.
+ */
+static inline void
+__cell_page_del_window_cleanup(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, bool *clearedp)
+{
+    /*
+     * The fast-truncate times are a stop time for the whole page; this code should match the stop
+     * txn and stop time logic for KV cells.
+     */
+    if (page_del->txnid != WT_TXN_MAX) {
+        if (clearedp != NULL)
+            *clearedp = true;
+        page_del->txnid = WT_TXN_NONE;
+        /* As above, only for non-timestamped tables. */
+        if (page_del->timestamp == WT_TS_MAX) {
+            page_del->timestamp = WT_TS_NONE;
+            WT_ASSERT(session, page_del->durable_timestamp == WT_TS_NONE);
+        }
+    } else
+        WT_ASSERT(session, page_del->timestamp == WT_TS_MAX);
+}
+
+/*
  * __cell_addr_window_cleanup --
  *     Clean up addr cells loaded from a previous run.
  */
@@ -976,8 +1000,10 @@ static inline void
 __cell_addr_window_cleanup(
   WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK_ADDR *unpack_addr)
 {
-    WT_PAGE_DELETED *page_del;
     WT_TIME_AGGREGATE *ta;
+    bool cleared;
+
+    cleared = false;
 
     /* Tell reconciliation we cleared the transaction ids and the cell needs to be rebuilt. */
     if (unpack_addr != NULL) {
@@ -1005,22 +1031,9 @@ __cell_addr_window_cleanup(
 
         /* Also handle any fast-truncate information. */
         if (unpack_addr->raw == WT_CELL_ADDR_DEL && F_ISSET(dsk, WT_PAGE_FT_UPDATE)) {
-            page_del = &unpack_addr->page_del;
-
-            /*
-             * The fast-truncate times are a stop time for the whole page; this code should match
-             * the stop txn and stop time logic for KV cells.
-             */
-            if (page_del->txnid != WT_TXN_MAX) {
-                page_del->txnid = WT_TXN_NONE;
+            __cell_page_del_window_cleanup(session, &unpack_addr->page_del, &cleared);
+            if (cleared)
                 F_SET(unpack_addr, WT_CELL_UNPACK_TIME_WINDOW_CLEARED);
-                /* As above, only for non-timestamped tables. */
-                if (page_del->timestamp == WT_TS_MAX) {
-                    page_del->timestamp = WT_TS_NONE;
-                    WT_ASSERT(session, page_del->durable_timestamp == WT_TS_NONE);
-                }
-            } else
-                WT_ASSERT(session, page_del->timestamp == WT_TS_MAX);
         }
     }
 }
@@ -1057,6 +1070,32 @@ __cell_kv_window_cleanup(WT_SESSION_IMPL *session, WT_CELL_UNPACK_KV *unpack_kv)
         } else
             WT_ASSERT(session, tw->stop_ts == WT_TS_MAX);
     }
+}
+
+/*
+ * __cell_redo_page_del_cleanup --
+ *     Redo the window cleanup logic on a page_del structure after the write generations have been
+ *     bumped. Note: the name of this function is abusive (there are no cells involved) but as the
+ *     logic is a copy of __cell_unpack_window_cleanup it seems worthwhile to keep the two together.
+ */
+static inline void
+__cell_redo_page_del_cleanup(
+  WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_PAGE_DELETED *page_del)
+{
+    uint64_t write_gen;
+
+    WT_ASSERT(session, !WT_READING_CHECKPOINT(session));
+
+    write_gen = S2BT(session)->base_write_gen;
+
+    WT_ASSERT(session, dsk->write_gen != 0);
+    if (dsk->write_gen > write_gen)
+        return;
+
+    if (F_ISSET(session, WT_SESSION_DEBUG_DO_NOT_CLEAR_TXN_ID))
+        return;
+
+    __cell_page_del_window_cleanup(session, page_del, NULL);
 }
 
 /*

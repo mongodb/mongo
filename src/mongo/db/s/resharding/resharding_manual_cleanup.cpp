@@ -48,8 +48,9 @@ namespace {
 std::vector<ShardId> getAllParticipantsFromCoordDoc(const ReshardingCoordinatorDocument& doc) {
     std::vector<ShardId> participants;
 
-    auto donorShards = extractShardIdsFromParticipantEntriesAsSet(doc.getDonorShards());
-    auto recipientShards = extractShardIdsFromParticipantEntriesAsSet(doc.getRecipientShards());
+    auto donorShards = resharding::extractShardIdsFromParticipantEntriesAsSet(doc.getDonorShards());
+    auto recipientShards =
+        resharding::extractShardIdsFromParticipantEntriesAsSet(doc.getRecipientShards());
     std::set_union(donorShards.begin(),
                    donorShards.end(),
                    recipientShards.begin(),

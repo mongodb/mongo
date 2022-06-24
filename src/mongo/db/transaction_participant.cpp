@@ -207,8 +207,15 @@ struct ActiveTransactionHistory {
 ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                                                        const LogicalSessionId& lsid,
                                                        bool fetchOplogEntries) {
-    // Storage engine operations require at least Global IS.
-    Lock::GlobalLock lk(opCtx, MODE_IS);
+    // FlowControl is only impacted when a MODE_IX global lock is acquired. If we are in a
+    // multi-document transaction, we must acquire a MODE_IX global lock. Prevent obtaining a flow
+    // control ticket while in a mutli-document transaction.
+    FlowControl::Bypass flowControlBypass(opCtx);
+
+    // Storage engine operations require at a least global MODE_IS lock. In multi-document
+    // transactions, storage opeartions require at least a global MODE_IX lock. Prevent lock
+    // upgrading in the case of a multi-document transaction.
+    Lock::GlobalLock lk(opCtx, opCtx->inMultiDocumentTransaction() ? MODE_IX : MODE_IS);
 
     ActiveTransactionHistory result;
 
@@ -612,6 +619,17 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
     }
 }
 
+boost::optional<TxnNumber> TransactionParticipant::Observer::getClientTxnNumber(
+    const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) const {
+    if (_isInternalSessionForNonRetryableWrite()) {
+        return boost::none;
+    } else if (_isInternalSessionForRetryableWrite()) {
+        invariant(_sessionId().getTxnNumber());
+        return _sessionId().getTxnNumber();
+    }
+    return {txnNumberAndRetryCounter.getTxnNumber()};
+}
+
 Session* TransactionParticipant::Observer::_session() const {
     return getTransactionParticipant.owner(_tp);
 }
@@ -652,29 +670,73 @@ boost::optional<TxnNumber> TransactionParticipant::Observer::_activeRetryableWri
 
 void TransactionParticipant::Participant::_uassertNoConflictingInternalTransactionForRetryableWrite(
     OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
+    auto clientTxnNumber = getClientTxnNumber(txnNumberAndRetryCounter);
+    if (!clientTxnNumber) {
+        // This must be a non-retryable child session transaction so there can't be a conflict.
+        return;
+    }
+
     auto& retryableWriteTxnParticipantCatalog =
         getRetryableWriteTransactionParticipantCatalog(opCtx);
-    invariant(retryableWriteTxnParticipantCatalog.isValid());
+    retryableWriteTxnParticipantCatalog.checkForConflictingInternalTransactions(
+        opCtx, *clientTxnNumber, txnNumberAndRetryCounter);
+}
 
-    for (const auto& it : retryableWriteTxnParticipantCatalog.getParticipants()) {
-        const auto& txnParticipant = it.second;
+bool TransactionParticipant::Participant::_verifyCanBeginMultiDocumentTransaction(
+    OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
+    if (txnNumberAndRetryCounter.getTxnNumber() ==
+        o().activeTxnNumberAndRetryCounter.getTxnNumber()) {
+        if (txnNumberAndRetryCounter.getTxnRetryCounter() <
+            o().activeTxnNumberAndRetryCounter.getTxnRetryCounter()) {
+            uasserted(
+                TxnRetryCounterTooOldInfo(*o().activeTxnNumberAndRetryCounter.getTxnRetryCounter()),
+                str::stream() << "Cannot start a transaction at given transaction number "
+                              << txnNumberAndRetryCounter.getTxnNumber() << " on session "
+                              << _sessionId() << " using txnRetryCounter "
+                              << txnNumberAndRetryCounter.getTxnRetryCounter()
+                              << " because it has already been restarted using a "
+                              << "higher txnRetryCounter "
+                              << o().activeTxnNumberAndRetryCounter.getTxnRetryCounter());
+        } else if (txnNumberAndRetryCounter.getTxnRetryCounter() ==
+                       o().activeTxnNumberAndRetryCounter.getTxnRetryCounter() ||
+                   o().activeTxnNumberAndRetryCounter.getTxnRetryCounter() ==
+                       kUninitializedTxnRetryCounter) {
+            // Servers in a sharded cluster can start a new transaction at the active transaction
+            // number to allow internal retries by routers on re-targeting errors, like
+            // StaleShard/DatabaseVersion or SnapshotTooOld.
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    "Only servers in a sharded cluster can start a new transaction at the active "
+                    "transaction number",
+                    serverGlobalParams.clusterRole != ClusterRole::None);
 
-        if (txnParticipant._sessionId() == opCtx->getLogicalSessionId() ||
-            !txnParticipant._isInternalSessionForRetryableWrite()) {
-            continue;
+            if (_isInternalSessionForRetryableWrite() &&
+                o().txnState.isInSet(TransactionState::kCommitted)) {
+                // This is a retry of a committed internal transaction for retryable writes so
+                // skip resetting the state and updating the metrics.
+                return true;
+            }
+
+            _uassertCanReuseActiveTxnNumberForTransaction(opCtx);
+        } else {
+            const auto restartableStates = TransactionState::kNone | TransactionState::kInProgress |
+                TransactionState::kAbortedWithoutPrepare | TransactionState::kAbortedWithPrepare;
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "Cannot restart transaction "
+                                  << txnNumberAndRetryCounter.getTxnNumber()
+                                  << " using txnRetryCounter "
+                                  << txnNumberAndRetryCounter.getTxnRetryCounter()
+                                  << " because it is already in state " << o().txnState
+                                  << " with txnRetryCounter "
+                                  << o().activeTxnNumberAndRetryCounter.getTxnRetryCounter(),
+                    o().txnState.isInSet(restartableStates));
         }
-
-        uassert(ErrorCodes::RetryableTransactionInProgress,
-                str::stream() << "Cannot run retryable write with session id " << _sessionId()
-                              << " and transaction number "
-                              << txnNumberAndRetryCounter.getTxnNumber()
-                              << " because it is being executed in a retryable internal transaction"
-                              << " with session id " << txnParticipant._sessionId()
-                              << " and transaction number "
-                              << txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber()
-                              << " in state " << txnParticipant.o().txnState,
-                !txnParticipant.transactionIsOpen());
+    } else {
+        invariant(txnNumberAndRetryCounter.getTxnNumber() >
+                  o().activeTxnNumberAndRetryCounter.getTxnNumber());
     }
+
+    _uassertNoConflictingInternalTransactionForRetryableWrite(opCtx, txnNumberAndRetryCounter);
+    return false;
 }
 
 void TransactionParticipant::Participant::_uassertCanReuseActiveTxnNumberForTransaction(
@@ -808,57 +870,6 @@ void TransactionParticipant::Participant::_continueMultiDocumentTransaction(
 
 void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
     OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
-    if (txnNumberAndRetryCounter.getTxnNumber() ==
-        o().activeTxnNumberAndRetryCounter.getTxnNumber()) {
-        if (txnNumberAndRetryCounter.getTxnRetryCounter() <
-            o().activeTxnNumberAndRetryCounter.getTxnRetryCounter()) {
-            uasserted(
-                TxnRetryCounterTooOldInfo(*o().activeTxnNumberAndRetryCounter.getTxnRetryCounter()),
-                str::stream() << "Cannot start a transaction at given transaction number "
-                              << txnNumberAndRetryCounter.getTxnNumber() << " on session "
-                              << _sessionId() << " using txnRetryCounter "
-                              << txnNumberAndRetryCounter.getTxnRetryCounter()
-                              << " because it has already been restarted using a "
-                              << "higher txnRetryCounter "
-                              << o().activeTxnNumberAndRetryCounter.getTxnRetryCounter());
-        } else if (txnNumberAndRetryCounter.getTxnRetryCounter() ==
-                       o().activeTxnNumberAndRetryCounter.getTxnRetryCounter() ||
-                   o().activeTxnNumberAndRetryCounter.getTxnRetryCounter() ==
-                       kUninitializedTxnRetryCounter) {
-            // Servers in a sharded cluster can start a new transaction at the active transaction
-            // number to allow internal retries by routers on re-targeting errors, like
-            // StaleShard/DatabaseVersion or SnapshotTooOld.
-            uassert(ErrorCodes::ConflictingOperationInProgress,
-                    "Only servers in a sharded cluster can start a new transaction at the active "
-                    "transaction number",
-                    serverGlobalParams.clusterRole != ClusterRole::None);
-
-            if (_isInternalSessionForRetryableWrite() &&
-                o().txnState.isInSet(TransactionState::kCommitted)) {
-                // This is a retry of a committed internal transaction for retryable writes so
-                // skip resetting the state and updating the metrics.
-                return;
-            }
-
-            _uassertCanReuseActiveTxnNumberForTransaction(opCtx);
-        } else {
-            const auto restartableStates = TransactionState::kNone | TransactionState::kInProgress |
-                TransactionState::kAbortedWithoutPrepare | TransactionState::kAbortedWithPrepare;
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << "Cannot restart transaction "
-                                  << txnNumberAndRetryCounter.getTxnNumber()
-                                  << " using txnRetryCounter "
-                                  << txnNumberAndRetryCounter.getTxnRetryCounter()
-                                  << " because it is already in state " << o().txnState
-                                  << " with txnRetryCounter "
-                                  << o().activeTxnNumberAndRetryCounter.getTxnRetryCounter(),
-                    o().txnState.isInSet(restartableStates));
-        }
-    } else {
-        invariant(txnNumberAndRetryCounter.getTxnNumber() >
-                  o().activeTxnNumberAndRetryCounter.getTxnNumber());
-    }
-
     // Aborts any in-progress txns.
     _setNewTxnNumberAndRetryCounter(opCtx, txnNumberAndRetryCounter);
     p().autoCommit = false;
@@ -1008,6 +1019,13 @@ void TransactionParticipant::Participant::beginOrContinue(
     // an argument on the request. The 'startTransaction' argument currently can only be specified
     // as true, which is verified earlier, when parsing the request.
     invariant(*startTransaction);
+
+    auto isRetry = _verifyCanBeginMultiDocumentTransaction(opCtx, txnNumberAndRetryCounter);
+    if (isRetry) {
+        // This is a retry for the active transaction, so we don't throw, and we also don't need to
+        // start the transaction since that already happened.
+        return;
+    }
     _beginMultiDocumentTransaction(opCtx, txnNumberAndRetryCounter);
 }
 
@@ -2722,6 +2740,12 @@ void TransactionParticipant::Participant::_setNewTxnNumberAndRetryCounter(
     if (o().txnState.isInProgress()) {
         _abortTransactionOnSession(opCtx);
     }
+    // If txnNumber ordering applies, abort any child transactions with a lesser txnNumber.
+    auto clientTxnNumber = getClientTxnNumber(txnNumberAndRetryCounter);
+    if (clientTxnNumber.has_value()) {
+        getRetryableWriteTransactionParticipantCatalog(opCtx).abortSupersededTransactions(
+            opCtx, *clientTxnNumber);
+    }
 
     stdx::unique_lock<Client> lk(*opCtx->getClient());
     o(lk).activeTxnNumberAndRetryCounter = txnNumberAndRetryCounter;
@@ -2753,8 +2777,8 @@ void RetryableWriteTransactionParticipantCatalog::addParticipant(
     invariant(*txnNumber >= _activeTxnNumber);
 
     if (txnNumber > _activeTxnNumber) {
+        reset();
         _activeTxnNumber = *txnNumber;
-        _participants.clear();
     }
     if (auto it = _participants.find(participant._sessionId()); it != _participants.end()) {
         invariant(it->second._tp == participant._tp);
@@ -2766,6 +2790,7 @@ void RetryableWriteTransactionParticipantCatalog::addParticipant(
 void RetryableWriteTransactionParticipantCatalog::reset() {
     _activeTxnNumber = kUninitializedTxnNumber;
     _participants.clear();
+    _hasSeenIncomingConflictingRetryableTransaction = false;
 }
 
 void RetryableWriteTransactionParticipantCatalog::markAsValid() {
@@ -2784,6 +2809,94 @@ bool RetryableWriteTransactionParticipantCatalog::isValid() const {
     return _isValid && std::all_of(_participants.begin(), _participants.end(), [](const auto& it) {
                return it.second.p().isValid;
            });
+}
+
+void RetryableWriteTransactionParticipantCatalog::checkForConflictingInternalTransactions(
+    OperationContext* opCtx,
+    TxnNumber incomingClientTxnNumber,
+    const TxnNumberAndRetryCounter& incomingTxnNumberAndRetryCounter) {
+    invariant(isValid());
+
+    for (auto&& it : _participants) {
+        auto& sessionId = it.first;
+        auto& txnParticipant = it.second;
+
+        if (sessionId == opCtx->getLogicalSessionId() ||
+            !txnParticipant._isInternalSessionForRetryableWrite()) {
+            continue;
+        }
+
+        if (!txnParticipant.transactionIsOpen()) {
+            // The transaction isn't open, so it can't conflict with an incoming transaction.
+            continue;
+        }
+
+        auto clientTxnNumber =
+            txnParticipant.getClientTxnNumber(txnParticipant.getActiveTxnNumberAndRetryCounter());
+        invariant(clientTxnNumber.has_value());
+        if (*clientTxnNumber < incomingClientTxnNumber) {
+            // To match the behavior of client transactions when a logically earlier prepared
+            // transaction is in progress, throw an error to block the new transaction until the
+            // earlier one exists prepare.
+            uassert(ErrorCodes::RetryableTransactionInProgress,
+                    "Operation conflicts with an earlier retryable transaction in prepare",
+                    !txnParticipant.transactionIsPrepared());
+
+            // Otherwise skip this transaction because it will be aborted when this one begins.
+            continue;
+        }
+
+        if (!_hasSeenIncomingConflictingRetryableTransaction &&
+            txnParticipant.transactionIsInProgress()) {
+            // Only abort when the transaction is in progress since other states may not be safe,
+            // e.g. prepare.
+            _hasSeenIncomingConflictingRetryableTransaction = true;
+            txnParticipant._abortTransactionOnSession(opCtx);
+        } else {
+            uassert(
+                ErrorCodes::RetryableTransactionInProgress,
+                str::stream() << "Cannot run operation with session id "
+                              << opCtx->getLogicalSessionId() << " and transaction number "
+                              << incomingTxnNumberAndRetryCounter.getTxnNumber()
+                              << " because it conflicts with an active operation with session id "
+                              << sessionId << " and transaction number "
+                              << txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber()
+                              << " in state " << txnParticipant.o().txnState,
+                !txnParticipant.transactionIsOpen());
+        }
+    }
+}
+
+void RetryableWriteTransactionParticipantCatalog::abortSupersededTransactions(
+    OperationContext* opCtx, TxnNumber incomingClientTxnNumber) {
+    if (!isValid()) {
+        // This was called while refreshing from storage or applying ops on a secondary, so skip it.
+        return;
+    }
+
+    for (auto&& it : _participants) {
+        auto& sessionId = it.first;
+        auto& txnParticipant = it.second;
+
+        if (sessionId == opCtx->getLogicalSessionId() ||
+            !txnParticipant._isInternalSessionForRetryableWrite()) {
+            continue;
+        }
+
+        // We should never try to abort a prepared transaction. We should have earlier thrown either
+        // RetryableTransactionInProgress or PreparedTransactionInProgress.
+        invariant(!txnParticipant.transactionIsPrepared(),
+                  str::stream() << "Transaction on session " << sessionId
+                                << " unexpectedly in prepare");
+
+        auto clientTxnNumber =
+            txnParticipant.getClientTxnNumber(txnParticipant.getActiveTxnNumberAndRetryCounter());
+        invariant(clientTxnNumber.has_value());
+        if (*clientTxnNumber < incomingClientTxnNumber &&
+            txnParticipant.transactionIsInProgress()) {
+            txnParticipant._abortTransactionOnSession(opCtx);
+        }
+    }
 }
 
 void TransactionParticipant::Participant::refreshFromStorageIfNeeded(OperationContext* opCtx) {

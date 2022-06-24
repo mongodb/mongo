@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
@@ -65,7 +63,7 @@ public:
         chunk.setMax(BSON("x" << min + 10));
         chunk.setJumbo(false);
         chunk.setShard(shardId);
-        chunk.setVersion(ChunkVersion(1, 1, OID::gen(), Timestamp(10)));
+        chunk.setVersion(ChunkVersion({OID::gen(), Timestamp(10)}, {1, 1}));
         return chunk;
     }
 
@@ -76,7 +74,7 @@ public:
                            kUuid,
                            BSON("x" << min),
                            BSON("x" << min + 10),
-                           ChunkVersion(1, 1, OID::gen(), Timestamp(10)),
+                           ChunkVersion({OID::gen(), Timestamp(10)}, {1, 1}),
                            MoveChunkRequest::ForceJumbo::kDoNotForce);
     }
 
@@ -234,7 +232,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMergeChunkCommand) {
     _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
 
     ChunkRange range(BSON("x" << 0), BSON("x" << 20));
-    ChunkVersion version(1, 1, OID::gen(), Timestamp(10));
+    ChunkVersion version({OID::gen(), Timestamp(10)}, {1, 1});
     auto futureResponse =
         _scheduler.requestMergeChunks(operationContext(), kNss, kShardId0, range, version);
     ASSERT_OK(futureResponse.getNoThrow());
@@ -246,7 +244,7 @@ TEST_F(BalancerCommandsSchedulerTest, MergeChunkNonexistentShard) {
     auto remoteResponsesFuture = setRemoteResponses();
     _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     ChunkRange range(BSON("x" << 0), BSON("x" << 20));
-    ChunkVersion version(1, 1, OID::gen(), Timestamp(10));
+    ChunkVersion version({OID::gen(), Timestamp(10)}, {1, 1});
     auto futureResponse = _scheduler.requestMergeChunks(
         operationContext(), kNss, ShardId("nonexistent"), range, version);
     auto shardNotFoundError = Status{ErrorCodes::ShardNotFound, "Shard nonexistent not found"};

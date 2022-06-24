@@ -104,6 +104,7 @@ public:
     void visit(const ProjectionElemMatchASTNode* node) final {
         _deps->requiresDocument = true;
         _deps->hasExpressions = true;
+        _deps->containsElemMatch = true;
     }
 
     void visit(const ExpressionASTNode* node) final {

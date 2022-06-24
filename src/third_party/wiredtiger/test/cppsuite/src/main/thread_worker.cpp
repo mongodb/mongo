@@ -120,9 +120,8 @@ thread_worker::update(
             testutil_die(ret, "unhandled error while trying to update a key");
     }
 
-    uint64_t txn_id = ((WT_SESSION_IMPL *)session.get())->txn->id;
     ret = op_tracker->save_operation(
-      txn_id, tracking_operation::INSERT, collection_id, key, value, ts, op_track_cursor);
+      session.get(), tracking_operation::INSERT, collection_id, key, value, ts, op_track_cursor);
 
     if (ret == 0)
         txn.add_op();
@@ -162,9 +161,8 @@ thread_worker::insert(
             testutil_die(ret, "unhandled error while trying to insert a key");
     }
 
-    uint64_t txn_id = ((WT_SESSION_IMPL *)session.get())->txn->id;
     ret = op_tracker->save_operation(
-      txn_id, tracking_operation::INSERT, collection_id, key, value, ts, op_track_cursor);
+      session.get(), tracking_operation::INSERT, collection_id, key, value, ts, op_track_cursor);
 
     if (ret == 0)
         txn.add_op();
@@ -200,9 +198,8 @@ thread_worker::remove(scoped_cursor &cursor, uint64_t collection_id, const std::
             testutil_die(ret, "unhandled error while trying to remove a key");
     }
 
-    uint64_t txn_id = ((WT_SESSION_IMPL *)session.get())->txn->id;
     ret = op_tracker->save_operation(
-      txn_id, tracking_operation::DELETE_KEY, collection_id, key, "", ts, op_track_cursor);
+      session.get(), tracking_operation::DELETE_KEY, collection_id, key, "", ts, op_track_cursor);
 
     if (ret == 0)
         txn.add_op();

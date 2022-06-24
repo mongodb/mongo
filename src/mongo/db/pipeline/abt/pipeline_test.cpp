@@ -461,7 +461,9 @@ TEST(ABTTranslate, ProjectPaths) {
         "|           EvalPath []\n"
         "|           |   Variable [scan_0]\n"
         "|           PathGet [x]\n"
+        "|           PathTraverse []\n"
         "|           PathGet [y]\n"
+        "|           PathTraverse []\n"
         "|           PathGet [z]\n"
         "|           PathIdentity []\n"
         "Scan [collection]\n"
@@ -525,12 +527,13 @@ TEST(ABTTranslate, ProjectInclusion) {
         "|   BindBlock:\n"
         "|       [projGetPath_0]\n"
         "|           BinaryOp [Add]\n"
-        "|           |   EvalPath []\n"
-        "|           |   |   Variable [scan_0]\n"
-        "|           |   PathGet [c]\n"
-        "|           |   PathGet [d]\n"
-        "|           |   PathIdentity []\n"
-        "|           Const [2]\n"
+        "|           |   Const [2]\n"
+        "|           EvalPath []\n"
+        "|           |   Variable [scan_0]\n"
+        "|           PathGet [c]\n"
+        "|           PathTraverse []\n"
+        "|           PathGet [d]\n"
+        "|           PathIdentity []\n"
         "Scan [collection]\n"
         "    BindBlock:\n"
         "        [scan_0]\n"
@@ -654,7 +657,30 @@ TEST(ABTTranslate, MatchBasic) {
         optimized);
 }
 
-TEST(ABTTranslate, MatchPath) {
+TEST(ABTTranslate, MatchPath1) {
+    ABT translated = translatePipeline("[{$match: {$expr: {$eq: ['$a', 1]}}}]");
+
+    // Demonstrate simple path is converted to EvalFilter.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "Scan [collection]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        translated);
+}
+
+TEST(ABTTranslate, MatchPath2) {
     ABT translated = translatePipeline("[{$match: {$expr: {$eq: ['$a.b', 1]}}}]");
 
     ASSERT_EXPLAIN_V2(
@@ -666,10 +692,15 @@ TEST(ABTTranslate, MatchPath) {
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [scan_0]\n"
+        "|   PathConstant []\n"
+        "|   BinaryOp [Eq]\n"
+        "|   |   Const [1]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [scan_0]\n"
         "|   PathGet [a]\n"
+        "|   PathTraverse []\n"
         "|   PathGet [b]\n"
-        "|   PathCompare [Eq]\n"
-        "|   Const [1]\n"
+        "|   PathIdentity []\n"
         "Scan [collection]\n"
         "    BindBlock:\n"
         "        [scan_0]\n"
@@ -776,11 +807,11 @@ TEST(ABTTranslate, MatchProject) {
         "|           BinaryOp [Add]\n"
         "|           |   EvalPath []\n"
         "|           |   |   Variable [scan_0]\n"
-        "|           |   PathGet [a]\n"
+        "|           |   PathGet [b]\n"
         "|           |   PathIdentity []\n"
         "|           EvalPath []\n"
         "|           |   Variable [scan_0]\n"
-        "|           PathGet [b]\n"
+        "|           PathGet [a]\n"
         "|           PathIdentity []\n"
         "Scan [collection]\n"
         "    BindBlock:\n"
@@ -942,11 +973,11 @@ TEST(ABTTranslate, GroupBasic) {
         "|           BinaryOp [Mult]\n"
         "|           |   EvalPath []\n"
         "|           |   |   Variable [scan_0]\n"
-        "|           |   PathGet [b]\n"
+        "|           |   PathGet [c]\n"
         "|           |   PathIdentity []\n"
         "|           EvalPath []\n"
         "|           |   Variable [scan_0]\n"
-        "|           PathGet [c]\n"
+        "|           PathGet [b]\n"
         "|           PathIdentity []\n"
         "Evaluation []\n"
         "|   BindBlock:\n"
@@ -954,6 +985,7 @@ TEST(ABTTranslate, GroupBasic) {
         "|           EvalPath []\n"
         "|           |   Variable [scan_0]\n"
         "|           PathGet [a]\n"
+        "|           PathTraverse []\n"
         "|           PathGet [b]\n"
         "|           PathIdentity []\n"
         "Scan [collection]\n"
@@ -1218,6 +1250,7 @@ TEST(ABTTranslate, UnwindAndGroup) {
         "|           EvalPath []\n"
         "|           |   Variable [embedProj_0]\n"
         "|           PathGet [a]\n"
+        "|           PathTraverse []\n"
         "|           PathGet [b]\n"
         "|           PathIdentity []\n"
         "Evaluation []\n"
@@ -2039,11 +2072,12 @@ TEST(ABTTranslate, GroupMultiKey) {
         "|           |   PathField [count]\n"
         "|           |   PathConstant []\n"
         "|           |   Variable [count_agg_0]\n"
+        "|           PathField [_id]\n"
         "|           PathComposeM []\n"
-        "|           |   PathField [_id.year]\n"
+        "|           |   PathField [year]\n"
         "|           |   PathConstant []\n"
         "|           |   Variable [groupByProj_1]\n"
-        "|           PathField [_id.isin]\n"
+        "|           PathField [isin]\n"
         "|           PathConstant []\n"
         "|           Variable [groupByProj_0]\n"
         "GroupBy []\n"
@@ -2292,13 +2326,15 @@ TEST(ABTTranslate, PartialIndex) {
 
     // The expression matches the pipeline.
     // By default the constant is translated as "int32".
-    auto conversionResult = convertExprToPartialSchemaReq(make<EvalFilter>(
-        make<PathGet>("b",
-                      make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int32(2)))),
-        make<Variable>(scanProjName)));
-    ASSERT_TRUE(conversionResult._success);
-    ASSERT_FALSE(conversionResult._hasEmptyInterval);
-    ASSERT_FALSE(conversionResult._retainPredicate);
+    auto conversionResult = convertExprToPartialSchemaReq(
+        make<EvalFilter>(
+            make<PathGet>(
+                "b", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int32(2)))),
+            make<Variable>(scanProjName)),
+        true /*isFilterContext*/);
+    ASSERT_TRUE(conversionResult.has_value());
+    ASSERT_FALSE(conversionResult->_hasEmptyInterval);
+    ASSERT_FALSE(conversionResult->_retainPredicate);
 
     Metadata metadata = {
         {{scanDefName,
@@ -2307,7 +2343,7 @@ TEST(ABTTranslate, PartialIndex) {
                            IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending}},
                                            true /*multiKey*/,
                                            {DistributionType::Centralized},
-                                           std::move(conversionResult._reqMap)}}}}}}};
+                                           std::move(conversionResult->_reqMap)}}}}}}};
 
     ABT translated = translatePipeline(
         metadata, "[{$match: {'a': 3, 'b': 2}}]", scanProjName, scanDefName, prefixId);
@@ -2360,13 +2396,15 @@ TEST(ABTTranslate, PartialIndexNegative) {
     ProjectionName scanProjName = prefixId.getNextId("scan");
 
     // The expression does not match the pipeline.
-    auto conversionResult = convertExprToPartialSchemaReq(make<EvalFilter>(
-        make<PathGet>("b",
-                      make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int32(2)))),
-        make<Variable>(scanProjName)));
-    ASSERT_TRUE(conversionResult._success);
-    ASSERT_FALSE(conversionResult._hasEmptyInterval);
-    ASSERT_FALSE(conversionResult._retainPredicate);
+    auto conversionResult = convertExprToPartialSchemaReq(
+        make<EvalFilter>(
+            make<PathGet>(
+                "b", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int32(2)))),
+            make<Variable>(scanProjName)),
+        true /*isFilterContext*/);
+    ASSERT_TRUE(conversionResult.has_value());
+    ASSERT_FALSE(conversionResult->_hasEmptyInterval);
+    ASSERT_FALSE(conversionResult->_retainPredicate);
 
     Metadata metadata = {
         {{scanDefName,
@@ -2375,7 +2413,7 @@ TEST(ABTTranslate, PartialIndexNegative) {
                            IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending}},
                                            true /*multiKey*/,
                                            {DistributionType::Centralized},
-                                           std::move(conversionResult._reqMap)}}}}}}};
+                                           std::move(conversionResult->_reqMap)}}}}}}};
 
     ABT translated = translatePipeline(
         metadata, "[{$match: {'a': 3, 'b': 3}}]", scanProjName, scanDefName, prefixId);
@@ -2461,11 +2499,11 @@ TEST(ABTTranslate, CommonExpressionElimination) {
         "|   BindBlock:\n"
         "|       [projGetPath_0]\n"
         "|           BinaryOp [Add]\n"
-        "|           |   EvalPath []\n"
-        "|           |   |   Variable [scan_0]\n"
-        "|           |   PathGet [b]\n"
-        "|           |   PathIdentity []\n"
-        "|           Const [1]\n"
+        "|           |   Const [1]\n"
+        "|           EvalPath []\n"
+        "|           |   Variable [scan_0]\n"
+        "|           PathGet [b]\n"
+        "|           PathIdentity []\n"
         "Scan [test]\n"
         "    BindBlock:\n"
         "        [scan_0]\n"

@@ -490,6 +490,8 @@ error_codes:
 
     - {code: 374, name: TransactionAPIMustRetryTransaction, categories: [InternalOnly]}
     - {code: 375, name: TransactionAPIMustRetryCommit, categories: [InternalOnly]}
+    - {code: 376, name: ChangeStreamNotEnabled}
+    - {code: 377, name: FLEMaxTagLimitExceeded }
 
     # Error codes 4000-8999 are reserved.
 

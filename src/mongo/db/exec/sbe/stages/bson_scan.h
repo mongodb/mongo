@@ -51,7 +51,8 @@ public:
                   boost::optional<value::SlotId> recordSlot,
                   std::vector<std::string> fields,
                   value::SlotVector vars,
-                  PlanNodeId planNodeId);
+                  PlanNodeId planNodeId,
+                  bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 

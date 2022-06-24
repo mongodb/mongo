@@ -375,7 +375,7 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
         for (const auto& spec : specs) {
             uassert(6100900,
                     "Cannot implicitly create a new collection with createIndex 'clustered' option",
-                    !spec["clustered"]);
+                    !spec[IndexDescriptor::kClusteredFieldName]);
         }
 
         // We need to create the collection.
@@ -716,6 +716,13 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
  * { createIndexes : "bar",
  *   indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ],
  *   commitQuorum: "majority" }
+ *
+ * commitQuorum specifies which or how many replica set members must be ready to commit before the
+ * primary will commit the index. The same values can be used for commitQuorum as writeConcern, with
+ * the addition of 'votingMembers', the default. It is used to ensure secondaries can commit indexes
+ * quickly, minimizing replication lag (secondaries block replication on receipt of commitIndexBuild
+ * while completing the associated index). Note that commitQuorum is NOT like writeConcern: there is
+ * no guarantee that indexes on secondaries are ready for use after the command returns.
  */
 class CmdCreateIndexes : public CreateIndexesCmdVersion1Gen<CmdCreateIndexes> {
 public:
@@ -805,6 +812,10 @@ public:
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kNever;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
     }
 
 } cmdCreateIndex;

@@ -317,38 +317,43 @@ BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinished
 }
 
 void CollectionCloner::runQuery() {
-    // Non-resumable query.
-    Query query;
+    FindCommandRequest findCmd{_sourceDbAndUuid};
 
     if (_resumeToken) {
         // Resume the query from where we left off.
         LOGV2_DEBUG(21133, 1, "Collection cloner will resume the last successful query");
-        query.requestResumeToken(true).resumeAfter(_resumeToken.get());
+        findCmd.setRequestResumeToken(true);
+        findCmd.setResumeAfter(_resumeToken.get());
     } else {
         // New attempt at a resumable query.
         LOGV2_DEBUG(21134, 1, "Collection cloner will run a new query");
-        query.requestResumeToken(true);
+        findCmd.setRequestResumeToken(true);
     }
-    query.hint(BSON("$natural" << 1));
+
+    findCmd.setHint(BSON("$natural" << 1));
+    findCmd.setNoCursorTimeout(true);
+    findCmd.setReadConcern(ReadConcernArgs::kLocal);
+    if (_collectionClonerBatchSize) {
+        findCmd.setBatchSize(_collectionClonerBatchSize);
+    }
+
+    ExhaustMode exhaustMode = collectionClonerUsesExhaust ? ExhaustMode::kOn : ExhaustMode::kOff;
 
     // We reset this every time we retry or resume a query.
     // We distinguish the first batch from the rest so that we only store the remote cursor id
     // the first time we get it.
     _firstBatchOfQueryRound = true;
 
-    getClient()->query_DEPRECATED(
-        [this](DBClientCursorBatchIterator& iter) { handleNextBatch(iter); },
-        _sourceDbAndUuid,
-        BSONObj{},
-        query,
-        nullptr /* fieldsToReturn */,
-        QueryOption_NoCursorTimeout | QueryOption_SecondaryOk |
-            (collectionClonerUsesExhaust ? QueryOption_Exhaust : 0),
-        _collectionClonerBatchSize,
-        ReadConcernArgs::kLocal);
+    auto cursor = getClient()->find(
+        std::move(findCmd), ReadPreferenceSetting{ReadPreference::SecondaryPreferred}, exhaustMode);
+
+    // Process the results of the cursor one batch at a time.
+    while (cursor->more()) {
+        handleNextBatch(*cursor);
+    }
 }
 
-void CollectionCloner::handleNextBatch(DBClientCursorBatchIterator& iter) {
+void CollectionCloner::handleNextBatch(DBClientCursor& cursor) {
     {
         stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
         if (!getSharedData()->getStatus(lk).isOK()) {
@@ -370,15 +375,15 @@ void CollectionCloner::handleNextBatch(DBClientCursorBatchIterator& iter) {
 
     if (_firstBatchOfQueryRound) {
         // Store the cursorId of the remote cursor.
-        _remoteCursorId = iter.getCursorId();
+        _remoteCursorId = cursor.getCursorId();
     }
     _firstBatchOfQueryRound = false;
 
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _stats.receivedBatches++;
-        while (iter.moreInCurrentBatch()) {
-            _documentsToInsert.emplace_back(iter.nextSafe());
+        while (cursor.moreInCurrentBatch()) {
+            _documentsToInsert.emplace_back(cursor.nextSafe());
         }
     }
 
@@ -394,7 +399,7 @@ void CollectionCloner::handleNextBatch(DBClientCursorBatchIterator& iter) {
     }
 
     // Store the resume token for this batch.
-    _resumeToken = iter.getPostBatchResumeToken();
+    _resumeToken = cursor.getPostBatchResumeToken();
 
     initialSyncHangCollectionClonerAfterHandlingBatchResponse.executeIf(
         [&](const BSONObj&) {

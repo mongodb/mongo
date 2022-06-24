@@ -295,6 +295,8 @@ err:
     __wt_scr_free(session, &buf);
     if (tracking)
         WT_TRET(__wt_meta_track_off(session, true, ret != 0));
+    if (ret == ENOENT)
+        ret = 0;
     return (ret);
 }
 
@@ -338,32 +340,34 @@ __tier_do_operation(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, co
     else {
         /* WT_TIERED_WORK_FLUSH */
         /* This call make take a while, and may fail due to network timeout. */
-        WT_ERR(storage_source->ss_flush(
-          storage_source, &session->iface, bucket_fs, local_name, tmp, NULL));
-
-        WT_WITH_CHECKPOINT_LOCK(session,
-          WT_WITH_SCHEMA_LOCK(
-            session, ret = __tier_flush_meta(session, tiered, local_uri, obj_uri)));
+        ret = storage_source->ss_flush(
+          storage_source, &session->iface, bucket_fs, local_name, tmp, NULL);
+        if (ret == 0)
+            WT_WITH_CHECKPOINT_LOCK(session,
+              WT_WITH_SCHEMA_LOCK(
+                session, ret = __tier_flush_meta(session, tiered, local_uri, obj_uri)));
         /*
          * If a user did a flush_tier with sync off, it is possible that a drop happened before the
-         * flush work unit was processed. Ignore non-existent errors.
+         * flush work unit was processed. Ignore non-existent errors from either previous call.
          */
         if (ret == ENOENT)
             ret = 0;
-        WT_ERR(ret);
+        else {
+            WT_ERR(ret);
 
-        /*
-         * After successful flushing, push a work unit to perform whatever post-processing the
-         * shared storage wants to do for this object. Note that this work unit is unrelated to the
-         * drop local work unit below. They do not need to be in any order and do not interfere with
-         * each other.
-         */
-        WT_ERR(__wt_tiered_put_flush_finish(session, tiered, id));
-        /*
-         * After successful flushing, push a work unit to drop the local object in the future. The
-         * object will be removed locally after the local retention period expires.
-         */
-        WT_ERR(__wt_tiered_put_drop_local(session, tiered, id));
+            /*
+             * After successful flushing, push a work unit to perform whatever post-processing the
+             * shared storage wants to do for this object. Note that this work unit is unrelated to
+             * the drop local work unit below. They do not need to be in any order and do not
+             * interfere with each other.
+             */
+            WT_ERR(__wt_tiered_put_flush_finish(session, tiered, id));
+            /*
+             * After successful flushing, push a work unit to drop the local object in the future.
+             * The object will be removed locally after the local retention period expires.
+             */
+            WT_ERR(__wt_tiered_put_drop_local(session, tiered, id));
+        }
     }
 
 err:

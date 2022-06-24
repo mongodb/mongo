@@ -31,12 +31,14 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/chunk_move_write_concern_options.h"
+#include "mongo/db/s/commit_chunk_migration_gen.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -44,7 +46,6 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/commit_chunk_migration_request_type.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -79,9 +80,23 @@ namespace {
  * }
  *
  */
-class ConfigSvrCommitChunkMigrationCommand : public BasicCommand {
+
+
+ChunkType toChunkType(const MigratedChunkType& migratedChunk) {
+
+    ChunkType chunk;
+    chunk.setMin(migratedChunk.getMin());
+    chunk.setMax(migratedChunk.getMax());
+    chunk.setVersion(migratedChunk.getLastmod());
+    return chunk;
+}
+
+
+class ConfigSvrCommitChunkMigrationCommand
+    : public TypedCommand<ConfigSvrCommitChunkMigrationCommand> {
 public:
-    ConfigSvrCommitChunkMigrationCommand() : BasicCommand("_configsvrCommitChunkMigration") {}
+    using Request = CommitChunkMigrationRequest;
+    using Response = ConfigSvrCommitChunkMigrationResponse;
 
     bool skipApiVersionCheck() const override {
         // Internal command (server to server).
@@ -100,51 +115,57 @@ public:
         return true;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
+    class Invocation : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(), ActionType::internal)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        ConfigSvrCommitChunkMigrationResponse typedRun(OperationContext* opCtx) {
+
+            uassert(ErrorCodes::IllegalOperation,
+                    "_configsvrClearJumboFlag can only be run on config servers",
+                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+
+            // Set the operation context read concern level to local for reads into the config
+            // database.
+            repl::ReadConcernArgs::get(opCtx) =
+                repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
+            const NamespaceString nss = ns();
+            auto migratedChunk = toChunkType(request().getMigratedChunk());
+
+            StatusWith<BSONObj> chunkVersionResponse =
+                ShardingCatalogManager::get(opCtx)->commitChunkMigration(
+                    opCtx,
+                    nss,
+                    migratedChunk,
+                    request().getFromShardCollectionVersion().epoch(),
+                    request().getFromShardCollectionVersion().getTimestamp(),
+                    request().getFromShard(),
+                    request().getToShard(),
+                    request().getValidAfter());
+
+            auto chunkVersionObj = uassertStatusOK(chunkVersionResponse);
+
+            return Response{ChunkVersion::parse(chunkVersionObj[ChunkVersion::kShardVersionField])};
         }
-        return Status::OK();
-    }
 
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(cmdObj);
-    }
+    private:
+        bool supportsWriteConcern() const override {
+            return true;
+        }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
+        NamespaceString ns() const override {
+            return request().getCommandParameter();
+        }
 
-        // Set the operation context read concern level to local for reads into the config database.
-        repl::ReadConcernArgs::get(opCtx) =
-            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-
-        const NamespaceString nss = NamespaceString(parseNs(dbName, cmdObj));
-
-        auto commitRequest =
-            uassertStatusOK(CommitChunkMigrationRequest::createFromCommand(nss, cmdObj));
-
-        StatusWith<BSONObj> response = ShardingCatalogManager::get(opCtx)->commitChunkMigration(
-            opCtx,
-            nss,
-            commitRequest.getMigratedChunk(),
-            commitRequest.getCollectionEpoch(),
-            commitRequest.getCollectionTimestamp(),
-            commitRequest.getFromShard(),
-            commitRequest.getToShard(),
-            commitRequest.getValidAfter());
-        uassertStatusOK(response.getStatus());
-        result.appendElements(response.getValue());
-        return true;
-    }
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                           ActionType::internal));
+        }
+    };
 
 } configsvrCommitChunkMigrationCommand;
 

@@ -53,6 +53,7 @@ MONGO_FAIL_POINT_DEFINE(simulateBsonColumnCompressionDataLoss);
 CompressionResult compressBucket(const BSONObj& bucketDoc,
                                  StringData timeFieldName,
                                  const NamespaceString& nss,
+                                 bool eligibleForReopening,
                                  bool validateDecompression) try {
     CompressionResult result;
 
@@ -179,20 +180,34 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
     {
         BSONObjBuilder control(builder.subobjStart(kBucketControlFieldName));
 
-        // Set right version, leave other control fields unchanged
+        const bool shouldSetBucketClosed = !eligibleForReopening &&
+            feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+                serverGlobalParams.featureCompatibility);
+
+        // Set the version to indicate that the bucket was compressed and the closed flag if the
+        // bucket shouldn't be reopened. Leave other control fields unchanged.
+        bool closedSet = false;
         bool versionSet = false;
         for (const auto& controlField : controlElement.Obj()) {
             if (controlField.fieldNameStringData() == kBucketControlVersionFieldName) {
                 control.append(kBucketControlVersionFieldName, kTimeseriesControlCompressedVersion);
                 versionSet = true;
+            } else if (controlField.fieldNameStringData() == kBucketControlClosedFieldName &&
+                       shouldSetBucketClosed) {
+                control.append(kBucketControlClosedFieldName, true);
+                closedSet = true;
             } else {
                 control.append(controlField);
             }
         }
 
-        // Set version if it was missing from uncompressed bucket
+        // Set version and closed if it was missing from uncompressed bucket
         if (!versionSet) {
             control.append(kBucketControlVersionFieldName, kTimeseriesControlCompressedVersion);
+        }
+
+        if (!closedSet && shouldSetBucketClosed) {
+            control.append(kBucketControlClosedFieldName, true);
         }
 
         // Set count

@@ -45,7 +45,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
@@ -98,13 +98,12 @@ public:
             OldClientContext ctx(_opCtx, NamespaceString::kRsOplogNamespace.ns());
         }
 
-        _metrics =
-            ReshardingMetricsNew::makeInstance(_reshardingUUID,
-                                               BSON("y" << 1),
-                                               NamespaceString{""},
-                                               ReshardingMetricsNew::Role::kRecipient,
-                                               getServiceContext()->getFastClockSource()->now(),
-                                               getServiceContext());
+        _metrics = ReshardingMetrics::makeInstance(_reshardingUUID,
+                                                   BSON("y" << 1),
+                                                   NamespaceString{""},
+                                                   ReshardingMetrics::Role::kRecipient,
+                                                   getServiceContext()->getFastClockSource()->now(),
+                                                   getServiceContext());
 
         for (const auto& shardId : kTwoShardIdList) {
             auto shardTargeter = RemoteCommandTargeterMock::get(
@@ -299,7 +298,8 @@ public:
                     BSON(
                         "msg" << fmt::format("Writes to {} are temporarily blocked for resharding.",
                                              dataColl.getCollection()->ns().toString())),
-                    BSON("type" << kReshardFinalOpLogType << "reshardingUUID" << _reshardingUUID),
+                    BSON("type" << resharding::kReshardFinalOpLogType << "reshardingUUID"
+                                << _reshardingUUID),
                     boost::none,
                     boost::none,
                     boost::none,
@@ -343,7 +343,7 @@ protected:
     Timestamp _fetchTimestamp;
     ShardId _donorShard;
     ShardId _destinationShard;
-    std::unique_ptr<ReshardingMetricsNew> _metrics;
+    std::unique_ptr<ReshardingMetrics> _metrics;
 
 private:
     static HostAndPort makeHostAndPort(const ShardId& shardId) {

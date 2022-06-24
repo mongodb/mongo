@@ -79,7 +79,7 @@ public:
         return {ErrorCodes::NotImplemented, "AuthzMongos::getRolesAsUserFragment"};
     }
     Status getRoleDescriptionsForDB(OperationContext* opCtx,
-                                    StringData dbname,
+                                    const DatabaseName& dbname,
                                     PrivilegeFormat showPrivileges,
                                     AuthenticationRestrictionsFormat,
                                     bool showBuiltinRoles,

@@ -83,7 +83,7 @@ public:
         std::vector<ChunkType> chunks = {ChunkType{
             _sourceUUID,
             ChunkRange{BSON(_currentShardKey << MINKEY), BSON(_currentShardKey << MAXKEY)},
-            ChunkVersion(100, 0, epoch, Timestamp(1, 1)),
+            ChunkVersion({epoch, Timestamp(1, 1)}, {100, 0}),
             _someDonorId}};
 
         auto rt = RoutingTableHistory::makeNew(_sourceNss,
@@ -136,7 +136,9 @@ public:
                                    const BSONObj& query,
                                    const BSONObj& update) override {}
 
-    void clearFilteringMetadata(OperationContext* opCtx) override {}
+    void clearFilteringMetadata(OperationContext* opCtx,
+                                const NamespaceString& sourceNss,
+                                const NamespaceString& tempReshardingNss) override {}
 
 private:
     RoutingTableHistoryValueHandle _makeStandaloneRoutingTableHistory(RoutingTableHistory rt) {
@@ -250,12 +252,12 @@ public:
 
         NamespaceString sourceNss("sourcedb", "sourcecollection");
         auto sourceUUID = UUID::gen();
-        auto commonMetadata =
-            CommonReshardingMetadata(UUID::gen(),
-                                     sourceNss,
-                                     sourceUUID,
-                                     constructTemporaryReshardingNss(sourceNss.db(), sourceUUID),
-                                     newShardKeyPattern());
+        auto commonMetadata = CommonReshardingMetadata(
+            UUID::gen(),
+            sourceNss,
+            sourceUUID,
+            resharding::constructTemporaryReshardingNss(sourceNss.db(), sourceUUID),
+            newShardKeyPattern());
         commonMetadata.setStartTime(getServiceContext()->getFastClockSource()->now());
 
         doc.setCommonReshardingMetadata(std::move(commonMetadata));
@@ -625,7 +627,8 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
               ErrorCodes::InterruptedDueToReplStateChange);
 
     DBDirectClient client(opCtx.get());
-    NamespaceString sourceNss = constructTemporaryReshardingNss("sourcedb", doc.getSourceUUID());
+    NamespaceString sourceNss =
+        resharding::constructTemporaryReshardingNss("sourcedb", doc.getSourceUUID());
 
     FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
     findRequest.setFilter(
@@ -671,7 +674,8 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardColle
               ErrorCodes::InterruptedDueToReplStateChange);
 
     DBDirectClient client(opCtx.get());
-    NamespaceString sourceNss = constructTemporaryReshardingNss("sourcedb", doc.getSourceUUID());
+    NamespaceString sourceNss =
+        resharding::constructTemporaryReshardingNss("sourcedb", doc.getSourceUUID());
 
     FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
     findRequest.setFilter(
@@ -739,7 +743,7 @@ TEST_F(ReshardingRecipientServiceTest, TruncatesXLErrorOnRecipientDocument) {
             // to the primitive truncation algorithm - Check that the total size is less than
             // kReshardErrorMaxBytes + a couple additional bytes to provide a buffer for the field
             // name sizes.
-            int maxReshardErrorBytesCeiling = kReshardErrorMaxBytes + 200;
+            int maxReshardErrorBytesCeiling = resharding::kReshardErrorMaxBytes + 200;
             ASSERT_LT(persistedAbortReasonBSON->objsize(), maxReshardErrorBytesCeiling);
             ASSERT_EQ(persistedAbortReasonBSON->getIntField("code"),
                       ErrorCodes::ReshardCollectionTruncatedError);
@@ -815,7 +819,8 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
             for (const auto& donor : donorShards) {
                 // Setup oplogBuffer collection.
                 ReshardingDonorOplogId donorOplogId{{20, i}, {19, 0}};
-                insertFn(getLocalOplogBufferNamespace(doc.getSourceUUID(), donor.getShardId()),
+                insertFn(resharding::getLocalOplogBufferNamespace(doc.getSourceUUID(),
+                                                                  donor.getShardId()),
                          InsertStatement{BSON("_id" << donorOplogId.toBSON())});
                 ++i;
 
@@ -923,7 +928,7 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUpWithMissingProgr
 
         // Setup oplogBuffer collection.
         ReshardingDonorOplogId donorOplogId{{20, i}, {19, 0}};
-        insertFn(getLocalOplogBufferNamespace(doc.getSourceUUID(), donor.getShardId()),
+        insertFn(resharding::getLocalOplogBufferNamespace(doc.getSourceUUID(), donor.getShardId()),
                  InsertStatement{BSON("_id" << donorOplogId.toBSON())});
 
         // Setup reshardingApplierProgress collection.

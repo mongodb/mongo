@@ -2,8 +2,10 @@
 
 /**
  * Verifies the transactions server status metrics on mongos while running transactions.
+ * Temporarily disabled for BF-24311.
  *
- * @tags: [requires_sharding, assumes_snapshot_transactions, uses_transactions]
+ * @tags: [__TEMPORARILY_DISABLED__, requires_sharding, assumes_snapshot_transactions,
+ * uses_transactions]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload

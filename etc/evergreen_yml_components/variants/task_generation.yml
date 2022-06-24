@@ -10,3 +10,4 @@ buildvariants:
   - rhel80-medium
   tasks:
   - name: version_gen
+  - name: version_expansions_gen

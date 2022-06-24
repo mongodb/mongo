@@ -57,7 +57,7 @@ StatusWith<std::pair<const BSONObj, const BSONObj>> extractMinAndMax(const BSONO
 }  // namespace
 
 StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
-                                               const CollatorInterface* collator) {
+                                               const StringData::ComparatorInterface* comparator) {
     auto swDocs = extractMinAndMax(bucketDoc);
     if (!swDocs.isOK()) {
         return swDocs.getStatus();
@@ -66,14 +66,14 @@ StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
     const auto& [minObj, maxObj] = swDocs.getValue();
 
     try {
-        return MinMax::parseFromBSON(minObj, maxObj, collator);
+        return MinMax::parseFromBSON(minObj, maxObj, comparator);
     } catch (...) {
         return exceptionToStatus();
     }
 }
 
 StatusWith<Schema> generateSchemaFromBucketDoc(const BSONObj& bucketDoc,
-                                               const CollatorInterface* collator) {
+                                               const StringData::ComparatorInterface* comparator) {
     auto swDocs = extractMinAndMax(bucketDoc);
     if (!swDocs.isOK()) {
         return swDocs.getStatus();
@@ -82,7 +82,7 @@ StatusWith<Schema> generateSchemaFromBucketDoc(const BSONObj& bucketDoc,
     const auto& [minObj, maxObj] = swDocs.getValue();
 
     try {
-        return Schema::parseFromBSON(minObj, maxObj, collator);
+        return Schema::parseFromBSON(minObj, maxObj, comparator);
     } catch (...) {
         return exceptionToStatus();
     }

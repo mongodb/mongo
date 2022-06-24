@@ -42,6 +42,10 @@ bool isSecondary(const OperationContext* opCtx) {
     return !opCtx->writesAreReplicated();
 }
 
+bool isPrimary(const OperationContext* opCtx) {
+    return opCtx->writesAreReplicated();
+}
+
 const auto tenantIdsToDeleteDecoration =
     OperationContext::declareDecoration<boost::optional<std::vector<std::string>>>();
 
@@ -49,6 +53,13 @@ ShardSplitDonorDocument parseAndValidateDonorDocument(const BSONObj& doc) {
     auto donorStateDoc =
         ShardSplitDonorDocument::parse(IDLParserErrorContext("donorStateDoc"), doc);
     const std::string errmsg = "Invalid donor state doc, {}: {}";
+
+    if (donorStateDoc.getExpireAt()) {
+        uassert(ErrorCodes::BadValue,
+                "Contains 'expireAt' but the split has not committed or aborted",
+                donorStateDoc.getState() == ShardSplitDonorStateEnum::kCommitted ||
+                    donorStateDoc.getState() == ShardSplitDonorStateEnum::kAborted);
+    }
 
     switch (donorStateDoc.getState()) {
         case ShardSplitDonorStateEnum::kUninitialized:
@@ -67,6 +78,12 @@ ShardSplitDonorDocument parseAndValidateDonorDocument(const BSONObj& doc) {
                                 "Cannot have abortReason while being in data sync state",
                                 doc.toString()),
                     !donorStateDoc.getAbortReason());
+            break;
+        case ShardSplitDonorStateEnum::kAbortingIndexBuilds:
+            uassert(ErrorCodes::BadValue,
+                    errmsg,
+                    !donorStateDoc.getBlockTimestamp() && !donorStateDoc.getCommitOrAbortOpTime() &&
+                        !donorStateDoc.getAbortReason());
             break;
         case ShardSplitDonorStateEnum::kBlocking:
             uassert(ErrorCodes::BadValue,
@@ -125,54 +142,61 @@ ShardSplitDonorDocument parseAndValidateDonorDocument(const BSONObj& doc) {
  * Initializes the TenantMigrationDonorAccessBlocker for the tenant migration denoted by the given
  * state doc.
  */
-void onBlockerInitialization(OperationContext* opCtx,
-                             const ShardSplitDonorDocument& donorStateDoc) {
-    invariant(donorStateDoc.getState() == ShardSplitDonorStateEnum::kBlocking);
-    invariant(donorStateDoc.getBlockTimestamp());
+void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
+                                       const ShardSplitDonorDocument& donorStateDoc) {
+    invariant(donorStateDoc.getState() == ShardSplitDonorStateEnum::kAbortingIndexBuilds);
+    invariant(donorStateDoc.getTenantIds());
+    invariant(donorStateDoc.getRecipientConnectionString());
 
-    auto optionalTenants = donorStateDoc.getTenantIds();
-    invariant(optionalTenants);
+    auto tenantIds = *donorStateDoc.getTenantIds();
+    auto recipientConnectionString = *donorStateDoc.getRecipientConnectionString();
+    for (const auto& tenantId : tenantIds) {
+        auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
+            opCtx->getServiceContext(),
+            donorStateDoc.getId(),
+            tenantId.toString(),
+            MigrationProtocolEnum::kMultitenantMigrations,
+            recipientConnectionString.toString());
 
-    const auto& tenantIds = optionalTenants.get();
-
-    // The primary create and sets the tenant access blocker to blocking within the
-    // ShardSplitDonorService.
-    if (isSecondary(opCtx)) {
-        auto recipientConnectionString = [stateDoc = donorStateDoc]() {
-            if (stateDoc.getRecipientConnectionString()) {
-                return *stateDoc.getRecipientConnectionString();
-            }
-
-            auto recipientTagName = stateDoc.getRecipientTagName();
-            invariant(recipientTagName);
-            auto recipientSetName = stateDoc.getRecipientSetName();
-            invariant(recipientSetName);
-            auto config = repl::ReplicationCoordinator::get(cc().getServiceContext())->getConfig();
-            return serverless::makeRecipientConnectionString(
-                config, *recipientTagName, *recipientSetName);
-        }();
-
-        for (const auto& tenantId : tenantIds) {
-            auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-                opCtx->getServiceContext(),
-                donorStateDoc.getId(),
-                tenantId.toString(),
-                MigrationProtocolEnum::kMultitenantMigrations,
-                recipientConnectionString.toString());
-
-            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .add(tenantId, mtab);
-
-            // No rollback handler is necessary as the write should not fail on secondaries.
-            mtab->startBlockingWrites();
-        }
+        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext()).add(tenantId, mtab);
     }
 
-    for (const auto& tenantId : tenantIds) {
+    if (isPrimary(opCtx)) {
+        // onRollback is not registered on secondaries since secondaries should not fail to
+        // apply the write.
+        opCtx->recoveryUnit()->onRollback([opCtx, tenantIds] {
+            for (const auto& tenantId : tenantIds) {
+                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
+            }
+        });
+    }
+}
+
+/**
+ * Transitions the TenantMigrationDonorAccessBlocker to the blocking state.
+ */
+void onTransitionToBlocking(OperationContext* opCtx, const ShardSplitDonorDocument& donorStateDoc) {
+    invariant(donorStateDoc.getState() == ShardSplitDonorStateEnum::kBlocking);
+    invariant(donorStateDoc.getBlockTimestamp());
+    invariant(donorStateDoc.getTenantIds());
+
+    auto tenantIds = *donorStateDoc.getTenantIds();
+    for (auto tenantId : tenantIds) {
         auto mtab = tenant_migration_access_blocker::getTenantMigrationDonorAccessBlocker(
             opCtx->getServiceContext(), tenantId);
         invariant(mtab);
 
+        if (isSecondary(opCtx)) {
+            // A primary calls startBlockingWrites on the TenantMigrationDonorAccessBlocker before
+            // reserving the OpTime for the "start blocking" write, so only secondaries call
+            // startBlockingWrites on the TenantMigrationDonorAccessBlocker in the op observer.
+            mtab->startBlockingWrites();
+        }
+
+        // Both primaries and secondaries call startBlockingReadsAfter in the op observer, since
+        // startBlockingReadsAfter just needs to be called before the "start blocking" write's oplog
+        // hole is filled.
         mtab->startBlockingReadsAfter(donorStateDoc.getBlockTimestamp().get());
     }
 }
@@ -206,9 +230,9 @@ void onTransitionToAborted(OperationContext* opCtx, const ShardSplitDonorDocumen
 
     auto tenants = donorStateDoc.getTenantIds();
     if (!tenants) {
-        // The only case where there can be no tenants is when the instance is created by the abort
-        // command. In that case, no tenant migration blockers are created and the state will go
-        // straight to abort.
+        // The only case where there can be no tenants is when the instance is created by the
+        // abort command. In that case, no tenant migration blockers are created and the state
+        // will go straight to abort.
         invariant(donorStateDoc.getState() == ShardSplitDonorStateEnum::kUninitialized);
         return;
     }
@@ -242,34 +266,35 @@ public:
                             _opCtx->getServiceContext(), tenantId);
 
                     if (!mtab) {
-                        // The state doc and TenantMigrationDonorAccessBlocker for this migration
-                        // were removed immediately after expireAt was set. This is unlikely to
-                        // occur in production where the garbage collection delay should be
-                        // sufficiently large.
+                        // The state doc and TenantMigrationDonorAccessBlocker for this
+                        // migration were removed immediately after expireAt was set. This is
+                        // unlikely to occur in production where the garbage collection delay
+                        // should be sufficiently large.
                         continue;
                     }
 
-                    if (!_opCtx->writesAreReplicated()) {
-                        // Setting expireAt implies that the TenantMigrationDonorAccessBlocker for
-                        // this migration will be removed shortly after this. However, a lagged
-                        // secondary might not manage to advance its majority commit point past the
-                        // migration commit or abort opTime and consequently transition out of the
-                        // blocking state before the TenantMigrationDonorAccessBlocker is removed.
-                        // When this occurs, blocked reads or writes will be left waiting for the
-                        // migration decision indefinitely. To avoid that, notify the
-                        // TenantMigrationDonorAccessBlocker here that the commit or abort opTime
-                        // has been majority committed (guaranteed to be true since by design the
-                        // donor never marks its state doc as garbage collectable before the
-                        // migration decision is majority committed).
+                    if (isSecondary(_opCtx)) {
+                        // Setting expireAt implies that the TenantMigrationDonorAccessBlocker
+                        // for this migration will be removed shortly after this. However, a
+                        // lagged secondary might not manage to advance its majority commit
+                        // point past the migration commit or abort opTime and consequently
+                        // transition out of the blocking state before the
+                        // TenantMigrationDonorAccessBlocker is removed. When this occurs,
+                        // blocked reads or writes will be left waiting for the migration
+                        // decision indefinitely. To avoid that, notify the
+                        // TenantMigrationDonorAccessBlocker here that the commit or abort
+                        // opTime has been majority committed (guaranteed to be true since by
+                        // design the donor never marks its state doc as garbage collectable
+                        // before the migration decision is majority committed).
                         mtab->onMajorityCommitPointUpdate(
                             _donorStateDoc.getCommitOrAbortOpTime().get());
                     }
 
                     if (_donorStateDoc.getState() == ShardSplitDonorStateEnum::kAborted) {
                         invariant(mtab->inStateAborted());
-                        // The migration durably aborted and is now marked as garbage collectable,
-                        // remove its TenantMigrationDonorAccessBlocker right away to allow
-                        // back-to-back migration retries.
+                        // The migration durably aborted and is now marked as garbage
+                        // collectable, remove its TenantMigrationDonorAccessBlocker right away
+                        // to allow back-to-back migration retries.
                         TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
                             .remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
                     }
@@ -305,7 +330,7 @@ void ShardSplitDonorOpObserver::onInserts(OperationContext* opCtx,
                                           std::vector<InsertStatement>::const_iterator first,
                                           std::vector<InsertStatement>::const_iterator last,
                                           bool fromMigrate) {
-    if (nss != NamespaceString::kTenantSplitDonorsNamespace ||
+    if (nss != NamespaceString::kShardSplitDonorsNamespace ||
         tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }
@@ -313,45 +338,41 @@ void ShardSplitDonorOpObserver::onInserts(OperationContext* opCtx,
     for (auto it = first; it != last; it++) {
         auto donorStateDoc = parseAndValidateDonorDocument(it->doc);
         switch (donorStateDoc.getState()) {
-            case ShardSplitDonorStateEnum::kBlocking:
-                onBlockerInitialization(opCtx, donorStateDoc);
+            case ShardSplitDonorStateEnum::kAbortingIndexBuilds:
+                onTransitionToAbortingIndexBuilds(opCtx, donorStateDoc);
                 break;
             case ShardSplitDonorStateEnum::kAborted:
                 // If the operation starts aborted, do not do anything.
                 break;
-            case ShardSplitDonorStateEnum::kUninitialized:
-            case ShardSplitDonorStateEnum::kCommitted:
-                uasserted(ErrorCodes::IllegalOperation,
-                          "cannot insert a donor's state doc with 'state' other than 'kAborted' or "
-                          "'kBlocking'");
-                break;
             default:
-                MONGO_UNREACHABLE;
+                uasserted(ErrorCodes::IllegalOperation,
+                          "Cannot insert donor's state document with state other than 'aborted' or "
+                          "'aborting index builds'.");
         }
     }
 }
 
 void ShardSplitDonorOpObserver::onUpdate(OperationContext* opCtx,
                                          const OplogUpdateEntryArgs& args) {
-    if (args.nss != NamespaceString::kTenantSplitDonorsNamespace ||
+    if (args.nss != NamespaceString::kShardSplitDonorsNamespace ||
         tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }
 
     auto donorStateDoc = parseAndValidateDonorDocument(args.updateArgs->updatedDoc);
     switch (donorStateDoc.getState()) {
+        case ShardSplitDonorStateEnum::kBlocking:
+            onTransitionToBlocking(opCtx, donorStateDoc);
+            break;
         case ShardSplitDonorStateEnum::kCommitted:
         case ShardSplitDonorStateEnum::kAborted:
             opCtx->recoveryUnit()->registerChange(
                 std::make_unique<TenantMigrationDonorCommitOrAbortHandler>(opCtx, donorStateDoc));
             break;
-        case ShardSplitDonorStateEnum::kBlocking:
-            uasserted(ErrorCodes::IllegalOperation,
-                      "The state document should be inserted as blocking and never transition to "
-                      "blocking");
-            break;
         default:
-            MONGO_UNREACHABLE;
+            uasserted(ErrorCodes::IllegalOperation,
+                      "Cannot update donor's state document with state other than 'aborted', "
+                      "'committed', or 'aborted'");
     }
 }
 
@@ -359,13 +380,12 @@ void ShardSplitDonorOpObserver::aboutToDelete(OperationContext* opCtx,
                                               NamespaceString const& nss,
                                               const UUID& uuid,
                                               BSONObj const& doc) {
-    if (nss != NamespaceString::kTenantSplitDonorsNamespace ||
+    if (nss != NamespaceString::kShardSplitDonorsNamespace ||
         tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }
 
     auto donorStateDoc = parseAndValidateDonorDocument(doc);
-
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "cannot delete a donor's state document " << doc
                           << " since it has not been marked as garbage collectable and is not a"
@@ -390,8 +410,7 @@ void ShardSplitDonorOpObserver::onDelete(OperationContext* opCtx,
                                          const UUID& uuid,
                                          StmtId stmtId,
                                          const OplogDeleteEntryArgs& args) {
-    if (nss != NamespaceString::kTenantSplitDonorsNamespace ||
-        !tenantIdsToDeleteDecoration(opCtx) ||
+    if (nss != NamespaceString::kShardSplitDonorsNamespace || !tenantIdsToDeleteDecoration(opCtx) ||
         tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }
@@ -414,7 +433,7 @@ repl::OpTime ShardSplitDonorOpObserver::onDropCollection(OperationContext* opCtx
                                                          const UUID& uuid,
                                                          std::uint64_t numRecords,
                                                          const CollectionDropType dropType) {
-    if (collectionName == NamespaceString::kTenantSplitDonorsNamespace) {
+    if (collectionName == NamespaceString::kShardSplitDonorsNamespace) {
         opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                 .removeAll(TenantMigrationAccessBlocker::BlockerType::kDonor);

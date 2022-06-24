@@ -80,7 +80,7 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
         // The 'minRecord' and 'maxRecord' parameters are used for a special optimization that
         // applies only to forwards scans of the oplog and scans on clustered collections.
         invariant(!params.resumeAfterRecordId);
-        if (collection->ns().isOplog()) {
+        if (collection->ns().isOplogOrChangeCollection()) {
             invariant(params.direction == CollectionScanParams::FORWARD);
         } else {
             invariant(collection->isClustered());
@@ -109,17 +109,26 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
                 "collection scan bounds",
                 "min"_attr = (!_params.minRecord) ? "none" : _params.minRecord->toString(),
                 "max"_attr = (!_params.maxRecord) ? "none" : _params.maxRecord->toString());
-    invariant(!_params.shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
+    tassert(6521000,
+            "Expected an oplog or a change collection with 'shouldTrackLatestOplogTimestamp'",
+            !_params.shouldTrackLatestOplogTimestamp ||
+                collection->ns().isOplogOrChangeCollection());
 
-    if (params.assertTsHasNotFallenOffOplog) {
-        invariant(params.shouldTrackLatestOplogTimestamp);
-        invariant(params.direction == CollectionScanParams::FORWARD);
+    if (params.assertTsHasNotFallenOff) {
+        tassert(6521001,
+                "Expected 'shouldTrackLatestOplogTimestamp' with 'assertTsHasNotFallenOff'",
+                params.shouldTrackLatestOplogTimestamp);
+        tassert(6521002,
+                "Expected forward collection scan with 'assertTsHasNotFallenOff'",
+                params.direction == CollectionScanParams::FORWARD);
     }
 
     if (params.resumeAfterRecordId) {
         // The 'resumeAfterRecordId' parameter is used for resumable collection scans, which we
         // only support in the forward direction.
-        invariant(params.direction == CollectionScanParams::FORWARD);
+        tassert(6521003,
+                "Expected forward collection scan with 'resumeAfterRecordId'",
+                params.direction == CollectionScanParams::FORWARD);
     }
 }
 
@@ -227,8 +236,8 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     }
 
     _lastSeenId = record->id;
-    if (_params.assertTsHasNotFallenOffOplog) {
-        assertTsHasNotFallenOffOplog(*record);
+    if (_params.assertTsHasNotFallenOff) {
+        assertTsHasNotFallenOff(*record);
     }
     if (_params.shouldTrackLatestOplogTimestamp) {
         setLatestOplogEntryTimestamp(*record);
@@ -259,22 +268,28 @@ void CollectionScan::setLatestOplogEntryTimestamp(const Record& record) {
     _latestOplogEntryTimestamp = std::max(_latestOplogEntryTimestamp, tsElem.timestamp());
 }
 
-void CollectionScan::assertTsHasNotFallenOffOplog(const Record& record) {
-    // If the first entry we see in the oplog is the replset initialization, then it doesn't matter
-    // if its timestamp is later than the timestamp that should not have fallen off the oplog; no
-    // events earlier can have fallen off this oplog. Otherwise, verify that the timestamp of the
-    // first observed oplog entry is earlier than or equal to timestamp that should not have fallen
-    // off the oplog.
+void CollectionScan::assertTsHasNotFallenOff(const Record& record) {
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(record.data.toBson()));
     invariant(_specificStats.docsTested == 0);
+
+    // If the first entry we see in the oplog is the replset initialization, then it doesn't matter
+    // if its timestamp is later than the timestamp that should not have fallen off the oplog; no
+    // events earlier can have fallen off this oplog.
+    // NOTE: A change collection can be created at any moment as such it might not have replset
+    // initialization message, as such this case is not fully applicable for the change collection.
     const bool isNewRS =
         oplogEntry.getObject().binaryEqual(BSON("msg" << repl::kInitiatingSetMsg)) &&
         oplogEntry.getOpType() == repl::OpTypeEnum::kNoop;
+
+    // Verify that the timestamp of the first observed oplog entry is earlier than or equal to
+    // timestamp that should not have fallen off the oplog.
+    const bool tsHasNotFallenOff = oplogEntry.getTimestamp() <= *_params.assertTsHasNotFallenOff;
+
     uassert(ErrorCodes::OplogQueryMinTsMissing,
             "Specified timestamp has already fallen off the oplog",
-            isNewRS || oplogEntry.getTimestamp() <= *_params.assertTsHasNotFallenOffOplog);
+            isNewRS || tsHasNotFallenOff);
     // We don't need to check this assertion again after we've confirmed the first oplog event.
-    _params.assertTsHasNotFallenOffOplog = boost::none;
+    _params.assertTsHasNotFallenOff = boost::none;
 }
 
 namespace {

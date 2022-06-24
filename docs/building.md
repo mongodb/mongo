@@ -95,16 +95,22 @@ tests, etc):
 SCons Targets
 --------------
 
-The following targets can be named on the scons command line to build
-only certain components:
+The following targets can be named on the scons command line to build and
+install a subset of components:
 
 * `install-mongod`
 * `install-mongos`
-* `install-servers` (includes `mongod` and `mongos`)
-* `install-core` (includes `mongod` and `mongos`)
-* `install-devcore` (includes `mongod`, `mongos`, and `jstestshell` (formerly mongo shell))
-* `install-all`
+* `install-core` (includes *only* `mongod` and `mongos`)
+* `install-servers` (includes all server components)
+* `install-devcore` (includes `mongod`, `mongos`, and `jstestshell` (formerly `mongo` shell))
+* `install-all` (includes a complete end-user distribution and tests)
+* `install-all-meta` (absolutely everything that can be built and installed)
 
+***NOTE***: The `install-core` and `install-servers` targets are *not*
+guaranteed to be identical. The `install-core` target will only ever include a
+minimal set of "core" server components, while `install-servers` is intended
+for a functional end-user installation. If you are testing, you should use the
+`install-core` or `install-devcore` targets instead.
 
 Where to find Binaries
 ----------------------

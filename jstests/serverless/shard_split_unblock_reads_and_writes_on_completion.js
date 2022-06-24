@@ -194,7 +194,7 @@ const kCollName = "testColl";
     // Cannot mark the state doc as garbage collectable before the migration commits or aborts.
     assert.commandFailedWithCode(donorsColl.update({recipientSetName: operation.recipientSetName},
                                                    {$set: {expireAt: new Date()}}),
-                                 ErrorCodes.IllegalOperation);
+                                 ErrorCodes.BadValue);
 
     // Can drop the state doc collection but this will not cause all blocked reads and writes to
     // hang.

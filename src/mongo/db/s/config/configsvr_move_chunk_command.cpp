@@ -96,19 +96,9 @@ public:
         repl::ReadConcernArgs::get(opCtx) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-        auto request = uassertStatusOK(
-            BalanceChunkRequest::parseFromConfigCommand(cmdObj, false /* requireUUID */));
+        auto request = uassertStatusOK(BalanceChunkRequest::parseFromConfigCommand(cmdObj));
 
         const auto& nss = request.getNss();
-
-        // In case of mixed binaries including v5.0, the collection UUID field may not be attached
-        // to the chunk.
-        if (!request.getChunk().hasCollectionUUID_UNSAFE()) {
-            // TODO (SERVER-60792): Remove the following logic after v6.0 branches out.
-            const auto& collection = Grid::get(opCtx)->catalogClient()->getCollection(
-                opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
-            request.setCollectionUUID(collection.getUuid());  // Set collection UUID on chunk member
-        }
 
         if (request.hasToShardId()) {
             uassertStatusOK(Balancer::get(opCtx)->moveSingleChunk(opCtx,

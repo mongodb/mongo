@@ -86,7 +86,7 @@ void ConstEval::removeUnusedEvalNodes() {
             // TODO: consider caching.
             // TODO: consider deriving IndexingAvailability.
             if (!_disableSargableInlining ||
-                !convertExprToPartialSchemaReq(k->getProjection())._success) {
+                !convertExprToPartialSchemaReq(k->getProjection(), false /*isFilterContext*/)) {
                 // Schedule node inlining as there is exactly one reference.
                 _singleRef.emplace(v.front());
                 _changed = true;

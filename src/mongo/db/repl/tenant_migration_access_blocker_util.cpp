@@ -437,7 +437,7 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
 
     // Recover TenantMigrationDonorAccessBlockers for ShardSplit.
     PersistentTaskStore<ShardSplitDonorDocument> shardSplitDonorStore(
-        NamespaceString::kTenantSplitDonorsNamespace);
+        NamespaceString::kShardSplitDonorsNamespace);
 
     shardSplitDonorStore.forEach(opCtx, {}, [&](const ShardSplitDonorDocument& doc) {
         // Skip creating a TenantMigrationDonorAccessBlocker for terminal shard split that have been
@@ -462,6 +462,8 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
                 .add(tenantId.toString(), mtab);
 
             switch (doc.getState()) {
+                case ShardSplitDonorStateEnum::kAbortingIndexBuilds:
+                    break;
                 case ShardSplitDonorStateEnum::kBlocking:
                     invariant(doc.getBlockTimestamp());
                     mtab->startBlockingWrites();

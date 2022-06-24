@@ -56,8 +56,7 @@ BalanceChunkRequest::BalanceChunkRequest(ChunkType chunk,
                                          MigrationSecondaryThrottleOptions secondaryThrottle)
     : _chunk(std::move(chunk)), _secondaryThrottle(std::move(secondaryThrottle)) {}
 
-StatusWith<BalanceChunkRequest> BalanceChunkRequest::parseFromConfigCommand(const BSONObj& obj,
-                                                                            bool requireUUID) {
+StatusWith<BalanceChunkRequest> BalanceChunkRequest::parseFromConfigCommand(const BSONObj& obj) {
 
     NamespaceString nss;
     {
@@ -69,7 +68,7 @@ StatusWith<BalanceChunkRequest> BalanceChunkRequest::parseFromConfigCommand(cons
         nss = NamespaceString(ns);
     }
 
-    const auto chunkStatus = ChunkType::parseFromNetworkRequest(obj, requireUUID);
+    const auto chunkStatus = ChunkType::parseFromNetworkRequest(obj);
     if (!chunkStatus.isOK()) {
         return chunkStatus.getStatus();
     }
@@ -154,7 +153,7 @@ BSONObj BalanceChunkRequest::serializeToRebalanceCommandForConfig(
     range.append(&cmdBuilder);
     cmdBuilder.append(ChunkType::shard(), owningShard);
     collectionUUID.appendToBuilder(&cmdBuilder, ChunkType::collectionUUID());
-    expectedChunkVersion.appendLegacyWithField(&cmdBuilder, ChunkType::lastmod());
+    expectedChunkVersion.serializeToBSON(ChunkType::lastmod(), &cmdBuilder);
     cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
                       kMajorityWriteConcernNoTimeout.toBSON());
 

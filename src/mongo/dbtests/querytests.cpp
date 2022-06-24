@@ -136,7 +136,7 @@ protected:
         {
             WriteUnitOfWork wunit(&_opCtx);
             uassertStatusOK(indexer.commit(&_opCtx,
-                                           collection.getWritableCollection(),
+                                           collection.getWritableCollection(&_opCtx),
                                            MultiIndexBlock::kNoopOnCreateEachFn,
                                            MultiIndexBlock::kNoopOnCommitFn));
             wunit.commit();
@@ -1401,10 +1401,10 @@ public:
         ASSERT(Helpers::findOne(&_opCtx, ctx.getCollection(), BSON("_id" << 20), res));
         ASSERT_EQUALS(40, res["x"].numberInt());
 
-        ASSERT(Helpers::findById(&_opCtx, ctx.db(), ns(), BSON("_id" << 20), res));
+        ASSERT(Helpers::findById(&_opCtx, ns(), BSON("_id" << 20), res));
         ASSERT_EQUALS(40, res["x"].numberInt());
 
-        ASSERT(!Helpers::findById(&_opCtx, ctx.db(), ns(), BSON("_id" << 200), res));
+        ASSERT(!Helpers::findById(&_opCtx, ns(), BSON("_id" << 200), res));
 
         long long slow;
         long long fast;
@@ -1420,7 +1420,7 @@ public:
         {
             Timer t;
             for (int i = 0; i < n; i++) {
-                ASSERT(Helpers::findById(&_opCtx, ctx.db(), ns(), BSON("_id" << 20), res));
+                ASSERT(Helpers::findById(&_opCtx, ns(), BSON("_id" << 20), res));
             }
             fast = t.micros();
         }
@@ -1445,7 +1445,7 @@ public:
 
         BSONObj res;
         for (int i = 0; i < 1000; i++) {
-            bool found = Helpers::findById(&_opCtx, ctx.db(), ns(), BSON("_id" << i), res);
+            bool found = Helpers::findById(&_opCtx, ns(), BSON("_id" << i), res);
             ASSERT_EQUALS(i % 2, int(found));
         }
     }

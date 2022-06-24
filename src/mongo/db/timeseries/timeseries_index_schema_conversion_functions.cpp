@@ -149,7 +149,8 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
 
         // Indexes on measurement fields are only supported when the 'gTimeseriesMetricIndexes'
         // feature flag is enabled.
-        if (!feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV()) {
+        if (!feature_flags::gTimeseriesMetricIndexes.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
             auto reason = str::stream();
             reason << "Invalid index spec for time-series collection: "
                    << redact(timeseriesIndexSpecBSON) << ". ";
@@ -366,7 +367,7 @@ StatusWith<BSONObj> createBucketsShardKeySpecFromTimeseriesShardKeySpec(
 boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndex) {
     bool timeseriesMetricIndexesFeatureFlagEnabled =
-        feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV();
+        feature_flags::gTimeseriesMetricIndexes.isEnabled(serverGlobalParams.featureCompatibility);
 
     if (bucketsIndex.hasField(kOriginalSpecFieldName) &&
         timeseriesMetricIndexesFeatureFlagEnabled) {
@@ -406,21 +407,16 @@ std::list<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
     return indexSpecs;
 }
 
-bool isBucketsIndexSpecCompatibleForDowngrade(const TimeseriesOptions& timeseriesOptions,
-                                              const BSONObj& bucketsIndex) {
+bool shouldIncludeOriginalSpec(const TimeseriesOptions& timeseriesOptions,
+                               const BSONObj& bucketsIndex) {
     if (!bucketsIndex.hasField(kKeyFieldName)) {
-        return false;
-    }
-
-    if (bucketsIndex.hasField(kPartialFilterExpressionFieldName)) {
-        // Partial indexes are not supported in FCV < 5.2.
         return false;
     }
 
     return createTimeseriesIndexSpecFromBucketsIndexSpec(
                timeseriesOptions,
                bucketsIndex.getField(kKeyFieldName).Obj(),
-               /*timeseriesMetricIndexesFeatureFlagEnabled=*/false) != boost::none;
+               /*timeseriesMetricIndexesFeatureFlagEnabled=*/false) == boost::none;
 }
 
 bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,

@@ -38,12 +38,15 @@ namespace mongo {
 class Status;
 
 /**
+ * 'CommitQuorumOptions' is used to determine when a primary should commit an index build. When the
+ * specified 'quorum' of replica set members is reached, then the primary proceeds to commit the
+ * index. commitQuorum ensures secondaries are ready to commit the index as quickly as possible:
+ * secondary replication will stall on receipt of a commitIndexBuild oplog entry until the
+ * secondary's index build is complete and ready to be committed.
+ *
  * The 'CommitQuorumOptions' has the same range of settings as the 'w' field from
  * 'WriteConcernOptions'. It can be set to an integer starting from 0 and up, or to a string. The
  * string option can be 'majority', 'votingMembers' or a replica set tag.
- *
- * The principal idea behind 'CommitQuorumOptions' is to figure out when an index build should be
- * committed on the replica set based on the number of commit ready members.
  */
 class CommitQuorumOptions {
 public:
@@ -86,10 +89,15 @@ public:
         return (numNodes == rhs.numNodes && mode == rhs.mode) ? true : false;
     }
 
-    // Returns the BSON representation of this object.
+    /**
+     * Returns the BSON representation of this object.
+     * E.g. {commitQuorum: "majority"}
+     */
     BSONObj toBSON() const;
 
-    // Appends the BSON representation of this object.
+    /**
+     * Appends the commitQuorum value (mode or numNodes) with the given field name "fieldName".
+     */
     void appendToBuilder(StringData fieldName, BSONObjBuilder* builder) const;
 
     // The 'commitQuorum' parameter to define the required quorum for the index builds to commit.

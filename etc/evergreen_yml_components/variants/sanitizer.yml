@@ -11,7 +11,9 @@ buildvariants:
   stepback: true
   expansions:
     lang_environment: LANG=C
-    san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+    san_options: >-
+      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo)
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -22,7 +24,7 @@ buildvariants:
     separate_debug: off
   tasks:
     - name: compile_test_and_package_serial_TG
-    - name: .aggfuzzer .common
+    - name: .aggfuzzer .common !.feature_flag_guarded
     - name: free_monitoring
     - name: .jstestfuzz !.initsync
 
@@ -39,7 +41,9 @@ buildvariants:
     lang_environment: LANG=C
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
-    san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+    san_options: >-
+      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
     multiversion_platform: rhel80
@@ -51,9 +55,8 @@ buildvariants:
     separate_debug: off
     large_distro_name: rhel80-build
   tasks:
-  - name: compile_test_and_package_serial_TG
-  - name: compile_benchmarks
-  - name: .aggregation
+  - name: compile_test_benchmark_and_package_serial_TG
+  - name: .aggregation !.feature_flag_guarded
   - name: .auth
   - name: audit
   - name: .benchmarks
@@ -124,9 +127,8 @@ buildvariants:
     separate_debug: off
     large_distro_name: rhel80-build
   tasks:
-  - name: compile_test_and_package_serial_TG
-  - name: compile_benchmarks
-  - name: .aggregation
+  - name: compile_test_benchmark_and_package_serial_TG
+  - name: .aggregation !.feature_flag_guarded
   - name: .auth
   - name: audit
   - name: .benchmarks

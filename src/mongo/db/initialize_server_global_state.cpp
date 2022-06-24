@@ -64,7 +64,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 
-namespace mongo {
+namespace mongo::initialize_server_global_state {
 
 #ifndef _WIN32
 static void croak(StringData prefix, int savedErr = errno) {
@@ -411,7 +411,7 @@ MONGO_INITIALIZER(RegisterShortCircuitExitHandler)(InitializerContext*) {
         uasserted(ErrorCodes::InternalError, "Failed setting short-circuit exit handler.");
 }
 
-bool initializeServerGlobalState(ServiceContext* service, PidFileWrite pidWrite) {
+bool checkSocketPath() {
 #ifndef _WIN32
     if (!serverGlobalParams.noUnixSocket &&
         !boost::filesystem::is_directory(serverGlobalParams.socket)) {
@@ -420,14 +420,12 @@ bool initializeServerGlobalState(ServiceContext* service, PidFileWrite pidWrite)
     }
 #endif
 
-    if (!serverGlobalParams.pidFile.empty() && pidWrite == PidFileWrite::kWrite) {
-        if (!writePidFile(serverGlobalParams.pidFile)) {
-            // error message logged in writePidFile
-            return false;
-        }
-    }
-
     return true;
+}
+
+bool writePidFile() {
+    return serverGlobalParams.pidFile.empty() ? true
+                                              : mongo::writePidFile(serverGlobalParams.pidFile);
 }
 
 #ifndef _WIN32
@@ -541,4 +539,4 @@ void ProcessUMaskServerParameter::append(OperationContext*,
 #endif
 }
 
-}  // namespace mongo
+}  // namespace mongo::initialize_server_global_state

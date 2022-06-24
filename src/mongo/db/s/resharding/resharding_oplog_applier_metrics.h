@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/util/duration.h"
 
@@ -40,7 +40,7 @@ namespace mongo {
  */
 class ReshardingOplogApplierMetrics {
 public:
-    ReshardingOplogApplierMetrics(ReshardingMetricsNew* metricsNew,
+    ReshardingOplogApplierMetrics(ReshardingMetrics* metrics,
                                   boost::optional<ReshardingOplogApplierProgress> progressDoc);
 
     void onInsertApplied();
@@ -59,7 +59,7 @@ public:
     int64_t getWritesToStashCollections() const;
 
 private:
-    ReshardingMetricsNew* _metricsNew;
+    ReshardingMetrics* _metrics;
     int64_t _insertsApplied{0};
     int64_t _updatesApplied{0};
     int64_t _deletesApplied{0};

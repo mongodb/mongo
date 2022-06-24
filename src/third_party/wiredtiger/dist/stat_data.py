@@ -344,6 +344,7 @@ conn_stats = [
     CursorStat('cursor_search_hs', 'cursor search history store calls'),
     CursorStat('cursor_search_near', 'cursor search near calls'),
     CursorStat('cursor_truncate', 'cursor truncate calls'),
+    CursorStat('cursor_truncate_keys_deleted', 'cursor truncates performed on individual keys'),
     CursorStat('cursor_update', 'cursor update calls'),
     CursorStat('cursor_update_bytes', 'cursor update key and value bytes', 'size'),
     CursorStat('cursor_update_bytes_changed', 'cursor update value size change', 'size'),

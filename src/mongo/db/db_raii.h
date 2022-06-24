@@ -184,10 +184,6 @@ public:
         Date_t deadline = Date_t::max(),
         const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs = {});
 
-    Database* getDb() const {
-        return _autoColl->getDb();
-    }
-
     /**
      * Indicates whether any namespace in 'secondaryNssOrUUIDs' is a view or sharded.
      *
@@ -315,6 +311,7 @@ public:
     const CollectionPtr& getCollection() const;
     const ViewDefinition* getView() const;
     const NamespaceString& getNss() const;
+    bool isAnySecondaryNamespaceAViewOrSharded() const;
 
 private:
     boost::optional<AutoGetCollectionForRead> _autoGet;
@@ -389,10 +386,6 @@ public:
         const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs = {})
         : AutoGetCollectionForReadCommandBase(
               opCtx, nsOrUUID, viewMode, deadline, logMode, secondaryNssOrUUIDs) {}
-
-    Database* getDb() const {
-        return _autoCollForRead.getDb();
-    }
 };
 
 /**

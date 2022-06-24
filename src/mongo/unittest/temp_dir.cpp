@@ -52,25 +52,27 @@ namespace unittest {
 namespace moe = mongo::optionenvironment;
 
 namespace {
-boost::filesystem::path defaultRoot;
+boost::filesystem::path tempPathRoot;
 
-MONGO_INITIALIZER(SetTempDirDefaultRoot)(InitializerContext* context) {
-    if (moe::startupOptionsParsed.count("tempPath")) {
-        defaultRoot = moe::startupOptionsParsed["tempPath"].as<string>();
-    } else {
-        defaultRoot = boost::filesystem::temp_directory_path();
-    }
-
-    if (!boost::filesystem::exists(defaultRoot)) {
+void setTempPathRoot(boost::filesystem::path root) {
+    if (!boost::filesystem::exists(root)) {
         uasserted(ErrorCodes::BadValue,
-                  str::stream() << "Attempted to use a tempPath (" << defaultRoot.string()
+                  str::stream() << "Attempted to use a tempPath (" << root.string()
                                 << ") that doesn't exist");
     }
 
-    if (!boost::filesystem::is_directory(defaultRoot)) {
+    if (!boost::filesystem::is_directory(root)) {
         uasserted(ErrorCodes::BadValue,
-                  str::stream() << "Attempted to use a tempPath (" << defaultRoot.string()
+                  str::stream() << "Attempted to use a tempPath (" << root.string()
                                 << ") that exists, but isn't a directory");
+    }
+    tempPathRoot = std::move(root);
+}
+
+
+MONGO_INITIALIZER(SetTempDirDefaultRoot)(InitializerContext*) {
+    if (tempPathRoot.empty()) {
+        setTempPathRoot(boost::filesystem::temp_directory_path());
     }
 }
 }  // namespace
@@ -82,7 +84,7 @@ TempDir::TempDir(const std::string& namePrefix) {
     const boost::filesystem::path dirName =
         boost::filesystem::unique_path(namePrefix + "-%%%%-%%%%-%%%%-%%%%");
 
-    _path = (defaultRoot / dirName).string();
+    _path = (tempPathRoot / dirName).string();
 
     bool createdNewDirectory = boost::filesystem::create_directory(_path);
     if (!createdNewDirectory) {
@@ -94,6 +96,9 @@ TempDir::TempDir(const std::string& namePrefix) {
 }
 
 TempDir::~TempDir() {
+    if (_path.empty())
+        return;
+
     try {
         boost::filesystem::remove_all(_path);
     } catch (const std::exception& e) {
@@ -106,8 +111,7 @@ TempDir::~TempDir() {
 }
 
 void TempDir::setTempPath(string tempPath) {
-    invariant(defaultRoot.empty());
-    defaultRoot = std::move(tempPath);
+    setTempPathRoot(std::move(tempPath));
 }
 
 }  // namespace unittest

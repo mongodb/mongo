@@ -374,7 +374,9 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     const BSONObj& hint = query.getFindCommandRequest().getHint();
     if (!hint.isEmpty()) {
         BSONElement natural = hint[query_request_helper::kNaturalSortField];
-        if (natural) {
+        // If we have a natural hint and a time series traversal preference, let the traversal
+        // preference decide what order to scan, so that we can avoid a blocking sort.
+        if (natural && !params.traversalPreference) {
             // If the hint is {$natural: +-1} this changes the direction of the collection scan.
             csn->direction = natural.safeNumberInt() >= 0 ? 1 : -1;
         }
@@ -384,8 +386,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     // the collection scan to return timestamp-based tokens. Otherwise, we should
     // return generic RecordId-based tokens.
     if (query.getFindCommandRequest().getRequestResumeToken()) {
-        csn->shouldTrackLatestOplogTimestamp = query.nss().isOplog();
-        csn->requestResumeToken = !query.nss().isOplog();
+        csn->shouldTrackLatestOplogTimestamp = query.nss().isOplogOrChangeCollection();
+        csn->requestResumeToken = !query.nss().isOplogOrChangeCollection();
     }
 
     // Extract and assign the RecordId from the 'resumeAfter' token, if present.
@@ -397,26 +399,31 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
 
     const bool assertMinTsHasNotFallenOffOplog =
         params.options & QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG;
-    if (query.nss().isOplog() && csn->direction == 1) {
+    if (query.nss().isOplogOrChangeCollection() && csn->direction == 1) {
+        // Takes Timestamp 'ts' as input, transforms it to the RecordIdBound and assigns it to the
+        // output parameter 'recordId'. The RecordId format for the change collection is a string,
+        // where as the RecordId format for the oplog is a long integer. The timestamp should be
+        // converted to the required format before assigning it to the 'recordId'.
+        auto assignRecordIdFromTimestamp = [&](auto& ts, auto* recordId) {
+            auto keyFormat = query.nss().isChangeCollection() ? KeyFormat::String : KeyFormat::Long;
+            auto status = record_id_helpers::keyForOptime(ts, keyFormat);
+            if (status.isOK()) {
+                *recordId = RecordIdBound(status.getValue());
+            }
+        };
+
         // Optimizes the start and end location parameters for a collection scan for an oplog
         // collection. Not compatible with $_resumeAfter so we do not optimize in that case.
         if (resumeAfterObj.isEmpty()) {
             auto [minTs, maxTs] = extractTsRange(query.root());
             if (minTs) {
-                StatusWith<RecordId> goal = record_id_helpers::keyForOptime(*minTs);
-                if (goal.isOK()) {
-                    csn->minRecord = RecordIdBound(goal.getValue());
-                }
-
+                assignRecordIdFromTimestamp(*minTs, &csn->minRecord);
                 if (assertMinTsHasNotFallenOffOplog) {
-                    csn->assertTsHasNotFallenOffOplog = *minTs;
+                    csn->assertTsHasNotFallenOff = *minTs;
                 }
             }
             if (maxTs) {
-                StatusWith<RecordId> goal = record_id_helpers::keyForOptime(*maxTs);
-                if (goal.isOK()) {
-                    csn->maxRecord = RecordIdBound(goal.getValue());
-                }
+                assignRecordIdFromTimestamp(*maxTs, &csn->maxRecord);
             }
         }
 
@@ -433,9 +440,9 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     // specify a minimum timestamp. This is not a valid request, so we throw InvalidOptions.
     if (assertMinTsHasNotFallenOffOplog) {
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "assertTsHasNotFallenOffOplog cannot be applied to a query "
+                str::stream() << "assertTsHasNotFallenOff cannot be applied to a query "
                                  "which does not imply a minimum 'ts' value ",
-                csn->assertTsHasNotFallenOffOplog);
+                csn->assertTsHasNotFallenOff);
     }
 
     auto queryCollator = query.getCollator();

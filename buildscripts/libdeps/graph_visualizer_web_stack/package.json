@@ -20,17 +20,18 @@
     "@material-ui/core": "5.0.0-alpha.22",
     "@material-ui/icons": "5.0.0-alpha.22",
     "@material-ui/lab": "5.0.0-alpha.22",
+    "bezier-js": "4.0.3",
     "canvas": "^2.5.0",
     "date-fns": "^2.16.1",
     "dayjs": "^1.9.7",
+    "force-graph": "1.40.0",
+    "http-proxy-middleware": "^2.0.6",
     "http-server": "^0.12.3",
     "luxon": "^1.25.0",
     "moment": "^2.29.1",
     "p-limit": "^3.0.2",
     "react": "^16.8",
     "react-dom": "^16.0.0",
-    "bezier-js": "4.0.3",
-    "force-graph": "1.40.0",
     "react-force-graph-2d": "1.18.1",
     "react-force-graph-3d": "1.18.8",
     "react-indiana-drag-scroll": "^1.8.0",
@@ -56,6 +57,5 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  },
-  "proxy": "http://localhost:5000"
+  }
 }

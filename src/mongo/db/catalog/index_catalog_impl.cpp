@@ -118,8 +118,8 @@ Status isSpecOKClusteredIndexCheck(const BSONObj& indexSpec,
     auto key = indexSpec.getObjectField("key");
     bool keysMatch = clustered_util::matchesClusterKey(key, collInfo);
 
-    bool clusteredOptionPresent =
-        indexSpec.hasField("clustered") && indexSpec["clustered"].trueValue();
+    bool clusteredOptionPresent = indexSpec.hasField(IndexDescriptor::kClusteredFieldName) &&
+        indexSpec[IndexDescriptor::kClusteredFieldName].trueValue();
 
     if (clusteredOptionPresent && !keysMatch) {
         // The 'clustered' option implies the indexSpec must match the clustered index.
@@ -907,8 +907,11 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
                 str::stream() << pluginName
                               << " indexes are under development and cannot be used without "
                                  "enabling the feature flag",
-                feature_flags::gFeatureFlagColumnstoreIndexes.isEnabled(
-                    serverGlobalParams.featureCompatibility));
+                // With our testing failpoint we may try to run this code before we've initialized
+                // the FCV.
+                !serverGlobalParams.featureCompatibility.isVersionInitialized() ||
+                    feature_flags::gFeatureFlagColumnstoreIndexes.isEnabled(
+                        serverGlobalParams.featureCompatibility));
         if (auto columnSpecStatus = validateColumnStoreSpec(collection, spec, indexVersion);
             !columnSpecStatus.isOK()) {
             return columnSpecStatus;

@@ -85,11 +85,11 @@ ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
       _originalCommand{std::move(originalCommand)},
       _sourceNs{std::move(sourceNs)},
       _role{role},
+      _startTime{startTime},
       _clockSource{clockSource},
       _observer{std::move(observer)},
       _cumulativeMetrics{cumulativeMetrics},
       _deregister{_cumulativeMetrics->registerInstanceMetrics(_observer.get())},
-      _startTime{startTime},
       _copyingStartTime{kNoDate},
       _copyingEndTime{kNoDate},
       _approxDocumentsToCopy{0},
@@ -118,7 +118,8 @@ ShardingDataTransformInstanceMetrics::~ShardingDataTransformInstanceMetrics() {
 Milliseconds ShardingDataTransformInstanceMetrics::getHighEstimateRemainingTimeMillis() const {
     switch (_role) {
         case Role::kRecipient: {
-            auto estimate = estimateRemainingRecipientTime(_applyingStartTime.load() != kNoDate,
+            auto estimate =
+                resharding::estimateRemainingRecipientTime(_applyingStartTime.load() != kNoDate,
                                                            _bytesCopied.load(),
                                                            _approxBytesToCopy.load(),
                                                            getCopyingElapsedTimeSecs(),

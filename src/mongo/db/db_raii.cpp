@@ -804,6 +804,14 @@ const CollectionPtr& AutoGetCollectionForReadMaybeLockFree::getCollection() cons
     }
 }
 
+bool AutoGetCollectionForReadMaybeLockFree::isAnySecondaryNamespaceAViewOrSharded() const {
+    if (_autoGet) {
+        return _autoGet->isAnySecondaryNamespaceAViewOrSharded();
+    } else {
+        return _autoGetLockFree->isAnySecondaryNamespaceAViewOrSharded();
+    }
+}
+
 template <typename AutoGetCollectionForReadType>
 AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
     AutoGetCollectionForReadCommandBase(

@@ -99,6 +99,7 @@ env.Library(
         'expression_context.cpp',
         'expression_function.cpp',
         'expression_js_emit.cpp',
+        'expression_parser.idl',
         'expression_test_api_version.cpp',
         'expression_trigonometric.cpp',
         'javascript_execution.cpp',
@@ -106,6 +107,7 @@ env.Library(
         'variables.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/crypto/fle_crypto',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
@@ -128,6 +130,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/vector_clock',
+        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 

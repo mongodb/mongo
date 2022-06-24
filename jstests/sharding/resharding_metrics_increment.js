@@ -125,7 +125,7 @@ const topology = DiscoverTopology.findConnectedNodes(mongos);
     jsTest.log(`Resharding stats for ${mongo}: ${tojson(sub)}`);
 
     verifyDict(sub.active, {
-        "documentsProcessed": e.documents,
+        "documentsCopied": e.documents,
         "oplogEntriesFetched": e.fetched,
         "oplogEntriesApplied": e.applied,
         "insertsApplied": e.opcounters.insert,
@@ -134,7 +134,7 @@ const topology = DiscoverTopology.findConnectedNodes(mongos);
     });
 
     // bytesCopied is harder to pin down but it should be >0.
-    assert.betweenIn(1, sub.active['bytesWritten'], 1024, 'bytesWritten');
+    assert.betweenIn(1, sub.active['bytesCopied'], 1024, 'bytesCopied');
 });
 
 reshardingTest.teardown();

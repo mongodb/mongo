@@ -37,8 +37,9 @@ namespace mongo::sbe {
 LimitSkipStage::LimitSkipStage(std::unique_ptr<PlanStage> input,
                                boost::optional<long long> limit,
                                boost::optional<long long> skip,
-                               PlanNodeId planNodeId)
-    : PlanStage(!skip ? "limit"_sd : "limitskip"_sd, planNodeId),
+                               PlanNodeId planNodeId,
+                               bool participateInTrialRunTracking)
+    : PlanStage(!skip ? "limit"_sd : "limitskip"_sd, planNodeId, participateInTrialRunTracking),
       _limit(limit),
       _skip(skip),
       _current(0),
@@ -51,7 +52,7 @@ LimitSkipStage::LimitSkipStage(std::unique_ptr<PlanStage> input,
 
 std::unique_ptr<PlanStage> LimitSkipStage::clone() const {
     return std::make_unique<LimitSkipStage>(
-        _children[0]->clone(), _limit, _skip, _commonStats.nodeId);
+        _children[0]->clone(), _limit, _skip, _commonStats.nodeId, _participateInTrialRunTracking);
 }
 
 void LimitSkipStage::prepare(CompileCtx& ctx) {

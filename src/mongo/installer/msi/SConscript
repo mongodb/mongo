@@ -121,7 +121,6 @@ candle_targets = env.Command(
         ' -dTargetExt=.msi'
         ' -dTargetFileName=${SERVER_ARCHIVE}'
         r' -dSaslSource=c:\sasl\bin'
-        r' -dSnmpSource=c:\snmp\bin'
         r' -dSslSource=' + env['WINDOWS_OPENSSL_BIN'] + ' -out ' + buildDir + r'\msi\\'
         ' -arch ' + msi_platform + ' -ext "$WIXUIEXT"'
         ' -ext "$WIXUTILEXT"'

@@ -80,7 +80,7 @@ public:
                                       const OID epoch,
                                       const Timestamp timestamp,
                                       std::vector<std::pair<ChunkRange, ShardId>> chunkInfos) {
-        ChunkVersion version(1, 0, epoch, timestamp);
+        ChunkVersion version({epoch, timestamp}, {1, 0});
         std::vector<ChunkType> chunks;
         for (auto&& pair : chunkInfos) {
             chunks.emplace_back(uuid, pair.first, version, pair.second);

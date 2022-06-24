@@ -211,7 +211,7 @@ thread_ckpt_run(void *arg)
      * Keep a separate file with the records we wrote for checking.
      */
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
-    for (i = 0;; ++i) {
+    for (i = 1;; ++i) {
         sleep_time = __wt_random(&rnd) % MAX_CKPT_INVL;
         sleep(sleep_time);
         /*
@@ -250,7 +250,12 @@ thread_flush_run(void *arg)
     testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, sentinel_file));
     (void)unlink(buf);
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
-    for (i = 0;;) {
+    /*
+     * Increment at the end of the loop so we only count actual calls to flush_tier and don't
+     * increment for skipping for the first checkpoint. The condition for creating the sentinel file
+     * requires proper counting.
+     */
+    for (i = 1;;) {
         sleep_time = __wt_random(&rnd) % MAX_FLUSH_INVL;
         sleep(sleep_time);
         testutil_check(td->conn->query_timestamp(td->conn, ts_string, "get=last_checkpoint"));
@@ -271,10 +276,11 @@ thread_flush_run(void *arg)
          * Create the sentinel file so that the parent process knows the desired number of
          * flush_tier calls have finished and can start its timer.
          */
-        if (++i == flush_calls) {
+        if (i == flush_calls) {
             testutil_assert_errno((fp = fopen(buf, "w")) != NULL);
             testutil_assert_errno(fclose(fp) == 0);
         }
+        ++i;
     }
     /* NOTREACHED */
 }
@@ -619,15 +625,12 @@ verify_tiered(WT_SESSION *session)
                 testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, name));
                 ret = stat(buf, &sb);
                 /*
-                 * Logged tables, i.e. "oplog" or "local" may be unable to remove the last object
-                 * from before the restart due to recovery applying log records. So if we get a stat
-                 * return that indicates the file exists, verify it is one of those tables.
+                 * If we get a stat return that indicates the file exists, verify it is must be the
+                 * second last object only. Since we're running with flush_checkpoint debug mode
+                 * turned on, the recovery and checkpoint after flush_tier may open the last object
+                 * that existed prior to crash. All earlier objects must not exist.
                  */
-                if (i == last - 1 && ret == 0)
-                    testutil_assert(
-                      WT_PREFIX_MATCH(name, uri_local) || WT_PREFIX_MATCH(name, uri_oplog));
-                else
-                    testutil_assert(ret != 0);
+                testutil_assert(ret != 0 || i == last - 1);
                 /* Verify earlier objects exist in the bucket directory. */
                 testutil_check(
                   __wt_snprintf(buf, sizeof(buf), "%s/%s/%s%s", home, BUCKET, BUCKET_PFX, name));
@@ -805,8 +808,9 @@ main(int argc, char *argv[])
     if (chdir(home) != 0)
         testutil_die(errno, "parent chdir: %s", home);
 
-    /* Copy the data to a separate folder for debugging purpose. */
-    testutil_copy_data(home);
+    if (!verify_only)
+        /* Copy the data to a separate folder for debugging purpose. */
+        testutil_copy_data(home);
 
     /* Come back to root directory, so we can link wiredtiger with extensions properly. */
     if (chdir("../") != 0)

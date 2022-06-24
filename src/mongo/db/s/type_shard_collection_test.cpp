@@ -67,25 +67,12 @@ TEST(ShardCollectionType, FromBSONEpochMatchesLastRefreshedCollectionVersionWhen
              << ShardCollectionType::kUuidFieldName << UUID::gen()
              << ShardCollectionType::kKeyPatternFieldName << kKeyPattern
              << ShardCollectionType::kUniqueFieldName << true
-             << ShardCollectionType::kLastRefreshedCollectionVersionFieldName << Timestamp(1, 1)));
+             << ShardCollectionType::kLastRefreshedCollectionMajorMinorVersionFieldName
+             << Timestamp(123, 45)));
     ASSERT_EQ(epoch, shardCollType.getLastRefreshedCollectionVersion()->epoch());
     ASSERT_EQ(timestamp, shardCollType.getLastRefreshedCollectionVersion()->getTimestamp());
-}
-
-TEST(ShardCollectionType, FromBSONEpochMatchesLastRefreshedCollectionVersionWhenDate) {
-    OID epoch = OID::gen();
-    Timestamp timestamp(1, 1);
-
-    ShardCollectionType shardCollType(
-        BSON(ShardCollectionType::kNssFieldName
-             << kNss.ns() << ShardCollectionType::kEpochFieldName << epoch
-             << ShardCollectionType::kUuidFieldName << UUID::gen()
-             << ShardCollectionType::kTimestampFieldName << timestamp
-             << ShardCollectionType::kKeyPatternFieldName << kKeyPattern
-             << ShardCollectionType::kUniqueFieldName << true
-             << ShardCollectionType::kLastRefreshedCollectionVersionFieldName << Date_t()));
-    ASSERT_EQ(epoch, shardCollType.getLastRefreshedCollectionVersion()->epoch());
-    ASSERT_EQ(timestamp, shardCollType.getLastRefreshedCollectionVersion()->getTimestamp());
+    ASSERT_EQ(Timestamp(123, 45),
+              Timestamp(shardCollType.getLastRefreshedCollectionVersion()->toLong()));
 }
 
 TEST(ShardCollectionType, ToBSONEmptyDefaultCollationNotIncluded) {

@@ -36,6 +36,7 @@ env.Library(
         'cluster_commit_transaction_cmd_s.cpp',
         'cluster_compact_cmd.cpp',
         'cluster_convert_to_capped_cmd.cpp',
+        'cluster_coordinate_commit_txn.cpp',
         'cluster_count_cmd.cpp',
         'cluster_create_cmd.cpp',
         'cluster_create_indexes_cmd.cpp',

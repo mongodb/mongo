@@ -685,7 +685,7 @@ TEST_F(TimestampKVEngineTest, TimestampAdvancesOnNotification) {
     _storageEngine->getTimestampMonitor()->clearListeners();
 }
 
-TEST_F(StorageEngineTest, UseAlternateStorageLocation) {
+TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString coll1Ns("db.coll1");

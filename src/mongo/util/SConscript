@@ -571,6 +571,34 @@ env.Library(
     ],
 )
 
+pcre_env = env.Clone()
+pcre_env.InjectThirdParty(libraries=['pcre2'])
+pcre_env.Library(
+    target=[
+        'pcre_wrapper',
+    ],
+    source=[
+        'pcre.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/third_party/shim_pcre2',
+    ],
+)
+
+env.Library(
+    target='pcre_util',
+    source=[
+        'pcre_util.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'pcre_wrapper',
+    ],
+)
+
 env.Benchmark(
     target='hash_table_bm',
     source='hash_table_bm.cpp',
@@ -707,6 +735,8 @@ icuEnv.CppUnitTest(
         'md5main.cpp',
         'out_of_line_executor_test.cpp',
         'packaged_task_test.cpp',
+        'pcre_test.cpp',
+        'pcre_util_test.cpp',
         'periodic_runner_impl_test.cpp',
         'processinfo_test.cpp',
         'procparser_test.cpp' if env.TargetOSIs('linux') else [],
@@ -743,6 +773,8 @@ icuEnv.CppUnitTest(
         'icu',
         'latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
         'md5',
+        'pcre_util',
+        'pcre_wrapper',
         'periodic_runner_impl',
         'processinfo',
         'procparser' if env.TargetOSIs('linux') else [],

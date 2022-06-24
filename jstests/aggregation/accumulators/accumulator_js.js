@@ -192,8 +192,9 @@ command.pipeline = [{
         }
     }
 }];
-// 16554 means "$add only supports numeric or date types"
-assert.commandFailedWithCode(db.runCommand(command), 16554);
+// ErrorCodes.TypeMismatch means "$add only supports numeric or date types". Code 16554 represented
+// a type mismatch before 6.1 for this specific check.
+assert.commandFailedWithCode(db.runCommand(command), [16554, ErrorCodes.TypeMismatch]);
 
 // Test that initArgs can have a different length per group.
 assert(db.accumulator_js.drop());

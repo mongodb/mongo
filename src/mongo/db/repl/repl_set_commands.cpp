@@ -528,6 +528,11 @@ public:
                "primary.)\n"
                "http://dochub.mongodb.org/core/replicasetcommands";
     }
+
+    bool shouldCheckoutSession() const final {
+        return false;
+    }
+
     CmdReplSetStepDown()
         : ReplSetCommand("replSetStepDown"),
           _stepDownCmdsWithForceExecutedMetric("commands.replSetStepDownWithForce.total",
@@ -685,7 +690,7 @@ public:
         if (metadataResult.isOK()) {
             // New style update position command has metadata, which may inform the
             // upstream of a higher term.
-            auto metadata = metadataResult.getValue();
+            const auto& metadata = metadataResult.getValue();
             replCoord->processReplSetMetadata(metadata);
         }
 

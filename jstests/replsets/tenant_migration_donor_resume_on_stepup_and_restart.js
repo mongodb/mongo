@@ -3,16 +3,12 @@
  *
  * Incompatible with shard merge, which can't handle restart.
  *
- * TODO SERVER-66034: Remove requires_fcv_61 tag.
- *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
- *   # failpoint pauseTenantMigrationAfterUpdatingToCommittedState only exists on the latest branch.
- *   requires_fcv_61,
  *   # Tenant migrations are only used in serverless.
  *   serverless,
  * ]

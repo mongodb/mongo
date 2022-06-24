@@ -92,8 +92,8 @@ struct __wt_blkincr {
 #define WT_BLKINCR_FULL 0x1u  /* There is no checkpoint, always do full file */
 #define WT_BLKINCR_INUSE 0x2u /* This entry is active */
 #define WT_BLKINCR_VALID 0x4u /* This entry is valid */
-                              /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
-    uint64_t flags;
+                              /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
+    uint8_t flags;
 };
 
 /*

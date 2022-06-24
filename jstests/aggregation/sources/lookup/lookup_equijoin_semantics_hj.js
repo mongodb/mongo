@@ -8,7 +8,7 @@ load("jstests/libs/fixture_helpers.js");  // For isSharded.
 load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
 load("jstests/aggregation/sources/lookup/lookup_equijoin_semantics_lib.js");  // For runTests.
 
-if (!checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
+if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping the test because it only applies to $lookup in SBE");
     return;
 }

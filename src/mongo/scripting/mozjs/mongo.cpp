@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/scripting/mozjs/mongo.h"
 
 #include <js/Object.h>
@@ -36,6 +34,7 @@
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/client/client_api_version_parameters_gen.h"
+#include "mongo/client/client_deprecated.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/global_conn_pool.h"
@@ -259,13 +258,16 @@ void doRunCommand(JSContext* cx, JS::CallArgs args, MakeRequest makeRequest) {
     auto arg = ValueWriter(cx, args.get(1)).toBSON();
 
     auto request = makeRequest(database, arg);
-    if (auto token = args.get(3); token.isObject()) {
-        request.securityToken = ValueWriter(cx, token).toBSON();
+    if (auto tokenArg = args.get(3); tokenArg.isObject()) {
+        using VTS = auth::ValidatedTenancyScope;
+        if (auto token = ValueWriter(cx, tokenArg).toBSON(); token.nFields() > 0) {
+            request.validatedTenancyScope = VTS(token, VTS::InitTag::kInitForShell);
+        }
     } else {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "The token parameter to " << Params::kCommandName
                               << " must be an object",
-                token.isUndefined());
+                tokenArg.isUndefined());
     }
 
     const auto& conn = getConnectionRef(args);
@@ -316,6 +318,51 @@ void MongoBase::Functions::_runCommandImpl::call(JSContext* cx, JS::CallArgs arg
     });
 }
 
+namespace {
+/**
+ * WARNING: Do not add new callers! This is a special-purpose function that exists only to
+ * accommodate the shell.
+ *
+ * Although OP_QUERY find is no longer supported by either the shell or the server, the shell's
+ * exhaust path still internally constructs a request that resembles on OP_QUERY find. This function
+ * converts this query to a 'FindCommandRequest'.
+ */
+FindCommandRequest upconvertLegacyOpQueryToFindCommandRequest(NamespaceString nss,
+                                                              const BSONObj& opQueryFormattedBson,
+                                                              const BSONObj& projection,
+                                                              int limit,
+                                                              int skip,
+                                                              int batchSize,
+                                                              int queryOptions) {
+    FindCommandRequest findCommand{std::move(nss)};
+
+    client_deprecated::initFindFromLegacyOptions(opQueryFormattedBson, queryOptions, &findCommand);
+
+    if (!projection.isEmpty()) {
+        findCommand.setProjection(projection.getOwned());
+    }
+
+    if (limit) {
+        // To avoid changing the behavior of the shell API, we allow the caller of the JS code to
+        // use a negative limit to request at most a single batch.
+        if (limit < 0) {
+            findCommand.setLimit(-static_cast<int64_t>(limit));
+            findCommand.setSingleBatch(true);
+        } else {
+            findCommand.setLimit(limit);
+        }
+    }
+    if (skip) {
+        findCommand.setSkip(skip);
+    }
+    if (batchSize) {
+        findCommand.setBatchSize(batchSize);
+    }
+
+    return findCommand;
+}
+}  // namespace
+
 void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
@@ -351,15 +398,12 @@ void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
     int batchSize = ValueWriter(cx, args.get(5)).toInt32();
     int options = ValueWriter(cx, args.get(6)).toInt32();
 
-    const Query query = Query::fromBSONDeprecated(q);
-    std::unique_ptr<DBClientCursor> cursor(conn->query_DEPRECATED(NamespaceString(ns),
-                                                                  query.getFilter(),
-                                                                  query,
-                                                                  limit,
-                                                                  nToSkip,
-                                                                  haveFields ? &fields : nullptr,
-                                                                  options,
-                                                                  batchSize));
+    auto findCmd = upconvertLegacyOpQueryToFindCommandRequest(
+        NamespaceString{ns}, q, fields, limit, nToSkip, batchSize, options);
+    auto readPref = uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(q));
+    ExhaustMode exhaustMode =
+        ((options & QueryOption_Exhaust) != 0) ? ExhaustMode::kOn : ExhaustMode::kOff;
+    std::unique_ptr<DBClientCursor> cursor = conn->find(std::move(findCmd), readPref, exhaustMode);
     if (!cursor.get()) {
         uasserted(ErrorCodes::InternalError, "error doing query: failed");
     }

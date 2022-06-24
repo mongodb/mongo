@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/data_range.h"
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
@@ -2195,6 +2196,38 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+};
+
+class ExpressionInternalFLEEqual final : public Expression {
+public:
+    ExpressionInternalFLEEqual(ExpressionContext* expCtx,
+                               boost::intrusive_ptr<Expression> field,
+                               ConstDataRange serverToken,
+                               int64_t contentionFactor,
+                               ConstDataRange edcToken);
+    Value serialize(bool explain) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    const char* getOpName() const;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vps);
+    void _doAddDependencies(DepsTracker* deps) const final;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+private:
+    std::array<std::uint8_t, 32> _serverToken;
+    std::array<std::uint8_t, 32> _edcToken;
+    int64_t _contentionFactor;
+    stdx::unordered_set<std::array<std::uint8_t, 32>> _cachedEDCTokens;
 };
 
 class ExpressionMap final : public Expression {

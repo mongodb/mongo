@@ -112,7 +112,7 @@ const DataGrid = ({
       style["justifyContent"] = "space-evenly";
       finalCellData = (
         <Checkbox
-          checked={checkBoxes[rowIndex].selected}
+          checked={checkBoxes[rowIndex] ? checkBoxes[rowIndex].selected : false}
           onChange={(event) => {
             setCheckBoxes(
               checkBoxes.map((checkbox, index) => {

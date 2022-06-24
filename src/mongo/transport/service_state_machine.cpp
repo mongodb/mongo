@@ -121,29 +121,10 @@ Message makeExhaustMessage(Message requestMsg, DbResponse* dbresponse) {
 }
 }  // namespace
 
-class ServiceStateMachine::Impl final
-    : public std::enable_shared_from_this<ServiceStateMachine::Impl> {
+class ServiceStateMachine::Impl {
 public:
-    /*
-     * Any state may transition to EndSession in case of an error, otherwise the valid state
-     * transitions are:
-     * Source -> SourceWait -> Process -> SinkWait -> Source (standard RPC)
-     * Source -> SourceWait -> Process -> SinkWait -> Process -> SinkWait ... (exhaust)
-     * Source -> SourceWait -> Process -> Source (fire-and-forget)
-     */
-    enum class State {
-        Created,     // The session has been created, but no operations have been performed yet
-        Source,      // Request a new Message from the network to handle
-        SourceWait,  // Wait for the new Message to arrive from the network
-        Process,     // Run the Message through the database
-        SinkWait,    // Wait for the database result to be sent by the network
-        EndSession,  // End the session - the ServiceStateMachine will be invalid after this
-        Ended        // The session has ended. It is illegal to call any method besides
-                     // state() if this is the current state.
-    };
-
-    Impl(ServiceContext::UniqueClient client)
-        : _state{State::Created},
+    Impl(ServiceStateMachine* ssm, ServiceContext::UniqueClient client)
+        : _ssm{ssm},
           _serviceContext{client->getServiceContext()},
           _sep{_serviceContext->getServiceEntryPoint()},
           _clientStrand{ClientStrand::make(std::move(client))} {}
@@ -152,9 +133,11 @@ public:
         _sep->onEndSession(session());
     }
 
-    void start(ServiceExecutorContext seCtx);
+    Client* client() const {
+        return _clientStrand->getClientPointer();
+    }
 
-    void setCleanupHook(std::function<void()> hook);
+    void start();
 
     /*
      * Terminates the associated transport Session, regardless of tags.
@@ -206,34 +189,31 @@ public:
     void cleanupExhaustResources() noexcept;
 
     /*
-     * Gets the current state of connection for testing/diagnostic purposes.
-     */
-    State state() const {
-        return _state.load();
-    }
-
-    /*
      * Gets the transport::Session associated with this connection
      */
     const transport::SessionHandle& session() {
-        return _clientStrand->getClientPointer()->session();
+        return client()->session();
     }
 
     /*
      * Gets the transport::ServiceExecutor associated with this connection.
      */
     ServiceExecutor* executor() {
-        return ServiceExecutorContext::get(_clientStrand->getClientPointer())->getServiceExecutor();
+        return ServiceExecutorContext::get(client())->getServiceExecutor();
     }
 
 private:
-    AtomicWord<State> _state{State::Created};
+    /** Alias: refers to this Impl, but holds a ref to the enclosing SSM. */
+    std::shared_ptr<Impl> shared_from_this() {
+        return {_ssm->shared_from_this(), this};
+    }
 
+    ServiceStateMachine* const _ssm;
     ServiceContext* const _serviceContext;
     ServiceEntryPoint* const _sep;
 
+    AtomicWord<bool> _isTerminated{false};
     ClientStrandPtr _clientStrand;
-    std::function<void()> _cleanupHook;
 
     bool _inExhaust = false;
     boost::optional<MessageCompressorId> _compressorId;
@@ -245,8 +225,6 @@ private:
 
 void ServiceStateMachine::Impl::sourceMessage() {
     invariant(_inMessage.empty());
-    invariant(_state.load() == State::Source);
-    _state.store(State::SourceWait);
 
     // Reset the compressor only before sourcing a new message. This ensures the same compressor,
     // if any, is used for sinking exhaust messages. For moreToCome messages, this allows resetting
@@ -268,8 +246,6 @@ void ServiceStateMachine::Impl::sourceMessage() {
     const auto status = msg.getStatus();
 
     if (status.isOK()) {
-        _state.store(State::Process);
-
         // If the sourceMessage succeeded then we can move to on to process the message. We simply
         // return from here and the future chain in startNewLoop() will continue to the next state
         // normally.
@@ -296,16 +272,12 @@ void ServiceStateMachine::Impl::sourceMessage() {
               "remote"_attr = remote,
               "connectionId"_attr = session()->id());
     }
-
-    _state.store(State::EndSession);
     uassertStatusOK(status);
 }
 
 void ServiceStateMachine::Impl::sinkMessage() {
     // Sink our response to the client
-    invariant(_state.load() == State::Process);
-    _state.store(State::SinkWait);
-
+    //
     // If there was an error sinking the message to the client, then we should print an error and
     // end the session.
     //
@@ -317,12 +289,7 @@ void ServiceStateMachine::Impl::sinkMessage() {
               "error"_attr = status,
               "remote"_attr = session()->remote(),
               "connectionId"_attr = session()->id());
-        _state.store(State::EndSession);
         uassertStatusOK(status);
-    } else if (_inExhaust) {
-        _state.store(State::Process);
-    } else {
-        _state.store(State::Source);
     }
 
     // Performance testing showed a significant benefit from yielding here.
@@ -418,7 +385,6 @@ Future<void> ServiceStateMachine::Impl::processMessage() {
 
                 _outMessage = std::move(toSink);
             } else {
-                _state.store(State::Source);
                 _inMessage.reset();
                 _outMessage.reset();
                 _inExhaust = false;
@@ -426,14 +392,7 @@ Future<void> ServiceStateMachine::Impl::processMessage() {
         });
 }
 
-void ServiceStateMachine::Impl::start(ServiceExecutorContext seCtx) {
-    {
-        auto client = _clientStrand->getClientPointer();
-        stdx::lock_guard lk(*client);
-        ServiceExecutorContext::set(client, std::move(seCtx));
-    }
-
-    invariant(_state.swap(State::Source) == State::Created);
+void ServiceStateMachine::Impl::start() {
     invariant(!_inExhaust, "Cannot start the state machine in exhaust mode");
 
     scheduleNewLoop(Status::OK());
@@ -466,7 +425,6 @@ void ServiceStateMachine::Impl::scheduleNewLoop(Status status) try {
     }
 } catch (const DBException& ex) {
     LOGV2_DEBUG(5763901, 2, "Terminating session due to error", "error"_attr = ex.toStatus());
-    _state.store(State::EndSession);
     terminate();
     cleanupSession(ex.toStatus());
 }
@@ -495,14 +453,14 @@ void ServiceStateMachine::Impl::startNewLoop(const Status& executorStatus) {
 }
 
 void ServiceStateMachine::Impl::terminate() {
-    if (state() == State::Ended)
+    if (_isTerminated.swap(true))
         return;
 
     session()->end();
 }
 
 void ServiceStateMachine::Impl::terminateIfTagsDontMatch(transport::Session::TagMask tags) {
-    if (state() == State::Ended)
+    if (_isTerminated.load())
         return;
 
     auto sessionTags = session()->getTags();
@@ -522,7 +480,7 @@ void ServiceStateMachine::Impl::cleanupExhaustResources() noexcept try {
     if (!_inExhaust) {
         return;
     }
-    auto request = OpMsgRequest::parse(_inMessage);
+    auto request = OpMsgRequest::parse(_inMessage, Client::getCurrent());
     // Clean up cursor for exhaust getMore request.
     if (request.getCommandName() == "getMore"_sd) {
         auto cursorId = request.body["getMore"].Long();
@@ -542,44 +500,23 @@ void ServiceStateMachine::Impl::cleanupExhaustResources() noexcept try {
           "error"_attr = e.toStatus());
 }
 
-void ServiceStateMachine::Impl::setCleanupHook(std::function<void()> hook) {
-    invariant(state() == State::Created);
-    _cleanupHook = std::move(hook);
-}
-
 void ServiceStateMachine::Impl::cleanupSession(const Status& status) {
     LOGV2_DEBUG(5127900, 2, "Ending session", "error"_attr = status);
-
     cleanupExhaustResources();
-    auto client = _clientStrand->getClientPointer();
-    _sep->onClientDisconnect(client);
-
-    {
-        stdx::lock_guard lk(*client);
-        transport::ServiceExecutorContext::reset(client);
-    }
-
-    auto previousState = _state.swap(State::Ended);
-    invariant(previousState != State::Ended);
-
-    _inMessage.reset();
-
-    _outMessage.reset();
-
-    if (auto cleanupHook = std::exchange(_cleanupHook, {})) {
-        cleanupHook();
-    }
+    _sep->onClientDisconnect(client());
 }
 
-ServiceStateMachine::ServiceStateMachine(ServiceContext::UniqueClient client)
-    : _impl{std::make_shared<Impl>(std::move(client))} {}
+ServiceStateMachine::ServiceStateMachine(PassKeyTag, ServiceContext::UniqueClient client)
+    : _impl{std::make_unique<Impl>(this, std::move(client))} {}
 
-void ServiceStateMachine::start(ServiceExecutorContext seCtx) {
-    _impl->start(std::move(seCtx));
+ServiceStateMachine::~ServiceStateMachine() = default;
+
+Client* ServiceStateMachine::client() const {
+    return _impl->client();
 }
 
-void ServiceStateMachine::setCleanupHook(std::function<void()> hook) {
-    _impl->setCleanupHook(std::move(hook));
+void ServiceStateMachine::start() {
+    _impl->start();
 }
 
 void ServiceStateMachine::terminate() {

@@ -86,9 +86,8 @@ void notifyChangeStreamsOnRefineCollectionShardKeyComplete(OperationContext* opC
 
 RefineCollectionShardKeyCoordinator::RefineCollectionShardKeyCoordinator(
     ShardingDDLCoordinatorService* service, const BSONObj& initialState)
-    : ShardingDDLCoordinator(service, initialState),
-      _doc(RefineCollectionShardKeyCoordinatorDocument::parse(
-          IDLParserErrorContext("RefineCollectionShardKeyCoordinatorDocument"), initialState)),
+    : RecoverableShardingDDLCoordinator(
+          service, "RefineCollectionShardKeyCoordinator", initialState),
       _request(_doc.getRefineCollectionShardKeyRequest()),
       _newShardKey(_doc.getNewShardKey()) {}
 
@@ -104,47 +103,8 @@ void RefineCollectionShardKeyCoordinator::checkIfOptionsConflict(const BSONObj& 
                 _request.toBSON() == otherDoc.getRefineCollectionShardKeyRequest().toBSON()));
 }
 
-boost::optional<BSONObj> RefineCollectionShardKeyCoordinator::reportForCurrentOp(
-    MongoProcessInterface::CurrentOpConnectionsMode connMode,
-    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-    BSONObjBuilder cmdBob;
-    if (const auto& optComment = getForwardableOpMetadata().getComment()) {
-        cmdBob.append(optComment.get().firstElement());
-    }
-    cmdBob.appendElements(_request.toBSON());
-
-    BSONObjBuilder bob;
-    bob.append("type", "op");
-    bob.append("desc", "RefineCollectionShardKeyCoordinator");
-    bob.append("op", "command");
-    bob.append("ns", nss().toString());
-    bob.append("command", cmdBob.obj());
-    bob.append("active", true);
-    return bob.obj();
-}
-
-void RefineCollectionShardKeyCoordinator::_enterPhase(Phase newPhase) {
-    StateDoc newDoc(_doc);
-    newDoc.setPhase(newPhase);
-
-    LOGV2_DEBUG(
-        6233200,
-        2,
-        "Refine collection shard key coordinator phase transition",
-        "namespace"_attr = nss(),
-        "newPhase"_attr = RefineCollectionShardKeyCoordinatorPhase_serializer(newDoc.getPhase()),
-        "oldPhase"_attr = RefineCollectionShardKeyCoordinatorPhase_serializer(_doc.getPhase()));
-
-    if (_doc.getPhase() == Phase::kUnset) {
-        newDoc = _insertStateDocument(std::move(newDoc));
-    } else {
-        newDoc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
-    }
-
-    {
-        stdx::unique_lock ul{_docMutex};
-        _doc = std::move(newDoc);
-    }
+void RefineCollectionShardKeyCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
+    cmdInfoBuilder->appendElements(_request.toBSON());
 }
 
 ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(

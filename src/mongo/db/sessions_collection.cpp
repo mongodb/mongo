@@ -236,7 +236,7 @@ LogicalSessionIdSet SessionsCollection::_doFindRemoved(
     auto wrappedSend = [&](BSONObj batch) {
         BSONObjBuilder batchWithReadConcernLocal(batch);
         batchWithReadConcernLocal.append(repl::ReadConcernArgs::kReadConcernFieldName,
-                                         repl::ReadConcernArgs::kImplicitDefault);
+                                         repl::ReadConcernArgs::kLocal);
         auto swBatchResult = send(batchWithReadConcernLocal.obj());
 
         auto result =

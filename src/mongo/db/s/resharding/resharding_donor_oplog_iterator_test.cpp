@@ -95,7 +95,7 @@ public:
         const BSONObj oField(BSON("msg"
                                   << "Created temporary resharding collection"));
         const BSONObj o2Field(
-            BSON("type" << kReshardFinalOpLogType << "reshardingUUID" << UUID::gen()));
+            BSON("type" << resharding::kReshardFinalOpLogType << "reshardingUUID" << UUID::gen()));
         return makeOplog(_crudNss, _uuid, repl::OpTypeEnum::kNoop, oField, o2Field, oplogId);
     }
 
@@ -103,7 +103,7 @@ public:
         ReshardingDonorOplogId oplogId(ts, ts);
         const BSONObj oField(BSON("msg"
                                   << "Latest oplog ts from donor's cursor response"));
-        const BSONObj o2Field(BSON("type" << kReshardProgressMark));
+        const BSONObj o2Field(BSON("type" << resharding::kReshardProgressMark));
         return makeOplog(_crudNss, _uuid, repl::OpTypeEnum::kNoop, oField, o2Field, oplogId);
     }
 

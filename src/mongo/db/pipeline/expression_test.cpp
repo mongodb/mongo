@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <climits>
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/config.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -47,6 +49,8 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/summation.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -170,6 +174,7 @@ void parseAndVerifyResults(
     auto expr = parseFn(&expCtx, elem, vps);
     ASSERT_VALUE_EQ(expr->evaluate({}, &expCtx.variables), expected);
 }
+
 
 /* ------------------------- ExpressionArrayToObject -------------------------- */
 
@@ -3715,6 +3720,451 @@ TEST(ExpressionCondTest, ConstantCondShouldOptimizeWithNonConstantBranches) {
     auto optimizedExprCond = exprCond->optimize();
     auto expectedResult = fromjson("{$add: [\"$a\", {$const: 2}]}");
     ASSERT_BSONOBJ_BINARY_EQ(expectedResult, expressionToBson(optimizedExprCond));
+}
+
+TEST(ExpressionAddTest, Integers) {
+    assertExpectedResults("$add",
+                          {
+                              // Empty case.
+                              {{}, 0},
+                              // Singleton case.
+                              {{1}, 1},
+                              // Integer addition.
+                              {{1, 2, 3}, 6},
+                              // Adding negative numbers
+                              {{6, -3, 2}, 5},
+                              // Getting a negative result
+                              {{-6, -3, 2}, -7},
+                              // Min/max ints are not promoted to longs.
+                              {{INT_MAX}, INT_MAX},
+                              {{INT_MAX, -1}, Value(INT_MAX - 1)},
+                              {{INT_MIN}, INT_MIN},
+                              {{INT_MIN, 1}, Value(INT_MIN + 1)},
+                              // Integer overflow is promoted to a long.
+                              {{INT_MAX, 1}, Value((long long)INT_MAX + 1LL)},
+                              {{INT_MIN, -1}, Value((long long)INT_MIN - 1LL)},
+                          });
+}
+
+
+TEST(ExpressionAddTest, Longs) {
+    assertExpectedResults(
+        "$add",
+        {
+            // Singleton case.
+            {{1LL}, 1LL},
+            // Long addition.
+            {{1LL, 2LL, 3LL}, 6LL},
+            // Adding negative numbers
+            {{6LL, -3LL, 2LL}, 5LL},
+            // Getting a negative result
+            {{-6LL, -3LL, 2LL}, -7LL},
+            // Confirm that NumberLong is wider than NumberInt, and the output
+            // will be a long if any operand is a long.
+            {{1LL, 2, 3LL}, 6LL},
+            {{1LL, 2, 3}, 6LL},
+            {{1, 2, 3LL}, 6LL},
+            {{1, 2LL, 3LL}, 6LL},
+            {{6, -3LL, 2}, 5LL},
+            {{-6LL, -3, 2}, -7LL},
+            // Min/max longs are not promoted to double.
+            {{LLONG_MAX}, LLONG_MAX},
+            {{LLONG_MAX, -1LL}, Value(LLONG_MAX - 1LL)},
+            {{LLONG_MIN}, LLONG_MIN},
+            {{LLONG_MIN, 1LL}, Value(LLONG_MIN + 1LL)},
+            // Long overflow is promoted to a double.
+            {{LLONG_MAX, 1LL}, Value((double)LLONG_MAX + 1.0)},
+            // The result is "incorrect" here due to floating-point rounding errors.
+            {{LLONG_MIN, -1LL}, Value((double)LLONG_MIN)},
+        });
+}
+
+TEST(ExpressionAddTest, Doubles) {
+    assertExpectedResults("$add",
+                          {
+                              // Singleton case.
+                              {{1.0}, 1.0},
+                              // Double addition.
+                              {{1.0, 2.0, 3.0}, 6.0},
+                              // Adding negative numbers
+                              {{6.0, -3.0, 2.0}, 5.0},
+                              // Getting a negative result
+                              {{-6.0, -3.0, 2.0}, -7.0},
+                              // Confirm that doubles are wider than ints and longs, and the output
+                              // will be a double if any operand is a double.
+                              {{1, 2, 3.0}, 6.0},
+                              {{1LL, 2LL, 3.0}, 6.0},
+                              {{3.0, 2, 1LL}, 6.0},
+                              {{3, 2.0, 1LL}, 6.0},
+                              {{-3, 2.0, 1LL}, 0.0},
+                              {{-6LL, 2LL, 3.0}, -1.0},
+                              {{-6.0, 2LL, 3.0}, -1.0},
+                              // Confirm floating point arithmetic has rounding errors.
+                              {{0.1, 0.2}, 0.30000000000000004},
+                          });
+}
+
+TEST(ExpressionAddTest, Decimals) {
+    assertExpectedResults(
+        "$add",
+        {
+            // Singleton case.
+            {{Decimal128(1)}, Decimal128(1)},
+            // Decimal addition.
+            {{Decimal128(1.0), Decimal128(2.0), Decimal128(3.0)}, Decimal128(6.0)},
+            {{Decimal128(-6.0), Decimal128(2.0), Decimal128(3.0)}, Decimal128(-1.0)},
+            // Confirm that decimals are wider than all other types, and the output
+            // will be a double if any operand is a double.
+            {{Decimal128(1), 2LL, 3}, Decimal128(6.0)},
+            {{Decimal128(3), 2.0, 1LL}, Decimal128(6.0)},
+            {{Decimal128(3), 2, 1.0}, Decimal128(6.0)},
+            {{1, 2, Decimal128(3.0)}, Decimal128(6.0)},
+            {{1LL, Decimal128(2.0), 3.0}, Decimal128(6.0)},
+            {{1.0, 2.0, Decimal128(3.0)}, Decimal128(6.0)},
+            {{1, Decimal128(2.0), 3.0}, Decimal128(6.0)},
+            {{1LL, Decimal128(2.0), 3.0, 2}, Decimal128(8.0)},
+            {{1LL, Decimal128(2.0), 3, 2.0}, Decimal128(8.0)},
+            {{1, Decimal128(2.0), 3LL, 2.0}, Decimal128(8.0)},
+            {{3.0, Decimal128(0.0), 2, 1LL}, Decimal128(6.0)},
+            {{1, 3LL, 2.0, Decimal128(2.0)}, Decimal128(8.0)},
+            {{3.0, 2, 1LL, Decimal128(0.0)}, Decimal128(6.0)},
+            {{Decimal128(-6.0), 2.0, 3LL}, Decimal128(-1.0)},
+        });
+}
+
+TEST(ExpressionAddTest, DatesNonDecimal) {
+    assertExpectedResults(
+        "$add",
+        {
+            {{1, 2, 3, Date_t::fromMillisSinceEpoch(100)}, Date_t::fromMillisSinceEpoch(106)},
+            {{1LL, 2LL, 3LL, Value(Date_t::fromMillisSinceEpoch(100))},
+             Date_t::fromMillisSinceEpoch(106)},
+            {{1.0, 2.0, 3.0, Value(Date_t::fromMillisSinceEpoch(100))},
+             Date_t::fromMillisSinceEpoch(106)},
+            {{1.0, 2.0, Value(Date_t::fromMillisSinceEpoch(100)), 3.0},
+             Date_t::fromMillisSinceEpoch(106)},
+            {{1.0, 2.2, 3.5, Value(Date_t::fromMillisSinceEpoch(100))},
+             Date_t::fromMillisSinceEpoch(107)},
+            {{1, 2.2, 3.5, Value(Date_t::fromMillisSinceEpoch(100))},
+             Date_t::fromMillisSinceEpoch(107)},
+            {{1, Date_t::fromMillisSinceEpoch(100), 2.2, 3.5}, Date_t::fromMillisSinceEpoch(107)},
+            {{Date_t::fromMillisSinceEpoch(100), 1, 2.2, 3.5}, Date_t::fromMillisSinceEpoch(107)},
+            {{-6, Date_t::fromMillisSinceEpoch(100)}, Date_t::fromMillisSinceEpoch(94)},
+            {{-200, Date_t::fromMillisSinceEpoch(100)}, Date_t::fromMillisSinceEpoch(-100)},
+            {{1, 2, 3, Date_t::fromMillisSinceEpoch(-100)}, Date_t::fromMillisSinceEpoch(-94)},
+        });
+}
+
+TEST(ExpressionAddTest, DatesDecimal) {
+    assertExpectedResults(
+        "$add",
+        {
+            {{1, Decimal128(2), 3, Date_t::fromMillisSinceEpoch(100)},
+             Date_t::fromMillisSinceEpoch(106)},
+            {{1LL, 2LL, Decimal128(3LL), Value(Date_t::fromMillisSinceEpoch(100))},
+             Date_t::fromMillisSinceEpoch(106)},
+            {{1, Decimal128(2.2), 3.5, Value(Date_t::fromMillisSinceEpoch(100))},
+             Date_t::fromMillisSinceEpoch(107)},
+            {{1, Decimal128(2.2), Decimal128(3.5), Value(Date_t::fromMillisSinceEpoch(100))},
+             Date_t::fromMillisSinceEpoch(107)},
+            {{1.0, Decimal128(2.2), Decimal128(3.5), Value(Date_t::fromMillisSinceEpoch(100))},
+             Date_t::fromMillisSinceEpoch(107)},
+            {{Decimal128(-6), Date_t::fromMillisSinceEpoch(100)}, Date_t::fromMillisSinceEpoch(94)},
+            {{Decimal128(-200), Date_t::fromMillisSinceEpoch(100)},
+             Date_t::fromMillisSinceEpoch(-100)},
+            {{1, Decimal128(2), 3, Date_t::fromMillisSinceEpoch(-100)},
+             Date_t::fromMillisSinceEpoch(-94)},
+        });
+}
+
+TEST(ExpressionAddTest, Assertions) {
+    // Date addition must fit in a NumberLong from a double.
+    ASSERT_THROWS_CODE(
+        evaluateExpression("$add", {Date_t::fromMillisSinceEpoch(100), (double)LLONG_MAX}),
+        AssertionException,
+        ErrorCodes::Overflow);
+
+    // Only one date allowed in an $add expression.
+    ASSERT_THROWS_CODE(
+        evaluateExpression(
+            "$add", {Date_t::fromMillisSinceEpoch(100), 1, Date_t::fromMillisSinceEpoch(100)}),
+        AssertionException,
+        16612);
+
+    // Only numeric types are allowed in a $add.
+    ASSERT_THROWS_CODE(evaluateExpression("$add", {1, 2, "not numeric!"_sd, 3}),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
+}
+
+
+TEST(ExpressionAddTest, VerifyNoDoubleDoubleSummation) {
+    // Confirm that we're not using DoubleDoubleSummation for $add expression with a set of double
+    // values from mongo/util/summation_test.cpp.
+    std::vector<ImplicitValue> doubleValues = {
+        1.4831356930199802e-05,  -3.121724665346865,     3041897608700.073,
+        1001318343149.7166,      -1714.6229586696593,    1731390114894580.8,
+        6.256645803154374e-08,   -107144114533844.25,    -0.08839485091750919,
+        -265119153.02185738,     -0.02450615965231944,   0.0002684331017079073,
+        32079040427.68358,       -0.04733295911845742,   0.061381859083076085,
+        -25329.59126796951,      -0.0009567520620034965, -1553879364344.9932,
+        -2.1101077525869814e-08, -298421079729.5547,     0.03182394834273594,
+        22.201944843278916,      -33.35667991109125,     11496013.960449915,
+        -40652595.33210472,      3.8496066090328163,     2.5074042398147304e-08,
+        -0.02208724071782122,    -134211.37290639878,    0.17640433666616578,
+        4.463787499171126,       9.959669945399718,      129265976.35224283,
+        1.5865526187526546e-07,  -4746011.710555799,     -712048598925.0789,
+        582214206210.4034,       0.025236204812875362,   530078170.91147506,
+        -14.865307666195053,     1.6727994895185032e-05, -113386276.03121366,
+        -6.135827207137054,      10644945799901.145,     -100848907797.1582,
+        2.2404406961625282e-08,  1.315662618424494e-09,  -0.832190208349044,
+        -9.779323414999364,      -546522170658.2997};
+    double straightSum = 0.0;
+    DoubleDoubleSummation compensatedSum;
+    for (auto x : doubleValues) {
+        compensatedSum.addDouble(x.getDouble());
+        straightSum += x.getDouble();
+    }
+    ASSERT_NE(straightSum, compensatedSum.getDouble());
+
+    Value result = evaluateExpression("$add", doubleValues);
+    ASSERT_VALUE_EQ(result, Value(straightSum));
+    ASSERT_VALUE_NE(result, Value(compensatedSum.getDouble()));
+}
+TEST(ExpressionFLETest, BadInputs) {
+
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+    {
+        auto expr = fromjson("{$_internalFleEq: 12}");
+        ASSERT_THROWS_CODE(ExpressionInternalFLEEqual::parse(&expCtx, expr.firstElement(), vps),
+                           DBException,
+                           10065);
+    }
+}
+
+// Test we return true if it matches
+TEST(ExpressionFLETest, TestBinData) {
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+
+    {
+        auto expr = fromjson(R"({$_internalFleEq: {
+        field: {
+            "$binary": {
+                "base64":
+                "BxI0VngSNJh2EjQSNFZ4kBIQ0JE8aMUFkPk5sSTVqfdNNfjqUfQQ1Uoj0BBcthrWoe9wyU3cN6zmWaQBPJ97t0ZPbecnMsU736yXre6cBO4Zdt/wThtY+v5+7vFgNnWpgRP0e+vam6QPmLvbBrO0LdsvAPTGW4yqwnzCIXCoEg7QPGfbfAXKPDTNenBfRlawiblmTOhO/6ljKotWsMp22q/rpHrn9IEIeJmecwuuPIJ7EA+XYQ3hOKVccYf2ogoK73+8xD/Vul83Qvr84Q8afc4QUMVs8A==",
+                    "subType": "6"
+            }
+        },
+        server: {
+            "$binary": {
+                "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
+                "subType": "6"
+            }
+        },
+        counter: {
+            "$numberLong": "3"
+        },
+        edc: {
+            "$binary": {
+                "base64": "CEWSmQID7SfwyAUI3ZkSFkATKryDQfnxXEOGad5d4Rsg",
+                "subType": "6"
+            }
+        }    } })");
+        auto exprFle = ExpressionInternalFLEEqual::parse(&expCtx, expr.firstElement(), vps);
+
+        ASSERT_VALUE_EQ(exprFle->evaluate({}, &expCtx.variables), Value(true));
+    }
+
+    // Negative: Use wrong server token
+    {
+        auto expr = fromjson(R"({$_internalFleEq: {
+        field: {
+            "$binary": {
+                "base64":
+                "BxI0VngSNJh2EjQSNFZ4kBIQ0JE8aMUFkPk5sSTVqfdNNfjqUfQQ1Uoj0BBcthrWoe9wyU3cN6zmWaQBPJ97t0ZPbecnMsU736yXre6cBO4Zdt/wThtY+v5+7vFgNnWpgRP0e+vam6QPmLvbBrO0LdsvAPTGW4yqwnzCIXCoEg7QPGfbfAXKPDTNenBfRlawiblmTOhO/6ljKotWsMp22q/rpHrn9IEIeJmecwuuPIJ7EA+XYQ3hOKVccYf2ogoK73+8xD/Vul83Qvr84Q8afc4QUMVs8A==",
+                    "subType": "6"
+            }
+        },
+        server: {
+            "$binary": {
+                "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
+                "subType": "6"
+            }
+        },
+        counter: {
+            "$numberLong": "3"
+        },
+        edc: {
+            "$binary": {
+                "base64": "CEWSMQID7SFWYAUI3ZKSFKATKRYDQFNXXEOGAD5D4RSG",
+                "subType": "6"
+            }
+        }    } })");
+        auto exprFle = ExpressionInternalFLEEqual::parse(&expCtx, expr.firstElement(), vps);
+
+        ASSERT_VALUE_EQ(exprFle->evaluate({}, &expCtx.variables), Value(false));
+    }
+
+    // Negative: Use wrong edc token
+    {
+        auto expr = fromjson(R"({$_internalFleEq: {
+        field: {
+            "$binary": {
+                "base64":
+                "BxI0VngSNJh2EjQSNFZ4kBIQ0JE8aMUFkPk5sSTVqfdNNfjqUfQQ1Uoj0BBcthrWoe9wyU3cN6zmWaQBPJ97t0ZPbecnMsU736yXre6cBO4Zdt/wThtY+v5+7vFgNnWpgRP0e+vam6QPmLvbBrO0LdsvAPTGW4yqwnzCIXCoEg7QPGfbfAXKPDTNenBfRlawiblmTOhO/6ljKotWsMp22q/rpHrn9IEIeJmecwuuPIJ7EA+XYQ3hOKVccYf2ogoK73+8xD/Vul83Qvr84Q8afc4QUMVs8A==",
+                    "subType": "6"
+            }
+        },
+        server: {
+            "$binary": {
+                "base64": "COUAC/ERLYAKKX6B0VZ1R3QODOQFFJQJD+XLGIPU4/PS",
+                "subType": "6"
+            }
+        },
+        counter: {
+            "$numberLong": "3"
+        },
+        edc: {
+            "$binary": {
+                "base64": "CEWSmQID7SfwyAUI3ZkSFkATKryDQfnxXEOGad5d4Rsg",
+                "subType": "6"
+            }
+        }    } })");
+        auto exprFle = ExpressionInternalFLEEqual::parse(&expCtx, expr.firstElement(), vps);
+
+        ASSERT_THROWS_CODE(
+            exprFle->evaluate({}, &expCtx.variables), DBException, ErrorCodes::Overflow);
+    }
+}
+
+TEST(ExpressionFLETest, TestBinData_ContentionFactor) {
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+
+    // Use the wrong contention factor - 0
+    {
+        auto expr = fromjson(R"({$_internalFleEq: {
+        field: {
+            "$binary": {
+                "base64":
+                "BxI0VngSNJh2EjQSNFZ4kBIQ5+Wa5+SZafJeRUDGdLNx+i2ADDkyV2qA90Xcve7FqltoDm1PllSSgUS4fYtw3XDjzoNZrFFg8LfG2wH0HYbLMswv681KJpmEw7+RXy4CcPVFgoRFt24N13p7jT+pqu2oQAHAoxYTy/TsiAyY4RnAMiXYGg3hWz4AO/WxHNSyq6B6kX5d7x/hrXvppsZDc2Pmhd+c5xmovlv5RPj7wnNld13kYcMluztjNswiCH05hM/kp2/P7kw30iVnbz0SZxn1FjjCug==",
+                    "subType": "6"
+            }
+        },
+        server: {
+            "$binary": {
+                "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
+                "subType": "6"
+            }
+        },
+        counter: {
+            "$numberLong": "0"
+        },
+        edc: {
+            "$binary": {
+                "base64": "CEWSmQID7SfwyAUI3ZkSFkATKryDQfnxXEOGad5d4Rsg",
+                "subType": "6"
+            }
+        }    } })");
+        auto exprFle = ExpressionInternalFLEEqual::parse(&expCtx, expr.firstElement(), vps);
+
+        ASSERT_VALUE_EQ(exprFle->evaluate({}, &expCtx.variables), Value(false));
+    }
+
+    // Use the right contention factor - 50
+    {
+        auto expr = fromjson(R"({$_internalFleEq: {
+        field: {
+            "$binary": {
+                "base64":
+"BxI0VngSNJh2EjQSNFZ4kBIQ5+Wa5+SZafJeRUDGdLNx+i2ADDkyV2qA90Xcve7FqltoDm1PllSSgUS4fYtw3XDjzoNZrFFg8LfG2wH0HYbLMswv681KJpmEw7+RXy4CcPVFgoRFt24N13p7jT+pqu2oQAHAoxYTy/TsiAyY4RnAMiXYGg3hWz4AO/WxHNSyq6B6kX5d7x/hrXvppsZDc2Pmhd+c5xmovlv5RPj7wnNld13kYcMluztjNswiCH05hM/kp2/P7kw30iVnbz0SZxn1FjjCug==",
+                    "subType": "6"
+            }
+        },
+        server: {
+            "$binary": {
+                "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
+                "subType": "6"
+            }
+        },
+        counter: {
+            "$numberLong": "50"
+        },
+        edc: {
+            "$binary": {
+                "base64": "CEWSmQID7SfwyAUI3ZkSFkATKryDQfnxXEOGad5d4Rsg",
+                "subType": "6"
+            }
+        }    } })");
+        auto exprFle = ExpressionInternalFLEEqual::parse(&expCtx, expr.firstElement(), vps);
+
+        ASSERT_VALUE_EQ(exprFle->evaluate({}, &expCtx.variables), Value(true));
+    }
+}
+
+TEST(ExpressionFLETest, TestBinData_RoundTrip) {
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+
+    auto expr = fromjson(R"({$_internalFleEq: {
+    field: {
+        "$binary": {
+            "base64":
+            "BxI0VngSNJh2EjQSNFZ4kBIQ0JE8aMUFkPk5sSTVqfdNNfjqUfQQ1Uoj0BBcthrWoe9wyU3cN6zmWaQBPJ97t0ZPbecnMsU736yXre6cBO4Zdt/wThtY+v5+7vFgNnWpgRP0e+vam6QPmLvbBrO0LdsvAPTGW4yqwnzCIXCoEg7QPGfbfAXKPDTNenBfRlawiblmTOhO/6ljKotWsMp22q/rpHrn9IEIeJmecwuuPIJ7EA+XYQ3hOKVccYf2ogoK73+8xD/Vul83Qvr84Q8afc4QUMVs8A==",
+                "subType": "6"
+        }
+    },
+    server: {
+        "$binary": {
+            "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
+            "subType": "6"
+        }
+    },
+    counter: {
+        "$numberLong": "3"
+    },
+    edc: {
+        "$binary": {
+            "base64": "CEWSmQID7SfwyAUI3ZkSFkATKryDQfnxXEOGad5d4Rsg",
+            "subType": "6"
+        }
+    }    } })");
+    auto exprFle = ExpressionInternalFLEEqual::parse(&expCtx, expr.firstElement(), vps);
+
+    ASSERT_VALUE_EQ(exprFle->evaluate({}, &expCtx.variables), Value(true));
+
+    // Verify it round trips
+    auto value = exprFle->serialize(false);
+
+    auto roundTripExpr = fromjson(R"({$_internalFleEq: {
+    field: {
+        "$const" : { "$binary": {
+            "base64":
+            "BxI0VngSNJh2EjQSNFZ4kBIQ0JE8aMUFkPk5sSTVqfdNNfjqUfQQ1Uoj0BBcthrWoe9wyU3cN6zmWaQBPJ97t0ZPbecnMsU736yXre6cBO4Zdt/wThtY+v5+7vFgNnWpgRP0e+vam6QPmLvbBrO0LdsvAPTGW4yqwnzCIXCoEg7QPGfbfAXKPDTNenBfRlawiblmTOhO/6ljKotWsMp22q/rpHrn9IEIeJmecwuuPIJ7EA+XYQ3hOKVccYf2ogoK73+8xD/Vul83Qvr84Q8afc4QUMVs8A==",
+                "subType": "6"
+        }}
+    },
+    edc: {
+        "$binary": {
+            "base64": "CEWSmQID7SfwyAUI3ZkSFkATKryDQfnxXEOGad5d4Rsg",
+            "subType": "6"
+        }
+    },
+    counter: {
+        "$numberLong": "3"
+    },
+    server: {
+        "$binary": {
+            "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
+            "subType": "6"
+        }
+    }
+        } })");
+
+
+    ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
 }
 
 }  // namespace ExpressionTests

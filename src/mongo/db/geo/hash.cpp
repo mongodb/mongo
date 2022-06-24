@@ -154,16 +154,37 @@ void GeoHash::initFromString(const char* s) {
             setBit(i, 1);
 }
 
+namespace {
+// Extends a 32 bit value into a 64 bit value interleaved with zeros.
+std::uint64_t interleaveWithZeros(std::uint32_t input) {
+    // The following example is an extension to 32-bits of the following bit manipulation for 16-bit
+    // numbers.
+    //
+    //    0000 0000 0000 0000  abcd efgh ijkl mnop
+    // -> 0000 0000 abcd efgh  0000 0000 ijkl mnop
+    // -> 0000 abcd 0000 efgh  0000 ijkl 0000 mnop
+    // -> 00ab 00cd 00ef 00gh  00ij 00kl 00mn 00op
+    // -> 0a0b 0c0d 0e0f 0g0h  0i0j 0k0l 0m0n 0o0p
+    uint64_t word = input;
+    word = (word ^ (word << 16)) & 0x0000ffff0000ffff;
+    word = (word ^ (word << 8)) & 0x00ff00ff00ff00ff;
+    word = (word ^ (word << 4)) & 0x0f0f0f0f0f0f0f0f;
+    word = (word ^ (word << 2)) & 0x3333333333333333;
+    word = (word ^ (word << 1)) & 0x5555555555555555;
+    return word;
+}
+}  // namespace
+
 GeoHash::GeoHash(unsigned x, unsigned y, unsigned bits) {
     verify(bits <= 32);
-    _hash = 0;
     _bits = bits;
-    for (unsigned i = 0; i < bits; i++) {
-        if (isBitSet(x, i))
-            _hash |= mask64For(i * 2);
-        if (isBitSet(y, i))
-            _hash |= mask64For((i * 2) + 1);
-    }
+    auto interleavedX = interleaveWithZeros(x);
+    auto interleavedY = interleaveWithZeros(y);
+    auto fullHash = (interleavedX << 1) | interleavedY;
+    // bits * 2 number of significant bits set to 1 leaving the rest set at 0.
+    auto bitMask = (std::numeric_limits<std::uint64_t>::max() << (64 - (bits * 2)));
+    fullHash = fullHash & bitMask;
+    _hash = fullHash;
 }
 
 GeoHash::GeoHash(const GeoHash& old) {

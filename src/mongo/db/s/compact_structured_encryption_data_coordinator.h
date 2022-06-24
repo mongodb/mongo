@@ -40,7 +40,9 @@
 
 namespace mongo {
 
-class CompactStructuredEncryptionDataCoordinator final : public ShardingDDLCoordinator {
+class CompactStructuredEncryptionDataCoordinator final
+    : public RecoverableShardingDDLCoordinator<CompactStructuredEncryptionDataState,
+                                               CompactStructuredEncryptionDataPhaseEnum> {
 public:
     static constexpr auto kStateContext = "CompactStructuredEncryptionDataState"_sd;
     using StateDoc = CompactStructuredEncryptionDataState;
@@ -48,7 +50,8 @@ public:
 
     CompactStructuredEncryptionDataCoordinator(ShardingDDLCoordinatorService* service,
                                                const BSONObj& doc)
-        : ShardingDDLCoordinator(service, doc), _doc(StateDoc::parse({kStateContext}, doc)) {}
+        : RecoverableShardingDDLCoordinator(
+              service, "CompactStructuredEncryptionDataCoordinator", doc) {}
 
     boost::optional<BSONObj> reportForCurrentOp(
         MongoProcessInterface::CurrentOpConnectionsMode connMode,
@@ -63,36 +66,14 @@ public:
     void checkIfOptionsConflict(const BSONObj& doc) const final {}
 
 private:
-    void _enterPhase(Phase newPhase);
-
-    template <typename Func>
-    auto _executePhase(const Phase& newPhase, Func&& func) {
-        return [=] {
-            const auto& currPhase = _doc.getPhase();
-            if (currPhase > newPhase) {
-                return;
-            }
-            if (currPhase < newPhase) {
-                _enterPhase(newPhase);
-            }
-
-            return func(_doc);
-        };
-    }
-
-private:
-    ShardingDDLCoordinatorMetadata const& metadata() const final {
-        return _doc.getShardingDDLCoordinatorMetadata();
+    StringData serializePhase(const Phase& phase) const override {
+        return CompactStructuredEncryptionDataPhase_serializer(phase);
     }
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept final;
 
 private:
-    mutable Mutex _docMutex =
-        MONGO_MAKE_LATCH("CompactStructuredEncryptionDataCoordinator::_docMutex");
-    StateDoc _doc;
-
     boost::optional<CompactStructuredEncryptionDataCommandReply> _response;
     bool _skipCompact{false};
     boost::optional<UUID> _ecocRenameUuid;

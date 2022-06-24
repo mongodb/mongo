@@ -1,8 +1,9 @@
-# Run for half an hour.
-duration_seconds=1800,
+# Run for an hour.
+duration_seconds=3600,
 # The configuration can produce a large number of updates at once, therefore use 500MB cache size 
 # to hold these values.
-cache_size_mb=500,
+# 1.5 GB
+cache_size_mb=1536,
 compression_enabled=true,
 statistics_config=
 (
@@ -11,40 +12,31 @@ statistics_config=
 ),
 metrics_monitor=
 (
-    # Seems to insert around 477K records. Give it +-20K margin.
     cache_hs_insert=
     (
-        max=497000,
-        min=457000,
-        postrun=false,
         save=true,
     ),
-    # Seems to remove 160K records. Give it a similar margin.
     cc_pages_removed=
     (
-        max=170000,
-        min=150000,
-        postrun=false,
         save=true,
     ),
     stat_cache_size=
     (
-        max=110,
+        # FIXME-WT-9339
+        # one day maybe we'll stop blowing out the cache.
+        max=200,
         runtime=true,
     ),
-    # The data files compress to around 25MB per table at the end of a run so 250MB total.
-    # +1.4GB for the history store. With an additional 150MB margin.
     stat_db_size=
     (
-        max=1900000000,
         save=true,
     ),
 ),
 timestamp_manager=
 (
     enabled=true,
-    oldest_lag=2,
-    stable_lag=5
+    oldest_lag=1,
+    stable_lag=10
 ),
 workload_manager=
 (
@@ -54,30 +46,29 @@ workload_manager=
     ),
     populate_config=
     (
-        collection_count=10,
+        collection_count=100,
         key_count_per_collection=1000,
-        key_size=5,
-        thread_count=10,
-        value_size=100000
+        key_size=50,
+        thread_count=100,
+        value_size=1000000
     ),
     read_config=
     (
         op_rate=5ms,
-        ops_per_transaction=(max=100,min=1),
-        thread_count=8
+        ops_per_transaction=(max=1000,min=1),
+        thread_count=20
     ),
     update_config=
     (
-        op_rate=10ms,
+        op_rate=1ms,
         # Be careful to not aim too high with this config, if we fill the dirty cache and
         # all threads are trying to update, they'll get pulled into eviction and will get stuck.
-        ops_per_transaction=(max=20,min=0),
-        thread_count=10,
-        value_size=100000
+        ops_per_transaction=(max=10,min=0),
+        thread_count=100,
+        value_size=1000000
     )
 ),
 operation_tracker=
 (
-    enabled=true,
-    op_rate=20s
+    enabled=false,
 )

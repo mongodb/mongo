@@ -131,7 +131,7 @@ BSONObj RandomizedIdempotencyTest::canonicalizeDocumentForDataHash(const BSONObj
 BSONObj RandomizedIdempotencyTest::getDoc() {
     AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
     BSONObj doc;
-    Helpers::findById(_opCtx.get(), autoColl.getDb(), nss.ns(), kDocIdQuery, doc);
+    Helpers::findById(_opCtx.get(), nss.ns(), kDocIdQuery, doc);
     return doc.getOwned();
 }
 

@@ -5,7 +5,7 @@
  *
  * Runs defragmentation on collections with concurrent operations.
  *
- * @tags: [requires_sharding, assumes_balancer_on]
+ * @tags: [requires_sharding, assumes_balancer_on, antithesis_incompatible]
  */
 
 const dbPrefix = jsTestName() + '_DB_';

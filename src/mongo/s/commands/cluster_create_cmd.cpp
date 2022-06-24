@@ -94,6 +94,10 @@ public:
         return false;
     }
 
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;

@@ -56,7 +56,7 @@ protected:
     }
 
     Future<HealthCheckStatus> periodicCheckImpl(
-        PeriodicHealthCheckContext&& periodicCheckContext) noexcept override;
+        PeriodicHealthCheckContext&& periodicCheckContext) override;
 
 private:
     mutable PseudoRandom _random;

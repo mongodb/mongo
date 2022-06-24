@@ -235,8 +235,8 @@ public:
                                                             "Uninitialized");
         writeConflictRetry(opCtx, "dropAllIndexes", toReIndexNss.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            collection.getWritableCollection()->getIndexCatalog()->dropAllIndexes(
-                opCtx, collection.getWritableCollection(), true, {});
+            collection.getWritableCollection(opCtx)->getIndexCatalog()->dropAllIndexes(
+                opCtx, collection.getWritableCollection(opCtx), true, {});
 
             swIndexesToRebuild =
                 indexer->init(opCtx, collection, all, MultiIndexBlock::kNoopOnInitFn);
@@ -263,7 +263,7 @@ public:
         writeConflictRetry(opCtx, "commitReIndex", toReIndexNss.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
             uassertStatusOK(indexer->commit(opCtx,
-                                            collection.getWritableCollection(),
+                                            collection.getWritableCollection(opCtx),
                                             MultiIndexBlock::kNoopOnCreateEachFn,
                                             MultiIndexBlock::kNoopOnCommitFn));
             wunit.commit();

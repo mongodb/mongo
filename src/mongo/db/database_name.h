@@ -49,27 +49,22 @@ public:
     /**
      * Constructs an empty DatabaseName.
      */
-    DatabaseName() : _tenantId(boost::none), _dbString(""), _tenantDbString(boost::none){};
+    DatabaseName() = default;
 
     /**
      * Constructs a DatabaseName from the given tenantId and database name.
      * "dbName" is expected only consist of a db name. It is the caller's responsibility to ensure
      * the dbName is a valid db name.
      */
-    DatabaseName(boost::optional<TenantId> tenantId, StringData dbString) {
-        _tenantId = tenantId;
-        _dbString = dbString.toString();
-
-        _tenantDbString =
-            _tenantId ? boost::make_optional(_tenantId->toString() + "_" + _dbString) : boost::none;
-    }
+    DatabaseName(boost::optional<TenantId> tenantId, StringData dbString)
+        : _tenantId(std::move(tenantId)), _dbString(dbString.toString()) {}
 
     /**
      * Prefer to use the constructor above.
      * TODO SERVER-65456 Remove this constructor.
      */
     DatabaseName(StringData dbName, boost::optional<TenantId> tenantId = boost::none)
-        : DatabaseName(tenantId, dbName) {}
+        : DatabaseName(std::move(tenantId), dbName) {}
 
     static DatabaseName createSystemTenantDbName(StringData dbString);
 
@@ -82,28 +77,26 @@ public:
     }
 
     const std::string& toString() const {
-        if (_tenantDbString)
-            return *_tenantDbString;
+        return db();
+    }
 
-        invariant(!_tenantId);
+    std::string toStringWithTenantId() const {
+        if (_tenantId)
+            return str::stream() << *_tenantId << '_' << _dbString;
+
         return _dbString;
     }
 
     bool equalCaseInsensitive(const DatabaseName& other) const {
-        return boost::iequals(toString(), other.toString());
-    }
-
-    /**
-     * Returns -1, 0, or 1 if 'this' is less, equal, or greater than 'other' in
-     * lexicographical order.
-     */
-    int compare(const DatabaseName& other) const {
-        return toString().compare(other.toString());
+        return boost::iequals(toStringWithTenantId(), other.toStringWithTenantId());
     }
 
     template <typename H>
     friend H AbslHashValue(H h, const DatabaseName& obj) {
-        return H::combine(std::move(h), obj.toString());
+        if (obj._tenantId) {
+            return H::combine(std::move(h), obj._tenantId.get(), obj._dbString);
+        }
+        return H::combine(std::move(h), obj._dbString);
     }
 
     friend auto logAttrs(const DatabaseName& obj) {
@@ -111,9 +104,8 @@ public:
     }
 
 private:
-    boost::optional<TenantId> _tenantId;
+    boost::optional<TenantId> _tenantId = boost::none;
     std::string _dbString;
-    boost::optional<std::string> _tenantDbString;
 };
 
 inline std::ostream& operator<<(std::ostream& stream, const DatabaseName& tdb) {
@@ -125,7 +117,7 @@ inline StringBuilder& operator<<(StringBuilder& builder, const DatabaseName& tdb
 }
 
 inline bool operator==(const DatabaseName& lhs, const DatabaseName& rhs) {
-    return lhs.compare(rhs) == 0;
+    return (lhs.tenantId() == rhs.tenantId()) && (lhs.db() == rhs.db());
 }
 
 inline bool operator!=(const DatabaseName& lhs, const DatabaseName& rhs) {
@@ -133,11 +125,17 @@ inline bool operator!=(const DatabaseName& lhs, const DatabaseName& rhs) {
 }
 
 inline bool operator<(const DatabaseName& lhs, const DatabaseName& rhs) {
-    return lhs.compare(rhs) < 0;
+    if (lhs.tenantId() != rhs.tenantId()) {
+        return lhs.tenantId() < rhs.tenantId();
+    }
+    return lhs.db() < rhs.db();
 }
 
 inline bool operator>(const DatabaseName& lhs, const DatabaseName& rhs) {
-    return rhs < lhs;
+    if (lhs.tenantId() != rhs.tenantId()) {
+        return lhs.tenantId() > rhs.tenantId();
+    }
+    return lhs.db() > rhs.db();
 }
 
 inline bool operator<=(const DatabaseName& lhs, const DatabaseName& rhs) {

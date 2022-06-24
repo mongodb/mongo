@@ -164,12 +164,12 @@ protected:
         "allShardsHighestRemainingOperationTimeEstimatedSecs";
 
 private:
+    const Date_t _startTime;
+
     ClockSource* _clockSource;
     ObserverPtr _observer;
     ShardingDataTransformCumulativeMetrics* _cumulativeMetrics;
     ShardingDataTransformCumulativeMetrics::DeregistrationFunction _deregister;
-
-    const Date_t _startTime;
 
     AtomicWord<Date_t> _copyingStartTime;
     AtomicWord<Date_t> _copyingEndTime;

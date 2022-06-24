@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/cqf/cqf_command_utils.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/cursor_manager.h"
@@ -216,6 +217,10 @@ public:
         return true;
     }
 
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
     class Invocation final : public CommandInvocation {
     public:
         Invocation(const FindCmd* definition, const OpMsgRequest& request, StringData dbName)
@@ -297,9 +302,8 @@ public:
             // If we are running a query against a view, or if we are trying to test the new
             // optimizer, redirect this query through the aggregation system.
             if (ctx->getView() ||
-                (feature_flags::gfeatureFlagCommonQueryFramework.isEnabled(
-                     serverGlobalParams.featureCompatibility) &&
-                 internalQueryEnableCascadesOptimizer.load())) {
+                isEligibleForBonsai(
+                    cq->getFindCommandRequest(), *cq->root(), opCtx, ctx->getCollection())) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 ctx.reset();
 
@@ -503,9 +507,8 @@ public:
             // If we are running a query against a view, or if we are trying to test the new
             // optimizer, redirect this query through the aggregation system.
             if (ctx->getView() ||
-                (feature_flags::gfeatureFlagCommonQueryFramework.isEnabled(
-                     serverGlobalParams.featureCompatibility) &&
-                 internalQueryEnableCascadesOptimizer.load())) {
+                isEligibleForBonsai(
+                    cq->getFindCommandRequest(), *cq->root(), opCtx, ctx->getCollection())) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 ctx.reset();
 

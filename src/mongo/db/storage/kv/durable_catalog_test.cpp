@@ -62,6 +62,8 @@ static const long kExpectedVersion = 1;
 
 class DurableCatalogTest : public CatalogTestFixture {
 public:
+    explicit DurableCatalogTest(Options options = {}) : CatalogTestFixture(std::move(options)) {}
+
     void setUp() override {
         CatalogTestFixture::setUp();
 
@@ -143,13 +145,17 @@ public:
             WriteUnitOfWork wuow(operationContext());
             const bool isSecondaryBackgroundIndexBuild = false;
             boost::optional<UUID> buildUUID(twoPhase, UUID::gen());
-            ASSERT_OK(collWriter.getWritableCollection()->prepareForIndexBuild(
-                operationContext(), desc.get(), buildUUID, isSecondaryBackgroundIndexBuild));
-            entry = collWriter.getWritableCollection()->getIndexCatalog()->createIndexEntry(
-                operationContext(),
-                collWriter.getWritableCollection(),
-                std::move(desc),
-                CreateIndexEntryFlags::kNone);
+            ASSERT_OK(collWriter.getWritableCollection(operationContext())
+                          ->prepareForIndexBuild(operationContext(),
+                                                 desc.get(),
+                                                 buildUUID,
+                                                 isSecondaryBackgroundIndexBuild));
+            entry = collWriter.getWritableCollection(operationContext())
+                        ->getIndexCatalog()
+                        ->createIndexEntry(operationContext(),
+                                           collWriter.getWritableCollection(operationContext()),
+                                           std::move(desc),
+                                           CreateIndexEntryFlags::kNone);
             wuow.commit();
         }
 
@@ -191,6 +197,9 @@ private:
 };
 
 class ImportCollectionTest : public DurableCatalogTest {
+public:
+    explicit ImportCollectionTest() : DurableCatalogTest(Options{}.ephemeral(false)) {}
+
 protected:
     void setUp() override {
         DurableCatalogTest::setUp();
@@ -541,8 +550,9 @@ TEST_F(DurableCatalogTest, SinglePhaseIndexBuild) {
         Lock::CollectionLock collLk(operationContext(), collection->ns(), MODE_X);
 
         WriteUnitOfWork wuow(operationContext());
-        getCollectionWriter().getWritableCollection()->indexBuildSuccess(operationContext(),
-                                                                         indexEntry);
+        getCollectionWriter()
+            .getWritableCollection(operationContext())
+            ->indexBuildSuccess(operationContext(), indexEntry);
         wuow.commit();
     }
 
@@ -564,8 +574,9 @@ TEST_F(DurableCatalogTest, TwoPhaseIndexBuild) {
         Lock::CollectionLock collLk(operationContext(), collection->ns(), MODE_X);
 
         WriteUnitOfWork wuow(operationContext());
-        getCollectionWriter().getWritableCollection()->indexBuildSuccess(operationContext(),
-                                                                         indexEntry);
+        getCollectionWriter()
+            .getWritableCollection(operationContext())
+            ->indexBuildSuccess(operationContext(), indexEntry);
         wuow.commit();
     }
 

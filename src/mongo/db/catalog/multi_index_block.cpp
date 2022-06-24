@@ -137,7 +137,7 @@ void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
             // This cleans up all index builds. Because that may need to write, it is done inside of
             // a WUOW. Nothing inside this block can fail, and it is made fatal if it does.
             for (size_t i = 0; i < _indexes.size(); i++) {
-                _indexes[i].block->fail(opCtx, collection.getWritableCollection());
+                _indexes[i].block->fail(opCtx, collection.getWritableCollection(opCtx));
             }
 
             onCleanUp();
@@ -301,16 +301,18 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                         stateInfoIt != resumeInfoIndexes.end());
 
                 stateInfo = *stateInfoIt;
-                status = index.block->initForResume(
-                    opCtx, collection.getWritableCollection(), *stateInfo, resumeInfo->getPhase());
+                status = index.block->initForResume(opCtx,
+                                                    collection.getWritableCollection(opCtx),
+                                                    *stateInfo,
+                                                    resumeInfo->getPhase());
             } else {
-                status = index.block->init(opCtx, collection.getWritableCollection());
+                status = index.block->init(opCtx, collection.getWritableCollection(opCtx));
             }
             if (!status.isOK())
                 return status;
 
             auto indexCatalogEntry =
-                index.block->getEntry(opCtx, collection.getWritableCollection());
+                index.block->getEntry(opCtx, collection.getWritableCollection(opCtx));
             index.real = indexCatalogEntry->accessMethod();
             status = index.real->initializeAsEmpty(opCtx);
             if (!status.isOK())

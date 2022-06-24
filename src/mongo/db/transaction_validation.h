@@ -57,12 +57,6 @@ void validateWriteConcernForTransaction(const WriteConcernOptions& wcResult, Str
 bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLevel);
 
 /**
- * Returns true if the given command is one of the commands that does not check out a session
- * regardless of its session options, e.g. two-phase commit commands.
- */
-bool shouldCommandSkipSessionCheckout(StringData cmdName);
-
-/**
  * Throws if the given session options are invalid for the given command and target namespace.
  */
 void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions,

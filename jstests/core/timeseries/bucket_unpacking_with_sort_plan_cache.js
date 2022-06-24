@@ -66,68 +66,83 @@ const bucketsName = "system.buckets." + collName;
 const stageName = "$_internalBoundedSort";
 const bucketsColl = db[bucketsName];
 
-const numDocs = 20;
-// Setup with a few documents.
-setupCollection(coll, collName, numDocs);
+const testBoundedSorterPlanCache = (sortDirection, indexDirection) => {
+    // Setup with a few documents.
+    const numDocs = 20;
+    setupCollection(coll, collName, numDocs);
 
-// Create indexes so that we have something to multiplan.
-assert.commandWorked(coll.createIndex({"m.a": 1, "m.i": 1, t: 1}));
-assert.commandWorked(coll.createIndex({"m.b": 1, "m.i": 1, t: 1}));
+    assert.commandWorked(
+        coll.createIndex({"m.a": indexDirection, "m.i": indexDirection, t: indexDirection}));
+    assert.commandWorked(
+        coll.createIndex({"m.b": indexDirection, "m.i": indexDirection, t: indexDirection}));
 
-// Check that the rewrite is performed before caching.
-const pipeline = [{$sort: {"m.i": 1, t: 1}}, {$match: {"m.a": 1, "m.b": 1}}];
-let explain = coll.explain().aggregate(pipeline);
-assert.eq(getAggPlanStages(explain, stageName).length, 1, explain);
+    // Check that the rewrite is performed before caching.
+    const pipeline =
+        [{$sort: {"m.i": sortDirection, t: sortDirection}}, {$match: {"m.a": 1, "m.b": 1}}];
+    let explain = coll.explain().aggregate(pipeline);
+    assert.eq(getAggPlanStages(explain, stageName).length, 1, explain);
+    const traversalDirection = sortDirection === indexDirection ? "forward" : "backward";
+    assert.eq(getAggPlanStage(explain, "IXSCAN").direction, traversalDirection, explain);
 
-// Check the cache is empty.
-assert.eq(db[bucketsName].getPlanCache().list().length, 0);
+    // Check the cache is empty.
+    assert.eq(db[bucketsName].getPlanCache().list().length, 0);
 
-// Run in order to cache the plan.
-let result = coll.aggregate(pipeline).toArray();
-assert.eq(result.length, 20, result);
+    // Run in order to cache the plan.
+    let result = coll.aggregate(pipeline).toArray();
+    assert.eq(result.length, 20, result);
 
-// Check the answer was cached.
-assert.eq(db[bucketsName].getPlanCache().list().length, 1);
+    // Check the answer was cached.
+    assert.eq(db[bucketsName].getPlanCache().list().length, 1);
 
-// Check that the solution still uses internal bounded sort.
-explain = coll.explain().aggregate(pipeline);
-assert(getAggPlanStages(explain, stageName).length === 1, explain);
+    // Check that the solution still uses internal bounded sort with the correct order.
+    explain = coll.explain().aggregate(pipeline);
+    assert.eq(getAggPlanStages(explain, stageName).length, 1, explain);
+    assert.eq(getAggPlanStage(explain, "IXSCAN").direction, traversalDirection, explain);
 
-// Get constants needed for replanning.
-const cursorStageName = "$cursor";
-const planCacheKey =
-    getPlanCacheKeyFromExplain(getAggPlanStage(explain, cursorStageName)[cursorStageName], db);
-const planCacheEntry = (() => {
-    const planCache = bucketsColl.getPlanCache().list([{$match: {planCacheKey}}]);
-    assert.eq(planCache.length, 1, planCache);
-    return planCache[0];
-})();
-let ratio = (() => {
-    const getParamRes = assert.commandWorked(
-        db.adminCommand({getParameter: 1, internalQueryCacheEvictionRatio: 1}));
-    return getParamRes["internalQueryCacheEvictionRatio"];
-})();
+    // Get constants needed for replanning.
+    const cursorStageName = "$cursor";
+    const planCacheKey =
+        getPlanCacheKeyFromExplain(getAggPlanStage(explain, cursorStageName)[cursorStageName], db);
+    const planCacheEntry = (() => {
+        const planCache = bucketsColl.getPlanCache().list([{$match: {planCacheKey}}]);
+        assert.eq(planCache.length, 1, planCache);
+        return planCache[0];
+    })();
+    let ratio = (() => {
+        const getParamRes = assert.commandWorked(
+            db.adminCommand({getParameter: 1, internalQueryCacheEvictionRatio: 1}));
+        return getParamRes["internalQueryCacheEvictionRatio"];
+    })();
 
-// Remove existing docs, add docs to trigger replanning.
-assert.commandWorked(coll.deleteMany({"m.a": 1, "m.b": 1}));
-let numNewDocs = ratio * planCacheEntry.works + 1;
-addDocs(coll, numNewDocs, [1, 0]);
-addDocs(coll, numNewDocs, [0, 1]);
+    // Remove existing docs, add docs to trigger replanning.
+    assert.commandWorked(coll.deleteMany({"m.a": 1, "m.b": 1}));
+    let numNewDocs = ratio * planCacheEntry.works + 1;
+    addDocs(coll, numNewDocs, [1, 0]);
+    addDocs(coll, numNewDocs, [0, 1]);
 
-// Turn on profiling.
-db.setProfilingLevel(2);
+    // Turn on profiling.
+    db.setProfilingLevel(2);
 
-// Rerun command with replanning.
-const comment = jsTestName();
-result = coll.aggregate(pipeline, {comment}).toArray();
-assert.eq(result.length, 0);
+    // Rerun command with replanning.
+    const comment = jsTestName();
+    result = coll.aggregate(pipeline, {comment}).toArray();
+    assert.eq(result.length, 0);
 
-// Check that the plan was replanned.
-const replanProfileEntry = getLatestProfilerEntry(db, {'command.comment': comment});
-assert(replanProfileEntry.replanned, replanProfileEntry);
+    // Check that the plan was replanned.
+    const replanProfileEntry = getLatestProfilerEntry(db, {'command.comment': comment});
+    assert(replanProfileEntry.replanned, replanProfileEntry);
 
-// Check that rewrite happens with replanning.
-explain = coll.explain().aggregate(pipeline);
-assert(getAggPlanStages(explain, stageName).length === 1,
-       {explain, stages: getAggPlanStages(explain, stageName)});
+    // Check that rewrite happens with replanning.
+    explain = coll.explain().aggregate(pipeline);
+    assert.eq(getAggPlanStages(explain, stageName).length,
+              1,
+              {explain, stages: getAggPlanStages(explain, stageName)});
+    assert.eq(getAggPlanStage(explain, "IXSCAN").direction, traversalDirection, explain);
+};
+
+for (const sortDirection of [-1, 1]) {
+    for (const indexDirection of [-1, 1]) {
+        testBoundedSorterPlanCache(sortDirection, indexDirection);
+    }
+}
 })();

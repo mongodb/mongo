@@ -108,7 +108,7 @@ allNodes.forEach((hostName) => {
     assert(serverStatus.hasOwnProperty('countFailed'), debugStr());
 
     assert(serverStatus.hasOwnProperty('active'), debugStr());
-    assert(serverStatus.active.hasOwnProperty('documentsProcessed'), debugStr());
+    assert(serverStatus.active.hasOwnProperty('documentsCopied'), debugStr());
 
     assert(serverStatus.hasOwnProperty('oldestActive'), debugStr());
     assert(

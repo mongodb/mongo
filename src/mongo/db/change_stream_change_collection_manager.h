@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {
@@ -63,7 +64,12 @@ public:
      * Returns true if change collections are enabled for recording oplog entries, false
      * otherwise.
      */
-    static bool isChangeCollectionEnabled();
+    static bool isChangeCollectionsModeActive();
+
+    /**
+     * Returns true if the change collection is present for the specified tenant, false otherwise.
+     */
+    bool hasChangeCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId) const;
 
     /**
      * Creates a change collection for the specified tenant, if it doesn't exist. Returns Status::OK
@@ -81,9 +87,9 @@ public:
     Status dropChangeCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId);
 
     /**
-     * Inserts documents to change collections. The parameter 'oplogRecords'
-     * is a vector of oplog records and the parameter 'oplogTimestamps' is a vector for respective
-     * timestamp for each oplog record.
+     * Inserts documents to change collections. The parameter 'oplogRecords' is a vector of oplog
+     * records and the parameter 'oplogTimestamps' is a vector for respective timestamp for each
+     * oplog record.
      *
      * The method fetches the tenant-id from the oplog entry, performs necessary modification to the
      * document and then write to the tenant's change collection at the specified oplog timestamp.
@@ -96,6 +102,20 @@ public:
     void insertDocumentsToChangeCollection(OperationContext* opCtx,
                                            const std::vector<Record>& oplogRecords,
                                            const std::vector<Timestamp>& oplogTimestamps);
+
+
+    /**
+     * Performs a range inserts on respective change collections using the oplog entries as
+     * specified by 'beginOplogEntries' and 'endOplogEntries'.
+     *
+     * Bails out if a failure is encountered in inserting documents to a particular change
+     * collection.
+     */
+    Status insertDocumentsToChangeCollection(
+        OperationContext* opCtx,
+        std::vector<InsertStatement>::const_iterator beginOplogEntries,
+        std::vector<InsertStatement>::const_iterator endOplogEntries,
+        OpDebug* opDebug);
 };
 
 }  // namespace mongo

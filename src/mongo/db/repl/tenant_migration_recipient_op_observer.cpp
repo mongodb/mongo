@@ -282,11 +282,11 @@ void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
     if (nss == NamespaceString::kTenantMigrationRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         if (tenantIdToDeleteDecoration(opCtx)) {
+            auto tenantId = tenantIdToDeleteDecoration(opCtx).get();
             LOGV2_INFO(8423337, "Removing expired 'multitenant migration' migration");
-            opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
+            opCtx->recoveryUnit()->onCommit([opCtx, tenantId](boost::optional<Timestamp>) {
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .remove(tenantIdToDeleteDecoration(opCtx).get(),
-                            TenantMigrationAccessBlocker::BlockerType::kRecipient);
+                    .remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
             });
         }
 
@@ -297,8 +297,7 @@ void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
                        "migrationId"_attr = migrationId);
             opCtx->recoveryUnit()->onCommit([opCtx, migrationId](boost::optional<Timestamp>) {
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .removeRecipientAccessBlockersForMigration(
-                        migrationIdToDeleteDecoration(opCtx).get());
+                    .removeRecipientAccessBlockersForMigration(migrationId);
                 repl::TenantFileImporterService::get(opCtx->getServiceContext())
                     ->interrupt(migrationId);
             });

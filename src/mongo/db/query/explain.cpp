@@ -48,6 +48,7 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_impl.h"
@@ -79,7 +80,7 @@ namespace {
  * - 'out' is a builder for the explain output.
  */
 void generatePlannerInfo(PlanExecutor* exec,
-                         const CollectionPtr& collection,
+                         const MultipleCollectionAccessor& collections,
                          BSONObj extraInfo,
                          BSONObjBuilder* out) {
     BSONObjBuilder plannerBob(out->subobjStart("queryPlanner"));
@@ -91,22 +92,23 @@ void generatePlannerInfo(PlanExecutor* exec,
     bool indexFilterSet = false;
     boost::optional<uint32_t> queryHash;
     boost::optional<uint32_t> planCacheKeyHash;
-    if (collection && exec->getCanonicalQuery()) {
+    const auto& mainCollection = collections.getMainCollection();
+    if (mainCollection && exec->getCanonicalQuery()) {
         const QuerySettings* querySettings =
-            QuerySettingsDecoration::get(collection->getSharedDecorations());
+            QuerySettingsDecoration::get(mainCollection->getSharedDecorations());
         if (exec->getCanonicalQuery()->isSbeCompatible() &&
             feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() &&
             !exec->getCanonicalQuery()->getForceClassicEngine() &&
-            // TODO(SERVER-61507): Remove pipeline check once lowered pipelines are integrated with
-            // SBE plan cache.
-            exec->getCanonicalQuery()->pipeline().empty()) {
-            const auto planCacheKeyInfo = plan_cache_key_factory::make<sbe::PlanCacheKey>(
-                *exec->getCanonicalQuery(), collection);
+            // TODO SERVER-61507: remove canUseSbePlanCache check when $group pushdown is
+            // integrated with SBE plan cache.
+            canonical_query_encoder::canUseSbePlanCache(*exec->getCanonicalQuery())) {
+            const auto planCacheKeyInfo =
+                plan_cache_key_factory::make(*exec->getCanonicalQuery(), collections);
             planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
             queryHash = planCacheKeyInfo.queryHash();
         } else {
-            const auto planCacheKeyInfo =
-                plan_cache_key_factory::make<PlanCacheKey>(*exec->getCanonicalQuery(), collection);
+            const auto planCacheKeyInfo = plan_cache_key_factory::make<PlanCacheKey>(
+                *exec->getCanonicalQuery(), mainCollection);
             planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
             queryHash = planCacheKeyInfo.queryHash();
         }
@@ -310,7 +312,7 @@ void appendBasicPlanCacheEntryInfoToBSON(const EntryType& entry, BSONObjBuilder*
 }  // namespace
 
 void Explain::explainStages(PlanExecutor* exec,
-                            const CollectionPtr& collection,
+                            const MultipleCollectionAccessor& collections,
                             ExplainOptions::Verbosity verbosity,
                             Status executePlanStatus,
                             boost::optional<PlanExplainer::PlanStatsDetails> winningPlanTrialStats,
@@ -325,7 +327,7 @@ void Explain::explainStages(PlanExecutor* exec,
     out->appendElements(explainVersionToBson(explainer.getVersion()));
 
     if (verbosity >= ExplainOptions::Verbosity::kQueryPlanner) {
-        generatePlannerInfo(exec, collection, extraInfo, out);
+        generatePlannerInfo(exec, collections, extraInfo, out);
     }
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
@@ -364,7 +366,7 @@ void Explain::explainPipeline(PlanExecutor* exec,
 }
 
 void Explain::explainStages(PlanExecutor* exec,
-                            const CollectionPtr& collection,
+                            const MultipleCollectionAccessor& collections,
                             ExplainOptions::Verbosity verbosity,
                             BSONObj extraInfo,
                             const BSONObj& command,
@@ -372,9 +374,10 @@ void Explain::explainStages(PlanExecutor* exec,
     auto&& explainer = exec->getPlanExplainer();
     auto winningPlanTrialStats = explainer.getWinningPlanTrialStats();
     Status executePlanStatus = Status::OK();
-    const CollectionPtr* collectionPtr = &collection;
+    const MultipleCollectionAccessor* collectionsPtr = &collections;
 
     // If we need execution stats, then run the plan in order to gather the stats.
+    const MultipleCollectionAccessor emptyCollections;
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         try {
             executePlan(exec);
@@ -386,12 +389,12 @@ void Explain::explainStages(PlanExecutor* exec,
         // then the collection may no longer be valid. We conservatively set our collection pointer
         // to null in case it is invalid.
         if (!executePlanStatus.isOK() && executePlanStatus != ErrorCodes::NoQueryExecutionPlans) {
-            collectionPtr = &CollectionPtr::null;
+            collectionsPtr = &emptyCollections;
         }
     }
 
     explainStages(exec,
-                  *collectionPtr,
+                  *collectionsPtr,
                   verbosity,
                   executePlanStatus,
                   winningPlanTrialStats,
@@ -401,6 +404,15 @@ void Explain::explainStages(PlanExecutor* exec,
 
     explain_common::generateServerInfo(out);
     explain_common::generateServerParameters(out);
+}
+
+void Explain::explainStages(PlanExecutor* exec,
+                            const CollectionPtr& collection,
+                            ExplainOptions::Verbosity verbosity,
+                            BSONObj extraInfo,
+                            const BSONObj& command,
+                            BSONObjBuilder* out) {
+    explainStages(exec, MultipleCollectionAccessor(collection), verbosity, extraInfo, command, out);
 }
 
 void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* out) {

@@ -158,15 +158,16 @@ public:
 
         const Operations op = translateCmpOpFn(expr->getOp());
         if (op != Operations::Cmp3w) {
-            // If we have EvalPaths coming from the left or on the right, add a PathCompare, and
-            // keep propagating the path.
-            if (auto leftPtr = left.cast<EvalPath>();
-                leftPtr != nullptr && leftPtr->getInput() == _ctx.getRootProjVar()) {
+            // If we have simple EvalPaths coming from the left or on the right, add a PathCompare,
+            // and keep propagating the path.
+            if (auto leftPtr = left.cast<EvalPath>(); leftPtr != nullptr &&
+                isSimplePath(leftPtr->getPath()) && leftPtr->getInput() == _ctx.getRootProjVar()) {
                 addEvalFilterFn(std::move(leftPtr->getPath()), std::move(right), op);
                 return;
             }
-            if (auto rightPtr = right.cast<EvalPath>();
-                rightPtr != nullptr && rightPtr->getInput() == _ctx.getRootProjVar()) {
+            if (auto rightPtr = right.cast<EvalPath>(); rightPtr != nullptr &&
+                isSimplePath(rightPtr->getPath()) &&
+                rightPtr->getInput() == _ctx.getRootProjVar()) {
                 addEvalFilterFn(
                     std::move(rightPtr->getPath()), std::move(left), reverseComparisonOp(op));
                 return;
@@ -248,8 +249,10 @@ public:
         ABT path = translateFieldPath(
             fieldPath,
             make<PathIdentity>(),
-            [](const std::string& fieldName, const bool /*isLastElement*/, ABT input) {
-                // No traverse.
+            [](const std::string& fieldName, const bool isLastElement, ABT input) {
+                if (!isLastElement) {
+                    input = make<PathTraverse>(std::move(input));
+                }
                 return make<PathGet>(fieldName, std::move(input));
             },
             1ul);
@@ -308,7 +311,7 @@ public:
     }
 
     void visit(const ExpressionLn* expr) override final {
-        unsupportedExpression(expr->getOpName());
+        pushSingleArgFunctionFromTop("ln");
     }
 
     void visit(const ExpressionLog* expr) override final {
@@ -316,6 +319,10 @@ public:
     }
 
     void visit(const ExpressionLog10* expr) override final {
+        unsupportedExpression(expr->getOpName());
+    }
+
+    void visit(const ExpressionInternalFLEEqual* expr) override final {
         unsupportedExpression(expr->getOpName());
     }
 
@@ -328,7 +335,7 @@ public:
     }
 
     void visit(const ExpressionMod* expr) override final {
-        unsupportedExpression(expr->getOpName());
+        pushMultiArgFunctionFromTop("mod", 2);
     }
 
     void visit(const ExpressionMultiply* expr) override final {
@@ -775,6 +782,7 @@ private:
         for (size_t i = 0; i < arity; i++) {
             ABT child = _ctx.pop();
             if (auto filterPtr = child.cast<EvalFilter>(); allFilters && filterPtr != nullptr &&
+                isSimplePath(filterPtr->getPath()) &&
                 filterPtr->getInput() == _ctx.getRootProjVar()) {
                 childPaths.push_back(filterPtr->getPath());
             } else {
@@ -784,7 +792,7 @@ private:
         }
 
         if (allFilters) {
-            // If all children are paths, place a path composition.
+            // If all children are simple paths, place a path composition.
             ABT result = make<PathIdentity>();
             if (isAnd) {
                 for (ABT& child : childPaths) {
@@ -812,6 +820,8 @@ private:
         for (size_t i = 0; i < argCount; i++) {
             children.emplace_back(_ctx.pop());
         }
+        std::reverse(children.begin(), children.end());
+
         _ctx.push<FunctionCall>(functionName, children);
     }
 
@@ -822,14 +832,10 @@ private:
     void pushArithmeticBinaryExpr(const Expression* expr, const Operations op) {
         const size_t arity = expr->getChildren().size();
         _ctx.ensureArity(arity);
-        if (arity < 2) {
-            // Nothing to do for arity 0 and 1.
-            return;
-        }
 
         ABT current = _ctx.pop();
         for (size_t i = 0; i < arity - 1; i++) {
-            current = make<BinaryOp>(op, std::move(current), _ctx.pop());
+            current = make<BinaryOp>(op, _ctx.pop(), std::move(current));
         }
         _ctx.push(std::move(current));
     }

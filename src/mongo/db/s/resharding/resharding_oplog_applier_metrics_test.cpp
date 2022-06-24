@@ -42,14 +42,14 @@ namespace {
 
 class ReshardingOplogApplierMetricsTest : public ShardingDataTransformMetricsTestFixture {
 public:
-    std::unique_ptr<ReshardingMetricsNew> createInstanceMetrics() {
-        return std::make_unique<ReshardingMetricsNew>(UUID::gen(),
-                                                      kTestCommand,
-                                                      kTestNamespace,
-                                                      ReshardingMetricsNew::Role::kRecipient,
-                                                      getClockSource()->now(),
-                                                      getClockSource(),
-                                                      &_cumulativeMetrics);
+    std::unique_ptr<ReshardingMetrics> createInstanceMetrics() {
+        return std::make_unique<ReshardingMetrics>(UUID::gen(),
+                                                   kTestCommand,
+                                                   kTestNamespace,
+                                                   ReshardingMetrics::Role::kRecipient,
+                                                   getClockSource()->now(),
+                                                   getClockSource(),
+                                                   &_cumulativeMetrics);
     }
 };
 

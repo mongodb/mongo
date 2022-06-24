@@ -33,7 +33,6 @@
 #include <vector>
 
 #include "mongo/client/connection_string.h"
-#include "mongo/client/query.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/rpc/unique_message.h"
@@ -167,20 +166,6 @@ public:
      * Finds documents from this mock server according to 'findRequest'.
      */
     mongo::BSONArray find(InstanceID id, const FindCommandRequest& findRequest);
-
-    /**
-     * Legacy query API: New callers should use 'find()' rather than this method.
-     */
-    mongo::BSONArray query(InstanceID id,
-                           const NamespaceStringOrUUID& nsOrUuid,
-                           const BSONObj& filter,
-                           const Query& querySettings,
-                           int limit = 0,
-                           int nToSkip = 0,
-                           const mongo::BSONObj* fieldsToReturn = nullptr,
-                           int queryOptions = 0,
-                           int batchSize = 0,
-                           boost::optional<BSONObj> readConcernObj = boost::none);
 
     //
     // Getters

@@ -93,6 +93,10 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
     Status explain(OperationContext* opCtx,
                    const OpMsgRequest& opMsgRequest,
                    ExplainOptions::Verbosity verbosity,

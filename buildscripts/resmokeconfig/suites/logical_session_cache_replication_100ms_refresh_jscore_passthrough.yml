@@ -14,7 +14,6 @@ selector:
   # can be triggered deterministically.
   - jstests/core/list_all_local_sessions.js
   - jstests/core/list_all_sessions.js
-  - jstests/core/list_local_sessions.js
   - jstests/core/list_sessions.js
   # The awaitdata_getmore_cmd.js test tails the oplog and waits for the getMore batch size to equal
   # zero. The CheckReplDBHashInBackground hook consistently runs and creates sessions. At the same

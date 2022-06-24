@@ -96,7 +96,6 @@ private:
 
     // Queries '_stashNss' using 'idQuery'.
     BSONObj _queryStashCollById(OperationContext* opCtx,
-                                Database* db,
                                 const CollectionPtr& coll,
                                 const BSONObj& idQuery) const;
 

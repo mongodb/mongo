@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
+#include "mongo/db/s/rename_collection_participant_service.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog/collection_catalog.h"
@@ -40,8 +39,6 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/recoverable_critical_section_service.h"
-#include "mongo/db/s/rename_collection_participant_service.h"
-#include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
@@ -49,9 +46,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
-
 namespace {
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
@@ -76,7 +71,6 @@ void dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) 
                 "collectionExisted"_attr = knownNss);
 }
 
-/* Clear the CollectionShardingRuntime entry for the specified namespace */
 void clearFilteringMetadata(OperationContext* opCtx, const NamespaceString& nss) {
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
@@ -135,6 +129,7 @@ void renameOrDropTarget(OperationContext* opCtx,
         deleteRangeDeletionTasksForRename(opCtx, fromNss, toNss);
     }
 }
+
 }  // namespace
 
 RenameCollectionParticipantService* RenameCollectionParticipantService::getService(

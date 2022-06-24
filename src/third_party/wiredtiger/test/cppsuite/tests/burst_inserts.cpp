@@ -96,9 +96,6 @@ class burst_inserts : public test {
                 std::chrono::seconds(_burst_duration)) {
                 tc->txn.try_begin();
                 auto key = tc->pad_string(std::to_string(start_key + added_count), tc->key_size);
-                cc.write_cursor->set_key(cc.write_cursor.get(), key.c_str());
-                testutil_assert(cc.write_cursor->search(cc.write_cursor.get()) == WT_NOTFOUND);
-
                 /* A return value of true implies the insert was successful. */
                 auto value =
                   random_generator::instance().generate_pseudo_random_string(tc->value_size);
@@ -130,9 +127,6 @@ class burst_inserts : public test {
                     }
                     added_count = 0;
                 }
-
-                /* Sleep as currently this loop is too fast. */
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
             /* Close out our current txn. */
             if (tc->txn.active()) {

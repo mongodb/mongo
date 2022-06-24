@@ -359,6 +359,17 @@ public:
          */
         void reportUnstashedState(OperationContext* opCtx, BSONObjBuilder* builder) const;
 
+        /**
+         * Returns the transaction number associated with the client operation that spawned this
+         * transaction. ie the top-level txnNumber for a retryable write or client transaction or
+         * the txnNumber in the session id for a retryable transaction. The passed in
+         * txnNumberAndRetryCounter should be the active txnNumberAndRetryCounter of this
+         * participant. This must be provided so this method can be used before the participant's
+         * active txnNumberAndRetryCounter has been changed.
+         */
+        boost::optional<TxnNumber> getClientTxnNumber(
+            const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) const;
+
     protected:
         explicit Observer(TransactionParticipant* tp) : _tp(tp) {}
 
@@ -919,6 +930,12 @@ public:
         // byzantine messages, this check should never fail.
         void _uassertCanReuseActiveTxnNumberForTransaction(OperationContext* opCtx);
 
+        // Verifies we can begin a multi document transaction with the given txnNumber and
+        // txnRetryCounter. Throws if we cannot. Returns true if this is a retry of the active
+        // transaction and false otherwise.
+        bool _verifyCanBeginMultiDocumentTransaction(
+            OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);
+
         // Attempt to begin or retry a retryable write at the given transaction number.
         void _beginOrContinueRetryableWrite(
             OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);
@@ -1250,10 +1267,35 @@ public:
      */
     bool isValid() const;
 
+    /**
+     * If a transaction in the catalog conflicts with the incoming transaction and this is the first
+     * time that has happened, the conflicting transaction is aborted, on the assumption that the
+     * new transaction is likely from a fresher client and the client of the conflicting transaction
+     * has give up (e.g. crashed). To prevent livelocks if both clients are alive and retrying,
+     * RetryableTransactionInProgress is thrown on subsequent calls, forcing the incoming
+     * transaction to wait for the conflicting to complete.
+     */
+    void checkForConflictingInternalTransactions(
+        OperationContext* opCtx,
+        TxnNumber incomingClientTxnNumber,
+        const TxnNumberAndRetryCounter& incomingTxnNumberAndRetryCounter);
+
+    /**
+     * Aborts any child transactions that are logically superseded by the incoming transaction, ie
+     * retryable transactions where the txnNumber in their session id < the top-level txnNumber for
+     * a retryable write / client transaction or the session id txnNumber for a retryable
+     * transaction.
+     */
+    void abortSupersededTransactions(OperationContext* opCtx, TxnNumber incomingClientTxnNumber);
+
 private:
     TxnNumber _activeTxnNumber{kUninitializedTxnNumber};
     LogicalSessionIdMap<TransactionParticipant::Participant> _participants;
     bool _isValid{false};
+
+    // Set true after an incoming retryable transaction has conflicted with an open transaction in
+    // this catalog.
+    bool _hasSeenIncomingConflictingRetryableTransaction{false};
 };
 
 }  // namespace mongo

@@ -47,8 +47,9 @@ HashLookupStage::HashLookupStage(std::unique_ptr<PlanStage> outer,
                                  value::SlotVector innerProjects,
                                  value::SlotMap<std::unique_ptr<EExpression>> innerAggs,
                                  boost::optional<value::SlotId> collatorSlot,
-                                 PlanNodeId planNodeId)
-    : PlanStage("hash_lookup"_sd, planNodeId),
+                                 PlanNodeId planNodeId,
+                                 bool participateInTrialRunTracking)
+    : PlanStage("hash_lookup"_sd, planNodeId, participateInTrialRunTracking),
       _outerCond(outerCond),
       _innerCond(innerCond),
       _innerProjects(innerProjects),
@@ -72,7 +73,8 @@ std::unique_ptr<PlanStage> HashLookupStage::clone() const {
                                              _innerProjects,
                                              std::move(innerAggs),
                                              _collatorSlot,
-                                             _commonStats.nodeId);
+                                             _commonStats.nodeId,
+                                             _participateInTrialRunTracking);
 }
 
 void HashLookupStage::prepare(CompileCtx& ctx) {

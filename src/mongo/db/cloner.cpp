@@ -90,11 +90,11 @@ BSONObj Cloner::_getIdIndexSpec(const std::list<BSONObj>& indexSpecs) {
 
 Cloner::Cloner() {}
 
-struct Cloner::Fun {
-    Fun(OperationContext* opCtx, const std::string& dbName)
+struct Cloner::BatchHandler {
+    BatchHandler(OperationContext* opCtx, const std::string& dbName)
         : lastLog(0), opCtx(opCtx), _dbName(dbName) {}
 
-    void operator()(DBClientCursorBatchIterator& i) {
+    void operator()(DBClientCursor& cursor) {
         boost::optional<Lock::DBLock> dbLock;
         dbLock.emplace(opCtx, _dbName, MODE_X);
         uassert(ErrorCodes::NotWritablePrimary,
@@ -128,7 +128,7 @@ struct Cloner::Fun {
             });
         }
 
-        while (i.moreInCurrentBatch()) {
+        while (cursor.moreInCurrentBatch()) {
             if (numSeen % 128 == 127) {
                 time_t now = time(nullptr);
                 if (now - lastLog >= 60) {
@@ -164,7 +164,7 @@ struct Cloner::Fun {
                         collection);
             }
 
-            BSONObj tmp = i.nextSafe();
+            BSONObj tmp = cursor.nextSafe();
 
             /* assure object is valid.  note this will slow us down a little. */
             // We allow cloning of collections containing decimal data even if decimal is disabled.
@@ -245,23 +245,24 @@ void Cloner::_copy(OperationContext* opCtx,
                 logAttrs(nss),
                 "conn_getServerAddress"_attr = conn->getServerAddress());
 
-    Fun f(opCtx, toDBName);
-    f.numSeen = 0;
-    f.nss = nss;
-    f.from_options = from_opts;
-    f.from_id_index = from_id_index;
-    f.saveLast = time(nullptr);
+    BatchHandler batchHandler{opCtx, toDBName};
+    batchHandler.numSeen = 0;
+    batchHandler.nss = nss;
+    batchHandler.from_options = from_opts;
+    batchHandler.from_id_index = from_id_index;
+    batchHandler.saveLast = time(nullptr);
 
-    int options = QueryOption_NoCursorTimeout | QueryOption_Exhaust;
+    FindCommandRequest findCmd{nss};
+    findCmd.setNoCursorTimeout(true);
+    findCmd.setReadConcern(repl::ReadConcernArgs::kLocal);
+    auto cursor = conn->find(std::move(findCmd),
+                             ReadPreferenceSetting{ReadPreference::SecondaryPreferred},
+                             ExhaustMode::kOn);
 
-    conn->query_DEPRECATED(std::function<void(DBClientCursorBatchIterator&)>(f),
-                           nss,
-                           BSONObj{} /* filter */,
-                           Query() /* querySettings */,
-                           nullptr,
-                           options,
-                           0 /* batchSize */,
-                           repl::ReadConcernArgs::kLocal);
+    // Process the results of the cursor in batches.
+    while (cursor->more()) {
+        batchHandler(*cursor);
+    }
 }
 
 void Cloner::_copyIndexes(OperationContext* opCtx,

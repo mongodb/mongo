@@ -74,7 +74,6 @@
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
-#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -87,7 +86,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
-#include "mongo/s/pm2583_feature_flags_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
@@ -345,14 +343,10 @@ public:
 
                 // Drain moveChunks if the actualVersion relies on the new migration protocol but
                 // the requestedVersion uses the old one (downgrading).
-                if ((feature_flags::gFeatureFlagMigrationRecipientCriticalSection
-                         .isEnabledOnVersion(actualVersion) &&
-                     !feature_flags::gFeatureFlagMigrationRecipientCriticalSection
-                          .isEnabledOnVersion(requestedVersion)) ||
-                    (feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
-                         actualVersion) &&
-                     !feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
-                         requestedVersion))) {
+                if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
+                        actualVersion) &&
+                    !feature_flags::gFeatureFlagMigrationRecipientCriticalSection
+                         .isEnabledOnVersion(requestedVersion)) {
                     drainNewMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionDowngrade");
 
                     // At this point, because we are holding the MigrationBlockingGuard, no new
@@ -388,30 +382,6 @@ public:
                             !isBlockingUserWrites);
                 }
 
-                // TODO (SERVER-65572): Remove setClusterParameter serialization and collection
-                // drop after this is backported to 6.0.
-                if (!gFeatureFlagClusterWideConfig.isEnabledOnVersion(requestedVersion)) {
-                    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                        uassert(ErrorCodes::CannotDowngrade,
-                                "Cannot downgrade while cluster server parameter is being set",
-                                ConfigsvrCoordinatorService::getService(opCtx)
-                                    ->areAllCoordinatorsOfTypeFinished(
-                                        opCtx, ConfigsvrCoordinatorTypeEnum::kSetClusterParameter));
-                    }
-
-                    DropReply dropReply;
-                    const auto dropStatus = dropCollection(
-                        opCtx,
-                        NamespaceString::kClusterParametersNamespace,
-                        &dropReply,
-                        DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
-                    uassert(
-                        dropStatus.code(),
-                        str::stream() << "Failed to drop the cluster server parameters collection"
-                                      << causedBy(dropStatus.reason()),
-                        dropStatus.isOK() || dropStatus.code() == ErrorCodes::NamespaceNotFound);
-                }
-
                 FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                     opCtx,
                     actualVersion,
@@ -428,17 +398,6 @@ public:
                     BalancerStatsRegistry::get(opCtx)->terminate();
                     ScopedRangeDeleterLock rangeDeleterLock(opCtx);
                     clearOrphanCountersFromRangeDeletionTasks(opCtx);
-                }
-
-                // TODO (SERVER-62325): Remove collMod draining mechanism after 6.0 branching.
-                if (actualVersion > requestedVersion &&
-                    requestedVersion < multiversion::FeatureCompatibilityVersion::kVersion_6_0) {
-                    // No more collMod coordinators will start because we have already switched
-                    // the FCV value to kDowngrading. Wait for the ongoing collMod coordinators to
-                    // finish.
-                    ShardingDDLCoordinatorService::getService(opCtx)
-                        ->waitForCoordinatorsOfGivenTypeToComplete(
-                            opCtx, DDLCoordinatorTypeEnum::kCollMod);
                 }
 
                 // TODO SERVER-65077: Remove FCV check once 6.0 is released
@@ -480,10 +439,6 @@ public:
             if ((!feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
                      actualVersion) &&
                  feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
-                     requestedVersion)) ||
-                (!feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
-                     actualVersion) &&
-                 feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
                      requestedVersion)) ||
                 orphanTrackingCondition) {
                 drainOldMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionUpgrade");
@@ -585,14 +540,6 @@ private:
         const bool preImagesFeatureFlagDisabledOnDowngradeVersion =
             !feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledOnVersion(
                 requestedVersion);
-
-        // TODO SERVER-62693: remove the following scope once 6.0 branches out
-        if (requestedVersion == multiversion::GenericFCV::kLastLTS) {
-            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
-                serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-                sharding_util::downgradeCollectionBalancingFieldsToPre53(opCtx);
-            }
-        }
 
         // TODO  SERVER-65332 remove logic bound to this future object When kLastLTS is 6.0
         boost::optional<SharedSemiFuture<void>> chunkResizeAsyncTask;
@@ -729,13 +676,6 @@ private:
                                                << NamespaceString::kTransactionCoordinatorsNamespace
                                                << " documents for internal transactions");
             }
-        }
-
-        // TODO SERVER-64720 Remove when 6.0 becomes last LTS
-        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kCreateCollection);
         }
 
         // TODO SERVER-62338 Remove when 6.0 branches-out

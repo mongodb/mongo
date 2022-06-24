@@ -70,12 +70,8 @@ var $config = (function() {
     function setup(db, collName, cluster) {
         // Do not run the rest of the tests if the foreign collection is implicitly sharded but the
         // flag to allow $lookup into a sharded collection is disabled.
-        const getParam = db.adminCommand({
-            getParameter: 1,
-            featureFlagShardedLookup: 1,
-            featureFlagSBELookupPushdown: 1,
-            internalQueryForceClassicEngine: 1
-        });
+        const getParam = db.adminCommand(
+            {getParameter: 1, featureFlagShardedLookup: 1, internalQueryForceClassicEngine: 1});
         const isShardedLookupEnabled = getParam.hasOwnProperty("featureFlagShardedLookup") &&
             getParam.featureFlagShardedLookup.value;
         if (FixtureHelpers.isSharded(db[collName]) && !isShardedLookupEnabled) {
@@ -96,9 +92,8 @@ var $config = (function() {
         assertWhenOwnColl.eq(this.numDocs, res.nInserted);
         assertWhenOwnColl.eq(this.numDocs, db[collName].find().itcount());
 
-        const isLookupPushdownEnabled = getParam.hasOwnProperty("featureFlagSBELookupPushdown") &&
+        const isLookupPushdownEnabled =
             getParam.hasOwnProperty("internalQueryForceClassicEngine") &&
-            getParam.featureFlagSBELookupPushdown.value &&
             !getParam.internalQueryForceClassicEngine.value;
 
         this.allowDiskUse = true;

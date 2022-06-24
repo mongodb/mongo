@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/namespace_string.h"
@@ -46,7 +43,6 @@
 #include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {
@@ -119,7 +115,7 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     const int nChunks = 10;
     std::vector<ChunkType> chunks;
     for (int i = 0; i < nChunks; i++) {
-        ChunkVersion chunkVersion(1, i, fromEpoch, collTimestamp);
+        ChunkVersion chunkVersion({fromEpoch, collTimestamp}, {1, uint32_t(i)});
         ChunkType chunk;
         chunk.setName(OID::gen());
         chunk.setCollectionUUID(collUUID);
@@ -138,7 +134,7 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     const auto toEpoch = OID::gen();
     const auto toUUID = UUID::gen();
     for (int i = 0; i < nChunks; i++) {
-        ChunkVersion chunkVersion(1, i, toEpoch, Timestamp(2));
+        ChunkVersion chunkVersion({toEpoch, Timestamp(2)}, {1, uint32_t(i)});
         ChunkType chunk;
         chunk.setName(OID::gen());
         chunk.setCollectionUUID(toUUID);
@@ -215,7 +211,7 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsAreMet) {
         opCtx, false /* sourceIsSharded */, kToNss, false /* dropTarget */);
 
     // Initialize a chunk
-    ChunkVersion chunkVersion(1, 1, OID::gen(), Timestamp(2, 1));
+    ChunkVersion chunkVersion({OID::gen(), Timestamp(2, 1)}, {1, 1});
     ChunkType chunk;
     chunk.setName(OID::gen());
     chunk.setCollectionUUID(UUID::gen());
@@ -256,7 +252,7 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetCollectionExists) {
     auto opCtx = operationContext();
 
     // Initialize a chunk
-    ChunkVersion chunkVersion(1, 1, OID::gen(), Timestamp(2, 1));
+    ChunkVersion chunkVersion({OID::gen(), Timestamp(2, 1)}, {1, 1});
     ChunkType chunk;
     chunk.setName(OID::gen());
     chunk.setCollectionUUID(UUID::gen());

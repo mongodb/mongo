@@ -75,7 +75,8 @@ public:
                  bool optimizedClose,
                  boost::optional<value::SlotId> collatorSlot,
                  bool allowDiskUse,
-                 PlanNodeId planNodeId);
+                 PlanNodeId planNodeId,
+                 bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -183,6 +184,11 @@ private:
     value::MaterializedRow _aggValueRecordStore{0};
     std::vector<std::unique_ptr<value::MaterializedSingleRowAccessor>> _outRecordStoreKeyAccessors;
     std::vector<std::unique_ptr<value::MaterializedSingleRowAccessor>> _outRecordStoreAggAccessors;
+
+    // This buffer stores values for the spilled '_aggKeyRecordStore' that's loaded into memory from
+    // the '_recordStore'. Values in the '_aggKeyRecordStore' row are pointers that point to data in
+    // this buffer.
+    BufBuilder _aggKeyRSBuffer;
 
     std::vector<value::SlotAccessor*> _seekKeysAccessors;
     value::MaterializedRow _seekKeys;

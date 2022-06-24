@@ -1,105 +1,136 @@
+// requires_fcv_61 since the balancer in v6.0 is still working on the number of chunks,
+// hence the balancer is not triggered and the chunk is not marked as jumbo
+// @tags: [requires_fcv_61]
+
 (function() {
 "use strict";
 
 load("jstests/sharding/libs/find_chunks_util.js");
 
-let st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 
 const mongosSession = st.s.startSession({retryWrites: true});
-const sessionAdminDB = mongosSession.getDatabase('admin');
-const sessionConfigDB = mongosSession.getDatabase('config');
+const adminDB = mongosSession.getDatabase('admin');
+const configDB = mongosSession.getDatabase('config');
+const testDB = mongosSession.getDatabase('test');
+const testColl = testDB.getCollection('range');
+const hashedTestColl = testDB.getCollection('hashed');
 
-assert.commandWorked(sessionAdminDB.runCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard('test', st.shard0.shardName);
+function runBalancer(coll) {
+    st.startBalancer();
+
+    // Let the balancer run until balanced.
+    st.printShardingStatus(true);
+    st.awaitBalance(coll.getName(), coll.getDB());
+    st.printShardingStatus(true);
+
+    st.stopBalancer();
+}
+
+function createJumboChunk(coll, keyValue) {
+    const largeString = 'X'.repeat(1024 * 1024);  // 1 MB
+
+    // Create sufficient documents to create a jumbo chunk, and use the same shard key in all of
+    // them so that the chunk cannot be split.
+    let bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 0; i < 10; i++) {
+        bulk.insert({x: keyValue, big: largeString, i: i});
+    }
+    assert.commandWorked(bulk.execute());
+    runBalancer(coll);
+}
+
+function validateJumboFlag(ns, query) {
+    let jumboChunk = findChunksUtil.findOneChunkByNs(configDB, ns, query);
+    assert.eq(jumboChunk.jumbo, true);
+}
+
+// Initializing test database
 assert.commandWorked(
-    sessionAdminDB.runCommand({addShardToZone: st.shard1.shardName, zone: 'finalDestination'}));
+    adminDB.runCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
+assert.commandWorked(adminDB.runCommand({addShardToZone: st.shard1.shardName, zone: 'ZoneShard1'}));
 
 ////////////////////////////////////////////////////////////////////////////
 // Ranged shard key
-assert.commandWorked(sessionAdminDB.runCommand({shardCollection: 'test.range', key: {x: 1}}));
-assert.commandWorked(sessionAdminDB.runCommand({split: 'test.range', middle: {x: 0}}));
+let testNs = testColl.getFullName();
 
-let chunkColl = sessionConfigDB.chunks;
+assert.commandWorked(adminDB.runCommand({shardCollection: testNs, key: {x: 1}}));
+assert.commandWorked(adminDB.runCommand({split: testNs, middle: {x: 0}}));
 
-let testRangeColl = sessionConfigDB.collections.findOne({_id: 'test.range'});
-if (testRangeColl.timestamp) {
-    assert.commandWorked(
-        chunkColl.update({uuid: testRangeColl.uuid, min: {x: 0}}, {$set: {jumbo: true}}));
-} else {
-    assert.commandWorked(chunkColl.update({ns: 'test.range', min: {x: 0}}, {$set: {jumbo: true}}));
-}
-
-let jumboChunk = findChunksUtil.findOneChunkByNs(sessionConfigDB, 'test.range', {min: {x: 0}});
-assert(jumboChunk.jumbo, tojson(jumboChunk));
+createJumboChunk(testColl, 0);
+validateJumboFlag(testNs, {min: {x: 0}});
+let jumboChunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
 let jumboMajorVersionBefore = jumboChunk.lastmod.getTime();
 
 // Target non-jumbo chunk should not affect real jumbo chunk.
-assert.commandWorked(sessionAdminDB.runCommand({clearJumboFlag: 'test.range', find: {x: -1}}));
-jumboChunk = findChunksUtil.findOneChunkByNs(sessionConfigDB, 'test.range', {min: {x: 0}});
+assert.commandWorked(adminDB.runCommand({clearJumboFlag: testNs, find: {x: -1}}));
+jumboChunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
 assert(jumboChunk.jumbo, tojson(jumboChunk));
 assert.eq(jumboMajorVersionBefore, jumboChunk.lastmod.getTime());
 
 // Target real jumbo chunk should bump version.
-assert.commandWorked(sessionAdminDB.runCommand({clearJumboFlag: 'test.range', find: {x: 1}}));
-jumboChunk = findChunksUtil.findOneChunkByNs(sessionConfigDB, 'test.range', {min: {x: 0}});
+assert.commandWorked(adminDB.runCommand({clearJumboFlag: testNs, find: {x: 1}}));
+jumboChunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
 assert(!jumboChunk.jumbo, tojson(jumboChunk));
 assert.lt(jumboMajorVersionBefore, jumboChunk.lastmod.getTime());
+
+// Delete all documents
+assert.commandWorked(testColl.deleteMany({x: 0}));
+let docCount = assert.commandWorked(adminDB.runCommand({count: testNs}));
+assert.eq(docCount.n, 0);
 
 ////////////////////////////////////////////////////////////////////////////
 // Hashed shard key
-assert.commandWorked(sessionAdminDB.runCommand(
-    {shardCollection: 'test.hashed', key: {x: 'hashed'}, numInitialChunks: 2}));
+testNs = hashedTestColl.getFullName();
 
-let testHashedColl = sessionConfigDB.collections.findOne({_id: 'test.hashed'});
-if (testHashedColl.timestamp) {
-    assert.commandWorked(
-        chunkColl.update({uuid: testHashedColl.uuid, min: {x: 0}}, {$set: {jumbo: true}}));
-} else {
-    assert.commandWorked(chunkColl.update({ns: 'test.hashed', min: {x: 0}}, {$set: {jumbo: true}}));
-}
-jumboChunk = findChunksUtil.findOneChunkByNs(sessionConfigDB, 'test.hashed', {min: {x: 0}});
-assert(jumboChunk.jumbo, tojson(jumboChunk));
+assert.commandWorked(
+    adminDB.runCommand({shardCollection: testNs, key: {x: 'hashed'}, numInitialChunks: 2}));
+
+createJumboChunk(hashedTestColl, 0);
+validateJumboFlag(testNs, {min: {x: 0}});
+
+jumboChunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
 jumboMajorVersionBefore = jumboChunk.lastmod.getTime();
 
 // Target non-jumbo chunk should not affect real jumbo chunk.
-let unrelatedChunk =
-    findChunksUtil.findOneChunkByNs(sessionConfigDB, 'test.hashed', {min: {x: MinKey}});
-assert.commandWorked(sessionAdminDB.runCommand(
-    {clearJumboFlag: 'test.hashed', bounds: [unrelatedChunk.min, unrelatedChunk.max]}));
-jumboChunk = findChunksUtil.findOneChunkByNs(sessionConfigDB, 'test.hashed', {min: {x: 0}});
+let unrelatedChunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: MinKey}});
+assert.commandWorked(
+    adminDB.runCommand({clearJumboFlag: testNs, bounds: [unrelatedChunk.min, unrelatedChunk.max]}));
+jumboChunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
 assert(jumboChunk.jumbo, tojson(jumboChunk));
 assert.eq(jumboMajorVersionBefore, jumboChunk.lastmod.getTime());
 
 // Target real jumbo chunk should bump version.
-assert.commandWorked(sessionAdminDB.runCommand(
-    {clearJumboFlag: 'test.hashed', bounds: [jumboChunk.min, jumboChunk.max]}));
-jumboChunk = findChunksUtil.findOneChunkByNs(sessionConfigDB, 'test.hashed', {min: {x: 0}});
+assert.commandWorked(
+    adminDB.runCommand({clearJumboFlag: testNs, bounds: [jumboChunk.min, jumboChunk.max]}));
+jumboChunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
 assert(!jumboChunk.jumbo, tojson(jumboChunk));
 assert.lt(jumboMajorVersionBefore, jumboChunk.lastmod.getTime());
 
-////////////////////////////////////////////////////////////////////////////
 // Ensure clear jumbo flag stores the correct chunk version
-
 assert.eq(undefined, jumboChunk.lastmodEpoch);
 assert.eq(undefined, jumboChunk.lastmodTimestamp);
+
+// Delete all documents
+assert.commandWorked(hashedTestColl.deleteMany({x: 0}));
+docCount = assert.commandWorked(adminDB.runCommand({count: testNs}));
+assert.eq(docCount.n, 0);
 
 ////////////////////////////////////////////////////////////////////////////
 // Balancer with jumbo chunks behavior
 // Forces a jumbo chunk to be on a wrong zone but balancer shouldn't be able to move it until
 // jumbo flag is cleared.
+testNs = testColl.getFullName();
 
 st.stopBalancer();
 
-if (testRangeColl.timestamp) {
-    assert.commandWorked(
-        chunkColl.update({uuid: testRangeColl.uuid, min: {x: 0}}, {$set: {jumbo: true}}));
-} else {
-    assert.commandWorked(chunkColl.update({ns: 'test.range', min: {x: 0}}, {$set: {jumbo: true}}));
-}
-assert.commandWorked(sessionAdminDB.runCommand(
-    {updateZoneKeyRange: 'test.range', min: {x: 0}, max: {x: MaxKey}, zone: 'finalDestination'}));
+assert.commandWorked(adminDB.runCommand(
+    {updateZoneKeyRange: testNs, min: {x: 0}, max: {x: MaxKey}, zone: 'ZoneShard1'}));
 
-let chunk = findChunksUtil.findOneChunkByNs(sessionConfigDB, 'test.range', {min: {x: 0}});
+createJumboChunk(testColl, 0);
+validateJumboFlag(testNs, {min: {x: 0}});
+
+let chunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
 assert(chunk.jumbo, tojson(chunk));
 assert.eq(st.shard0.shardName, chunk.shard);
 
@@ -111,29 +142,26 @@ st.forEachConfigServer((conn) => {
     });
 });
 
-let waitForBalancerToRun = function() {
-    let lastRoundNumber =
-        assert.commandWorked(sessionAdminDB.runCommand({balancerStatus: 1})).numBalancerRounds;
-    st.startBalancer();
+runBalancer(testColl);
 
-    assert.soon(function() {
-        let res = assert.commandWorked(sessionAdminDB.runCommand({balancerStatus: 1}));
-        return res.mode == "full" && res.numBalancerRounds - lastRoundNumber > 1;
-    });
-
-    st.stopBalancer();
-};
-
-waitForBalancerToRun();
-
-chunk = findChunksUtil.findOneChunkByNs(sessionConfigDB, 'test.range', {min: {x: 0}});
+// Verify chunk stays in shard0
+chunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
 assert.eq(st.shard0.shardName, chunk.shard);
 
-assert.commandWorked(sessionAdminDB.runCommand({clearJumboFlag: 'test.range', find: {x: 0}}));
+// Delete all documents
+assert.commandWorked(testColl.deleteMany({x: 0}));
+docCount = assert.commandWorked(adminDB.runCommand({count: testNs}));
+assert.eq(docCount.n, 0);
 
-waitForBalancerToRun();
+// Clear jumbo flag
+assert.commandWorked(adminDB.runCommand({clearJumboFlag: testNs, find: {x: 0}}));
+chunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
+assert(!jumboChunk.jumbo, tojson(jumboChunk));
 
-chunk = findChunksUtil.findOneChunkByNs(sessionConfigDB, 'test.range', {min: {x: 0}});
+runBalancer(testColl);
+
+// Verify chunk is moved to shard1
+chunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
 assert.eq(st.shard1.shardName, chunk.shard);
 
 st.stop();

@@ -541,8 +541,8 @@ struct __wt_connection_impl {
 #define WT_DIRECT_IO_CHECKPOINT 0x1u /* Checkpoints */
 #define WT_DIRECT_IO_DATA 0x2u       /* Data files */
 #define WT_DIRECT_IO_LOG 0x4u        /* Log files */
-                                     /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
-    uint64_t direct_io;              /* O_DIRECT, FILE_FLAG_NO_BUFFERING */
+                                     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+    uint32_t direct_io;              /* O_DIRECT, FILE_FLAG_NO_BUFFERING */
     uint64_t write_through;          /* FILE_FLAG_WRITE_THROUGH */
 
     bool mmap;     /* use mmap when reading checkpoints */
@@ -558,12 +558,13 @@ struct __wt_connection_impl {
 #define WT_CONN_DEBUG_CKPT_RETAIN 0x01u
 #define WT_CONN_DEBUG_CORRUPTION_ABORT 0x02u
 #define WT_CONN_DEBUG_CURSOR_COPY 0x04u
-#define WT_CONN_DEBUG_FLUSH_CKPT 0x08u
-#define WT_CONN_DEBUG_REALLOC_EXACT 0x10u
-#define WT_CONN_DEBUG_SLOW_CKPT 0x20u
-#define WT_CONN_DEBUG_UPDATE_RESTORE_EVICT 0x40u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
-    uint64_t debug_flags;
+#define WT_CONN_DEBUG_CURSOR_REPOSITION 0x08u
+#define WT_CONN_DEBUG_FLUSH_CKPT 0x10u
+#define WT_CONN_DEBUG_REALLOC_EXACT 0x20u
+#define WT_CONN_DEBUG_SLOW_CKPT 0x40u
+#define WT_CONN_DEBUG_UPDATE_RESTORE_EVICT 0x80u
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
+    uint16_t debug_flags;
 
     /* Verbose settings for our various categories. */
     WT_VERBOSE_LEVEL verbose[WT_VERB_NUM_CATEGORIES];
@@ -598,8 +599,8 @@ struct __wt_connection_impl {
 #define WT_TIMING_STRESS_SPLIT_6 0x20000u
 #define WT_TIMING_STRESS_SPLIT_7 0x40000u
 #define WT_TIMING_STRESS_TIERED_FLUSH_FINISH 0x80000u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
-    uint64_t timing_stress_flags;
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+    uint32_t timing_stress_flags;
 
 #define WT_STDERR(s) (&S2C(s)->wt_stderr)
 #define WT_STDOUT(s) (&S2C(s)->wt_stdout)

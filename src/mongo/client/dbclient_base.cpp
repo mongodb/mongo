@@ -49,7 +49,7 @@
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/config.h"
 #include "mongo/db/api_parameters_gen.h"
-#include "mongo/db/auth/security_token.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
@@ -190,8 +190,8 @@ void appendMetadata(OperationContext* opCtx,
     request.body = bob.obj();
 
     if (opCtx) {
-        if (auto securityToken = auth::getSecurityToken(opCtx)) {
-            request.securityToken = securityToken->toBSON();
+        if (auto validatedTenancyScope = auth::ValidatedTenancyScope::get(opCtx)) {
+            request.validatedTenancyScope = validatedTenancyScope;
         }
     }
 }
@@ -584,33 +584,11 @@ bool DBClientBase::exists(const string& ns) {
 
 const uint64_t DBClientBase::INVALID_SOCK_CREATION_TIME = std::numeric_limits<uint64_t>::max();
 
-unique_ptr<DBClientCursor> DBClientBase::query_DEPRECATED(const NamespaceStringOrUUID& nsOrUuid,
-                                                          const BSONObj& filter,
-                                                          const Query& querySettings,
-                                                          int limit,
-                                                          int nToSkip,
-                                                          const BSONObj* fieldsToReturn,
-                                                          int queryOptions,
-                                                          int batchSize,
-                                                          boost::optional<BSONObj> readConcernObj) {
-    unique_ptr<DBClientCursor> c(new DBClientCursor(this,
-                                                    nsOrUuid,
-                                                    filter,
-                                                    querySettings,
-                                                    limit,
-                                                    nToSkip,
-                                                    fieldsToReturn,
-                                                    queryOptions,
-                                                    batchSize,
-                                                    readConcernObj));
-    if (c->init())
-        return c;
-    return nullptr;
-}
-
 std::unique_ptr<DBClientCursor> DBClientBase::find(FindCommandRequest findRequest,
-                                                   const ReadPreferenceSetting& readPref) {
-    auto cursor = std::make_unique<DBClientCursor>(this, std::move(findRequest), readPref);
+                                                   const ReadPreferenceSetting& readPref,
+                                                   ExhaustMode exhaustMode) {
+    auto cursor = std::make_unique<DBClientCursor>(
+        this, std::move(findRequest), readPref, exhaustMode == ExhaustMode::kOn);
     if (cursor->init()) {
         return cursor;
     }
@@ -619,8 +597,9 @@ std::unique_ptr<DBClientCursor> DBClientBase::find(FindCommandRequest findReques
 
 void DBClientBase::find(FindCommandRequest findRequest,
                         const ReadPreferenceSetting& readPref,
+                        ExhaustMode exhaustMode,
                         std::function<void(const BSONObj&)> callback) {
-    auto cursor = this->find(std::move(findRequest), readPref);
+    auto cursor = this->find(std::move(findRequest), readPref, exhaustMode);
     while (cursor->more()) {
         callback(cursor->nextSafe());
     }
@@ -632,7 +611,7 @@ BSONObj DBClientBase::findOne(FindCommandRequest findRequest,
             "caller cannot provide a limit when calling DBClientBase::findOne()",
             !findRequest.getLimit());
     findRequest.setLimit(1);
-    auto cursor = this->find(std::move(findRequest), readPref);
+    auto cursor = this->find(std::move(findRequest), readPref, ExhaustMode::kOff);
 
     uassert(5951201, "DBClientBase::findOne() could not produce cursor", cursor);
 
@@ -647,44 +626,10 @@ BSONObj DBClientBase::findOne(const NamespaceStringOrUUID& nssOrUuid, BSONObj fi
 
 unique_ptr<DBClientCursor> DBClientBase::getMore(const string& ns, long long cursorId) {
     unique_ptr<DBClientCursor> c(
-        new DBClientCursor(this, NamespaceString(ns), cursorId, 0 /* limit */, 0 /* options */));
+        new DBClientCursor(this, NamespaceString(ns), cursorId, false /*isExhaust*/));
     if (c->init())
         return c;
     return nullptr;
-}
-
-unsigned long long DBClientBase::query_DEPRECATED(
-    std::function<void(DBClientCursorBatchIterator&)> f,
-    const NamespaceStringOrUUID& nsOrUuid,
-    const BSONObj& filter,
-    const Query& querySettings,
-    const BSONObj* fieldsToReturn,
-    int queryOptions,
-    int batchSize,
-    boost::optional<BSONObj> readConcernObj) {
-    // mask options
-    queryOptions &= (int)(QueryOption_NoCursorTimeout | QueryOption_SecondaryOk);
-
-    unique_ptr<DBClientCursor> c(this->query_DEPRECATED(nsOrUuid,
-                                                        filter,
-                                                        querySettings,
-                                                        0,
-                                                        0,
-                                                        fieldsToReturn,
-                                                        queryOptions,
-                                                        batchSize,
-                                                        readConcernObj));
-    // query_DEPRECATED() throws on network error so OK to uassert with numeric code here.
-    uassert(16090, "socket error for mapping query", c.get());
-
-    unsigned long long n = 0;
-
-    while (c->more()) {
-        DBClientCursorBatchIterator i(*c);
-        f(i);
-        n += i.n();
-    }
-    return n;
 }
 
 namespace {

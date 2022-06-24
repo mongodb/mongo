@@ -78,7 +78,7 @@ variables:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi
     exe: ".exe"
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     num_scons_link_jobs_available: 0.5
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -88,6 +88,7 @@ variables:
     jstestfuzz_num_generated_files: 35
     large_distro_name: windows-vsCurrent-large
     test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
+    external_auth_jobs_max: 1
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -101,7 +102,7 @@ variables:
   - name: .crypt
     distros:
     - windows-vsCurrent-xlarge
-  - name: .encrypt !.aggregation !.gcm
+  - name: .encrypt !.aggregation !.gcm !.feature_flag_guarded
   - name: external_auth
   - name: external_auth_aws
   - name: external_auth_windows
@@ -114,7 +115,6 @@ variables:
   - name: sasl
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
-  - name: snmp
 
 # TODO: SERVER-XYZ remove this duplicate task definition.
 - &enterprise-rhel-70-64-bit-template
@@ -182,7 +182,6 @@ variables:
   - name: search_ssl
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
-  - name: snmp
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
@@ -237,7 +236,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
-  - name: .aggregation !.encrypt
+  - name: .aggregation !.encrypt !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams !.secondary_reads
@@ -317,8 +316,8 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: .aggfuzzer .common
-  - name: aggregation
-  - name: aggregation_auth
+  - name: aggregation !.feature_flag_guarded
+  - name: aggregation_auth !.feature_flag_guarded
   - name: auth_gen
   - name: .misc_js !.sharded
   - name: concurrency_gen
@@ -388,7 +387,7 @@ buildvariants:
     - rhel80-xlarge
   - name: test_api_version_compatibility
   - name: .aggfuzzer !.multiversion
-  - name: .aggregation !.multiversion
+  - name: .aggregation !.multiversion !.feature_flag_guarded
   - name: audit
   - name: .auth !.multiversion
   - name: .causally_consistent !.sharding
@@ -435,7 +434,6 @@ buildvariants:
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns !.multiversion
   - name: .sharding .common !.multiversion
-  - name: snmp
   - name: .stitch
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
@@ -508,7 +506,7 @@ buildvariants:
   # tasks we would normally include have been disabled. See revert of
   # SERVER-60832
   #- name: .aggfuzzer
-  #- name: .aggregation !.unwind
+  #- name: .aggregation !.unwind !.feature_flag_guarded
   #- name: audit
   #- name: .auth
   #- name: causally_consistent_jscore_txns_passthrough
@@ -546,7 +544,6 @@ buildvariants:
   #- name: session_jscore_passthrough
   #- name: .sharding .jscore !.wo_snapshot
   #- name: .sharding .common
-  #- name: snmp
   #- name: update_fuzzer_gen
 
 - name: enterprise-rhel-80-64-bit-coverage-clang
@@ -729,7 +726,7 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - windows-vsCurrent-xlarge
-  - name: .aggregation !.auth !.encrypt
+  - name: .aggregation !.auth !.encrypt !.feature_flag_guarded
   - name: aggregation_expression_multiversion_fuzzer_gen
   - name: aggregation_expression_optimization_fuzzer_gen
   - name: auth_gen
@@ -785,7 +782,7 @@ buildvariants:
     exe: ".exe"
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -801,6 +798,7 @@ buildvariants:
     push_name: windows
     push_arch: x86_64-enterprise
     test_flags: *windows_common_test_excludes
+    external_auth_jobs_max: 1
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -832,8 +830,11 @@ buildvariants:
   - name: mqlrun
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
-  - name: .replica_sets .common
-  - name: .replica_sets .multi_oplog
+  - name: .replica_sets .common !.ignore_non_generated_replica_sets_jscore_passthrough
+  - name: .replica_sets .multi_oplog !.ignore_non_generated_replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough
+    distros:
+    - windows-vsCurrent-large
   - name: replica_sets_ese_gen
   - name: sasl
   - name: server_discovery_and_monitoring_json_test_TG
@@ -843,7 +844,6 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_ese_gen
   - name: sharding_opportunistic_secondary_targeting_gen
-  - name: snmp
   - name: unittest_shell_hang_analyzer_gen
 
 - <<: *enterprise-windows-required-template
@@ -855,7 +855,7 @@ buildvariants:
     exe: ".exe"
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")  --win-version-min=win10
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")  --win-version-min=win10
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -872,6 +872,7 @@ buildvariants:
       --runAllFeatureFlagTests
       --excludeWithAnyTags=incompatible_with_windows_tls
       --excludeWithAnyTags=incompatible_with_shard_merge
+    external_auth_jobs_max: 1
   tasks:
   - name: cqf
   - name: cqf_parallel
@@ -913,7 +914,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_ese_gen
-  - name: snmp
 # Disabling as the following tests are not aware of feature flags.
 #    - name: buildscripts_test
 #    - name: unittest_shell_hang_analyzer_gen
@@ -929,7 +929,7 @@ buildvariants:
   modules:
   - enterprise
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")  --win-version-min=win10
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")  --win-version-min=win10
   tasks:
   - name: compile_ninja_next_TG
     distros:
@@ -949,7 +949,7 @@ buildvariants:
     exe: ".exe"
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
     content_type: application/zip
-    compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10 --cxx-std=20
+    compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10 --cxx-std=20
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -967,7 +967,7 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
   - name: .aggfuzzer
-  - name: .aggregation !.auth !.encrypt !.unwind
+  - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
@@ -1004,7 +1004,7 @@ buildvariants:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     exe: ".exe"
     content_type: application/zip
-    compile_flags: --dbg=on --opt=off --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10
+    compile_flags: --dbg=on --opt=off --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -1043,7 +1043,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
-  - name: aggregation
+  - name: aggregation !.feature_flag_guarded
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
   - name: disk_wiredtiger
@@ -1264,7 +1264,7 @@ buildvariants:
   - name: check_feature_flag_tags
   - name: check_for_todos
   - name: .aggfuzzer
-  - name: .aggregation
+  - name: .aggregation !.feature_flag_guarded
   - name: audit
   - name: .auth
   - name: burn_in_tags_gen
@@ -1344,7 +1344,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .sharding .common
   - name: sharding_opportunistic_secondary_targeting_gen
-  - name: snmp
   - name: .stitch
   - name: .crypt
     distros:
@@ -1495,7 +1494,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .sharding .common
   - name: sharded_multi_stmt_txn_jscore_passthrough
-  - name: snmp
   - name: .stitch
   - name: .crypt
     distros:
@@ -1541,7 +1539,7 @@ buildvariants:
       --mongodSetParameters="{internalQueryForceClassicEngine: true}"
   tasks:
   - name: .aggfuzzer
-  - name: .aggregation
+  - name: .aggregation !.sbe_only
   - name: .auth
   - name: .causally_consistent !.sharding
   - name: .change_stream_fuzzer
@@ -1629,7 +1627,6 @@ buildvariants:
     - rhel80-xlarge
   - name: session_jscore_passthrough
   - name: sharding_api_version_jscore_passthrough_gen
-  - name: snmp
   - name: test_api_version_compatibility
   - name: unittest_shell_hang_analyzer_gen
 
@@ -1896,7 +1893,6 @@ buildvariants:
   - name: search_ssl
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
-  - name: snmp
   - name: .stitch
   - name: test_packages
     distros:
@@ -1986,8 +1982,44 @@ buildvariants:
   - name: search_ssl
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
-  - name: snmp
   - name: .stitch
+
+- name: ubuntu1804-sbe-yielding-debug
+  display_name: "Shared Library Ubuntu 18.04 DEBUG Yielding Support for SBE"
+  cron: "0 12 * * *" # Every day starting at 12:00
+  run_on:
+  - ubuntu1804-test
+  expansions:
+    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    num_scons_link_jobs_available: 0.99
+    large_distro_name: ubuntu1804-large
+    test_flags: >-
+      --mongodSetParameters="{maintainValidCursorsAcrossSBEYieldandReadCommands: true, featureFlagSbeFull: true}"
+  tasks:
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - ubuntu1804-xlarge
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - ubuntu1804-xlarge
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
+    distros:
+    - ubuntu1804-xlarge
+  - name: jsCore
+  - name: .aggregation !.encrypt !.feature_flag_guarded
+  - name: replica_sets_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough
+  - name: sharding_gen
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
+  # Exclude concurrency tasks which are ubsan-specific, test interaction between causal consistency
+  # and transactions, or involve stepdowns/termination. These should not have any particularly
+  # interesting interaction with the new yielding behavior and may exceed the standard testing time
+  # limits.
+  - name: .concurrency !.ubsan !.no_txns !.stepdowns !.kill_terminate
 
 - name: ubuntu1804-container
   display_name: "Ubuntu 18.04 Container"
@@ -2139,7 +2171,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     scons_cache_scope: shared
   tasks:
-  - name: compile_benchmarks
+  - name: compile_upload_benchmarks_TG
   - name: .benchmarks
 
 
@@ -2162,7 +2194,9 @@ buildvariants:
     lang_environment: LANG=C
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
-    san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
+    san_options: >-
+      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
+      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -2181,7 +2215,6 @@ buildvariants:
   - name: cqf
   - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG
-  - name: compile_benchmarks
   - name: .aggregation
   #  - name: .auth
   - name: audit
@@ -2215,13 +2248,12 @@ buildvariants:
   - name: session_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
-  - name: snmp
   - name: .serverless
   - name: .watchdog
   - name: .stitch
   - name: .shard_split
 # Disabling the following tests as they are not aware of feature flags.
-#  - name: .benchmarks
+#  - name: .benchmarks - building benchmarks is also disabled
 #  - name: unittest_shell_hang_analyzer_gen
 #  - name: server_discovery_and_monitoring_json_test_TG
 #  - name: server_selection_json_test_TG
@@ -2245,7 +2277,9 @@ buildvariants:
     lang_environment: LANG=C
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
-    san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+    san_options: >-
+      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: >-
       --mongodSetParameters="{internalQueryForceClassicEngine: true}"
@@ -2259,9 +2293,8 @@ buildvariants:
     separate_debug: off
     large_distro_name: rhel80-build
   tasks:
-  - name: compile_test_and_package_serial_TG
-  - name: compile_benchmarks
-  - name: .aggregation
+  - name: compile_test_benchmark_and_package_serial_TG
+  - name: .aggregation !.sbe_only
   - name: .auth
   - name: audit
   - name: .benchmarks
@@ -2296,7 +2329,6 @@ buildvariants:
   - name: session_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
-  - name: snmp
   - name: .watchdog
   - name: .stitch
   - name: .serverless
@@ -2338,7 +2370,6 @@ buildvariants:
   - name: cqf
   - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG
-  - name: compile_benchmarks
   - name: .aggregation
   - name: .auth
   - name: audit
@@ -2370,14 +2401,13 @@ buildvariants:
   - name: session_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
-  - name: snmp
   - name: .stitch
   - name: .serverless
   - name: .updatefuzzer
   - name: watchdog_wiredtiger
   - name: .shard_split
 # Disabling the following tests as they are not aware of feature flags.
-#  - name: .benchmarks
+#  - name: .benchmarks - building benchmarks is also disabled
 #  - name: server_discovery_and_monitoring_json_test_TG
 #  - name: server_selection_json_test_TG
 
@@ -2412,9 +2442,8 @@ buildvariants:
     separate_debug: off
     large_distro_name: rhel80-build
   tasks:
-  - name: compile_test_and_package_serial_TG
-  - name: compile_benchmarks
-  - name: .aggregation
+  - name: compile_test_benchmark_and_package_serial_TG
+  - name: .aggregation !.sbe_only
   - name: .auth
   - name: audit
   - name: .benchmarks
@@ -2446,7 +2475,6 @@ buildvariants:
   - name: session_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
-  - name: snmp
   - name: .stitch
   - name: .updatefuzzer
   - name: .serverless
@@ -2468,7 +2496,10 @@ buildvariants:
     lang_environment: LANG=C
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
-    san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+    san_options: >-
+      UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
+      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
@@ -2503,7 +2534,10 @@ buildvariants:
     lang_environment: LANG=C
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
-    san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+    san_options: >-
+      UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
+      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic
     # To force disable feature flags even on the all feature flags variant, please use this file:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
@@ -2644,7 +2678,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: .aggregation !.no_async
+  - name: .aggregation !.no_async !.feature_flag_guarded
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
@@ -2685,7 +2719,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: .aggregation !.no_async
+  - name: .aggregation !.no_async !.feature_flag_guarded
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
@@ -2722,7 +2756,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: .aggregation !.no_async
+  - name: .aggregation !.no_async !.feature_flag_guarded
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
@@ -2760,7 +2794,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: .aggregation !.no_async
+  - name: .aggregation !.no_async !.feature_flag_guarded
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
@@ -2798,7 +2832,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: .aggregation !.no_async
+  - name: .aggregation !.no_async !.feature_flag_guarded
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
@@ -2836,7 +2870,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: .aggregation !.no_async
+  - name: .aggregation !.no_async !.feature_flag_guarded
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
@@ -2867,7 +2901,7 @@ buildvariants:
     distros:
     - rhel80-build
     patch_only: true
-  - name: .aggregation !.no_async
+  - name: .aggregation !.no_async !.feature_flag_guarded
     patch_only: true
   - name: .sharding .auth
     patch_only: true
@@ -2935,7 +2969,7 @@ buildvariants:
   expansions:
     # --link-model=dynamic is set by visiblity_test's task_compile_flags
     # expansion
-    compile_flags: CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
+    compile_flags: CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     has_packages: false
@@ -2977,9 +3011,33 @@ buildvariants:
       --excludeWithAnyTags=resource_intensive
       --excludeWithAnyTags=incompatible_with_shard_merge
 
+- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
+  name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-security-patch-only
+  display_name: "~ Shared Library Enterprise RHEL 8.0 Security Patch Only (all feature flags)"
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+  expansions:
+    <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
+    target_resmoke_time: 15
+    max_sub_suites: 15
+  tasks:
+  - name: .audit .patch_build
+  - name: .sasl .patch_build
+  - name: .encrypt .patch_build
+  - name: .lint
+  - name: lint_fuzzer_sanity_patch
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+      - rhel80-xlarge
+# Disable unittests for now since they're not aware of feature flags.
+#  - name: compile_test_and_package_parallel_unittest_stream_TG
+#    distros:
+#      - rhel80-xlarge
+#  - name: compile_test_and_package_parallel_dbtest_stream_TG
+#    distros:
+#      - rhel80-xlarge
+
 - name: enterprise-ubuntu1804-64-libvoidstar
   display_name: ~ Enterprise Ubuntu 18.04 w/ libvoidstar
-  cron: "0 4 * * FRI" # Every week at 0400 UTC Friday. This has to be a Friday since we run Antithesis on Fridays.
   modules:
   - enterprise
   run_on:
@@ -2993,11 +3051,10 @@ buildvariants:
     multiversion_edition: enterprise
     repo_edition: enterprise
     large_distro_name: ubuntu1804-build
-    use_scons_cache: false
-    scons_cache_scope: "none"
+    scons_cache_scope: shared
   tasks:
   - name: compile_and_archive_dist_test_TG
-  - name: .antithesis
+  - name: antithesis_image_push
   - name: generate_buildid_to_debug_symbols_mapping
 
 - <<: *enterprise-windows-nopush-template
@@ -3005,7 +3062,7 @@ buildvariants:
   display_name: "~ Enterprise Windows (Benchmarks)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   tasks:
-  - name: compile_benchmarks
+  - name: compile_upload_benchmarks_TG
     distros:
     - windows-vsCurrent-large
   - name: .benchmarks !benchmarks_orphaned
@@ -3046,7 +3103,10 @@ buildvariants:
     toolchain_version: v3
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
-    san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
+    san_options: >-
+      UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
+      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
+      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
     compile_flags: LINKFLAGS=-nostdlib++ LIBS=stdc++ --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address,fuzzer --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.

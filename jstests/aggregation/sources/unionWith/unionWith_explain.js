@@ -13,8 +13,6 @@ load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
 load("jstests/libs/analyze_plan.js");         // For getAggPlanStage.
 load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
-const groupPushdownEnabled = checkSBEEnabled(db, ["featureFlagSBEGroupPushdown"]);
-
 const testDB = db.getSiblingDB(jsTestName());
 const collA = testDB.A;
 collA.drop();

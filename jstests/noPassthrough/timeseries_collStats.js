@@ -14,14 +14,18 @@ load("jstests/core/timeseries/libs/timeseries.js");
 
 const kIdleBucketExpiryMemoryUsageThreshold = 1024 * 1024 * 10;
 const conn = MongoRunner.runMongod({
-    setParameter:
-        {timeseriesIdleBucketExpiryMemoryUsageThreshold: kIdleBucketExpiryMemoryUsageThreshold}
+    setParameter: {
+        timeseriesIdleBucketExpiryMemoryUsageThreshold: kIdleBucketExpiryMemoryUsageThreshold,
+        timeseriesBucketMinCount: 1
+    }
 });
 
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
 const isTimeseriesBucketCompressionEnabled =
     TimeseriesTest.timeseriesBucketCompressionEnabled(testDB);
+const isTimeseriesScalabilityImprovementsEnabled =
+    TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB);
 
 assert.commandWorked(testDB.dropDatabase());
 
@@ -50,12 +54,22 @@ const clearCollection = function() {
     expectedStats.numBucketsClosedDueToTimeForward = 0;
     expectedStats.numBucketsClosedDueToTimeBackward = 0;
     expectedStats.numBucketsClosedDueToMemoryThreshold = 0;
+    if (isTimeseriesScalabilityImprovementsEnabled) {
+        expectedStats.numBucketsArchivedDueToTimeForward = 0;
+        expectedStats.numBucketsArchivedDueToTimeBackward = 0;
+        expectedStats.numBucketsArchivedDueToMemoryThreshold = 0;
+    }
     expectedStats.numCommits = 0;
     expectedStats.numWaits = 0;
     expectedStats.numMeasurementsCommitted = 0;
     expectedStats.numCompressedBuckets = 0;
     expectedStats.numUncompressedBuckets = 0;
     expectedStats.numSubObjCompressionRestart = 0;
+
+    if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
+        expectedStats.numBucketsReopened = 0;
+        expectedStats.numBucketsKeptOpenDueToLargeMeasurements = 0;
+    }
 };
 clearCollection();
 
@@ -65,7 +79,8 @@ const checkCollStats = function(empty = false) {
     assert.eq(coll.getFullName(), stats.ns);
 
     for (let [stat, value] of Object.entries(expectedStats)) {
-        if (stat === 'numBucketsClosedDueToMemoryThreshold') {
+        if (stat === 'numBucketsClosedDueToMemoryThreshold' ||
+            stat === 'numBucketsArchivedDueToMemoryThreshold') {
             // Idle bucket expiration behavior will be non-deterministic since buckets are hashed
             // into shards within the catalog based on metadata, and expiration is done on a
             // per-shard basis. We just want to make sure that if we are expecting the number to be
@@ -149,9 +164,13 @@ assert.commandWorked(coll.insert(
 expectedStats.bucketCount++;
 expectedStats.numBucketInserts++;
 expectedStats.numCommits++;
-expectedStats.numBucketsClosedDueToTimeBackward++;
+if (isTimeseriesScalabilityImprovementsEnabled) {
+    expectedStats.numBucketsArchivedDueToTimeBackward++;
+} else {
+    expectedStats.numBucketsClosedDueToTimeBackward++;
+}
 expectedStats.numMeasurementsCommitted++;
-if (isTimeseriesBucketCompressionEnabled) {
+if (isTimeseriesBucketCompressionEnabled && !isTimeseriesScalabilityImprovementsEnabled) {
     expectedStats.numCompressedBuckets++;
 }
 checkCollStats();
@@ -232,7 +251,11 @@ assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount += numDocs;
 expectedStats.numBucketInserts += numDocs;
 expectedStats.numBucketsOpenedDueToMetadata++;
-expectedStats.numBucketsClosedDueToTimeForward++;
+if (isTimeseriesScalabilityImprovementsEnabled) {
+    expectedStats.numBucketsArchivedDueToTimeForward++;
+} else {
+    expectedStats.numBucketsClosedDueToTimeForward++;
+}
 expectedStats.numCommits += numDocs;
 expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =
@@ -255,7 +278,11 @@ const testIdleBucketExpiry = function(docFn) {
         expectedStats.numBucketInserts++;
         expectedStats.numBucketsOpenedDueToMetadata++;
         if (shouldExpire) {
-            expectedStats.numBucketsClosedDueToMemoryThreshold++;
+            if (isTimeseriesScalabilityImprovementsEnabled) {
+                expectedStats.numBucketsArchivedDueToMemoryThreshold++;
+            } else {
+                expectedStats.numBucketsClosedDueToMemoryThreshold++;
+            }
         }
         expectedStats.numCommits++;
         expectedStats.numMeasurementsCommitted++;

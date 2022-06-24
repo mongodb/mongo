@@ -106,14 +106,20 @@ function checkBothEnginesAreRunOnCluster(theDB) {
                 const getParam = conn.adminCommand({
                     getParameter: 1,
                     internalQueryForceClassicEngine: 1,
-                    internalQueryEnableSlotBasedExecutionEngine: 1
+                    internalQueryEnableSlotBasedExecutionEngine: 1,
+                    featureFlagSbeFull: 1,
                 });
 
                 if (getParam.hasOwnProperty("internalQueryForceClassicEngine")) {
-                    if (getParam.internalQueryForceClassicEngine) {
-                        engineMap.classic++;
-                    } else {
+                    // We say SBE is fully enabled if the engine is on and either
+                    // 'featureFlagSbeFull' doesn't exist on the targeted server, or it exists and
+                    // is set to true.
+                    if (!getParam.internalQueryForceClassicEngine &&
+                        (!getParam.hasOwnProperty("featureFlagSbeFull") ||
+                         getParam.featureFlagSbeFull.value)) {
                         engineMap.sbe++;
+                    } else {
+                        engineMap.classic++;
                     }
                 }
 

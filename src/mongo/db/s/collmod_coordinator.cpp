@@ -77,10 +77,7 @@ bool hasTimeSeriesGranularityUpdate(const CollModRequest& request) {
 
 CollModCoordinator::CollModCoordinator(ShardingDDLCoordinatorService* service,
                                        const BSONObj& initialState)
-    : ShardingDDLCoordinator(service, initialState),
-      _initialState{initialState.getOwned()},
-      _doc{CollModCoordinatorDocument::parse(IDLParserErrorContext("CollModCoordinatorDocument"),
-                                             _initialState)},
+    : RecoverableShardingDDLCoordinator(service, "CollModCoordinator", initialState),
       _request{_doc.getCollModRequest()} {}
 
 void CollModCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
@@ -96,54 +93,9 @@ void CollModCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
             SimpleBSONObjComparator::kInstance.evaluate(selfReq == otherReq));
 }
 
-boost::optional<BSONObj> CollModCoordinator::reportForCurrentOp(
-    MongoProcessInterface::CurrentOpConnectionsMode connMode,
-    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-
-    BSONObjBuilder cmdBob;
-    if (const auto& optComment = getForwardableOpMetadata().getComment()) {
-        cmdBob.append(optComment.get().firstElement());
-    }
-
-    const auto currPhase = [&]() {
-        stdx::lock_guard l{_docMutex};
-        return _doc.getPhase();
-    }();
-
-    cmdBob.appendElements(_request.toBSON());
-    BSONObjBuilder bob;
-    bob.append("type", "op");
-    bob.append("desc", "CollModCoordinator");
-    bob.append("op", "command");
-    bob.append("ns", nss().toString());
-    bob.append("command", cmdBob.obj());
-    bob.append("currentPhase", currPhase);
-    bob.append("active", true);
-    return bob.obj();
-}
-
-void CollModCoordinator::_enterPhase(Phase newPhase) {
-    StateDoc newDoc(_doc);
-    newDoc.setPhase(newPhase);
-
-    LOGV2_DEBUG(6069401,
-                2,
-                "CollMod coordinator phase transition",
-                "namespace"_attr = nss(),
-                "newPhase"_attr = CollModCoordinatorPhase_serializer(newDoc.getPhase()),
-                "oldPhase"_attr = CollModCoordinatorPhase_serializer(_doc.getPhase()));
-
-    if (_doc.getPhase() == Phase::kUnset) {
-        newDoc = _insertStateDocument(std::move(newDoc));
-    } else {
-        newDoc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
-    }
-
-    {
-        stdx::unique_lock ul{_docMutex};
-        _doc = std::move(newDoc);
-    }
-}
+void CollModCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
+    cmdInfoBuilder->appendElements(_request.toBSON());
+};
 
 void CollModCoordinator::_performNoopRetryableWriteOnParticipants(
     OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor) {
@@ -154,9 +106,9 @@ void CollModCoordinator::_performNoopRetryableWriteOnParticipants(
         return participants;
     }();
 
-    _doc = _updateSession(opCtx, _doc);
+    _updateSession(opCtx);
     sharding_ddl_util::performNoopRetryableWriteOnShards(
-        opCtx, shardsAndConfigsvr, getCurrentSession(_doc), executor);
+        opCtx, shardsAndConfigsvr, getCurrentSession(), executor);
 }
 
 void CollModCoordinator::_saveCollectionInfoOnCoordinatorIfNecessary(OperationContext* opCtx) {
@@ -229,14 +181,15 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
-                _doc = _updateSession(opCtx, _doc);
+                _updateSession(opCtx);
 
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
 
                 if (_collInfo->isSharded) {
-                    _doc.setCollUUID(
-                        sharding_ddl_util::getCollectionUUID(opCtx, nss(), true /* allowViews */));
-                    sharding_ddl_util::stopMigrations(opCtx, nss(), _doc.getCollUUID());
+                    _doc.setCollUUID(sharding_ddl_util::getCollectionUUID(
+                        opCtx, _collInfo->nsForTargeting, true /* allowViews */));
+                    sharding_ddl_util::stopMigrations(
+                        opCtx, _collInfo->nsForTargeting, _doc.getCollUUID());
                 }
 
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
@@ -258,7 +211,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
-                _doc = _updateSession(opCtx, _doc);
+                _updateSession(opCtx);
 
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
@@ -285,7 +238,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
-                _doc = _updateSession(opCtx, _doc);
+                _updateSession(opCtx);
 
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
@@ -335,7 +288,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         CommandHelpers::appendSimpleCommandStatus(builder, ok, errmsg);
                     }
                     _result = builder.obj();
-                    sharding_ddl_util::resumeMigrations(opCtx, nss(), _doc.getCollUUID());
+                    sharding_ddl_util::resumeMigrations(
+                        opCtx, _collInfo->nsForTargeting, _doc.getCollUUID());
                 } else {
                     CollMod cmd(nss());
                     cmd.setCollModRequest(_request);
@@ -370,7 +324,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     auto* opCtx = opCtxHolder.get();
                     getForwardableOpMetadata().setOn(opCtx);
 
-                    sharding_ddl_util::resumeMigrations(opCtx, nss(), _doc.getCollUUID());
+                    sharding_ddl_util::resumeMigrations(
+                        opCtx, _collInfo->nsForTargeting, _doc.getCollUUID());
                 }
             }
             return status;

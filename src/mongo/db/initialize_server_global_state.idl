@@ -26,7 +26,7 @@
 # it in the license file.
 
 global:
-    cpp_namespace: mongo
+    cpp_namespace: mongo::initialize_server_global_state
     cpp_includes:
       - mongo/logv2/constants.h
 

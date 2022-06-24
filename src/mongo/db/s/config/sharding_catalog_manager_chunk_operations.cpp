@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 
 #include "mongo/base/status_with.h"
@@ -67,7 +64,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
 namespace {
 
@@ -87,7 +83,7 @@ void appendShortVersion(BufBuilder* out, const ChunkType& chunk) {
     bb.append(ChunkType::min(), chunk.getMin());
     bb.append(ChunkType::max(), chunk.getMax());
     if (chunk.isVersionSet()) {
-        chunk.getVersion().appendLegacyWithField(&bb, ChunkType::lastmod());
+        chunk.getVersion().serializeToBSON(ChunkType::lastmod(), &bb);
     }
     bb.done();
 }
@@ -268,7 +264,8 @@ ChunkVersion getShardVersion(OperationContext* opCtx,
         if (swDonorShardVersion.getStatus().code() == 50577) {
             // The query to find 'nss' chunks belonging to the donor shard didn't return any chunks,
             // meaning the last chunk for fromShard was donated. Gracefully handle the error.
-            return ChunkVersion(0, 0, collectionVersion.epoch(), collectionVersion.getTimestamp());
+            return ChunkVersion({collectionVersion.epoch(), collectionVersion.getTimestamp()},
+                                {0, 0});
         } else {
             // Bubble up any other error
             uassertStatusOK(swDonorShardVersion);
@@ -391,10 +388,9 @@ void ShardingCatalogManager::bumpMajorVersionOneChunkPerShard(
     TxnNumber txnNumber,
     const std::vector<ShardId>& shardIds) {
     auto curCollectionVersion = uassertStatusOK(getCollectionVersion(opCtx, nss));
-    ChunkVersion targetChunkVersion(curCollectionVersion.majorVersion() + 1,
-                                    0,
-                                    curCollectionVersion.epoch(),
-                                    curCollectionVersion.getTimestamp());
+    ChunkVersion targetChunkVersion(
+        {curCollectionVersion.epoch(), curCollectionVersion.getTimestamp()},
+        {curCollectionVersion.majorVersion() + 1, 0});
 
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto findCollResponse = uassertStatusOK(
@@ -684,7 +680,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
         BSONObjBuilder b(logDetail.subobjStart("before"));
         b.append(ChunkType::min(), range.getMin());
         b.append(ChunkType::max(), range.getMax());
-        collVersion.appendLegacyWithField(&b, ChunkType::lastmod());
+        collVersion.serializeToBSON(ChunkType::lastmod(), &b);
     }
 
     if (splitChunkResult.newChunks->size() == 2) {
@@ -960,8 +956,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
             b.append(chunkToMerge.toConfigBSON());
         }
     }
-    initialVersion.appendLegacyWithField(&logDetail, "prevShardVersion");
-    mergeVersion.appendLegacyWithField(&logDetail, "mergedVersion");
+    initialVersion.serializeToBSON("prevShardVersion", &logDetail);
+    mergeVersion.serializeToBSON("mergedVersion", &logDetail);
     logDetail.append("owningShard", shardId);
 
     ShardingLogging::get(opCtx)->logChange(
@@ -1127,10 +1123,9 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     newMigratedChunk->setMin(migratedChunk.getMin());
     newMigratedChunk->setMax(migratedChunk.getMax());
     newMigratedChunk->setShard(toShard);
-    newMigratedChunk->setVersion(ChunkVersion(currentCollectionVersion.majorVersion() + 1,
-                                              minVersionIncrement++,
-                                              currentCollectionVersion.epoch(),
-                                              currentCollectionVersion.getTimestamp()));
+    newMigratedChunk->setVersion(
+        ChunkVersion({currentCollectionVersion.epoch(), currentCollectionVersion.getTimestamp()},
+                     {currentCollectionVersion.majorVersion() + 1, minVersionIncrement++}));
 
     // Copy the complete history.
     auto newHistory = currentChunk.getHistory();
@@ -1186,10 +1181,9 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
             ChunkType leftSplitChunk = currentChunk;
             leftSplitChunk.setName(OID::gen());
             leftSplitChunk.setMax(movedChunkMin);
-            leftSplitChunk.setVersion(ChunkVersion(movedChunkVersion.majorVersion(),
-                                                   minVersionIncrement++,
-                                                   movedChunkVersion.epoch(),
-                                                   movedChunkVersion.getTimestamp()));
+            leftSplitChunk.setVersion(
+                ChunkVersion({movedChunkVersion.epoch(), movedChunkVersion.getTimestamp()},
+                             {movedChunkVersion.majorVersion(), minVersionIncrement++}));
             newSplitChunks->emplace_back(std::move(leftSplitChunk));
         }
 
@@ -1199,10 +1193,9 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
             ChunkType rightSplitChunk = currentChunk;
             rightSplitChunk.setName(OID::gen());
             rightSplitChunk.setMin(movedChunkMax);
-            rightSplitChunk.setVersion(ChunkVersion(movedChunkVersion.majorVersion(),
-                                                    minVersionIncrement++,
-                                                    movedChunkVersion.epoch(),
-                                                    movedChunkVersion.getTimestamp()));
+            rightSplitChunk.setVersion(
+                ChunkVersion({movedChunkVersion.epoch(), movedChunkVersion.getTimestamp()},
+                             {movedChunkVersion.majorVersion(), minVersionIncrement++}));
             newSplitChunks->emplace_back(std::move(rightSplitChunk));
         }
     }
@@ -1218,10 +1211,9 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
 
         newControlChunk = std::make_shared<ChunkType>(origControlChunk);
         // Setting control chunk's minor version to 1 on the donor shard.
-        newControlChunk->setVersion(ChunkVersion(currentCollectionVersion.majorVersion() + 1,
-                                                 minVersionIncrement++,
-                                                 currentCollectionVersion.epoch(),
-                                                 currentCollectionVersion.getTimestamp()));
+        newControlChunk->setVersion(ChunkVersion(
+            {currentCollectionVersion.epoch(), currentCollectionVersion.getTimestamp()},
+            {currentCollectionVersion.majorVersion() + 1, minVersionIncrement++}));
     }
 
     _commitChunkMigrationInTransaction(
@@ -1232,7 +1224,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
         // We migrated the last chunk from the donor shard.
         newMigratedChunk->getVersion().serializeToBSON(kCollectionVersionField, &response);
         const ChunkVersion donorShardVersion(
-            0, 0, currentCollectionVersion.epoch(), currentCollectionVersion.getTimestamp());
+            {currentCollectionVersion.epoch(), currentCollectionVersion.getTimestamp()}, {0, 0});
         donorShardVersion.serializeToBSON(ChunkVersion::kShardVersionField, &response);
     } else {
         newControlChunk->getVersion().serializeToBSON(kCollectionVersionField, &response);
@@ -1349,8 +1341,8 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
     }();
 
     // Bump the major version in order to be guaranteed to trigger refresh on every shard
-    ChunkVersion newCollectionVersion(
-        collVersion.majorVersion() + 1, 0, collVersion.epoch(), collVersion.getTimestamp());
+    ChunkVersion newCollectionVersion({collVersion.epoch(), collVersion.getTimestamp()},
+                                      {collVersion.majorVersion() + 1, 0});
     std::set<ShardId> changedShardIds;
     for (const auto& chunk : allChunksVector) {
         auto upgradeChunk = uassertStatusOK(
@@ -1491,10 +1483,9 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
                           << chunk.toString() << ").",
             currentCollectionVersion.epoch() == collectionEpoch);
 
-    ChunkVersion newVersion(currentCollectionVersion.majorVersion() + 1,
-                            0,
-                            currentCollectionVersion.epoch(),
-                            currentCollectionVersion.getTimestamp());
+    ChunkVersion newVersion(
+        {currentCollectionVersion.epoch(), currentCollectionVersion.getTimestamp()},
+        {currentCollectionVersion.majorVersion() + 1, 0});
 
     BSONObj chunkQuery(BSON(ChunkType::min(chunk.getMin())
                             << ChunkType::max(chunk.getMax()) << ChunkType::collectionUUID
@@ -1653,8 +1644,8 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
     // Generate a new version for the chunk by incrementing the collectionVersion's major
     // version.
     auto newChunk = matchingChunk;
-    newChunk.setVersion(ChunkVersion(
-        highestChunk.getVersion().majorVersion() + 1, 0, coll.getEpoch(), coll.getTimestamp()));
+    newChunk.setVersion(ChunkVersion({coll.getEpoch(), coll.getTimestamp()},
+                                     {highestChunk.getVersion().majorVersion() + 1, 0}));
 
     // Update the chunk, if it still exists, to have the bumped version.
     earlyReturnBeforeDoingWriteGuard.dismiss();

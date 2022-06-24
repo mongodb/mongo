@@ -47,37 +47,6 @@
 
 namespace mongo {
 
-DropCollectionCoordinator::DropCollectionCoordinator(ShardingDDLCoordinatorService* service,
-                                                     const BSONObj& initialState)
-    : ShardingDDLCoordinator(service, initialState),
-      _doc(DropCollectionCoordinatorDocument::parse(
-          IDLParserErrorContext("DropCollectionCoordinatorDocument"), initialState)) {}
-
-boost::optional<BSONObj> DropCollectionCoordinator::reportForCurrentOp(
-    MongoProcessInterface::CurrentOpConnectionsMode connMode,
-    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-
-    BSONObjBuilder cmdBob;
-    if (const auto& optComment = getForwardableOpMetadata().getComment()) {
-        cmdBob.append(optComment.get().firstElement());
-    }
-
-    const auto currPhase = [&]() {
-        stdx::lock_guard l{_docMutex};
-        return _doc.getPhase();
-    }();
-
-    BSONObjBuilder bob;
-    bob.append("type", "op");
-    bob.append("desc", "DropCollectionCoordinator");
-    bob.append("op", "command");
-    bob.append("ns", nss().toString());
-    bob.append("command", cmdBob.obj());
-    bob.append("currentPhase", currPhase);
-    bob.append("active", true);
-    return bob.obj();
-}
-
 DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
                                                            const NamespaceString& nss) {
     {
@@ -99,29 +68,6 @@ DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opC
     repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 
     return result;
-}
-
-void DropCollectionCoordinator::_enterPhase(Phase newPhase) {
-    StateDoc newDoc(_doc);
-    newDoc.setPhase(newPhase);
-
-    LOGV2_DEBUG(5390501,
-                2,
-                "Drop collection coordinator phase transition",
-                "namespace"_attr = nss(),
-                "newPhase"_attr = DropCollectionCoordinatorPhase_serializer(newDoc.getPhase()),
-                "oldPhase"_attr = DropCollectionCoordinatorPhase_serializer(_doc.getPhase()));
-
-    if (_doc.getPhase() == Phase::kUnset) {
-        newDoc = _insertStateDocument(std::move(newDoc));
-    } else {
-        newDoc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
-    }
-
-    {
-        stdx::unique_lock ul{_docMutex};
-        _doc = std::move(newDoc);
-    }
 }
 
 ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
@@ -161,7 +107,7 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                 // Persist the collection info before sticking to using it's uuid. This ensures this
                 // node is still the RS primary, so it was also the primary at the moment we read
                 // the collection metadata.
-                _doc = _updateStateDocument(opCtx, StateDoc(_doc));
+                _updateStateDocument(opCtx, StateDoc(_doc));
 
                 if (_doc.getCollInfo()) {
                     sharding_ddl_util::stopMigrations(opCtx, nss(), _doc.getCollInfo()->getUuid());
@@ -178,9 +124,9 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                     // Perform a noop write on the participants in order to advance the txnNumber
                     // for this coordinator's lsid so that requests with older txnNumbers can no
                     // longer execute.
-                    _doc = _updateSession(opCtx, _doc);
+                    _updateSession(opCtx);
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getCurrentSession(_doc), **executor);
+                        opCtx, getCurrentSession(), **executor);
                 }
 
                 const auto collIsSharded = bool(_doc.getCollInfo());
@@ -199,12 +145,11 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                 }
 
                 // Remove tags even if the collection is not sharded or didn't exist
-                _doc = _updateSession(opCtx, _doc);
-                sharding_ddl_util::removeTagsMetadataFromConfig(
-                    opCtx, nss(), getCurrentSession(_doc));
+                _updateSession(opCtx);
+                sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss(), getCurrentSession());
 
                 // get a Lsid and an incremented txnNumber. Ensures we are the primary
-                _doc = _updateSession(opCtx, _doc);
+                _updateSession(opCtx);
 
                 const auto primaryShardId = ShardingState::get(opCtx)->shardId();
 
@@ -217,13 +162,13 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                     participants.end());
 
                 sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-                    opCtx, nss(), participants, **executor, getCurrentSession(_doc));
+                    opCtx, nss(), participants, **executor, getCurrentSession());
 
                 // The sharded collection must be dropped on the primary shard after it has been
                 // dropped on all of the other shards to ensure it can only be re-created as
                 // unsharded with a higher optime than all of the drops.
                 sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-                    opCtx, nss(), {primaryShardId}, **executor, getCurrentSession(_doc));
+                    opCtx, nss(), {primaryShardId}, **executor, getCurrentSession());
 
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss().ns());
                 LOGV2(5390503, "Collection dropped", "namespace"_attr = nss());

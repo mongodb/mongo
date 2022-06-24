@@ -38,7 +38,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/client/query.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/concurrency/d_concurrency.h"

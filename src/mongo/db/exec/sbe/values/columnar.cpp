@@ -237,6 +237,24 @@ void addToObjectNoArrays(value::TypeTags tag,
     });
 }
 
+/*
+ * Ensures that the path (stored in 'state') leads to an object and materializes an empty object if
+ * it does not. Assumes that there are no arrays along remaining path (i.e., the components that are
+ * not yet traversed via withNextPathComponent()).
+ *
+ * This function is a no-op when there are no remaining path components.
+ */
+template <class C>
+void materializeObjectNoArrays(AddToDocumentState<C>& state, value::Object& out) {
+    if (state.atLastPathComponent()) {
+        return;
+    }
+
+    state.withNextPathComponent([&](StringData nextPathComponent) {
+        materializeObjectNoArrays(state, *findOrAddObjInObj(nextPathComponent, &out));
+    });
+}
+
 template <class C>
 void addToObject(value::Object& obj, AddToDocumentState<C>& state);
 
@@ -268,23 +286,19 @@ void addToArray(value::Array& arr, AddToDocumentState<C>& state) {
                 for (; insertAt < index; insertAt++) {
                     invariant(insertAt < arr.size());
 
-                    auto [tag, val] = [nextChar, &state]() {
-                        if (nextChar == '|') {
-                            return state.extractAndCopyValue();
+                    if (nextChar == 'o') {
+                        materializeObjectNoArrays(state, *findOrAddObjInArr(insertAt, &arr));
+                    } else if (nextChar == '|') {
+                        auto [tag, val] = state.extractAndCopyValue();
+                        if (state.atLastPathComponent()) {
+                            invariant(arr.getAt(insertAt).first == kPlaceHolderType);
+                            arr.setAt(insertAt, tag, val);
                         } else {
-                            invariant(nextChar == 'o');
-                            return value::makeNewObject();
+                            addToObjectNoArrays(
+                                tag, val, state, *findOrAddObjInArr(insertAt, &arr), 0);
                         }
-                    }();
-                    if (state.atLastPathComponent()) {
-                        // At this point we are inserting a leaf value.
-                        dassert(arr.getAt(insertAt).first == kPlaceHolderType);
-                        arr.setAt(insertAt, tag, val);
                     } else {
-                        // This is valid on initialized elements when the subobject contains more
-                        // than one member.
-                        auto* subObj = findOrAddObjInArr(insertAt, &arr);
-                        addToObjectNoArrays(tag, val, state, *subObj, 0);
+                        MONGO_UNREACHABLE;
                     }
                 }
                 break;

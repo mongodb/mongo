@@ -571,6 +571,8 @@ void ParseAndRunCommand::_parseCommand() {
         APIParameters::get(opCtx) = APIParameters::fromClient(apiParamsFromClient);
     }
 
+    rpc::readRequestMetadata(opCtx, request, command->requiresAuth());
+
     _invocation = command->parse(opCtx, request);
     CommandInvocation::set(opCtx, _invocation);
 
@@ -663,8 +665,6 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         apiVersionMetrics.update(appName, apiParams);
     }
 
-    rpc::readRequestMetadata(opCtx, request, command->requiresAuth());
-
     CommandHelpers::evaluateFailCommandFailPoint(opCtx, invocation.get());
     bool startTransaction = false;
     if (_parc->_osi->getAutocommit()) {
@@ -712,7 +712,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
          (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient));
 
     if (supportsWriteConcern && !clientSuppliedWriteConcern &&
-        (!TransactionRouter::get(opCtx) || isTransactionCommand(_parc->_commandName)) &&
+        (!TransactionRouter::get(opCtx) || command->isTransactionCommand()) &&
         !opCtx->getClient()->isInDirectClient()) {
         if (isInternalClient) {
             uassert(
@@ -1193,7 +1193,8 @@ private:
 void ClientCommand::_parseMessage() try {
     const auto& msg = _rec->getMessage();
     _rec->setReplyBuilder(rpc::makeReplyBuilder(rpc::protocolForMessage(msg)));
-    auto opMsgReq = rpc::opMsgRequestFromAnyProtocol(msg);
+    auto opMsgReq = rpc::opMsgRequestFromAnyProtocol(msg, _rec->getOpCtx()->getClient());
+
     if (msg.operation() == dbQuery) {
         checkAllowedOpQueryCommand(*(_rec->getOpCtx()->getClient()), opMsgReq.getCommandName());
     }

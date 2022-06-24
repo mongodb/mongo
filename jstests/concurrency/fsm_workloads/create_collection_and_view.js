@@ -4,7 +4,7 @@
  * Repeatedly creates a collection and a view with the same namespace. Validates that we never
  * manage to have both a Collection and View created on the same namespace at the same time.
  *
- * @tags: [catches_command_failures]
+ * @tags: [catches_command_failures, antithesis_incompatible]
  */
 
 var $config = (function() {

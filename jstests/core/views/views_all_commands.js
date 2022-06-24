@@ -368,7 +368,6 @@ let viewsCommandTests = {
     fsyncUnlock: {skip: isUnrelated},
     getAuditConfig: {skip: isUnrelated},
     getDatabaseVersion: {skip: isUnrelated},
-    getChangeStreamOptions: {skip: isUnrelated},  // TODO SERVER-65353 remove in 6.1.
     getClusterParameter: {skip: isUnrelated},
     getCmdLineOpts: {skip: isUnrelated},
     getDefaultRWConcern: {skip: isUnrelated},
@@ -496,7 +495,7 @@ let viewsCommandTests = {
         expectedErrorCode: ErrorCodes.NamespaceNotSharded,
     },
     moveChunk: {
-        command: {moveChunk: "test.view"},
+        command: {moveChunk: "test.view", find: {}, to: "a"},
         skipStandalone: true,
         isAdminCommand: true,
         expectFailure: true,
@@ -609,7 +608,6 @@ let viewsCommandTests = {
     saslStart: {skip: isUnrelated},
     sbe: {skip: isAnInternalCommand},
     serverStatus: {command: {serverStatus: 1}, skip: isUnrelated},
-    setChangeStreamOptions: {skip: isUnrelated},  // TODO SERVER-65353 remove in 6.1.
     setIndexCommitQuorum: {skip: isUnrelated},
     setAuditConfig: {skip: isUnrelated},
     setCommittedSnapshot: {skip: isAnInternalCommand},
@@ -647,7 +645,7 @@ let viewsCommandTests = {
             max: {x: 0},
             keyPattern: {x: 1},
             splitKeys: [{x: -2}, {x: -1}],
-            shardVersion: [Timestamp(1, 2), ObjectId(), Timestamp(1, 1)]
+            shardVersion: {t: Timestamp(1, 2), e: ObjectId(), v: Timestamp(1, 1)}
         },
         skipSharded: true,
         expectFailure: true,

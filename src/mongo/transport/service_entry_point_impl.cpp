@@ -30,20 +30,37 @@
 
 #include "mongo/transport/service_entry_point_impl.h"
 
+#include <boost/optional.hpp>
+#include <cstdint>
 #include <fmt/format.h>
+#include <memory>
+#include <string>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/restriction_environment.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/transport/hello_metrics.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_impl_gen.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/transport/service_executor_fixed.h"
 #include "mongo/transport/service_executor_gen.h"
+#include "mongo/transport/service_executor_reserved.h"
+#include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/service_state_machine.h"
 #include "mongo/transport/session.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/net/cidr.h"
 
 #if !defined(_WIN32)
 #include <sys/resource.h>
@@ -60,40 +77,59 @@ namespace mongo {
 
 using namespace fmt::literals;
 
+namespace {
+bool quiet() {
+    return serverGlobalParams.quiet.load();
+}
+
+/** Some diagnostic data that we will want to log about a Client after its death. */
+struct ClientSummary {
+    explicit ClientSummary(const Client* c)
+        : uuid{c->getUUID()}, remote{c->session()->remote()}, id{c->session()->id()} {}
+
+    friend auto logAttrs(const ClientSummary& m) {
+        return logv2::multipleAttrs(
+            "remote"_attr = m.remote, "uuid"_attr = m.uuid, "connectionId"_attr = m.id);
+    }
+
+    UUID uuid;
+    HostAndPort remote;
+    transport::SessionId id;
+};
+}  // namespace
+
 bool shouldOverrideMaxConns(const transport::SessionHandle& session,
                             const std::vector<stdx::variant<CIDR, std::string>>& exemptions) {
-    if (exemptions.empty()) {
+    if (exemptions.empty())
         return false;
-    }
-
-    const auto& remoteAddr = session->remoteAddr();
-    const auto& localAddr = session->localAddr();
 
     boost::optional<CIDR> remoteCIDR;
+    if (const auto& ra = session->remoteAddr(); ra.isValid() && ra.isIP())
+        remoteCIDR = uassertStatusOK(CIDR::parse(ra.getAddr()));
 
-    if (remoteAddr.isValid() && remoteAddr.isIP()) {
-        remoteCIDR = uassertStatusOK(CIDR::parse(remoteAddr.getAddr()));
-    }
-    for (const auto& exemption : exemptions) {
-        // If this exemption is a CIDR range, then we check that the remote IP is in the
-        // CIDR range
-        if ((stdx::holds_alternative<CIDR>(exemption)) && (remoteCIDR)) {
-            if (stdx::get<CIDR>(exemption).contains(*remoteCIDR)) {
-                return true;
-            }
-// Otherwise the exemption is a UNIX path and we should check the local path
-// (the remoteAddr == "anonymous unix socket") against the exemption string
-//
-// On Windows we don't check this at all and only CIDR ranges are supported
 #ifndef _WIN32
-        } else if ((stdx::holds_alternative<std::string>(exemption)) && localAddr.isValid() &&
-                   (localAddr.getAddr() == stdx::get<std::string>(exemption))) {
-            return true;
+    boost::optional<std::string> localPath;
+    if (const auto& la = session->localAddr(); la.isValid())
+        localPath = la.getAddr();
 #endif
-        }
-    }
 
-    return false;
+    return std::any_of(exemptions.begin(), exemptions.end(), [&](const auto& exemption) {
+        return stdx::visit(
+            [&](auto&& ex) {
+                using Alt = std::decay_t<decltype(ex)>;
+                if constexpr (std::is_same_v<Alt, CIDR>)
+                    return remoteCIDR && ex.contains(*remoteCIDR);
+#ifndef _WIN32
+                // Otherwise the exemption is a UNIX path and we should check the local path
+                // (the remoteAddr == "anonymous unix socket") against the exemption string.
+                // On Windows we don't check this at all and only CIDR ranges are supported.
+                if constexpr (std::is_same_v<Alt, std::string>)
+                    return localPath && *localPath == ex;
+#endif
+                return false;
+            },
+            exemption);
+    });
 }
 
 size_t getSupportedMax() {
@@ -130,8 +166,96 @@ size_t getSupportedMax() {
     return supportedMax;
 }
 
+class ServiceEntryPointImpl::Sessions {
+public:
+    struct Entry {
+        explicit Entry(std::shared_ptr<transport::ServiceStateMachine> ssm) : ssm{std::move(ssm)} {}
+        std::shared_ptr<transport::ServiceStateMachine> ssm;
+        ClientSummary summary{ssm->client()};
+    };
+    using ByClientMap = stdx::unordered_map<Client*, Entry>;
+    using iterator = ByClientMap::iterator;
+
+    /** A proxy object providing properly synchronized Sessions accessors. */
+    class SyncToken {
+    public:
+        explicit SyncToken(Sessions* src) : _src{src}, _lk{_src->_mutex} {}
+
+        /** Run `f(ssm)` for each `ServiceStateMachine& ssm`, in an unspecified order. */
+        template <typename F>
+        void forEach(F&& f) {
+            for (auto& e : _src->_byClient)
+                f(*e.second.ssm);
+        }
+
+        /**
+         * Waits for Sessions to drain, possibly unlocking and relocking its
+         * Mutex. SyncToken holds exclusive access to a Sessions object before
+         * and after this function call, but not during.
+         */
+        bool waitForEmpty(Date_t deadline) {
+            return _src->_cv.wait_until(
+                _lk, deadline.toSystemTimePoint(), [&] { return _src->_byClient.empty(); });
+        }
+
+        iterator insert(std::shared_ptr<transport::ServiceStateMachine> ssm) {
+            Client* cli = ssm->client();
+            auto [it, ok] = _src->_byClient.insert({cli, Entry(std::move(ssm))});
+            invariant(ok);
+            _src->_created.fetchAndAdd(1);
+            _onSizeChange();
+            return it;
+        }
+
+        void erase(iterator it) {
+            _src->_byClient.erase(it);
+            _onSizeChange();
+        }
+
+        iterator find(Client* client) {
+            auto iter = _src->_byClient.find(client);
+            invariant(iter != _src->_byClient.end());
+            return iter;
+        }
+
+        size_t size() const {
+            return _src->_byClient.size();
+        }
+
+    private:
+        void _onSizeChange() {
+            _src->_size.store(_src->_byClient.size());
+            _src->_cv.notify_all();
+        }
+
+        Sessions* _src;
+        stdx::unique_lock<Mutex> _lk;
+    };
+
+    /** Returns a proxy object providing synchronized mutable access to the Sessions object. */
+    SyncToken sync() {
+        return SyncToken(this);
+    }
+
+    size_t size() const {
+        return _size.load();
+    }
+
+    size_t created() const {
+        return _created.load();
+    }
+
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ServiceEntryPointImpl::Sessions::_mutex");
+    stdx::condition_variable _cv;    ///< notified on `_byClient` changes.
+    AtomicWord<size_t> _size{0};     ///< Kept in sync with `_byClient.size()`
+    AtomicWord<size_t> _created{0};  ///< Increases with each `insert` call.
+    ByClientMap _byClient;           ///< guarded by `_mutex`
+};
+
 ServiceEntryPointImpl::ServiceEntryPointImpl(ServiceContext* svcCtx)
-    : _svcCtx(svcCtx), _maxNumConnections(getSupportedMax()) {}
+    : _svcCtx(svcCtx), _maxSessions(getSupportedMax()), _sessions{std::make_unique<Sessions>()} {}
+
+ServiceEntryPointImpl::~ServiceEntryPointImpl() = default;
 
 Status ServiceEntryPointImpl::start() {
     if (auto status = transport::ServiceExecutorSynchronous::get(_svcCtx)->start();
@@ -153,6 +277,7 @@ Status ServiceEntryPointImpl::start() {
 }
 
 void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
+    invariant(session);
     // Setup the restriction environment on the Session, if the Session has local/remote Sockaddrs
     const auto& remoteAddr = session->remoteAddr();
     const auto& localAddr = session->localAddr();
@@ -160,88 +285,64 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     auto restrictionEnvironment = std::make_unique<RestrictionEnvironment>(remoteAddr, localAddr);
     RestrictionEnvironment::set(session, std::move(restrictionEnvironment));
 
-    bool canOverrideMaxConns = shouldOverrideMaxConns(session, serverGlobalParams.maxConnsOverride);
+    bool isPrivilegedSession = shouldOverrideMaxConns(session, serverGlobalParams.maxConnsOverride);
 
-    auto clientName = "conn{}"_format(session->id());
-    auto client = _svcCtx->makeClient(clientName, session);
-    auto uuid = client->getUUID();
+    auto client = _svcCtx->makeClient("conn{}"_format(session->id()), session);
+    auto clientPtr = client.get();
 
-    const bool quiet = serverGlobalParams.quiet.load();
-
-    size_t connectionCount;
-    auto maybeSsmIt = [&]() -> boost::optional<SSMListIterator> {
-        stdx::lock_guard lk(_sessionsMutex);
-        connectionCount = _currentConnections.load();
-        if (connectionCount > _maxNumConnections && !canOverrideMaxConns) {
-            return boost::none;
+    Sessions::iterator iter;
+    {
+        auto sync = _sessions->sync();
+        if (sync.size() >= _maxSessions && !isPrivilegedSession) {
+            if (!quiet()) {
+                LOGV2(22942,
+                      "Connection refused because there are too many open connections",
+                      "remote"_attr = session->remote(),
+                      "connectionCount"_attr = sync.size());
+            }
+            return;
         }
 
-        auto clientPtr = client.get();
-        auto it = _sessions.emplace(_sessions.begin(), std::move(client));
-
-        connectionCount = _sessions.size();
-        _currentConnections.store(connectionCount);
-        _createdConnections.addAndFetch(1);
-        onClientConnect(clientPtr);
-
-        return it;
-    }();
-
-    if (!maybeSsmIt) {
-        if (!quiet) {
-            LOGV2(22942,
-                  "Connection refused because there are too many open connections",
-                  "remote"_attr = session->remote(),
-                  "connectionCount"_attr = connectionCount);
+        // Imbue the new Client with a ServiceExecutorContext.
+        {
+            auto seCtx = std::make_unique<transport::ServiceExecutorContext>();
+            seCtx->setThreadingModel(transport::ServiceExecutor::getInitialThreadingModel());
+            seCtx->setCanUseReserved(isPrivilegedSession);
+            stdx::lock_guard lk(*client);
+            transport::ServiceExecutorContext::set(&*client, std::move(seCtx));
         }
-        return;
-    } else if (!quiet) {
-        LOGV2(22943,
-              "Connection accepted",
-              "remote"_attr = session->remote(),
-              "uuid"_attr = uuid.toString(),
-              "connectionId"_attr = session->id(),
-              "connectionCount"_attr = connectionCount);
+
+        auto ssm = transport::ServiceStateMachine::make(std::move(client));
+        iter = sync.insert(std::move(ssm));
+        if (!quiet()) {
+            LOGV2(22943,
+                  "Connection accepted",
+                  logAttrs(iter->second.summary),
+                  "connectionCount"_attr = sync.size());
+        }
     }
 
-    auto ssmIt = *maybeSsmIt;
-    ssmIt->setCleanupHook([this, ssmIt, quiet, session = std::move(session), uuid] {
-        size_t connectionCount;
-        auto remote = session->remote();
-        {
-            stdx::lock_guard<decltype(_sessionsMutex)> lk(_sessionsMutex);
-            _sessions.erase(ssmIt);
-            connectionCount = _sessions.size();
-            _currentConnections.store(connectionCount);
-        }
+    onClientConnect(clientPtr);
+    iter->second.ssm->start();
+}
 
-        _sessionsCV.notify_one();
-
-        if (!quiet) {
-            LOGV2(22944,
-                  "Connection ended",
-                  "remote"_attr = remote,
-                  "uuid"_attr = uuid.toString(),
-                  "connectionId"_attr = session->id(),
-                  "connectionCount"_attr = connectionCount);
-        }
-    });
-
-    auto seCtx = transport::ServiceExecutorContext{};
-    seCtx.setThreadingModel(transport::ServiceExecutor::getInitialThreadingModel());
-    seCtx.setCanUseReserved(canOverrideMaxConns);
-    ssmIt->start(std::move(seCtx));
+void ServiceEntryPointImpl::onClientDisconnect(Client* client) {
+    derivedOnClientDisconnect(client);
+    {
+        stdx::lock_guard lk(*client);
+        transport::ServiceExecutorContext::reset(client);
+    }
+    auto sync = _sessions->sync();
+    auto iter = sync.find(client);
+    auto summary = iter->second.summary;
+    sync.erase(iter);
+    if (!quiet()) {
+        LOGV2(22944, "Connection ended", logAttrs(summary), "connectionCount"_attr = sync.size());
+    }
 }
 
 void ServiceEntryPointImpl::endAllSessions(transport::Session::TagMask tags) {
-    // While holding the _sesionsMutex, loop over all the current connections, and if their tags
-    // do not match the requested tags to skip, terminate the session.
-    {
-        stdx::unique_lock<decltype(_sessionsMutex)> lk(_sessionsMutex);
-        for (auto& ssm : _sessions) {
-            ssm.terminateIfTagsDontMatch(tags);
-        }
-    }
+    _sessions->sync().forEach([&](auto&& ssm) { ssm.terminateIfTagsDontMatch(tags); });
 }
 
 bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
@@ -266,88 +367,73 @@ bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
     return true;
 }
 
+size_t ServiceEntryPointImpl::numOpenSessions() const {
+    return _sessions->size();
+}
+
+size_t ServiceEntryPointImpl::maxOpenSessions() const {
+    return _maxSessions;
+}
+
 bool ServiceEntryPointImpl::shutdownAndWait(Milliseconds timeout) {
     auto deadline = _svcCtx->getPreciseClockSource()->now() + timeout;
 
-    stdx::unique_lock<decltype(_sessionsMutex)> lk(_sessionsMutex);
-
-    // Request that all sessions end, while holding the _sesionsMutex, loop over all the current
-    // connections and terminate them. Then wait for the number of active connections to reach zero
-    // with a condition_variable that notifies in the session cleanup hook. If we haven't closed
-    // drained all active operations within the deadline, just keep going with shutdown: the OS will
-    // do it for us when the process terminates.
-    _terminateAll(lk);
-
+    // Issue a terminate to all sessions, then wait for them to drain.
+    // If there are undrained sessions after the deadline, shutdown continues.
     LOGV2(6367401, "Shutting down service entry point and waiting for sessions to join");
 
-    auto result = _waitForNoSessions(lk, deadline);
-    lk.unlock();
-
-    if (result) {
-        LOGV2(22946, "shutdown: no running workers found...");
-    } else {
-        LOGV2(
-            22947,
-            "shutdown: exhausted grace period for {workers} active workers to "
-            "drain; continuing with shutdown...",
-            "shutdown: exhausted grace period active workers to drain; continuing with shutdown...",
-            "workers"_attr = numOpenSessions());
+    bool drainedAll;
+    {
+        auto sync = _sessions->sync();
+        sync.forEach([&](auto&& ssm) { ssm.terminate(); });
+        drainedAll = sync.waitForEmpty(deadline);
+        if (!drainedAll) {
+            LOGV2(22947,
+                  "Shutdown: some sessions not drained after deadline. Continuing shutdown",
+                  "sessions"_attr = sync.size());
+        } else {
+            LOGV2(22946, "Shutdown: all sessions drained");
+        }
     }
 
     transport::ServiceExecutor::shutdownAll(_svcCtx, deadline);
 
-    return result;
+    return drainedAll;
 }
 
 void ServiceEntryPointImpl::endAllSessionsNoTagMask() {
-    auto lk = stdx::unique_lock<decltype(_sessionsMutex)>(_sessionsMutex);
-    _terminateAll(lk);
-}
-
-void ServiceEntryPointImpl::_terminateAll(WithLock) {
-    for (auto& ssm : _sessions) {
-        ssm.terminate();
-    }
+    _sessions->sync().forEach([&](auto&& ssm) { ssm.terminate(); });
 }
 
 bool ServiceEntryPointImpl::waitForNoSessions(Milliseconds timeout) {
     auto deadline = _svcCtx->getPreciseClockSource()->now() + timeout;
-    LOGV2(5342100, "Waiting until for all sessions to conclude", "deadline"_attr = deadline);
+    LOGV2(5342100, "Waiting for all sessions to conclude", "deadline"_attr = deadline);
 
-    auto lk = stdx::unique_lock<decltype(_sessionsMutex)>(_sessionsMutex);
-    return _waitForNoSessions(lk, deadline);
-}
-
-bool ServiceEntryPointImpl::_waitForNoSessions(stdx::unique_lock<decltype(_sessionsMutex)>& lk,
-                                               Date_t deadline) {
-    auto noWorkersLeft = [this] { return numOpenSessions() == 0; };
-    _sessionsCV.wait_until(lk, deadline.toSystemTimePoint(), noWorkersLeft);
-
-    return noWorkersLeft();
+    return _sessions->sync().waitForEmpty(deadline);
 }
 
 void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
+    size_t sessionCount = _sessions->size();
+    size_t sessionsCreated = _sessions->created();
 
-    size_t sessionCount = _currentConnections.load();
+    auto appendInt = [&](StringData n, auto v) { bob->append(n, static_cast<int>(v)); };
 
-    bob->append("current", static_cast<int>(sessionCount));
-    bob->append("available", static_cast<int>(_maxNumConnections - sessionCount));
-    bob->append("totalCreated", static_cast<int>(_createdConnections.load()));
+    appendInt("current", sessionCount);
+    appendInt("available", _maxSessions - sessionCount);
+    appendInt("totalCreated", sessionsCreated);
 
     invariant(_svcCtx);
-    bob->append("active", static_cast<int>(_svcCtx->getActiveClientOperations()));
+    appendInt("active", _svcCtx->getActiveClientOperations());
 
     const auto seStats = transport::ServiceExecutorStats::get(_svcCtx);
-    bob->append("threaded", static_cast<int>(seStats.usesDedicated));
-    if (serverGlobalParams.maxConnsOverride.size()) {
-        bob->append("limitExempt", static_cast<int>(seStats.limitExempt));
-    }
+    appendInt("threaded", seStats.usesDedicated);
+    if (!serverGlobalParams.maxConnsOverride.empty())
+        appendInt("limitExempt", seStats.limitExempt);
 
-    bob->append("exhaustIsMaster",
-                static_cast<int>(HelloMetrics::get(_svcCtx)->getNumExhaustIsMaster()));
-    bob->append("exhaustHello", static_cast<int>(HelloMetrics::get(_svcCtx)->getNumExhaustHello()));
-    bob->append("awaitingTopologyChanges",
-                static_cast<int>(HelloMetrics::get(_svcCtx)->getNumAwaitingTopologyChanges()));
+    auto&& hm = HelloMetrics::get(_svcCtx);
+    appendInt("exhaustIsMaster", hm->getNumExhaustIsMaster());
+    appendInt("exhaustHello", hm->getNumExhaustHello());
+    appendInt("awaitingTopologyChanges", hm->getNumAwaitingTopologyChanges());
 
     if (auto adminExec = transport::ServiceExecutorReserved::get(_svcCtx)) {
         BSONObjBuilder section(bob->subobjStart("adminConnections"));

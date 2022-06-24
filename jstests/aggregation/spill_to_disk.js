@@ -27,7 +27,7 @@ const sharded = FixtureHelpers.isSharded(coll);
 
 const memoryLimitMB = sharded ? 200 : 100;
 
-const isSBELookupEnabled = checkSBEEnabled(db, ["featureFlagSBELookupPushdown"]);
+const isSBELookupEnabled = checkSBEEnabled(db);
 
 const bigStr = Array(1024 * 1024 + 1).toString();  // 1MB of ','
 for (let i = 0; i < memoryLimitMB + 1; i++)

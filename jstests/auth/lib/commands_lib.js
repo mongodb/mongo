@@ -3028,8 +3028,27 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "_configsvrCommitChunkMigration",
-          command: {_configsvrCommitChunkMigration: "x.y"},
+            testname: "_configsvrCommitChunkMigration",
+            command: {
+              _configsvrCommitChunkMigration: "db.fooHashed",
+              fromShard: "move_chunk_basic-rs0",
+              toShard: "move_chunk_basic-rs1",
+              migratedChunk: {
+                  lastmod: {
+                      e: new ObjectId('62b052ac7f5653479a67a54f'),
+                      t: new Timestamp(1655722668, 22),
+                      v: new Timestamp(1, 0)
+                  },
+                  min: {_id: MinKey}, 
+                  max: {_id: -4611686018427387902}
+              },
+              fromShardCollectionVersion: {
+                  e: new ObjectId('62b052ac7f5653479a67a54f'),
+                  t: new Timestamp(1655722668, 22),
+                  v: new Timestamp(1, 3)
+              },
+              validAfter: new Timestamp(1655722670, 6)
+          },
           skipSharded: true,
           expectFail: true,
           testcases: [
@@ -4179,7 +4198,7 @@ var authCommandsLib = {
           skipTest: (conn) => {
               const hello = assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
               const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
-              return !TestData.setParameters.featureFlagClusterWideConfig || isStandalone;
+              return isStandalone;
           },
           testcases: [
             {
@@ -5010,7 +5029,7 @@ var authCommandsLib = {
         },
         {
           testname: "s_moveChunk",
-          command: {moveChunk: "test.x"},
+          command: {moveChunk: "test.x", find:{}, to:"a"},
           skipUnlessSharded: true,
           testcases: [
               {
@@ -5672,7 +5691,7 @@ var authCommandsLib = {
           skipTest: (conn) => {
               const hello = assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
               const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
-              return !TestData.setParameters.featureFlagClusterWideConfig || isStandalone;
+              return isStandalone;
           },
           testcases: [
               {

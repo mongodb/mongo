@@ -144,6 +144,10 @@ void acquireCollectionLocksInResourceIdOrder(
         // ResourceId(RESOURCE_COLLECTION, nss.ns()).
         temp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID));
         for (const auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
+            invariant(secondaryNssOrUUID.db() == nsOrUUID.db(),
+                      str::stream()
+                          << "Unable to acquire locks for collections across different databases ("
+                          << secondaryNssOrUUID << " vs " << nsOrUUID << ")");
             temp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID));
         }
 
@@ -165,29 +169,12 @@ void acquireCollectionLocksInResourceIdOrder(
 }  // namespace
 
 // TODO SERVER-62918 Pass DatabaseName instead of string for dbName.
-AutoGetDb::AutoGetDb(OperationContext* opCtx,
-                     StringData dbName,
-                     LockMode mode,
-                     Date_t deadline,
-                     const std::set<StringData>& secondaryDbNames)
+AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, Date_t deadline)
     : _dbName(dbName), _dbLock(opCtx, dbName, mode, deadline), _db([&] {
           const DatabaseName tenantDbName(boost::none, dbName);
           auto databaseHolder = DatabaseHolder::get(opCtx);
           return databaseHolder->getDb(opCtx, tenantDbName);
       }()) {
-    // Take the secondary dbs' database locks only: no global or RSTL, as they are already acquired
-    // above. Note: no consistent ordering is when acquiring database locks because there are no
-    // occasions where multiple strong locks are acquired to make ordering matter (deadlock
-    // avoidance).
-    for (const auto& secondaryDbName : secondaryDbNames) {
-        // The primary database may be repeated in the secondary databases and the primary database
-        // should not be locked twice.
-        if (secondaryDbName != _dbName) {
-            _secondaryDbLocks.emplace_back(
-                opCtx, secondaryDbName, MODE_IS, deadline, true /*skipGlobalAndRSTLLocks*/);
-        }
-    }
-
     // The 'primary' database must be version checked for sharding.
     auto dss = DatabaseShardingState::get(opCtx, dbName);
     auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
@@ -219,19 +206,9 @@ AutoGetCollection::AutoGetCollection(
     const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs) {
     invariant(!opCtx->isLockFreeReadsOp());
 
-    // Get a unique list of 'secondary' database names to pass into AutoGetDb below.
-    std::set<StringData> secondaryDbNames;
-    for (auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
-        secondaryDbNames.emplace(secondaryNssOrUUID.db());
-    }
-
     // Acquire the global/RSTL and all the database locks (may or may not be multiple
     // databases).
-    _autoDb.emplace(opCtx,
-                    !nsOrUUID.dbname().empty() ? nsOrUUID.dbname() : nsOrUUID.nss()->db(),
-                    isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
-                    deadline,
-                    secondaryDbNames);
+    _autoDb.emplace(opCtx, nsOrUUID.db(), isSharedLockMode(modeColl) ? MODE_IS : MODE_IX, deadline);
 
     // Out of an abundance of caution, force operations to acquire new snapshots after
     // acquiring exclusive collection locks. Operations that hold MODE_X locks make an
@@ -246,7 +223,7 @@ AutoGetCollection::AutoGetCollection(
     // Acquire the collection locks. If there's only one lock, then it can simply be taken. If
     // there are many, however, the locks must be taken in _ascending_ ResourceId order to avoid
     // deadlocks across threads.
-    if (secondaryDbNames.empty()) {
+    if (secondaryNssOrUUIDs.empty()) {
         uassertStatusOK(nsOrUUID.isNssValid());
         _collLocks.emplace_back(opCtx, nsOrUUID, modeColl, deadline);
     } else {
@@ -478,7 +455,6 @@ struct CollectionWriter::SharedImpl {
 
 CollectionWriter::CollectionWriter(OperationContext* opCtx, const UUID& uuid)
     : _collection(&_storedCollection),
-      _opCtx(opCtx),
       _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
@@ -490,7 +466,6 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const UUID& uuid)
 
 CollectionWriter::CollectionWriter(OperationContext* opCtx, const NamespaceString& nss)
     : _collection(&_storedCollection),
-      _opCtx(opCtx),
       _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
     _storedCollection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
@@ -502,7 +477,6 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const NamespaceStrin
 
 CollectionWriter::CollectionWriter(OperationContext* opCtx, AutoGetCollection& autoCollection)
     : _collection(&autoCollection.getCollection()),
-      _opCtx(opCtx),
       _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
     _sharedImpl->_writableCollectionInitializer = [&autoCollection, opCtx]() {
@@ -523,7 +497,7 @@ CollectionWriter::~CollectionWriter() {
     }
 }
 
-Collection* CollectionWriter::getWritableCollection() {
+Collection* CollectionWriter::getWritableCollection(OperationContext* opCtx) {
     // Acquire writable instance lazily if not already available
     if (!_writableCollection) {
         _writableCollection = _sharedImpl->_writableCollectionInitializer();
@@ -539,7 +513,7 @@ Collection* CollectionWriter::getWritableCollection() {
             // and re-clone the Collection if a new write unit of work is opened. Holds the back
             // pointer to the CollectionWriter explicitly so we can detect if the instance is
             // already destroyed.
-            _opCtx->recoveryUnit()->registerChange(
+            opCtx->recoveryUnit()->registerChange(
                 [shared = _sharedImpl](boost::optional<Timestamp>) {
                     if (shared->_parent)
                         shared->_parent->_writableCollection = nullptr;
@@ -598,5 +572,36 @@ AutoGetOplog::AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t
     _oplogInfo = LocalOplogInfo::get(opCtx);
     _oplog = &_oplogInfo->getCollection();
 }
+
+
+AutoGetChangeCollection::AutoGetChangeCollection(OperationContext* opCtx,
+                                                 AutoGetChangeCollection::AccessMode mode,
+                                                 boost::optional<TenantId> tenantId,
+                                                 Date_t deadline) {
+    auto nss = NamespaceString::makeChangeCollectionNSS(tenantId);
+    if (mode == AccessMode::kWrite) {
+        // The global lock must already be held.
+        invariant(opCtx->lockState()->isWriteLocked());
+
+        // TODO SERVER-66715 avoid taking 'AutoGetCollection' and remove
+        // 'AllowLockAcquisitionOnTimestampedUnitOfWork'.
+        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+        _coll.emplace(
+            opCtx, nss, LockMode::MODE_IX, AutoGetCollectionViewMode::kViewsForbidden, deadline);
+    }
+}
+
+const Collection* AutoGetChangeCollection::operator->() const {
+    return _coll ? _coll->getCollection().get() : nullptr;
+}
+
+const CollectionPtr& AutoGetChangeCollection::operator*() const {
+    return _coll->getCollection();
+}
+
+AutoGetChangeCollection::operator bool() const {
+    return _coll && _coll->getCollection().get();
+}
+
 
 }  // namespace mongo

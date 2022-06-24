@@ -49,7 +49,7 @@ function setupCollections(localRecords, foreignRecords, foreignField) {
  */
 function checkJoinConfiguration(explain) {
     const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
-    if (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
+    if (checkSBEEnabled(db)) {
         if (eqLookupNodes.length > 0) {
             // The $lookup stage has been lowered. Check that it's using the expected join strategy.
             assert.eq(currentJoinAlgorithm.strategy, eqLookupNodes[0].strategy, "Join strategy");
@@ -258,7 +258,7 @@ function runTests() {
             {_id: 11, a: [[null, 1], 2]},
         ];
 
-        if (checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
+        if (checkSBEEnabled(db)) {
             // When lowered to SBE, "undefined" should only match "undefined".
             runTest_SingleForeignRecord({
                 testDescription: "Undefined in foreign, top-level field in local",

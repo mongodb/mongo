@@ -1975,6 +1975,12 @@ __wt_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
     else
         FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CURSOR_COPY);
 
+    WT_RET(__wt_config_gets(session, cfg, "debug_mode.cursor_reposition", &cval));
+    if (cval.val)
+        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CURSOR_REPOSITION);
+    else
+        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CURSOR_REPOSITION);
+
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.eviction", &cval));
     if (cval.val)
         F_SET(cache, WT_CACHE_EVICT_DEBUG_MODE);
@@ -2262,7 +2268,7 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     const WT_NAME_FLAG *ft;
-    uint64_t flags;
+    uint32_t flags;
 
     conn = S2C(session);
 
@@ -2371,10 +2377,8 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
     __wt_config_init(session, &parser, base_config);
     while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
         /* Fix quoting for non-trivial settings. */
-        if (v.type == WT_CONFIG_ITEM_STRING) {
-            --v.str;
-            v.len += 2;
-        }
+        if (v.type == WT_CONFIG_ITEM_STRING)
+            WT_CONFIG_PRESERVE_QUOTES(session, &v);
         WT_ERR(__wt_fprintf(session, fs, "%.*s=%.*s\n", (int)k.len, k.str, (int)v.len, v.str));
     }
     WT_ERR_NOTFOUND_OK(ret, false);

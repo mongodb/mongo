@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -41,7 +38,6 @@
 #include "mongo/unittest/death_test.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
 
 namespace mongo {
 namespace {
@@ -115,7 +111,7 @@ TEST_F(CatalogCacheRefreshTest, FullLoad) {
 
     expectGetDatabase();
 
-    ChunkVersion version(1, 0, epoch, timestamp);
+    ChunkVersion version({epoch, timestamp}, {1, 0});
 
     ChunkType chunk1(reshardingUUID,
                      {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},
@@ -328,7 +324,7 @@ TEST_F(CatalogCacheRefreshTest, ChunksBSONCorrupted) {
         const auto chunk1 =
             ChunkType(coll.getUuid(),
                       {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
-                      ChunkVersion(1, 0, epoch, Timestamp(1, 1)),
+                      ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
                       {"0"});
         return std::vector<BSONObj>{/* collection */
                                     coll.toBSON(),
@@ -359,7 +355,7 @@ TEST_F(CatalogCacheRefreshTest, FullLoadMissingChunkWithLowestVersion) {
     expectGetDatabase();
 
     const auto incompleteChunks = [&]() {
-        ChunkVersion version(1, 0, epoch, timestamp);
+        ChunkVersion version({epoch, timestamp}, {1, 0});
 
         // Chunk from (MinKey, -100) is missing (as if someone is dropping the collection
         // concurrently) and has the lowest version.
@@ -415,7 +411,7 @@ TEST_F(CatalogCacheRefreshTest, FullLoadMissingChunkWithHighestVersion) {
     expectGetDatabase();
 
     const auto incompleteChunks = [&]() {
-        ChunkVersion version(1, 0, epoch, timestamp);
+        ChunkVersion version({epoch, timestamp}, {1, 0});
 
         // Chunk from (MinKey, -100) is missing (as if someone is dropping the collection
         // concurrently) and has the higest version.
@@ -473,7 +469,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithLowestVersion) {
     auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
     const auto incompleteChunks = [&]() {
-        ChunkVersion version(1, 0, epoch, timestamp);
+        ChunkVersion version({epoch, timestamp}, {1, 0});
 
         // Chunk from (MinKey, -100) is missing (as if someone is dropping the collection
         // concurrently) and has the lowest version.
@@ -531,7 +527,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithHighestVersion) {
     auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
     const auto incompleteChunks = [&]() {
-        ChunkVersion version(1, 0, epoch, timestamp);
+        ChunkVersion version({epoch, timestamp}, {1, 0});
 
         // Chunk from (MinKey, -100) is missing (as if someone is dropping the collection
         // concurrently) and has the higest version.
@@ -621,7 +617,7 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
         // recreated collection.
         ChunkType chunk3(coll.getUuid(),
                          {BSON("_id" << 100), shardKeyPattern.getKeyPattern().globalMax()},
-                         ChunkVersion(5, 2, newEpoch, newTimestamp),
+                         ChunkVersion({newEpoch, newTimestamp}, {5, 2}),
                          {"1"});
         chunk3.setName(OID::gen());
 
@@ -631,7 +627,7 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
     });
 
     // On the second retry attempt, return the correct set of chunks from the recreated collection
-    ChunkVersion newVersion(5, 0, newEpoch, newTimestamp);
+    ChunkVersion newVersion({newEpoch, newTimestamp}, {5, 0});
     onFindCommand([&](const RemoteCommandRequest& request) {
         const auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         const auto aggRequest = unittest::assertGet(
@@ -676,9 +672,9 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
     ASSERT(cm.isSharded());
     ASSERT_EQ(3, cm.numChunks());
     ASSERT_EQ(newVersion, cm.getVersion());
-    ASSERT_EQ(ChunkVersion(5, 1, newVersion.epoch(), newVersion.getTimestamp()),
+    ASSERT_EQ(ChunkVersion({newVersion.epoch(), newVersion.getTimestamp()}, {5, 1}),
               cm.getVersion({"0"}));
-    ASSERT_EQ(ChunkVersion(5, 2, newVersion.epoch(), newVersion.getTimestamp()),
+    ASSERT_EQ(ChunkVersion({newVersion.epoch(), newVersion.getTimestamp()}, {5, 2}),
               cm.getVersion({"1"}));
 }
 
@@ -693,7 +689,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
     auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
     ChunkVersion oldVersion = initialRoutingInfo.getVersion();
-    ChunkVersion newVersion(1, 0, OID::gen(), Timestamp(2));
+    ChunkVersion newVersion({OID::gen(), Timestamp(2)}, {1, 0});
     const UUID uuid = initialRoutingInfo.getUUID();
 
     // Return collection with a different epoch and a set of chunks, which represent a split
@@ -736,9 +732,9 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
     ASSERT(cm.isSharded());
     ASSERT_EQ(2, cm.numChunks());
     ASSERT_EQ(newVersion, cm.getVersion());
-    ASSERT_EQ(ChunkVersion(1, 0, newVersion.epoch(), newVersion.getTimestamp()),
+    ASSERT_EQ(ChunkVersion({newVersion.epoch(), newVersion.getTimestamp()}, {1, 0}),
               cm.getVersion({"0"}));
-    ASSERT_EQ(ChunkVersion(1, 1, newVersion.epoch(), newVersion.getTimestamp()),
+    ASSERT_EQ(ChunkVersion({newVersion.epoch(), newVersion.getTimestamp()}, {1, 1}),
               cm.getVersion({"1"}));
 }
 
@@ -798,7 +794,8 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
     ASSERT_EQ(2, cm.numChunks());
     ASSERT_EQ(version, cm.getVersion());
     ASSERT_EQ(version, cm.getVersion({"0"}));
-    ASSERT_EQ(ChunkVersion(0, 0, version.epoch(), version.getTimestamp()), cm.getVersion({"1"}));
+    ASSERT_EQ(ChunkVersion({version.epoch(), version.getTimestamp()}, {0, 0}),
+              cm.getVersion({"1"}));
 }
 
 TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveWithReshardingFieldsAdded) {
@@ -877,7 +874,8 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunkWithReshardingF
     ASSERT(cm.isSharded());
     ASSERT_EQ(1, cm.numChunks());
     ASSERT_EQ(version, cm.getVersion());
-    ASSERT_EQ(ChunkVersion(0, 0, version.epoch(), version.getTimestamp()), cm.getVersion({"0"}));
+    ASSERT_EQ(ChunkVersion({version.epoch(), version.getTimestamp()}, {0, 0}),
+              cm.getVersion({"0"}));
     ASSERT_EQ(version, cm.getVersion({"1"}));
     ASSERT(boost::none == cm.getReshardingFields());
 }

@@ -163,6 +163,7 @@ let testCases = {
     connPoolSync: {skip: "does not return user data"},
     connectionStatus: {skip: "does not return user data"},
     convertToCapped: {skip: "primary only"},
+    coordinateCommitTransaction: {skip: "unimplemented. Serves only as a stub."},
     count: {
         setUp: function(mongosConn) {
             assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
@@ -246,8 +247,6 @@ let testCases = {
     fsync: {skip: "does not return user data"},
     fsyncUnlock: {skip: "does not return user data"},
     getAuditConfig: {skip: "does not return user data"},
-    getChangeStreamOptions:
-        {skip: "does not return user data"},  // TODO SERVER-65353 remove in 6.1.
     getClusterParameter: {skip: "does not return user data"},
     getCmdLineOpts: {skip: "does not return user data"},
     getDefaultRWConcern: {skip: "does not return user data"},
@@ -395,7 +394,6 @@ let testCases = {
     serverStatus: {skip: "does not return user data"},
     setAllowMigrations: {skip: "primary only"},
     setAuditConfig: {skip: "does not return user data"},
-    setChangeStreamOptions: {skip: "primary only"},  // TODO SERVER-65353 remove in 6.1.
     setCommittedSnapshot: {skip: "does not return user data"},
     setDefaultRWConcern: {skip: "primary only"},
     setIndexCommitQuorum: {skip: "primary only"},

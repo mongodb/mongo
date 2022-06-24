@@ -60,6 +60,7 @@
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/yield_policy_callbacks_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
@@ -361,8 +362,25 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
         //   2) some stage requested a yield, or
         //   3) we need to yield and retry due to a WriteConflictException.
         // In all cases, the actual yielding happens here.
+
+        const auto whileYieldingFn = [&]() {
+            // If we yielded because we encountered a sharding critical section, wait for the
+            // critical section to end before continuing. By waiting for the critical section to be
+            // exited we avoid busy spinning immediately and encountering the same critical section
+            // again. It is important that this wait happens after having released the lock
+            // hierarchy -- otherwise deadlocks could happen, or the very least, locks would be
+            // unnecessarily held while waiting.
+            const auto& shardingCriticalSection = planExecutorShardingCriticalSectionFuture(_opCtx);
+            if (shardingCriticalSection) {
+                OperationShardingState::waitForCriticalSectionToComplete(_opCtx,
+                                                                         *shardingCriticalSection)
+                    .ignore();
+                planExecutorShardingCriticalSectionFuture(_opCtx).reset();
+            }
+        };
+
         if (_yieldPolicy->shouldYieldOrInterrupt(_opCtx)) {
-            uassertStatusOK(_yieldPolicy->yieldOrInterrupt(_opCtx));
+            uassertStatusOK(_yieldPolicy->yieldOrInterrupt(_opCtx, whileYieldingFn));
         }
 
         WorkingSetID id = WorkingSet::INVALID_ID;

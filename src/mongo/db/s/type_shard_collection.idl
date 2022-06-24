@@ -80,15 +80,6 @@ imports:
     - "mongo/s/resharding/type_collection_fields.idl"
     - "mongo/s/type_collection_common_types.idl"
 
-types:
-    ChunkVersionLegacy:
-        bson_serialization_type: any
-        description: "An object representing a chunk version for a collection. Ignores the
-                      component in the chunk version for legacy reasons."
-        cpp_type: ChunkVersion
-        serializer: ChunkVersion::serialiseMajorMinorVersionOnlyForShardCollectionType
-        deserializer: ChunkVersion::parseMajorMinorVersionOnlyFromShardCollectionType
-
 structs:
     ShardCollectionTypeBase:
         description: "Represents the layout and contents of documents contained in the shard 
@@ -102,11 +93,12 @@ structs:
                 optional: false
             epoch:
                 type: objectid
+                optional: false
                 description: "Uniquely identifies this instance of the collection, in case of
                               drop/create or shard key refine."
-                optional: false
             timestamp:
                 type: timestamp
+                optional: false
                 description: "Uniquely identifies this incarnation of the collection. Only changes
                               in case of drop and create, or shard key refine.
                               This field will store the ClusterTime of the Config Server when the
@@ -141,7 +133,8 @@ structs:
                               chunk metadata."
                 optional: true
             lastRefreshedCollectionVersion:
-                type: ChunkVersionLegacy
+                type: timestamp
+                cpp_name: lastRefreshedCollectionMajorMinorVersion
                 description: "Set by primaries and used by shard secondaries to safely refresh chunk
                               metadata. Indicates the collection version of the last complete chunk
                               metadata refresh, and is used to indicate if a refresh occurred if the

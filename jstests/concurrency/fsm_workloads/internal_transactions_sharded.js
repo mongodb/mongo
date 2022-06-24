@@ -8,7 +8,8 @@
  * @tags: [
  *  requires_fcv_60,
  *  requires_sharding,
- *  uses_transactions
+ *  uses_transactions,
+ *  antithesis_incompatible
  * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');
@@ -105,9 +106,7 @@ var $config = extendWorkload($config, function($config, $super) {
             }
         }
 
-        if (this.overrideReapThreshold) {
-            this.overrideInternalTransactionsReapThreshold(cluster);
-        }
+        this.overrideInternalTransactionsReapThreshold(cluster);
         this.overrideStoreFindAndModifyImagesInSideCollection(cluster);
         if (this.lowerTransactionLifetimeLimitSeconds) {
             this.overrideTransactionLifetimeLimit(cluster);

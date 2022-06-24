@@ -54,6 +54,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -564,7 +565,7 @@ public:
         _fixture->_cleanup(session);
     }
 
-    void onClientDisconnect(Client* client) override {
+    void derivedOnClientDisconnect(Client* client) override {
         invariant(client);
         _fixture->_onClientDisconnect();
     }

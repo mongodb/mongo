@@ -33,7 +33,7 @@
 
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/security_token.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_time_validator.h"
@@ -95,9 +95,7 @@ void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRe
     }
 
     readImpersonatedUserMetadata(impersonationElem, opCtx);
-    auth::readSecurityTokenMetadata(opCtx, opMsg.securityToken);
-
-    parseDollarTenantFromRequest(opCtx, opMsg);
+    auth::ValidatedTenancyScope::set(opCtx, opMsg.validatedTenancyScope);
 
     // We check for "$client" but not "client" here, because currentOp can filter on "client" as
     // a top-level field.

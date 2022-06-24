@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/read_preference.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_cache_noop.h"
@@ -85,7 +83,7 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
     chunk.setName(OID::gen());
     chunk.setCollectionUUID(collUuid);
 
-    auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+    auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
     chunk.setVersion(origVersion);
     chunk.setShard(_shardId);
 
@@ -119,17 +117,16 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
                                                       _shardId,
                                                       validAfter));
 
-    auto collVersion = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["collectionVersion"]);
-    auto shardVersion = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["shardVersion"]);
+    auto collVersion = ChunkVersion::parse(versions["collectionVersion"]);
+    auto shardVersion = ChunkVersion::parse(versions["shardVersion"]);
 
     ASSERT_TRUE(origVersion.isOlderThan(shardVersion));
     ASSERT_EQ(collVersion, shardVersion);
 
     // Check for increment on mergedChunk's minor version
-    auto expectedShardVersion = ChunkVersion(origVersion.majorVersion(),
-                                             origVersion.minorVersion() + 1,
-                                             origVersion.epoch(),
-                                             origVersion.getTimestamp());
+    auto expectedShardVersion =
+        ChunkVersion({origVersion.epoch(), origVersion.getTimestamp()},
+                     {origVersion.majorVersion(), origVersion.minorVersion() + 1});
     ASSERT_EQ(expectedShardVersion, shardVersion);
 
 
@@ -170,7 +167,7 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
     chunk.setName(OID::gen());
     chunk.setCollectionUUID(collUuid);
 
-    auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+    auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
     chunk.setVersion(origVersion);
     chunk.setShard(_shardId);
 
@@ -251,7 +248,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     otherChunk.setName(OID::gen());
     otherChunk.setCollectionUUID(collUuid);
 
-    auto origVersion = ChunkVersion(1, 2, collEpoch, collTimestamp);
+    auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 2});
     chunk.setVersion(origVersion);
     chunk.setShard(_shardId);
 
@@ -273,7 +270,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     ChunkRange rangeToBeMerged(chunk.getMin(), chunk2.getMax());
 
     // Set up other chunk with competing version
-    auto competingVersion = ChunkVersion(2, 1, collEpoch, collTimestamp);
+    auto competingVersion = ChunkVersion({collEpoch, collTimestamp}, {2, 1});
     otherChunk.setVersion(competingVersion);
     otherChunk.setShard(_shardId);
     otherChunk.setMin(BSON("a" << 10));
@@ -334,7 +331,7 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
     chunk.setName(OID::gen());
     chunk.setCollectionUUID(collUuid);
 
-    auto origVersion = ChunkVersion(1, 2, collEpoch, collTimestamp);
+    auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 2});
     chunk.setVersion(origVersion);
     chunk.setShard(shardId);
 
@@ -415,7 +412,7 @@ TEST_F(MergeChunkTest, NonExistingNamespace) {
     ChunkType chunk;
     chunk.setCollectionUUID(UUID::gen());
 
-    auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+    auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
     chunk.setVersion(origVersion);
 
     // Construct chunk to be merged
@@ -457,7 +454,7 @@ TEST_F(MergeChunkTest, NonMatchingUUIDsOfChunkAndRequestErrors) {
     ChunkType chunk;
     chunk.setCollectionUUID(collUuid);
 
-    auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+    auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
     chunk.setVersion(origVersion);
     chunk.setShard(_shardId);
 
@@ -503,7 +500,7 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
     ChunkRange rangeToBeMerged(chunkMin, chunkMax);
 
     // Store a chunk that matches the range that will be requested
-    auto mergedVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+    auto mergedVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
     mergedVersion.incMinor();
     ChunkType mergedChunk;
     mergedChunk.setVersion(mergedVersion);
@@ -559,7 +556,7 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
     chunk1.setCollectionUUID(collUuid);
 
 
-    auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+    auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
     chunk1.setVersion(origVersion);
     chunk1.setShard(_shardId);
 

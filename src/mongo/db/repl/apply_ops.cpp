@@ -28,11 +28,10 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/apply_ops.h"
 
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/client_deprecated.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -297,12 +296,11 @@ Status _checkPrecondition(OperationContext* opCtx,
         DBDirectClient db(opCtx);
         // The preconditions come in "q: {{query: {...}, orderby: ..., etc.}}" format. This format
         // is no longer used either internally or over the wire in other contexts. We are using a
-        // legacy API from 'DBDirectClient' in order to parse this format and convert it into the
+        // legacy API from 'client_deprecated' in order to parse this format and convert it into the
         // corresponding find command.
-        auto preconditionQuery = Query::fromBSONDeprecated(preCondition["q"].Obj());
-        auto cursor =
-            db.query_DEPRECATED(nss, preconditionQuery.getFilter(), preconditionQuery, 1 /*limit*/);
-        BSONObj realres = cursor->more() ? cursor->nextSafe() : BSONObj{};
+        FindCommandRequest findCmd{nss};
+        client_deprecated::initFindFromLegacyOptions(preCondition["q"].Obj(), 0, &findCmd);
+        BSONObj realres = db.findOne(std::move(findCmd));
 
         // Get collection default collation.
         auto databaseHolder = DatabaseHolder::get(opCtx);

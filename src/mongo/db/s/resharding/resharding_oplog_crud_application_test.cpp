@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
-#include <memory>
-#include <vector>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog_raii.h"
@@ -47,7 +41,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
-#include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_state.h"
@@ -112,15 +106,15 @@ public:
                         CollectionMetadata(makeChunkManagerForOutputCollection(), _myDonorId));
             }
 
-            _metricsNew =
-                ReshardingMetricsNew::makeInstance(_sourceUUID,
-                                                   BSON(_newShardKey << 1),
-                                                   _outputNss,
-                                                   ShardingDataTransformMetrics::Role::kRecipient,
-                                                   serviceContext->getFastClockSource()->now(),
-                                                   serviceContext);
+            _metrics =
+                ReshardingMetrics::makeInstance(_sourceUUID,
+                                                BSON(_newShardKey << 1),
+                                                _outputNss,
+                                                ShardingDataTransformMetrics::Role::kRecipient,
+                                                serviceContext->getFastClockSource()->now(),
+                                                serviceContext);
             _oplogApplierMetrics =
-                std::make_unique<ReshardingOplogApplierMetrics>(_metricsNew.get(), boost::none);
+                std::make_unique<ReshardingOplogApplierMetrics>(_metrics.get(), boost::none);
             _applier = std::make_unique<ReshardingOplogApplicationRules>(
                 _outputNss,
                 std::vector<NamespaceString>{_myStashNss, _otherStashNss},
@@ -289,16 +283,16 @@ private:
                 _sourceUUID,
                 ChunkRange{BSON(_currentShardKey << MINKEY),
                            BSON(_currentShardKey << -std::numeric_limits<double>::infinity())},
-                ChunkVersion(100, 0, epoch, Timestamp(1, 1)),
+                ChunkVersion({epoch, Timestamp(1, 1)}, {100, 0}),
                 _myDonorId},
             ChunkType{_sourceUUID,
                       ChunkRange{BSON(_currentShardKey << -std::numeric_limits<double>::infinity()),
                                  BSON(_currentShardKey << 0)},
-                      ChunkVersion(100, 1, epoch, Timestamp(1, 1)),
+                      ChunkVersion({epoch, Timestamp(1, 1)}, {100, 1}),
                       _otherDonorId},
             ChunkType{_sourceUUID,
                       ChunkRange{BSON(_currentShardKey << 0), BSON(_currentShardKey << MAXKEY)},
-                      ChunkVersion(100, 2, epoch, Timestamp(1, 1)),
+                      ChunkVersion({epoch, Timestamp(1, 1)}, {100, 2}),
                       _myDonorId}};
 
         return makeChunkManager(
@@ -311,7 +305,7 @@ private:
         std::vector<ChunkType> chunks = {
             ChunkType{outputUuid,
                       ChunkRange{BSON(_newShardKey << MINKEY), BSON(_newShardKey << MAXKEY)},
-                      ChunkVersion(100, 0, epoch, Timestamp(1, 1)),
+                      ChunkVersion({epoch, Timestamp(1, 1)}, {100, 0}),
                       _myDonorId}};
 
         return makeChunkManager(
@@ -335,13 +329,14 @@ private:
     const ShardId _otherDonorId{"otherDonorId"};
 
     const NamespaceString _outputNss =
-        constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
-    const NamespaceString _myStashNss = getLocalConflictStashNamespace(_sourceUUID, _myDonorId);
+        resharding::constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
+    const NamespaceString _myStashNss =
+        resharding::getLocalConflictStashNamespace(_sourceUUID, _myDonorId);
     const NamespaceString _otherStashNss =
-        getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
+        resharding::getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
 
     std::unique_ptr<ReshardingOplogApplicationRules> _applier;
-    std::unique_ptr<ReshardingMetricsNew> _metricsNew;
+    std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingOplogApplierMetrics> _oplogApplierMetrics;
 };
 

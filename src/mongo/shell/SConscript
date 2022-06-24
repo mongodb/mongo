@@ -212,7 +212,7 @@ if get_option('ssl') == 'on':
                 '$BUILD_DIR/mongo/db/matcher/expressions',
                 '$BUILD_DIR/mongo/scripting/scripting',
                 '$BUILD_DIR/mongo/shell/shell_options_register',
-                '$BUILD_DIR/third_party/shim_mozjs',
+                '$BUILD_DIR/third_party/mozjs/mozjs',
                 'kms',
             ],
         )

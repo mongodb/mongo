@@ -150,7 +150,9 @@ TEST(OplogEntryTest, InsertIncludesTidField) {
 
     ASSERT(entry.getTid());
     ASSERT_EQ(*entry.getTid(), tid);
-    ASSERT_EQ(entry.getNss(), nss);
+    // TODO SERVER-66708 Check that (entry.getNss() == nss) once the OplogEntry deserializer
+    // passes "tid" to the NamespaceString constructor
+    ASSERT_EQ(entry.getNss(), NamespaceString(boost::none, nss.ns()));
     ASSERT_BSONOBJ_EQ(entry.getIdElement().wrap("_id"), BSON("_id" << docId));
     ASSERT_BSONOBJ_EQ(entry.getOperationToApply(), doc);
 }

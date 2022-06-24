@@ -62,6 +62,18 @@ server_parameters:
         cpp_varname: "gTimeseriesIdleBucketExpiryMaxCountPerAttempt"
         default:  3
         validator: { gte: 2 }
+    "timeseriesBucketMinCount":
+        description: "Time-series buckets that need to be closed due to size
+                      (timeseriesBucketMaxSize) but haven't crossed this threshold are considered to
+                      contain large measurements, and will be kept open to improve bucketing
+                      performance. These buckets will be closed when they reach the threshold or if
+                      the bucket is close to the max BSON size limit. Setting this to 1 disables
+                      this behaviour."
+        set_at: [ startup ]
+        cpp_vartype: "std::int32_t"
+        cpp_varname: "gTimeseriesBucketMinCount"
+        default:  10
+        validator: { gte: 1 }
 
 enums:
     BucketGranularity:

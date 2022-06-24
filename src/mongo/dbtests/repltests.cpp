@@ -129,6 +129,8 @@ public:
 
         createOplog(&_opCtx);
 
+        // Prevent upgrading from MODE_IX to MODE_X when deleteAll() is issued.
+        Lock::GlobalWrite lk(&_opCtx);
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         WriteUnitOfWork wuow(&_opCtx);
 

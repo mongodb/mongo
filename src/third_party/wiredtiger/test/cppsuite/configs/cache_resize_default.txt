@@ -22,7 +22,7 @@ workload_manager=
     insert_config=
     (
         key_size=1000000,
-        op_rate=4s,
+        op_rate=3s,
         ops_per_transaction=(min=2,max=2),
         thread_count=5,
     ),
@@ -37,5 +37,5 @@ operation_tracker=
     # Timestamp, transaction id,
     tracking_key_format=QQ,
     # Operation type, cache size
-    tracking_value_format=iS
+    tracking_value_format=iQ
 )

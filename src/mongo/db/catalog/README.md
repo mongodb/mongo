@@ -25,7 +25,10 @@ directory.
 
 For more information on the Storage Engine API, see the [storage/README][].
 
+For more information on time-series collections, see the [timeseries/README][].
+
 [storage/README]: https://github.com/mongodb/mongo/blob/master/src/mongo/db/storage/README.md
+[timeseries/README]: https://github.com/mongodb/mongo/blob/master/src/mongo/db/timeseries/README.md
 
 # The Catalog
 
@@ -756,11 +759,18 @@ Manual](https://docs.mongodb.com/master/core/index-creation/#index-builds-in-rep
 
 ### Commit Quorum
 
-A primary will not commit an index build until a minimum number of data-bearing nodes have completed
-the index build and are ready to commit. This threshold is called the _commit quorum_.
+The purpose of `commitQuorm` is to ensure secondaries are ready to commit an index build quickly.
+This minimizes replication lag on secondaries: secondaries, on receipt of a `commitIndexBuild` oplog
+entry, will stall oplog application until the local index build can be committed. `commitQuorum`
+delays commit of an index build on the primary node until secondaries are also ready to commit. A
+primary will not commit an index build until a minimum number of data-bearing nodes are ready to
+commit the index build. Index builds can take anywhere from moments to days to complete, so the
+replication lag can be very significant. Note: `commitQuorum` makes no guarantee that indexes on
+secondaries are ready for use when the command completes, `writeConcern` must still be used for
+that.
 
 A `commitQuorum` option can be provided to the `createIndexes` command and specifies the number of
-nodes, including itself, a primary must wait to be ready before committing. The `commitQuorum`
+nodes, including itself, for which a primary must wait to be ready before committing. The `commitQuorum`
 option accepts the same range of values as the writeConcern `"w"` option. This can be an integer
 specifying the number of nodes, `"majority"`, `"votingMembers"`, or a replica set tag. The default value
 is `"votingMembers"`, or all voting data-bearing nodes.
@@ -777,6 +787,10 @@ the index build is successful, it will replicate a `commitIndexBuild` oplog entr
 
 Secondaries that were not included in the commit quorum and recieve a `commitIndexBuild` oplog entry
 will block replication until their index build is complete.
+
+The `commitQuorum` for a running index build may be changed by the user via the
+[`setIndexCommitQuorum`](https://github.com/mongodb/mongo/blob/v6.0/src/mongo/db/commands/set_index_commit_quorum_command.cpp#L55)
+server command.
 
 See
 [IndexBuildsCoordinator::_waitForNextIndexBuildActionAndCommit](https://github.com/mongodb/mongo/blob/r4.4.0-rc9/src/mongo/db/index_builds_coordinator_mongod.cpp#L632).
@@ -953,8 +967,6 @@ _Code spelunking starting points:_
 * [_The TTLMonitor Class_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.h)
 * [_The TTLCollectionCache Class_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl_collection_cache.h)
 * [_ttl.idl_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl)
-
-TODO SERVER-66898: Refresh links
 
 # Repair
 
@@ -1721,6 +1733,10 @@ values are ObjectId's.
 The TTL monitor will only delete data from a time-series bucket collection when a bucket's minimum
 time, _id, is past the expiration plus the bucket maximum time span (default 1 hour). This
 procedure avoids deleting buckets with data that is not older than the expiration time.
+
+For more information on time-series collections, see the [timeseries/README][].
+
+[timeseries/README]: https://github.com/mongodb/mongo/blob/master/src/mongo/db/timeseries/README.md
 
 ## Capped clustered collections
 

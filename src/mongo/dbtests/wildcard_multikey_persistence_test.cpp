@@ -219,7 +219,7 @@ protected:
 
         WriteUnitOfWork wunit(opCtx());
         ASSERT_OK(indexer.commit(opCtx(),
-                                 coll.getWritableCollection(),
+                                 coll.getWritableCollection(opCtx()),
                                  MultiIndexBlock::kNoopOnCreateEachFn,
                                  MultiIndexBlock::kNoopOnCommitFn));
         abortOnExit.dismiss();

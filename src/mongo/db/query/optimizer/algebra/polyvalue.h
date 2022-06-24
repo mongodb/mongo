@@ -33,32 +33,30 @@
 #include <stdexcept>
 #include <type_traits>
 
-namespace mongo::optimizer {
-namespace algebra {
+#include "mongo/util/assert_util.h"
+
+namespace mongo::optimizer::algebra {
 namespace detail {
 
 template <typename T, typename... Args>
 inline constexpr bool is_one_of_v = std::disjunction_v<std::is_same<T, Args>...>;
-
-template <typename T, typename... Args>
-inline constexpr bool is_one_of_f() {
-    return is_one_of_v<T, Args...>;
-}
 
 template <typename... Args>
 struct is_unique_t : std::true_type {};
 
 template <typename H, typename... T>
 struct is_unique_t<H, T...>
-    : std::bool_constant<!is_one_of_f<H, T...>() && is_unique_t<T...>::value> {};
+    : std::bool_constant<!is_one_of_v<H, T...> && is_unique_t<T...>::value> {};
 
 template <typename... Args>
 inline constexpr bool is_unique_v = is_unique_t<Args...>::value;
 
-// Given the type T find its index in Ts
+/**
+ * Given the type T find its index in Ts.
+ */
 template <typename T, typename... Ts>
 static inline constexpr int find_index() {
-    static_assert(detail::is_unique_v<Ts...>, "Types must be unique");
+    static_assert(is_unique_v<Ts...>, "Types must be unique");
     constexpr bool matchVector[] = {std::is_same<T, Ts>::value...};
 
     for (int index = 0; index < static_cast<int>(sizeof...(Ts)); ++index) {
@@ -85,35 +83,10 @@ using get_type_by_index = typename get_type_by_index_impl<I, Ts...>::type;
 
 }  // namespace detail
 
-/*=====-----
- *
- * The overload trick to construct visitors from lambdas.
- *
- */
-template <class... Ts>
-struct overload : Ts... {
-    using Ts::operator()...;
-};
-template <class... Ts>
-overload(Ts...)->overload<Ts...>;
-
-/*=====-----
- *
- * Forward declarations
- *
- */
-template <typename... Ts>
-class PolyValue;
-
-template <typename T, typename... Ts>
-class ControlBlockVTable;
-
-/*=====-----
- *
+/**
  * The base control block that PolyValue holds.
  *
- * It does not contain anything else by the runtime tag.
- *
+ * It does not contain anything else except for the runtime tag.
  */
 template <typename... Ts>
 class ControlBlock {
@@ -128,13 +101,10 @@ public:
     }
 };
 
-/*=====-----
- *
+/**
  * The concrete control block VTable generator.
  *
- * It must be empty ad PolyValue derives from the generators
- * and we want EBO to kick in.
- *
+ * It must be empty as PolyValue derives from the generators and we want EBO to kick in.
  */
 template <typename T, typename... Ts>
 class ControlBlockVTable {
@@ -144,13 +114,9 @@ protected:
 
     using AbstractType = ControlBlock<Ts...>;
 
-    /*=====-----
-     *
-     * The concrete control block for every type T of Ts.
-     *
-     * It derives from the ControlBlock. All methods are private and only
-     * the friend class ControlBlockVTable can call them.
-     *
+    /**
+     * The concrete control block for every type T of Ts. Derives from a ControlBlock which holds
+     * the runtime type tag for T.
      */
     class ConcreteType : public AbstractType {
         T _t;
@@ -222,18 +188,21 @@ public:
         }
     }
 
-    template <typename V, typename N, typename... Args>
-    static auto visit(V&& v, N& holder, AbstractType* block, Args&&... args) {
-        return v(holder, *cast<T>(block), std::forward<Args>(args)...);
+    template <typename Callback, typename N, typename... Args>
+    static auto visit(Callback&& cb, N& holder, AbstractType* block, Args&&... args) {
+        return cb(holder, *cast<T>(block), std::forward<Args>(args)...);
     }
 
-    template <typename V, typename N, typename... Args>
-    static auto visitConst(V&& v, const N& holder, const AbstractType* block, Args&&... args) {
-        return v(holder, *castConst<T>(block), std::forward<Args>(args)...);
+    template <typename Callback, typename N, typename... Args>
+    static auto visitConst(Callback&& cb,
+                           const N& holder,
+                           const AbstractType* block,
+                           Args&&... args) {
+        return cb(holder, *castConst<T>(block), std::forward<Args>(args)...);
     }
 };
 
-/*=====-----
+/**
  *
  * This is a variation on variant and polymorphic value theme.
  *
@@ -257,6 +226,9 @@ private:
     static_assert(std::conjunction_v<std::is_empty<ControlBlockVTable<Ts, Ts...>>...>,
                   "VTable base classes must be empty");
 
+    // Static array that allows lookup into methods on ControlBlockVTable using the PolyValue tag.
+    static constexpr std::array cloneTbl = {&ControlBlockVTable<Ts, Ts...>::clone...};
+
     ControlBlock<Ts...>* _object{nullptr};
 
     PolyValue(ControlBlock<Ts...>* object) noexcept : _object(object) {}
@@ -266,9 +238,7 @@ private:
     }
 
     static void check(const ControlBlock<Ts...>* object) {
-        if (!object) {
-            throw std::logic_error("PolyValue is empty");
-        }
+        tassert(6232700, "PolyValue is empty", object != nullptr);
     }
 
     static void destroy(ControlBlock<Ts...>* object) noexcept {
@@ -336,35 +306,38 @@ private:
             return tag();
         }
 
-
-        template <typename V, typename... Args>
-        auto visit(V&& v, Args&&... args) {
+        template <typename Callback, typename... Args>
+        auto visit(Callback&& cb, Args&&... args) {
             // unfortunately gcc rejects much nicer code, clang and msvc accept
             // static constexpr std::array visitTbl = { &ControlBlockVTable<Ts, Ts...>::template
             // visit<V>... };
 
             using FunPtrType = decltype(
-                &ControlBlockVTable<get_t<0>, Ts...>::template visit<V, Reference, Args...>);
+                &ControlBlockVTable<get_t<0>, Ts...>::template visit<Callback, Reference, Args...>);
             static constexpr FunPtrType visitTbl[] = {
-                &ControlBlockVTable<Ts, Ts...>::template visit<V, Reference, Args...>...};
+                &ControlBlockVTable<Ts, Ts...>::template visit<Callback, Reference, Args...>...};
 
             check(_object);
-            return visitTbl[tag()](std::forward<V>(v), *this, _object, std::forward<Args>(args)...);
+            return visitTbl[tag()](
+                std::forward<Callback>(cb), *this, _object, std::forward<Args>(args)...);
         }
 
-        template <typename V, typename... Args>
-        auto visit(V&& v, Args&&... args) const {
+        template <typename Callback, typename... Args>
+        auto visit(Callback&& cb, Args&&... args) const {
             // unfortunately gcc rejects much nicer code, clang and msvc accept
             // static constexpr std::array visitTbl = { &ControlBlockVTable<Ts, Ts...>::template
             // visitConst<V>... };
 
             using FunPtrType = decltype(
-                &ControlBlockVTable<get_t<0>, Ts...>::template visitConst<V, Reference, Args...>);
+                &ControlBlockVTable<get_t<0>,
+                                    Ts...>::template visitConst<Callback, Reference, Args...>);
             static constexpr FunPtrType visitTbl[] = {
-                &ControlBlockVTable<Ts, Ts...>::template visitConst<V, Reference, Args...>...};
+                &ControlBlockVTable<Ts,
+                                    Ts...>::template visitConst<Callback, Reference, Args...>...};
 
             check(_object);
-            return visitTbl[tag()](std::forward<V>(v), *this, _object, std::forward<Args>(args)...);
+            return visitTbl[tag()](
+                std::forward<Callback>(cb), *this, _object, std::forward<Args>(args)...);
         }
 
         template <typename T>
@@ -420,21 +393,18 @@ public:
 
     key_type tagOf() const {
         check(_object);
-
         return tag();
     }
 
     PolyValue() = delete;
 
     PolyValue(const PolyValue& other) {
-        static constexpr std::array cloneTbl = {&ControlBlockVTable<Ts, Ts...>::clone...};
         if (other._object) {
             _object = cloneTbl[other.tag()](other._object);
         }
     }
 
     PolyValue(const Reference& other) {
-        static constexpr std::array cloneTbl = {&ControlBlockVTable<Ts, Ts...>::clone...};
         if (other._object) {
             _object = cloneTbl[other.tag()](other._object);
         }
@@ -463,34 +433,37 @@ public:
     template <int I>
     using get_t = detail::get_type_by_index<I, Ts...>;
 
-    template <typename V, typename... Args>
-    auto visit(V&& v, Args&&... args) {
+    template <typename Callback, typename... Args>
+    auto visit(Callback&& cb, Args&&... args) {
         // unfortunately gcc rejects much nicer code, clang and msvc accept
         // static constexpr std::array visitTbl = { &ControlBlockVTable<Ts, Ts...>::template
         // visit<V>... };
 
-        using FunPtrType =
-            decltype(&ControlBlockVTable<get_t<0>, Ts...>::template visit<V, PolyValue, Args...>);
+        using FunPtrType = decltype(
+            &ControlBlockVTable<get_t<0>, Ts...>::template visit<Callback, PolyValue, Args...>);
         static constexpr FunPtrType visitTbl[] = {
-            &ControlBlockVTable<Ts, Ts...>::template visit<V, PolyValue, Args...>...};
+            &ControlBlockVTable<Ts, Ts...>::template visit<Callback, PolyValue, Args...>...};
 
         check(_object);
-        return visitTbl[tag()](std::forward<V>(v), *this, _object, std::forward<Args>(args)...);
+        return visitTbl[tag()](
+            std::forward<Callback>(cb), *this, _object, std::forward<Args>(args)...);
     }
 
-    template <typename V, typename... Args>
-    auto visit(V&& v, Args&&... args) const {
+    template <typename Callback, typename... Args>
+    auto visit(Callback&& cb, Args&&... args) const {
         // unfortunately gcc rejects much nicer code, clang and msvc accept
         // static constexpr std::array visitTbl = { &ControlBlockVTable<Ts, Ts...>::template
         // visitConst<V>... };
 
-        using FunPtrType = decltype(
-            &ControlBlockVTable<get_t<0>, Ts...>::template visitConst<V, PolyValue, Args...>);
+        using FunPtrType =
+            decltype(&ControlBlockVTable<get_t<0>,
+                                         Ts...>::template visitConst<Callback, PolyValue, Args...>);
         static constexpr FunPtrType visitTbl[] = {
-            &ControlBlockVTable<Ts, Ts...>::template visitConst<V, PolyValue, Args...>...};
+            &ControlBlockVTable<Ts, Ts...>::template visitConst<Callback, PolyValue, Args...>...};
 
         check(_object);
-        return visitTbl[tag()](std::forward<V>(v), *this, _object, std::forward<Args>(args)...);
+        return visitTbl[tag()](
+            std::forward<Callback>(cb), *this, _object, std::forward<Args>(args)...);
     }
 
     template <typename T>
@@ -517,13 +490,13 @@ public:
     }
 
     bool operator==(const PolyValue& rhs) const noexcept {
-        static constexpr std::array cmp = {ControlBlockVTable<Ts, Ts...>::compareEq...};
-        return cmp[tag()](_object, rhs._object);
+        static constexpr std::array cmpTbl = {ControlBlockVTable<Ts, Ts...>::compareEq...};
+        return cmpTbl[tag()](_object, rhs._object);
     }
 
     bool operator==(const Reference& rhs) const noexcept {
-        static constexpr std::array cmp = {ControlBlockVTable<Ts, Ts...>::compareEq...};
-        return cmp[tag()](_object, rhs._object);
+        static constexpr std::array cmpTbl = {ControlBlockVTable<Ts, Ts...>::compareEq...};
+        return cmpTbl[tag()](_object, rhs._object);
     }
 
     auto ref() {
@@ -537,5 +510,4 @@ public:
     }
 };
 
-}  // namespace algebra
-}  // namespace mongo::optimizer
+}  // namespace mongo::optimizer::algebra

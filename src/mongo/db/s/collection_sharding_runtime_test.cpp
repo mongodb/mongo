@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "boost/optional/optional_io.hpp"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
@@ -63,7 +61,7 @@ protected:
         const Timestamp timestamp(1, 1);
         auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
         auto chunk = ChunkType(
-            uuid, std::move(range), ChunkVersion(1, 0, epoch, timestamp), ShardId("other"));
+            uuid, std::move(range), ChunkVersion({epoch, timestamp}, {1, 0}), ShardId("other"));
         ChunkManager cm(ShardId("0"),
                         DatabaseVersion(UUID::gen(), timestamp),
                         makeStandaloneRoutingTableHistory(
@@ -218,8 +216,8 @@ TEST_F(CollectionShardingRuntimeTest, ReturnUnshardedMetadataInServerlessMode) {
     ScopedSetShardRole scopedSetShardRole2{
         opCtx,
         NamespaceString::kLogicalSessionsNamespace,
-        ChunkVersion(1, 0, OID::gen(), Timestamp(1, 1)), /* shardVersion */
-        boost::none                                      /* databaseVersion */
+        ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0}), /* shardVersion */
+        boost::none                                          /* databaseVersion */
     };
 
     CollectionShardingRuntime csrLogicalSession(
@@ -324,11 +322,11 @@ public:
                                         const Timestamp& timestamp) {
         auto range1 = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << 5));
         ChunkType chunk1(
-            uuid, range1, ChunkVersion(1, 0, epoch, timestamp), kShardList[0].getName());
+            uuid, range1, ChunkVersion({epoch, timestamp}, {1, 0}), kShardList[0].getName());
 
         auto range2 = ChunkRange(BSON(kShardKey << 5), BSON(kShardKey << MAXKEY));
         ChunkType chunk2(
-            uuid, range2, ChunkVersion(1, 1, epoch, timestamp), kShardList[0].getName());
+            uuid, range2, ChunkVersion({epoch, timestamp}, {1, 1}), kShardList[0].getName());
 
         return {chunk1, chunk2};
     }

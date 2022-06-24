@@ -28,18 +28,12 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/sharding_util.h"
 
 #include <fmt/format.h>
 
 #include "mongo/db/commands.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/type_shard_collection.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -111,46 +105,6 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
         }
     }
     return responses;
-}
-
-void downgradeCollectionBalancingFieldsToPre53(OperationContext* opCtx) {
-    const NamespaceString collNss = [&]() {
-        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-            return NamespaceString::kShardConfigCollectionsNamespace;
-        } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            return CollectionType::ConfigNS;
-        }
-        MONGO_UNREACHABLE;
-    }();
-
-    write_ops::UpdateCommandRequest updateOp(collNss);
-    updateOp.setUpdates({[&] {
-        write_ops::UpdateOpEntry entry;
-        BSONObjBuilder updateCmd;
-        BSONObjBuilder unsetBuilder(updateCmd.subobjStart("$unset"));
-        unsetBuilder.append(CollectionType::kMaxChunkSizeBytesFieldName, 0);
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            unsetBuilder.append(CollectionType::kNoAutoSplitFieldName, 0);
-        } else {
-            unsetBuilder.append(ShardCollectionTypeBase::kAllowAutoSplitFieldName, 0);
-        }
-        unsetBuilder.doneFast();
-        entry.setQ({});
-        const BSONObj update = updateCmd.obj();
-        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
-        entry.setUpsert(false);
-        entry.setMulti(true);
-        return entry;
-    }()});
-
-    DBDirectClient client(opCtx);
-    client.update(updateOp);
-
-    const WriteConcernOptions majorityWC{
-        WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
-    WriteConcernResult ignoreResult;
-    auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    uassertStatusOK(waitForWriteConcern(opCtx, latestOpTime, majorityWC, &ignoreResult));
 }
 
 }  // namespace sharding_util

@@ -1361,6 +1361,7 @@ regionp
 reinitialization
 relocked
 repl
+repositions
 resizable
 resize
 resizing
@@ -1511,6 +1512,7 @@ trk
 trk's
 trun
 trunc
+truncations
 trylock
 tryrdlock
 trywrlock

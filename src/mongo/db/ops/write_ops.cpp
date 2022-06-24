@@ -30,7 +30,6 @@
 #include "mongo/db/ops/write_ops.h"
 
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/ops/new_write_error_exception_format_feature_flag_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
@@ -295,18 +294,6 @@ WriteError WriteError::parse(const BSONObj& obj) {
         auto code = ErrorCodes::Error(obj[WriteError::kCodeFieldName].Int());
         auto errmsg = obj[WriteError::kErrmsgFieldName].valueStringDataSafe();
 
-        // At least up to FCV 5.x, the write commands operation used to convert StaleConfig errors
-        // into StaleShardVersion and store the extra info of StaleConfig in a sub-field called
-        // "errInfo".
-        //
-        // TODO (SERVER-64449): This special parsing should be removed in the stable version
-        // following the resolution of this ticket.
-        if (code == ErrorCodes::OBSOLETE_StaleShardVersion) {
-            return Status(ErrorCodes::StaleConfig,
-                          std::move(errmsg),
-                          obj[WriteError::kErrInfoFieldName].Obj());
-        }
-
         // All remaining errors have the error stored at the same level as the code and errmsg (in
         // the same way that Status is serialised as part of regular command response)
         return Status(code, std::move(errmsg), obj);
@@ -319,28 +306,10 @@ BSONObj WriteError::serialize() const {
     BSONObjBuilder errBuilder;
     errBuilder.append(WriteError::kIndexFieldName, _index);
 
-    // At least up to FCV 5.x, the write commands operation used to convert StaleConfig errors into
-    // StaleShardVersion and store the extra info of StaleConfig in a sub-field called "errInfo".
-    // This logic preserves this for backwards compatibility.
-    //
-    // TODO (SERVER-64449): This special serialisation should be removed in the stable version
-    // following the resolution of this ticket.
-    if (_status == ErrorCodes::StaleConfig &&
-        !feature_flags::gFeatureFlagNewWriteErrorExceptionFormat.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        errBuilder.append(WriteError::kCodeFieldName,
-                          int32_t(ErrorCodes::OBSOLETE_StaleShardVersion));
-        errBuilder.append(WriteError::kErrmsgFieldName, _status.reason());
-        auto extraInfo = _status.extraInfo();
-        invariant(extraInfo);
-        BSONObjBuilder extraInfoBuilder(errBuilder.subobjStart(WriteError::kErrInfoFieldName));
-        extraInfo->serialize(&extraInfoBuilder);
-    } else {
-        errBuilder.append(WriteError::kCodeFieldName, int32_t(_status.code()));
-        errBuilder.append(WriteError::kErrmsgFieldName, _status.reason());
-        if (auto extraInfo = _status.extraInfo()) {
-            extraInfo->serialize(&errBuilder);
-        }
+    errBuilder.append(WriteError::kCodeFieldName, int32_t(_status.code()));
+    errBuilder.append(WriteError::kErrmsgFieldName, _status.reason());
+    if (auto extraInfo = _status.extraInfo()) {
+        extraInfo->serialize(&errBuilder);
     }
 
     return errBuilder.obj();

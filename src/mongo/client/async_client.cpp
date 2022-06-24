@@ -319,7 +319,7 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
     auto startTimer = Timer();
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(
         std::move(request.dbname), std::move(request.cmdObj), std::move(request.metadata));
-    opMsgRequest.securityToken = request.securityToken;
+    opMsgRequest.validatedTenancyScope = request.validatedTenancyScope;
     return runCommand(std::move(opMsgRequest), baton, request.options.fireAndForget)
         .then([this, startTimer = std::move(startTimer)](rpc::UniqueReply response) {
             return executor::RemoteCommandResponse(*response, startTimer.elapsed());
@@ -358,7 +358,7 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::beginExhaustCommandReques
     executor::RemoteCommandRequest request, const BatonHandle& baton) {
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(
         std::move(request.dbname), std::move(request.cmdObj), std::move(request.metadata));
-    opMsgRequest.securityToken = request.securityToken;
+    opMsgRequest.validatedTenancyScope = request.validatedTenancyScope;
 
     return runExhaustCommand(std::move(opMsgRequest), baton);
 }

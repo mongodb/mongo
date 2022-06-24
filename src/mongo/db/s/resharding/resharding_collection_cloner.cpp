@@ -50,7 +50,7 @@
 #include "mongo/db/s/resharding/document_source_resharding_ownership_match.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
-#include "mongo/db/s/resharding/resharding_metrics_new.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context.h"
@@ -80,7 +80,7 @@ bool collectionHasSimpleCollation(OperationContext* opCtx, const NamespaceString
 
 }  // namespace
 
-ReshardingCollectionCloner::ReshardingCollectionCloner(ReshardingMetricsNew* metrics,
+ReshardingCollectionCloner::ReshardingCollectionCloner(ReshardingMetrics* metrics,
                                                        ShardKeyPattern newShardKeyPattern,
                                                        NamespaceString sourceNss,
                                                        const UUID& sourceUUID,
@@ -109,7 +109,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
     resolvedNamespaces[_sourceNss.coll()] = {_sourceNss, std::vector<BSONObj>{}};
 
     // Assume that the config.cache.chunks collection isn't a view either.
-    auto tempNss = constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
+    auto tempNss = resharding::constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
     auto tempCacheChunksNss =
         NamespaceString(NamespaceString::kConfigDb, "cache.chunks." + tempNss.ns());
     resolvedNamespaces[tempCacheChunksNss.coll()] = {tempCacheChunksNss, std::vector<BSONObj>{}};

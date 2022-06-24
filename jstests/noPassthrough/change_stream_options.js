@@ -1,8 +1,6 @@
 // Tests setClusterParameter and getClusterParameter for changeStreamOptions on standalone, replica
 // set and sharded cluster configurations.
 // @tags: [
-//  requires_fcv_60,
-//  featureFlagClusterWideConfig,
 //  requires_replication,
 //  requires_sharding,
 // ]

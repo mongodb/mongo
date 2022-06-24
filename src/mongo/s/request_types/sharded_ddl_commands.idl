@@ -117,9 +117,6 @@ structs:
     CreateCollectionRequest:
         description: "All the parameters sent by the router."
         generate_comparison_operators: false
-        # TODO SERVER-64720 remove the following comment
-        # WARN if you add any new field to this request you must also include it in
-        # CreateCollectionCoordinatorDocumentPre60Compatible::kPre60IncompatibleFields
         strict: false
         fields:
             shardKey:

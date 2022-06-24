@@ -3,9 +3,6 @@
  *
  * @tags: [
  *   does_not_support_stepdowns,
- *   featureFlagClusterWideConfig,
- *   # Requires all nodes to be running the latest binary.
- *   requires_fcv_60,
  *   # Restarts all replica set member nodes mid-test.
  *   requires_persistence,
  *  ]

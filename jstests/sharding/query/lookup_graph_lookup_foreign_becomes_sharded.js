@@ -116,12 +116,10 @@ const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlag
 
 let res = st.getPrimaryShard(jsTestName()).getDB("admin").adminCommand({
     getParameter: 1,
-    featureFlagSBELookupPushdown: 1,
     internalQueryForceClassicEngine: 1
 });
-let isSBELookupEnabled = res.ok && res.hasOwnProperty("featureFlagSBELookupPushdown") &&
-    res.hasOwnProperty("internalQueryForceClassicEngine") &&
-    res.featureFlagSBELookupPushdown.value && !res.internalQueryForceClassicEngine;
+let isSBELookupEnabled = res.ok && res.hasOwnProperty("internalQueryForceClassicEngine") &&
+    !res.internalQueryForceClassicEngine;
 
 // Now run a getMore for each of the test cases. The collection has become sharded mid-iteration, so
 // we should observe the error code associated with the test case.
@@ -197,13 +195,6 @@ assert.commandWorked(shard0.getPrimary().adminCommand({fsync: 1}));
 // that the first attempt to run $lookup or $graphLookup should produce a stale shard exception for
 // both the source and foreign collections.
 shard0.restart(shard0.getPrimary());
-
-// Refreshes the SBE lookup feature availability just in case that a different version of mongod
-// is running after restart.
-res = shard0.getPrimary().getDB("admin").adminCommand(
-    {getParameter: 1, featureFlagSBELookupPushdown: 1});
-isSBELookupEnabled = res.ok && res.hasOwnProperty("featureFlagSBELookupPushdown") &&
-    res.featureFlagSBELookupPushdown.value;
 
 // Enable profiling on shard0 to capture stale shard version exceptions.
 const primaryDB = shard0.getPrimary().getDB(jsTestName());

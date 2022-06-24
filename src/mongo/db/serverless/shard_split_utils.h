@@ -64,7 +64,7 @@ repl::ReplSetConfig makeSplitConfig(const repl::ReplSetConfig& config,
 
 /**
  * Inserts the shard split state document 'stateDoc' into
- * 'config.tenantSplitDonors' collection. Also, creates the collection if not present
+ * 'config.shardSplitDonors' collection. Also, creates the collection if not present
  * before inserting the document.
  *
  * NOTE: A state doc might get inserted based on a decision made out of a stale read within a

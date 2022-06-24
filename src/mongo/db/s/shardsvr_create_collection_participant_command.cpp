@@ -65,6 +65,10 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
@@ -76,6 +80,11 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
+            const auto txnParticipant = TransactionParticipant::get(opCtx);
+            uassert(6077300,
+                    str::stream() << Request::kCommandName << " must be run as a retryable write",
+                    txnParticipant);
+
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             MigrationDestinationManager::cloneCollectionIndexesAndOptions(
@@ -86,23 +95,15 @@ public:
                  request().getIdIndex(),
                  request().getOptions()});
 
-            // The txnParticipant will only be missing when the command was sent from a coordinator
-            // running an old 5.0.0 binary that didn't attach a sessionId & txnNumber.
-            // TODO SERVER-60773: Once 6.0 has branched out, txnParticipant must always exist. Add a
-            // uassert for that.
-            auto txnParticipant = TransactionParticipant::get(opCtx);
-            if (txnParticipant) {
-                // Since no write that generated a retryable write oplog entry with this sessionId
-                // and txnNumber happened, we need to make a dummy write so that the session gets
-                // durably persisted on the oplog. This must be the last operation done on this
-                // command.
-                DBDirectClient client(opCtx);
-                client.update(NamespaceString::kServerConfigurationNamespace.ns(),
-                              BSON("_id" << Request::kCommandName),
-                              BSON("$inc" << BSON("count" << 1)),
-                              true /* upsert */,
-                              false /* multi */);
-            }
+            // Since no write that generated a retryable write oplog entry with this sessionId and
+            // txnNumber happened, we need to make a dummy write so that the session gets durably
+            // persisted on the oplog. This must be the last operation done on this command.
+            DBDirectClient client(opCtx);
+            client.update(NamespaceString::kServerConfigurationNamespace.ns(),
+                          BSON("_id" << Request::kCommandName),
+                          BSON("$inc" << BSON("count" << 1)),
+                          true /* upsert */,
+                          false /* multi */);
         }
 
     private:

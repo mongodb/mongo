@@ -17,7 +17,6 @@ utEnv.Library(
         'matcher_core.cpp',
         'temp_dir.cpp',
         'unittest.cpp',
-        'unittest.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

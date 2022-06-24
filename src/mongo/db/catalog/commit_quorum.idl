@@ -40,8 +40,8 @@ types:
             - decimal
             - double
             - string
-        description: "CommitQuorumOptions defines the required quorum for the index builds to 
-                      commit."
+        description: "CommitQuorumOptions defines the replica set membership required to be ready
+                      for commit in order for the primary to proceed to commit an index build."
         cpp_type: "mongo::CommitQuorumOptions"
         serializer: "mongo::CommitQuorumOptions::appendToBuilder"
         deserializer: "mongo::CommitQuorumOptions::deserializerForIDL"

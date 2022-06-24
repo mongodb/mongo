@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/base/status.h"
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/s/collection_metadata.h"
@@ -62,7 +60,7 @@ CollectionMetadata makeCollectionMetadataImpl(
 
     std::vector<ChunkType> allChunks;
     auto nextMinKey = shardKeyPattern.globalMin();
-    ChunkVersion version{1, 0, epoch, timestamp};
+    ChunkVersion version({epoch, timestamp}, {1, 0});
     for (const auto& myNextChunk : thisShardsChunks) {
         if (SimpleBSONObjComparator::kInstance.evaluate(nextMinKey < myNextChunk.first)) {
             // Need to add a chunk to the other shard from nextMinKey to myNextChunk.first.
@@ -125,7 +123,7 @@ protected:
             reshardingFields.setRecipientFields(std::move(recipientFields));
         } else if (state == CoordinatorStateEnum::kBlockingWrites) {
             TypeCollectionDonorFields donorFields{
-                constructTemporaryReshardingNss(kNss.db(), existingUuid),
+                resharding::constructTemporaryReshardingNss(kNss.db(), existingUuid),
                 KeyPattern{BSON("newKey" << 1)},
                 {kThisShard, kOtherShard}};
             reshardingFields.setDonorFields(std::move(donorFields));

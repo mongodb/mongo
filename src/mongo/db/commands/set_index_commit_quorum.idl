@@ -53,5 +53,6 @@ commands:
             commitQuorum:
                 type: CommitQuorum
                 description: "commitQuorum can be set to the same values as writeConcern.w and
-                              indicates how many and/or which replica set members are needed for the
-                              primary to commit the index build."
+                              indicates how many and/or which replica set members must be ready to
+                              commit the index build before the primary will proceed to commit the
+                              index build."

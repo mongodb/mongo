@@ -66,6 +66,10 @@ public:
         return true;
     }
 
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
     class Invocation : public KCV1Gen::InvocationBaseGen {
     public:
         using KCV1Gen::InvocationBaseGen::InvocationBaseGen;

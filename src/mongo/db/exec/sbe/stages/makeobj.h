@@ -87,6 +87,22 @@ public:
                      value::SlotVector projectVars,
                      bool forceNewObject,
                      bool returnOldObject,
+                     PlanNodeId planNodeId,
+                     bool participateInTrialRunTracking = true);
+
+    /**
+     * A convenience constructor that takes a set instead of a vector for 'fields' and
+     * 'projectedFields'.
+     */
+    MakeObjStageBase(std::unique_ptr<PlanStage> input,
+                     value::SlotId objSlot,
+                     boost::optional<value::SlotId> rootSlot,
+                     boost::optional<FieldBehavior> fieldBehavior,
+                     std::set<std::string> fields,
+                     std::set<std::string> projectFields,
+                     value::SlotVector projectVars,
+                     bool forceNewObject,
+                     bool returnOldObject,
                      PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;

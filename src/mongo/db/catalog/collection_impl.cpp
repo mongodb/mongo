@@ -37,7 +37,7 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/auth/security_token.h"
+#include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -818,7 +818,6 @@ Status CollectionImpl::insertDocumentsForOplog(OperationContext* opCtx,
     return status;
 }
 
-
 Status CollectionImpl::insertDocuments(OperationContext* opCtx,
                                        const std::vector<InsertStatement>::const_iterator begin,
                                        const std::vector<InsertStatement>::const_iterator end,
@@ -842,8 +841,20 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
         }
 
         auto status = _checkValidationAndParseResult(opCtx, it->doc);
-        if (!status.isOK())
+        if (!status.isOK()) {
             return status;
+        }
+
+        auto& validationSettings = DocumentValidationSettings::get(opCtx);
+
+        if (getCollectionOptions().encryptedFieldConfig &&
+            !validationSettings.isSchemaValidationDisabled() &&
+            !validationSettings.isSafeContentValidationDisabled() &&
+            it->doc.hasField(kSafeContent)) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream()
+                              << "Cannot insert a document with field name " << kSafeContent);
+        }
     }
 
     const SnapshotId sid = opCtx->recoveryUnit()->getSnapshotId();
@@ -1347,6 +1358,17 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     }
 }
 
+bool compareSafeContentElem(const BSONObj& oldDoc, const BSONObj& newDoc) {
+    if (newDoc.hasField(kSafeContent) != oldDoc.hasField(kSafeContent)) {
+        return false;
+    }
+    if (!newDoc.hasField(kSafeContent)) {
+        return true;
+    }
+
+    return newDoc.getField(kSafeContent).binaryEqual(oldDoc.getField(kSafeContent));
+}
+
 RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
                                         RecordId oldLocation,
                                         const Snapshotted<BSONObj>& oldDoc,
@@ -1369,6 +1391,17 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
             }
             // bad -> bad is ok in moderate mode
         }
+    }
+
+    auto& validationSettings = DocumentValidationSettings::get(opCtx);
+    if (getCollectionOptions().encryptedFieldConfig &&
+        !validationSettings.isSchemaValidationDisabled() &&
+        !validationSettings.isSafeContentValidationDisabled()) {
+
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "New document and old document both need to have " << kSafeContent
+                              << " field.",
+                compareSafeContentElem(oldDoc.value(), newDoc));
     }
 
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_IX));
@@ -2166,8 +2199,9 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
               str::stream() << "index " << imd.nameStringData()
                             << " is already in current metadata: " << _metadata->toBSON());
 
-    if (getTimeseriesOptions() && feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV() &&
-        serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest() &&
+    if (getTimeseriesOptions() &&
+        feature_flags::gTimeseriesMetricIndexes.isEnabled(
+            serverGlobalParams.featureCompatibility) &&
         timeseries::doesBucketsIndexIncludeMeasurement(
             opCtx, ns(), *getTimeseriesOptions(), spec->infoObj())) {
         invariant(_metadata->timeseriesBucketsMayHaveMixedSchemaData);

@@ -25,6 +25,12 @@ effects may be discarded by calling WT_SESSION::rollback_transaction. If
 WT_SESSION::commit_transaction returns any error, the transaction was rolled
 back, not committed.
 
+Schema changing operations are not generally transactional in WiredTiger, they
+can't be grouped together within the scope of a transaction and atomically
+committed or aborted. Think of them as one-shot transactions where the operation
+will either succeed or fail. Examples of schema changing operations are table
+create, drop and rename.
+
 A data operation executed within a transaction can fail if it conflicts with an
 operation in another concurrently running transaction.  (A conflict occurs
 between two operations when letting both of them continue would lead to a

@@ -71,10 +71,11 @@ std::list<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
     const TimeseriesOptions& timeseriesOptions, const std::list<BSONObj>& bucketsIndexes);
 
 /**
- * Returns true if the 'bucketsIndex' is compatible for FCV downgrade.
+ * Returns true if the original index specification should be included when creating an index on the
+ * time-series buckets collection.
  */
-bool isBucketsIndexSpecCompatibleForDowngrade(const TimeseriesOptions& timeseriesOptions,
-                                              const BSONObj& bucketsIndex);
+bool shouldIncludeOriginalSpec(const TimeseriesOptions& timeseriesOptions,
+                               const BSONObj& bucketsIndex);
 
 /**
  * Returns true if 'bucketsIndex' uses a measurement field, excluding the time field. Checks both

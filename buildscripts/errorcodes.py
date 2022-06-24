@@ -23,7 +23,6 @@ except ImportError:
     print("*** Run 'pip3 install --user regex' to speed up error code checking")
     import re  # type: ignore
 
-ASSERT_NAMES = ["uassert", "massert", "fassert", "fassertFailed"]
 MAXIMUM_CODE = 9999999  # JIRA Ticket + XX
 
 # pylint: disable=invalid-name
@@ -306,7 +305,7 @@ def main():
     parser.add_option("--list-files", dest="list_files", action="store_true", default=False,
                       help="Print the name of each file as it is scanned [default: %default]")
     parser.add_option(
-        "--ticket", dest="ticket", type="str", action="store", default=0,
+        "--ticket", dest="ticket", type="str", action="store", default=None,
         help="Generate error codes for a given SERVER ticket number. Inputs can be of"
         " the form: `--ticket=12345` or `--ticket=SERVER-12345`.")
     options, extra = parser.parse_args()
@@ -322,11 +321,13 @@ def main():
     if ok and options.quiet:
         return
 
-    next_code_gen = get_next_code(seen, coerce_to_number(options.ticket))
-
     print("ok: %s" % ok)
-    if not options.replace:
+
+    if options.ticket:
+        next_code_gen = get_next_code(seen, coerce_to_number(options.ticket))
         print("next: %s" % next(next_code_gen))
+    else:
+        next_code_gen = get_next_code(seen, 0)
 
     if ok:
         sys.exit(0)

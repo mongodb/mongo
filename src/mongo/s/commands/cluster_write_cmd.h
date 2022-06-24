@@ -50,6 +50,14 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
 protected:
     class InvocationBase;
 

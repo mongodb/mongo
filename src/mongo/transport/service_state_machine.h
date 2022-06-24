@@ -44,8 +44,15 @@ namespace transport {
  * lifecycle of each user request as a state machine. It is the glue between the stateless
  * ServiceEntryPoint and TransportLayer that ties network and database logic together for a
  * user.
+ *
+ * A `ServiceStateMachine` must be managed by a `shared_ptr`, so we force all instances
+ * to be created by the static `make` function.
  */
-class ServiceStateMachine {
+class ServiceStateMachine : public std::enable_shared_from_this<ServiceStateMachine> {
+    struct PassKeyTag {
+        explicit PassKeyTag() = default;
+    };
+    class Impl;
     ServiceStateMachine(ServiceStateMachine&) = delete;
     ServiceStateMachine& operator=(ServiceStateMachine&) = delete;
 
@@ -53,17 +60,23 @@ class ServiceStateMachine {
     ServiceStateMachine& operator=(ServiceStateMachine&&) = delete;
 
 public:
-    class Impl;
+    /** Factory function: The only public way to create instances. */
+    static std::shared_ptr<ServiceStateMachine> make(ServiceContext::UniqueClient client) {
+        return std::make_shared<ServiceStateMachine>(PassKeyTag{}, std::move(client));
+    }
 
-    /*
-     * Construct a ServiceStateMachine for a given Client.
-     */
-    ServiceStateMachine(ServiceContext::UniqueClient client);
+    /** Public must use `make` to create instances. */
+    ServiceStateMachine(PassKeyTag, ServiceContext::UniqueClient client);
+
+    ~ServiceStateMachine();
+
+    /** Returns the Client given in the constructor. */
+    Client* client() const;
 
     /*
      * start() schedules a call to _runOnce() in the future.
      */
-    void start(ServiceExecutorContext seCtx);
+    void start();
 
     /*
      * Terminates the associated transport Session, regardless of tags.
@@ -81,13 +94,8 @@ public:
      */
     void terminateIfTagsDontMatch(transport::Session::TagMask tags);
 
-    /*
-     * Sets a function to be called after the session is ended
-     */
-    void setCleanupHook(std::function<void()> hook);
-
 private:
-    std::shared_ptr<Impl> _impl;
+    std::unique_ptr<Impl> _impl;
 };
 
 }  // namespace transport

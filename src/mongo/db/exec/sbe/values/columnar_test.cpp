@@ -201,4 +201,11 @@ TEST(ColumnarObjTest, AddNonLeafCellWithArrayInfoToObject) {
     std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a.b", "{[o1", {})};
     compareMakeObjWithExpected(cells, fromjson("{a: {b: [{}, {}]}}"));
 }
+
+TEST(ColumnarObjTest, AddLeafCellThenAddSparseSibling) {
+    std::vector<MockTranslatedCell> cells{makeCellOfIntegers("a.b", "[", {1, 2}),
+                                          makeCellOfIntegers("a", "[o1", {}),
+                                          makeCellOfIntegers("a.c", "[1", {3})};
+    compareMakeObjWithExpected(cells, fromjson("{a: [{b: 1}, {b: 2, c: 3}]}"));
+}
 }  // namespace mongo::sbe

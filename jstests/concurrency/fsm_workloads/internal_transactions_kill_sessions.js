@@ -7,6 +7,7 @@
  * @tags: [
  *  requires_fcv_60,
  *  uses_transactions,
+ *  kills_random_sessions
  * ]
  */
 
@@ -23,11 +24,9 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.insertInitialDocsOnSetUp = true;
 
     // The transaction API does not abort internal transactions that are interrupted after they
-    // have started to commit. Lowering the transactionLifetimeLimitSeconds enables a retry of a
-    // retryable write that uses such an interrupted internal transaction to not get blocked
-    // indefinitely (24 hours) due to the RetryableTransactionInProgress error.
-    // TODO (SERVER-66725): Make incoming retryable transactions abort conflicting transactions
-    // once.
+    // have started to commit. The first retry of that transaction will abort the open transaction,
+    // but will block if it happens again on that retry, so we lower the
+    // transactionLifetimeLimitSeconds so subsequent retries do not block indefinitely (24 hours).
     $config.data.lowerTransactionLifetimeLimitSeconds = true;
 
     $config.data.expectDirtyDocs = {
@@ -79,6 +78,15 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.states.killSession = function(db, collName) {
         return killSession(db, collName);
+    };
+
+    $config.teardown = function teardown(db, collName, cluster) {
+        $super.teardown.apply(this, arguments);
+
+        // If a client session is killed and the transaction API is running a non-retryable
+        // transaction on that session, the API may be killed and unable to abort the transaction,
+        // leaving it open, which can block later tasks like CheckReplDBHash.
+        this.killAllSessions(cluster);
     };
 
     $config.transitions = {

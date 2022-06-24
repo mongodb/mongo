@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/action_type.h"
@@ -39,7 +38,6 @@
 #include "mongo/db/s/shard_key_index_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {
@@ -96,13 +94,15 @@ public:
             return false;
         }
 
+        std::string tmpErrMsg = "couldn't find valid index for shard key";
         auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
                                                      *collection,
                                                      collection->getIndexCatalog(),
                                                      keyPattern,
-                                                     /*requireSingleKey=*/true);
+                                                     /*requireSingleKey=*/true,
+                                                     &tmpErrMsg);
         if (!shardKeyIdx) {
-            errmsg = "couldn't find valid index for shard key";
+            errmsg = tmpErrMsg;
             return false;
         }
 

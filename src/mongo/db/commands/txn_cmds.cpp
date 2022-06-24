@@ -78,6 +78,15 @@ public:
     std::string help() const final {
         return "Commits a transaction";
     }
+
+    bool isTransactionCommand() const final {
+        return true;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;
@@ -180,6 +189,14 @@ public:
 
     std::string help() const final {
         return "Aborts a transaction";
+    }
+
+    bool isTransactionCommand() const final {
+        return true;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
     }
 
     class Invocation final : public InvocationBaseGen {

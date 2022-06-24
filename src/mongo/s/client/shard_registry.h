@@ -283,12 +283,6 @@ public:
     void reload(OperationContext* opCtx);
 
     /**
-     * Clears all entries from the shard registry entries, which will force the registry to do a
-     * reload on next access.
-     */
-    void clearEntries();
-
-    /**
      * For use in mongos which needs notifications about changes to shard replset membership to
      * update the config.shards collection.
      */

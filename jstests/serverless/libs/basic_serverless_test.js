@@ -7,13 +7,9 @@ const runForgetShardSplitAsync = function(primaryHost, migrationIdString) {
     return primary.adminCommand({forgetShardSplit: 1, migrationId: UUID(migrationIdString)});
 };
 
-const runAbortShardSplitAsync = function(rstArgs, migrationIdString) {
-    load("jstests/replsets/rslib.js");
-
-    const donorRst = createRst(rstArgs, true);
-    const admin = donorRst.getPrimary().getDB("admin");
-
-    return admin.runCommand({abortShardSplit: 1, migrationId: UUID(migrationIdString)});
+const runAbortShardSplitAsync = function(primaryHost, migrationIdString) {
+    const primary = new Mongo(primaryHost);
+    return primary.adminCommand({abortShardSplit: 1, migrationId: UUID(migrationIdString)});
 };
 
 const runCommitShardSplitAsync = function(rstArgs,
@@ -147,9 +143,12 @@ class ShardSplitOperation {
         jsTestLog("Running forgetShardSplit command");
 
         this.basicServerlessTest.removeRecipientNodesFromDonor();
+        const donorRstArgs = createRstArgs(this.donorSet);
+        this.basicServerlessTest.removeRecipientsFromRstArgs(donorRstArgs);
+        const donorSet = createRst(donorRstArgs, true);
 
         const cmdObj = {forgetShardSplit: 1, migrationId: this.migrationId};
-        assert.commandWorked(runShardSplitCommand(this.donorSet,
+        assert.commandWorked(runShardSplitCommand(donorSet,
                                                   cmdObj,
                                                   true /* retryableOnErrors */,
                                                   false /*enableDonorStartMigrationFsync*/));
@@ -175,11 +174,11 @@ class ShardSplitOperation {
      */
     abortAsync() {
         jsTestLog("Running abortShardSplit command asynchronously");
-        const donorRstArgs = createRstArgs(this.donorSet);
+        const primary = this.basicServerlessTest.getDonorPrimary();
         const migrationIdString = extractUUIDFromObject(this.migrationId);
 
         const abortShardSplitThread =
-            new Thread(runAbortShardSplitAsync, donorRstArgs, migrationIdString);
+            new Thread(runAbortShardSplitAsync, primary.host, migrationIdString);
 
         abortShardSplitThread.start();
 
@@ -191,8 +190,8 @@ class ShardSplitOperation {
      */
     abort() {
         jsTestLog("Running abort command");
-
-        const admin = this.donorSet.getPrimary().getDB("admin");
+        const primary = this.basicServerlessTest.getDonorPrimary();
+        const admin = primary.getDB("admin");
 
         return admin.runCommand({abortShardSplit: 1, migrationId: this.migrationId});
     }
@@ -348,7 +347,7 @@ class BasicServerlessTest {
 
     /*
      *  Wait for state document garbage collection by polling for when the document has been removed
-     * from the tenantSplitDonors namespace, and all access blockers have been removed.
+     * from the 'shardSplitDonors' namespace, and all access blockers have been removed.
      * @param {migrationId} id that was used for the commitShardSplit command.
      * @param {tenantIds} tenant ids of the shard split.
      */
@@ -529,6 +528,33 @@ class BasicServerlessTest {
     }
 
     /**
+     * Asserts that the TenantMigrationAccessBlocker for the given tenant on the given node has the
+     * expected statistics.
+     */
+    static checkShardSplitAccessBlocker(node, tenantId, {
+        numBlockedWrites = 0,
+        numBlockedReads = 0,
+        numTenantMigrationCommittedErrors = 0,
+        numTenantMigrationAbortedErrors = 0
+    }) {
+        const mtab = BasicServerlessTest.getTenantMigrationAccessBlocker({node, tenantId}).donor;
+        if (!mtab) {
+            assert.eq(0, numBlockedWrites);
+            assert.eq(0, numTenantMigrationCommittedErrors);
+            assert.eq(0, numTenantMigrationAbortedErrors);
+            return;
+        }
+
+        assert.eq(mtab.numBlockedReads, numBlockedReads, tojson(mtab));
+        assert.eq(mtab.numBlockedWrites, numBlockedWrites, tojson(mtab));
+        assert.eq(mtab.numTenantMigrationCommittedErrors,
+                  numTenantMigrationCommittedErrors,
+                  tojson(mtab));
+        assert.eq(
+            mtab.numTenantMigrationAbortedErrors, numTenantMigrationAbortedErrors, tojson(mtab));
+    }
+
+    /**
      * Get the current donor primary by ignoring all the recipient nodes from the current donor set.
      */
     getDonorPrimary() {
@@ -539,7 +565,7 @@ class BasicServerlessTest {
     }
 }
 
-BasicServerlessTest.kConfigSplitDonorsNS = "config.tenantSplitDonors";
+BasicServerlessTest.kConfigSplitDonorsNS = "config.shardSplitDonors";
 BasicServerlessTest.DonorState = {
     kUninitialized: "uninitialized",
     kBlocking: "blocking",

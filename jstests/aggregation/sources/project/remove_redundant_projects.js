@@ -18,7 +18,7 @@ assert.commandWorked(coll.insert({_id: {a: 1, b: 1}, a: 1, c: {d: 1}, e: ['elem1
 
 let indexSpec = {a: 1, 'c.d': 1, 'e.0': 1};
 
-const groupPushdownEnabled = checkSBEEnabled(db, ["featureFlagSBEGroupPushdown"]);
+const groupPushdownEnabled = checkSBEEnabled(db);
 
 /**
  * Helper to test that for a given pipeline, the same results are returned whether or not an

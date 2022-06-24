@@ -81,7 +81,8 @@ std::unique_ptr<PlanStage> IndexScanStage::clone() const {
                                             _seekKeyLow->clone(),
                                             _seekKeyHigh->clone(),
                                             _yieldPolicy,
-                                            _commonStats.nodeId);
+                                            _commonStats.nodeId,
+                                            _participateInTrialRunTracking);
 }
 
 void IndexScanStage::prepare(CompileCtx& ctx) {
