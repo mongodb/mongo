@@ -7,8 +7,10 @@ import IconButton from "@material-ui/core/IconButton";
 import AddCircleOutline from "@material-ui/icons/AddCircleOutline";
 import Typography from "@material-ui/core/Typography";
 
-import { socket } from "./connect";
 import { updateCheckbox } from "./redux/nodes";
+import { setGraphData } from "./redux/graphData";
+import { setNodeInfos } from "./redux/nodeInfo";
+import { getGraphData } from "./redux/store";
 
 const OverflowTip = (props) => {
   const textElementRef = useRef(null);
@@ -22,6 +24,35 @@ const OverflowTip = (props) => {
     }
   };
 
+  function newGraphData() {
+    let gitHash = props.selectedGraph;
+    let postData = {
+        "selected_nodes": props.nodes.filter(node => node.selected == true).map(node => node.node)
+    };
+    fetch('/api/graphs/' + gitHash + '/d3', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(postData)
+    })
+      .then(response => response.json())
+      .then(data => {
+        props.setGraphData(data.graphData);
+      });
+    fetch('/api/graphs/' + gitHash + '/nodes/details', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(postData)
+    })
+      .then(response => response.json())
+      .then(data => {
+        props.setNodeInfos(data.nodeInfos);
+      });
+  }
+
   useEffect(() => {
     compareSize(textElementRef);
     window.addEventListener("resize", compareSize);
@@ -33,7 +64,7 @@ const OverflowTip = (props) => {
   return (
     <Tooltip
       title={props.value}
-      interactive
+      interactive="true"
       disableHoverListener={!hoverStatus}
       style={{ fontSize: "1em" }}
       enterDelay={500}
@@ -54,10 +85,7 @@ const OverflowTip = (props) => {
               color="secondary"
               onClick={(event) => {
                 props.updateCheckbox({ node: props.text, value: "flip" });
-                socket.emit("row_selected", {
-                  data: { node: props.text, name: props.name },
-                  isSelected: "flip",
-                });
+                newGraphData();
               }}
             >
               <AddCircleOutline style={{ height: "15px", width: "15px" }} />
@@ -70,4 +98,4 @@ const OverflowTip = (props) => {
   );
 };
 
-export default connect(null, { updateCheckbox })(OverflowTip);
+export default connect(getGraphData, { updateCheckbox, setGraphData, setNodeInfos })(OverflowTip);

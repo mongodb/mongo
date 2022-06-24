@@ -4,10 +4,11 @@ import LoadingButton from "@material-ui/lab/LoadingButton";
 import GitIcon from "@material-ui/icons/GitHub";
 import { green, grey } from "@material-ui/core/colors";
 
-import { socket } from "./connect";
 import { getGraphFiles } from "./redux/store";
 import { setLoading } from "./redux/loading";
 import theme from "./theme";
+import { selectGraphFile } from "./redux/graphFiles";
+import { nodeInfo, setNodeInfos } from "./redux/nodeInfo";
 
 const selectedStyle = {
   color: theme.palette.getContrastText(green[500]),
@@ -31,15 +32,28 @@ const unselectedStyle = {
   },
 };
 
-const GitHashButton = ({ loading, graphFiles, setLoading, text }) => {
+const GitHashButton = ({ loading, graphFiles, setLoading, selectGraphFile, setNodeInfos, text }) => {
   const [selected, setSelected] = React.useState(false);
   const [selfLoading, setSelfLoading] = React.useState(false);
   const [firstLoad, setFirstLoad] = React.useState(true);
 
   function handleClick() {
+    const selectedGraphFiles = graphFiles.filter(
+      (graphFile) => graphFile.selected == true
+    );
+
+    if (selectedGraphFiles.length > 0) {
+      if (selectedGraphFiles[0]["git"] == text) {
+        return;
+      }
+    }
+    
     setSelfLoading(true);
     setLoading(true);
-    socket.emit("git_hash_selected", { hash: text, selected: true });
+    selectGraphFile({
+      hash: text,
+      selected: true,
+    });
   }
 
   React.useEffect(() => {
@@ -76,4 +90,4 @@ const GitHashButton = ({ loading, graphFiles, setLoading, text }) => {
   );
 };
 
-export default connect(getGraphFiles, { setLoading })(GitHashButton);
+export default connect(getGraphFiles, { setLoading, selectGraphFile, setNodeInfos })(GitHashButton);

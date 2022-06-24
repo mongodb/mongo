@@ -8,10 +8,11 @@ import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
 
 import theme from "./theme";
-import { socket } from "./connect";
 import { getGraphData } from "./redux/store";
 import { updateCheckbox } from "./redux/nodes";
 import { setFindNode } from "./redux/findNode";
+import { setGraphData } from "./redux/graphData";
+import { setNodeInfos } from "./redux/nodeInfo";
 import LoadingBar from "./LoadingBar";
 
 const handleFindNode = (node_value, graphData, activeComponent, forceRef) => {
@@ -59,9 +60,11 @@ const DrawGraph = ({
   updateCheckbox,
   findNode,
   setFindNode,
+  setGraphData,
+  setNodeInfos,
+  selectedGraph
 }) => {
   const [activeComponent, setActiveComponent] = React.useState("2D");
-  const [selectedNodes, setSelectedNodes] = React.useState([]);
   const [pathNodes, setPathNodes] = React.useState({});
   const [pathEdges, setPathEdges] = React.useState([]);
   const forceRef = useRef(null);
@@ -71,15 +74,7 @@ const DrawGraph = ({
     setFindNode("");
   }, [findNode, graphData, activeComponent, forceRef]);
 
-  React.useEffect(() => {
-    setSelectedNodes(
-      nodes.map((node) => {
-        if (node.selected) {
-          return node.node;
-        }
-      })
-    );
-  }, [nodes]);
+  const selectedNodes = nodes.filter(node => node.selected == true).map(node => node.node);
 
   React.useEffect(() => {
     setPathNodes({ fromNode: graphPaths.fromNode, toNode: graphPaths.toNode });
@@ -111,6 +106,35 @@ const DrawGraph = ({
 
     }
   }, [forceRef.current, activeComponent]);
+
+  function newGraphData() {
+    let gitHash = selectedGraph;
+    let postData = {
+        "selected_nodes": nodes.filter(node => node.selected == true).map(node => node.node)
+    };
+    fetch('/api/graphs/' + gitHash + '/d3', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(postData)
+    })
+      .then(response => response.json())
+      .then(data => {
+        setGraphData(data.graphData);
+      });
+    fetch('/api/graphs/' + gitHash + '/nodes/details', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(postData)
+    })
+      .then(response => response.json())
+      .then(data => {
+        setNodeInfos(data.nodeInfos);
+      });
+  }
 
   const paintRing = React.useCallback(
     (node, ctx) => {
@@ -244,10 +268,7 @@ const DrawGraph = ({
           nodeCanvasObject={paintRing}
           onNodeClick={(node, event) => {
             updateCheckbox({ node: node.id, value: "flip" });
-            socket.emit("row_selected", {
-              data: { node: node.id, name: node.name },
-              isSelected: !selectedNodes.includes(node.id),
-            });
+            newGraphData();
           }}
         />
         <ForceGraph3D
@@ -271,10 +292,7 @@ const DrawGraph = ({
           }}
           onNodeClick={(node, event) => {
             updateCheckbox({ node: node.id, value: "flip" });
-            socket.emit("row_selected", {
-              data: { node: node.id, name: node.name },
-              isSelected: !selectedNodes.includes(node.id),
-            });
+            newGraphData();
           }}
           linkColor={(d) => {
             if (graphPaths.selectedPath >= 0) {
@@ -344,6 +362,6 @@ const DrawGraph = ({
   );
 };
 
-export default connect(getGraphData, { setFindNode, updateCheckbox })(
+export default connect(getGraphData, { setFindNode, updateCheckbox, setGraphData, setNodeInfos })(
   DrawGraph
 );

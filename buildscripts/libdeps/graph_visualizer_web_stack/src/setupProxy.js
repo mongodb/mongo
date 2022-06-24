@@ -7,11 +7,10 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 
 module.exports = function(app) {
     app.use(
-        createProxyMiddleware('/socket.io', {
+        createProxyMiddleware('/api', {
             target: 'http://localhost:5000',
-            ws: true,
             changeOrigin: true,
-            secure: false
+            secure: false,
         })
     );
 };

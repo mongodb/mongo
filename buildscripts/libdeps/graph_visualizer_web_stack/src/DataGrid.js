@@ -10,7 +10,8 @@ import Typography from "@material-ui/core/Typography";
 
 import { getRows } from "./redux/store";
 import { updateSelected } from "./redux/nodes";
-import { socket } from "./connect";
+import { setGraphData } from "./redux/graphData";
+import { setNodeInfos } from "./redux/nodeInfo";
 
 function componentToHex(c) {
   var hex = c.toString(16);
@@ -88,12 +89,46 @@ const DataGrid = ({
   onNodeClicked,
   updateSelected,
   classes,
+  setGraphData,
+  selectedGraph,
+  setNodeInfos,
+  selectedNodes,
+  searchedNodes,
 }) => {
   const [checkBoxes, setCheckBoxes] = React.useState([]);
 
   React.useEffect(() => {
-    setCheckBoxes(nodes);
-  }, [nodes]);
+    setCheckBoxes(searchedNodes);
+  }, [searchedNodes]);
+
+  function newGraphData() {
+    let gitHash = selectedGraph;
+    let postData = {
+        "selected_nodes": nodes.filter(node => node.selected == true).map(node => node.node)
+    };
+    fetch('/api/graphs/' + gitHash + '/d3', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(postData)
+    })
+      .then(response => response.json())
+      .then(data => {
+        setGraphData(data.graphData);
+      });
+    fetch('/api/graphs/' + gitHash + '/nodes/details', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(postData)
+    })
+      .then(response => response.json())
+      .then(data => {
+        setNodeInfos(data.nodeInfos);
+      });
+  }
 
   const getRowClassName = ({ index }) => {
     return clsx(
@@ -125,10 +160,7 @@ const DataGrid = ({
             if (checkBoxes[rowIndex].selected != event.target.checked) {
               updateSelected({ index: rowIndex, value: event.target.checked });
             }
-            socket.emit("row_selected", {
-              data: { node: nodes[rowIndex].node, name: nodes[rowIndex].name },
-              isSelected: event.target.checked,
-            });
+            newGraphData();
           }}
         />
       );
@@ -217,6 +249,6 @@ const DataGrid = ({
   );
 };
 
-export default connect(getRows, { updateSelected })(
+export default connect(getRows, { updateSelected, setGraphData, setNodeInfos })(
   withStyles(styles)(DataGrid)
 );

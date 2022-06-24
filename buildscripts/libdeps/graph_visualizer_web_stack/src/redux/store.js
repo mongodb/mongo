@@ -65,6 +65,15 @@ export const initialState = {
   listSearchTerm: "",
 };
 
+export const getCurrentGraphHash = (state) => {
+  let selectedGraphFiles = state.graphFiles.filter(x => x.selected == true);
+  let selectedGraph = '0000000';
+  if (selectedGraphFiles.length > 0) {
+    selectedGraph = selectedGraphFiles[0].git;
+  }
+  return selectedGraph;
+};
+
 export const getLoading = (state) => {
   return { loading: state };
 };
@@ -85,6 +94,7 @@ export const getNodeInfos = (state) => {
 export const getCounts = (state) => {
   const counts = state.counts;
   return {
+    selectedGraph: getCurrentGraphHash(state),
     counts: state.counts,
   };
 };
@@ -92,16 +102,20 @@ export const getCounts = (state) => {
 export const getRows = (state) => {
   let searchedNodes = state.nodes.filter(node => node.node.indexOf(state.listSearchTerm) > -1);
   return {
+    selectedGraph: getCurrentGraphHash(state),
     rowCount: searchedNodes.length,
     rowGetter: ({ index }) => searchedNodes[index],
     checkBox: ({ index }) => searchedNodes[index].selected,
-    nodes: searchedNodes,
+    nodes: state.nodes,
+    searchedNodes: searchedNodes
   };
 };
 
 export const getSelected = (state) => {
   return {
+    selectedGraph: getCurrentGraphHash(state),
     selectedNodes: state.nodes.filter((node) => node.selected),
+    nodes: state.nodes,
     selectedEdges: [],
     loading: state.loading,
     graphPaths: state.graphPaths,
@@ -110,6 +124,7 @@ export const getSelected = (state) => {
 
 export const getNodes = (state) => {
   return {
+    selectedGraph: getCurrentGraphHash(state),
     nodes: state.nodes,
     loading: state.loading,
     listSearchTerm: state.listSearchTerm,
@@ -119,6 +134,7 @@ export const getNodes = (state) => {
 
 export const getGraphData = (state) => {
   return {
+    selectedGraph: getCurrentGraphHash(state),
     nodes: state.nodes,
     graphData: state.graphData,
     loading: state.loading,

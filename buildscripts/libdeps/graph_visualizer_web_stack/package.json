@@ -43,7 +43,6 @@
     "react-virtualized": "^9.22.2",
     "react-window": "^1.8.6",
     "redux": "^4.0.5",
-    "socket.io-client": "latest",
     "typescript": "^3.9.7"
   },
   "browserslist": {

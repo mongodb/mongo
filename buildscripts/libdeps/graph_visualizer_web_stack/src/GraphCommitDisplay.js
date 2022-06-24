@@ -10,10 +10,12 @@ import List from "@material-ui/core/List";
 import ListItem from "@material-ui/core/ListItem";
 import TextField from "@material-ui/core/TextField";
 
-import SocketConnection from "./connect";
 import { getGraphFiles } from "./redux/store";
+import { setGraphFiles } from "./redux/graphFiles";
 
 import GitHashButton from "./GitHashButton";
+
+const { REACT_APP_API_URL } = process.env;
 
 const flexContainer = {
   display: "flex",
@@ -29,7 +31,19 @@ const textFields = [
   "Commit Range End",
 ];
 
-const GraphCommitDisplay = ({ graphFiles }) => {
+const GraphCommitDisplay = ({ graphFiles, setGraphFiles }) => {
+  React.useEffect(() => {
+    fetch(REACT_APP_API_URL + "/api/graphs")
+      .then((res) => res.json())
+      .then((data) => {
+        setGraphFiles(data.graph_files);
+      })
+      .catch((err) => {
+        /* eslint-disable no-console */
+        console.log("Error Reading data " + err);
+      });
+    }, []);
+
   return (
     <Paper style={{ height: "100%", width: "100%" }}>
       <List style={flexContainer}>
@@ -56,10 +70,9 @@ const GraphCommitDisplay = ({ graphFiles }) => {
             </TableRow>
           </TableBody>
         </Table>
-        <SocketConnection />
       </ScrollContainer>
     </Paper>
   );
 };
 
-export default connect(getGraphFiles)(GraphCommitDisplay);
+export default connect(getGraphFiles, { setGraphFiles })(GraphCommitDisplay);

@@ -24,9 +24,9 @@
 """
 Libdeps Graph Visualization Tool.
 
-Starts a web service which creates a UI for interacting and examing the libdeps graph.
-The web service front end consist of React+Redux for the framework, SocketIO for backend
-communication, and Material UI for the GUI. The web service back end use flask and socketio.
+Starts a web service which creates a UI for interacting and examining the libdeps graph.
+The web service front end consist of React+Redux for the framework, flask API for backend
+communication, and Material UI for the GUI. The web service back end uses flask.
 
 This script will automatically install the npm modules, and build and run the production
 web service if not debug.
@@ -116,9 +116,8 @@ def check_node(node_check, cwd):
 def start_backend(web_service_info, debug):
     """Start the backend in debug mode."""
 
-    web_service_info['socketio'].run(app=web_service_info['app'],
-                                     host=web_service_info['backend_host'],
-                                     port=web_service_info['backend_port'], debug=debug)
+    web_service_info['app'].run(host=web_service_info['backend_host'],
+                                port=web_service_info['backend_port'], debug=debug)
 
 
 def start_frontend_thread(web_service_info, npm_command, debug):
@@ -160,12 +159,11 @@ def main():
     server = BackendServer(graphml_dir=args.graphml_dir,
                            frontend_url=f"http://{args.frontend_host}:{args.frontend_port}")
 
-    app, socketio = server.get_app()
+    app = server.get_app()
     cwd = Path(__file__).parent / 'graph_visualizer_web_stack'
 
     web_service_info = {
         'app': app,
-        'socketio': socketio,
         'cwd': cwd,
         'frontend_host': args.frontend_host,
         'frontend_port': args.frontend_port,

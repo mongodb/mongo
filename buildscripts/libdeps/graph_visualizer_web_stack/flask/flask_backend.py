@@ -33,10 +33,10 @@ from collections import namedtuple, OrderedDict
 import flask
 import networkx
 
-from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from flask_session import Session
 from lxml import etree
+from flask import request
 
 import libdeps.graph
 import libdeps.analyzer
@@ -49,51 +49,50 @@ class BackendServer:
     def __init__(self, graphml_dir, frontend_url):
         """Create and setup the state variables."""
         self.app = flask.Flask(__name__)
-        self.socketio = SocketIO(self.app, cors_allowed_origins=frontend_url)
         self.app.config['CORS_HEADERS'] = 'Content-Type'
         CORS(self.app, resources={r"/*": {"origins": frontend_url}})
 
-        self.app.add_url_rule("/graph_files", "return_graph_files", self.return_graph_files)
-        self.socketio.on_event('git_hash_selected', self.git_hash_selected)
-        self.socketio.on_event('row_selected', self.row_selected)
-        self.socketio.on_event('receive_graph_paths', self.receive_graph_paths)
+        self.app.add_url_rule("/api/graphs", "return_graph_files", self.return_graph_files)
+        self.app.add_url_rule("/api/graphs/<git_hash>/nodes", "return_node_list",
+                              self.return_node_list)
+        self.app.add_url_rule("/api/graphs/<git_hash>/analysis", "return_analyze_counts",
+                              self.return_analyze_counts)
+        self.app.add_url_rule("/api/graphs/<git_hash>/d3", "return_d3", self.return_d3,
+                              methods=['POST'])
+        self.app.add_url_rule("/api/graphs/<git_hash>/nodes/details", "return_node_infos",
+                              self.return_node_infos, methods=['POST'])
+        self.app.add_url_rule("/api/graphs/<git_hash>/paths", "return_paths_between",
+                              self.return_paths_between, methods=['POST'])
 
         self.loaded_graphs = {}
-        self.current_selected_rows = {}
         self.graphml_dir = Path(graphml_dir)
         self.frontend_url = frontend_url
 
         self.graph_file_tuple = namedtuple('GraphFile', ['version', 'git_hash', 'graph_file'])
         self.graph_files = self.get_graphml_files()
 
-        self._dependents_graph = None
-        self._dependency_graph = None
+    @staticmethod
+    def get_dependency_graph(graph):
+        """Returns the dependency graph of a given graph."""
 
-        try:
-            default_selected_graph = list(self.graph_files.items())[0][1].graph_file
-            self.load_graph_from_file(default_selected_graph)
-        except (IndexError, AttributeError) as ex:
-            print(ex)
-            print(
-                f"Failed to load read a graph file from {list(self.graph_files.items())} for graphml_dir '{self.graphml_dir}'"
-            )
-            exit(1)
-
-    def load_graph_from_file(self, file_path):
-        """Load a graph file from disk and handle version."""
-
-        graph = libdeps.graph.LibdepsGraph(networkx.read_graphml(file_path))
         if graph.graph['graph_schema_version'] == 1:
-            self._dependents_graph = graph
-            self._dependency_graph = networkx.reverse_view(self._dependents_graph)
+            return networkx.reverse_view(graph)
         else:
-            self._dependency_graph = graph
-            self._dependents_graph = networkx.reverse_view(self._dependency_graph)
+            return graph
+
+    @staticmethod
+    def get_dependents_graph(graph):
+        """Returns the dependents graph of a given graph."""
+
+        if graph.graph['graph_schema_version'] == 1:
+            return graph
+        else:
+            return networkx.reverse_view(graph)
 
     def get_app(self):
-        """Return the app and socketio instances."""
+        """Return the app instance."""
 
-        return self.app, self.socketio
+        return self.app
 
     def get_graph_build_data(self, graph_file):
         """Fast method for extracting basic build data from the graph file."""
@@ -132,187 +131,182 @@ class BackendServer:
             })
         return data
 
-    def send_node_infos(self):
-        """Search through the selected rows and find information about the selected rows."""
+    def return_node_infos(self, git_hash):
+        """Returns details about a set of selected nodes."""
 
-        with self.app.test_request_context():
+        req_body = request.get_json()
+        if "selected_nodes" in req_body.keys():
+            selected_nodes = req_body["selected_nodes"]
 
-            nodeinfo_data = {'nodeInfos': []}
+            if graph := self.load_graph(git_hash):
+                dependents_graph = self.get_dependents_graph(graph)
+                dependency_graph = self.get_dependency_graph(graph)
 
-            for node, _ in self.current_selected_rows.items():
+                nodeinfo_data = {'nodeInfos': []}
 
-                nodeinfo_data['nodeInfos'].append({
-                    'id':
-                        len(nodeinfo_data['nodeInfos']),
-                    'node':
-                        str(node),
-                    'name':
-                        node.name,
-                    'attribs': [{
-                        'name': key, 'value': value
-                    } for key, value in self._dependents_graph.nodes(data=True)[str(node)].items()],
-                    'dependers': [{
+                for node in selected_nodes:
+
+                    nodeinfo_data['nodeInfos'].append({
+                        'id':
+                            len(nodeinfo_data['nodeInfos']),
                         'node':
-                            depender, 'symbols':
-                                self._dependents_graph[str(node)][depender].get('symbols',
+                            str(node),
+                        'name':
+                            Path(node).name,
+                        'attribs': [{
+                            'name': key, 'value': value
+                        } for key, value in dependents_graph.nodes(data=True)[str(node)].items()],
+                        'dependers': [{
+                            'node':
+                                depender, 'symbols':
+                                    dependents_graph[str(node)][depender].get('symbols',
+                                                                              '').split(' ')
+                        } for depender in dependents_graph[str(node)]],
+                        'dependencies': [{
+                            'node':
+                                dependency, 'symbols':
+                                    dependents_graph[dependency][str(node)].get('symbols',
                                                                                 '').split(' ')
-                    } for depender in self._dependents_graph[str(node)]],
-                    'dependencies': [{
-                        'node':
-                            dependency, 'symbols':
-                                self._dependents_graph[dependency][str(node)].get('symbols',
-                                                                                  '').split(' ')
-                    } for dependency in self._dependency_graph[str(node)]],
-                })
+                        } for dependency in dependency_graph[str(node)]],
+                    })
 
-            self.socketio.emit("node_infos", nodeinfo_data)
+                return nodeinfo_data, 200
+            return {
+                'error': 'Git commit hash (' + git_hash + ') does not have a matching graph file.'
+            }, 400
+        return {'error': 'Request body does not contain "selected_nodes" attribute.'}, 400
 
-    def send_graph_data(self, extra_nodes=None):
+    def return_d3(self, git_hash):
         """Convert the current selected rows into a format for D3."""
 
-        with self.app.test_request_context():
+        req_body = request.get_json()
+        if "selected_nodes" in req_body.keys():
+            selected_nodes = req_body["selected_nodes"]
 
-            nodes = {}
-            links = {}
+            if graph := self.load_graph(git_hash):
+                dependents_graph = self.get_dependents_graph(graph)
+                dependency_graph = self.get_dependency_graph(graph)
 
-            def add_node_to_graph_data(node):
-                nodes[str(node)] = {
-                    'id': str(node), 'name': Path(node).name,
-                    'type': self._dependents_graph.nodes()[str(node)]['bin_type']
-                }
+                nodes = {}
+                links = {}
 
-            def add_link_to_graph_data(source, target):
-                links[str(source) + str(target)] = {'source': str(source), 'target': str(target)}
+                def add_node_to_graph_data(node):
+                    nodes[str(node)] = {
+                        'id': str(node), 'name': Path(node).name, 'type': dependents_graph.nodes()
+                                                                          [str(node)]['bin_type']
+                    }
 
-            for node, _ in self.current_selected_rows.items():
-                add_node_to_graph_data(node)
+                def add_link_to_graph_data(source, target):
+                    links[str(source) + str(target)] = {
+                        'source': str(source), 'target': str(target)
+                    }
 
-                for libdep in self._dependency_graph[str(node)]:
-                    if self._dependents_graph[libdep][str(node)].get('direct'):
-                        add_node_to_graph_data(libdep)
-                        add_link_to_graph_data(node, libdep)
-
-            if extra_nodes is not None:
-                for node in extra_nodes:
+                for node in selected_nodes:
                     add_node_to_graph_data(node)
 
-                    for libdep in self._dependency_graph.get_direct_nonprivate_graph()[str(node)]:
-                        add_node_to_graph_data(libdep)
-                        add_link_to_graph_data(node, libdep)
+                    for libdep in dependency_graph[str(node)]:
+                        if dependents_graph[libdep][str(node)].get('direct'):
+                            add_node_to_graph_data(libdep)
+                            add_link_to_graph_data(node, libdep)
 
-            node_data = {
-                'graphData': {
-                    'nodes': [data for node, data in nodes.items()],
-                    'links': [data for link, data in links.items()],
-                }, 'selectedNodes': [str(node) for node in list(self.current_selected_rows.keys())]
-            }
-            self.socketio.emit("graph_data", node_data)
+                if "extra_nodes" in req_body.keys():
+                    extra_nodes = req_body["extra_nodes"]
+                    for node in extra_nodes:
+                        add_node_to_graph_data(node)
 
-    def row_selected(self, message):
-        """Construct the new graphData nodeInfo when a cell is selected."""
+                        for libdep in dependency_graph.get_direct_nonprivate_graph()[str(node)]:
+                            add_node_to_graph_data(libdep)
+                            add_link_to_graph_data(node, libdep)
 
-        if message['isSelected'] == 'flip':
-            if message['data']['node'] in self.current_selected_rows:
-                self.current_selected_rows.pop(Path(message['data']['node']))
-            else:
-                self.current_selected_rows[Path(message['data']['node'])] = message['data']
-        else:
-            if message['isSelected'] and message:
-                self.current_selected_rows[Path(message['data']['node'])] = message['data']
-            else:
-                self.current_selected_rows.pop(Path(message['data']['node']))
+                node_data = {
+                    'graphData': {
+                        'nodes': [data for node, data in nodes.items()],
+                        'links': [data for link, data in links.items()],
+                    }
+                }
+                return node_data, 200
+            return {
+                'error': 'Git commit hash (' + git_hash + ') does not have a matching graph file.'
+            }, 400
+        return {'error': 'Request body does not contain "selected_nodes" attribute.'}, 400
 
-        self.socketio.start_background_task(self.send_graph_data)
-        self.socketio.start_background_task(self.send_node_infos)
-
-    def analyze_counts(self):
+    def return_analyze_counts(self, git_hash):
         """Perform count analysis and send the results back to frontend."""
 
         with self.app.test_request_context():
+            if graph := self.load_graph(git_hash):
+                dependency_graph = self.get_dependency_graph(graph)
 
-            analysis = libdeps.analyzer.counter_factory(
-                self._dependency_graph,
-                [name[0] for name in libdeps.analyzer.CountTypes.__members__.items()])
-            ga = libdeps.analyzer.LibdepsGraphAnalysis(analysis)
-            results = ga.get_results()
+                analysis = libdeps.analyzer.counter_factory(
+                    dependency_graph,
+                    [name[0] for name in libdeps.analyzer.CountTypes.__members__.items()])
+                ga = libdeps.analyzer.LibdepsGraphAnalysis(analysis)
+                results = ga.get_results()
 
-            graph_data = []
-            for i, data in enumerate(results):
-                graph_data.append({'id': i, 'type': data, 'value': results[data]})
-            self.socketio.emit("graph_results", graph_data)
+                graph_data = []
+                for i, data in enumerate(results):
+                    graph_data.append({'id': i, 'type': data, 'value': results[data]})
+                return {'results': graph_data}, 200
+            return {
+                'error': 'Git commit hash (' + git_hash + ') does not have a matching graph file.'
+            }, 400
 
-    def receive_graph_paths(self, message):
-        """Receive the reqest message and kick it off to another thread."""
+    def return_paths_between(self, git_hash):
+        """Gather all the paths in the graph between a fromNode and toNode."""
 
-        self.socketio.start_background_task(self.send_paths, message)
+        message = request.get_json()
+        if "fromNode" in message.keys() and "toNode" in message.keys():
+            if graph := self.load_graph(git_hash):
+                dependency_graph = self.get_dependency_graph(graph)
+                analysis = [
+                    libdeps.analyzer.GraphPaths(dependency_graph, message['fromNode'],
+                                                message['toNode'])
+                ]
+                ga = libdeps.analyzer.LibdepsGraphAnalysis(analysis=analysis)
+                results = ga.get_results()
 
-    def send_paths(self, message):
+                paths = results[libdeps.analyzer.DependsReportTypes.GRAPH_PATHS.name][(
+                    message['fromNode'], message['toNode'])]
+                paths.sort(key=len)
+                nodes = set()
+                for path in paths:
+                    for node in path:
+                        nodes.add(node)
+
+                # Need to handle self.send_graph_data(extra_nodes=list(nodes))
+                return {
+                    'fromNode': message['fromNode'], 'toNode': message['toNode'], 'paths': paths,
+                    'extraNodes': list(nodes)
+                }, 200
+            return {
+                'error': 'Git commit hash (' + git_hash + ') does not have a matching graph file.'
+            }, 400
+        return {'error': 'Body must contain toNode and fromNode'}, 400
+
+    def return_node_list(self, git_hash):
         """Gather all the nodes in the graph for the node list."""
 
         with self.app.test_request_context():
+            node_data = {'nodes': [], 'links': []}
+            if graph := self.load_graph(git_hash):
+                for node in sorted(graph.nodes()):
+                    node_path = Path(node)
+                    node_data['nodes'].append(str(node_path))
+                return node_data, 200
+            return {
+                'error': 'Git commit hash (' + git_hash + ') does not have a matching graph file.'
+            }, 400
 
-            analysis = [
-                libdeps.analyzer.GraphPaths(self._dependency_graph, message['fromNode'],
-                                            message['toNode'])
-            ]
-            ga = libdeps.analyzer.LibdepsGraphAnalysis(analysis=analysis)
-            results = ga.get_results()
-
-            paths = results[libdeps.analyzer.DependsReportTypes.GRAPH_PATHS.name][(
-                message['fromNode'], message['toNode'])]
-            paths.sort(key=len)
-            nodes = set()
-            for path in paths:
-                for node in path:
-                    nodes.add(node)
-
-            self.send_graph_data(extra_nodes=list(nodes))
-
-            self.socketio.emit(
-                "graph_path_results",
-                {'fromNode': message['fromNode'], 'toNode': message['toNode'], 'paths': paths})
-
-    def send_node_list(self):
-        """Gather all the nodes in the graph for the node list."""
+    def load_graph(self, git_hash):
+        """Load the graph into application memory."""
 
         with self.app.test_request_context():
-            node_data = {
-                'graphData': {'nodes': [], 'links': []},
-                "selectedNodes": [str(node) for node in list(self.current_selected_rows.keys())]
-            }
-
-            for node in sorted(self._dependents_graph.nodes()):
-                node_path = Path(node)
-                node_data['graphData']['nodes'].append(
-                    {'id': str(node_path), 'name': node_path.name})
-            self.socketio.emit("graph_nodes", node_data)
-
-    def load_graph(self, message):
-        """Load the graph into application memory and kick off threads for analysis on new graph."""
-
-        with self.app.test_request_context():
-
-            current_hash = self._dependents_graph.graph.get('git_hash', 'NO_HASH')[:7]
-            if current_hash != message['hash']:
-                self.current_selected_rows = {}
-                if message['hash'] in self.loaded_graphs:
-                    self._dependents_graph = self.loaded_graphs[message['hash']]
-                    self._dependency_graph = networkx.reverse_view(self._dependents_graph)
-                else:
-                    print(
-                        f'loading new graph {current_hash} because different than {message["hash"]}'
-                    )
-
-                    self.load_graph_from_file(self.graph_files[message['hash']].graph_file)
-                    self.loaded_graphs[message['hash']] = self._dependents_graph
-
-            self.socketio.start_background_task(self.analyze_counts)
-            self.socketio.start_background_task(self.send_node_list)
-            self.socketio.emit("graph_data", {'graphData': {'nodes': [], 'links': []}})
-
-    def git_hash_selected(self, message):
-        """Load the new graph and perform queries on it."""
-
-        emit("other_hash_selected", message, broadcast=True)
-
-        self.socketio.start_background_task(self.load_graph, message)
+            if git_hash in self.loaded_graphs:
+                return self.loaded_graphs[git_hash]
+            else:
+                if git_hash in self.graph_files:
+                    file_path = self.graph_files[git_hash].graph_file
+                    graph = libdeps.graph.LibdepsGraph(networkx.read_graphml(file_path))
+                    self.loaded_graphs[git_hash] = graph
+                    return graph
+                return None
