@@ -39,7 +39,7 @@ echo "Packing release into $RELEASE_DIR/$PKG.tar.bz2"
 (cd "$RELEASE_DIR" && tar cf - $PKG | bzip2 -9 > $PKG.tar.bz2)
 
 echo "Packing documentation into $RELEASE_DIR/$PKG-docs.tar.bz2"
-(cd "$RELEASE_DIR" && tar cf - $PKG/LICENSE $PKG/NEWS $PKG/README $PKG/docs | \
+(cd "$RELEASE_DIR" && tar cf - $PKG/LICENSE $PKG/README $PKG/docs | \
     bzip2 -9 > $PKG-docs.tar.bz2)
 
 rm -r $DEST

@@ -21,16 +21,6 @@ export PYTHONDONTWRITEBYTECODE=1
 
 e=0
 
-changelog()
-{
-	# convert the top-level NEWS file into a change log page in the docs
-	(echo "WiredTiger Change Log"
-	 echo "====================="
-	 echo
-	 sed -e 's, \([0-9a-f]\{7\}\) , [\1](https://github.com/wiredtiger/wiredtiger/commit/\1) ,g' \
-	     -e 's,\(\(WT\|SERVER\)-[0-9]*\),[\1](https://jira.mongodb.org/browse/\1),g' ../NEWS) > ../src/docs/changelog.md
-}
-
 wtperf_config()
 {
 	# The Linux ed command writes line numbers to stderr, redirect both
@@ -243,9 +233,6 @@ while :
 		break;;
 	esac
 done
-
-# Generate the change log
-changelog
 
 # Generate the list of wtperf configuration options.
 wtperf_config

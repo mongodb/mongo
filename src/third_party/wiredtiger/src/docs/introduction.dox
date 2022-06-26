@@ -38,9 +38,8 @@ For more information about administrating WiredTiger databases, see:
 - @subpage command_line
 - @subpage admin
 
-For release change logs and upgrading information, see:
+For release upgrading information, see:
 
-- @subpage md_changelog
 - @subpage upgrading
 
 WiredTiger is distributed under Open Source licenses; for more information, see:

@@ -75,10 +75,4 @@ for f in $l; do
 	check "--mode=ccpp" $f
 done
 
-l="NEWS"
-# Check other files.
-for f in $l; do
-	check "" $f
-done
-
 exit 0
