@@ -23,7 +23,7 @@ freed.
 implementation for a given bucket. The store requires a bucket and an access token to create the
 filesystem. The bucket is expected to be a string argument, which is the bucket name and the
 corresponding region separated by a ';', e.g. "bucket1;ap-southeast-2". AWS requires an access token
-to authenticate programmatic access to S3. The access token comprises of an access key ID and a
+to authenticate programmatic access to S3. The access token comprises an access key ID and a
 secret access key as a set. The S3 store requires the token to be provided as a single string
 argument of the access key followed by the secret key, separated by a ';'.
 

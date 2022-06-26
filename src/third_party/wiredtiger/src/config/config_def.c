@@ -1276,7 +1276,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     confchk_WT_SESSION_flush_tier, 4},
   {"WT_SESSION.join",
     "bloom_bit_count=16,bloom_false_positives=false,"
-    "bloom_hash_count=8,compare=\"eq\",count=,operation=\"and\","
+    "bloom_hash_count=8,compare=\"eq\",count=0,operation=\"and\","
     "strategy=",
     confchk_WT_SESSION_join, 7},
   {"WT_SESSION.log_flush", "sync=on", confchk_WT_SESSION_log_flush, 1},

@@ -194,7 +194,7 @@ struct __wt_modify {
  * more information.
  *
  * <b>Thread safety:</b> A WT_CURSOR handle is not usually shared between
- * threads, see @ref threads for more information.
+ * threads. See @ref threads for more information.
  */
 struct __wt_cursor {
 	WT_SESSION *session;	/*!< The session handle for this cursor. */
@@ -235,7 +235,7 @@ struct __wt_cursor {
 	 * @param cursor the cursor handle
 	 * @param ... pointers to hold key fields corresponding to
 	 * WT_CURSOR::key_format.
-	 * The API does not validate the argument types passed in, the caller is
+	 * The API does not validate the argument types passed in; the caller is
 	 * responsible for passing the correct argument types according to
 	 * WT_CURSOR::key_format.
 	 * @errors
@@ -252,7 +252,7 @@ struct __wt_cursor {
 	 * @param cursor the cursor handle
 	 * @param ... pointers to hold value fields corresponding to
 	 * WT_CURSOR::value_format.
-	 * The API does not validate the argument types passed in, the caller is
+	 * The API does not validate the argument types passed in; the caller is
 	 * responsible for passing the correct argument types according to
 	 * WT_CURSOR::value_format.
 	 * @errors
@@ -442,7 +442,8 @@ struct __wt_cursor {
 	 *
 	 * If a cursor with record number keys was configured with
 	 * "append=true" (not the default), the value must be set; a new record
-	 * will be appended and the record number set as the cursor key value.
+	 * will be appended and the new record number can be retrieved using
+	 * WT_CURSOR::get_key.
 	 *
 	 * @snippet ex_all.c Insert a new record and assign a record number
 	 *
@@ -459,7 +460,7 @@ struct __wt_cursor {
 	 *
 	 * Inserting a new record after the current maximum record in a
 	 * fixed-length bit field column-store (that is, a store with an
-	 * 'r' type key and 't' type value) may implicitly create the missing
+	 * 'r' type key and 't' type value) will implicitly create the missing
 	 * records as records with a value of 0.
 	 *
 	 * When loading a large amount of data into a new object, using
@@ -665,12 +666,12 @@ struct __wt_cursor {
 	 *
 	 * @param cursor the cursor handle
 	 * @configstart{WT_CURSOR.reconfigure, see dist/api_data.py}
-	 * @config{append, append the value as a new record\, creating a new record number key;
-	 * valid only for cursors with record number keys., a boolean flag; default \c false.}
+	 * @config{append, append written values as new records\, giving each a new record number
+	 * key; valid only for cursors with record number keys., a boolean flag; default \c false.}
 	 * @config{overwrite, configures whether the cursor's insert and update methods check the
 	 * existing state of the record.  If \c overwrite is \c false\, WT_CURSOR::insert fails with
-	 * ::WT_DUPLICATE_KEY if the record exists\, WT_CURSOR::update fails with ::WT_NOTFOUND if
-	 * the record does not exist., a boolean flag; default \c true.}
+	 * ::WT_DUPLICATE_KEY if the record exists\, and WT_CURSOR::update fails with ::WT_NOTFOUND
+	 * if the record does not exist., a boolean flag; default \c true.}
 	 * @configend
 	 * @errors
 	 */
@@ -681,16 +682,17 @@ struct __wt_cursor {
 	 *
 	 * @param cursor the cursor handle
 	 * @configstart{WT_CURSOR.bound, see dist/api_data.py}
-	 * @config{action, configures whether this call into the api will set or clear range bounds
-	 * on the given cursor\, it takes two values "set" or "clear". If "set" is specified then
-	 * "bound" must also be specified.  If "clear" is specified without any bounds then both
-	 * will be cleared.  The keys relevant to the given bound must have been set prior to the
-	 * call using WT_CURSOR::set_key.  This configuration is currently a work in progress and
-	 * should not be used., a string\, chosen from the following options: \c "clear"\, \c "set";
-	 * default \c set.}
-	 * @config{bound, configures which bound is being operated on\, it takes two values "lower"
-	 * and "upper". This configuration is currently a work in progress and should not be used.,
-	 * a string\, chosen from the following options: \c "lower"\, \c "upper"; default empty.}
+	 * @config{action, configures whether this call into the API will set or clear range bounds
+	 * on the given cursor.  It takes one of two values\, "set" or "clear". If "set" is
+	 * specified then "bound" must also be specified.  If "clear" is specified without any
+	 * bounds then both bounds will be cleared.  The keys relevant to the given bound must have
+	 * been set prior to the call using WT_CURSOR::set_key.  This configuration is currently a
+	 * work in progress and should not be used., a string\, chosen from the following options:
+	 * \c "clear"\, \c "set"; default \c set.}
+	 * @config{bound, configures which bound is being operated on.  It takes one of two values\,
+	 * "lower" or "upper". This configuration is currently a work in progress and should not be
+	 * used., a string\, chosen from the following options: \c "lower"\, \c "upper"; default
+	 * empty.}
 	 * @config{inclusive, configures whether the given bound is inclusive or not.  This
 	 * configuration is currently a work in progress and should not be used., a boolean flag;
 	 * default \c true.}
@@ -848,12 +850,14 @@ struct __wt_session {
 	 * cache_cursors., a boolean flag; default \c true.}
 	 * @config{cache_max_wait_ms, the maximum number of milliseconds an application thread will
 	 * wait for space to be available in cache before giving up.  Default value will be the
-	 * global setting of the connection config., an integer greater than or equal to 0; default
-	 * \c 0.}
+	 * global setting of the connection config., an integer greater than or equal to \c 0;
+	 * default \c 0.}
 	 * @config{debug = (, configure debug specific behavior on a session.  Generally only used
-	 * for internal testing purposes., a set of related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;release_evict_page, Configure the session to evict the
-	 * page when it is released and no longer needed., a boolean flag; default \c false.}
+	 * for internal testing purposes., a set of related configuration options defined as
+	 * follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;release_evict_page, Configure the session to
+	 * evict the page when it is released and no longer needed., a boolean flag; default \c
+	 * false.}
 	 * @config{ ),,}
 	 * @config{ignore_cache_size, when set\, operations performed by this session ignore the
 	 * cache size and are not blocked when the cache is full.  Note that use of this option for
@@ -898,7 +902,7 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @param error a return value from a WiredTiger, ISO C, or POSIX
-	 * standard API
+	 * standard API call
 	 * @returns a string representation of the error
 	 */
 	const char *__F(strerror)(WT_SESSION *session, int error);
@@ -928,7 +932,7 @@ struct __wt_session {
 	 * context of the current transaction, if any.
 	 *
 	 * WT_SESSION::rollback_transaction implicitly resets all cursors associated with the
-         # session.
+         * session.
 	 *
 	 * Cursors are relatively light-weight objects but may hold references
 	 * to heavier-weight objects; applications should re-use cursors when
@@ -946,8 +950,8 @@ struct __wt_session {
 	 *  @copydoc doc_cursor_types
 	 * @param to_dup a cursor to duplicate or gather statistics on
 	 * @configstart{WT_SESSION.open_cursor, see dist/api_data.py}
-	 * @config{append, append the value as a new record\, creating a new record number key;
-	 * valid only for cursors with record number keys., a boolean flag; default \c false.}
+	 * @config{append, append written values as new records\, giving each a new record number
+	 * key; valid only for cursors with record number keys., a boolean flag; default \c false.}
 	 * @config{bulk, configure the cursor for bulk-loading\, a fast\, initial load path (see
 	 * @ref tune_bulk_load for more information). Bulk-load may only be used for newly created
 	 * objects and applications should use the WT_CURSOR::insert method to insert rows.  When
@@ -958,17 +962,18 @@ struct __wt_session {
 	 * records in the bitmap (as specified by the object's \c value_format configuration).
 	 * Bulk-loaded bitmap values must end on a byte boundary relative to the bit count (except
 	 * for the last set of values loaded)., a string; default \c false.}
-	 * @config{checkpoint, the name of a checkpoint to open (the reserved name
-	 * "WiredTigerCheckpoint" opens the most recent checkpoint taken for the object). The cursor
+	 * @config{checkpoint, the name of a checkpoint to open.  (The reserved name
+	 * "WiredTigerCheckpoint" opens the most recent checkpoint taken for the object.) The cursor
 	 * does not support data modification., a string; default empty.}
 	 * @config{debug = (, configure debug specific behavior on a cursor.  Generally only used
-	 * for internal testing purposes., a set of related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;dump_version, open a version cursor\, which is a debug
-	 * cursor on a table that enables iteration through the history of values for a given key.,
-	 * a boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;release_evict,
-	 * Configure the cursor to evict the page positioned on when the reset API is used., a
-	 * boolean flag; default \c false.}
+	 * for internal testing purposes., a set of related configuration options defined as
+	 * follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;dump_version, open a version cursor\, which is
+	 * a debug cursor on a table that enables iteration through the history of values for a
+	 * given key., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+	 * release_evict, Configure the cursor to evict the page positioned on when the reset API
+	 * call is used., a boolean flag; default \c false.}
 	 * @config{ ),,}
 	 * @config{dump, configure the cursor for dump format inputs and outputs: "hex" selects a
 	 * simple hexadecimal format\, "json" selects a JSON format with each record formatted as
@@ -981,7 +986,7 @@ struct __wt_session {
 	 * "pretty"\, \c "pretty_hex"\, \c "print"; default empty.}
 	 * @config{incremental = (, configure the cursor for block incremental backup usage.  These
 	 * formats are only compatible with the backup data source; see @ref backup., a set of
-	 * related configuration options defined below.}
+	 * related configuration options defined as follows.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
 	 * consolidate, causes block incremental backup information to be consolidated if adjacent
 	 * granularity blocks are modified.  If false\, information will be returned in granularity
@@ -998,15 +1003,15 @@ struct __wt_session {
 	 * operations should be done on this open cursor., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;granularity, this setting manages the granularity of how
 	 * WiredTiger maintains modification maps internally.  The larger the granularity\, the
-	 * smaller amount of information WiredTiger need to maintain., an integer between 4KB and
-	 * 2GB; default \c 16MB.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;src_id, a string that identifies a
-	 * previous checkpoint backup source as the source of this incremental backup.  This
-	 * identifier must have already been created by use of the 'this_id' configuration in an
-	 * earlier backup.  A source id is required to begin an incremental backup., a string;
+	 * smaller amount of information WiredTiger need to maintain., an integer between \c 4KB and
+	 * \c 2GB; default \c 16MB.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;src_id, a string that
+	 * identifies a previous checkpoint backup source as the source of this incremental backup.
+	 * This identifier must have already been created by use of the 'this_id' configuration in
+	 * an earlier backup.  A source id is required to begin an incremental backup., a string;
 	 * default empty.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;this_id, a string that identifies the
-	 * current system state as a future backup source for an incremental backup via 'src_id'.
+	 * current system state as a future backup source for an incremental backup via \c src_id.
 	 * This identifier is required when opening an incremental backup cursor and an error will
 	 * be returned if one is not provided.  The identifiers can be any text string\, but should
 	 * be unique., a string; default empty.}
@@ -1024,15 +1029,16 @@ struct __wt_session {
 	 * \c 0.}
 	 * @config{overwrite, configures whether the cursor's insert and update methods check the
 	 * existing state of the record.  If \c overwrite is \c false\, WT_CURSOR::insert fails with
-	 * ::WT_DUPLICATE_KEY if the record exists\, WT_CURSOR::update fails with ::WT_NOTFOUND if
-	 * the record does not exist., a boolean flag; default \c true.}
+	 * ::WT_DUPLICATE_KEY if the record exists\, and WT_CURSOR::update fails with ::WT_NOTFOUND
+	 * if the record does not exist., a boolean flag; default \c true.}
 	 * @config{raw, ignore the encodings for the key and value\, manage data as if the formats
 	 * were \c "u". See @ref cursor_raw for details., a boolean flag; default \c false.}
 	 * @config{read_once, results that are brought into cache from disk by this cursor will be
 	 * given less priority in the cache., a boolean flag; default \c false.}
 	 * @config{readonly, only query operations are supported by this cursor.  An error is
 	 * returned if a modification is attempted using the cursor.  The default is false for all
-	 * cursor types except for metadata cursors., a boolean flag; default \c false.}
+	 * cursor types except for metadata cursors and checkpoint cursors., a boolean flag; default
+	 * \c false.}
 	 * @config{statistics, Specify the statistics to be gathered.  Choosing "all" gathers
 	 * statistics regardless of cost and may include traversing on-disk files; "fast" gathers a
 	 * subset of relatively inexpensive statistics.  The selection must agree with the database
@@ -1048,8 +1054,8 @@ struct __wt_session {
 	 * See @ref statistics for more information., a list\, with values chosen from the following
 	 * options: \c "all"\, \c "cache_walk"\, \c "fast"\, \c "clear"\, \c "size"\, \c
 	 * "tree_walk"; default empty.}
-	 * @config{target, if non-empty\, backup the list of objects; valid only for a backup data
-	 * source., a list of strings; default empty.}
+	 * @config{target, if non-empty\, back up the given list of objects; valid only for a backup
+	 * data source., a list of strings; default empty.}
 	 * @configend
 	 * @param[out] cursorp a pointer to the newly opened cursor
 	 * @errors
@@ -1077,36 +1083,37 @@ struct __wt_session {
 	 * @configstart{WT_SESSION.alter, see dist/api_data.py}
 	 * @config{access_pattern_hint, It is recommended that workloads that consist primarily of
 	 * updates and/or point queries specify \c random.  Workloads that do many cursor scans
-	 * through large ranges of data specify \c sequential and other workloads specify \c none.
-	 * The option leads to an advisory call to an appropriate operating system API where
+	 * through large ranges of data should specify \c sequential and other workloads should
+	 * specify \c none.  The option leads to an appropriate operating system advisory call where
 	 * available., a string\, chosen from the following options: \c "none"\, \c "random"\, \c
 	 * "sequential"; default \c none.}
 	 * @config{app_metadata, application-owned metadata for this object., a string; default
 	 * empty.}
 	 * @config{assert = (, declare timestamp usage., a set of related configuration options
-	 * defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;read_timestamp, check timestamps are \c
-	 * always or \c never used on reads with this table\, writing an error message if policy is
-	 * violated.  If the library was built in diagnostic mode\, drop core at the failing check.,
-	 * a string\, chosen from the following options: \c "always"\, \c "never"\, \c "none";
-	 * default \c none.}
+	 * defined as follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;read_timestamp, if set\, check that
+	 * timestamps are \c always or \c never used on reads with this table\, writing an error
+	 * message if the policy is violated.  If the library was built in diagnostic mode\, drop
+	 * core at the failing check., a string\, chosen from the following options: \c "always"\,
+	 * \c "never"\, \c "none"; default \c none.}
 	 * @config{ ),,}
 	 * @config{cache_resident, do not ever evict the object's pages from cache.  Not compatible
 	 * with LSM tables; see @ref tuning_cache_resident for more information., a boolean flag;
 	 * default \c false.}
-	 * @config{log = (, the transaction log configuration for this object.  Only valid if log is
-	 * enabled in ::wiredtiger_open., a set of related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, if false\, this object has checkpoint-level
-	 * durability., a boolean flag; default \c true.}
+	 * @config{log = (, the transaction log configuration for this object.  Only valid if \c log
+	 * is enabled in ::wiredtiger_open., a set of related configuration options defined as
+	 * follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, if false\, this object has
+	 * checkpoint-level durability., a boolean flag; default \c true.}
 	 * @config{ ),,}
 	 * @config{os_cache_dirty_max, maximum dirty system buffer cache usage\, in bytes.  If
 	 * non-zero\, schedule writes for dirty blocks belonging to this object in the system buffer
 	 * cache after that many bytes from this object are written into the buffer cache., an
-	 * integer greater than or equal to 0; default \c 0.}
+	 * integer greater than or equal to \c 0; default \c 0.}
 	 * @config{os_cache_max, maximum system buffer cache usage\, in bytes.  If non-zero\, evict
 	 * object blocks from the system buffer cache after that many bytes from this object are
-	 * read or written into the buffer cache., an integer greater than or equal to 0; default \c
-	 * 0.}
+	 * read or written into the buffer cache., an integer greater than or equal to \c 0; default
+	 * \c 0.}
 	 * @config{write_timestamp_usage, describe how timestamps are expected to be used on table
 	 * modifications.  The choices are the default\, which ensures that once timestamps are used
 	 * for a key\, they are always used\, and also that multiple updates to a key never use
@@ -1135,30 +1142,30 @@ struct __wt_session {
 	 * @configstart{WT_SESSION.create, see dist/api_data.py}
 	 * @config{access_pattern_hint, It is recommended that workloads that consist primarily of
 	 * updates and/or point queries specify \c random.  Workloads that do many cursor scans
-	 * through large ranges of data specify \c sequential and other workloads specify \c none.
-	 * The option leads to an advisory call to an appropriate operating system API where
+	 * through large ranges of data should specify \c sequential and other workloads should
+	 * specify \c none.  The option leads to an appropriate operating system advisory call where
 	 * available., a string\, chosen from the following options: \c "none"\, \c "random"\, \c
 	 * "sequential"; default \c none.}
-	 * @config{allocation_size, the file unit allocation size\, in bytes\, must a power-of-two;
-	 * smaller values decrease the file space required by overflow items\, and the default value
-	 * of 4KB is a good choice absent requirements from the operating system or storage device.,
-	 * an integer between 512B and 128MB; default \c 4KB.}
+	 * @config{allocation_size, the file unit allocation size\, in bytes\, must be a power of
+	 * two; smaller values decrease the file space required by overflow items\, and the default
+	 * value of 4KB is a good choice absent requirements from the operating system or storage
+	 * device., an integer between \c 512B and \c 128MB; default \c 4KB.}
 	 * @config{app_metadata, application-owned metadata for this object., a string; default
 	 * empty.}
 	 * @config{assert = (, declare timestamp usage., a set of related configuration options
-	 * defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;read_timestamp, check timestamps are \c
-	 * always or \c never used on reads with this table\, writing an error message if policy is
-	 * violated.  If the library was built in diagnostic mode\, drop core at the failing check.,
-	 * a string\, chosen from the following options: \c "always"\, \c "never"\, \c "none";
-	 * default \c none.}
+	 * defined as follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;read_timestamp, if set\, check that
+	 * timestamps are \c always or \c never used on reads with this table\, writing an error
+	 * message if the policy is violated.  If the library was built in diagnostic mode\, drop
+	 * core at the failing check., a string\, chosen from the following options: \c "always"\,
+	 * \c "never"\, \c "none"; default \c none.}
 	 * @config{ ),,}
 	 * @config{block_allocation, configure block allocation.  Permitted values are \c "best" or
 	 * \c "first"; the \c "best" configuration uses a best-fit algorithm\, the \c "first"
 	 * configuration uses a first-available algorithm during block allocation., a string\,
 	 * chosen from the following options: \c "best"\, \c "first"; default \c best.}
 	 * @config{block_compressor, configure a compressor for file blocks.  Permitted values are
-	 * \c "none" or custom compression engine name created with WT_CONNECTION::add_compressor.
+	 * \c "none" or a custom compression engine name created with WT_CONNECTION::add_compressor.
 	 * If WiredTiger has builtin support for \c "lz4"\, \c "snappy"\, \c "zlib" or \c "zstd"
 	 * compression\, these names are also available.  See @ref compression for more
 	 * information., a string; default \c none.}
@@ -1176,7 +1183,8 @@ struct __wt_session {
 	 * stored separately\, keyed by the primary key of the table.  If no column groups are
 	 * specified\, all columns are stored together in a single file.  All value columns in the
 	 * table must appear in at least one column group.  Each column group must be created with a
-	 * separate call to WT_SESSION::create., a list of strings; default empty.}
+	 * separate call to WT_SESSION::create using a \c colgroup: URI., a list of strings; default
+	 * empty.}
 	 * @config{collator, configure custom collation for keys.  Permitted values are \c "none" or
 	 * a custom collator name created with WT_CONNECTION::add_collator., a string; default \c
 	 * none.}
@@ -1187,23 +1195,23 @@ struct __wt_session {
 	 * default empty.}
 	 * @config{dictionary, the maximum number of unique values remembered in the Btree row-store
 	 * leaf page value dictionary; see @ref file_formats_compression for more information., an
-	 * integer greater than or equal to 0; default \c 0.}
+	 * integer greater than or equal to \c 0; default \c 0.}
 	 * @config{encryption = (, configure an encryptor for file blocks.  When a table is
 	 * created\, its encryptor is not implicitly used for any related indices or column groups.,
-	 * a set of related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * keyid, An identifier that identifies a unique instance of the encryptor.  It is stored in
-	 * clear text\, and thus is available when the wiredtiger database is reopened.  On the
-	 * first use of a (name\, keyid) combination\, the WT_ENCRYPTOR::customize function is
-	 * called with the keyid as an argument., a string; default empty.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, Permitted values are \c "none" or custom encryption
-	 * engine name created with WT_CONNECTION::add_encryptor.  See @ref encryption for more
-	 * information., a string; default \c none.}
+	 * a set of related configuration options defined as follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;keyid, An identifier that identifies a unique instance of
+	 * the encryptor.  It is stored in clear text\, and thus is available when the WiredTiger
+	 * database is reopened.  On the first use of a (name\, keyid) combination\, the
+	 * WT_ENCRYPTOR::customize function is called with the keyid as an argument., a string;
+	 * default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, Permitted values are \c "none" or a
+	 * custom encryption engine name created with WT_CONNECTION::add_encryptor.  See @ref
+	 * encryption for more information., a string; default \c none.}
 	 * @config{ ),,}
 	 * @config{exclusive, fail if the object exists.  When false (the default)\, if the object
 	 * exists\, check that its settings match the specified configuration., a boolean flag;
 	 * default \c false.}
-	 * @config{extractor, configure custom extractor for indices.  Permitted values are \c
+	 * @config{extractor, configure a custom extractor for indices.  Permitted values are \c
 	 * "none" or an extractor name created with WT_CONNECTION::add_extractor., a string; default
 	 * \c none.}
 	 * @config{format, the file format., a string\, chosen from the following options: \c
@@ -1217,10 +1225,10 @@ struct __wt_session {
 	 * if the cache is already at capacity.  Only valid in conjunction with in-memory databases.
 	 * Should be used with caution - this configuration allows WiredTiger to consume memory over
 	 * the configured cache limit., a boolean flag; default \c false.}
-	 * @config{immutable, configure the index to be immutable - that is an index is not changed
-	 * by any update to a record in the table., a boolean flag; default \c false.}
+	 * @config{immutable, configure the index to be immutable -- that is\, the index is not
+	 * changed by any update to a record in the table., a boolean flag; default \c false.}
 	 * @config{import = (, configure import of an existing object into the currently running
-	 * database., a set of related configuration options defined below.}
+	 * database., a set of related configuration options defined as follows.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;compare_timestamp, allow importing files with timestamps
 	 * smaller or equal to the configured global timestamps.  Note the history of the files are
 	 * not imported together and thus snapshot read of historical data will not work with the
@@ -1239,7 +1247,7 @@ struct __wt_session {
 	 * reconstruct the metadata from the raw file content., a boolean flag; default \c false.}
 	 * @config{ ),,}
 	 * @config{internal_key_max, This option is no longer supported\, retained for backward
-	 * compatibility., an integer greater than or equal to 0; default \c 0.}
+	 * compatibility., an integer greater than or equal to \c 0; default \c 0.}
 	 * @config{internal_key_truncate, configure internal key truncation\, discarding unnecessary
 	 * trailing bytes on internal keys (ignored for custom collators)., a boolean flag; default
 	 * \c true.}
@@ -1247,51 +1255,52 @@ struct __wt_session {
 	 * must be a multiple of the allocation size and is significant for applications wanting to
 	 * avoid excessive L2 cache misses while searching the tree.  The page maximum is the bytes
 	 * of uncompressed data\, that is\, the limit is applied before any block compression is
-	 * done., an integer between 512B and 512MB; default \c 4KB.}
+	 * done., an integer between \c 512B and \c 512MB; default \c 4KB.}
 	 * @config{key_format, the format of the data packed into key items.  See @ref
 	 * schema_format_types for details.  By default\, the key_format is \c 'u' and applications
 	 * use WT_ITEM structures to manipulate raw byte arrays.  By default\, records are stored in
 	 * row-store files: keys of type \c 'r' are record numbers and records referenced by record
 	 * number are stored in column-store files., a format string; default \c u.}
 	 * @config{key_gap, This option is no longer supported\, retained for backward
-	 * compatibility., an integer greater than or equal to 0; default \c 10.}
+	 * compatibility., an integer greater than or equal to \c 0; default \c 10.}
 	 * @config{leaf_key_max, the largest key stored in a leaf node\, in bytes.  If set\, keys
 	 * larger than the specified size are stored as overflow items (which may require additional
 	 * I/O to access). The default value is one-tenth the size of a newly split leaf page., an
-	 * integer greater than or equal to 0; default \c 0.}
+	 * integer greater than or equal to \c 0; default \c 0.}
 	 * @config{leaf_page_max, the maximum page size for leaf nodes\, in bytes; the size must be
 	 * a multiple of the allocation size\, and is significant for applications wanting to
 	 * maximize sequential data transfer from a storage device.  The page maximum is the bytes
 	 * of uncompressed data\, that is\, the limit is applied before any block compression is
 	 * done.  For fixed-length column store\, the size includes only the bitmap data; pages
 	 * containing timestamp information can be larger\, and the size is limited to 128KB rather
-	 * than 512MB., an integer between 512B and 512MB; default \c 32KB.}
+	 * than 512MB., an integer between \c 512B and \c 512MB; default \c 32KB.}
 	 * @config{leaf_value_max, the largest value stored in a leaf node\, in bytes.  If set\,
 	 * values larger than the specified size are stored as overflow items (which may require
 	 * additional I/O to access). If the size is larger than the maximum leaf page size\, the
 	 * page size is temporarily ignored when large values are written.  The default is one-half
-	 * the size of a newly split leaf page., an integer greater than or equal to 0; default \c
-	 * 0.}
-	 * @config{log = (, the transaction log configuration for this object.  Only valid if log is
-	 * enabled in ::wiredtiger_open., a set of related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, if false\, this object has checkpoint-level
-	 * durability., a boolean flag; default \c true.}
+	 * the size of a newly split leaf page., an integer greater than or equal to \c 0; default
+	 * \c 0.}
+	 * @config{log = (, the transaction log configuration for this object.  Only valid if \c log
+	 * is enabled in ::wiredtiger_open., a set of related configuration options defined as
+	 * follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, if false\, this object has
+	 * checkpoint-level durability., a boolean flag; default \c true.}
 	 * @config{ ),,}
 	 * @config{lsm = (, options only relevant for LSM data sources., a set of related
-	 * configuration options defined below.}
+	 * configuration options defined as follows.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;auto_throttle,
 	 * Throttle inserts into LSM trees if flushing to disk isn't keeping up., a boolean flag;
 	 * default \c true.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom, create bloom filters on LSM tree
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom, create Bloom filters on LSM tree
 	 * chunks as they are merged., a boolean flag; default \c true.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_bit_count, the number of bits used per item for LSM
-	 * bloom filters., an integer between 2 and 1000; default \c 16.}
+	 * Bloom filters., an integer between \c 2 and \c 1000; default \c 16.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_config, config string used when creating Bloom
 	 * filter files\, passed to WT_SESSION::create., a string; default empty.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_hash_count, the number of hash values per item used
-	 * for LSM bloom filters., an integer between 2 and 100; default \c 8.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_oldest, create a bloom filter on the oldest LSM
-	 * tree chunk.  Only supported if bloom filters are enabled., a boolean flag; default \c
+	 * for LSM Bloom filters., an integer between \c 2 and \c 100; default \c 8.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_oldest, create a Bloom filter on the oldest LSM
+	 * tree chunk.  Only supported if Bloom filters are enabled., a boolean flag; default \c
 	 * false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_count_limit, the maximum number of chunks
 	 * to allow in an LSM tree.  This option automatically times out old data.  As new chunks
@@ -1300,58 +1309,59 @@ struct __wt_session {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_max, the
 	 * maximum size a single chunk can be.  Chunks larger than this size are not considered for
 	 * further merges.  This is a soft limit\, and chunks larger than this value can be created.
-	 * Must be larger than chunk_size., an integer between 100MB and 10TB; default \c 5GB.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_size, the maximum size of the in-memory chunk of an
-	 * LSM tree.  This limit is soft\, it is possible for chunks to be temporarily larger than
-	 * this value.  This overrides the \c memory_page_max setting., an integer between 512K and
-	 * 500MB; default \c 10MB.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_custom = (, configure the
-	 * tree to merge into a custom data source., a set of related configuration options defined
-	 * below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;prefix, custom data
-	 * source prefix instead of \c "file"., a string; default empty.}
+	 * Must be larger than chunk_size., an integer between \c 100MB and \c 10TB; default \c
+	 * 5GB.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_size, the maximum size of the in-memory chunk
+	 * of an LSM tree.  This limit is soft\, it is possible for chunks to be temporarily larger
+	 * than this value.  This overrides the \c memory_page_max setting., an integer between \c
+	 * 512K and \c 500MB; default \c 10MB.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_custom = (,
+	 * configure the tree to merge into a custom data source., a set of related configuration
+	 * options defined as follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+	 * prefix, custom data source prefix instead of \c "file"., a string; default empty.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;start_generation, merge
 	 * generation at which the custom data source is used (zero indicates no custom data
-	 * source)., an integer between 0 and 10; default \c 0.}
+	 * source)., an integer between \c 0 and \c 10; default \c 0.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;suffix, custom data source suffix
 	 * instead of \c ".lsm"., a string; default empty.}
-	 * @config{ ),,}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp; ),,}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_max, the maximum number of chunks to include in a
-	 * merge operation., an integer between 2 and 100; default \c 15.}
+	 * merge operation., an integer between \c 2 and \c 100; default \c 15.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_min, the minimum number of chunks to include in a
 	 * merge operation.  If set to 0 or 1 half the value of merge_max is used., an integer no
-	 * more than 100; default \c 0.}
+	 * more than \c 100; default \c 0.}
 	 * @config{ ),,}
 	 * @config{memory_page_image_max, the maximum in-memory page image represented by a single
 	 * storage block.  Depending on compression efficiency\, compression can create storage
 	 * blocks which require significant resources to re-instantiate in the cache\, penalizing
 	 * the performance of future point updates.  The value limits the maximum in-memory page
 	 * image a storage block will need.  If set to 0\, a default of 4 times \c leaf_page_max is
-	 * used., an integer greater than or equal to 0; default \c 0.}
+	 * used., an integer greater than or equal to \c 0; default \c 0.}
 	 * @config{memory_page_max, the maximum size a page can grow to in memory before being
 	 * reconciled to disk.  The specified size will be adjusted to a lower bound of
 	 * <code>leaf_page_max</code>\, and an upper bound of <code>cache_size / 10</code>. This
 	 * limit is soft - it is possible for pages to be temporarily larger than this value.  This
-	 * setting is ignored for LSM trees\, see \c chunk_size., an integer between 512B and 10TB;
-	 * default \c 5MB.}
+	 * setting is ignored for LSM trees\, see \c chunk_size., an integer between \c 512B and \c
+	 * 10TB; default \c 5MB.}
 	 * @config{os_cache_dirty_max, maximum dirty system buffer cache usage\, in bytes.  If
 	 * non-zero\, schedule writes for dirty blocks belonging to this object in the system buffer
 	 * cache after that many bytes from this object are written into the buffer cache., an
-	 * integer greater than or equal to 0; default \c 0.}
+	 * integer greater than or equal to \c 0; default \c 0.}
 	 * @config{os_cache_max, maximum system buffer cache usage\, in bytes.  If non-zero\, evict
 	 * object blocks from the system buffer cache after that many bytes from this object are
-	 * read or written into the buffer cache., an integer greater than or equal to 0; default \c
-	 * 0.}
+	 * read or written into the buffer cache., an integer greater than or equal to \c 0; default
+	 * \c 0.}
 	 * @config{prefix_compression, configure prefix compression on row-store leaf pages., a
 	 * boolean flag; default \c false.}
 	 * @config{prefix_compression_min, minimum gain before prefix compression will be used on
-	 * row-store leaf pages., an integer greater than or equal to 0; default \c 4.}
+	 * row-store leaf pages., an integer greater than or equal to \c 0; default \c 4.}
 	 * @config{split_pct, the Btree page split size as a percentage of the maximum Btree page
 	 * size\, that is\, when a Btree page is split\, it will be split into smaller pages\, where
 	 * each page is the specified percentage of the maximum Btree page size., an integer between
-	 * 50 and 100; default \c 90.}
+	 * \c 50 and \c 100; default \c 90.}
 	 * @config{tiered_storage = (, configure a storage source for this table., a set of related
-	 * configuration options defined below.}
+	 * configuration options defined as follows.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;auth_token,
 	 * authentication string identifier., a string; default empty.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bucket, the bucket indicating the location for this
@@ -1364,8 +1374,8 @@ struct __wt_session {
 	 * directory., a string; default empty.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;local_retention,
 	 * time in seconds to retain data on tiered storage on the local tier for faster read
-	 * access., an integer between 0 and 10000; default \c 300.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, permitted values are \c "none" or custom storage
+	 * access., an integer between \c 0 and \c 10000; default \c 300.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, permitted values are \c "none" or a custom storage
 	 * source name created with WT_CONNECTION::add_storage_source.  See @ref
 	 * custom_storage_sources for more information., a string; default \c none.}
 	 * @config{ ),,}
@@ -1465,27 +1475,27 @@ struct __wt_session {
 	 * finished with it, although not before the join_cursor is closed.
 	 *
 	 * @configstart{WT_SESSION.join, see dist/api_data.py}
-	 * @config{bloom_bit_count, the number of bits used per item for the bloom filter., an
-	 * integer between 2 and 1000; default \c 16.}
-	 * @config{bloom_false_positives, return all values that pass the bloom filter\, without
+	 * @config{bloom_bit_count, the number of bits used per item for the Bloom filter., an
+	 * integer between \c 2 and \c 1000; default \c 16.}
+	 * @config{bloom_false_positives, return all values that pass the Bloom filter\, without
 	 * eliminating any false positives., a boolean flag; default \c false.}
-	 * @config{bloom_hash_count, the number of hash values per item for the bloom filter., an
-	 * integer between 2 and 100; default \c 8.}
+	 * @config{bloom_hash_count, the number of hash values per item for the Bloom filter., an
+	 * integer between \c 2 and \c 100; default \c 8.}
 	 * @config{compare, modifies the set of items to be returned so that the index key satisfies
 	 * the given comparison relative to the key set in this cursor., a string\, chosen from the
 	 * following options: \c "eq"\, \c "ge"\, \c "gt"\, \c "le"\, \c "lt"; default \c "eq".}
 	 * @config{count, set an approximate count of the elements that would be included in the
-	 * join.  This is used in sizing the bloom filter\, and also influences evaluation order for
-	 * cursors in the join.  When the count is equal for multiple bloom filters in a composition
-	 * of joins\, the bloom filter may be shared., an integer; default \c .}
+	 * join.  This is used in sizing the Bloom filter\, and also influences evaluation order for
+	 * cursors in the join.  When the count is equal for multiple Bloom filters in a composition
+	 * of joins\, the Bloom filter may be shared., an integer; default \c 0.}
 	 * @config{operation, the operation applied between this and other joined cursors.  When
 	 * "operation=and" is specified\, all the conditions implied by joins must be satisfied for
 	 * an entry to be returned by the join cursor; when "operation=or" is specified\, only one
 	 * must be satisfied.  All cursors joined to a join cursor must have matching operations., a
 	 * string\, chosen from the following options: \c "and"\, \c "or"; default \c "and".}
-	 * @config{strategy, when set to bloom\, a bloom filter is created and populated for this
+	 * @config{strategy, when set to \c bloom\, a Bloom filter is created and populated for this
 	 * index.  This has an up front cost but may reduce the number of accesses to the main table
-	 * when iterating the joined cursor.  The bloom setting requires that count be set., a
+	 * when iterating the joined cursor.  The \c bloom setting requires that \c count be set., a
 	 * string\, chosen from the following options: \c "bloom"\, \c "default"; default empty.}
 	 * @configend
 	 * @errors
@@ -1556,16 +1566,16 @@ struct __wt_session {
 	/*!
 	 * Salvage a table.
 	 *
-	 * Salvage rebuilds the file, or files of which a table is comprised,
+	 * Salvage rebuilds the file or files which comprise a table,
 	 * discarding any corrupted file blocks.
 	 *
-	 * Previously deleted records may re-appear, and inserted records may
-	 * disappear, when salvage is done, so salvage should not be run
+	 * When salvage is done, previously deleted records may re-appear, and
+	 * inserted records may disappear, so salvage should not be run
 	 * unless it is known to be necessary.  Normally, salvage should be
 	 * called after a table or file has been corrupted, as reported by the
 	 * WT_SESSION::verify method.
 	 *
-	 * Files are rebuilt in place, the salvage method overwrites the
+	 * Files are rebuilt in place. The salvage method overwrites the
 	 * existing files.
 	 *
 	 * @exclusive
@@ -1593,7 +1603,10 @@ struct __wt_session {
 	 * it is not required the cursor reference a record in the object, only
 	 * that the key be set.  This allows applications to discard portions of
 	 * the object name space without knowing exactly what records the object
-	 * contains.
+	 * contains. The start and stop points are both inclusive; that is, the
+	 * key set in the start cursor is the first record to be deleted and the
+	 * key set in the stop cursor is the last.
+	 *
 	 * @snippet ex_all.c Truncate a range
 	 *
 	 * Range truncate is implemented as a "scan and write" operation, specifically without range
@@ -1608,7 +1621,7 @@ struct __wt_session {
 	 * the WT_CURSOR::next (WT_CURSOR::prev) method will iterate from the
 	 * beginning (end) of the table.
 	 *
-	 * Truncate a backup cursor.  This operation removes all log files that
+	 * Example: truncate a backup cursor.  This operation removes all log files that
 	 * have been returned by the backup cursor.  It can be used to remove log
 	 * files after copying them during @ref backup_incremental.
 	 * @snippet ex_backup.c Truncate a backup cursor
@@ -1648,9 +1661,8 @@ struct __wt_session {
 	/*!
 	 * Verify a table.
 	 *
-	 * Verify reports if a file, or the files of which a table is
-	 * comprised, have been corrupted.  The WT_SESSION::salvage method
-	 * can be used to repair a corrupted file,
+	 * Verify reports if a file, or the files that comprise a table, have been corrupted.
+	 * The WT_SESSION::salvage method can be used to repair a corrupted file.
 	 *
 	 * @snippet ex_all.c Verify a table
 	 *
@@ -1709,9 +1721,9 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @configstart{WT_SESSION.begin_transaction, see dist/api_data.py}
-	 * @config{ignore_prepare, whether to ignore the updates by other prepared transactions as
-	 * part of read operations of this transaction.  When \c true\, forces the transaction to be
-	 * read-only.  Use \c force to ignore prepared updates and permit writes (see @ref
+	 * @config{ignore_prepare, whether to ignore updates by other prepared transactions when
+	 * doing of read operations of this transaction.  When \c true\, forces the transaction to
+	 * be read-only.  Use \c force to ignore prepared updates and permit writes (see @ref
 	 * timestamp_prepare_ignore_prepare for more information)., a string\, chosen from the
 	 * following options: \c "false"\, \c "force"\, \c "true"; default \c false.}
 	 * @config{isolation, the isolation level for this transaction; defaults to the session's
@@ -1719,25 +1731,26 @@ struct __wt_session {
 	 * \c "read-committed"\, \c "snapshot"; default empty.}
 	 * @config{name, name of the transaction for tracing and debugging., a string; default
 	 * empty.}
-	 * @config{no_timestamp, allow a commit without a timestamp\, creating a value that has
-	 * "always existed" and is visible regardless of timestamp.  See @ref timestamp_txn_api., a
+	 * @config{no_timestamp, allow a commit without a timestamp\, creating values that have
+	 * "always existed" and are visible regardless of timestamp.  See @ref timestamp_txn_api., a
 	 * boolean flag; default \c false.}
 	 * @config{operation_timeout_ms, when non-zero\, a requested limit on the time taken to
 	 * complete operations in this transaction.  Time is measured in real time milliseconds from
 	 * the start of each WiredTiger API call.  There is no guarantee any operation will not take
 	 * longer than this amount of time.  If WiredTiger notices the limit has been exceeded\, an
 	 * operation may return a WT_ROLLBACK error.  Default is to have no limit., an integer
-	 * greater than or equal to 1; default \c 0.}
+	 * greater than or equal to \c 1; default \c 0.}
 	 * @config{priority, priority of the transaction for resolving conflicts.  Transactions with
-	 * higher values are less likely to abort., an integer between -100 and 100; default \c 0.}
+	 * higher values are less likely to abort., an integer between \c -100 and \c 100; default
+	 * \c 0.}
 	 * @config{read_timestamp, read using the specified timestamp.  The value must not be older
 	 * than the current oldest timestamp.  See @ref timestamp_txn_api., a string; default
 	 * empty.}
 	 * @config{roundup_timestamps = (, round up timestamps of the transaction., a set of related
-	 * configuration options defined below.}
+	 * configuration options defined as follows.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;prepared,
-	 * applicable only for prepared transactions\, and intended only for special-purpose use\,
-	 * see @ref timestamp_prepare_roundup.  Allows the prepare timestamp and the commit
+	 * applicable only for prepared transactions\, and intended only for special-purpose use.
+	 * See @ref timestamp_prepare_roundup.  Allows the prepare timestamp and the commit
 	 * timestamp of this transaction to be rounded up to be no older than the oldest timestamp\,
 	 * and allows violating the usual restriction that the prepare timestamp must be newer than
 	 * the stable timestamp.  Specifically: at transaction prepare\, if the prepare timestamp is
@@ -1748,7 +1761,7 @@ struct __wt_session {
 	 * timestamp., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;read, if
 	 * the read timestamp is less than the oldest timestamp\, the read timestamp will be rounded
-	 * up to the oldest timestamp\, see @ref timestamp_read_roundup., a boolean flag; default \c
+	 * up to the oldest timestamp.  See @ref timestamp_read_roundup., a boolean flag; default \c
 	 * false.}
 	 * @config{ ),,}
 	 * @config{sync, whether to sync log records when the transaction commits\, inherited from
@@ -1773,11 +1786,11 @@ struct __wt_session {
 	 * @param session the session handle
 	 * @configstart{WT_SESSION.commit_transaction, see dist/api_data.py}
 	 * @config{commit_timestamp, set the commit timestamp for the current transaction.  For
-	 * non-prepared transactions\, value must not be older than the first commit timestamp
-	 * already set for the current transaction\, if any\, must not be older than the current
-	 * oldest timestamp and must be after the current stable timestamp.  For prepared
+	 * non-prepared transactions\, the value must not be older than the first commit timestamp
+	 * already set for the current transaction (if any)\, must not be older than the current
+	 * oldest timestamp\, and must be after the current stable timestamp.  For prepared
 	 * transactions\, a commit timestamp is required\, must not be older than the prepare
-	 * timestamp and can be set only once.  See @ref timestamp_txn_api and @ref
+	 * timestamp\, and can be set only once.  See @ref timestamp_txn_api and @ref
 	 * timestamp_prepare., a string; default empty.}
 	 * @config{durable_timestamp, set the durable timestamp for the current transaction.
 	 * Required for the commit of a prepared transaction\, and otherwise not permitted.  The
@@ -1788,12 +1801,12 @@ struct __wt_session {
 	 * the start of each WiredTiger API call.  There is no guarantee any operation will not take
 	 * longer than this amount of time.  If WiredTiger notices the limit has been exceeded\, an
 	 * operation may return a WT_ROLLBACK error.  Default is to have no limit., an integer
-	 * greater than or equal to 1; default \c 0.}
-	 * @config{sync, override whether to sync log records when the transaction commits\,
-	 * inherited from ::wiredtiger_open \c transaction_sync.  The \c off setting does not wait
-	 * for records to be written or synchronized.  The \c on setting forces log records to be
-	 * written to the storage device., a string\, chosen from the following options: \c "off"\,
-	 * \c "on"; default empty.}
+	 * greater than or equal to \c 1; default \c 0.}
+	 * @config{sync, override whether to sync log records when the transaction commits.  The
+	 * default is inherited from ::wiredtiger_open \c transaction_sync.  The \c off setting does
+	 * not wait for records to be written or synchronized.  The \c on setting forces log records
+	 * to be written to the storage device., a string\, chosen from the following options: \c
+	 * "off"\, \c "on"; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1843,7 +1856,7 @@ struct __wt_session {
 	 * the start of each WiredTiger API call.  There is no guarantee any operation will not take
 	 * longer than this amount of time.  If WiredTiger notices the limit has been exceeded\, an
 	 * operation may return a WT_ROLLBACK error.  Default is to have no limit., an integer
-	 * greater than or equal to 1; default \c 0.}
+	 * greater than or equal to \c 1; default \c 0.}
 	 * @configend
 	 * @errors
 	 */
@@ -1952,7 +1965,7 @@ struct __wt_session {
 	 * durability are always included in the checkpoint. See @ref durability_checkpoint and
 	 * @ref durability_log for more information.
 	 *
-	 * Calling the checkpoint method multiple times serializes the checkpoints, new checkpoint
+	 * Calling the checkpoint method multiple times serializes the checkpoints; new checkpoint
 	 * calls wait for running checkpoint calls to complete.
 	 *
 	 * Existing named checkpoints may optionally be discarded.
@@ -1971,12 +1984,12 @@ struct __wt_session {
 	 * checkpoints created prior to the start of the backup cannot be dropped., a list of
 	 * strings; default empty.}
 	 * @config{force, if false (the default)\, checkpoints may be skipped if the underlying
-	 * object has not been modified\, if true\, this option forces the checkpoint., a boolean
+	 * object has not been modified.  If true\, this option forces the checkpoint., a boolean
 	 * flag; default \c false.}
 	 * @config{name, if set\, specify a name for the checkpoint (note that checkpoints including
 	 * LSM trees may not be named)., a string; default empty.}
 	 * @config{target, if non-empty\, checkpoint the list of objects.  Checkpointing a list of
-	 * objects separately from a database-wide checkpoint can lead to data inconsistencies\, see
+	 * objects separately from a database-wide checkpoint can lead to data inconsistencies; see
 	 * @ref checkpoint_target for more information., a list of strings; default empty.}
 	 * @config{use_timestamp, if true (the default)\, create the checkpoint as of the last
 	 * stable timestamp if timestamps are in use\, or with all committed updates if there is no
@@ -1988,16 +2001,16 @@ struct __wt_session {
 	int __F(checkpoint)(WT_SESSION *session, const char *config);
 
 	/*!
-	 * Reset the snapshot.
+	 * Reset the snapshot used for database visibility.
 	 *
-	 * This method resets snapshots for snapshot isolation transactions to update their existing
-	 * snapshot. It raises an error when this API is used in an isolation other than snapshot,
-	 * or when the transaction has performed any write operations.
-	 *
-	 * This API internally releases the current snapshot and gets the new running transactions
-	 * snapshot to avoid pinning the content in the database that is no longer needed.
+	 * For transactions running with snapshot isolation, this method releases the existing
+	 * snapshot of the database and gets a new one. This makes newer commits visible. The
+	 * call can be used to avoid pinning old and no-longer-needed content in the database.
 	 * Applications not using read timestamps for search may see different results after the
 	 * snapshot is updated.
+	 *
+ 	 * It is an error to call this method when using an isolation level other than snapshot
+	 * isolation, or if the current transaction has already written any data.
 	 *
 	 * @requires_transaction
 	 *
@@ -2011,9 +2024,9 @@ struct __wt_session {
 	/*!
 	 * Return the transaction ID range pinned by the session handle.
 	 *
-	 * The ID range is approximate and is calculated based on the oldest
-	 * ID needed for the active transaction in this session, compared
-	 * to the newest transaction in the system.
+	 * The ID range is an approximate count of transactions and is calculated
+	 * based on the oldest ID needed for the active transaction in this session,
+	 * compared to the newest transaction in the system.
 	 *
 	 * @snippet ex_all.c transaction pinned range
 	 *
@@ -2060,8 +2073,8 @@ struct __wt_session {
  * will communicate with the first process over a socket connection to perform
  * their operations.
  *
- * <b>Thread safety:</b> A WT_CONNECTION handle may be shared between threads,
- * see @ref threads for more information.
+ * <b>Thread safety:</b> A WT_CONNECTION handle may be shared between threads.
+ * See @ref threads for more information.
  */
 struct __wt_connection {
 	/*!
@@ -2115,10 +2128,10 @@ struct __wt_connection {
 	 * @param connection the connection handle
 	 * @configstart{WT_CONNECTION.reconfigure, see dist/api_data.py}
 	 * @config{block_cache = (, block cache configuration options., a set of related
-	 * configuration options defined below.}
+	 * configuration options defined as follows.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
 	 * blkcache_eviction_aggression, seconds an unused block remains in the cache before it is
-	 * evicted., an integer between 1 and 7200; default \c 1800.}
+	 * evicted., an integer between \c 1 and \c 7200; default \c 1800.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;cache_on_checkpoint, cache blocks written by a
 	 * checkpoint., a boolean flag; default \c true.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
@@ -2128,104 +2141,102 @@ struct __wt_connection {
 	 * cache., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;full_target,
 	 * the fraction of the block cache that must be full before eviction will remove unused
-	 * blocks., an integer between 30 and 100; default \c 95.}
+	 * blocks., an integer between \c 30 and \c 100; default \c 95.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;hashsize, number of buckets in the hashtable that keeps
+	 * track of blocks., an integer between \c 512 and \c 256K; default \c 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;max_percent_overhead, maximum tolerated overhead
+	 * expressed as the number of blocks added and removed as percent of blocks looked up; cache
+	 * population and eviction will be suppressed if the overhead exceeds the threshold., an
+	 * integer between \c 1 and \c 500; default \c 10.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * hashsize, number of buckets in the hashtable that keeps track of blocks., an integer
-	 * between 512 and 256K; default \c 0.}
+	 * nvram_path, the absolute path to the file system mounted on the NVRAM device., a string;
+	 * default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;percent_file_in_dram, bypass cache for a
+	 * file if the set percentage of the file fits in system DRAM (as specified by
+	 * block_cache.system_ram)., an integer between \c 0 and \c 100; default \c 50.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for the block cache., an
+	 * integer between \c 0 and \c 10TB; default \c 0.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * max_percent_overhead, maximum tolerated overhead expressed as the number of blocks added
-	 * and removed as percent of blocks looked up; cache population and eviction will be
-	 * suppressed if the overhead exceeds the threshold., an integer between 1 and 500; default
-	 * \c 10.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;nvram_path, the absolute path to the file system
-	 * mounted on the NVRAM device., a string; default empty.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * percent_file_in_dram, bypass cache for a file if the set percentage of the file fits in
-	 * system DRAM (as specified by block_cache.system_ram)., an integer between 0 and 100;
-	 * default \c 50.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for the
-	 * block cache., an integer between 0 and 10TB; default \c 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;system_ram, the bytes of system DRAM available for
-	 * caching filesystem blocks., an integer between 0 and 1024GB; default \c 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;type, cache location: DRAM or NVRAM., a string; default
-	 * empty.}
+	 * system_ram, the bytes of system DRAM available for caching filesystem blocks., an integer
+	 * between \c 0 and \c 1024GB; default \c 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;type, cache
+	 * location: DRAM or NVRAM., a string; default empty.}
 	 * @config{ ),,}
 	 * @config{cache_max_wait_ms, the maximum number of milliseconds an application thread will
 	 * wait for space to be available in cache before giving up.  Default will wait forever., an
-	 * integer greater than or equal to 0; default \c 0.}
+	 * integer greater than or equal to \c 0; default \c 0.}
 	 * @config{cache_overhead, assume the heap allocator overhead is the specified percentage\,
 	 * and adjust the cache usage by that amount (for example\, if there is 10GB of data in
 	 * cache\, a percentage of 10 means WiredTiger treats this as 11GB). This value is
 	 * configurable because different heap allocators have different overhead and different
 	 * workloads will have different heap allocation sizes and patterns\, therefore applications
 	 * may need to adjust this value based on allocator choice and behavior in measured
-	 * workloads., an integer between 0 and 30; default \c 8.}
+	 * workloads., an integer between \c 0 and \c 30; default \c 8.}
 	 * @config{cache_size, maximum heap memory to allocate for the cache.  A database should
-	 * configure either \c cache_size or \c shared_cache but not both., an integer between 1MB
-	 * and 10TB; default \c 100MB.}
+	 * configure either \c cache_size or \c shared_cache but not both., an integer between \c
+	 * 1MB and \c 10TB; default \c 100MB.}
 	 * @config{checkpoint = (, periodically checkpoint the database.  Enabling the checkpoint
-	 * server uses a session from the configured session_max., a set of related configuration
-	 * options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_size, wait for this amount of
-	 * log record bytes to be written to the log between each checkpoint.  If non-zero\, this
-	 * value will use a minimum of the log file size.  A database can configure both log_size
-	 * and wait to set an upper bound for checkpoints; setting this value above 0 configures
-	 * periodic checkpoints., an integer between 0 and 2GB; default \c 0.}
+	 * server uses a session from the configured \c session_max., a set of related configuration
+	 * options defined as follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_size, wait for this
+	 * amount of log record bytes to be written to the log between each checkpoint.  If
+	 * non-zero\, this value will use a minimum of the log file size.  A database can configure
+	 * both log_size and wait to set an upper bound for checkpoints; setting this value above 0
+	 * configures periodic checkpoints., an integer between \c 0 and \c 2GB; default \c 0.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each checkpoint; setting
-	 * this value above 0 configures periodic checkpoints., an integer between 0 and 100000;
-	 * default \c 0.}
+	 * this value above 0 configures periodic checkpoints., an integer between \c 0 and \c
+	 * 100000; default \c 0.}
 	 * @config{ ),,}
 	 * @config{compatibility = (, set compatibility version of database.  Changing the
 	 * compatibility version requires that there are no active operations for the duration of
-	 * the call., a set of related configuration options defined below.}
+	 * the call., a set of related configuration options defined as follows.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;release, compatibility release version string., a string;
 	 * default empty.}
 	 * @config{ ),,}
 	 * @config{debug_mode = (, control the settings of various extended debugging features., a
-	 * set of related configuration options defined below.}
+	 * set of related configuration options defined as follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;checkpoint_retention, adjust log removal to retain the
+	 * log records of this number of checkpoints.  Zero or one means perform normal removal., an
+	 * integer between \c 0 and \c 1024; default \c 0.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * checkpoint_retention, adjust log removal to retain the log records of this number of
-	 * checkpoints.  Zero or one means perform normal removal., an integer between 0 and 1024;
-	 * default \c 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;corruption_abort, if true and built in
-	 * diagnostic mode\, dump core in the case of data corruption., a boolean flag; default \c
-	 * true.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;cursor_copy, if true\, use the system allocator to
-	 * make a copy of any data returned by a cursor operation and return the copy instead.  The
-	 * copy is freed on the next cursor operation.  This allows memory sanitizers to detect
-	 * inappropriate references to memory owned by cursors., a boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;cursor_reposition, if true\, for the operations with
-	 * snapshot isolation the cursor temporarily releases the page that requires force
-	 * eviction\, then repositions back to the page for further operations.  A page release
-	 * encourages eviction of hot or large pages\, which is more likely to succeed without a
-	 * cursor keeping the page pinned., a boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;eviction, if true\, modify internal algorithms to change
-	 * skew to force history store eviction to happen more aggressively.  This includes but is
-	 * not limited to not skewing newest\, not favoring leaf pages\, and modifying the eviction
-	 * score mechanism., a boolean flag; default \c false.}
+	 * corruption_abort, if true and built in diagnostic mode\, dump core in the case of data
+	 * corruption., a boolean flag; default \c true.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * flush_checkpoint, if true\, call a system wide checkpoint immediately after a flush_tier
-	 * completes to force objects out to disk so that a flush_tier can work single-threaded., a
-	 * boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_retention, adjust
-	 * log removal to retain at least this number of log files\, ignored if set to 0. (Warning:
-	 * this option can remove log files required for recovery if no checkpoints have yet been
-	 * done and the number of log files exceeds the configured value.  As WiredTiger cannot
-	 * detect the difference between a system that has not yet checkpointed and one that will
-	 * never checkpoint\, it might discard log files before any checkpoint is done.)., an
-	 * integer between 0 and 1024; default \c 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact,
-	 * if true\, reallocation of memory will only provide the exact amount requested.  This will
-	 * help with spotting memory allocation issues more easily., a boolean flag; default \c
-	 * false.}
+	 * cursor_copy, if true\, use the system allocator to make a copy of any data returned by a
+	 * cursor operation and return the copy instead.  The copy is freed on the next cursor
+	 * operation.  This allows memory sanitizers to detect inappropriate references to memory
+	 * owned by cursors., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+	 * cursor_reposition, if true\, for operations with snapshot isolation the cursor
+	 * temporarily releases any page that requires force eviction\, then repositions back to the
+	 * page for further operations.  A page release encourages eviction of hot or large pages\,
+	 * which is more likely to succeed without a cursor keeping the page pinned., a boolean
+	 * flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;eviction, if true\, modify
+	 * internal algorithms to change skew to force history store eviction to happen more
+	 * aggressively.  This includes but is not limited to not skewing newest\, not favoring leaf
+	 * pages\, and modifying the eviction score mechanism., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;flush_checkpoint, if true\, call a system wide checkpoint
+	 * immediately after a flush_tier completes to force objects out to disk so that a
+	 * flush_tier can work single-threaded., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_retention, adjust log removal to retain at least this
+	 * number of log files.  (Warning: this option can remove log files required for recovery if
+	 * no checkpoints have yet been done and the number of log files exceeds the configured
+	 * value.  As WiredTiger cannot detect the difference between a system that has not yet
+	 * checkpointed and one that will never checkpoint\, it might discard log files before any
+	 * checkpoint is done.) Ignored if set to 0., an integer between \c 0 and \c 1024; default
+	 * \c 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact, if true\, reallocation of memory
+	 * will only provide the exact amount requested.  This will help with spotting memory
+	 * allocation issues more easily., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a WT_ROLLBACK error from a
 	 * transaction operation about every Nth operation to simulate a collision., an integer
-	 * between 0 and 10M; default \c 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;slow_checkpoint, if
-	 * true\, slow down checkpoint creation by slowing down internal page processing., a boolean
-	 * flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if true\, write
-	 * transaction related information to the log for all operations\, even operations for
+	 * between \c 0 and \c 10M; default \c 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;slow_checkpoint,
+	 * if true\, slow down checkpoint creation by slowing down internal page processing., a
+	 * boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if true\,
+	 * write transaction related information to the log for all operations\, even operations for
 	 * tables with logging turned off.  This additional logging information is intended for
 	 * debugging and is informational only\, that is\, it is ignored during recovery., a boolean
 	 * flag; default \c false.}
@@ -2235,122 +2246,123 @@ struct __wt_connection {
 	 * @config{ ),,}
 	 * @config{error_prefix, prefix string for error messages., a string; default empty.}
 	 * @config{eviction = (, eviction configuration options., a set of related configuration
-	 * options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of
-	 * threads WiredTiger will start to help evict pages from cache.  The number of threads
+	 * options defined as follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number
+	 * of threads WiredTiger will start to help evict pages from cache.  The number of threads
 	 * started will vary depending on the current eviction load.  Each eviction worker thread
-	 * uses a session from the configured session_max., an integer between 1 and 20; default \c
-	 * 8.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum number of threads WiredTiger
-	 * will start to help evict pages from cache.  The number of threads currently running will
-	 * vary depending on the current eviction load., an integer between 1 and 20; default \c 1.}
+	 * uses a session from the configured session_max., an integer between \c 1 and \c 20;
+	 * default \c 8.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum number of threads
+	 * WiredTiger will start to help evict pages from cache.  The number of threads currently
+	 * running will vary depending on the current eviction load., an integer between \c 1 and \c
+	 * 20; default \c 1.}
 	 * @config{ ),,}
 	 * @config{eviction_checkpoint_target, perform eviction at the beginning of checkpoints to
 	 * bring the dirty content in cache to this level.  It is a percentage of the cache size if
 	 * the value is within the range of 0 to 100 or an absolute size when greater than 100. The
 	 * value is not allowed to exceed the \c cache_size.  Ignored if set to zero., an integer
-	 * between 0 and 10TB; default \c 1.}
+	 * between \c 0 and \c 10TB; default \c 1.}
 	 * @config{eviction_dirty_target, perform eviction in worker threads when the cache contains
 	 * at least this much dirty content.  It is a percentage of the cache size if the value is
 	 * within the range of 1 to 100 or an absolute size when greater than 100. The value is not
 	 * allowed to exceed the \c cache_size and has to be lower than its counterpart \c
-	 * eviction_dirty_trigger., an integer between 1 and 10TB; default \c 5.}
+	 * eviction_dirty_trigger., an integer between \c 1 and \c 10TB; default \c 5.}
 	 * @config{eviction_dirty_trigger, trigger application threads to perform eviction when the
 	 * cache contains at least this much dirty content.  It is a percentage of the cache size if
 	 * the value is within the range of 1 to 100 or an absolute size when greater than 100. The
 	 * value is not allowed to exceed the \c cache_size and has to be greater than its
 	 * counterpart \c eviction_dirty_target.  This setting only alters behavior if it is lower
-	 * than eviction_trigger., an integer between 1 and 10TB; default \c 20.}
+	 * than eviction_trigger., an integer between \c 1 and \c 10TB; default \c 20.}
 	 * @config{eviction_target, perform eviction in worker threads when the cache contains at
 	 * least this much content.  It is a percentage of the cache size if the value is within the
 	 * range of 10 to 100 or an absolute size when greater than 100. The value is not allowed to
 	 * exceed the \c cache_size and has to be lower than its counterpart \c eviction_trigger.,
-	 * an integer between 10 and 10TB; default \c 80.}
+	 * an integer between \c 10 and \c 10TB; default \c 80.}
 	 * @config{eviction_trigger, trigger application threads to perform eviction when the cache
 	 * contains at least this much content.  It is a percentage of the cache size if the value
 	 * is within the range of 10 to 100 or an absolute size when greater than 100. The value is
 	 * not allowed to exceed the \c cache_size and has to be greater than its counterpart \c
-	 * eviction_target., an integer between 10 and 10TB; default \c 95.}
+	 * eviction_target., an integer between \c 10 and \c 10TB; default \c 95.}
 	 * @config{eviction_updates_target, perform eviction in worker threads when the cache
 	 * contains at least this many bytes of updates.  It is a percentage of the cache size if
 	 * the value is within the range of 0 to 100 or an absolute size when greater than 100.
 	 * Calculated as half of \c eviction_dirty_target by default.  The value is not allowed to
 	 * exceed the \c cache_size and has to be lower than its counterpart \c
-	 * eviction_updates_trigger., an integer between 0 and 10TB; default \c 0.}
+	 * eviction_updates_trigger., an integer between \c 0 and \c 10TB; default \c 0.}
 	 * @config{eviction_updates_trigger, trigger application threads to perform eviction when
 	 * the cache contains at least this many bytes of updates.  It is a percentage of the cache
 	 * size if the value is within the range of 1 to 100 or an absolute size when greater than
 	 * 100\. Calculated as half of \c eviction_dirty_trigger by default.  The value is not
 	 * allowed to exceed the \c cache_size and has to be greater than its counterpart \c
 	 * eviction_updates_target.  This setting only alters behavior if it is lower than \c
-	 * eviction_trigger., an integer between 0 and 10TB; default \c 0.}
+	 * eviction_trigger., an integer between \c 0 and \c 10TB; default \c 0.}
 	 * @config{file_manager = (, control how file handles are managed., a set of related
-	 * configuration options defined below.}
+	 * configuration options defined as follows.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
 	 * close_handle_minimum, number of handles open before the file manager will look for
-	 * handles to close., an integer greater than or equal to 0; default \c 250.}
+	 * handles to close., an integer greater than or equal to \c 0; default \c 250.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_idle_time, amount of time in seconds a file handle
 	 * needs to be idle before attempting to close it.  A setting of 0 means that idle handles
-	 * are not closed., an integer between 0 and 100000; default \c 30.}
+	 * are not closed., an integer between \c 0 and \c 100000; default \c 30.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_scan_interval, interval in seconds at which to
-	 * check for files that are inactive and close them., an integer between 1 and 100000;
+	 * check for files that are inactive and close them., an integer between \c 1 and \c 100000;
 	 * default \c 10.}
 	 * @config{ ),,}
 	 * @config{history_store = (, history store configuration options., a set of related
-	 * configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, The
+	 * configuration options defined as follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the
 	 * maximum number of bytes that WiredTiger is allowed to use for its history store
 	 * mechanism.  If the history store file exceeds this size\, a panic will be triggered.  The
 	 * default value means that the history store file is unbounded and may use as much space as
 	 * the filesystem will accommodate.  The minimum non-zero setting is 100MB., an integer
-	 * greater than or equal to 0; default \c 0.}
+	 * greater than or equal to \c 0; default \c 0.}
 	 * @config{ ),,}
 	 * @config{io_capacity = (, control how many bytes per second are written and read.
 	 * Exceeding the capacity results in throttling., a set of related configuration options
-	 * defined below.}
+	 * defined as follows.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;total, number of bytes per second
 	 * available to all subsystems in total.  When set\, decisions about what subsystems are
 	 * throttled\, and in what proportion\, are made internally.  The minimum non-zero setting
-	 * is 1MB., an integer between 0 and 1TB; default \c 0.}
+	 * is 1MB., an integer between \c 0 and \c 1TB; default \c 0.}
 	 * @config{ ),,}
 	 * @config{json_output, enable JSON formatted messages on the event handler interface.
 	 * Options are given as a list\, where each option specifies an event handler category e.g.
 	 * 'error' represents the messages from the WT_EVENT_HANDLER::handle_error method., a list\,
 	 * with values chosen from the following options: \c "error"\, \c "message"; default \c [].}
 	 * @config{log = (, enable logging.  Enabling logging uses three sessions from the
-	 * configured session_max., a set of related configuration options defined below.}
+	 * configured session_max., a set of related configuration options defined as follows.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;os_cache_dirty_pct, maximum dirty system buffer cache
 	 * usage\, as a percentage of the log's \c file_max.  If non-zero\, schedule writes for
 	 * dirty blocks belonging to the log in the system buffer cache after that percentage of the
 	 * log has been written into the buffer cache without an intervening file sync., an integer
-	 * between 0 and 100; default \c 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate
-	 * log files., a boolean flag; default \c true.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;remove,
-	 * automatically remove unneeded log files., a boolean flag; default \c true.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write zeroes into log files., a
-	 * boolean flag; default \c false.}
+	 * between \c 0 and \c 100; default \c 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc,
+	 * pre-allocate log files., a boolean flag; default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;remove, automatically remove unneeded log files., a
+	 * boolean flag; default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write
+	 * zeroes into log files., a boolean flag; default \c false.}
 	 * @config{ ),,}
 	 * @config{lsm_manager = (, configure database wide options for LSM tree management.  The
 	 * LSM manager is started automatically the first time an LSM tree is opened.  The LSM
 	 * manager uses a session from the configured session_max., a set of related configuration
-	 * options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM chunks where
-	 * possible., a boolean flag; default \c true.}
+	 * options defined as follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM chunks
+	 * where possible., a boolean flag; default \c true.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
 	 * worker_thread_max, Configure a set of threads to manage merging LSM trees in the
 	 * database.  Each worker thread uses a session handle from the configured session_max., an
-	 * integer between 3 and 20; default \c 4.}
+	 * integer between \c 3 and \c 20; default \c 4.}
 	 * @config{ ),,}
 	 * @config{operation_timeout_ms, if non-zero\, a requested limit on the number of elapsed
 	 * real time milliseconds application threads will take to complete database operations.
 	 * Time is measured from the start of each WiredTiger API call.  There is no guarantee any
 	 * operation will not take longer than this amount of time.  If WiredTiger notices the limit
 	 * has been exceeded\, an operation may return a WT_ROLLBACK error.  The default of 0 is to
-	 * have no limit., an integer greater than or equal to 0; default \c 0.}
+	 * have no limit., an integer greater than or equal to \c 0; default \c 0.}
 	 * @config{operation_tracking = (, enable tracking of performance-critical functions.  See
 	 * @ref operation_tracking for more information., a set of related configuration options
-	 * defined below.}
+	 * defined as follows.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable operation tracking
 	 * subsystem., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the
@@ -2362,9 +2374,9 @@ struct __wt_connection {
 	 * configure either a cache_size or a shared_cache not both.  Enabling a shared cache uses a
 	 * session from the configured session_max.  A shared cache can not have absolute values
 	 * configured for cache eviction settings., a set of related configuration options defined
-	 * below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared cache is
-	 * redistributed., an integer between 1MB and 10TB; default \c 10MB.}
+	 * as follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared cache
+	 * is redistributed., an integer between \c 1MB and \c 10TB; default \c 10MB.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the name of a cache that is shared between
 	 * databases or \c "none" when no shared cache is configured., a string; default \c none.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;quota, maximum size of cache this database can be
@@ -2375,7 +2387,7 @@ struct __wt_connection {
 	 * Defaults to the chunk size., an integer; default \c 0.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
 	 * size, maximum memory to allocate for the shared cache.  Setting this will update the
-	 * value if one is already set., an integer between 1MB and 10TB; default \c 500MB.}
+	 * value if one is already set., an integer between \c 1MB and \c 10TB; default \c 500MB.}
 	 * @config{ ),,}
 	 * @config{statistics, Maintain database statistics\, which may impact performance.
 	 * Choosing "all" maintains all statistics regardless of cost\, "fast" maintains a subset of
@@ -2391,28 +2403,28 @@ struct __wt_connection {
 	 * @config{statistics_log = (, log any statistics the database is configured to maintain\,
 	 * to a file.  See @ref statistics for more information.  Enabling the statistics log server
 	 * uses a session from the configured session_max., a set of related configuration options
-	 * defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;json, encode statistics in JSON format.,
-	 * a boolean flag; default \c false.}
+	 * defined as follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;json, encode statistics in JSON
+	 * format., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;on_close, log
 	 * statistics on database close., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;sources, if non-empty\, include statistics for the list
 	 * of data source URIs\, if they are open at the time of the statistics logging.  The list
 	 * may include URIs matching a single data source ("table:mytable")\, or a URI matching all
 	 * data sources of a particular type ("table:")., a list of strings; default empty.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp prepended to each log record\, may
-	 * contain strftime conversion specifications\, when \c json is configured\, defaults to \c
-	 * "%Y-%m-%dT%H:%M:%S.000Z"., a string; default \c "%b %d %H:%M:%S".}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp prepended to each log record.  May
+	 * contain \c strftime conversion specifications.  When \c json is configured\, defaults to
+	 * \c "%Y-%m-%dT%H:%M:%S.000Z"., a string; default \c "%b %d %H:%M:%S".}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each write of the log
-	 * records; setting this value above 0 configures statistics logging., an integer between 0
-	 * and 100000; default \c 0.}
+	 * records; setting this value above 0 configures statistics logging., an integer between \c
+	 * 0 and \c 100000; default \c 0.}
 	 * @config{ ),,}
 	 * @config{tiered_storage = (, enable tiered storage.  Enabling tiered storage may use one
 	 * session from the configured session_max., a set of related configuration options defined
-	 * below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;local_retention, time in seconds to retain data
-	 * on tiered storage on the local tier for faster read access., an integer between 0 and
-	 * 10000; default \c 300.}
+	 * as follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;local_retention, time in seconds to retain
+	 * data on tiered storage on the local tier for faster read access., an integer between \c 0
+	 * and \c 10000; default \c 300.}
 	 * @config{ ),,}
 	 * @config{verbose, enable messages for various subsystems and operations.  Options are
 	 * given as a list\, where each message type can optionally define an associated verbosity
@@ -2495,12 +2507,14 @@ struct __wt_connection {
 	 * cache_cursors., a boolean flag; default \c true.}
 	 * @config{cache_max_wait_ms, the maximum number of milliseconds an application thread will
 	 * wait for space to be available in cache before giving up.  Default value will be the
-	 * global setting of the connection config., an integer greater than or equal to 0; default
-	 * \c 0.}
+	 * global setting of the connection config., an integer greater than or equal to \c 0;
+	 * default \c 0.}
 	 * @config{debug = (, configure debug specific behavior on a session.  Generally only used
-	 * for internal testing purposes., a set of related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;release_evict_page, Configure the session to evict the
-	 * page when it is released and no longer needed., a boolean flag; default \c false.}
+	 * for internal testing purposes., a set of related configuration options defined as
+	 * follows.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;release_evict_page, Configure the session to
+	 * evict the page when it is released and no longer needed., a boolean flag; default \c
+	 * false.}
 	 * @config{ ),,}
 	 * @config{ignore_cache_size, when set\, operations performed by this session ignore the
 	 * cache size and are not blocked when the cache is full.  Note that use of this option for
@@ -2572,12 +2586,12 @@ struct __wt_connection {
 	 * maximum durable timestamp\, or rollback-to-stable resets the value.  See @ref
 	 * timestamp_global_api., a string; default empty.}
 	 * @config{oldest_timestamp, future commits and queries will be no earlier than the
-	 * specified timestamp.  Values must be monotonically increasing\, any attempt to set the
+	 * specified timestamp.  Values must be monotonically increasing; any attempt to set the
 	 * value to older than the current is silently ignored.  The value must not be newer than
 	 * the current stable timestamp.  See @ref timestamp_global_api., a string; default empty.}
 	 * @config{stable_timestamp, checkpoints will not include commits that are newer than the
 	 * specified timestamp in tables configured with \c "log=(enabled=false)". Values must be
-	 * monotonically increasing\, any attempt to set the value to older than the current is
+	 * monotonically increasing; any attempt to set the value to older than the current is
 	 * silently ignored.  The value must not be older than the current oldest timestamp.  See
 	 * @ref timestamp_global_api., a string; default empty.}
 	 * @configend
@@ -2815,47 +2829,49 @@ struct __wt_connection {
  * @configstart{wiredtiger_open, see dist/api_data.py}
  * @config{backup_restore_target, If non-empty and restoring from a backup\, restore only the table
  * object targets listed.  WiredTiger will remove all the metadata entries for the tables that are
- * not listed in th list from the reconstructed metadata.  The target list must include URIs
- * matching of type table:., a list of strings; default empty.}
+ * not listed in the list from the reconstructed metadata.  The target list must include URIs of
+ * type \c table:., a list of strings; default empty.}
  * @config{block_cache = (, block cache configuration options., a set of related configuration
- * options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;blkcache_eviction_aggression, seconds an
- * unused block remains in the cache before it is evicted., an integer between 1 and 7200; default
- * \c 1800.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;cache_on_checkpoint, cache blocks written by a
- * checkpoint., a boolean flag; default \c true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;cache_on_writes,
- * cache blocks as they are written (other than checkpoint blocks)., a boolean flag; default \c
- * true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable block cache., a boolean flag; default \c
- * false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;full_target, the fraction of the block cache that must be
- * full before eviction will remove unused blocks., an integer between 30 and 100; default \c 95.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;hashsize, number of buckets in the hashtable that keeps track of
- * blocks., an integer between 512 and 256K; default \c 0.}
+ * options defined as follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;blkcache_eviction_aggression,
+ * seconds an unused block remains in the cache before it is evicted., an integer between \c 1 and
+ * \c 7200; default \c 1800.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;cache_on_checkpoint, cache blocks
+ * written by a checkpoint., a boolean flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * max_percent_overhead, maximum tolerated overhead expressed as the number of blocks added and
- * removed as percent of blocks looked up; cache population and eviction will be suppressed if the
- * overhead exceeds the threshold., an integer between 1 and 500; default \c 10.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;nvram_path, the absolute path to the file system mounted on the
- * NVRAM device., a string; default empty.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;percent_file_in_dram,
- * bypass cache for a file if the set percentage of the file fits in system DRAM (as specified by
- * block_cache.system_ram)., an integer between 0 and 100; default \c 50.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for the block cache., an integer
- * between 0 and 10TB; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;system_ram, the bytes of
- * system DRAM available for caching filesystem blocks., an integer between 0 and 1024GB; default \c
- * 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;type, cache location: DRAM or NVRAM., a string; default
- * empty.}
+ * cache_on_writes, cache blocks as they are written (other than checkpoint blocks)., a boolean
+ * flag; default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable block cache., a boolean
+ * flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;full_target, the fraction of the block
+ * cache that must be full before eviction will remove unused blocks., an integer between \c 30 and
+ * \c 100; default \c 95.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;hashsize, number of buckets in the
+ * hashtable that keeps track of blocks., an integer between \c 512 and \c 256K; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;max_percent_overhead, maximum tolerated overhead expressed as the
+ * number of blocks added and removed as percent of blocks looked up; cache population and eviction
+ * will be suppressed if the overhead exceeds the threshold., an integer between \c 1 and \c 500;
+ * default \c 10.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;nvram_path, the absolute path to the file system
+ * mounted on the NVRAM device., a string; default empty.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * percent_file_in_dram, bypass cache for a file if the set percentage of the file fits in system
+ * DRAM (as specified by block_cache.system_ram)., an integer between \c 0 and \c 100; default \c
+ * 50.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for the block cache., an
+ * integer between \c 0 and \c 10TB; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;system_ram, the
+ * bytes of system DRAM available for caching filesystem blocks., an integer between \c 0 and \c
+ * 1024GB; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;type, cache location: DRAM or NVRAM., a
+ * string; default empty.}
  * @config{ ),,}
  * @config{buffer_alignment, in-memory alignment (in bytes) for buffers used for I/O. The default
  * value of -1 indicates a platform-specific alignment value should be used (4KB on Linux systems
  * when direct I/O is configured\, zero elsewhere). If the configured alignment is larger than
  * default or configured object page sizes\, file allocation and page sizes are silently increased
  * to the buffer alignment size.  Requires the \c posix_memalign API. See @ref
- * tuning_system_buffer_cache_direct_io., an integer between -1 and 1MB; default \c -1.}
+ * tuning_system_buffer_cache_direct_io., an integer between \c -1 and \c 1MB; default \c -1.}
  * @config{builtin_extension_config, A structure where the keys are the names of builtin extensions
  * and the values are passed to WT_CONNECTION::load_extension as the \c config parameter (for
  * example\, <code>builtin_extension_config={zlib={compression_level=3}}</code>)., a string; default
@@ -2865,34 +2881,34 @@ struct __wt_connection {
  * WT_CONNECTION.open_session., a boolean flag; default \c true.}
  * @config{cache_max_wait_ms, the maximum number of milliseconds an application thread will wait for
  * space to be available in cache before giving up.  Default will wait forever., an integer greater
- * than or equal to 0; default \c 0.}
+ * than or equal to \c 0; default \c 0.}
  * @config{cache_overhead, assume the heap allocator overhead is the specified percentage\, and
  * adjust the cache usage by that amount (for example\, if there is 10GB of data in cache\, a
  * percentage of 10 means WiredTiger treats this as 11GB). This value is configurable because
  * different heap allocators have different overhead and different workloads will have different
  * heap allocation sizes and patterns\, therefore applications may need to adjust this value based
- * on allocator choice and behavior in measured workloads., an integer between 0 and 30; default \c
- * 8.}
+ * on allocator choice and behavior in measured workloads., an integer between \c 0 and \c 30;
+ * default \c 8.}
  * @config{cache_size, maximum heap memory to allocate for the cache.  A database should configure
- * either \c cache_size or \c shared_cache but not both., an integer between 1MB and 10TB; default
- * \c 100MB.}
+ * either \c cache_size or \c shared_cache but not both., an integer between \c 1MB and \c 10TB;
+ * default \c 100MB.}
  * @config{checkpoint = (, periodically checkpoint the database.  Enabling the checkpoint server
- * uses a session from the configured session_max., a set of related configuration options defined
- * below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_size, wait for this amount of log record bytes to be
- * written to the log between each checkpoint.  If non-zero\, this value will use a minimum of the
- * log file size.  A database can configure both log_size and wait to set an upper bound for
- * checkpoints; setting this value above 0 configures periodic checkpoints., an integer between 0
- * and 2GB; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each
- * checkpoint; setting this value above 0 configures periodic checkpoints., an integer between 0 and
- * 100000; default \c 0.}
+ * uses a session from the configured \c session_max., a set of related configuration options
+ * defined as follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_size, wait for this amount of log record
+ * bytes to be written to the log between each checkpoint.  If non-zero\, this value will use a
+ * minimum of the log file size.  A database can configure both log_size and wait to set an upper
+ * bound for checkpoints; setting this value above 0 configures periodic checkpoints., an integer
+ * between \c 0 and \c 2GB; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait
+ * between each checkpoint; setting this value above 0 configures periodic checkpoints., an integer
+ * between \c 0 and \c 100000; default \c 0.}
  * @config{ ),,}
  * @config{checkpoint_sync, flush files to stable storage when closing or writing checkpoints., a
  * boolean flag; default \c true.}
  * @config{compatibility = (, set compatibility version of database.  Changing the compatibility
  * version requires that there are no active operations for the duration of the call., a set of
- * related configuration options defined below.}
+ * related configuration options defined as follows.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;release,
  * compatibility release version string., a string; default empty.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
@@ -2910,10 +2926,10 @@ struct __wt_connection {
  * flag; default \c true.}
  * @config{create, create the database if it does not exist., a boolean flag; default \c false.}
  * @config{debug_mode = (, control the settings of various extended debugging features., a set of
- * related configuration options defined below.}
+ * related configuration options defined as follows.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
  * checkpoint_retention, adjust log removal to retain the log records of this number of checkpoints.
- * Zero or one means perform normal removal., an integer between 0 and 1024; default \c 0.}
+ * Zero or one means perform normal removal., an integer between \c 0 and \c 1024; default \c 0.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;corruption_abort, if true and built in diagnostic mode\, dump
  * core in the case of data corruption., a boolean flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;cursor_copy, if true\, use the system allocator to make a copy of
@@ -2921,8 +2937,8 @@ struct __wt_connection {
  * next cursor operation.  This allows memory sanitizers to detect inappropriate references to
  * memory owned by cursors., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * cursor_reposition, if true\, for the operations with snapshot isolation the cursor temporarily
- * releases the page that requires force eviction\, then repositions back to the page for further
+ * cursor_reposition, if true\, for operations with snapshot isolation the cursor temporarily
+ * releases any page that requires force eviction\, then repositions back to the page for further
  * operations.  A page release encourages eviction of hot or large pages\, which is more likely to
  * succeed without a cursor keeping the page pinned., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;eviction, if true\, modify internal algorithms to change skew to
@@ -2933,19 +2949,20 @@ struct __wt_connection {
  * a system wide checkpoint immediately after a flush_tier completes to force objects out to disk so
  * that a flush_tier can work single-threaded., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_retention, adjust log removal to retain at least this number
- * of log files\, ignored if set to 0. (Warning: this option can remove log files required for
- * recovery if no checkpoints have yet been done and the number of log files exceeds the configured
- * value.  As WiredTiger cannot detect the difference between a system that has not yet checkpointed
- * and one that will never checkpoint\, it might discard log files before any checkpoint is done.).,
- * an integer between 0 and 1024; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact, if
- * true\, reallocation of memory will only provide the exact amount requested.  This will help with
- * spotting memory allocation issues more easily., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a WT_ROLLBACK error from a transaction
- * operation about every Nth operation to simulate a collision., an integer between 0 and 10M;
- * default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;slow_checkpoint, if true\, slow down checkpoint
- * creation by slowing down internal page processing., a boolean flag; default \c false.}
+ * of log files.  (Warning: this option can remove log files required for recovery if no checkpoints
+ * have yet been done and the number of log files exceeds the configured value.  As WiredTiger
+ * cannot detect the difference between a system that has not yet checkpointed and one that will
+ * never checkpoint\, it might discard log files before any checkpoint is done.) Ignored if set to
+ * 0., an integer between \c 0 and \c 1024; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * realloc_exact, if true\, reallocation of memory will only provide the exact amount requested.
+ * This will help with spotting memory allocation issues more easily., a boolean flag; default \c
+ * false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a WT_ROLLBACK error from a
+ * transaction operation about every Nth operation to simulate a collision., an integer between \c 0
+ * and \c 10M; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;slow_checkpoint, if true\, slow down
+ * checkpoint creation by slowing down internal page processing., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if true\, write transaction related information to
  * the log for all operations\, even operations for tables with logging turned off.  This additional
  * logging information is intended for debugging and is informational only\, that is\, it is ignored
@@ -2956,23 +2973,23 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{direct_io, Use \c O_DIRECT on POSIX systems\, and \c FILE_FLAG_NO_BUFFERING on Windows to
  * access files.  Options are given as a list\, such as <code>"direct_io=[data]"</code>. Configuring
- * \c direct_io requires care\, see @ref tuning_system_buffer_cache_direct_io for important
- * warnings.  Including \c "data" will cause WiredTiger data files\, including WiredTiger internal
- * data files\, to use direct I/O; including \c "log" will cause WiredTiger log files to use direct
- * I/O; including \c "checkpoint" will cause WiredTiger data files opened using a (read-only)
- * checkpoint cursor to use direct I/O. \c direct_io should be combined with \c write_through to get
- * the equivalent of \c O_DIRECT on Windows., a list\, with values chosen from the following
- * options: \c "checkpoint"\, \c "data"\, \c "log"; default empty.}
+ * \c direct_io requires care; see @ref tuning_system_buffer_cache_direct_io for important warnings.
+ * Including \c "data" will cause WiredTiger data files\, including WiredTiger internal data files\,
+ * to use direct I/O; including \c "log" will cause WiredTiger log files to use direct I/O;
+ * including \c "checkpoint" will cause WiredTiger data files opened using a (read-only) checkpoint
+ * cursor to use direct I/O. \c direct_io should be combined with \c write_through to get the
+ * equivalent of \c O_DIRECT on Windows., a list\, with values chosen from the following options: \c
+ * "checkpoint"\, \c "data"\, \c "log"; default empty.}
  * @config{encryption = (, configure an encryptor for system wide metadata and logs.  If a system
  * wide encryptor is set\, it is also used for encrypting data files and tables\, unless encryption
  * configuration is explicitly set for them when they are created with WT_SESSION::create., a set of
- * related configuration options defined below.}
+ * related configuration options defined as follows.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;keyid, An
  * identifier that identifies a unique instance of the encryptor.  It is stored in clear text\, and
- * thus is available when the wiredtiger database is reopened.  On the first use of a (name\, keyid)
+ * thus is available when the WiredTiger database is reopened.  On the first use of a (name\, keyid)
  * combination\, the WT_ENCRYPTOR::customize function is called with the keyid as an argument., a
  * string; default empty.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, Permitted values are \c "none" or
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, Permitted values are \c "none" or a
  * custom encryption engine name created with WT_CONNECTION::add_encryptor.  See @ref encryption for
  * more information., a string; default \c none.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;secretkey, A
@@ -2982,149 +2999,153 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{error_prefix, prefix string for error messages., a string; default empty.}
  * @config{eviction = (, eviction configuration options., a set of related configuration options
- * defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads WiredTiger
- * will start to help evict pages from cache.  The number of threads started will vary depending on
- * the current eviction load.  Each eviction worker thread uses a session from the configured
- * session_max., an integer between 1 and 20; default \c 8.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * threads_min, minimum number of threads WiredTiger will start to help evict pages from cache.  The
- * number of threads currently running will vary depending on the current eviction load., an integer
- * between 1 and 20; default \c 1.}
+ * defined as follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads
+ * WiredTiger will start to help evict pages from cache.  The number of threads started will vary
+ * depending on the current eviction load.  Each eviction worker thread uses a session from the
+ * configured session_max., an integer between \c 1 and \c 20; default \c 8.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum number of threads WiredTiger will start to
+ * help evict pages from cache.  The number of threads currently running will vary depending on the
+ * current eviction load., an integer between \c 1 and \c 20; default \c 1.}
  * @config{ ),,}
  * @config{eviction_checkpoint_target, perform eviction at the beginning of checkpoints to bring the
  * dirty content in cache to this level.  It is a percentage of the cache size if the value is
  * within the range of 0 to 100 or an absolute size when greater than 100. The value is not allowed
- * to exceed the \c cache_size.  Ignored if set to zero., an integer between 0 and 10TB; default \c
- * 1.}
+ * to exceed the \c cache_size.  Ignored if set to zero., an integer between \c 0 and \c 10TB;
+ * default \c 1.}
  * @config{eviction_dirty_target, perform eviction in worker threads when the cache contains at
  * least this much dirty content.  It is a percentage of the cache size if the value is within the
  * range of 1 to 100 or an absolute size when greater than 100. The value is not allowed to exceed
  * the \c cache_size and has to be lower than its counterpart \c eviction_dirty_trigger., an integer
- * between 1 and 10TB; default \c 5.}
+ * between \c 1 and \c 10TB; default \c 5.}
  * @config{eviction_dirty_trigger, trigger application threads to perform eviction when the cache
  * contains at least this much dirty content.  It is a percentage of the cache size if the value is
  * within the range of 1 to 100 or an absolute size when greater than 100. The value is not allowed
  * to exceed the \c cache_size and has to be greater than its counterpart \c eviction_dirty_target.
- * This setting only alters behavior if it is lower than eviction_trigger., an integer between 1 and
- * 10TB; default \c 20.}
+ * This setting only alters behavior if it is lower than eviction_trigger., an integer between \c 1
+ * and \c 10TB; default \c 20.}
  * @config{eviction_target, perform eviction in worker threads when the cache contains at least this
  * much content.  It is a percentage of the cache size if the value is within the range of 10 to 100
  * or an absolute size when greater than 100. The value is not allowed to exceed the \c cache_size
- * and has to be lower than its counterpart \c eviction_trigger., an integer between 10 and 10TB;
- * default \c 80.}
+ * and has to be lower than its counterpart \c eviction_trigger., an integer between \c 10 and \c
+ * 10TB; default \c 80.}
  * @config{eviction_trigger, trigger application threads to perform eviction when the cache contains
  * at least this much content.  It is a percentage of the cache size if the value is within the
  * range of 10 to 100 or an absolute size when greater than 100. The value is not allowed to exceed
  * the \c cache_size and has to be greater than its counterpart \c eviction_target., an integer
- * between 10 and 10TB; default \c 95.}
+ * between \c 10 and \c 10TB; default \c 95.}
  * @config{eviction_updates_target, perform eviction in worker threads when the cache contains at
  * least this many bytes of updates.  It is a percentage of the cache size if the value is within
  * the range of 0 to 100 or an absolute size when greater than 100. Calculated as half of \c
  * eviction_dirty_target by default.  The value is not allowed to exceed the \c cache_size and has
- * to be lower than its counterpart \c eviction_updates_trigger., an integer between 0 and 10TB;
- * default \c 0.}
+ * to be lower than its counterpart \c eviction_updates_trigger., an integer between \c 0 and \c
+ * 10TB; default \c 0.}
  * @config{eviction_updates_trigger, trigger application threads to perform eviction when the cache
  * contains at least this many bytes of updates.  It is a percentage of the cache size if the value
  * is within the range of 1 to 100 or an absolute size when greater than 100\. Calculated as half of
  * \c eviction_dirty_trigger by default.  The value is not allowed to exceed the \c cache_size and
  * has to be greater than its counterpart \c eviction_updates_target.  This setting only alters
- * behavior if it is lower than \c eviction_trigger., an integer between 0 and 10TB; default \c 0.}
+ * behavior if it is lower than \c eviction_trigger., an integer between \c 0 and \c 10TB; default
+ * \c 0.}
  * @config{exclusive, fail if the database already exists\, generally used with the \c create
  * option., a boolean flag; default \c false.}
  * @config{extensions, list of shared library extensions to load (using dlopen). Any values
  * specified to a library extension are passed to WT_CONNECTION::load_extension as the \c config
  * parameter (for example\, <code>extensions=(/path/ext.so={entry=my_entry})</code>)., a list of
  * strings; default empty.}
- * @config{file_extend, file extension configuration.  If set\, extend files of the set type in
- * allocations of the set size\, instead of a block at a time as each new block is written.  For
- * example\, <code>file_extend=(data=16MB)</code>. If set to 0\, disable the file extension for the
- * set type.  For log files\, the allowed range is between 100KB and 2GB; values larger than the
- * configured maximum log size and the default config would extend log files in allocations of the
- * maximum log file size., a list\, with values chosen from the following options: \c "data"\, \c
- * "log"; default empty.}
+ * @config{file_extend, file size extension configuration.  If set\, extend files of the given type
+ * in allocations of the given size\, instead of a block at a time as each new block is written.
+ * For example\, <code>file_extend=(data=16MB)</code>. If set to 0\, disable file size extension for
+ * the given type.  For log files\, the allowed range is between 100KB and 2GB; values larger than
+ * the configured maximum log size and the default config would extend log files in allocations of
+ * the maximum log file size., a list\, with values chosen from the following options: \c "data"\,
+ * \c "log"; default empty.}
  * @config{file_manager = (, control how file handles are managed., a set of related configuration
- * options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_handle_minimum, number of handles
- * open before the file manager will look for handles to close., an integer greater than or equal to
- * 0; default \c 250.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_idle_time, amount of time in seconds a
- * file handle needs to be idle before attempting to close it.  A setting of 0 means that idle
- * handles are not closed., an integer between 0 and 100000; default \c 30.}
+ * options defined as follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_handle_minimum, number of
+ * handles open before the file manager will look for handles to close., an integer greater than or
+ * equal to \c 0; default \c 250.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_idle_time, amount of time
+ * in seconds a file handle needs to be idle before attempting to close it.  A setting of 0 means
+ * that idle handles are not closed., an integer between \c 0 and \c 100000; default \c 30.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_scan_interval, interval in seconds at which to check for
- * files that are inactive and close them., an integer between 1 and 100000; default \c 10.}
+ * files that are inactive and close them., an integer between \c 1 and \c 100000; default \c 10.}
  * @config{ ),,}
- * @config{hash = (, manage resources around hash bucket arrays.  All values must be a power of two.
- * Note that setting large values can significantly increase memory usage inside WiredTiger., a set
- * of related configuration options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;buckets,
- * configure the number of hash buckets for most system hash arrays., an integer between 64 and
+ * @config{hash = (, manage resources used by hash bucket arrays.  All values must be a power of
+ * two.  Note that setting large values can significantly increase memory usage inside WiredTiger.,
+ * a set of related configuration options defined as follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * buckets, configure the number of hash buckets for most system hash arrays., an integer between \c
+ * 64 and \c 65536; default \c 512.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;dhandle_buckets, configure the
+ * number of hash buckets for hash arrays relating to data handles., an integer between \c 64 and \c
  * 65536; default \c 512.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;dhandle_buckets, configure the number of
- * hash buckets for hash arrays relating to data handles., an integer between 64 and 65536; default
- * \c 512.}
  * @config{ ),,}
  * @config{history_store = (, history store configuration options., a set of related configuration
- * options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, The maximum number of bytes
- * that WiredTiger is allowed to use for its history store mechanism.  If the history store file
- * exceeds this size\, a panic will be triggered.  The default value means that the history store
- * file is unbounded and may use as much space as the filesystem will accommodate.  The minimum
- * non-zero setting is 100MB., an integer greater than or equal to 0; default \c 0.}
+ * options defined as follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum number of
+ * bytes that WiredTiger is allowed to use for its history store mechanism.  If the history store
+ * file exceeds this size\, a panic will be triggered.  The default value means that the history
+ * store file is unbounded and may use as much space as the filesystem will accommodate.  The
+ * minimum non-zero setting is 100MB., an integer greater than or equal to \c 0; default \c 0.}
  * @config{ ),,}
- * @config{in_memory, keep data in-memory only.  See @ref in_memory for more information., a boolean
+ * @config{in_memory, keep data in memory only.  See @ref in_memory for more information., a boolean
  * flag; default \c false.}
  * @config{io_capacity = (, control how many bytes per second are written and read.  Exceeding the
- * capacity results in throttling., a set of related configuration options defined below.}
+ * capacity results in throttling., a set of related configuration options defined as follows.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;total, number of bytes per second available to all subsystems in
  * total.  When set\, decisions about what subsystems are throttled\, and in what proportion\, are
- * made internally.  The minimum non-zero setting is 1MB., an integer between 0 and 1TB; default \c
- * 0.}
+ * made internally.  The minimum non-zero setting is 1MB., an integer between \c 0 and \c 1TB;
+ * default \c 0.}
  * @config{ ),,}
  * @config{json_output, enable JSON formatted messages on the event handler interface.  Options are
  * given as a list\, where each option specifies an event handler category e.g.  'error' represents
  * the messages from the WT_EVENT_HANDLER::handle_error method., a list\, with values chosen from
  * the following options: \c "error"\, \c "message"; default \c [].}
  * @config{log = (, enable logging.  Enabling logging uses three sessions from the configured
- * session_max., a set of related configuration options defined below.}
+ * session_max., a set of related configuration options defined as follows.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;compressor, configure a compressor for log records.  Permitted
- * values are \c "none" or custom compression engine name created with
+ * values are \c "none" or a custom compression engine name created with
  * WT_CONNECTION::add_compressor.  If WiredTiger has builtin support for \c "lz4"\, \c "snappy"\, \c
  * "zlib" or \c "zstd" compression\, these names are also available.  See @ref compression for more
  * information., a string; default \c none.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable logging
  * subsystem., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the
- * maximum size of log files., an integer between 100KB and 2GB; default \c 100MB.}
+ * maximum size of log files., an integer between \c 100KB and \c 2GB; default \c 100MB.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;os_cache_dirty_pct, maximum dirty system buffer cache usage\, as
  * a percentage of the log's \c file_max.  If non-zero\, schedule writes for dirty blocks belonging
  * to the log in the system buffer cache after that percentage of the log has been written into the
- * buffer cache without an intervening file sync., an integer between 0 and 100; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the name of a directory into which log files are written.
- * The directory must already exist.  If the value is not an absolute path\, the path is relative to
- * the database home (see @ref absolute_path for more information)., a string; default \c ".".}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate log files., a boolean flag; default \c
- * true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery or error if recovery needs to run
- * after an unclean shutdown., a string\, chosen from the following options: \c "error"\, \c "on";
- * default \c on.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;remove, automatically remove unneeded log files.,
- * a boolean flag; default \c true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write
- * zeroes into log files., a boolean flag; default \c false.}
- * @config{ ),,}
+ * buffer cache without an intervening file sync., an integer between \c 0 and \c 100; default \c
+ * 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the name of a directory into which log files are
+ * written.  The directory must already exist.  If the value is not an absolute path\, the path is
+ * relative to the database home (see @ref absolute_path for more information)., a string; default
+ * \c ".".}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate log files., a boolean flag;
+ * default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery or fail with an error if
+ * recovery needs to run after an unclean shutdown., a string\, chosen from the following options:
+ * \c "error"\, \c "on"; default \c on.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;remove, automatically
+ * remove unneeded log files., a boolean flag; default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * zero_fill, manually write zeroes into log files., a boolean flag; default \c false.}
+ * @config{
+ * ),,}
  * @config{lsm_manager = (, configure database wide options for LSM tree management.  The LSM
  * manager is started automatically the first time an LSM tree is opened.  The LSM manager uses a
- * session from the configured session_max., a set of related configuration options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM chunks where possible., a boolean flag; default
- * \c true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;worker_thread_max, Configure a set of threads to manage
- * merging LSM trees in the database.  Each worker thread uses a session handle from the configured
- * session_max., an integer between 3 and 20; default \c 4.}
+ * session from the configured session_max., a set of related configuration options defined as
+ * follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM chunks where possible., a boolean
+ * flag; default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;worker_thread_max, Configure a set of
+ * threads to manage merging LSM trees in the database.  Each worker thread uses a session handle
+ * from the configured session_max., an integer between \c 3 and \c 20; default \c 4.}
  * @config{ ),,}
  * @config{mmap, Use memory mapping when accessing files in a read-only mode., a boolean flag;
  * default \c true.}
- * @config{mmap_all, Use memory mapping to read and write all data files\, may not be configured
+ * @config{mmap_all, Use memory mapping to read and write all data files.  May not be configured
  * with direct I/O., a boolean flag; default \c false.}
  * @config{multiprocess, permit sharing between processes (will automatically start an RPC server
  * for primary processes and use RPC for secondary processes). <b>Not yet supported in
@@ -3134,44 +3155,45 @@ struct __wt_connection {
  * from the start of each WiredTiger API call.  There is no guarantee any operation will not take
  * longer than this amount of time.  If WiredTiger notices the limit has been exceeded\, an
  * operation may return a WT_ROLLBACK error.  The default of 0 is to have no limit., an integer
- * greater than or equal to 0; default \c 0.}
+ * greater than or equal to \c 0; default \c 0.}
  * @config{operation_tracking = (, enable tracking of performance-critical functions.  See @ref
- * operation_tracking for more information., a set of related configuration options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable operation tracking subsystem., a boolean flag;
- * default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the name of a directory into which
- * operation tracking files are written.  The directory must already exist.  If the value is not an
- * absolute path\, the path is relative to the database home (see @ref absolute_path for more
- * information)., a string; default \c ".".}
+ * operation_tracking for more information., a set of related configuration options defined as
+ * follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable operation tracking subsystem., a
+ * boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the name of a directory
+ * into which operation tracking files are written.  The directory must already exist.  If the value
+ * is not an absolute path\, the path is relative to the database home (see @ref absolute_path for
+ * more information)., a string; default \c ".".}
  * @config{ ),,}
  * @config{readonly, open connection in read-only mode.  The database must exist.  All methods that
  * may modify a database are disabled.  See @ref readonly for more information., a boolean flag;
  * default \c false.}
  * @config{salvage, open connection and salvage any WiredTiger-owned database and log files that it
- * detects as corrupted.  This API should only be used after getting an error return of
+ * detects as corrupted.  This call should only be used after getting an error return of
  * WT_TRY_SALVAGE. Salvage rebuilds files in place\, overwriting existing files.  We recommend
  * making a backup copy of all files with the WiredTiger prefix prior to passing this flag., a
  * boolean flag; default \c false.}
  * @config{session_max, maximum expected number of sessions (including server threads)., an integer
- * greater than or equal to 1; default \c 100.}
+ * greater than or equal to \c 1; default \c 100.}
  * @config{shared_cache = (, shared cache configuration options.  A database should configure either
  * a cache_size or a shared_cache not both.  Enabling a shared cache uses a session from the
  * configured session_max.  A shared cache can not have absolute values configured for cache
- * eviction settings., a set of related configuration options defined below.}
+ * eviction settings., a set of related configuration options defined as follows.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared cache is redistributed., an
- * integer between 1MB and 10TB; default \c 10MB.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the name of
- * a cache that is shared between databases or \c "none" when no shared cache is configured., a
- * string; default \c none.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;quota, maximum size of cache this
- * database can be allocated from the shared cache.  Defaults to the entire shared cache size., an
- * integer; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache this database is
- * guaranteed to have available from the shared cache.  This setting is per database.  Defaults to
- * the chunk size., an integer; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory
- * to allocate for the shared cache.  Setting this will update the value if one is already set., an
- * integer between 1MB and 10TB; default \c 500MB.}
+ * integer between \c 1MB and \c 10TB; default \c 10MB.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the
+ * name of a cache that is shared between databases or \c "none" when no shared cache is
+ * configured., a string; default \c none.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;quota, maximum size of
+ * cache this database can be allocated from the shared cache.  Defaults to the entire shared cache
+ * size., an integer; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache this
+ * database is guaranteed to have available from the shared cache.  This setting is per database.
+ * Defaults to the chunk size., an integer; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;size,
+ * maximum memory to allocate for the shared cache.  Setting this will update the value if one is
+ * already set., an integer between \c 1MB and \c 10TB; default \c 500MB.}
  * @config{ ),,}
  * @config{statistics, Maintain database statistics\, which may impact performance.  Choosing "all"
  * maintains all statistics regardless of cost\, "fast" maintains a subset of statistics that are
@@ -3185,30 +3207,32 @@ struct __wt_connection {
  * "tree_walk"; default \c none.}
  * @config{statistics_log = (, log any statistics the database is configured to maintain\, to a
  * file.  See @ref statistics for more information.  Enabling the statistics log server uses a
- * session from the configured session_max., a set of related configuration options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;json, encode statistics in JSON format., a boolean flag; default
- * \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;on_close, log statistics on database close., a boolean
+ * session from the configured session_max., a set of related configuration options defined as
+ * follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;json, encode statistics in JSON format., a boolean
  * flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the name of a directory into which
- * statistics files are written.  The directory must already exist.  If the value is not an absolute
- * path\, the path is relative to the database home (see @ref absolute_path for more information).,
- * a string; default \c ".".}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;sources, if non-empty\, include
- * statistics for the list of data source URIs\, if they are open at the time of the statistics
- * logging.  The list may include URIs matching a single data source ("table:mytable")\, or a URI
- * matching all data sources of a particular type ("table:")., a list of strings; default empty.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp prepended to each log record\, may contain
- * strftime conversion specifications\, when \c json is configured\, defaults to \c
- * "%Y-%m-%dT%H:%M:%S.000Z"., a string; default \c "%b %d %H:%M:%S".}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;on_close, log statistics on database
+ * close., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the name of a
+ * directory into which statistics files are written.  The directory must already exist.  If the
+ * value is not an absolute path\, the path is relative to the database home (see @ref absolute_path
+ * for more information)., a string; default \c ".".}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;sources, if
+ * non-empty\, include statistics for the list of data source URIs\, if they are open at the time of
+ * the statistics logging.  The list may include URIs matching a single data source
+ * ("table:mytable")\, or a URI matching all data sources of a particular type ("table:")., a list
+ * of strings; default empty.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp prepended to
+ * each log record.  May contain \c strftime conversion specifications.  When \c json is
+ * configured\, defaults to \c "%Y-%m-%dT%H:%M:%S.000Z"., a string; default \c "%b %d %H:%M:%S".}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each write of the log records;
- * setting this value above 0 configures statistics logging., an integer between 0 and 100000;
+ * setting this value above 0 configures statistics logging., an integer between \c 0 and \c 100000;
  * default \c 0.}
  * @config{ ),,}
  * @config{transaction_sync = (, how to sync log records when the transaction commits., a set of
- * related configuration options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, whether to
- * sync the log on every commit by default\, can be overridden by the \c sync setting to
+ * related configuration options defined as follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled,
+ * whether to sync the log on every commit by default\, can be overridden by the \c sync setting to
  * WT_SESSION::commit_transaction., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;method, the method used to ensure log records are stable on
  * disk\, see @ref tune_durability for more information., a string\, chosen from the following
@@ -3232,12 +3256,12 @@ struct __wt_connection {
  * "read"\, \c "reconcile"\, \c "recovery"\, \c "recovery_progress"\, \c "rts"\, \c "salvage"\, \c
  * "shared_cache"\, \c "split"\, \c "temporary"\, \c "thread_group"\, \c "tiered"\, \c "timestamp"\,
  * \c "transaction"\, \c "verify"\, \c "version"\, \c "write"; default \c [].}
- * @config{verify_metadata, open connection and verify any WiredTiger metadata.  Not compatible when
+ * @config{verify_metadata, open connection and verify any WiredTiger metadata.  Not supported when
  * opening a connection from a backup.  This API allows verification and detection of corruption in
  * WiredTiger metadata., a boolean flag; default \c false.}
  * @config{write_through, Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to files.  Ignored on
  * non-Windows systems.  Options are given as a list\, such as <code>"write_through=[data]"</code>.
- * Configuring \c write_through requires care\, see @ref tuning_system_buffer_cache_direct_io for
+ * Configuring \c write_through requires care; see @ref tuning_system_buffer_cache_direct_io for
  * important warnings.  Including \c "data" will cause WiredTiger data files to write through
  * cache\, including \c "log" will cause WiredTiger log files to write through cache.  \c
  * write_through should be combined with \c direct_io to get the equivalent of POSIX \c O_DIRECT on
@@ -3261,7 +3285,7 @@ int wiredtiger_open(const char *home,
  *
  * @snippet ex_all.c Display an error
  *
- * @param error a return value from a WiredTiger, ISO C, or POSIX standard API
+ * @param error a return value from a WiredTiger, ISO C, or POSIX standard API call
  * @returns a string representation of the error
  */
 const char *wiredtiger_strerror(int error) WT_ATTRIBUTE_LIBRARY_VISIBLE;
@@ -3279,7 +3303,7 @@ struct __wt_event_handler {
 	 *
 	 * Errors that require the application to exit and restart will have
 	 * their \c error value set to \c WT_PANIC. The application can exit
-	 * immediately when \c WT_PANIC is passed to an event handler, there
+	 * immediately when \c WT_PANIC is passed to an event handler; there
 	 * is no reason to return into WiredTiger.
 	 *
 	 * Event handler returns are not ignored: if the handler returns
@@ -3290,7 +3314,7 @@ struct __wt_event_handler {
 	 * was generated. The handle may have been created by the application
 	 * or automatically by WiredTiger.
 	 * @param error a return value from a WiredTiger, ISO C, or
-	 * POSIX standard API, which can be converted to a string using
+	 * POSIX standard API call, which can be converted to a string using
 	 * WT_SESSION::strerror
 	 * @param message an error string
 	 */
@@ -3570,8 +3594,8 @@ struct __wt_config_item {
 	 * list or string), the \c str field will reference the value of the
 	 * configuration string.
 	 *
-	 * The bytes referenced by \c str are <b>not</b> nul-terminated,
-	 * use the \c len field instead of a terminating nul byte.
+	 * The bytes referenced by \c str are <b>not</b> nul-terminated.
+	 * Use the \c len field instead of a terminating nul byte.
 	 */
 	const char *str;
 
@@ -3585,7 +3609,7 @@ struct __wt_config_item {
 	 * \c val field will be set to 1 (true), or 0 (false).
 	 *
 	 * If the configuration string can be legally interpreted as an integer,
-	 * using the strtoll function rules as specified in ISO/IEC 9899:1990
+	 * using the \c strtoll function rules as specified in ISO/IEC 9899:1990
 	 * ("ISO C90"), that integer will be stored in the \c val field.
 	 */
 	int64_t val;
@@ -3612,8 +3636,8 @@ struct __wt_config_item {
 
 #if !defined(SWIG) && !defined(DOXYGEN)
 /*!
- * Validate a configuration string for a WiredTiger API.
- * This API is outside the scope of a WiredTiger connection handle, since
+ * Validate a configuration string for a WiredTiger API call.
+ * This call is outside the scope of a WiredTiger connection handle, since
  * applications may need to validate configuration strings prior to calling
  * ::wiredtiger_open.
  * @param session the session handle (may be \c NULL if the database not yet
@@ -3641,8 +3665,8 @@ int wiredtiger_test_config_validate(WT_SESSION *session,
 
 /*!
  * Create a handle that can be used to parse or create configuration strings
- * compatible with WiredTiger APIs.
- * This API is outside the scope of a WiredTiger connection handle, since
+ * compatible with the WiredTiger API.
+ * This call is outside the scope of a WiredTiger connection handle, since
  * applications may need to generate configuration strings prior to calling
  * ::wiredtiger_open.
  * @param session the session handle to be used for error reporting (if NULL,
@@ -3661,7 +3685,7 @@ int wiredtiger_config_parser_open(WT_SESSION *session,
 
 /*!
  * A handle that can be used to search and traverse configuration strings
- * compatible with WiredTiger APIs.
+ * compatible with the WiredTiger API.
  * To parse the contents of a list or nested configuration string use a new
  * configuration parser handle based on the content of the ::WT_CONFIG_ITEM
  * retrieved from the parent configuration string.
@@ -3742,7 +3766,7 @@ struct __wt_config_parser {
  * Return a pointer to a function that calculates a CRC32C checksum.
  *
  * The WiredTiger library CRC32C checksum function uses hardware support where available, else it
- * falls back to a software implementation. Selecting a CRC32C checksum function can be slow, the
+ * falls back to a software implementation. Selecting a CRC32C checksum function can be slow, so the
  * return value should be cached by the caller for repeated use.
  *
  * @snippet ex_all.c Checksum a buffer
@@ -3811,7 +3835,7 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp)
  * @name Error returns
  * Most functions and methods in WiredTiger return an integer code indicating
  * whether the operation succeeded or failed.  A return of zero indicates
- * success, all non-zero return values indicate some kind of failure.
+ * success; all non-zero return values indicate some kind of failure.
  *
  * WiredTiger reserves all values from -31,800 to -31,999 as possible error
  * return values.  WiredTiger may also return C99/POSIX error codes such as
@@ -3961,7 +3985,7 @@ struct __wt_collator {
 	 * If non-NULL a callback performed when the data source is closed
 	 * for customized extractors otherwise when the database is closed.
 	 *
-	 * The WT_COLLATOR::terminate callback is intended to allow cleanup,
+	 * The WT_COLLATOR::terminate callback is intended to allow cleanup;
 	 * the handle will not be subsequently accessed by WiredTiger.
 	 */
 	int (*terminate)(WT_COLLATOR *collator, WT_SESSION *session);
@@ -4109,7 +4133,7 @@ struct __wt_compressor {
 	/*!
 	 * If non-NULL, a callback performed when the database is closed.
 	 *
-	 * The WT_COMPRESSOR::terminate callback is intended to allow cleanup,
+	 * The WT_COMPRESSOR::terminate callback is intended to allow cleanup;
 	 * the handle will not be subsequently accessed by WiredTiger.
 	 *
 	 * @snippet nop_compress.c WT_COMPRESSOR terminate
@@ -4232,7 +4256,7 @@ struct __wt_data_source {
 	/*!
 	 * If non-NULL, a callback performed when the database is closed.
 	 *
-	 * The WT_DATA_SOURCE::terminate callback is intended to allow cleanup,
+	 * The WT_DATA_SOURCE::terminate callback is intended to allow cleanup;
 	 * the handle will not be subsequently accessed by WiredTiger.
 	 *
 	 * @snippet ex_data_source.c WT_DATA_SOURCE terminate
@@ -4466,7 +4490,7 @@ struct __wt_extractor {
 	 * is closed for customized extractors otherwise when the database
 	 * is closed.
 	 *
-	 * The WT_EXTRACTOR::terminate callback is intended to allow cleanup,
+	 * The WT_EXTRACTOR::terminate callback is intended to allow cleanup;
 	 * the handle will not be subsequently accessed by WiredTiger.
 	 */
 	int (*terminate)(WT_EXTRACTOR *extractor, WT_SESSION *session);
@@ -4678,7 +4702,7 @@ struct __wt_file_system {
 	 * This method is not required and should be set to NULL when not
 	 * required by the file system.
 	 *
-	 * The WT_FILE_SYSTEM::terminate callback is intended to allow cleanup,
+	 * The WT_FILE_SYSTEM::terminate callback is intended to allow cleanup;
 	 * the handle will not be subsequently accessed by WiredTiger.
 	 */
 	int (*terminate)(WT_FILE_SYSTEM *file_system, WT_SESSION *session);
@@ -4690,7 +4714,7 @@ struct __wt_file_system {
 #define	WT_FILE_HANDLE_WILLNEED	2
 
 /*!
- * A file handle implementation returned by WT_FILE_SYSTEM::open_file.
+ * A file handle implementation returned by WT_FILE_SYSTEM::fs_open_file.
  *
  * <b>Thread safety:</b> Unless explicitly stated otherwise, WiredTiger may
  * invoke methods on the WT_FILE_HANDLE interface from multiple threads
@@ -4701,17 +4725,17 @@ struct __wt_file_system {
  */
 struct __wt_file_handle {
 	/*!
-	 * The enclosing file system, set by WT_FILE_SYSTEM::open_file.
+	 * The enclosing file system, set by WT_FILE_SYSTEM::fs_open_file.
 	 */
 	WT_FILE_SYSTEM *file_system;
 
 	/*!
-	 * The name of the file, set by WT_FILE_SYSTEM::open_file.
+	 * The name of the file, set by WT_FILE_SYSTEM::fs_open_file.
 	 */
 	char *name;
 
 	/*!
-	 * Close a file handle, the handle will not be further accessed by
+	 * Close a file handle. The handle will not be further accessed by
 	 * WiredTiger.
 	 *
 	 * @errors
@@ -5093,7 +5117,7 @@ struct __wt_storage_source {
 	 * This method is not required and should be set to NULL when not
 	 * required by the storage source implementation.
 	 *
-	 * The WT_STORAGE_SOURCE::terminate callback is intended to allow cleanup,
+	 * The WT_STORAGE_SOURCE::terminate callback is intended to allow cleanup;
 	 * the handle will not be subsequently accessed by WiredTiger.
 	 */
 	int (*terminate)(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session);
@@ -5130,11 +5154,11 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  * @anchor backup_types
  * @{
  */
-/*! invalid type */
+/*! Invalid backup type. */
 #define WT_BACKUP_INVALID	0
-/*! whole file */
+/*! Whole file. */
 #define WT_BACKUP_FILE		1
-/*! file range */
+/*! File range. */
 #define WT_BACKUP_RANGE		2
 /*! @} */
 
@@ -5148,37 +5172,37 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  * never change because they're written into the log.  Append
  * any new records or operations to the appropriate set.
  */
-/*! checkpoint */
+/*! Checkpoint. */
 #define	WT_LOGREC_CHECKPOINT	0
-/*! transaction commit */
+/*! Transaction commit. */
 #define	WT_LOGREC_COMMIT	1
-/*! file sync */
+/*! File sync. */
 #define	WT_LOGREC_FILE_SYNC	2
-/*! message */
+/*! Message. */
 #define	WT_LOGREC_MESSAGE	3
-/*! system/internal record */
+/*! System/internal record. */
 #define	WT_LOGREC_SYSTEM	4
-/*! invalid operation */
+/*! Invalid operation. */
 #define	WT_LOGOP_INVALID	0
-/*! column-store put */
+/*! Column-store put. */
 #define	WT_LOGOP_COL_PUT	1
-/*! column-store remove */
+/*! Column-store remove. */
 #define	WT_LOGOP_COL_REMOVE	2
-/*! column-store truncate */
+/*! Column-store truncate. */
 #define	WT_LOGOP_COL_TRUNCATE	3
-/*! row-store put */
+/*! Row-store put. */
 #define	WT_LOGOP_ROW_PUT	4
-/*! row-store remove */
+/*! Row-store remove. */
 #define	WT_LOGOP_ROW_REMOVE	5
-/*! row-store truncate */
+/*! Row-store truncate. */
 #define	WT_LOGOP_ROW_TRUNCATE	6
-/*! checkpoint start */
+/*! Checkpoint start. */
 #define	WT_LOGOP_CHECKPOINT_START	7
-/*! previous LSN */
+/*! Previous LSN. */
 #define	WT_LOGOP_PREV_LSN	8
-/*! column-store modify */
+/*! Column-store modify. */
 #define	WT_LOGOP_COL_MODIFY	9
-/*! row-store modify */
+/*! Row-store modify. */
 #define	WT_LOGOP_ROW_MODIFY	10
 /*
  * NOTE: Diagnostic-only log operations should have values in
@@ -7338,7 +7362,7 @@ typedef enum {
     WT_VERB_SPLIT,
     WT_VERB_TEMPORARY,
     WT_VERB_THREAD_GROUP,
-    WT_VERB_TIERED,               /*!< Tiered messages. */
+    WT_VERB_TIERED,               /*!< Tiered storage messages. */
     WT_VERB_TIMESTAMP,            /*!< Timestamp messages. */
     WT_VERB_TRANSACTION,          /*!< Transaction messages. */
     WT_VERB_VERIFY,               /*!< Verify messages. */

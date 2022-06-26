@@ -54,14 +54,15 @@ common_runtime_config = [
             this option is no longer supported, retained for backward compatibility''',
             choices=['always', 'key_consistent', 'never', 'none'], undoc=True),
         Config('read_timestamp', 'none', r'''
-            check timestamps are \c always or \c never used on reads with this table, writing an
-            error message if policy is violated. If the library was built in diagnostic mode,
-            drop core at the failing check''',
+            if set, check that timestamps are \c always or \c never used on reads with this table,
+            writing an error message if the policy is violated. If the library was built in
+            diagnostic mode, drop core at the failing check''',
             choices=['always', 'never', 'none']),
         Config('write_timestamp', 'off', r'''
-            check timestamps are used consistently with the configured \c write_timestamp_usage
-            option for this table, writing an error message if policy is violated. If the
-            library was built in diagnostic mode, drop core at the failing check''',
+            if set, check that timestamps are used consistently with the configured
+            \c write_timestamp_usage option for this table, writing an error message if the policy
+            is violated. If the library was built in diagnostic mode, drop core at the failing
+            check''',
             choices=['off', 'on'], undoc=True),
         ]),
     Config('verbose', '[]', r'''
@@ -128,18 +129,18 @@ lsm_config = [
             Throttle inserts into LSM trees if flushing to disk isn't keeping up''',
             type='boolean'),
         Config('bloom', 'true', r'''
-            create bloom filters on LSM tree chunks as they are merged''',
+            create Bloom filters on LSM tree chunks as they are merged''',
             type='boolean'),
         Config('bloom_bit_count', '16', r'''
-            the number of bits used per item for LSM bloom filters''',
+            the number of bits used per item for LSM Bloom filters''',
             min='2', max='1000'),
         Config('bloom_config', '', r'''
             config string used when creating Bloom filter files, passed to WT_SESSION::create'''),
         Config('bloom_hash_count', '8', r'''
-            the number of hash values per item used for LSM bloom filters''',
+            the number of hash values per item used for LSM Bloom filters''',
             min='2', max='100'),
         Config('bloom_oldest', 'false', r'''
-            create a bloom filter on the oldest LSM tree chunk. Only supported if bloom filters
+            create a Bloom filter on the oldest LSM tree chunk. Only supported if Bloom filters
             are enabled''',
             type='boolean'),
         Config('chunk_count_limit', '0', r'''
@@ -184,7 +185,7 @@ tiered_config = [
         configure a storage source for this table''',
         type='category', subconfig=[
         Config('name', 'none', r'''
-            permitted values are \c "none" or custom storage source name created with
+            permitted values are \c "none" or a custom storage source name created with
             WT_CONNECTION::add_storage_source. See @ref custom_storage_sources for more
             information'''),
         Config('auth_token', '', r'''
@@ -222,15 +223,15 @@ file_runtime_config = common_runtime_config + [
     Config('access_pattern_hint', 'none', r'''
         It is recommended that workloads that consist primarily of updates and/or point queries
         specify \c random. Workloads that do many cursor scans through large ranges of data
-        specify \c sequential and other workloads specify \c none. The option leads to an
-        advisory call to an appropriate operating system API where available''',
+        should specify \c sequential and other workloads should specify \c none. The option leads
+        to an appropriate operating system advisory call where available''',
         choices=['none', 'random', 'sequential']),
     Config('cache_resident', 'false', r'''
         do not ever evict the object's pages from cache. Not compatible with LSM tables; see
         @ref tuning_cache_resident for more information''',
         type='boolean'),
     Config('log', '', r'''
-        the transaction log configuration for this object. Only valid if log is enabled in
+        the transaction log configuration for this object. Only valid if \c log is enabled in
         ::wiredtiger_open''',
         type='category', subconfig=[
         Config('enabled', 'true', r'''
@@ -257,12 +258,12 @@ file_config = format_meta + file_runtime_config + tiered_config + [
         first-available algorithm during block allocation''',
         choices=['best', 'first',]),
     Config('allocation_size', '4KB', r'''
-        the file unit allocation size, in bytes, must a power-of-two; smaller values decrease
+        the file unit allocation size, in bytes, must be a power of two; smaller values decrease
         the file space required by overflow items, and the default value of 4KB is a good choice
         absent requirements from the operating system or storage device''',
         min='512B', max='128MB'),
     Config('block_compressor', 'none', r'''
-        configure a compressor for file blocks. Permitted values are \c "none" or custom
+        configure a compressor for file blocks. Permitted values are \c "none" or a custom
         compression engine name created with WT_CONNECTION::add_compressor. If WiredTiger
         has builtin support for \c "lz4", \c "snappy", \c "zlib" or \c "zstd" compression,
         these names are also available. See @ref compression for more information'''),
@@ -283,11 +284,11 @@ file_config = format_meta + file_runtime_config + tiered_config + [
         implicitly used for any related indices or column groups''',
         type='category', subconfig=[
         Config('name', 'none', r'''
-            Permitted values are \c "none" or custom encryption engine name created with
+            Permitted values are \c "none" or a custom encryption engine name created with
             WT_CONNECTION::add_encryptor. See @ref encryption for more information'''),
         Config('keyid', '', r'''
             An identifier that identifies a unique instance of the encryptor. It is stored in
-            clear text, and thus is available when the wiredtiger database is reopened. On the
+            clear text, and thus is available when the WiredTiger database is reopened. On the
             first use of a (name, keyid) combination, the WT_ENCRYPTOR::customize function is
             called with the keyid as an argument'''),
         ]),
@@ -443,16 +444,16 @@ table_only_config = [
         keyed by the primary key of the table. If no column groups are specified, all columns
         are stored together in a single file. All value columns in the table must appear in
         at least one column group. Each column group must be created with a separate call to
-        WT_SESSION::create''',
+        WT_SESSION::create using a \c colgroup: URI''',
         type='list'),
 ]
 
 index_only_config = [
     Config('extractor', 'none', r'''
-        configure custom extractor for indices. Permitted values are \c "none" or an extractor
+        configure a custom extractor for indices. Permitted values are \c "none" or an extractor
         name created with WT_CONNECTION::add_extractor'''),
     Config('immutable', 'false', r'''
-        configure the index to be immutable - that is an index is not changed by any update to
+        configure the index to be immutable -- that is, the index is not changed by any update to
         a record in the table''',
         type='boolean'),
 ]
@@ -523,7 +524,7 @@ connection_runtime_config = [
         history store configuration options''',
         type='category', subconfig=[
         Config('file_max', '0', r'''
-            The maximum number of bytes that WiredTiger is allowed to use for its history store
+            the maximum number of bytes that WiredTiger is allowed to use for its history store
             mechanism. If the history store file exceeds this size, a panic will be triggered. The
             default value means that the history store file is unbounded and may use as much
             space as the filesystem will accommodate. The minimum non-zero setting is 100MB.''',
@@ -540,7 +541,7 @@ connection_runtime_config = [
         min='0', max='30'),
     Config('checkpoint', '', r'''
         periodically checkpoint the database. Enabling the checkpoint server uses a session
-        from the configured session_max''',
+        from the configured \c session_max''',
         type='category', subconfig=[
         Config('log_size', '0', r'''
             wait for this amount of log record bytes to be written to the log between each
@@ -570,10 +571,10 @@ connection_runtime_config = [
             memory owned by cursors.''',
             type='boolean'),
         Config('cursor_reposition', 'false', r'''
-            if true, for the operations with snapshot isolation the cursor temporarily releases the
-            page that requires force eviction, then repositions back to the page for further
-            operations. A page release encourages eviction of hot or large pages, which is more
-            likely to succeed without a cursor keeping the page pinned.''',
+            if true, for operations with snapshot isolation the cursor temporarily releases any page
+            that requires force eviction, then repositions back to the page for further operations.
+            A page release encourages eviction of hot or large pages, which is more likely to
+            succeed without a cursor keeping the page pinned.''',
             type='boolean'),
         Config('eviction', 'false', r'''
             if true, modify internal algorithms to change skew to force history store eviction
@@ -585,12 +586,12 @@ connection_runtime_config = [
             force objects out to disk so that a flush_tier can work single-threaded''',
             type='boolean'),
         Config('log_retention', '0', r'''
-            adjust log removal to retain at least this number of log files, ignored if set to 0.
+            adjust log removal to retain at least this number of log files.
             (Warning: this option can remove log files required for recovery if no checkpoints
             have yet been done and the number of log files exceeds the configured value. As
             WiredTiger cannot detect the difference between a system that has not yet checkpointed
             and one that will never checkpoint, it might discard log files before any checkpoint is
-            done.)''',
+            done.) Ignored if set to 0''',
             min='0', max='1024'),
         Config('realloc_exact', 'false', r'''
             if true, reallocation of memory will only provide the exact amount requested. This
@@ -897,7 +898,7 @@ wiredtiger_open_log_configuration = [
             enable logging subsystem''',
             type='boolean'),
         Config('compressor', 'none', r'''
-            configure a compressor for log records. Permitted values are \c "none" or custom
+            configure a compressor for log records. Permitted values are \c "none" or a custom
             compression engine name created with WT_CONNECTION::add_compressor. If WiredTiger
             has builtin support for \c "lz4", \c "snappy", \c "zlib" or \c "zstd" compression,
             these names are also available. See @ref compression for more information'''),
@@ -915,7 +916,8 @@ wiredtiger_open_log_configuration = [
             exist. If the value is not an absolute path, the path is relative to the database
             home (see @ref absolute_path for more information)'''),
         Config('recover', 'on', r'''
-            run recovery or error if recovery needs to run after an unclean shutdown''',
+            run recovery or fail with an error if recovery needs to run after an unclean
+            shutdown''',
             choices=['error', 'on'])
     ]),
 ]
@@ -933,8 +935,8 @@ statistics_log_configuration_common = [
         ("table:mytable"), or a URI matching all data sources of a particular type ("table:")''',
         type='list'),
     Config('timestamp', '"%b %d %H:%M:%S"', r'''
-        a timestamp prepended to each log record, may contain strftime conversion specifications,
-        when \c json is configured, defaults to \c "%Y-%m-%dT%H:%M:%S.000Z"'''),
+        a timestamp prepended to each log record. May contain \c strftime conversion specifications.
+        When \c json is configured, defaults to \c "%Y-%m-%dT%H:%M:%S.000Z"'''),
     Config('wait', '0', r'''
         seconds to wait between each write of the log records; setting this value above 0
         configures statistics logging''',
@@ -982,7 +984,7 @@ wiredtiger_open_tiered_storage_configuration = [
             interval in seconds at which to check for tiered storage related work to perform''',
             min=1, max=1000),
         Config('name', 'none', r'''
-            Permitted values are \c "none" or custom storage name created with
+            Permitted values are \c "none" or a custom storage name created with
             WT_CONNECTION::add_storage_source'''),
     ]),
 ]
@@ -1040,8 +1042,8 @@ wiredtiger_open_common =\
     Config('backup_restore_target', '', r'''
         If non-empty and restoring from a backup, restore only the table object targets listed.
         WiredTiger will remove all the metadata entries for the tables that are not listed in
-        th list from the reconstructed metadata. The target list must include URIs matching of
-        type table:''',
+        the list from the reconstructed metadata. The target list must include URIs of type
+        \c table:''',
         type='list'),
     Config('buffer_alignment', '-1', r'''
         in-memory alignment (in bytes) for buffers used for I/O. The default value of -1
@@ -1065,7 +1067,7 @@ wiredtiger_open_common =\
     Config('direct_io', '', r'''
         Use \c O_DIRECT on POSIX systems, and \c FILE_FLAG_NO_BUFFERING on Windows to access files.
         Options are given as a list, such as <code>"direct_io=[data]"</code>. Configuring \c
-        direct_io requires care, see @ref tuning_system_buffer_cache_direct_io for important
+        direct_io requires care; see @ref tuning_system_buffer_cache_direct_io for important
         warnings. Including \c "data" will cause WiredTiger data files, including WiredTiger
         internal data files, to use direct I/O; including \c "log" will cause WiredTiger log
         files to use direct I/O; including \c "checkpoint" will cause WiredTiger data files
@@ -1078,11 +1080,11 @@ wiredtiger_open_common =\
         is explicitly set for them when they are created with WT_SESSION::create''',
         type='category', subconfig=[
         Config('name', 'none', r'''
-            Permitted values are \c "none" or custom encryption engine name created with
+            Permitted values are \c "none" or a custom encryption engine name created with
             WT_CONNECTION::add_encryptor. See @ref encryption for more information'''),
         Config('keyid', '', r'''
             An identifier that identifies a unique instance of the encryptor. It is stored in
-            clear text, and thus is available when the wiredtiger database is reopened. On the
+            clear text, and thus is available when the WiredTiger database is reopened. On the
             first use of a (name, keyid) combination, the WT_ENCRYPTOR::customize function is
             called with the keyid as an argument'''),
         Config('secretkey', '', r'''
@@ -1096,15 +1098,15 @@ wiredtiger_open_common =\
         (for example, <code>extensions=(/path/ext.so={entry=my_entry})</code>)''',
         type='list'),
     Config('file_extend', '', r'''
-        file extension configuration. If set, extend files of the set type in allocations of
-        the set size, instead of a block at a time as each new block is written. For example,
-        <code>file_extend=(data=16MB)</code>. If set to 0, disable the file extension for the
-        set type. For log files, the allowed range is between 100KB and 2GB; values larger
+        file size extension configuration. If set, extend files of the given type in allocations of
+        the given size, instead of a block at a time as each new block is written. For example,
+        <code>file_extend=(data=16MB)</code>. If set to 0, disable file size extension for the
+        given type. For log files, the allowed range is between 100KB and 2GB; values larger
         than the configured maximum log size and the default config would extend log files in
         allocations of the maximum log file size.''',
         type='list', choices=['data', 'log']),
     Config('hash', '', r'''
-        manage resources around hash bucket arrays. All values must be a power of two. Note that
+        manage resources used by hash bucket arrays. All values must be a power of two. Note that
         setting large values can significantly increase memory usage inside WiredTiger''',
         type='category', subconfig=[
         Config('buckets', 512, r'''
@@ -1121,7 +1123,7 @@ wiredtiger_open_common =\
         Use memory mapping when accessing files in a read-only mode''',
         type='boolean'),
     Config('mmap_all', 'false', r'''
-        Use memory mapping to read and write all data files, may not be configured with direct
+        Use memory mapping to read and write all data files. May not be configured with direct
         I/O''',
         type='boolean'),
     Config('multiprocess', 'false', r'''
@@ -1134,7 +1136,7 @@ wiredtiger_open_common =\
         type='boolean'),
     Config('salvage', 'false', r'''
         open connection and salvage any WiredTiger-owned database and log files that it detects as
-        corrupted. This API should only be used after getting an error return of WT_TRY_SALVAGE.
+        corrupted. This call should only be used after getting an error return of WT_TRY_SALVAGE.
         Salvage rebuilds files in place, overwriting existing files. We recommend making a
         backup copy of all files with the WiredTiger prefix prior to passing this flag.''',
         type='boolean'),
@@ -1160,14 +1162,14 @@ wiredtiger_open_common =\
             choices=['dsync', 'fsync', 'none']),
         ]),
     Config('verify_metadata', 'false', r'''
-        open connection and verify any WiredTiger metadata. Not compatible when opening a
+        open connection and verify any WiredTiger metadata. Not supported when opening a
         connection from a backup. This API allows verification and detection of corruption in
         WiredTiger metadata.''',
         type='boolean'),
     Config('write_through', '', r'''
         Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to files. Ignored on non-Windows
         systems. Options are given as a list, such as <code>"write_through=[data]"</code>.
-        Configuring \c write_through requires care, see @ref tuning_system_buffer_cache_direct_io
+        Configuring \c write_through requires care; see @ref tuning_system_buffer_cache_direct_io
         for important warnings. Including \c "data" will cause WiredTiger data files to write
         through cache, including \c "log" will cause WiredTiger log files to write through
         cache. \c write_through should be combined with \c direct_io to get the equivalent of
@@ -1188,7 +1190,7 @@ wiredtiger_open = wiredtiger_open_common + [
         fail if the database already exists, generally used with the \c create option''',
         type='boolean'),
     Config('in_memory', 'false', r'''
-        keep data in-memory only. See @ref in_memory for more information''',
+        keep data in memory only. See @ref in_memory for more information''',
         type='boolean'),
     Config('use_environment', 'true', r'''
         use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment variables if the process
@@ -1202,10 +1204,10 @@ wiredtiger_open = wiredtiger_open_common + [
 
 cursor_bound_config = [
     Config('action', 'set', r'''
-        configures whether this call into the api will set or clear range bounds on the given
-        cursor, it takes two values "set" or "clear". If "set" is specified then "bound" must also
-        be specified. If "clear" is specified without any bounds then both will be cleared. The
-        keys relevant to the given bound must have been set prior to the call using
+        configures whether this call into the API will set or clear range bounds on the given
+        cursor. It takes one of two values, "set" or "clear". If "set" is specified then "bound"
+        must also be specified. If "clear" is specified without any bounds then both bounds will
+        be cleared. The keys relevant to the given bound must have been set prior to the call using
         WT_CURSOR::set_key. This configuration is currently a work in progress and should not be
         used.''',
         choices=['clear','set']),
@@ -1214,20 +1216,20 @@ cursor_bound_config = [
         work in progress and should not be used.''',
         type='boolean'),
     Config('bound', '', r'''
-        configures which bound is being operated on, it takes two values "lower" and "upper".
+        configures which bound is being operated on. It takes one of two values, "lower" or "upper".
         This configuration is currently a work in progress and should not be used.''',
         choices=['lower','upper']),
 ]
 
 cursor_runtime_config = [
     Config('append', 'false', r'''
-        append the value as a new record, creating a new record number key; valid only for
+        append written values as new records, giving each a new record number key; valid only for
         cursors with record number keys''',
         type='boolean'),
     Config('overwrite', 'true', r'''
         configures whether the cursor's insert and update methods check the existing state of
         the record. If \c overwrite is \c false, WT_CURSOR::insert fails with ::WT_DUPLICATE_KEY
-        if the record exists, WT_CURSOR::update fails with ::WT_NOTFOUND if the record does
+        if the record exists, and WT_CURSOR::update fails with ::WT_NOTFOUND if the record does
         not exist''',
         type='boolean'),
     Config('prefix_search', 'false', r'''
@@ -1343,20 +1345,20 @@ methods = {
         modifies the set of items to be returned so that the index key satisfies the given
         comparison relative to the key set in this cursor''',
         choices=['eq', 'ge', 'gt', 'le', 'lt']),
-    Config('count', '', r'''
+    Config('count', '0', r'''
         set an approximate count of the elements that would be included in the join. This is
-        used in sizing the bloom filter, and also influences evaluation order for cursors in
-        the join. When the count is equal for multiple bloom filters in a composition of joins,
-        the bloom filter may be shared''',
+        used in sizing the Bloom filter, and also influences evaluation order for cursors in
+        the join. When the count is equal for multiple Bloom filters in a composition of joins,
+        the Bloom filter may be shared''',
         type='int'),
     Config('bloom_bit_count', '16', r'''
-        the number of bits used per item for the bloom filter''',
+        the number of bits used per item for the Bloom filter''',
         min='2', max='1000'),
     Config('bloom_false_positives', 'false', r'''
-        return all values that pass the bloom filter, without eliminating any false positives''',
+        return all values that pass the Bloom filter, without eliminating any false positives''',
         type='boolean'),
     Config('bloom_hash_count', '8', r'''
-        the number of hash values per item for the bloom filter''',
+        the number of hash values per item for the Bloom filter''',
         min='2', max='100'),
     Config('operation', '"and"', r'''
         the operation applied between this and other joined cursors. When "operation=and"
@@ -1365,9 +1367,9 @@ methods = {
         All cursors joined to a join cursor must have matching operations''',
         choices=['and', 'or']),
     Config('strategy', '', r'''
-        when set to bloom, a bloom filter is created and populated for this index. This has an
+        when set to \c bloom, a Bloom filter is created and populated for this index. This has an
         up front cost but may reduce the number of accesses to the main table when iterating
-        the joined cursor. The bloom setting requires that count be set''',
+        the joined cursor. The \c bloom setting requires that \c count be set''',
         choices=['bloom', 'default']),
 ]),
 
@@ -1394,8 +1396,8 @@ methods = {
         Bulk-loaded bitmap values must end on a byte boundary relative to the bit count (except
         for the last set of values loaded)'''),
     Config('checkpoint', '', r'''
-        the name of a checkpoint to open (the reserved name "WiredTigerCheckpoint" opens
-        the most recent checkpoint taken for the object). The cursor does not support data
+        the name of a checkpoint to open. (The reserved name "WiredTigerCheckpoint" opens
+        the most recent checkpoint taken for the object.) The cursor does not support data
         modification'''),
     Config('checkpoint_use_history', 'true', r'''
         when opening a checkpoint cursor, open history store cursors and retrieve snapshot and
@@ -1421,7 +1423,7 @@ methods = {
             through the history of values for a given key.''',
             type='boolean'),
         Config('release_evict', 'false', r'''
-            Configure the cursor to evict the page positioned on when the reset API is used''',
+            Configure the cursor to evict the page positioned on when the reset API call is used''',
             type='boolean'),
         ]),
     Config('dump', '', r'''
@@ -1467,7 +1469,7 @@ methods = {
             incremental backup'''),
         Config('this_id', '', r'''
             a string that identifies the current system state  as a future backup source for
-            an incremental backup via 'src_id'. This identifier is required when opening an
+            an incremental backup via \c src_id. This identifier is required when opening an
             incremental backup cursor and an error will be returned if one is not provided.
             The identifiers can be any text string, but should be unique'''),
         ]),
@@ -1495,7 +1497,7 @@ methods = {
     Config('readonly', 'false', r'''
         only query operations are supported by this cursor. An error is returned if a modification
         is attempted using the cursor. The default is false for all cursor types except for
-        metadata cursors''',
+        metadata cursors and checkpoint cursors''',
         type='boolean'),
     Config('skip_sort_check', 'false', r'''
         skip the check of the sort order of each bulk-loaded key''',
@@ -1516,7 +1518,7 @@ methods = {
         See @ref statistics for more information''',
         type='list', choices=['all', 'cache_walk', 'fast', 'clear', 'size', 'tree_walk']),
     Config('target', '', r'''
-        if non-empty, backup the list of objects; valid only for a backup data source''',
+        if non-empty, back up the given list of objects; valid only for a backup data source''',
         type='list'),
 ]),
 
@@ -1601,7 +1603,7 @@ methods = {
 
 'WT_SESSION.begin_transaction' : Method([
     Config('ignore_prepare', 'false', r'''
-        whether to ignore the updates by other prepared transactions as part of read operations
+        whether to ignore updates by other prepared transactions when doing of read operations
         of this transaction. When \c true, forces the transaction to be read-only. Use \c force
         to ignore prepared updates and permit writes (see @ref timestamp_prepare_ignore_prepare
         for more information)''',
@@ -1612,7 +1614,7 @@ methods = {
     Config('name', '', r'''
         name of the transaction for tracing and debugging'''),
     Config('no_timestamp', 'false', r'''
-        allow a commit without a timestamp, creating a value that has "always existed" and is
+        allow a commit without a timestamp, creating values that have "always existed" and are
         visible regardless of timestamp. See @ref timestamp_txn_api''',
         type='boolean'),
     Config('operation_timeout_ms', '0', r'''
@@ -1633,8 +1635,8 @@ methods = {
         round up timestamps of the transaction''',
         type='category', subconfig= [
         Config('prepared', 'false', r'''
-            applicable only for prepared transactions, and intended only for special-purpose use,
-            see @ref timestamp_prepare_roundup. Allows the prepare timestamp and the commit
+            applicable only for prepared transactions, and intended only for special-purpose use.
+            See @ref timestamp_prepare_roundup. Allows the prepare timestamp and the commit
             timestamp of this transaction to be rounded up to be no older than the oldest
             timestamp, and allows violating the usual restriction that the prepare timestamp
             must be newer than the stable timestamp. Specifically: at transaction prepare, if
@@ -1646,7 +1648,7 @@ methods = {
             type='boolean'),
         Config('read', 'false', r'''
             if the read timestamp is less than the oldest timestamp, the read timestamp will be
-            rounded up to the oldest timestamp, see @ref timestamp_read_roundup''',
+            rounded up to the oldest timestamp. See @ref timestamp_read_roundup''',
             type='boolean'),
         ]),
     Config('sync', '', r'''
@@ -1658,10 +1660,10 @@ methods = {
 'WT_SESSION.commit_transaction' : Method([
     Config('commit_timestamp', '', r'''
         set the commit timestamp for the current transaction. For non-prepared transactions,
-        value must not be older than the first commit timestamp already set for the current
-        transaction, if any, must not be older than the current oldest timestamp and must
+        the value must not be older than the first commit timestamp already set for the current
+        transaction (if any), must not be older than the current oldest timestamp, and must
         be after the current stable timestamp. For prepared transactions, a commit timestamp
-        is required, must not be older than the prepare timestamp and can be set only once.
+        is required, must not be older than the prepare timestamp, and can be set only once.
         See @ref timestamp_txn_api and @ref timestamp_prepare'''),
     Config('durable_timestamp', '', r'''
         set the durable timestamp for the current transaction. Required for the commit of a
@@ -1676,8 +1678,8 @@ methods = {
         error. Default is to have no limit''',
         min=1),
     Config('sync', '', r'''
-        override whether to sync log records when the transaction commits, inherited from
-        ::wiredtiger_open \c transaction_sync. The \c off setting does not wait for records
+        override whether to sync log records when the transaction commits. The default is inherited
+        from ::wiredtiger_open \c transaction_sync. The \c off setting does not wait for records
         to be written or synchronized. The \c on setting forces log records to be written to
         the storage device''',
         choices=['off', 'on']),
@@ -1738,14 +1740,14 @@ methods = {
         type='list'),
     Config('force', 'false', r'''
         if false (the default), checkpoints may be skipped if the underlying object has not been
-        modified, if true, this option forces the checkpoint''',
+        modified. If true, this option forces the checkpoint''',
         type='boolean'),
     Config('name', '', r'''
         if set, specify a name for the checkpoint (note that checkpoints including LSM trees
         may not be named)'''),
     Config('target', '', r'''
         if non-empty, checkpoint the list of objects. Checkpointing a list of objects separately
-        from a database-wide checkpoint can lead to data inconsistencies, see @ref checkpoint_target
+        from a database-wide checkpoint can lead to data inconsistencies; see @ref checkpoint_target
         for more information''',
         type='list'),
     Config('use_timestamp', 'true', r'''
@@ -1847,12 +1849,12 @@ methods = {
         type='boolean', undoc=True),
     Config('oldest_timestamp', '', r'''
         future commits and queries will be no earlier than the specified timestamp. Values must
-        be monotonically increasing, any attempt to set the value to older than the current
+        be monotonically increasing; any attempt to set the value to older than the current
         is silently ignored. The value must not be newer than the current stable timestamp.
         See @ref timestamp_global_api'''),
     Config('stable_timestamp', '', r'''
         checkpoints will not include commits that are newer than the specified timestamp in tables
-        configured with \c "log=(enabled=false)". Values must be monotonically increasing,
+        configured with \c "log=(enabled=false)". Values must be monotonically increasing;
         any attempt to set the value to older than the current is silently ignored. The value
         must not be older than the current oldest timestamp. See @ref timestamp_global_api'''),
 ]),

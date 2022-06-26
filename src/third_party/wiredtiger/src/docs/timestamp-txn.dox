@@ -52,9 +52,9 @@ on their timestamps. Readers acquiring a snapshot after the commit of the
 update without a timestamp will not see prior historical values regardless
 of their read timestamps.
 
-There are additional timestamp usage checks in diagnostic builds. While
-building in diagnostic mode to enable these usage checks will decrease
-application performance, and applications should not configure diagnostic
+There are additional timestamp usage checks in diagnostic builds.
+Building in diagnostic mode to enable these usage checks will decrease
+application performance. While applications should not configure diagnostic
 builds for production use, they are strongly recommended during development.
 
 If WiredTiger detects a violation of timestamp policy, an error message
