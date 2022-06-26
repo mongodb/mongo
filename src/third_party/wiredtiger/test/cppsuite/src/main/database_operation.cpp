@@ -306,25 +306,34 @@ database_operation::remove_operation(thread_worker *tc)
         scoped_cursor &cursor = cursors[coll.id];
 
         /* Choose a random key to delete. */
-        const char *key_str;
         int ret = rnd_cursor->next(rnd_cursor.get());
-        /* It is possible not to find anything if the collection is empty. */
-        testutil_assert(ret == 0 || ret == WT_NOTFOUND);
-        if (ret == WT_NOTFOUND) {
+
+        if (ret != 0) {
             /*
-             * If we cannot find any record, finish the current transaction as we might be able to
-             * see new records after starting a new one.
+             * It is possible not to find anything if the collection is empty. In that case, finish
+             * the current transaction as we might be able to see new records after starting a new
+             * one.
              */
-            WT_IGNORE_RET_BOOL(tc->txn.commit());
+            if (ret == WT_NOTFOUND) {
+                WT_IGNORE_RET_BOOL(tc->txn.commit());
+            } else if (ret == WT_ROLLBACK) {
+                tc->txn.rollback();
+            } else {
+                testutil_die(ret, "Unexpected error returned from cursor->next()");
+            }
+            testutil_check(rnd_cursor->reset(rnd_cursor.get()));
             continue;
         }
+
+        const char *key_str;
         testutil_check(rnd_cursor->get_key(rnd_cursor.get(), &key_str));
         if (!tc->remove(cursor, coll.id, key_str)) {
             tc->txn.rollback();
         }
 
-        /* Reset our cursor to avoid pinning content. */
+        /* Reset our cursors to avoid pinning content. */
         testutil_check(cursor->reset(cursor.get()));
+        testutil_check(rnd_cursor->reset(rnd_cursor.get()));
 
         /* Commit the current transaction if we're able to. */
         if (tc->txn.can_commit())
