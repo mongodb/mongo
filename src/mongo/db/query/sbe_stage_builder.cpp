@@ -319,9 +319,6 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
         }
     }
 
-    // TODO SERVER-66039: Add dassert on sbe::validateInputParamsBindings().
-    // If the cached plan is parameterized, bind new values for the parameters into the runtime
-    // environment.
     input_params::bind(cq, data->inputParamToSlotMap, env, preparingFromCache);
 
     for (auto&& indexBoundsInfo : data->indexBoundsEvaluationInfos) {

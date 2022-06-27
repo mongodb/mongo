@@ -31,7 +31,6 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/sbe_stage_builder.h"
 
 namespace mongo::sbe {
 /**
@@ -40,16 +39,4 @@ namespace mongo::sbe {
 bool isQuerySbeCompatible(const CollectionPtr* collection,
                           const CanonicalQuery* cq,
                           size_t plannerOptions);
-
-/**
- * Some of InputParamIds assigned in the MatchExpression tree (parameter 'root') might be missing
- * from 'inputParamToSlotMap' due to later optimizations on index bound evaluation step. This
- * function validates that in this case the missing parameters are indeed missing due to the
- * optimizations mentioned above and, as such, are not represented in Interval Evaluation Tree built
- * during index bound evaluation and stored in 'inputParamToSlotMap'.
- */
-bool validateInputParamsBindings(
-    const MatchExpression* root,
-    const std::vector<stage_builder::IndexBoundsEvaluationInfo>& indexBoundsEvaluationInfos,
-    const stage_builder::InputParamToSlotMap& inputParamToSlotMap);
 }  // namespace mongo::sbe
