@@ -55,6 +55,14 @@ const testCommand = function(cmd, cmdObj) {
     validateErrorResponse(res, testDB.getName(), uuid, coll2.getName(), coll.getName());
     assert(!testDB.getCollectionNames().includes(coll2.getName()));
 
+    jsTestLog("The command '" + cmd +
+              "' fails with CollectionUUIDMismatch even if the database does not exist.");
+    const nonexistentDB = testDB.getSiblingDB(testDB.getName() + '_nonexistent');
+    cmdObj[cmd] = 'nonexistent';
+    res = assert.commandFailedWithCode(nonexistentDB.runCommand(cmdObj),
+                                       ErrorCodes.CollectionUUIDMismatch);
+    validateErrorResponse(res, nonexistentDB.getName(), uuid, 'nonexistent', null);
+
     jsTestLog("The command '" + cmd + "' succeeds on view when no UUID is provided.");
     const viewName = "view";
     assert.commandWorked(testDB.runCommand(

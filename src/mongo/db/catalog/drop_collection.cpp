@@ -36,6 +36,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
+#include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -355,7 +356,13 @@ Status _dropCollection(OperationContext* opCtx,
             AutoGetDb autoDb(opCtx, collectionName.db(), MODE_IX);
             auto db = autoDb.getDb();
             if (!db) {
-                return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+                return expectedUUID
+                    ? Status{CollectionUUIDMismatchInfo(collectionName.db().toString(),
+                                                        *expectedUUID,
+                                                        collectionName.coll().toString(),
+                                                        boost::none),
+                             "Database does not exist"}
+                    : Status(ErrorCodes::NamespaceNotFound, "ns not found");
             }
 
             if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName)) {
