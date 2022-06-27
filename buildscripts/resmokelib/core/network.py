@@ -49,7 +49,7 @@ class PortAllocator(object):
 
     # The first _PORTS_PER_FIXTURE ports of each range are reserved for the fixtures, the remainder
     # of the port range is used by tests.
-    _PORTS_PER_FIXTURE = 20
+    _PORTS_PER_FIXTURE = 40
 
     _NUM_USED_PORTS_LOCK = threading.Lock()
 
