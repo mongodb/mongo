@@ -28,13 +28,11 @@ env.SConscript('third_party/SConscript', exports=['env'])
 env = env.Clone()
 
 # Inject common dependencies from third_party globally for all core mongo code
-# and modules. Ideally, pcre wouldn't be here, but enough things require it
-# now that it seems hopeless to remove it.
+# and modules.
 env.InjectThirdParty(libraries=[
     'abseil-cpp',
     'boost',
     'fmt',
-    'pcre',
     'safeint',
     'variant',
 ])

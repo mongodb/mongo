@@ -427,7 +427,6 @@ for pack in [
     ('icu', 'ICU'),
     ('intel_decimal128', 'intel decimal128'),
     ('kms-message', ),
-    ('pcre', ),
     ('pcre2', ),
     ('snappy', ),
     ('stemmer', ),
@@ -4729,12 +4728,6 @@ def doConfigure(myenv):
             env.ConfError("Could not find <curl/curl.h> and curl lib")
 
         return False
-
-    if use_system_version_of_library("pcre"):
-        conf.FindSysLibDep("pcre", ["pcre"])
-        conf.FindSysLibDep("pcrecpp", ["pcrecpp"])
-    else:
-        conf.env.Prepend(CPPDEFINES=['PCRE_STATIC'])
 
     if use_system_version_of_library("pcre2"):
         conf.FindSysLibDep("pcre2", ["pcre2-8"])

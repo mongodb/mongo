@@ -58,7 +58,7 @@ _CODE_PATTERNS = [
 ]
 
 _DIR_EXCLUDE_RE = re.compile(r'(\..*'
-                             r'|pcre-.*'
+                             r'|pcre2.*'
                              r'|32bit.*'
                              r'|mongodb-.*'
                              r'|debian.*'

@@ -14,7 +14,6 @@ Import([
 ])
 
 snappySuffix = '-1.1.7'
-pcreSuffix = "-8.42"
 icuSuffix = '-57.1'
 timelibSuffix = '-2021.06'
 tomcryptSuffix = '-1.18.2'
@@ -74,11 +73,6 @@ env.AddMethod(injectMozJS, 'InjectMozJS')
 if not use_system_version_of_library('tcmalloc'):
     # GPerftools does this slightly differently than the others.
     thirdPartyEnvironmentModifications['gperftools'] = {}
-
-if not use_system_version_of_library('pcre'):
-    thirdPartyEnvironmentModifications['pcre'] = {
-        'CPPPATH': ['#/src/third_party/pcre' + pcreSuffix],
-    }
 
 if not use_system_version_of_library('pcre2'):
     thirdPartyEnvironmentModifications['pcre2'] = {
@@ -310,22 +304,6 @@ else:
     ])
 
 fmtEnv.ShimLibrary(name="fmt")
-
-pcreEnv = env.Clone()
-if use_system_version_of_library("pcre"):
-    pcreEnv = pcreEnv.Clone(SYSLIBDEPS=[
-        env['LIBDEPS_PCRE_SYSLIBDEP'],
-        env['LIBDEPS_PCRECPP_SYSLIBDEP'],
-    ])
-else:
-    pcreEnv = pcreEnv.Clone()
-    pcreEnv.InjectThirdParty(libraries=['pcre'])
-    pcreEnv.SConscript('pcre' + pcreSuffix + '/SConscript', exports={'env': pcreEnv})
-    pcreEnv = pcreEnv.Clone(LIBDEPS_INTERFACE=[
-        'pcre' + pcreSuffix + '/pcrecpp',
-    ])
-
-pcreEnv.ShimLibrary(name="pcrecpp")
 
 pcre2Env = env.Clone()
 if use_system_version_of_library("pcre2"):

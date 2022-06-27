@@ -7,7 +7,7 @@ src:src/third_party/icu4c-*/*
 src:src/third_party/libstemmer_c/*
 src:src/third_party/mozjs/*
 src:src/third_party/murmurhash3/*
-src:src/third_party/pcre-*/*
+src:src/third_party/pcre2/*
 src:src/third_party/s2/*
 src:src/third_party/snappy-*/*
 src:src/third_party/tz/*

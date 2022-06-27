@@ -232,14 +232,6 @@ components:
     team_owner: "Security"
     # Note: ocspresponder exists in Black Duck, but not OpenHub
 
-  PCRE:
-    homepage_url: https://www.pcre.org/
-    open_hub_url: https://www.openhub.net/p/pcre
-    release_monitoring_id: 2610
-    local_directory_path: src/third_party/pcre-8.42
-    team_owner: "Query"
-    upgrade_suppression: TODO SERVER-47278
-
   PCRE2:
     homepage_url: https://www.pcre.org/
     open_hub_url: https://www.openhub.net/p/pcre2
