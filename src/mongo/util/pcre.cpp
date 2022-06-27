@@ -156,7 +156,8 @@ private:
 /** Members implement Regex interface and are documented there. */
 class RegexImpl {
 public:
-    RegexImpl(std::string pattern, CompileOptions options) : _pattern{std::move(pattern)} {
+    RegexImpl(std::string pattern, CompileOptions options)
+        : _pattern{std::move(pattern)}, _errorPos{0} {
         int err = 0;
         CompileContext compileContext;
         if (auto ec = compileContext.setMaxPatternLength(kMaxPatternLength)) {
