@@ -108,7 +108,7 @@ public:
         const std::list<BSONObj>& originalIndexes) override;
 
     void createCollection(OperationContext* opCtx,
-                          const std::string& dbName,
+                          const DatabaseName& dbName,
                           const BSONObj& cmdObj) override;
 
     void dropCollection(OperationContext* opCtx, const NamespaceString& collection) override;

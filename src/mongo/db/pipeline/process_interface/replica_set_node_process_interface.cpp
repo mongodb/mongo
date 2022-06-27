@@ -142,13 +142,14 @@ void ReplicaSetNodeProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
 }
 
 void ReplicaSetNodeProcessInterface::createCollection(OperationContext* opCtx,
-                                                      const std::string& dbName,
+                                                      const DatabaseName& dbName,
                                                       const BSONObj& cmdObj) {
-    NamespaceString dbNs{dbName};
+    NamespaceString dbNs = NamespaceString(dbName, StringData(""));
     if (_canWriteLocally(opCtx, dbNs)) {
         return NonShardServerProcessInterface::createCollection(opCtx, dbName, cmdObj);
     }
-    auto ns = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
+    // TODO SERVER-67519 change CommandHelpers::parseNsCollectionRequired to take in DatabaseName
+    auto ns = CommandHelpers::parseNsCollectionRequired(dbName.toStringWithTenantId(), cmdObj);
     uassertStatusOK(_executeCommandOnPrimary(opCtx, ns, cmdObj));
 }
 

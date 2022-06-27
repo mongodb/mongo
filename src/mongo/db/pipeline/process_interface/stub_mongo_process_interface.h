@@ -138,7 +138,7 @@ public:
     }
 
     void createCollection(OperationContext* opCtx,
-                          const std::string& dbName,
+                          const DatabaseName& dbName,
                           const BSONObj& cmdObj) override {
         MONGO_UNREACHABLE;
     }

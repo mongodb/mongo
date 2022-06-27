@@ -76,7 +76,7 @@ public:
                                                  const BSONObj& originalCollectionOptions,
                                                  const std::list<BSONObj>& originalIndexes);
     void createCollection(OperationContext* opCtx,
-                          const std::string& dbName,
+                          const DatabaseName& dbName,
                           const BSONObj& cmdObj);
     void dropCollection(OperationContext* opCtx, const NamespaceString& collection);
     void createIndexesOnEmptyCollection(OperationContext* opCtx,

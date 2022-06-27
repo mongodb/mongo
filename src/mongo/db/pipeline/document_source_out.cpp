@@ -113,8 +113,9 @@ void DocumentSourceOut::initialize() {
     // to be the target collection once we are done.
     // Note that this temporary collection name is used by MongoMirror and thus should not be
     // changed without consultation.
-    _tempNs = NamespaceString(str::stream()
-                              << outputNs.dbName().toString() << ".tmp.agg_out." << UUID::gen());
+    _tempNs = NamespaceString(outputNs.tenantId(),
+                              str::stream() << outputNs.dbName().toString() << ".tmp.agg_out."
+                                            << UUID::gen());
 
     // Save the original collection options and index specs so we can check they didn't change
     // during computation.
@@ -139,7 +140,7 @@ void DocumentSourceOut::initialize() {
         cmd.appendElementsUnique(_originalOutOptions);
 
         pExpCtx->mongoProcessInterface->createCollection(
-            pExpCtx->opCtx, _tempNs.dbName().toString(), cmd.done());
+            pExpCtx->opCtx, _tempNs.dbName(), cmd.done());
     }
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(

@@ -255,7 +255,7 @@ public:
      * the primary shard of 'dbName'.
      */
     virtual void createCollection(OperationContext* opCtx,
-                                  const std::string& dbName,
+                                  const DatabaseName& dbName,
                                   const BSONObj& cmdObj) = 0;
 
     /**
