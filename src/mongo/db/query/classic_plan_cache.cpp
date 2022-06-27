@@ -126,6 +126,10 @@ std::string SolutionCacheData::toString() const {
 }
 
 bool shouldCacheQuery(const CanonicalQuery& query) {
+    if (internalQueryDisablePlanCache.load()) {
+        return false;
+    }
+
     const FindCommandRequest& findCommand = query.getFindCommandRequest();
     const MatchExpression* expr = query.root();
 

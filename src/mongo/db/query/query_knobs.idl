@@ -129,6 +129,13 @@ server_parameters:
   # Plan cache
   #
 
+  internalQueryDisablePlanCache:
+    description:  "Disables caching of query plans for both classic and SBE engines."
+    set_at: [ startup ]
+    cpp_varname: "internalQueryDisablePlanCache"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
   internalQueryCacheMaxEntriesPerCollection:
     description: "The maximum number of entries allowed in a given collection's plan cache. Applies
     only to the classic plan cache, not to the SBE plan cache."

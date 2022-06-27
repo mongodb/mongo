@@ -199,7 +199,10 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     }
     auto unavailableMetadata = validStatus.getValue();
     _root = MatchExpression::normalize(std::move(root));
-    if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+
+    // If caching is disabled, do not perform any autoparameterization.
+    if (!internalQueryDisablePlanCache.load() &&
+        feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
         const bool hasNoTextNodes =
             !QueryPlannerCommon::hasNode(_root.get(), MatchExpression::TEXT);
         if (hasNoTextNodes) {
