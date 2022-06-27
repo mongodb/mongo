@@ -23,7 +23,8 @@ env.Library(
         '$BUILD_DIR/mongo/scripting/bson_template_evaluator',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/third_party/shim_pcrecpp',
+        '$BUILD_DIR/mongo/util/pcre_util',
+        '$BUILD_DIR/mongo/util/pcre_wrapper',
     ],
 )
 
@@ -277,7 +278,6 @@ if not has_option('noshell') and jsEngine:
             "$BUILD_DIR/mongo/util/processinfo",
             "$BUILD_DIR/mongo/util/signal_handlers",
             "$BUILD_DIR/mongo/util/version_impl",
-            "$BUILD_DIR/third_party/shim_pcrecpp",
             "benchrun",
             "encrypted_dbclient" if get_option('ssl') == 'on' else '',
             "kms_shell" if get_option('ssl') == 'on' else '',
@@ -305,8 +305,8 @@ if not has_option('noshell') and jsEngine:
             "$BUILD_DIR/mongo/s/write_ops/batch_write_types",
             "$BUILD_DIR/mongo/transport/transport_layer",
             "$BUILD_DIR/mongo/util/net/ssl_manager",
+            "$BUILD_DIR/mongo/util/pcre_wrapper",
             "$BUILD_DIR/mongo/util/signal_handlers",
-            "$BUILD_DIR/third_party/shim_pcrecpp",
             "linenoise",
             "mongo_initializers",
             "shell_utils",

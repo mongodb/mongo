@@ -36,7 +36,6 @@
 #include <boost/predef/hardware/simd.h>
 #include <cstdint>
 #include <ostream>
-#include <pcre.h>
 #include <string>
 #include <utility>
 #include <vector>
@@ -52,6 +51,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/endian.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/represent_as.h"
 
 namespace mongo {
@@ -874,68 +874,6 @@ private:
 bool operator==(const ArraySet& lhs, const ArraySet& rhs);
 bool operator!=(const ArraySet& lhs, const ArraySet& rhs);
 
-/**
- * Implements a wrapper of PCRE regular expression.
- * Storing the pattern and the options allows for copying of the sbe::value::PcreRegex expression,
- * which includes recompilation.
- * The compiled expression pcre* allows for direct usage of the pcre C library functionality.
- */
-class PcreRegex {
-public:
-    PcreRegex(StringData pattern, StringData options) : _pattern(pattern), _options(options) {
-        _compile();
-    }
-
-    PcreRegex(const PcreRegex& other) : PcreRegex(other._pattern, other._options) {}
-
-    PcreRegex& operator=(const PcreRegex& other) {
-        if (this != &other) {
-            (*pcre_free)(_pcrePtr);
-            _pattern = other._pattern;
-            _options = other._options;
-            _compile();
-        }
-        return *this;
-    }
-
-    ~PcreRegex() {
-        (*pcre_free)(_pcrePtr);
-    }
-
-    const std::string& pattern() const {
-        return _pattern;
-    }
-
-    const std::string& options() const {
-        return _options;
-    }
-
-    /**
-     * Wrapper function for pcre_exec().
-     * - input: The input string.
-     * - startPos: The position from where the search should start.
-     * - buf: Array populated with the found matched string and capture groups.
-     * Returns the number of matches or an error code:
-     *         < -1 error
-     *         = -1 no match
-     *         = 0  there was a match, but not enough space in the buffer
-     *         > 0  the number of matches
-     */
-    int execute(StringData input, int startPos, std::vector<int>& buf);
-
-    size_t getNumberCaptures() const;
-
-    size_t getApproximateSize() const;
-
-private:
-    void _compile();
-
-    std::string _pattern;
-    std::string _options;
-
-    pcre* _pcrePtr = nullptr;
-};
-
 constexpr size_t kSmallStringMaxLength = 7;
 using ObjectIdType = std::array<uint8_t, 12>;
 static_assert(sizeof(ObjectIdType) == 12);
@@ -1218,10 +1156,10 @@ inline KeyString::Value* getKeyStringView(Value val) noexcept {
 
 std::pair<TypeTags, Value> makeNewPcreRegex(StringData pattern, StringData options);
 
-std::pair<TypeTags, Value> makeCopyPcreRegex(const PcreRegex& regex);
+std::pair<TypeTags, Value> makeCopyPcreRegex(const pcre::Regex& regex);
 
-inline PcreRegex* getPcreRegexView(Value val) noexcept {
-    return reinterpret_cast<PcreRegex*>(val);
+inline pcre::Regex* getPcreRegexView(Value val) noexcept {
+    return reinterpret_cast<pcre::Regex*>(val);
 }
 
 inline JsFunction* getJsFunctionView(Value val) noexcept {

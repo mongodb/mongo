@@ -31,12 +31,12 @@
 
 #include <boost/optional.hpp>
 #include <memory>
-#include <pcrecpp.h>
 #include <utility>
 #include <vector>
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
+#include "mongo/util/pcre.h"
 
 namespace mongo {
 
@@ -90,15 +90,15 @@ namespace mongo {
 class InternalSchemaAllowedPropertiesMatchExpression final : public MatchExpression {
 public:
     /**
-     * A container for regular expression data. Holds a pcrecpp::RE object, as well as the original
+     * A container for regular expression data. Holds a regex object, as well as the original
      * string pattern, which is used for comparisons and serialization.
      */
     struct Pattern {
         explicit Pattern(StringData pattern)
-            : rawRegex(pattern), regex(std::make_unique<pcrecpp::RE>(pattern.toString())) {}
+            : rawRegex(pattern), regex(std::make_unique<pcre::Regex>(std::string{rawRegex})) {}
 
         StringData rawRegex;
-        std::unique_ptr<pcrecpp::RE> regex;
+        std::unique_ptr<pcre::Regex> regex;
     };
 
     /**

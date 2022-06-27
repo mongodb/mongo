@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
+#include "mongo/util/errno_util.h"
 
 namespace mongo {
 constexpr StringData InternalSchemaAllowedPropertiesMatchExpression::kName;
@@ -47,10 +48,10 @@ InternalSchemaAllowedPropertiesMatchExpression::InternalSchemaAllowedPropertiesM
       _otherwise(std::move(otherwise)) {
 
     for (auto&& constraint : _patternProperties) {
-        const auto& errorStr = constraint.first.regex->error();
+        const auto& re = constraint.first.regex;
         uassert(ErrorCodes::BadValue,
-                str::stream() << "Invalid regular expression: " << errorStr,
-                errorStr.empty());
+                str::stream() << "Invalid regular expression: " << errorMessage(re->error()),
+                *re);
     }
 }
 
@@ -107,7 +108,7 @@ bool InternalSchemaAllowedPropertiesMatchExpression::_matchesBSONObj(const BSONO
     for (auto&& property : obj) {
         bool checkOtherwise = true;
         for (auto&& constraint : _patternProperties) {
-            if (constraint.first.regex->PartialMatch(property.fieldName())) {
+            if (constraint.first.regex->matchView(property.fieldName())) {
                 checkOtherwise = false;
                 if (!constraint.second->matchesBSONElement(property)) {
                     return false;

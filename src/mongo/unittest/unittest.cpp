@@ -39,7 +39,6 @@
 #include <iostream>
 #include <map>
 #include <memory>
-#include <pcrecpp.h>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"
@@ -55,6 +54,7 @@
 #include "mongo/logv2/plain_formatter.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/timer.h"
@@ -79,7 +79,7 @@ auto& suitesMap() {
 }  // namespace
 
 bool searchRegex(const std::string& pattern, const std::string& string) {
-    return pcrecpp::RE(pattern).PartialMatch(string);
+    return !!pcre::Regex(pattern).matchView(string);
 }
 
 class Result {
@@ -396,20 +396,20 @@ std::unique_ptr<Result> Suite::run(const std::string& filter,
     Timer timer;
     auto r = std::make_unique<Result>(_name);
 
-    boost::optional<pcrecpp::RE> filterRe;
-    boost::optional<pcrecpp::RE> fileNameFilterRe;
+    boost::optional<pcre::Regex> filterRe;
+    boost::optional<pcre::Regex> fileNameFilterRe;
     if (!filter.empty())
         filterRe.emplace(filter);
     if (!fileNameFilter.empty())
         fileNameFilterRe.emplace(fileNameFilter);
 
     for (const auto& tc : _tests) {
-        if (filterRe && !filterRe->PartialMatch(tc.name)) {
+        if (filterRe && !filterRe->matchView(tc.name)) {
             LOGV2_DEBUG(23057, 1, "skipped due to filter", "test"_attr = tc.name);
             continue;
         }
 
-        if (fileNameFilterRe && !fileNameFilterRe->PartialMatch(tc.fileName)) {
+        if (fileNameFilterRe && !fileNameFilterRe->matchView(tc.fileName)) {
             LOGV2_DEBUG(23058, 1, "skipped due to fileNameFilter", "testFile"_attr = tc.fileName);
             continue;
         }

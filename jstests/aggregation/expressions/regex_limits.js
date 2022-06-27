@@ -9,7 +9,7 @@ load('jstests/libs/sbe_assert_error_override.js');  // Override error-code-check
 
 const coll = db.regex_expr_limit;
 coll.drop();
-assert.commandWorked(coll.insert({z: "c".repeat(50000) + "d".repeat(50000) + "e"}));
+assert.commandWorked(coll.insert({z: "c".repeat(25000) + "d".repeat(25000) + "e"}));
 
 function testRegexAgg(inputObj, expectedOutputForFindAll) {
     const resultFindAll =
@@ -39,11 +39,8 @@ function testRegexAggException(inputObj, exceptionCode, expression) {
 }
 
 (function testLongRegex() {
-    // PCRE doesn't have a direct limit on the regex string length. It will instead error when
-    // the internal memory used while compiling reaches 64KB. When there are no capture groups
-    // this limit is 32764.
-    // Reference : https://www.pcre.org/original/doc/html/pcrelimits.html
-    const kMaxRegexPatternLen = 32764;
+    // Our limit on regex pattern length is 2^14.
+    const kMaxRegexPatternLen = 16384;
     const patternMaxLen = "c".repeat(kMaxRegexPatternLen);
 
     // Test that a regex with maximum allowable pattern length can find a document.
@@ -60,40 +57,25 @@ function testRegexAggException(inputObj, exceptionCode, expression) {
     // are 'n' characters in the input, it would result to 'n' individual matches. If the
     // pattern further has 'k' capture groups, then the output document will have 'n * k'
     // sub-strings representing the captures.
-    const pattern = "(".repeat(100) + ")".repeat(100);
+    const pattern = "(".repeat(150) + ")".repeat(150);
     // If the intermediate document size exceeds 64MB at any point, we will stop further
     // evaluation and throw an error.
     testRegexAggException({input: "$z", regex: pattern}, 51151, "$regexFindAll");
 
-    const pattern2 = "()".repeat(100);
+    const pattern2 = "()".repeat(150);
     testRegexAggException({input: "$z", regex: pattern2}, 51151, "$regexFindAll");
 })();
 
 (function testNumberOfCaptureGroupLimit() {
-    // Even though PCRE has a much higher limit on captures (65535), we will be limited by the
-    // other limit, maximum internal memory it uses while compiling is 64KB. PCRE will use a lot
-    // more memory when there are capture groups. As the number of capture groups increases, the
-    // max length of the regex reduces by a factor of around 4.
-    const approxAllowedCaptureGroups = 3999;
-    let pattern = "(d)".repeat(approxAllowedCaptureGroups) + "e";
-    const expectedOutputCaptures = new Array(approxAllowedCaptureGroups).fill('d');
+    const allowedCaptureGroups = 250;
+    let pattern = "(d)".repeat(allowedCaptureGroups) + "e";
+    const expectedOutputCaptures = new Array(allowedCaptureGroups).fill('d');
 
     testRegexAgg({input: "$z", regex: pattern}, [{
-                     match: "d".repeat(approxAllowedCaptureGroups) + "e",
-                     "idx": 96001,
+                     match: "d".repeat(allowedCaptureGroups) + "e",
+                     "idx": 49750,
                      "captures": expectedOutputCaptures
                  }]);
-
-    // In this case, during execution, PCRE will hit the PCRE_ERROR_RECURSIONLIMIT because of
-    // high number of captures and return an error.
-    const bufferExecutionFailure = 2553;
-    pattern = "(d)".repeat(bufferExecutionFailure) + pattern;
-    testRegexAggException({input: "$z", regex: pattern}, 51156);
-
-    // Add one more capture group to the pattern so that it tips over the maximum regex length
-    // limit, and verify that PCRE throws an error while attempting to compile.
-    pattern = "(d)" + pattern;
-    testRegexAggException({input: "$z", regex: pattern}, 51111);
 })();
 
 (function testMaxCaptureDepth() {
@@ -105,7 +87,7 @@ function testRegexAggException(inputObj, exceptionCode, expression) {
 
     // Test that there is a match.
     testRegexAgg({input: "$z", regex: patternMaxDepth},
-                 [{match: "e", "idx": 100000, "captures": expectedOutputCaptures}]);
+                 [{match: "e", "idx": 50000, "captures": expectedOutputCaptures}]);
 
     // Add one more and verify that regex expression throws an error.
     const patternTooLong = '(' + patternMaxDepth + ')';

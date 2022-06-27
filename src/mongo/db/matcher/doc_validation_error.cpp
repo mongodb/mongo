@@ -530,7 +530,8 @@ BSONArray findAdditionalProperties(const BSONObj& doc,
         if (!properties.contains(fieldName)) {
             bool additional = true;
             for (auto&& pattern : patternProperties) {
-                if (pattern.first.regex->PartialMatch(fieldName.toString())) {
+                auto&& re = pattern.first.regex;
+                if (re && re->matchView(fieldName)) {
                     additional = false;
                     break;
                 }
@@ -583,7 +584,8 @@ BSONElement findFailingProperty(const InternalSchemaAllowedPropertiesMatchExpres
     auto filter = patternSchema.second->getFilter();
     for (auto&& elem : ctx->getCurrentDocument()) {
         auto field = elem.fieldNameStringData();
-        if (pattern.regex->PartialMatch(field.toString()) && !filter->matchesBSONElement(elem)) {
+        auto&& re = pattern.regex;
+        if (re && *re && re->matchView(field) && !filter->matchesBSONElement(elem)) {
             return elem;
         }
     }

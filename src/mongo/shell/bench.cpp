@@ -32,7 +32,6 @@
 
 #include "mongo/shell/bench.h"
 
-#include <pcrecpp.h>
 #include <string>
 
 #include "mongo/base/shim.h"
@@ -45,6 +44,8 @@
 #include "mongo/scripting/bson_template_evaluator.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/md5.h"
+#include "mongo/util/pcre.h"
+#include "mongo/util/pcre_util.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
@@ -94,21 +95,6 @@ public:
 private:
     BenchRunState& _brState;
 };
-
-pcrecpp::RE_Options flags2options(const char* flags) {
-    pcrecpp::RE_Options options;
-    options.set_utf8(true);
-    while (flags && *flags) {
-        if (*flags == 'i')
-            options.set_caseless(true);
-        else if (*flags == 'm')
-            options.set_multiline(true);
-        else if (*flags == 'x')
-            options.set_extended(true);
-        flags++;
-    }
-    return options;
-}
 
 bool hasSpecial(const BSONObj& obj) {
     BSONObjIterator i(obj);
@@ -673,6 +659,11 @@ BenchRunOp opFromBson(const BSONObj& op) {
 void BenchRunConfig::initializeFromBson(const BSONObj& args) {
     initializeToDefaults();
 
+    auto argToRegex = [](auto&& arg) {
+        return std::make_shared<pcre::Regex>(arg.regex(),
+                                             pcre_util::flagsToOptions(arg.regexFlags()));
+    };
+
     for (auto arg : args) {
         auto name = arg.fieldNameStringData();
         if (name == "host") {
@@ -750,25 +741,13 @@ void BenchRunConfig::initializeFromBson(const BSONObj& args) {
         } else if (name == "breakOnTrap") {
             breakOnTrap = arg.trueValue();
         } else if (name == "trapPattern") {
-            const char* regex = arg.regex();
-            const char* flags = arg.regexFlags();
-            trapPattern =
-                std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, flags2options(flags)));
+            trapPattern = argToRegex(arg);
         } else if (name == "noTrapPattern") {
-            const char* regex = arg.regex();
-            const char* flags = arg.regexFlags();
-            noTrapPattern =
-                std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, flags2options(flags)));
+            noTrapPattern = argToRegex(arg);
         } else if (name == "watchPattern") {
-            const char* regex = arg.regex();
-            const char* flags = arg.regexFlags();
-            watchPattern =
-                std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, flags2options(flags)));
+            watchPattern = argToRegex(arg);
         } else if (name == "noWatchPattern") {
-            const char* regex = arg.regex();
-            const char* flags = arg.regexFlags();
-            noWatchPattern =
-                std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, flags2options(flags)));
+            noWatchPattern = argToRegex(arg);
         } else if (name == "ops") {
             // iterate through the objects in ops
             // create an BenchRunOp per
@@ -946,10 +925,12 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                 op.executeOnce(conn, lsid, *_config, &opState);
             } catch (const DBException& ex) {
                 if (!_config->hideErrors || op.showError) {
-                    bool yesWatch =
-                        (_config->watchPattern && _config->watchPattern->FullMatch(ex.what()));
-                    bool noWatch =
-                        (_config->noWatchPattern && _config->noWatchPattern->FullMatch(ex.what()));
+                    bool yesWatch = (_config->watchPattern &&
+                                     _config->watchPattern->matchView(
+                                         ex.what(), pcre::ANCHORED | pcre::ENDANCHORED));
+                    bool noWatch = (_config->noWatchPattern &&
+                                    _config->noWatchPattern->matchView(
+                                        ex.what(), pcre::ANCHORED | pcre::ENDANCHORED));
 
                     if ((!_config->watchPattern && _config->noWatchPattern &&
                          !noWatch) ||  // If we're just ignoring things
@@ -962,9 +943,12 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                    "error"_attr = causedBy(ex));
                 }
 
-                bool yesTrap = (_config->trapPattern && _config->trapPattern->FullMatch(ex.what()));
-                bool noTrap =
-                    (_config->noTrapPattern && _config->noTrapPattern->FullMatch(ex.what()));
+                bool yesTrap = (_config->trapPattern &&
+                                _config->trapPattern->matchView(
+                                    ex.what(), pcre::ANCHORED | pcre::ENDANCHORED));
+                bool noTrap = (_config->noTrapPattern &&
+                               _config->noTrapPattern->matchView(
+                                   ex.what(), pcre::ANCHORED | pcre::ENDANCHORED));
 
                 if ((!_config->trapPattern && _config->noTrapPattern && !noTrap) ||
                     (!_config->noTrapPattern && _config->trapPattern && yesTrap) ||

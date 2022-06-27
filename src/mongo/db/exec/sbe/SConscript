@@ -28,7 +28,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
         '$BUILD_DIR/mongo/db/query/query_index_bounds',
         '$BUILD_DIR/mongo/db/storage/key_string',
-        '$BUILD_DIR/mongo/util/regex_util',
+        '$BUILD_DIR/mongo/util/pcre_util',
     ],
 )
 

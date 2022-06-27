@@ -30,6 +30,7 @@
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/platform/basic.h"
+#include "mongo/util/pcre_util.h"
 
 namespace mongo::sbe::value {
 
@@ -405,7 +406,8 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
         }
         case TypeTags::pcreRegex: {
             auto regex = getPcreRegexView(val);
-            stream << "PcreRegex(/" << regex->pattern() << "/" << regex->options() << ")";
+            stream << "PcreRegex(/" << regex->pattern() << "/"
+                   << pcre_util::optionsToFlags(regex->options()) << ")";
             break;
         }
         case TypeTags::timeZoneDB: {

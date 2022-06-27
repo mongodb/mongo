@@ -38,7 +38,7 @@ namespace mongo::pcre_util {
 
 using namespace fmt::literals;
 
-pcre::CompileOptions parseOptions(StringData optionFlags, StringData opName) {
+pcre::CompileOptions flagsToOptions(StringData optionFlags, StringData opName) {
     pcre::CompileOptions opt = pcre::UTF;
     for (char flag : optionFlags) {
         switch (flag) {
@@ -48,19 +48,32 @@ pcre::CompileOptions parseOptions(StringData optionFlags, StringData opName) {
             case 'm':  // newlines match ^ and $
                 opt |= pcre::MULTILINE;
                 continue;
-            case 'x':  // extended mode
-                opt |= pcre::EXTENDED;
-                continue;
             case 's':  // allows dot to include newline chars
                 opt |= pcre::DOTALL;
                 continue;
             case 'u':
                 continue;
+            case 'x':  // extended mode
+                opt |= pcre::EXTENDED;
+                continue;
             default:
-                uasserted(6527600, "{} invalid flag in regex options: {}"_format(opName, flag));
+                uasserted(51108, "{} invalid flag in regex options: {}"_format(opName, flag));
         }
     }
     return opt;
+}
+
+std::string optionsToFlags(pcre::CompileOptions opt) {
+    std::string optionFlags = "";
+    if (opt & pcre::CASELESS)
+        optionFlags += 'i';
+    if (opt & pcre::MULTILINE)
+        optionFlags += 'm';
+    if (opt & pcre::DOTALL)
+        optionFlags += 's';
+    if (opt & pcre::EXTENDED)
+        optionFlags += 'x';
+    return optionFlags;
 }
 
 std::string quoteMeta(StringData str) {

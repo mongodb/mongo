@@ -123,10 +123,8 @@ namespace detail {
 
 class MatchDataImpl;
 
-// Global. Value is historical carryover from pcre1 and pcrecpp.
-// It's user-facing, so record and enforce its value even if the
-// engine can now support longer patterns.
-inline constexpr size_t kMaxPatternLength = 32761;
+// Global.
+inline constexpr size_t kMaxPatternLength = 16384;
 
 /** Wrapper around a pcre2_compile_context. */
 class CompileContext {

@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include <fmt/format.h>
-#include <pcrecpp.h>
 #include <stdio.h>
 
 #include "mongo/bson/json.h"
@@ -58,6 +57,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debugger.h"
+#include "mongo/util/pcre_util.h"
 #include "mongo/util/quick_exit.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -233,7 +233,7 @@ void DeathTestBase::Subprocess::execChild(std::string tempPath) {
     stripOption(av, "tempPath");
     const TestInfo* info = UnitTest::getInstance()->currentTestInfo();
     av.push_back("--suite={}"_format(info->suiteName()));
-    av.push_back("--filter=^{}$"_format(pcrecpp::RE::QuoteMeta(std::string{info->testName()})));
+    av.push_back("--filter=^{}$"_format(pcre_util::quoteMeta(info->testName())));
     av.push_back("--tempPath={}"_format(tempPath));
     // The presence of this flag is how the test body in the child process knows it's in the
     // child process, and therefore to not exec again. Its value is ignored.

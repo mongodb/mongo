@@ -42,10 +42,7 @@
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
-
-namespace pcrecpp {
-class RE;
-}  // namespace pcrecpp
+#include "mongo/util/pcre.h"
 
 namespace mongo {
 
@@ -469,7 +466,7 @@ class RegexMatchExpression : public LeafMatchExpression {
 public:
     static const std::set<char> kValidRegexFlags;
 
-    static std::unique_ptr<pcrecpp::RE> makeRegex(const std::string& regex,
+    static std::unique_ptr<pcre::Regex> makeRegex(const std::string& regex,
                                                   const std::string& flags);
 
     RegexMatchExpression(StringData path, Value e, clonable_ptr<ErrorAnnotation> annotation)
@@ -554,7 +551,7 @@ private:
 
     std::string _regex;
     std::string _flags;
-    std::unique_ptr<pcrecpp::RE> _re;
+    std::unique_ptr<pcre::Regex> _re;
 
     boost::optional<InputParamId> _sourceRegexInputParamId;
     boost::optional<InputParamId> _compiledRegexInputParamId;

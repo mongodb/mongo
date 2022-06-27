@@ -49,7 +49,14 @@ namespace mongo::pcre_util {
  *   'u': UTF (redundant, but accepted)
  *   'x': EXTENDED
  */
-pcre::CompileOptions parseOptions(StringData optionFlags, StringData opName = "");
+pcre::CompileOptions flagsToOptions(StringData optionFlags, StringData opName = "");
+
+/**
+ * Builds an std::string of flag characters from the input 'pcre::CompileOptions'.
+ * These flags are the same as those documented in flagsToOptions. They are returned in alphabetical
+ * order. Since 'u' is redundant, it will never be output by this function.
+ */
+std::string optionsToFlags(pcre::CompileOptions opt);
 
 /**
  * Escapes all potentially meaningful regex characters in the provided string.

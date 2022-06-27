@@ -24,7 +24,8 @@ utEnv.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
-        '$BUILD_DIR/third_party/shim_pcrecpp',
+        '$BUILD_DIR/mongo/util/pcre_util',
+        '$BUILD_DIR/mongo/util/pcre_wrapper',
         '$BUILD_DIR/third_party/shim_yaml',
     ],
     AIB_COMPONENT='unittests',

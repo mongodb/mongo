@@ -39,7 +39,6 @@
 #include <boost/log/sinks.hpp>
 #include <fstream>
 #include <iostream>
-#include <pcrecpp.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
@@ -79,6 +78,7 @@
 #include "mongo/util/net/ocsp/ocsp_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers.h"
@@ -278,16 +278,16 @@ void shellHistoryAdd(const char* line) {
     // be able to add things like `.author`, so be smart about how this is
     // detected by using regular expresions. This is so we can avoid storing passwords
     // in the history file in plaintext.
-    static pcrecpp::RE hiddenHelpers(
+    static pcre::Regex hiddenHelpers(
         "\\.\\s*(auth|createUser|updateUser|changeUserPassword)\\s*\\(");
     // Also don't want the raw user management commands to show in the shell when run directly
     // via runCommand.
-    static pcrecpp::RE hiddenCommands(
+    static pcre::Regex hiddenCommands(
         "(run|admin)Command\\s*\\(\\s*{\\s*(createUser|updateUser)\\s*:");
 
-    static pcrecpp::RE hiddenFLEConstructor(".*Mongo\\(([\\s\\S]*)secretAccessKey([\\s\\S]*)");
-    if (!hiddenHelpers.PartialMatch(line) && !hiddenCommands.PartialMatch(line) &&
-        !hiddenFLEConstructor.PartialMatch(line)) {
+    static pcre::Regex hiddenFLEConstructor(".*Mongo\\(([\\s\\S]*)secretAccessKey([\\s\\S]*)");
+    if (!hiddenHelpers.matchView(line) && !hiddenCommands.matchView(line) &&
+        !hiddenFLEConstructor.matchView(line)) {
         linenoiseHistoryAdd(line);
     }
 }

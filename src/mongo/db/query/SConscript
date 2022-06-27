@@ -268,7 +268,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/service_context",
         '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/idl/server_parameter',
-        '$BUILD_DIR/third_party/shim_pcrecpp',
+        '$BUILD_DIR/mongo/util/pcre_wrapper',
     ],
 )
 

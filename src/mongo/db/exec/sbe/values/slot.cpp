@@ -683,7 +683,7 @@ int getApproximateSize(TypeTags tag, Value val) {
             result += ConstDataView(getRawPointerView(val)).read<LittleEndian<uint32_t>>();
             break;
         case TypeTags::pcreRegex:
-            result += getPcreRegexView(val)->getApproximateSize();
+            result += getPcreRegexView(val)->codeSize();
             break;
         case TypeTags::timeZoneDB:
             // This type points to a block of memory that it doesn't own, so we don't acccount

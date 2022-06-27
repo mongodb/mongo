@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <pcrecpp.h>
+#include "mongo/platform/basic.h"
 
 #include "mongo/bson/json.h"
 #include "mongo/client/remote_command_targeter_mock.h"

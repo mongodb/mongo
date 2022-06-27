@@ -33,7 +33,6 @@
 
 #include <cmath>
 #include <memory>
-#include <pcrecpp.h>
 
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
@@ -44,7 +43,9 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/path.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/util/regex_util.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/pcre.h"
+#include "mongo/util/pcre_util.h"
 #include "mongo/util/represent_as.h"
 #include "mongo/util/str.h"
 
@@ -226,9 +227,9 @@ constexpr StringData GTEMatchExpression::kName;
 
 const std::set<char> RegexMatchExpression::kValidRegexFlags = {'i', 'm', 's', 'x'};
 
-std::unique_ptr<pcrecpp::RE> RegexMatchExpression::makeRegex(const std::string& regex,
+std::unique_ptr<pcre::Regex> RegexMatchExpression::makeRegex(const std::string& regex,
                                                              const std::string& flags) {
-    return std::make_unique<pcrecpp::RE>(regex.c_str(), regex_util::flagsToPcreOptions(flags));
+    return std::make_unique<pcre::Regex>(regex, pcre_util::flagsToOptions(flags));
 }
 
 RegexMatchExpression::RegexMatchExpression(StringData path,
@@ -238,15 +239,15 @@ RegexMatchExpression::RegexMatchExpression(StringData path,
     : LeafMatchExpression(REGEX, path, std::move(annotation)),
       _regex(regex.toString()),
       _flags(options.toString()),
-      _re(new pcrecpp::RE(_regex.c_str(), regex_util::flagsToPcreOptions(_flags))) {
+      _re(makeRegex(_regex, _flags)) {
 
     uassert(ErrorCodes::BadValue,
             "Regular expression cannot contain an embedded null byte",
             _regex.find('\0') == std::string::npos);
 
     uassert(51091,
-            str::stream() << "Regular expression is invalid: " << _re->error(),
-            _re->error().empty());
+            str::stream() << "Regular expression is invalid: " << errorMessage(_re->error()),
+            *_re);
 }
 
 RegexMatchExpression::~RegexMatchExpression() {}
@@ -263,14 +264,8 @@ bool RegexMatchExpression::equivalent(const MatchExpression* other) const {
 bool RegexMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     switch (e.type()) {
         case String:
-        case Symbol: {
-            // String values stored in documents can contain embedded NUL bytes. We construct a
-            // pcrecpp::StringPiece instance using the full length of the string to avoid truncating
-            // 'data' early.
-            auto stringData = e.valueStringData();
-            pcrecpp::StringPiece data{stringData.rawData(), static_cast<int>(stringData.size())};
-            return _re->PartialMatch(data);
-        }
+        case Symbol:
+            return !!_re->matchView(e.valueStringData());
         case RegEx:
             return _regex == e.regex() && _flags == e.regexFlags();
         default:

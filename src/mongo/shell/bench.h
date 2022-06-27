@@ -40,11 +40,8 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/timer.h"
-
-namespace pcrecpp {
-class RE;
-}  // namespace pcrecpp
 
 namespace mongo {
 
@@ -238,10 +235,10 @@ public:
     bool handleErrors;
     bool hideErrors;
 
-    std::shared_ptr<pcrecpp::RE> trapPattern;
-    std::shared_ptr<pcrecpp::RE> noTrapPattern;
-    std::shared_ptr<pcrecpp::RE> watchPattern;
-    std::shared_ptr<pcrecpp::RE> noWatchPattern;
+    std::shared_ptr<pcre::Regex> trapPattern;
+    std::shared_ptr<pcre::Regex> noTrapPattern;
+    std::shared_ptr<pcre::Regex> watchPattern;
+    std::shared_ptr<pcre::Regex> noWatchPattern;
 
     /**
      * Operation description. A list of BenchRunOps, each describing a single

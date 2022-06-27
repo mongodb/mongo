@@ -38,7 +38,6 @@
 #include <boost/program_options.hpp>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
-#include <pcrecpp.h>
 #include <yaml-cpp/yaml.h>
 
 #include "mongo/base/init.h"
@@ -46,6 +45,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/pcre.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -56,7 +56,7 @@ namespace po = ::boost::program_options;
 
 using namespace fmt::literals;
 
-static const pcrecpp::RE validNameRegex(R"([[:alnum:]_\-]*)");
+static const pcre::Regex validNameRegex(R"(^[[:alnum:]_\-]*$)");
 
 std::string readFile(const fs::path& path) {
     ASSERT_FALSE(is_directory(path));
@@ -115,7 +115,7 @@ std::string GoldenTestContext::toSnakeCase(const std::string& str) {
 }
 
 std::string GoldenTestContext::sanitizeName(const std::string& str) {
-    if (!validNameRegex.FullMatch(str)) {
+    if (!validNameRegex.matchView(str)) {
         FAIL("Unsupported characters in name '{}'"_format(str));
     }
 

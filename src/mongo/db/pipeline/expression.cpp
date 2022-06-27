@@ -35,7 +35,6 @@
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <cstdio>
-#include <pcrecpp.h>
 #include <utility>
 #include <vector>
 
@@ -57,7 +56,9 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/util/regex_util.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/pcre.h"
+#include "mongo/util/pcre_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/summation.h"
@@ -7038,105 +7039,46 @@ ExpressionRegex::RegexExecutionState ExpressionRegex::buildInitialState(
     return executionState;
 }
 
-int ExpressionRegex::execute(RegexExecutionState* regexState) const {
+pcre::MatchData ExpressionRegex::execute(RegexExecutionState* regexState) const {
     invariant(regexState);
     invariant(!regexState->nullish());
     invariant(regexState->pcrePtr);
 
-    int execResult = pcre_exec(regexState->pcrePtr.get(),
-                               nullptr,
-                               regexState->input->c_str(),
-                               regexState->input->size(),
-                               regexState->startBytePos,
-                               0,  // No need to overwrite the options set during pcre_compile.
-                               &(regexState->capturesBuffer.front()),
-                               regexState->capturesBuffer.size());
-    // The 'execResult' will be -1 if there is no match, 0 < execResult <= (numCaptures + 1)
-    // depending on how many capture groups match, negative (other than -1) if there is an error
-    // during execution, and zero if capturesBuffer's capacity is not sufficient to hold all the
-    // results. The latter scenario should never occur.
+    StringData in = *regexState->input;
+    auto m = regexState->pcrePtr->matchView(in, {}, regexState->startBytePos);
     uassert(51156,
             str::stream() << "Error occurred while executing the regular expression in " << _opName
-                          << ". Result code: " << execResult,
-            execResult == -1 || (execResult > 0 && execResult <= (regexState->numCaptures + 1)));
-    return execResult;
+                          << ". Result code: " << errorMessage(m.error()),
+            m || m.error() == pcre::Errc::ERROR_NOMATCH);
+    return m;
 }
 
 Value ExpressionRegex::nextMatch(RegexExecutionState* regexState) const {
-    int execResult = execute(regexState);
-
-    // No match.
-    if (execResult < 0) {
+    auto m = execute(regexState);
+    if (!m)
+        // No match.
         return Value(BSONNULL);
-    }
 
-    // Use 'input' as StringData throughout the function to avoid copying the string on 'substr'
-    // calls.
-    StringData input = *(regexState->input);
-
-    auto verifyBounds = [&input, this](auto startPos, auto limitPos, auto isCapture) {
-        // If a capture group was not matched, then the 'startPos' and 'limitPos' will both be -1.
-        // These bounds cannot occur for a match on the full string.
-        if (startPos == -1 || limitPos == -1) {
-            massert(31304,
-                    str::stream() << "Unexpected error occurred while executing " << _opName
-                                  << ". startPos: " << startPos << ", limitPos: " << limitPos,
-                    isCapture && startPos == -1 && limitPos == -1);
-            return;
-        }
-
-        massert(31305,
-                str::stream() << "Unexpected error occurred while executing " << _opName
-                              << ". startPos: " << startPos,
-                (startPos >= 0 && static_cast<size_t>(startPos) <= input.size()));
-        massert(31306,
-                str::stream() << "Unexpected error occurred while executing " << _opName
-                              << ". limitPos: " << limitPos,
-                (limitPos >= 0 && static_cast<size_t>(limitPos) <= input.size()));
-        massert(31307,
-                str::stream() << "Unexpected error occurred while executing " << _opName
-                              << ". startPos: " << startPos << ", limitPos: " << limitPos,
-                startPos <= limitPos);
-    };
-
-    // The first and second entries of the 'capturesBuffer' will have the start and (end+1) indices
-    // of the matched string, as byte offsets. '(limit - startIndex)' would be the length of the
-    // captured string.
-    verifyBounds(regexState->capturesBuffer[0], regexState->capturesBuffer[1], false);
-    const int matchStartByteIndex = regexState->capturesBuffer[0];
-    StringData matchedStr =
-        input.substr(matchStartByteIndex, regexState->capturesBuffer[1] - matchStartByteIndex);
-
-    // We iterate through the input string's contents preceding the match index, in order to convert
-    // the byte offset to a code point offset.
-    for (int byteIx = regexState->startBytePos; byteIx < matchStartByteIndex;
-         ++(regexState->startCodePointPos)) {
-        byteIx += str::getCodePointLength(input[byteIx]);
-    }
+    StringData beforeMatch(m.input().begin() + m.startPos(), m[0].begin());
+    regexState->startCodePointPos += str::lengthInUTF8CodePoints(beforeMatch);
 
     // Set the start index for match to the new one.
-    regexState->startBytePos = matchStartByteIndex;
+    regexState->startBytePos = m[0].begin() - m.input().begin();
 
     std::vector<Value> captures;
-    captures.reserve(regexState->numCaptures);
+    captures.reserve(m.captureCount());
 
-    // The next '2 * numCaptures' entries (after the first two entries) of 'capturesBuffer' will
-    // hold the start index and limit pairs, for each of the capture groups. We skip the first two
-    // elements and start iteration from 3rd element so that we only construct the strings for
-    // capture groups.
-    for (int i = 0; i < regexState->numCaptures; ++i) {
-        const int start = regexState->capturesBuffer[2 * (i + 1)];
-        const int limit = regexState->capturesBuffer[2 * (i + 1) + 1];
-        verifyBounds(start, limit, true);
-
-        // The 'start' and 'limit' will be set to -1, if the 'input' didn't match the current
-        // capture group. In this case we put a 'null' placeholder in place of the capture group.
-        captures.push_back(start == -1 && limit == -1 ? Value(BSONNULL)
-                                                      : Value(input.substr(start, limit - start)));
+    for (size_t i = 1; i < m.captureCount() + 1; ++i) {
+        if (StringData cap = m[i]; !cap.rawData()) {
+            // Use BSONNULL placeholder for unmatched capture groups.
+            captures.push_back(Value(BSONNULL));
+        } else {
+            captures.push_back(Value(cap));
+        }
     }
 
     MutableDocument match;
-    match.addField("match", Value(matchedStr));
+    match.addField("match", Value(m[0]));
     match.addField("idx", Value(regexState->startCodePointPos));
     match.addField("captures", Value(captures));
     return match.freezeToValue();
@@ -7161,41 +7103,20 @@ boost::intrusive_ptr<Expression> ExpressionRegex::optimize() {
 }
 
 void ExpressionRegex::_compile(RegexExecutionState* executionState) const {
-
-    const auto pcreOptions =
-        regex_util::flagsToPcreOptions(executionState->options.value_or(""), _opName).all_options();
-
     if (!executionState->pattern) {
         return;
     }
 
-    const char* compile_error;
-    int eoffset;
-
-    // The C++ interface pcreccp.h doesn't have a way to capture the matched string (or the index of
-    // the match). So we are using the C interface. First we compile all the regex options to
-    // generate pcre object, which will later be used to match against the input string.
-    executionState->pcrePtr = std::shared_ptr<pcre>(
-        pcre_compile(
-            executionState->pattern->c_str(), pcreOptions, &compile_error, &eoffset, nullptr),
-        pcre_free);
+    auto re = std::make_shared<pcre::Regex>(
+        *executionState->pattern,
+        pcre_util::flagsToOptions(executionState->options.value_or(""), _opName));
     uassert(51111,
-            str::stream() << "Invalid Regex in " << _opName << ": " << compile_error,
-            executionState->pcrePtr);
+            str::stream() << "Invalid Regex in " << _opName << ": " << errorMessage(re->error()),
+            *re);
+    executionState->pcrePtr = std::move(re);
 
     // Calculate the number of capture groups present in 'pattern' and store in 'numCaptures'.
-    const int pcre_retval = pcre_fullinfo(executionState->pcrePtr.get(),
-                                          nullptr,
-                                          PCRE_INFO_CAPTURECOUNT,
-                                          &executionState->numCaptures);
-    invariant(pcre_retval == 0);
-
-    // The first two-thirds of the vector is used to pass back captured substrings' start and
-    // (end+1) indexes. The remaining third of the vector is used as workspace by pcre_exec() while
-    // matching capturing subpatterns, and is not available for passing back information.
-    // pcre_compile will error if there are too many capture groups in the pattern. As long as this
-    // memory is allocated after compile, the amount of memory allocated will not be too high.
-    executionState->capturesBuffer.resize((1 + executionState->numCaptures) * 3);
+    executionState->numCaptures = executionState->pcrePtr->captureCount();
 }
 
 Value ExpressionRegex::serialize(bool explain) const {
@@ -7420,9 +7341,11 @@ boost::intrusive_ptr<Expression> ExpressionRegexMatch::parse(ExpressionContext* 
 }
 
 Value ExpressionRegexMatch::evaluate(const Document& root, Variables* variables) const {
-    auto executionState = buildInitialState(root, variables);
-    // Return output of execute only if regex is not nullish.
-    return executionState.nullish() ? Value(false) : Value(execute(&executionState) > 0);
+    auto state = buildInitialState(root, variables);
+    if (state.nullish())
+        return Value(false);
+    pcre::MatchData m = execute(&state);
+    return Value(!!m);
 }
 
 /* -------------------------- ExpressionRandom ------------------------------ */

@@ -38,7 +38,6 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/filesystem.hpp>
 #include <fcntl.h>
-#include <pcrecpp.h>
 #include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -51,6 +50,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
@@ -655,9 +655,9 @@ Status parseProcSelfMountStatsImpl(
         // 36 35 98:0 /mnt1 /mnt2 rw,noatime master:1 - ext3 /dev/root rw,errors=continue
         // |  |  |    |     |     |          |          |      |     |
         // (1)(2)(3:4)(5)   (6)   (7)        (8)        (9)   (10)   (11)
-        static const pcrecpp::RE kRe(R"re(\d+ \d+ \d+:\d+ \S+ (\S+))re");
-        std::string mountPoint;
-        if (kRe.PartialMatch(line, &mountPoint)) {
+        static const pcre::Regex kRe(R"re(\d+ \d+ \d+:\d+ \S+ (\S+))re");
+        if (auto m = kRe.matchView(line)) {
+            std::string mountPoint{m[1]};
             boost::filesystem::path p(mountPoint);
             boost::system::error_code ec;
             boost::filesystem::space_info spaceInfo = getSpace(p, ec);

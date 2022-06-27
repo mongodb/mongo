@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/util/pcre_util.h"
 
 namespace mongo::sbe {
 class SBERegexTest : public EExpressionTestFixture {
@@ -39,7 +40,8 @@ protected:
         ASSERT_EQUALS(value::TypeTags::pcreRegex, tag);
 
         auto regex = value::getPcreRegexView(val);
-        std::string res = str::stream() << "/" << regex->pattern() << "/" << regex->options();
+        std::string res = str::stream()
+            << "/" << regex->pattern() << "/" << pcre_util::optionsToFlags(regex->options());
         ASSERT_EQUALS(res, regexString);
     }
 

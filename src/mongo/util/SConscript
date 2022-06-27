@@ -131,17 +131,6 @@ env.Library(
 )
 
 env.Library(
-    target='regex_util',
-    source=[
-        'regex_util.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/third_party/shim_pcrecpp',
-    ],
-)
-
-env.Library(
     target='summation',
     source=[
         'summation.cpp',
@@ -201,7 +190,7 @@ env.Library(
         "$BUILD_DIR/mongo/base",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/third_party/shim_pcrecpp',
+        'pcre_wrapper',
     ],
 )
 
@@ -615,7 +604,7 @@ if env.TargetOSIs('linux'):
             '$BUILD_DIR/mongo/base',
         ],
         LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/third_party/shim_pcrecpp',
+            'pcre_wrapper',
         ],
     )
 
@@ -838,7 +827,7 @@ if use_libunwind:
     )
 
 stacktrace_test_LIBDEPS = stacktraceEnv.get('LIBDEPS', []).copy()
-insort_wrapper(stacktrace_test_LIBDEPS, '$BUILD_DIR/third_party/shim_pcrecpp')
+insort_wrapper(stacktrace_test_LIBDEPS, 'pcre_wrapper')
 
 stacktraceEnv.CppUnitTest(
     target='stacktrace_test',

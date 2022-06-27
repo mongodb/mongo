@@ -38,13 +38,13 @@
 #include <fmt/printf.h>
 #include <functional>
 #include <map>
-#include <pcrecpp.h>
 #include <random>
 #include <signal.h>
 #include <sstream>
 #include <utility>
 #include <vector>
 
+#include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/config.h"
@@ -55,6 +55,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/stacktrace.h"
 
 /** `sigaltstack` was introduced in glibc-2.12 in 2010. */
@@ -153,6 +154,15 @@ uintptr_t fromHex(const std::string& s) {
     return static_cast<uintptr_t>(std::stoull(s, nullptr, 16));
 }
 
+bool consume(const pcre::Regex& re, StringData* in, std::string* out) {
+    auto m = re.matchView(*in);
+    if (!m)
+        return false;
+    *in = in->substr(m[0].size());
+    *out = std::string{m[1]};
+    return true;
+}
+
 // Break down a printStackTrace output for a contrived call tree and sanity-check it.
 TEST(StackTrace, PosixFormat) {
     if (kIsWindows) {
@@ -174,18 +184,18 @@ TEST(StackTrace, PosixFormat) {
     // Each "Frame:" line holds a full json object, but we only examine its "a" field here.
     std::string jsonLine;
     std::vector<uintptr_t> humanAddrs;
-    pcrecpp::StringPiece in{trace};
-    static const pcrecpp::RE jsonLineRE(R"re(BACKTRACE: (\{.*\})\n?)re");
-    ASSERT_TRUE(jsonLineRE.Consume(&in, &jsonLine)) << "\"" << in.as_string() << "\"";
+    StringData in{trace};
+    static const pcre::Regex jsonLineRE(R"re(^BACKTRACE: (\{.*\})\n?)re");
+    ASSERT_TRUE(consume(jsonLineRE, &in, &jsonLine)) << "\"" << in << "\"";
     while (true) {
         std::string frameLine;
-        static const pcrecpp::RE frameRE(R"re(  Frame: (\{.*\})\n?)re");
-        if (!frameRE.Consume(&in, &frameLine))
+        static const pcre::Regex frameRE(R"re(^  Frame: (\{.*\})\n?)re");
+        if (!consume(frameRE, &in, &frameLine))
             break;
         BSONObj frameObj = fromjson(frameLine);  // throwy
         humanAddrs.push_back(fromHex(frameObj["a"].String()));
     }
-    ASSERT_TRUE(in.empty()) << "must be consumed fully: \"" << in.as_string() << "\"";
+    ASSERT_TRUE(in.empty()) << "must be consumed fully: \"" << in << "\"";
 
     BSONObj jsonObj = fromjson(jsonLine);  // throwy
     ASSERT_TRUE(jsonObj.hasField("backtrace"));
@@ -255,14 +265,18 @@ TEST(StackTrace, WindowsFormat) {
 
     std::vector<std::string> lines = splitLines(trace);
 
-    std::string jsonLine;
-    ASSERT_TRUE(pcrecpp::RE(R"re(BACKTRACE: (\{.*\}))re").FullMatch(lines[0], &jsonLine));
+    auto re = pcre::Regex(R"re(^BACKTRACE: (\{.*\})$)re");
+    auto m = re.matchView(lines[0]);
+    ASSERT_TRUE(!!m);
+    std::string jsonLine{m[1]};
 
     std::vector<uintptr_t> humanAddrs;
     for (size_t i = 1; i < lines.size(); ++i) {
-        static const pcrecpp::RE re(R"re(  Frame: (?:\{"a":"(.*?)",.*\}))re");
+        static const pcre::Regex re(R"re(^  Frame: (?:\{"a":"(.*?)",.*\})$)re");
         uintptr_t addr;
-        ASSERT_TRUE(re.FullMatch(lines[i], pcrecpp::Hex(&addr))) << lines[i];
+        auto m = re.matchView(lines[i]);
+        ASSERT_TRUE(!!m) << lines[i];
+        ASSERT_OK(NumberParser{}.base(16)(m[1], &addr));
         humanAddrs.push_back(addr);
     }
 

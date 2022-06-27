@@ -32,7 +32,6 @@
 
 #include <algorithm>
 #include <memory>
-#include <pcrecpp.h>
 #include <string>
 
 #include "mongo/base/status_with.h"
@@ -64,6 +63,7 @@
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
 
@@ -143,13 +143,12 @@ private:
  * in the cluster.
  */
 void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& clusterStats) {
-    static const auto& majorMinorRE = *new pcrecpp::RE(R"re(^(\d+)\.(\d+)\.)re");
+    static const auto& majorMinorRE = *new pcre::Regex(R"re(^(\d+)\.(\d+)\.)re");
     auto&& vii = VersionInfoInterface::instance();
     auto hasMyVersion = [&](auto&& stat) {
-        int major;
-        int minor;
-        return majorMinorRE.PartialMatch(pcrecpp::StringPiece(stat.mongoVersion), &major, &minor) &&
-            major == vii.majorVersion() && minor == vii.minorVersion();
+        auto m = majorMinorRE.match(stat.mongoVersion);
+        return m && std::stoi(std::string{m[1]}) == vii.majorVersion() &&
+            std::stoi(std::string{m[2]}) == vii.minorVersion();
     };
 
     // If we're all the same version, don't message

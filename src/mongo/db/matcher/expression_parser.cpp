@@ -32,7 +32,6 @@
 #include "mongo/db/matcher/expression_parser.h"
 
 #include <memory>
-#include <pcrecpp.h>
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonmisc.h"
@@ -74,9 +73,8 @@
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
+namespace mongo {
 namespace {
-
-using namespace mongo;
 
 /**
  * Returns true if subtree contains MatchExpression 'type'.
@@ -124,8 +122,6 @@ void addExpressionToRoot(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     root->add(std::move(newNode));
 }
 }  // namespace
-
-namespace mongo {
 
 using ErrorAnnotation = MatchExpression::ErrorAnnotation;
 using AnnotationMode = ErrorAnnotation::Mode;

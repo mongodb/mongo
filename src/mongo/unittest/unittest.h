@@ -38,7 +38,6 @@
 #include <cmath>
 #include <fmt/format.h>
 #include <functional>
-#include <pcrecpp.h>
 #include <sstream>
 #include <string>
 #include <tuple>

@@ -37,7 +37,6 @@
 
 #include <boost/optional.hpp>
 #include <fmt/format.h>
-#include <pcrecpp.h>
 
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
@@ -51,6 +50,7 @@
 #include "mongo/rpc/rewrite_state_change_errors_server_parameter_gen.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/static_immortal.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
@@ -80,12 +80,13 @@ auto enabledForOperation = OperationContext::declareDecoration<RewriteEnabled>()
  */
 boost::optional<std::string> scrubErrmsg(StringData val) {
     struct Scrub {
-        pcrecpp::RE pat;
+        Scrub(std::string pat, std::string sub) : pat(std::move(pat)), sub(std::move(sub)) {}
+        pcre::Regex pat;
         std::string sub;
     };
     static const StaticImmortal scrubs = std::array{
-        Scrub{pcrecpp::RE("not master"), "(NOT_PRIMARY)"},
-        Scrub{pcrecpp::RE("node is recovering"), "(NODE_IS_RECOVERING)"},
+        Scrub{"not master", "(NOT_PRIMARY)"},
+        Scrub{"node is recovering", "(NODE_IS_RECOVERING)"},
     };
     // Fast scan for the common case that no key phrase is present.
     static const StaticImmortal fastScan = [] {
@@ -96,16 +97,14 @@ boost::optional<std::string> scrubErrmsg(StringData val) {
             out = format_to(out, FMT_STRING("{}({})"), sep, scrub.pat.pattern());
             sep = "|"_sd;
         }
-        return pcrecpp::RE(pat);
+        return pcre::Regex(pat);
     }();
 
-    pcrecpp::StringPiece pcreVal(val.rawData(), val.size());
-
-    if (fastScan->PartialMatch(pcreVal)) {
+    if (fastScan->matchView(val)) {
         std::string s{val};
         bool didSub = false;
         for (auto&& scrub : *scrubs) {
-            bool subOk = scrub.pat.GlobalReplace(scrub.sub, &s);
+            bool subOk = scrub.pat.substitute(scrub.sub, &s, pcre::SUBSTITUTE_GLOBAL);
             didSub = (didSub || subOk);
         }
         if (didSub)

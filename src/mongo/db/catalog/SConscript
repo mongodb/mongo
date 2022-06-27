@@ -665,6 +665,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/unittest/unittest',
             '$BUILD_DIR/mongo/util/clock_source_mock',
             '$BUILD_DIR/mongo/util/fail_point',
+            '$BUILD_DIR/mongo/util/pcre_wrapper',
             'catalog_control',
             'catalog_helpers',
             'catalog_test_fixture',

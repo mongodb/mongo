@@ -29,9 +29,8 @@
 
 #include "mongo/db/query/plan_cache_size_parameter.h"
 
-#include <pcrecpp.h>
-
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/util/pcre.h"
 
 namespace mongo::plan_cache_util {
 
@@ -52,16 +51,14 @@ StatusWith<PlanCacheSizeUnits> parseUnitString(const std::string& strUnit) {
 }
 
 StatusWith<PlanCacheSizeParameter> PlanCacheSizeParameter::parse(const std::string& str) {
-    pcrecpp::RE_Options opt;
-    opt.set_caseless(true);
     // Looks for a floating point number with followed by a unit suffix (MB, GB, %).
-    pcrecpp::RE re("\\s*(\\d+\\.?\\d*)\\s*(MB|GB|%)\\s*", opt);
-
-    double size{};
-    std::string strUnit{};
-    if (!re.FullMatch(str, &size, &strUnit)) {
+    static auto& re = *new pcre::Regex(R"re((?i)^\s*(\d+\.?\d*)\s*(MB|GB|%)\s*$)re");
+    auto m = re.matchView(str);
+    if (!m) {
         return {ErrorCodes::Error{6007012}, "Unable to parse plan cache size string"};
     }
+    double size = std::stod(std::string{m[1]});
+    std::string strUnit{m[2]};
 
     auto statusWithUnit = parseUnitString(strUnit);
     if (!statusWithUnit.isOK()) {

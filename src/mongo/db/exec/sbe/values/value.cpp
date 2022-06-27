@@ -40,7 +40,8 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/storage/key_string.h"
-#include "mongo/util/regex_util.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/pcre_util.h"
 
 namespace mongo {
 namespace sbe {
@@ -134,45 +135,15 @@ std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey) {
 }
 
 std::pair<TypeTags, Value> makeNewPcreRegex(StringData pattern, StringData options) {
-    auto regex = std::make_unique<PcreRegex>(pattern, options);
-    return {TypeTags::pcreRegex, bitcastFrom<PcreRegex*>(regex.release())};
+    auto regex =
+        std::make_unique<pcre::Regex>(std::string{pattern}, pcre_util::flagsToOptions(options));
+    uassert(5073402, str::stream() << "Invalid Regex: " << errorMessage(regex->error()), *regex);
+    return {TypeTags::pcreRegex, bitcastFrom<pcre::Regex*>(regex.release())};
 }
 
-std::pair<TypeTags, Value> makeCopyPcreRegex(const PcreRegex& regex) {
-    auto regexCopy = std::make_unique<PcreRegex>(regex);
-    return {TypeTags::pcreRegex, bitcastFrom<PcreRegex*>(regexCopy.release())};
-}
-
-void PcreRegex::_compile() {
-    const auto pcreOptions = regex_util::flagsToPcreOptions(_options.c_str()).all_options();
-    const char* compile_error;
-    int eoffset;
-    _pcrePtr = pcre_compile(_pattern.c_str(), pcreOptions, &compile_error, &eoffset, nullptr);
-    uassert(5073402, str::stream() << "Invalid Regex: " << compile_error, _pcrePtr != nullptr);
-}
-
-int PcreRegex::execute(StringData stringView, int startPos, std::vector<int>& buf) {
-    return pcre_exec(_pcrePtr,
-                     nullptr,
-                     stringView.rawData(),
-                     stringView.size(),
-                     startPos,
-                     0,
-                     &(buf.front()),
-                     buf.size());
-}
-
-size_t PcreRegex::getNumberCaptures() const {
-    int numCaptures;
-    pcre_fullinfo(_pcrePtr, nullptr, PCRE_INFO_CAPTURECOUNT, &numCaptures);
-    invariant(numCaptures >= 0);
-    return static_cast<size_t>(numCaptures);
-}
-
-size_t PcreRegex::getApproximateSize() const {
-    size_t pcreSize;
-    pcre_fullinfo(_pcrePtr, nullptr, PCRE_INFO_SIZE, &pcreSize);
-    return sizeof(PcreRegex) + _pattern.size() + 1 + _options.size() + 1 + pcreSize;
+std::pair<TypeTags, Value> makeCopyPcreRegex(const pcre::Regex& regex) {
+    auto regexCopy = std::make_unique<pcre::Regex>(regex);
+    return {TypeTags::pcreRegex, bitcastFrom<pcre::Regex*>(regexCopy.release())};
 }
 
 KeyString::Value SortSpec::generateSortKey(const BSONObj& obj, const CollatorInterface* collator) {

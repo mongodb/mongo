@@ -36,7 +36,6 @@
 #include <boost/intrusive_ptr.hpp>
 #include <functional>
 #include <map>
-#include <pcre.h>
 #include <string>
 #include <utility>
 #include <vector>
@@ -57,6 +56,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/update/pattern_cmp.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -3719,7 +3719,7 @@ public:
          * and '_initialExecStateForConstantRegex'. If not, then the active RegexExecutionState is
          * the sole owner.
          */
-        std::shared_ptr<pcre> pcrePtr;
+        std::shared_ptr<pcre::Regex> pcrePtr;
 
         /**
          * The input text and starting position for the current execution context.
@@ -3744,11 +3744,11 @@ public:
     RegexExecutionState buildInitialState(const Document& root, Variables* variables) const;
 
     /**
-     * Checks if there is a match for the given input and pattern that are part of 'executionState'.
-     * The method will return a positive number if there is a match and '-1' if there is no match.
-     * Throws 'uassert()' for any errors.
+     * Checks if there is a match for the input, options, and pattern of 'executionState'.
+     * Returns the pcre::MatchData yielded by that match operation.
+     * Will uassert for any errors other than `pcre::Errc::ERROR_NOMATCH`.
      */
-    int execute(RegexExecutionState* executionState) const;
+    pcre::MatchData execute(RegexExecutionState* executionState) const;
 
     /**
      * Finds the next possible match for the given input and pattern that are part of

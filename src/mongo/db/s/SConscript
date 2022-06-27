@@ -317,6 +317,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/query/cluster_aggregate',
         '$BUILD_DIR/mongo/util/log_and_backoff',
+        '$BUILD_DIR/mongo/util/pcre_wrapper',
         'forwardable_operation_metadata',
         'sharding_logging',
         'user_writes_recoverable_critical_section',

@@ -30,7 +30,7 @@
 
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 
-#include <pcrecpp.h>
+#include <fmt/format.h>
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/dbdirectclient.h"
@@ -48,12 +48,16 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/util/pcre.h"
+#include "mongo/util/pcre_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 
 namespace mongo {
 namespace {
+
+using namespace fmt::literals;
 
 /**
  * Selects an optimal shard on which to place a newly created database from the set of available
@@ -150,9 +154,8 @@ DatabaseType ShardingCatalogManager::createDatabase(
     // Check if a database already exists with the same name (case sensitive), and if so, return the
     // existing entry.
     BSONObjBuilder queryBuilder;
-    queryBuilder.appendRegex(DatabaseType::kNameFieldName,
-                             (std::string) "^" + pcrecpp::RE::QuoteMeta(dbName.toString()) + "$",
-                             "i");
+    queryBuilder.appendRegex(
+        DatabaseType::kNameFieldName, "^{}$"_format(pcre_util::quoteMeta(dbName)), "i");
 
     auto dbDoc = client.findOne(NamespaceString::kConfigDatabasesNamespace, queryBuilder.obj());
     auto const [primaryShardPtr, database] = [&] {

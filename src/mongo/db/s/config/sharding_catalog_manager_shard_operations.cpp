@@ -33,7 +33,6 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 
 #include <iomanip>
-#include <pcrecpp.h>
 #include <set>
 
 #include "mongo/base/status_with.h"

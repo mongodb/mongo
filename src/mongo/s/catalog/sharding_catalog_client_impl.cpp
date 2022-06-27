@@ -32,8 +32,8 @@
 
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 
+#include <fmt/format.h>
 #include <iomanip>
-#include <pcrecpp.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -72,6 +72,8 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/pcre.h"
+#include "mongo/util/pcre_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -89,6 +91,8 @@ using std::vector;
 using str::stream;
 
 namespace {
+
+using namespace fmt::literals;
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::PrimaryPreferred,
@@ -455,9 +459,7 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
     OperationContext* opCtx, StringData dbName, repl::ReadConcernLevel readConcernLevel) {
     BSONObjBuilder b;
     if (!dbName.empty())
-        b.appendRegex(CollectionType::kNssFieldName,
-                      std::string(str::stream()
-                                  << "^" << pcrecpp::RE::QuoteMeta(dbName.toString()) << "\\."));
+        b.appendRegex(CollectionType::kNssFieldName, "^{}\\."_format(pcre_util::quoteMeta(dbName)));
 
     auto collDocs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
                                                             kConfigReadSelector,

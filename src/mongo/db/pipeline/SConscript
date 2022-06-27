@@ -121,7 +121,7 @@ env.Library(
         '$BUILD_DIR/mongo/scripting/scripting',
         '$BUILD_DIR/mongo/scripting/scripting_common',
         '$BUILD_DIR/mongo/util/intrusive_counter',
-        '$BUILD_DIR/mongo/util/regex_util',
+        '$BUILD_DIR/mongo/util/pcre_util',
         '$BUILD_DIR/mongo/util/summation',
         'aggregation_request_helper',
         'dependencies',

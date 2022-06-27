@@ -488,24 +488,6 @@ public:
     MatchData matchView(StringData input) const;
 
     /**
-     * True if all of `input` matches.
-     * If possible, add '^' and '$' to the `Regex` pattern instead, as this
-     * optimizes better than match-supplied options.
-     *
-     * Legacy: prefer `Regex::matchView` with `ANCHOR|ENDANCHOR` options.
-     */
-    bool fullMatch(StringData input) const;
-
-    /**
-     * True if a substring of `input` matches.
-     * Note that PCRE2 documentation uses the term "partial match" to mean
-     * something very different.
-     *
-     * Legacy: prefer `Regex::matchView`.
-     */
-    bool partialMatch(StringData input) const;
-
-    /**
      * Replaces occurrences in `str` of this pattern with `replacement`.
      * Additional substitute `options` can change behavior. Important ones:
      *
@@ -624,14 +606,6 @@ inline MatchData Regex::matchView(StringData input, MatchOptions options) const 
 }
 inline MatchData Regex::matchView(StringData input) const {
     return matchView(input, MatchOptions{}, 0);
-}
-
-inline bool Regex::fullMatch(StringData input) const {
-    return !matchView(input, ANCHORED | ENDANCHORED).error();
-}
-
-inline bool Regex::partialMatch(StringData input) const {
-    return !matchView(input).error();
 }
 
 }  // namespace mongo::pcre

@@ -35,14 +35,15 @@
 #include <fstream>
 #include <iostream>
 #include <malloc.h>
-#include <pcrecpp.h>
 #include <sched.h>
 #include <stdio.h>
+#include <string>
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <sys/utsname.h>
 #include <unistd.h>
+
 #ifdef __BIONIC__
 #include <android/api-level.h>
 #elif __UCLIBC__
@@ -55,12 +56,12 @@
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <fmt/format.h>
-#include <pcrecpp.h>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/file.h"
+#include "mongo/util/pcre.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -257,21 +258,34 @@ namespace {
 // (1)(2)(3:4)(5)   (6)   (7)        (8)        (9)   (10)   (11)
 struct MountRecord {
     bool parseLine(const std::string& line) {
-        static const pcrecpp::RE kRe{
-            //   (1)   (2)   (3)   (4)   (5)   (6)   (7)   (8)                (9)   (10)  (11)
-            R"re((\d+) (\d+) (\d+):(\d+) (\S+) (\S+) (\S+) ((?:\S+:\S+ ?)*) - (\S+) (\S+) (\S+))re"};
-        return kRe.FullMatch(line,
-                             &mountId,
-                             &parentId,
-                             &major,
-                             &minor,
-                             &root,
-                             &mountPoint,
-                             &options,
-                             &fields,
-                             &type,
-                             &source,
-                             &superOpt);
+        static const pcre::Regex kRe{
+            //    (1)   (2)   (3)   (4)   (5)   (6)   (7)   (8)                (9)   (10)  (11)
+            R"re(^(\d+) (\d+) (\d+):(\d+) (\S+) (\S+) (\S+) ((?:\S+:\S+ ?)*) - (\S+) (\S+) (\S+)$)re"};
+        auto m = kRe.matchView(line);
+        if (!m)
+            return false;
+        size_t i = 1;
+        auto load = [&](auto& var) {
+            using T = std::decay_t<decltype(var)>;
+            std::string nextString{m[i++]};
+            if constexpr (std::is_same_v<T, int>) {
+                var = std::stoi(nextString);
+            } else {
+                var = std::move(nextString);
+            }
+        };
+        load(mountId);
+        load(parentId);
+        load(major);
+        load(minor);
+        load(root);
+        load(mountPoint);
+        load(options);
+        load(fields);
+        load(type);
+        load(source);
+        load(superOpt);
+        return true;
     }
 
     void appendBSON(BSONObjBuilder& bob) const {
@@ -319,7 +333,9 @@ void appendMountInfo(BSONObjBuilder& bob) {
 class CpuInfoParser {
 public:
     struct LineProcessor {
-        pcrecpp::RE regex;
+        LineProcessor(std::string pattern, std::function<void(const std::string&)> f)
+            : regex{std::make_shared<pcre::Regex>(std::move(pattern))}, f{std::move(f)} {}
+        std::shared_ptr<pcre::Regex> regex;
         std::function<void(const std::string&)> f;
     };
     std::vector<LineProcessor> lineProcessors;
@@ -331,17 +347,18 @@ public:
 
         bool readSuccess;
         bool unprocessed = false;
-        static StaticImmortal<pcrecpp::RE> lineRegex(R"re((.*?)\s*:\s*(.*))re");
+        static StaticImmortal<pcre::Regex> lineRegex(R"re(^(.*?)\s*:\s*(.*)$)re");
         do {
             std::string fstr;
             readSuccess = f && std::getline(f, fstr);
             if (readSuccess && !fstr.empty()) {
-                std::string key;
-                std::string value;
-                if (!lineRegex->FullMatch(fstr, &key, &value))
+                auto m = lineRegex->matchView(fstr);
+                if (!m)
                     continue;
+                std::string key{m[1]};
+                std::string value{m[2]};
                 for (auto&& [lpr, lpf] : lineProcessors) {
-                    if (lpr.FullMatch(key))
+                    if (lpr->matchView(key, pcre::ANCHORED | pcre::ENDANCHORED))
                         lpf(value);
                 }
                 unprocessed = true;

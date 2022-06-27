@@ -170,24 +170,6 @@ TEST(PcreTest, StartPos) {
         ASSERT_EQ(hiRe.matchView(ohi, {}, i).startPos(), i) << " i="_format(i);
 }
 
-TEST(PcreTest, FullMatch) {
-    Regex re{"hi"};
-    ASSERT_FALSE(re.fullMatch("hello"));
-    ASSERT_TRUE(re.fullMatch("hi"));
-    ASSERT_FALSE(re.fullMatch("hii"));
-    ASSERT_FALSE(re.fullMatch("hhi"));
-}
-
-TEST(PcreTest, PartialMatch) {
-    Regex re{"abc"};
-    ASSERT_FALSE(re.partialMatch(""));
-    ASSERT_FALSE(re.partialMatch("a"));
-    ASSERT_FALSE(re.partialMatch("bc"));
-    ASSERT_TRUE(re.partialMatch("abc"));
-    ASSERT_TRUE(re.partialMatch("zabc"));
-    ASSERT_TRUE(re.partialMatch("abcz"));
-}
-
 TEST(PcreTest, CompileOptions) {
     std::string pattern = "a.b";
     std::array subjects{"a\nb"s, "A_b"s, "A\nb"s};
@@ -203,7 +185,7 @@ TEST(PcreTest, CompileOptions) {
          }) {
         Regex re{pattern, opt};
         for (size_t i = 0; i < subjects.size(); ++i)
-            ASSERT_EQ(re.fullMatch(subjects[i]), outMatch[i])
+            ASSERT_EQ(!!re.matchView(subjects[i], pcre::ANCHORED | pcre::ENDANCHORED), outMatch[i])
                 << "opt={}, subject={}"_format(uint32_t(opt), subjects[i]);
     }
 }

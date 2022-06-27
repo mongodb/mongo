@@ -31,10 +31,9 @@
 
 #include "mongo/db/matcher/expression_with_placeholder.h"
 
-#include <pcrecpp.h>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/static_immortal.h"
 
 namespace mongo {
@@ -43,8 +42,8 @@ namespace {
 
 bool matchesPlaceholderPattern(StringData placeholder) {
     // The placeholder must begin with a lowercase letter and contain no special characters.
-    static StaticImmortal<pcrecpp::RE> kRe("[[:lower:]][[:alnum:]]*");
-    return kRe->FullMatch(pcrecpp::StringPiece(placeholder.rawData(), placeholder.size()));
+    static StaticImmortal<pcre::Regex> kRe("^[[:lower:]][[:alnum:]]*$");
+    return !!kRe->matchView(placeholder);
 }
 
 /**

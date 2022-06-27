@@ -233,7 +233,6 @@ baseEnv.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/third_party/shim_intel_decimal128',
-        '$BUILD_DIR/third_party/shim_pcrecpp',
         '$BUILD_DIR/third_party/shim_unwind' if use_libunwind else [],
         'stdx/stdx',
         'util/boost_assert_shim',

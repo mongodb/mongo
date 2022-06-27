@@ -31,7 +31,6 @@
 
 #include <boost/optional/optional_io.hpp>
 #include <memory>
-#include <pcrecpp.h>
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/collection_catalog.h"
@@ -57,6 +56,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -350,10 +350,11 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
         ASSERT_TRUE(db);
 
         auto model = "tmp%%%%"_sd;
-        pcrecpp::RE re(_nss.db() + "\\.tmp[0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z]");
+        pcre::Regex re(_nss.db() + "\\.tmp[0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z]",
+                       pcre::ANCHORED | pcre::ENDANCHORED);
 
         auto nss1 = unittest::assertGet(db->makeUniqueCollectionNamespace(_opCtx.get(), model));
-        if (!re.FullMatch(nss1.ns())) {
+        if (!re.matchView(nss1.ns())) {
             FAIL((StringBuilder() << "First generated namespace \"" << nss1.ns()
                                   << "\" does not match regular expression \"" << re.pattern()
                                   << "\"")
@@ -370,7 +371,7 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
         }
 
         auto nss2 = unittest::assertGet(db->makeUniqueCollectionNamespace(_opCtx.get(), model));
-        if (!re.FullMatch(nss2.ns())) {
+        if (!re.matchView(nss2.ns())) {
             FAIL((StringBuilder() << "Second generated namespace \"" << nss2.ns()
                                   << "\" does not match regular expression \"" << re.pattern()
                                   << "\"")

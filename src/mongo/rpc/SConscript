@@ -91,7 +91,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/s/is_mongos',
-        '$BUILD_DIR/third_party/shim_pcrecpp',
+        '$BUILD_DIR/mongo/util/pcre_wrapper',
         'message',
     ],
 )

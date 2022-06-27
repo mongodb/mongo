@@ -739,8 +739,7 @@ StatusWithMatchExpression parseAllowedProperties(
     // that can't match documents.
     if (requiredMissingID) {
         for (const auto& pattern : patternPropertiesVec) {
-            // for (int i = 0; i < patternPropertiesVec.size(); ++i) {
-            if (pattern.first.regex->FullMatch("_id")) {
+            if (pattern.first.regex->matchView("_id", pcre::ANCHORED | pcre::ENDANCHORED)) {
                 requiredMissingID = false;
                 break;
             }
