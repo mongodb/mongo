@@ -309,7 +309,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
             // transaction table db lock to ensure the same lock ordering with normal replicated
             // updates to the table.
             Lock::DBLock lk(
-                opCtx, NamespaceString::kSessionTransactionsTableNamespace.db(), MODE_IX);
+                opCtx, NamespaceString::kSessionTransactionsTableNamespace.dbName(), MODE_IX);
             WriteUnitOfWork wunit(opCtx);
 
             result.oplogTime = repl::logOp(opCtx, &oplogEntry);

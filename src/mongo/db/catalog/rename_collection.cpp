@@ -295,7 +295,7 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     invariant(source.db() == target.db());
     DisableDocumentValidation validationDisabler(opCtx);
 
-    Lock::DBLock dbWriteLock(opCtx, source.db(), MODE_IX);
+    Lock::DBLock dbWriteLock(opCtx, source.dbName(), MODE_IX);
 
     {
         auto dss = DatabaseShardingState::get(opCtx, source.db());
@@ -356,7 +356,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
     invariant(source.db() == target.db());
     DisableDocumentValidation validationDisabler(opCtx);
 
-    Lock::DBLock dbWriteLock(opCtx, source.db(), MODE_X);
+    Lock::DBLock dbWriteLock(opCtx, source.dbName(), MODE_X);
 
     {
         auto dss = DatabaseShardingState::get(opCtx, source.db());
@@ -483,13 +483,13 @@ Status renameBetweenDBs(OperationContext* opCtx,
         // Lock the DB using MODE_IX to ensure we have the global lock in that mode, as to prevent
         // upgrade from MODE_IS to MODE_IX, which caused deadlock on systems not supporting Database
         // locking and should be avoided in general.
-        sourceDbLock.emplace(opCtx, source.db(), MODE_IX);
+        sourceDbLock.emplace(opCtx, source.dbName(), MODE_IX);
         sourceCollLock.emplace(opCtx, source, MODE_S);
     }
 
     boost::optional<Lock::DBLock> targetDBLock;
     if (!opCtx->lockState()->isDbLockedForMode(target.db(), MODE_X)) {
-        targetDBLock.emplace(opCtx, target.db(), MODE_X);
+        targetDBLock.emplace(opCtx, target.dbName(), MODE_X);
     }
 
     {

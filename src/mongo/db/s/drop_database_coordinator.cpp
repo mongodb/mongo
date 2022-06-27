@@ -84,7 +84,10 @@ public:
                                   const std::string dbName,
                                   const BSONObj reason)
         : _opCtx(opCtx), _dbName(std::move(dbName)), _reason(std::move(reason)) {
-        Lock::DBLock dbLock(_opCtx, _dbName, MODE_X);
+        // TODO SERVER-67438 Once ScopedDatabaseCriticalSection holds a DatabaseName obj, use dbName
+        // directly
+        DatabaseName databaseName(boost::none, _dbName);
+        Lock::DBLock dbLock(_opCtx, databaseName, MODE_X);
         auto dss = DatabaseShardingState::get(_opCtx, _dbName);
         auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(_opCtx, dss);
         dss->enterCriticalSectionCatchUpPhase(_opCtx, dssLock, _reason);
@@ -93,7 +96,10 @@ public:
 
     ~ScopedDatabaseCriticalSection() {
         UninterruptibleLockGuard guard(_opCtx->lockState());
-        Lock::DBLock dbLock(_opCtx, _dbName, MODE_X);
+        // TODO SERVER-67438 Once ScopedDatabaseCriticalSection holds a DatabaseName obj, use dbName
+        // directly
+        DatabaseName databaseName(boost::none, _dbName);
+        Lock::DBLock dbLock(_opCtx, databaseName, MODE_X);
         auto dss = DatabaseShardingState::get(_opCtx, _dbName);
         dss->exitCriticalSection(_opCtx, _reason);
     }
@@ -145,7 +151,8 @@ void DropDatabaseCoordinator::_dropShardedCollection(
 }
 
 void DropDatabaseCoordinator::_clearDatabaseInfoOnPrimary(OperationContext* opCtx) {
-    Lock::DBLock dbLock(opCtx, _dbName, MODE_X);
+    // TODO SERVER-67438 Use _dbName directly once it's of type DatabaseName
+    Lock::DBLock dbLock(opCtx, DatabaseName(boost::none, _dbName), MODE_X);
     auto dss = DatabaseShardingState::get(opCtx, _dbName);
     dss->clearDatabaseInfo(opCtx);
 }

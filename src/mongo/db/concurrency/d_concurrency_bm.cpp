@@ -137,8 +137,9 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionIntentSharedLock)(benchmark::S
         makeKClientsWithLockers(state.threads);
     }
 
+    DatabaseName dbName(boost::none, "test");
     for (auto keepRunning : state) {
-        Lock::DBLock dlk(clients[state.thread_index].second.get(), "test", MODE_IS);
+        Lock::DBLock dlk(clients[state.thread_index].second.get(), dbName, MODE_IS);
         Lock::CollectionLock clk(
             clients[state.thread_index].second.get(), NamespaceString("test.coll"), MODE_IS);
     }
@@ -153,8 +154,9 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionIntentExclusiveLock)(benchmark
         makeKClientsWithLockers(state.threads);
     }
 
+    DatabaseName dbName(boost::none, "test");
     for (auto keepRunning : state) {
-        Lock::DBLock dlk(clients[state.thread_index].second.get(), "test", MODE_IX);
+        Lock::DBLock dlk(clients[state.thread_index].second.get(), dbName, MODE_IX);
         Lock::CollectionLock clk(
             clients[state.thread_index].second.get(), NamespaceString("test.coll"), MODE_IX);
     }
@@ -169,8 +171,9 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionSharedLock)(benchmark::State& 
         makeKClientsWithLockers(state.threads);
     }
 
+    DatabaseName dbName(boost::none, "test");
     for (auto keepRunning : state) {
-        Lock::DBLock dlk(clients[state.thread_index].second.get(), "test", MODE_IS);
+        Lock::DBLock dlk(clients[state.thread_index].second.get(), dbName, MODE_IS);
         Lock::CollectionLock clk(
             clients[state.thread_index].second.get(), NamespaceString("test.coll"), MODE_S);
     }
@@ -185,8 +188,9 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionExclusiveLock)(benchmark::Stat
         makeKClientsWithLockers(state.threads);
     }
 
+    DatabaseName dbName(boost::none, "test");
     for (auto keepRunning : state) {
-        Lock::DBLock dlk(clients[state.thread_index].second.get(), "test", MODE_IX);
+        Lock::DBLock dlk(clients[state.thread_index].second.get(), dbName, MODE_IX);
         Lock::CollectionLock clk(
             clients[state.thread_index].second.get(), NamespaceString("test.coll"), MODE_X);
     }

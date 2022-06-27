@@ -114,7 +114,7 @@ public:
                       const NamespaceString& viewOn,
                       const BSONArray& pipeline,
                       const BSONObj& collation) {
-        Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_IX);
+        Lock::DBLock dbLock(operationContext(), viewName.dbName(), MODE_IX);
         Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
         Lock::CollectionLock sysCollLock(
             operationContext(),
@@ -133,7 +133,7 @@ public:
                       const NamespaceString& viewName,
                       const NamespaceString& viewOn,
                       const BSONArray& pipeline) {
-        Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_IX);
+        Lock::DBLock dbLock(operationContext(), viewName.dbName(), MODE_IX);
         Lock::CollectionLock collLock(operationContext(), viewName, MODE_X);
         Lock::CollectionLock sysCollLock(
             operationContext(),
@@ -149,7 +149,7 @@ public:
     }
 
     Status dropView(OperationContext* opCtx, const NamespaceString& viewName) {
-        Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_IX);
+        Lock::DBLock dbLock(operationContext(), viewName.dbName(), MODE_IX);
         Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
         Lock::CollectionLock sysCollLock(
             operationContext(),
@@ -169,7 +169,7 @@ public:
 
     std::shared_ptr<const ViewDefinition> lookup(OperationContext* opCtx,
                                                  const NamespaceString& ns) {
-        Lock::DBLock dbLock(operationContext(), NamespaceString(ns).db(), MODE_IS);
+        Lock::DBLock dbLock(operationContext(), ns.dbName(), MODE_IS);
         return getCatalog()->lookupView(operationContext(), ns);
     }
 
@@ -525,7 +525,7 @@ TEST_F(ViewCatalogFixture, LookupRIDExistingViewRollback) {
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");
     {
-        Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_X);
+        Lock::DBLock dbLock(operationContext(), viewName.dbName(), MODE_X);
         Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
         Lock::CollectionLock sysCollLock(
             operationContext(),
@@ -568,7 +568,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterDropRollback) {
     }
 
     {
-        Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_X);
+        Lock::DBLock dbLock(operationContext(), viewName.dbName(), MODE_X);
         Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
         Lock::CollectionLock sysCollLock(
             operationContext(),
@@ -606,7 +606,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
     }
 
     {
-        Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_IX);
+        Lock::DBLock dbLock(operationContext(), viewName.dbName(), MODE_IX);
         Lock::CollectionLock collLock(operationContext(), viewName, MODE_X);
         Lock::CollectionLock sysCollLock(
             operationContext(),
@@ -648,15 +648,14 @@ TEST_F(ViewCatalogFixture, Iterate) {
 
     std::set<std::string> viewNames = {"db.view1", "db.view2", "db.view3"};
 
-    Lock::DBLock dbLock(operationContext(), "db", MODE_IX);
-    getCatalog()->iterateViews(operationContext(),
-                               DatabaseName(boost::none, "db"),
-                               [&viewNames](const ViewDefinition& view) {
-                                   std::string name = view.name().toString();
-                                   ASSERT(viewNames.end() != viewNames.find(name));
-                                   viewNames.erase(name);
-                                   return true;
-                               });
+    Lock::DBLock dbLock(operationContext(), view1.dbName(), MODE_IX);
+    getCatalog()->iterateViews(
+        operationContext(), view1.dbName(), [&viewNames](const ViewDefinition& view) {
+            std::string name = view.name().toString();
+            ASSERT(viewNames.end() != viewNames.find(name));
+            viewNames.erase(name);
+            return true;
+        });
 
     ASSERT(viewNames.empty());
 }
@@ -678,7 +677,7 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectPipeline) {
     ASSERT_OK(createView(operationContext(), view2, view1, pipeline2.arr(), emptyCollation));
     ASSERT_OK(createView(operationContext(), view3, view2, pipeline3.arr(), emptyCollation));
 
-    Lock::DBLock dbLock(operationContext(), "db", MODE_IX);
+    Lock::DBLock dbLock(operationContext(), view1.dbName(), MODE_IX);
     auto resolvedView =
         view_catalog_helpers::resolveView(operationContext(), getCatalog(), view3, boost::none);
     ASSERT(resolvedView.isOK());
@@ -699,7 +698,7 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectPipeline) {
 TEST_F(ViewCatalogFixture, ResolveViewOnCollectionNamespace) {
     const NamespaceString collectionNamespace("db.coll");
 
-    Lock::DBLock dbLock(operationContext(), "db", MODE_IS);
+    Lock::DBLock dbLock(operationContext(), collectionNamespace.dbName(), MODE_IS);
     auto resolvedView = uassertStatusOK(view_catalog_helpers::resolveView(
         operationContext(), getCatalog(), collectionNamespace, boost::none));
 
@@ -723,7 +722,7 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectlyExtractsDefaultCollation) {
     ASSERT_OK(createView(operationContext(), view1, viewOn, pipeline1.arr(), collation));
     ASSERT_OK(createView(operationContext(), view2, view1, pipeline2.arr(), collation));
 
-    Lock::DBLock dbLock(operationContext(), "db", MODE_IS);
+    Lock::DBLock dbLock(operationContext(), view1.dbName(), MODE_IS);
     auto resolvedView =
         view_catalog_helpers::resolveView(operationContext(), getCatalog(), view2, boost::none);
     ASSERT(resolvedView.isOK());

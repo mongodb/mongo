@@ -74,7 +74,7 @@ boost::optional<UUID> getCollectionUUID(OperationContext* opCtx,
     if (optCollectionType) {
         return optCollectionType->getUuid();
     }
-    Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
+    Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
     const auto collPtr = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
     if (!collPtr && !throwOnNotFound) {

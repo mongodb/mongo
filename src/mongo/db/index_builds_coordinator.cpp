@@ -663,7 +663,9 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
         return {ErrorCodes::FailPointEnabled, "failSetUpResumeIndexBuild fail point is enabled"};
     }
 
-    Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+    // TODO SERVER-67439 Use dbName directly
+    DatabaseName databaseName(boost::none, dbName);
+    Lock::DBLock dbLock(opCtx, databaseName, MODE_IX);
     Lock::CollectionLock collLock(opCtx, nssOrUuid, MODE_X);
 
     CollectionWriter collection(opCtx, resumeInfo.getCollectionUUID());
@@ -1239,7 +1241,10 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
         LOGV2(4656010, "Attempting to abort index build", "buildUUID"_attr = replState->buildUUID);
 
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        Lock::DBLock dbLock(opCtx, replState->dbName, MODE_IX);
+        // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly for
+        // lock
+        DatabaseName dbName(boost::none, replState->dbName);
+        Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
 
         if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
             // Unlock RSTL to avoid deadlocks with prepare conflicts and state transitions caused by
@@ -1878,7 +1883,10 @@ Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(
 
     // Don't use the AutoGet helpers because they require an open database, which may not be the
     // case when an index builds is restarted during recovery.
-    Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+
+    // TODO SERVER-67439 Use dbName directly
+    DatabaseName databaseName(boost::none, dbName);
+    Lock::DBLock dbLock(opCtx, databaseName, MODE_IX);
     Lock::CollectionLock collLock(opCtx, nssOrUuid, MODE_X);
     auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collectionUUID);
     invariant(collection);
@@ -2225,7 +2233,10 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterFailure(
     runOnAlternateContext(
         opCtx, "self-abort", [this, replState, status](OperationContext* abortCtx) {
             ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(abortCtx->lockState());
-            Lock::DBLock dbLock(abortCtx, replState->dbName, MODE_IX);
+            // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly
+            // for lock
+            DatabaseName dbName(boost::none, replState->dbName);
+            Lock::DBLock dbLock(abortCtx, dbName, MODE_IX);
 
             // Unlock RSTL to avoid deadlocks with prepare conflicts and state transitions caused by
             // taking a strong collection lock. See SERVER-42621.
@@ -2259,7 +2270,10 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterFailure(
 
             // Take RSTL (implicitly by DBLock) to observe and prevent replication state from
             // changing.
-            Lock::DBLock dbLock(abortCtx, replState->dbName, MODE_IX);
+            // TODO SSERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly
+            // for lock
+            DatabaseName dbName(boost::none, replState->dbName);
+            Lock::DBLock dbLock(abortCtx, dbName, MODE_IX);
 
             // Index builds may not fail on secondaries. If a primary replicated an abortIndexBuild
             // oplog entry, then this index build would have received an IndexBuildAborted error
@@ -2535,7 +2549,10 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
         // if it waited.
         _awaitLastOpTimeBeforeInterceptorsMajorityCommitted(opCtx, replState);
 
-        Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
+        // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly for
+        // lock
+        DatabaseName dbName(boost::none, replState->dbName);
+        Lock::DBLock autoDb(opCtx, dbName, MODE_IX);
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IX);
 
@@ -2554,7 +2571,10 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
 void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     {
-        Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
+        // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly for
+        // lock
+        DatabaseName dbName(boost::none, replState->dbName);
+        Lock::DBLock autoDb(opCtx, dbName, MODE_IX);
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IX);
 
@@ -2595,7 +2615,10 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
     // Perform the first drain while holding an intent lock.
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     {
-        Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
+        // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly for
+        // lock
+        DatabaseName dbName(boost::none, replState->dbName);
+        Lock::DBLock autoDb(opCtx, dbName, MODE_IX);
         Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IX);
 
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
@@ -2620,7 +2643,10 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesBlockingWrites(
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     // Perform the second drain while stopping writes on the collection.
     {
-        Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
+        // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly for
+        // lock
+        DatabaseName dbName(boost::none, replState->dbName);
+        Lock::DBLock autoDb(opCtx, dbName, MODE_IX);
 
         // Unlock RSTL to avoid deadlocks with prepare conflicts and state transitions. See
         // SERVER-42621.
@@ -2656,7 +2682,9 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         hangIndexBuildBeforeCommit.pauseWhileSet();
     }
 
-    Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
+    // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly for lock
+    DatabaseName dbName(boost::none, replState->dbName);
+    Lock::DBLock autoDb(opCtx, dbName, MODE_IX);
 
     // Unlock RSTL to avoid deadlocks with prepare conflicts and state transitions caused by waiting
     // for a a strong collection lock. See SERVER-42621.

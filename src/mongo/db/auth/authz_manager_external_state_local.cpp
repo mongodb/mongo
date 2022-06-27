@@ -280,8 +280,8 @@ AuthzManagerExternalStateLocal::RolesLocks::RolesLocks(OperationContext* opCtx,
     if (!storageGlobalParams.disableLockFreeReads) {
         _readLockFree = std::make_unique<AutoReadLockFree>(opCtx);
     } else {
-        _adminLock =
-            std::make_unique<Lock::DBLock>(opCtx, NamespaceString::kAdminDb, LockMode::MODE_IS);
+        _adminLock = std::make_unique<Lock::DBLock>(
+            opCtx, DatabaseName(boost::none, NamespaceString::kAdminDb), LockMode::MODE_IS);
         _rolesLock = std::make_unique<Lock::CollectionLock>(
             opCtx, getRolesCollection(tenant), LockMode::MODE_S);
     }

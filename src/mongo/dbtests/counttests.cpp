@@ -42,10 +42,7 @@ namespace CountTests {
 
 class Base {
 public:
-    Base()
-        : _lk(&_opCtx, nsToDatabaseSubstring(ns()), MODE_X),
-          _context(&_opCtx, ns()),
-          _client(&_opCtx) {
+    Base() : _lk(&_opCtx, nss().dbName(), MODE_X), _context(&_opCtx, ns()), _client(&_opCtx) {
         _database = _context.db();
 
         {

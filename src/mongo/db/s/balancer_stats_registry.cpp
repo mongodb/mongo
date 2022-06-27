@@ -61,14 +61,16 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
 }  // namespace
 
 ScopedRangeDeleterLock::ScopedRangeDeleterLock(OperationContext* opCtx)
-    : _configLock(opCtx, NamespaceString::kConfigDb, MODE_IX),
+    // TODO SERVER-62491 Use system tenantId for DBLock
+    : _configLock(opCtx, DatabaseName(boost::none, NamespaceString::kConfigDb), MODE_IX),
       _rangeDeletionLock(opCtx, NamespaceString::kRangeDeletionNamespace, MODE_X) {}
 
 // Take DB and Collection lock in mode IX as well as collection UUID lock to serialize with
 // operations that take the above version of the ScopedRangeDeleterLock such as FCV downgrade and
 // BalancerStatsRegistry initialization.
 ScopedRangeDeleterLock::ScopedRangeDeleterLock(OperationContext* opCtx, const UUID& collectionUuid)
-    : _configLock(opCtx, NamespaceString::kConfigDb, MODE_IX),
+    // TODO SERVER-62491 Use system tenantId for DBLock
+    : _configLock(opCtx, DatabaseName(boost::none, NamespaceString::kConfigDb), MODE_IX),
       _rangeDeletionLock(opCtx, NamespaceString::kRangeDeletionNamespace, MODE_IX),
       _collectionUuidLock(Lock::ResourceLock(
           opCtx->lockState(),

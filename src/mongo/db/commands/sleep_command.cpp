@@ -103,7 +103,7 @@ public:
             dbMode = isSharedLockMode(mode) ? MODE_IS : MODE_IX;
         }
 
-        Lock::DBLock dbLock(opCtx, nss.db(), dbMode, Date_t::max());
+        Lock::DBLock dbLock(opCtx, nss.dbName(), dbMode, Date_t::max());
 
         if (nsIsDbOnly(ns)) {
             LOGV2(6001602,

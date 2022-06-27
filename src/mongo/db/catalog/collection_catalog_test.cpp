@@ -625,8 +625,8 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
 
     std::vector<NamespaceString> dCollList = {d1Coll, d2Coll, d3Coll};
 
-    Lock::DBLock dbLock(opCtx.get(), "dbD", MODE_S);
-    auto res = catalog.getAllCollectionNamesFromDb(opCtx.get(), DatabaseName(boost::none, "dbD"));
+    Lock::DBLock dbLock(opCtx.get(), d1Coll.dbName(), MODE_S);
+    auto res = catalog.getAllCollectionNamesFromDb(opCtx.get(), d1Coll.dbName());
     std::sort(res.begin(), res.end());
     ASSERT(res == dCollList);
 
@@ -684,7 +684,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
         const_cast<Collection*>(catalog.lookupCollectionByNamespace(opCtx.get(), aColl).get());
     invisibleCollA->setCommitted(false);
 
-    Lock::DBLock dbLock(opCtx.get(), "dbA", MODE_S);
+    Lock::DBLock dbLock(opCtx.get(), aColl.dbName(), MODE_S);
     auto res = catalog.getAllCollectionNamesFromDb(opCtx.get(), DatabaseName(boost::none, "dbA"));
     ASSERT(res.empty());
 
@@ -708,7 +708,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
             const_cast<Collection*>(catalog.lookupCollectionByNamespace(opCtx.get(), nss).get());
         invisibleCollD->setCommitted(false);
 
-        Lock::DBLock dbLock(opCtx.get(), "dbD", MODE_S);
+        Lock::DBLock dbLock(opCtx.get(), d1Coll.dbName(), MODE_S);
         res = catalog.getAllCollectionNamesFromDb(opCtx.get(), DatabaseName(boost::none, "dbD"));
         std::sort(res.begin(), res.end());
         ASSERT(res == dCollList);
@@ -758,9 +758,9 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDb) {
     auto opCtx = operationContext();
 
     {
-        auto dbLock = std::make_unique<Lock::DBLock>(opCtx, "db", MODE_IX);
-        int numCollectionsTraversed = 0;
         const DatabaseName dbName(boost::none, "db");
+        auto dbLock = std::make_unique<Lock::DBLock>(opCtx, dbName, MODE_IX);
+        int numCollectionsTraversed = 0;
         catalog::forEachCollectionFromDb(
             opCtx, dbName, MODE_X, [&](const CollectionPtr& collection) {
                 ASSERT_TRUE(
@@ -773,9 +773,9 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDb) {
     }
 
     {
-        auto dbLock = std::make_unique<Lock::DBLock>(opCtx, "db2", MODE_IX);
-        int numCollectionsTraversed = 0;
         const DatabaseName dbName(boost::none, "db2");
+        auto dbLock = std::make_unique<Lock::DBLock>(opCtx, dbName, MODE_IX);
+        int numCollectionsTraversed = 0;
         catalog::forEachCollectionFromDb(
             opCtx, dbName, MODE_IS, [&](const CollectionPtr& collection) {
                 ASSERT_TRUE(
@@ -788,9 +788,9 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDb) {
     }
 
     {
-        auto dbLock = std::make_unique<Lock::DBLock>(opCtx, "db3", MODE_IX);
-        int numCollectionsTraversed = 0;
         const DatabaseName dbName(boost::none, "db3");
+        auto dbLock = std::make_unique<Lock::DBLock>(opCtx, dbName, MODE_IX);
+        int numCollectionsTraversed = 0;
         catalog::forEachCollectionFromDb(
             opCtx, dbName, MODE_S, [&](const CollectionPtr& collection) {
                 numCollectionsTraversed++;
@@ -806,9 +806,9 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDbWithPredicate) {
     auto opCtx = operationContext();
 
     {
-        auto dbLock = std::make_unique<Lock::DBLock>(opCtx, "db", MODE_IX);
-        int numCollectionsTraversed = 0;
         const DatabaseName dbName(boost::none, "db");
+        auto dbLock = std::make_unique<Lock::DBLock>(opCtx, dbName, MODE_IX);
+        int numCollectionsTraversed = 0;
         catalog::forEachCollectionFromDb(
             opCtx,
             dbName,
@@ -829,9 +829,9 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDbWithPredicate) {
     }
 
     {
-        auto dbLock = std::make_unique<Lock::DBLock>(opCtx, "db", MODE_IX);
-        int numCollectionsTraversed = 0;
         const DatabaseName dbName(boost::none, "db");
+        auto dbLock = std::make_unique<Lock::DBLock>(opCtx, dbName, MODE_IX);
+        int numCollectionsTraversed = 0;
         catalog::forEachCollectionFromDb(
             opCtx,
             dbName,

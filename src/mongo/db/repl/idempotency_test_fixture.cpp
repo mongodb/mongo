@@ -359,7 +359,7 @@ std::vector<CollectionState> IdempotencyTest::validateAllCollections() {
         if (dbName.db() != "local") {
             std::vector<NamespaceString> collectionNames;
             {
-                Lock::DBLock lk(_opCtx.get(), dbName.db(), MODE_S);
+                Lock::DBLock lk(_opCtx.get(), dbName, MODE_S);
                 collectionNames = catalog->getAllCollectionNamesFromDb(_opCtx.get(), dbName);
             }
             for (const auto& nss : collectionNames) {

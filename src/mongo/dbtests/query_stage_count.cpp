@@ -58,7 +58,7 @@ const NamespaceString kTestNss = NamespaceString("db.dummy");
 class CountStageTest {
 public:
     CountStageTest()
-        : _dbLock(&_opCtx, nsToDatabaseSubstring(ns()), MODE_X),
+        : _dbLock(&_opCtx, nss().dbName(), MODE_X),
           _ctx(&_opCtx, ns()),
           _expCtx(make_intrusive<ExpressionContext>(&_opCtx, nullptr, kTestNss)),
           _coll(nullptr) {}

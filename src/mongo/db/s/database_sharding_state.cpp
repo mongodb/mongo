@@ -101,7 +101,8 @@ void DatabaseShardingState::checkIsPrimaryShardForDb(OperationContext* opCtx, St
             OperationShardingState::get(opCtx).hasDbVersion());
 
     const auto dbPrimaryShardId = [&]() {
-        Lock::DBLock dbWriteLock(opCtx, dbName, MODE_IS);
+        // TODO SERVER-63706 Use dbName directly
+        Lock::DBLock dbWriteLock(opCtx, DatabaseName(boost::none, dbName), MODE_IS);
         auto dss = DatabaseShardingState::get(opCtx, dbName);
         auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
         // The following call will also ensure that the database version matches

@@ -1069,8 +1069,8 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabasesWithLocks) {
     // from secondary oplog application).
     _createCollection(_opCtx.get(), _sourceNss);
     _insertDocument(_opCtx.get(), _sourceNss, BSON("_id" << 0));
-    Lock::DBLock sourceLk(_opCtx.get(), _sourceNss.db(), MODE_X);
-    Lock::DBLock targetLk(_opCtx.get(), _targetNssDifferentDb.db(), MODE_X);
+    Lock::DBLock sourceLk(_opCtx.get(), _sourceNss.dbName(), MODE_X);
+    Lock::DBLock targetLk(_opCtx.get(), _targetNssDifferentDb.dbName(), MODE_X);
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
     ASSERT_TRUE(_opObserver->onInsertsIsTargetDatabaseExclusivelyLocked);
 }

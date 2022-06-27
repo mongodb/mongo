@@ -146,7 +146,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsWithSpecificUuidNoExisti
     ASSERT_FALSE(collectionExists(opCtx.get(), newNss));
 
     auto uuid = UUID::gen();
-    Lock::DBLock lock(opCtx.get(), newNss.db(), MODE_IX);
+    Lock::DBLock lock(opCtx.get(), newNss.dbName(), MODE_IX);
     ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
                                           newNss.db().toString(),
                                           uuid,
@@ -232,7 +232,7 @@ TEST_F(CreateCollectionTest,
 
     auto opCtx = makeOpCtx();
     auto uuid = UUID::gen();
-    Lock::DBLock lock(opCtx.get(), newNss.db(), MODE_IX);
+    Lock::DBLock lock(opCtx.get(), newNss.dbName(), MODE_IX);
 
     // Create drop pending collection using StorageInterface.
     {

@@ -328,7 +328,7 @@ public:
 };  // namespace IndexUpdateTests
 
 Status IndexBuildBase::createIndex(const BSONObj& indexSpec) {
-    Lock::DBLock dbLk(_opCtx, _nss.db(), MODE_IX);
+    Lock::DBLock dbLk(_opCtx, _nss.dbName(), MODE_IX);
     Lock::CollectionLock collLk(_opCtx, _nss, MODE_X);
 
     MultiIndexBlock indexer;

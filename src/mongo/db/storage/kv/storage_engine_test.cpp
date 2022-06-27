@@ -294,7 +294,7 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedBackgroundSecondaryIndex) {
     const bool isBackgroundSecondaryBuild = true;
     const boost::optional<UUID> buildUUID = boost::none;
     {
-        Lock::DBLock dbLk(opCtx.get(), ns.db(), MODE_IX);
+        Lock::DBLock dbLk(opCtx.get(), ns.dbName(), MODE_IX);
         Lock::CollectionLock collLk(opCtx.get(), ns, MODE_X);
 
         WriteUnitOfWork wuow(opCtx.get());
@@ -344,7 +344,7 @@ TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
     // Start two indexes with the same buildUUID to simulate building multiple indexes within the
     // same build.
     {
-        Lock::DBLock dbLk(opCtx.get(), ns.db(), MODE_IX);
+        Lock::DBLock dbLk(opCtx.get(), ns.dbName(), MODE_IX);
         Lock::CollectionLock collLk(opCtx.get(), ns, MODE_X);
         {
             WriteUnitOfWork wuow(opCtx.get());

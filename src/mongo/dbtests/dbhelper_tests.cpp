@@ -124,10 +124,10 @@ public:
         opCtx1.get()->getServiceContext()->setOpObserver(std::move(registry));
         repl::createOplog(opCtx1.get());
 
-        Lock::DBLock dbLk1(opCtx1.get(), nss.db(), LockMode::MODE_IX);
+        Lock::DBLock dbLk1(opCtx1.get(), nss.dbName(), LockMode::MODE_IX);
         Lock::CollectionLock collLk1(opCtx1.get(), nss, LockMode::MODE_IX);
 
-        Lock::DBLock dbLk2(opCtx2.get(), nss.db(), LockMode::MODE_IX);
+        Lock::DBLock dbLk2(opCtx2.get(), nss.dbName(), LockMode::MODE_IX);
         Lock::CollectionLock collLk2(opCtx2.get(), nss, LockMode::MODE_IX);
 
         Database* db =

@@ -67,7 +67,7 @@ bool collectionExists(OperationContext* opCtx, OldClientContext* ctx, const stri
 }
 
 void createCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    Lock::DBLock dbXLock(opCtx, nss.db(), MODE_X);
+    Lock::DBLock dbXLock(opCtx, nss.dbName(), MODE_X);
     OldClientContext ctx(opCtx, nss.ns());
     {
         WriteUnitOfWork uow(opCtx);
@@ -169,7 +169,7 @@ public:
         NamespaceString nss(ns);
         dropDatabase(&opCtx, nss);
 
-        Lock::DBLock dbXLock(&opCtx, nss.db(), MODE_X);
+        Lock::DBLock dbXLock(&opCtx, nss.dbName(), MODE_X);
         OldClientContext ctx(&opCtx, ns);
         {
             WriteUnitOfWork uow(&opCtx);
@@ -206,7 +206,7 @@ public:
         NamespaceString nss(ns);
         dropDatabase(&opCtx, nss);
 
-        Lock::DBLock dbXLock(&opCtx, nss.db(), MODE_X);
+        Lock::DBLock dbXLock(&opCtx, nss.dbName(), MODE_X);
         OldClientContext ctx(&opCtx, ns);
         {
             WriteUnitOfWork uow(&opCtx);
@@ -377,7 +377,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         dropDatabase(&opCtx, nss);
 
-        Lock::DBLock dbXLock(&opCtx, nss.db(), MODE_X);
+        Lock::DBLock dbXLock(&opCtx, nss.dbName(), MODE_X);
         OldClientContext ctx(&opCtx, nss.ns());
 
         BSONObj oldDoc = BSON("_id"
@@ -435,7 +435,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         dropDatabase(&opCtx, nss);
 
-        Lock::DBLock dbXLock(&opCtx, nss.db(), MODE_X);
+        Lock::DBLock dbXLock(&opCtx, nss.dbName(), MODE_X);
         OldClientContext ctx(&opCtx, nss.ns());
 
         BSONObj doc = BSON("_id"
@@ -627,7 +627,7 @@ public:
         NamespaceString nss(ns);
         dropDatabase(&opCtx, nss);
 
-        Lock::DBLock dbXLock(&opCtx, nss.db(), MODE_X);
+        Lock::DBLock dbXLock(&opCtx, nss.dbName(), MODE_X);
         OldClientContext ctx(&opCtx, nss.ns());
 
         string idxNameA = "indexA";

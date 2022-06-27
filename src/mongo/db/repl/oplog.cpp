@@ -848,7 +848,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           // complete.
           const bool allowRenameOutOfTheWay = (mode != repl::OplogApplication::Mode::kSecondary);
 
-          Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+          Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
           if (auto idIndexElem = cmd["idIndex"]) {
               // Remove "idIndex" field from command.
               auto cmdWithoutIdIndex = cmd.removeField("idIndex");
@@ -896,7 +896,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                   "createIndexes value must be a string",
                   first.type() == mongo::String);
           BSONObj indexSpec = cmd.removeField("createIndexes");
-          Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+          Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
           Lock::CollectionLock collLock(opCtx, nss, MODE_X);
           createIndexForApplyOps(opCtx, indexSpec, nss, mode);
           return Status::OK();

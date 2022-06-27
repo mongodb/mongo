@@ -419,7 +419,7 @@ TEST_F(TxnParticipantTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
 
-    { Lock::DBLock dbXLock(opCtx(), dbName, MODE_X); }
+    { Lock::DBLock dbXLock(opCtx(), DatabaseName(boost::none, dbName), MODE_X); }
     txnParticipant.stashTransactionResources(opCtx());
     auto clientWithDatabaseXLock = Client::releaseCurrent();
 
@@ -452,7 +452,7 @@ TEST_F(TxnParticipantTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {
         newTxnParticipant.unstashTransactionResources(newOpCtx.get(), "insert");
 
         Date_t t1 = Date_t::now();
-        ASSERT_THROWS_CODE(Lock::DBLock(newOpCtx.get(), dbName, MODE_X),
+        ASSERT_THROWS_CODE(Lock::DBLock(newOpCtx.get(), DatabaseName(boost::none, dbName), MODE_X),
                            AssertionException,
                            ErrorCodes::LockTimeout);
         Date_t t2 = Date_t::now();
@@ -460,7 +460,7 @@ TEST_F(TxnParticipantTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {
         ASSERT_GTE(t2 - t1, Milliseconds(defaultMaxTransactionLockRequestTimeoutMillis));
 
         // A non-conflicting lock acquisition should work just fine.
-        { Lock::DBLock tempLock(newOpCtx.get(), "NewTestDB", MODE_X); }
+        { Lock::DBLock tempLock(newOpCtx.get(), DatabaseName(boost::none, "NewTestDB"), MODE_X); }
     }
     // Restore the original client so that teardown works.
     Client::releaseCurrent();
@@ -984,7 +984,7 @@ TEST_F(TxnParticipantTest, UnstashFailsShouldLeaveTxnResourceStashUnchanged) {
 
     // Simulate the locking of an insert.
     {
-        Lock::DBLock dbLock(opCtx(), "test", MODE_IX);
+        Lock::DBLock dbLock(opCtx(), DatabaseName(boost::none, "test"), MODE_IX);
         Lock::CollectionLock collLock(opCtx(), NamespaceString("test.foo"), MODE_IX);
     }
 
@@ -1131,7 +1131,7 @@ TEST_F(TxnParticipantTest, StepDownDuringPreparedAbortReleasesRSTL) {
 
     // Simulate the locking of an insert.
     {
-        Lock::DBLock dbLock(opCtx(), "test", MODE_IX);
+        Lock::DBLock dbLock(opCtx(), DatabaseName(boost::none, "test"), MODE_IX);
         Lock::CollectionLock collLock(opCtx(), NamespaceString("test.foo"), MODE_IX);
     }
 
@@ -1184,7 +1184,7 @@ TEST_F(TxnParticipantTest, StepDownDuringPreparedCommitReleasesRSTL) {
 
     // Simulate the locking of an insert.
     {
-        Lock::DBLock dbLock(opCtx(), "test", MODE_IX);
+        Lock::DBLock dbLock(opCtx(), DatabaseName(boost::none, "test"), MODE_IX);
         Lock::CollectionLock collLock(opCtx(), NamespaceString("test.foo"), MODE_IX);
     }
 
@@ -1847,7 +1847,7 @@ TEST_F(TxnParticipantTest, ReacquireLocksForPreparedTransactionsOnStepUp) {
         txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
         // Simulate the locking of an insert.
         {
-            Lock::DBLock dbLock(opCtx(), "test", MODE_IX);
+            Lock::DBLock dbLock(opCtx(), DatabaseName(boost::none, "test"), MODE_IX);
             Lock::CollectionLock collLock(opCtx(), NamespaceString("test.foo"), MODE_IX);
         }
         txnParticipant.prepareTransaction(opCtx(), repl::OpTime({1, 1}, 1));

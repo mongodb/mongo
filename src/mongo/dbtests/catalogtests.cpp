@@ -61,9 +61,9 @@ public:
         auto op1 = client1->makeOperationContext();
         auto op2 = client2->makeOperationContext();
 
-        Lock::DBLock dbLk1(op1.get(), competingNss.db(), LockMode::MODE_IX);
+        Lock::DBLock dbLk1(op1.get(), competingNss.dbName(), LockMode::MODE_IX);
         Lock::CollectionLock collLk1(op1.get(), competingNss, LockMode::MODE_IX);
-        Lock::DBLock dbLk2(op2.get(), competingNss.db(), LockMode::MODE_IX);
+        Lock::DBLock dbLk2(op2.get(), competingNss.dbName(), LockMode::MODE_IX);
         Lock::CollectionLock collLk2(op2.get(), competingNss, LockMode::MODE_IX);
 
         Database* db =

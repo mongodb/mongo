@@ -122,7 +122,7 @@ void createCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const CollectionOptions& options = generateOptionsWithUuid()) {
     writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
-        Lock::DBLock dblk(opCtx, nss.db(), MODE_X);
+        Lock::DBLock dblk(opCtx, nss.dbName(), MODE_X);
         OldClientContext ctx(opCtx, nss.ns());
         auto db = ctx.db();
         ASSERT_TRUE(db);
@@ -138,7 +138,7 @@ void createCollection(OperationContext* opCtx,
  * collection after the given index is created.
  */
 int _createIndexOnEmptyCollection(OperationContext* opCtx, NamespaceString nss, BSONObj indexSpec) {
-    Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
+    Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_X);
     AutoGetCollection coll(opCtx, nss, MODE_X);
 
     WriteUnitOfWork wunit(opCtx);

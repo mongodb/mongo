@@ -203,7 +203,7 @@ protected:
 
         auto indexSpec = (bob << "v" << kIndexVersion << "background" << background).obj();
 
-        Lock::DBLock dbLock(opCtx(), nss.db(), MODE_X);
+        Lock::DBLock dbLock(opCtx(), nss.dbName(), MODE_X);
         AutoGetCollection autoColl(opCtx(), nss, MODE_X);
         CollectionWriter coll(opCtx(), autoColl);
 

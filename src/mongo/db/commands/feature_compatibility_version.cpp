@@ -380,7 +380,7 @@ bool FeatureCompatibilityVersion::hasNoReplicatedCollections(OperationContext* o
     std::vector<DatabaseName> dbNames = storageEngine->listDatabases();
     auto catalog = CollectionCatalog::get(opCtx);
     for (auto&& dbName : dbNames) {
-        Lock::DBLock dbLock(opCtx, dbName.db(), MODE_S);
+        Lock::DBLock dbLock(opCtx, dbName, MODE_S);
         for (auto&& collNss : catalog->getAllCollectionNamesFromDb(opCtx, dbName)) {
             if (collNss.isReplicated()) {
                 return false;

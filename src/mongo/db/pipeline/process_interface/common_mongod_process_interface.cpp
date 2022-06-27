@@ -582,7 +582,7 @@ bool CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
     // We purposefully avoid a helper like AutoGetCollection here because we don't want to check the
     // db version or do anything else. We simply want to protect against concurrent modifications to
     // the catalog.
-    Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
+    Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->getDb(opCtx, nss.dbName());

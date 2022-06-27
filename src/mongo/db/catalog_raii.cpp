@@ -168,9 +168,10 @@ void acquireCollectionLocksInResourceIdOrder(
 
 }  // namespace
 
-// TODO SERVER-62918 Pass DatabaseName instead of string for dbName.
+// TODO SERVER-62923 Use DatabaseName obj to construct '_dbLock' and to pass to
+// DatabaseHolder::getDb().
 AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, Date_t deadline)
-    : _dbName(dbName), _dbLock(opCtx, dbName, mode, deadline), _db([&] {
+    : _dbName(dbName), _dbLock(opCtx, DatabaseName(boost::none, dbName), mode, deadline), _db([&] {
           const DatabaseName tenantDbName(boost::none, dbName);
           auto databaseHolder = DatabaseHolder::get(opCtx);
           return databaseHolder->getDb(opCtx, tenantDbName);

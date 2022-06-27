@@ -74,7 +74,7 @@ void dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) 
 
 void clearFilteringMetadata(OperationContext* opCtx, const NamespaceString& nss) {
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-    Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+    Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
     auto* csr = CollectionShardingRuntime::get(opCtx, nss);
     csr->clearFilteringMetadata(opCtx);
@@ -90,7 +90,7 @@ void renameOrDropTarget(OperationContext* opCtx,
                         const UUID& sourceUUID,
                         const boost::optional<UUID>& targetUUID) {
     {
-        Lock::DBLock dbLock(opCtx, toNss.db(), MODE_IS);
+        Lock::DBLock dbLock(opCtx, toNss.dbName(), MODE_IS);
         Lock::CollectionLock collLock(opCtx, toNss, MODE_IS);
         const auto targetCollPtr =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toNss);
@@ -107,7 +107,7 @@ void renameOrDropTarget(OperationContext* opCtx,
     }
 
     {
-        Lock::DBLock dbLock(opCtx, fromNss.db(), MODE_IS);
+        Lock::DBLock dbLock(opCtx, fromNss.dbName(), MODE_IS);
         Lock::CollectionLock collLock(opCtx, fromNss, MODE_IS);
         // ensure idempotency by checking sourceUUID
         const auto sourceCollPtr =

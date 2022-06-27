@@ -90,7 +90,7 @@ public:
 
     std::tuple<RecordId, UUID> createCollection(const NamespaceString& nss,
                                                 CollectionOptions options) {
-        Lock::DBLock dbLk(operationContext(), nss.db(), MODE_IX);
+        Lock::DBLock dbLk(operationContext(), nss.dbName(), MODE_IX);
         Lock::CollectionLock collLk(operationContext(), nss, MODE_IX);
 
         WriteUnitOfWork wuow(operationContext());
@@ -124,7 +124,7 @@ public:
     IndexCatalogEntry* createIndex(BSONObj keyPattern,
                                    std::string indexType = IndexNames::BTREE,
                                    bool twoPhase = false) {
-        Lock::DBLock dbLk(operationContext(), _nss.db(), MODE_IX);
+        Lock::DBLock dbLk(operationContext(), _nss.dbName(), MODE_IX);
         Lock::CollectionLock collLk(operationContext(), _nss, MODE_X);
 
         std::string indexName = "idx" + std::to_string(_numIndexesCreated);
@@ -204,7 +204,7 @@ protected:
     void setUp() override {
         DurableCatalogTest::setUp();
 
-        Lock::DBLock dbLock(operationContext(), nss.db(), MODE_IX);
+        Lock::DBLock dbLock(operationContext(), nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(operationContext(), nss, MODE_IX);
 
         WriteUnitOfWork wuow{operationContext()};
@@ -247,7 +247,7 @@ protected:
     StatusWith<DurableCatalog::ImportResult> importCollectionTest(const NamespaceString& nss,
                                                                   const BSONObj& metadata,
                                                                   const BSONObj& storageMetadata) {
-        Lock::DBLock dbLock(operationContext(), nss.db(), MODE_IX);
+        Lock::DBLock dbLock(operationContext(), nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(operationContext(), nss, MODE_X);
 
         WriteUnitOfWork wuow(operationContext());
@@ -546,7 +546,7 @@ TEST_F(DurableCatalogTest, SinglePhaseIndexBuild) {
     ASSERT_FALSE(collection->getIndexBuildUUID(indexEntry->descriptor()->indexName()));
 
     {
-        Lock::DBLock dbLk(operationContext(), collection->ns().db(), MODE_IX);
+        Lock::DBLock dbLk(operationContext(), collection->ns().dbName(), MODE_IX);
         Lock::CollectionLock collLk(operationContext(), collection->ns(), MODE_X);
 
         WriteUnitOfWork wuow(operationContext());
@@ -570,7 +570,7 @@ TEST_F(DurableCatalogTest, TwoPhaseIndexBuild) {
     ASSERT_TRUE(collection->getIndexBuildUUID(indexEntry->descriptor()->indexName()));
 
     {
-        Lock::DBLock dbLk(operationContext(), collection->ns().db(), MODE_IX);
+        Lock::DBLock dbLk(operationContext(), collection->ns().dbName(), MODE_IX);
         Lock::CollectionLock collLk(operationContext(), collection->ns(), MODE_X);
 
         WriteUnitOfWork wuow(operationContext());

@@ -523,11 +523,17 @@ public:
 
     /**
      * Removes an existing ResourceId 'rid' with namespace 'entry' from the map.
+     *
+     * TODO SERVER-67442 Create versions of removeResource that take in NamespaceString and
+     * DatabaseName and make the method that takes in a string private.
      */
     void removeResource(const ResourceId& rid, const std::string& entry);
 
     /**
      * Inserts a new ResourceId 'rid' into the map with namespace 'entry'.
+     *
+     * TODO SERVER-67442 Create versions of addResource that take in NamespaceString and
+     * DatabaseName and make the method that takes in a string private.
      */
     void addResource(const ResourceId& rid, const std::string& entry);
 

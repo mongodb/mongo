@@ -331,7 +331,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsDeletedWriteConflict
         make_intrusive<ExpressionContext>(batchedDeleteOpCtx.get(), nullptr, nss);
 
     // Acquire locks for the batched delete.
-    Lock::DBLock dbLk1(batchedDeleteOpCtx.get(), nss.db(), LockMode::MODE_IX);
+    Lock::DBLock dbLk1(batchedDeleteOpCtx.get(), nss.dbName(), LockMode::MODE_IX);
     Lock::CollectionLock collLk1(batchedDeleteOpCtx.get(), nss, LockMode::MODE_IX);
 
     auto nDocs = 11;
@@ -460,7 +460,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsUpdatedToNotMatchCli
         make_intrusive<ExpressionContext>(batchedDeleteOpCtx.get(), nullptr, nss);
 
     // Acquire locks for the batched delete.
-    Lock::DBLock dbLk1(batchedDeleteOpCtx.get(), nss.db(), LockMode::MODE_IX);
+    Lock::DBLock dbLk1(batchedDeleteOpCtx.get(), nss.dbName(), LockMode::MODE_IX);
     Lock::CollectionLock collLk1(batchedDeleteOpCtx.get(), nss, LockMode::MODE_IX);
 
     auto nDocs = 11;

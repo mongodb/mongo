@@ -100,7 +100,7 @@ public:
     }
 
     void dropCollection() {
-        Lock::DBLock dbLock(&_opCtx, nss.db(), MODE_X);
+        Lock::DBLock dbLock(&_opCtx, nss.dbName(), MODE_X);
         auto databaseHolder = DatabaseHolder::get(&_opCtx);
         auto database = databaseHolder->getDb(&_opCtx, nss.dbName());
         if (!database) {

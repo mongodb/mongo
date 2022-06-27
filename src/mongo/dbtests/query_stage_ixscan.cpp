@@ -47,7 +47,7 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 class IndexScanTest {
 public:
     IndexScanTest()
-        : _dbLock(&_opCtx, nsToDatabaseSubstring(ns()), MODE_X),
+        : _dbLock(&_opCtx, nss().dbName(), MODE_X),
           _ctx(&_opCtx, ns()),
           _coll(nullptr),
           _expCtx(make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss())) {}

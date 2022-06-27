@@ -573,7 +573,7 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
 
         ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
             opCtx->lockState());
-        Lock::DBLock dbLock(opCtx.get(), nss.db(), MODE_IS, deadline);
+        Lock::DBLock dbLock(opCtx.get(), nss.dbName(), MODE_IS, deadline);
         Lock::CollectionLock collLock(opCtx.get(), nss, MODE_IS, deadline);
 
         auto databaseHolder = DatabaseHolder::get(opCtx.get());

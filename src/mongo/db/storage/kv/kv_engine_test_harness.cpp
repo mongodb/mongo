@@ -82,7 +82,7 @@ protected:
                            const NamespaceString& ns,
                            const CollectionOptions& options,
                            DurableCatalogImpl* catalog) {
-        Lock::DBLock dbLk(opCtx, ns.db(), MODE_IX);
+        Lock::DBLock dbLk(opCtx, ns.dbName(), MODE_IX);
         auto swEntry = catalog->_addEntry(opCtx, ns, options);
         ASSERT_OK(swEntry.getStatus());
         return swEntry.getValue().catalogId;

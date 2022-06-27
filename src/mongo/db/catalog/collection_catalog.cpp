@@ -1172,8 +1172,7 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
 
     invariant(static_cast<size_t>(_stats.internal + _stats.userCollections) == _collections.size());
 
-    // TODO SERVER-62918 create ResourceId for db with DatabaseName.
-    auto dbRid = ResourceId(RESOURCE_DATABASE, nss.dbName().toString());
+    auto dbRid = ResourceId(RESOURCE_DATABASE, nss.dbName().toStringWithTenantId());
     addResource(dbRid, nss.dbName().toString());
 
     auto collRid = ResourceId(RESOURCE_COLLECTION, nss.ns());

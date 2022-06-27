@@ -59,7 +59,7 @@ public:
     IndexIteratorTests() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        Lock::DBLock lk(&opCtx, _nss.db(), MODE_X);
+        Lock::DBLock lk(&opCtx, _nss.dbName(), MODE_X);
         OldClientContext ctx(&opCtx, _nss.ns());
         WriteUnitOfWork wuow(&opCtx);
 
@@ -70,7 +70,7 @@ public:
     ~IndexIteratorTests() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        Lock::DBLock lk(&opCtx, _nss.db(), MODE_X);
+        Lock::DBLock lk(&opCtx, _nss.dbName(), MODE_X);
         OldClientContext ctx(&opCtx, _nss.ns());
         WriteUnitOfWork wuow(&opCtx);
 
@@ -117,7 +117,7 @@ public:
     IndexCatalogEntryDroppedTest() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        Lock::DBLock lk(&opCtx, _nss.db(), MODE_X);
+        Lock::DBLock lk(&opCtx, _nss.dbName(), MODE_X);
         OldClientContext ctx(&opCtx, _nss.ns());
         WriteUnitOfWork wuow(&opCtx);
 
@@ -163,7 +163,7 @@ public:
     RefreshEntry() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        Lock::DBLock lk(&opCtx, _nss.db(), MODE_X);
+        Lock::DBLock lk(&opCtx, _nss.dbName(), MODE_X);
         OldClientContext ctx(&opCtx, _nss.ns());
         WriteUnitOfWork wuow(&opCtx);
 
@@ -174,7 +174,7 @@ public:
     ~RefreshEntry() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        Lock::DBLock lk(&opCtx, _nss.db(), MODE_X);
+        Lock::DBLock lk(&opCtx, _nss.dbName(), MODE_X);
         OldClientContext ctx(&opCtx, _nss.ns());
         WriteUnitOfWork wuow(&opCtx);
 

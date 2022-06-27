@@ -133,7 +133,8 @@ namespace repl {
 namespace {
 
 const char localDbName[] = "local";
-const auto configDatabaseName = localDbName;
+// TODO SERVER-62491 Use SystemTenantId
+const auto configDatabaseName = DatabaseName(boost::none, localDbName);
 const auto lastVoteDatabaseName = localDbName;
 const char meCollectionName[] = "local.me";
 const auto meDatabaseName = localDbName;

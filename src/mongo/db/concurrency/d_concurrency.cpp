@@ -211,11 +211,14 @@ void Lock::GlobalLock::_unlock() {
 }
 
 Lock::DBLock::DBLock(OperationContext* opCtx,
-                     StringData db,
+                     const DatabaseName& dbName,
                      LockMode mode,
                      Date_t deadline,
                      bool skipGlobalAndRSTLLocks)
-    : _id(RESOURCE_DATABASE, db), _opCtx(opCtx), _result(LOCK_INVALID), _mode(mode) {
+    : _id(RESOURCE_DATABASE, dbName.toStringWithTenantId()),
+      _opCtx(opCtx),
+      _result(LOCK_INVALID),
+      _mode(mode) {
 
     if (!skipGlobalAndRSTLLocks) {
         _globalLock.emplace(opCtx,
@@ -223,7 +226,7 @@ Lock::DBLock::DBLock(OperationContext* opCtx,
                             deadline,
                             InterruptBehavior::kThrow);
     }
-    massert(28539, "need a valid database name", !db.empty() && nsIsDbOnly(db));
+    massert(28539, "need a valid database name", !dbName.db().empty());
 
     _opCtx->lockState()->lock(_opCtx, _id, _mode, deadline);
     _result = LOCK_OK;

@@ -96,7 +96,9 @@ struct Cloner::BatchHandler {
 
     void operator()(DBClientCursor& cursor) {
         boost::optional<Lock::DBLock> dbLock;
-        dbLock.emplace(opCtx, _dbName, MODE_X);
+        // TODO SERVER-63111 Once the Cloner holds a DatabaseName obj, use _dbName directly
+        DatabaseName dbName(boost::none, _dbName);
+        dbLock.emplace(opCtx, dbName, MODE_X);
         uassert(ErrorCodes::NotWritablePrimary,
                 str::stream() << "Not primary while cloning collection " << nss,
                 !opCtx->writesAreReplicated() ||
@@ -104,8 +106,6 @@ struct Cloner::BatchHandler {
 
         // Make sure database still exists after we resume from the temp release
         auto databaseHolder = DatabaseHolder::get(opCtx);
-        // TODO SERVER-63111 use TenantDatabase in the Cloner.
-        const DatabaseName dbName(boost::none, _dbName);
         auto db = databaseHolder->openDb(opCtx, dbName);
         auto catalog = CollectionCatalog::get(opCtx);
         auto collection = catalog->lookupCollectionByNamespace(opCtx, nss);
@@ -143,7 +143,10 @@ struct Cloner::BatchHandler {
 
                 CurOp::get(opCtx)->yielded();
 
-                dbLock.emplace(opCtx, _dbName, MODE_X);
+                // TODO SERVER-63111 Once the cloner takes in a DatabaseName obj, use _dbName
+                // directly
+                DatabaseName dbName(boost::none, _dbName);
+                dbLock.emplace(opCtx, dbName, MODE_X);
 
                 // Check if everything is still all right.
                 if (opCtx->writesAreReplicated()) {
@@ -521,7 +524,9 @@ Status Cloner::copyDb(OperationContext* opCtx,
     }
 
     {
-        Lock::DBLock dbXLock(opCtx, dBName, MODE_X);
+        // TODO SERVER-63111 Once the cloner takes in a DatabaseName obj, use dBName directly
+        DatabaseName dbName(boost::none, dBName);
+        Lock::DBLock dbXLock(opCtx, dbName, MODE_X);
         uassert(ErrorCodes::NotWritablePrimary,
                 str::stream() << "Not primary while cloning database " << dBName
                               << " (after getting list of collections to clone)",

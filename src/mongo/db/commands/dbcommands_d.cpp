@@ -324,7 +324,7 @@ public:
                 // a lock. For example, AutoGetCollection will throw if this namespace has since
                 // turned into a view and AutoGetDb will throw if the database version is stale.
                 UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-                Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
+                Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
                 invariant(dbLock.isLocked(),
                           "Expected lock acquisition to succeed due to UninterruptibleLockGuard");
                 Lock::CollectionLock collLock(opCtx, nss, MODE_IS);

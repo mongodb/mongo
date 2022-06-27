@@ -1827,7 +1827,9 @@ public:
 class CollectionInternalBase : public CollectionBase {
 public:
     CollectionInternalBase(const char* nsLeaf)
-        : CollectionBase(nsLeaf), _lk(&_opCtx, "unittests", MODE_X), _ctx(&_opCtx, ns()) {}
+        : CollectionBase(nsLeaf),
+          _lk(&_opCtx, DatabaseName(boost::none, "unittests"), MODE_X),
+          _ctx(&_opCtx, ns()) {}
 
 private:
     Lock::DBLock _lk;

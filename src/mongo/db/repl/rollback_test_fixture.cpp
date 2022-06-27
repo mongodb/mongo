@@ -210,7 +210,7 @@ std::pair<BSONObj, RecordId> RollbackTest::makeCommandOpForApplyOps(boost::optio
 Collection* RollbackTest::_createCollection(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             const CollectionOptions& options) {
-    Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
+    Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_X);
     mongo::WriteUnitOfWork wuow(opCtx);
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->openDb(opCtx, nss.dbName());

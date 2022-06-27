@@ -100,7 +100,7 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
                                           const ChunkRange& chunkRange,
                                           const std::vector<BSONObj>& splitPoints) {
     // DBLock and CollectionLock must be used in order to avoid shard version checks
-    Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
+    Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
 
     const auto metadataAfterSplit =

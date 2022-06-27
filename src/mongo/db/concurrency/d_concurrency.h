@@ -305,7 +305,7 @@ public:
     class DBLock {
     public:
         DBLock(OperationContext* opCtx,
-               StringData db,
+               const DatabaseName& dbName,
                LockMode mode,
                Date_t deadline = Date_t::max(),
                bool skipGlobalAndRSTLLocks = false);

@@ -107,7 +107,7 @@ Status _applyOps(OperationContext* opCtx,
 
             // ApplyOps does not have the global writer lock when applying transaction
             // operations, so we need to acquire the DB and Collection locks.
-            Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+            Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
 
             // When processing an update on a non-existent collection, applyOperation_inlock()
             // returns UpdateOperationFailed on updates and allows the collection to be
@@ -363,7 +363,9 @@ Status applyOps(OperationContext* opCtx,
     // There's one case where we are allowed to take the database lock instead of the global
     // lock - no preconditions; only CRUD ops; and non-atomic mode.
     if (!info.getPreCondition() && info.areOpsCrudOnly() && !info.getAllowAtomic()) {
-        dbWriteLock.emplace(opCtx, dbName, MODE_IX);
+        // TODO SERVER-62880 Once the dbName is of type DatabaseName, pass it directly to the DBlock
+        DatabaseName databaseName(boost::none, dbName);
+        dbWriteLock.emplace(opCtx, databaseName, MODE_IX);
     } else {
         globalWriteLock.emplace(opCtx);
     }

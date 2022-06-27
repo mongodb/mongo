@@ -459,7 +459,7 @@ void createCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const CollectionOptions& options) {
     writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
-        Lock::DBLock dbLk(opCtx, nss.db(), MODE_IX);
+        Lock::DBLock dbLk(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLk(opCtx, nss, MODE_X);
 
         OldClientContext ctx(opCtx, nss.ns());
@@ -498,7 +498,7 @@ void createIndex(OperationContext* opCtx,
                  const NamespaceString& nss,
                  const UUID collUUID,
                  const BSONObj& spec) {
-    Lock::DBLock dbLk(opCtx, nss.db(), MODE_IX);
+    Lock::DBLock dbLk(opCtx, nss.dbName(), MODE_IX);
     Lock::CollectionLock collLk(opCtx, nss, MODE_X);
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     indexBuildsCoord->createIndex(

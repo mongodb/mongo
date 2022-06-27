@@ -51,7 +51,7 @@ DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opC
                                                            const NamespaceString& nss) {
     {
         // Clear CollectionShardingRuntime entry
-        Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+        Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         auto* csr = CollectionShardingRuntime::get(opCtx, nss);
         csr->clearFilteringMetadata(opCtx);

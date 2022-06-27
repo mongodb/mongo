@@ -96,7 +96,9 @@ public:
               "collection"_attr = nss.coll());
         BSONObj obj = cmdObj["obj"].embeddedObjectUserCheck();
 
-        Lock::DBLock lk(opCtx, dbname, MODE_X);
+        // TODO SERVER-66561 Use DatabaseName obj passed in
+        DatabaseName dbName(boost::none, dbname);
+        Lock::DBLock lk(opCtx, dbName, MODE_X);
         OldClientContext ctx(opCtx, nss.ns());
         Database* db = ctx.db();
 

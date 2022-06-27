@@ -909,7 +909,7 @@ void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::str
     boost::optional<NamespaceString> nss =
         CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid);
     invariant(nss);
-    Lock::DBLock dbLock(opCtx, nss->db(), MODE_X);
+    Lock::DBLock dbLock(opCtx, nss->dbName(), MODE_X);
     CollectionWriter collection(opCtx, uuid);
 
     // If we cannot find the collection, we skip over dropping the index.
@@ -973,7 +973,7 @@ void rollbackDropIndexes(OperationContext* opCtx,
     auto catalog = CollectionCatalog::get(opCtx);
     boost::optional<NamespaceString> nss = catalog->lookupNSSByUUID(opCtx, uuid);
     invariant(nss);
-    Lock::DBLock dbLock(opCtx, nss->db(), MODE_IX);
+    Lock::DBLock dbLock(opCtx, nss->dbName(), MODE_IX);
     Lock::CollectionLock collLock(opCtx, *nss, MODE_X);
     CollectionPtr collection = catalog->lookupCollectionByNamespace(opCtx, *nss);
 
@@ -1142,8 +1142,7 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
  */
 void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollectionInfo info) {
 
-    auto dbString = info.renameFrom.db();
-    const DatabaseName dbName(boost::none, dbString);
+    auto dbName = info.renameFrom.dbName();
 
     LOGV2(21679,
           "Attempting to rename collection with UUID: {uuid}, from: {renameFrom}, to: "
@@ -1152,7 +1151,7 @@ void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollecti
           "uuid"_attr = uuid,
           "renameFrom"_attr = info.renameFrom,
           "renameTo"_attr = info.renameTo);
-    Lock::DBLock dbLock(opCtx, dbString, MODE_X);
+    Lock::DBLock dbLock(opCtx, dbName, MODE_X);
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->openDb(opCtx, dbName);
     invariant(db);
@@ -1581,7 +1580,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                   "namespace"_attr = *nss,
                   "uuid"_attr = uuid);
 
-            Lock::DBLock dbLock(opCtx, nss->db(), MODE_X);
+            Lock::DBLock dbLock(opCtx, nss->dbName(), MODE_X);
 
             auto databaseHolder = DatabaseHolder::get(opCtx);
             auto db = databaseHolder->openDb(opCtx, nss->dbName());
@@ -1737,7 +1736,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
                 // TODO: Lots of overhead in context. This can be faster.
                 const NamespaceString docNss(doc.ns);
-                Lock::DBLock docDbLock(opCtx, docNss.db(), MODE_X);
+                Lock::DBLock docDbLock(opCtx, docNss.dbName(), MODE_X);
                 OldClientContext ctx(opCtx, doc.ns.toString());
                 CollectionWriter collection(opCtx, uuid);
 
@@ -1956,7 +1955,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
     // Cleans up the oplog.
     {
         const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
-        Lock::DBLock oplogDbLock(opCtx, oplogNss.db(), MODE_IX);
+        Lock::DBLock oplogDbLock(opCtx, oplogNss.dbName(), MODE_IX);
         Lock::CollectionLock oplogCollectionLoc(opCtx, oplogNss, MODE_X);
         OldClientContext ctx(opCtx, oplogNss.ns());
         auto oplogCollection =

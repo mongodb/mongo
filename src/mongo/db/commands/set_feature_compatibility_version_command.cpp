@@ -574,8 +574,7 @@ private:
         if (serverGlobalParams.featureCompatibility
                 .isFCVDowngradingOrAlreadyDowngradedFromLatest()) {
             for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                const auto& db = dbName.db();
-                Lock::DBLock dbLock(opCtx, db, MODE_IX);
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
                 catalog::forEachCollectionFromDb(
                     opCtx,
                     dbName,
@@ -620,8 +619,7 @@ private:
             // Block downgrade for collections with encrypted fields
             // TODO SERVER-65077: Remove once FCV 6.0 becomes last-lts.
             for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                const auto& db = dbName.db();
-                Lock::DBLock dbLock(opCtx, db, MODE_IX);
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
                 catalog::forEachCollectionFromDb(
                     opCtx, dbName, MODE_X, [&](const CollectionPtr& collection) {
                         uassert(
