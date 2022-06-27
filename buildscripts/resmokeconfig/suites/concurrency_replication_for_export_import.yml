@@ -31,6 +31,8 @@ selector:
   - uses_write_concern
   # Sharding is not supported for live exports and imports.
   - requires_sharding
+  # Workloads that kill random sessions may interrupt the export/import commands.
+  - kills_random_sessions
 
 executor:
   config:
