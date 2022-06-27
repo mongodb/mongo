@@ -81,6 +81,8 @@ overrides:
   macos-arm64:
   - task: run_unittests
     exec_timeout: 60
+  - task: sharding_update_v1_oplog_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours
 
   rhel80-asan:
   - task: run_unittests
