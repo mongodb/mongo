@@ -39,6 +39,7 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
@@ -129,6 +130,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 const auto& fromNss = nss();
                 const auto& toNss = _request.getTo();
 
+                const auto criticalSectionReason =
+                    sharding_ddl_util::getCriticalSectionReasonForRename(fromNss, toNss);
+
                 try {
                     uassert(ErrorCodes::InvalidOptions,
                             "Cannot provide an expected collection UUID when renaming between "
@@ -163,6 +167,20 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
                     }
 
+                    // (SERVER-67325) Acquire critical section on the target collection in order
+                    // to disallow concurrent `createCollection`
+                    auto criticalSection = RecoverableCriticalSectionService::get(opCtx);
+                    criticalSection->acquireRecoverableCriticalSectionBlockWrites(
+                        opCtx,
+                        toNss,
+                        criticalSectionReason,
+                        ShardingCatalogClient::kLocalWriteConcern);
+                    criticalSection->promoteRecoverableCriticalSectionToBlockAlsoReads(
+                        opCtx,
+                        toNss,
+                        criticalSectionReason,
+                        ShardingCatalogClient::kLocalWriteConcern);
+
                     // Make sure the target namespace is not a view
                     {
                         uassert(ErrorCodes::CommandNotSupportedOnView,
@@ -172,9 +190,27 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     }
 
                     const auto optTargetCollType = getShardedCollection(opCtx, toNss);
-                    _doc.setTargetIsSharded((bool)optTargetCollType);
+                    const bool targetIsSharded = (bool)optTargetCollType;
+                    _doc.setTargetIsSharded(targetIsSharded);
                     _doc.setTargetUUID(getCollectionUUID(
                         opCtx, toNss, optTargetCollType, /*throwNotFound*/ false));
+
+                    const bool targetExists = [&]() {
+                        if (targetIsSharded) {
+                            return true;
+                        }
+                        auto collectionCatalog = CollectionCatalog::get(opCtx);
+                        auto targetColl =
+                            collectionCatalog->lookupCollectionByNamespace(opCtx, toNss);
+                        return (bool)targetColl;  // true if exists and is unsharded
+                    }();
+
+                    if (targetExists) {
+                        // Release the critical section because the target collection
+                        // already exists, hence no risk of concurrent `createCollection`
+                        criticalSection->releaseRecoverableCriticalSection(
+                            opCtx, toNss, criticalSectionReason, WriteConcerns::kLocalWriteConcern);
+                    }
 
                     sharding_ddl_util::checkRenamePreconditions(
                         opCtx, sourceIsSharded, toNss, _doc.getDropTarget());
@@ -189,6 +225,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     }
 
                 } catch (const DBException&) {
+                    auto criticalSection = RecoverableCriticalSectionService::get(opCtx);
+                    criticalSection->releaseRecoverableCriticalSection(
+                        opCtx, toNss, criticalSectionReason, WriteConcerns::kLocalWriteConcern);
                     _completeOnError = true;
                     throw;
                 }
