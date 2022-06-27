@@ -29,11 +29,15 @@
 
 #include "mongo/db/query/ce/ce_sampling.h"
 
+#include "mongo/db/commands/cqf/cqf_command_utils.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::optimizer::cascades {
 
@@ -191,7 +195,11 @@ private:
         }
 
         _selectivityCacheMap.emplace(std::move(abtTree), selectivity);
-        std::cerr << "Sampling sel.: " << selectivity << "\n";
+
+        OPTIMIZER_DEBUG_LOG(6264805,
+                            5,
+                            "CE sampling estimated filter selectivity",
+                            "selectivity"_attr = selectivity);
         return selectivity * childResult;
     }
 
@@ -207,9 +215,11 @@ private:
             properties::ProjectionRequirement{ProjectionNameVector{sampleSumProjection}},
             std::move(abtTree));
 
-        std::cerr << "********* Sampling ABT *********\n";
-        std::cerr << ExplainGenerator::explainV2(abtTree);
-        std::cerr << "********* Sampling ABT *********\n";
+
+        OPTIMIZER_DEBUG_LOG(6264806,
+                            5,
+                            "Estimate selectivity ABT",
+                            "explain"_attr = ExplainGenerator::explainV2(abtTree));
 
         if (!_phaseManager.optimize(abtTree)) {
             return {false, {}};

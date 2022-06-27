@@ -29,6 +29,7 @@
 
 #include "mongo/db/commands/cqf/cqf_aggregate.h"
 
+#include "mongo/db/commands/cqf/cqf_command_utils.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/pipeline/abt/abt_document_source_visitor.h"
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
@@ -43,6 +44,10 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/yield_policy_callbacks_impl.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 
@@ -239,27 +244,27 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
     const bool optimizationResult = phaseManager.optimize(abtTree);
     uassert(6624252, "Optimization failed", optimizationResult);
 
-    // TODO: SERVER-62648. std::cerr is used for debugging. Consider structured logging.
-    std::cerr << "********* Optimizer Stats *********\n";
     {
         const auto& memo = phaseManager.getMemo();
-        std::cerr << "Memo groups: " << memo.getGroupCount() << "\n";
-        std::cerr << "Memo logical nodes: " << memo.getLogicalNodeCount() << "\n";
-        std::cerr << "Memo phys. nodes: " << memo.getPhysicalNodeCount() << "\n";
-
         const auto& memoStats = memo.getStats();
-        std::cerr << "Memo integrations: " << memoStats._numIntegrations << "\n";
-        std::cerr << "Phys. plans explored: " << memoStats._physPlanExplorationCount << "\n";
-        std::cerr << "Phys. memo checks: " << memoStats._physMemoCheckCount << "\n";
+        OPTIMIZER_DEBUG_LOG(6264800,
+                            5,
+                            "Optimizer stats",
+                            "memoGroups"_attr = memo.getGroupCount(),
+                            "memoLogicalNodes"_attr = memo.getLogicalNodeCount(),
+                            "memoPhysNodes"_attr = memo.getPhysicalNodeCount(),
+                            "memoIntegrations"_attr = memoStats._numIntegrations,
+                            "physPlansExplored"_attr = memoStats._physPlanExplorationCount,
+                            "physMemoChecks"_attr = memoStats._physMemoCheckCount);
     }
-    std::cerr << "********* Optimizer Stats *********\n";
 
-    std::cerr << "********* Optimized ABT *********\n";
-    std::cerr << ExplainGenerator::explainV2(
-        make<MemoPhysicalDelegatorNode>(phaseManager.getPhysicalNodeId()),
-        true /*displayPhysicalProperties*/,
-        &phaseManager.getMemo());
-    std::cerr << "********* Optimized ABT *********\n";
+    {
+        const std::string explain = ExplainGenerator::explainV2(
+            make<MemoPhysicalDelegatorNode>(phaseManager.getPhysicalNodeId()),
+            true /*displayPhysicalProperties*/,
+            &phaseManager.getMemo());
+        OPTIMIZER_DEBUG_LOG(6264801, 5, "Optimized ABT", "explain"_attr = explain);
+    }
 
     auto env = VariableEnvironment::build(abtTree);
     SlotVarMap slotMap;
@@ -276,10 +281,8 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
     uassert(6624254, "Lowering failed: did not produce any output slots.", !slotMap.empty());
 
     {
-        std::cerr << "********* SBE *********\n";
         sbe::DebugPrinter p;
-        std::cerr << p.print(*sbePlan.get()) << "\n";
-        std::cerr << "********* SBE *********\n";
+        OPTIMIZER_DEBUG_LOG(6264802, 5, "Lowered SBE plan", "plan"_attr = p.print(*sbePlan.get()));
     }
 
     stage_builder::PlanStageData data{std::make_unique<sbe::RuntimeEnvironment>()};
@@ -451,9 +454,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     abtTree =
         translatePipelineToABT(metadata, pipeline, scanProjName, std::move(abtTree), prefixId);
 
-    std::cerr << "******* Translated ABT **********\n";
-    std::cerr << ExplainGenerator::explainV2(abtTree) << std::endl;
-    std::cerr << "******* Translated ABT **********\n";
+    OPTIMIZER_DEBUG_LOG(
+        6264803, 5, "Translated ABT", "explain"_attr = ExplainGenerator::explainV2(abtTree));
 
     if (collectionExists && numRecords > 0 &&
         internalQueryEnableSamplingCardinalityEstimator.load()) {

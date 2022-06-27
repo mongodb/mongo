@@ -91,8 +91,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/string_map.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 
@@ -960,7 +959,8 @@ Status runAggregate(OperationContext* opCtx,
                 opCtx, expCtx, nss, collections.getMainCollection(), request.getHint(), *pipeline));
             auto elapsed =
                 (Date_t::now().toMillisSinceEpoch() - timeBegin.toMillisSinceEpoch()) / 1000.0;
-            std::cerr << "Optimization took: " << elapsed << " s.\n";
+            OPTIMIZER_DEBUG_LOG(
+                6264804, 5, "Cascades optimization time elapsed", "time"_attr = elapsed);
         } else {
             execs = createLegacyExecutor(std::move(pipeline),
                                          liteParsedPipeline,

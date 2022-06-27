@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
 
+#include "mongo/db/commands/cqf/cqf_command_utils.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/pipeline/abt/abt_document_source_visitor.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -38,7 +39,10 @@
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/temp_dir.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::optimizer {
 
@@ -100,17 +104,15 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
         make<ValueScanNode>(ProjectionNameVector{scanProjName}, std::move(tree)),
         prefixId);
 
-    std::cerr << "********* Translated ABT *********\n";
-    std::cerr << ExplainGenerator::explainV2(tree);
-    std::cerr << "********* Translated ABT *********\n";
+    OPTIMIZER_DEBUG_LOG(
+        6264807, 5, "SBE translated ABT", "explain"_attr = ExplainGenerator::explainV2(tree));
 
     OptPhaseManager phaseManager(
         OptPhaseManager::getAllRewritesSet(), prefixId, {{}}, DebugInfo::kDefaultForTests);
     ASSERT_TRUE(phaseManager.optimize(tree));
 
-    std::cerr << "********* Optimized ABT *********\n";
-    std::cerr << ExplainGenerator::explainV2(tree);
-    std::cerr << "********* Optimized ABT *********\n";
+    OPTIMIZER_DEBUG_LOG(
+        6264808, 5, "SBE optimized ABT", "explain"_attr = ExplainGenerator::explainV2(tree));
 
     SlotVarMap map;
     sbe::value::SlotIdGenerator ids;
