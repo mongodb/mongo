@@ -47,8 +47,8 @@ jsTestLog("Waiting until the recipient primary is about to create an oplog buffe
 fpBeforeCreatingOplogBuffer.wait();
 
 jsTestLog("Stepping a new primary up.");
-assert.commandWorked(tenantMigrationTest.getRecipientRst().getSecondaries()[0].adminCommand(
-    {replSetStepUp: ReplSetTest.kForeverSecs, force: true}));
+tenantMigrationTest.getRecipientRst().stepUp(
+    tenantMigrationTest.getRecipientRst().getSecondaries()[0]);
 
 fpBeforeCreatingOplogBuffer.off();
 

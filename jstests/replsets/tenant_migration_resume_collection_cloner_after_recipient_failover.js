@@ -89,8 +89,7 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn, docs) {
     // Step up a new node in the recipient set and trigger a failover. The new primary should resume
     // cloning starting from the third document.
     const newRecipientPrimary = recipientRst.getSecondaries()[0];
-    recipientRst.awaitLastOpCommitted();
-    assert.commandWorked(newRecipientPrimary.adminCommand({replSetStepUp: 1}));
+    recipientRst.stepUp(newRecipientPrimary);
     hangDuringCollectionClone.off();
     recipientRst.getPrimary();
 

@@ -84,7 +84,7 @@ const newRecipientPrimary = tenantMigrationTest.getRecipientRst().getSecondary()
 const newPrimaryFp = configureFailPoint(newRecipientPrimary, "hangBeforeTaskCompletion");
 
 // Step up a new recipient primary before the state doc is truly marked as garbage collectable.
-assert.commandWorked(newRecipientPrimary.adminCommand({replSetStepUp: 1}));
+tenantMigrationTest.getRecipientRst().stepUp(newRecipientPrimary);
 fp.off();
 
 // The new primary should skip all tenant migration steps but wait for another

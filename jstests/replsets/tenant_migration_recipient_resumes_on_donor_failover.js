@@ -111,7 +111,9 @@ function runTest(failPoint) {
                                          'fpAfterStartingOplogFetcherMigrationRecipientInstance',
                                          {action: "hang"});
     // Step up a new donor primary.
-    assert.commandWorked(donorSecondary.adminCommand({replSetStepUp: 1}));
+    assert.soonNoExcept(() => {
+        return assert.commandWorked(donorSecondary.adminCommand({replSetStepUp: 1}));
+    });
     hangOnRetry.wait();
     res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient migration"});
     currOp = res.inprog[0];

@@ -54,8 +54,8 @@ forgetMigrationThread.start();
 fpBeforeDroppingOplogBufferCollection.wait();
 
 jsTestLog("Step up a new recipient primary.");
-assert.commandWorked(tenantMigrationTest.getRecipientRst().getSecondaries()[0].adminCommand(
-    {replSetStepUp: ReplSetTest.kForeverSecs, force: true}));
+tenantMigrationTest.getRecipientRst().stepUp(
+    tenantMigrationTest.getRecipientRst().getSecondaries()[0]);
 
 fpBeforeDroppingOplogBufferCollection.off();
 

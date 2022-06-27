@@ -93,7 +93,7 @@ if (appliedNoOps.count() === 2) {
 // Step up a new node in the recipient set and trigger a failover. The new primary should resume
 // fetching starting from the unapplied documents.
 const newRecipientPrimary = recipientRst.getSecondaries()[0];
-assert.commandWorked(newRecipientPrimary.adminCommand({replSetStepUp: 1}));
+recipientRst.stepUp(newRecipientPrimary);
 waitAfterDatabaseClone.off();
 waitInOplogApplier.off();
 recipientRst.getPrimary();

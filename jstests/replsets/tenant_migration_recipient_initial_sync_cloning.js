@@ -89,7 +89,7 @@ function restartNodeAndCheckStateWithoutOplogApplication(
 
     jsTestLog("Stepping up the new node.");
     // Now step up the new node
-    assert.commandWorked(initialSyncNode.adminCommand({"replSetStepUp": 1}));
+    tenantMigrationTest.getRecipientRst().stepUp(initialSyncNode);
     fpOnRecipient.off();
 }
 
@@ -118,7 +118,7 @@ function restartNodeAndCheckStateDuringOplogApplication(
 
     jsTestLog("Stepping up the new node.");
     // Now step up the new node
-    assert.commandWorked(initialSyncNode.adminCommand({"replSetStepUp": 1}));
+    tenantMigrationTest.getRecipientRst().stepUp(initialSyncNode);
     fpPauseOplogApplierOnBatch.off();
     fpOnRecipient.off();
 }

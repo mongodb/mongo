@@ -126,8 +126,7 @@ function testRetryOnRecipient(ordered) {
 
     jsTestLog("Step up secondary");
     const recipientRst = tenantMigrationTest.getRecipientRst();
-    recipientRst.awaitReplication();
-    assert.commandWorked(recipientRst.getSecondary().adminCommand({replSetStepUp: 1}));
+    recipientRst.stepUp(recipientRst.getSecondary());
     jsTestLog("Run retryable write on secondary after the migration");
     testRecipientRetryableWrites(recipientRst.getPrimary().getDB(kDbName), beforeWrites);
     testRecipientRetryableWrites(recipientRst.getPrimary().getDB(kDbName), duringWrites);

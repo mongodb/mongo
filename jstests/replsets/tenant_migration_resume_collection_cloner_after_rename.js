@@ -94,7 +94,7 @@ const fpPauseAtStartOfMigration =
 
 // Step up a new node in the recipient set and trigger a failover. The new primary should resume
 // cloning starting from the third document.
-assert.commandWorked(newRecipientPrimary.adminCommand({replSetStepUp: 1}));
+recipientRst.stepUp(newRecipientPrimary);
 hangDuringCollectionClone.off();
 recipientRst.getPrimary();
 

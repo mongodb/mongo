@@ -67,7 +67,9 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 
     // step up a secondary so that the migration will complete and the
     // waitForMigrationToComplete call to the donor primary succeeds
-    assert.commandWorked(donorSecondary.adminCommand({replSetStepUp: 1}));
+    assert.soonNoExcept(() => {
+        return assert.commandWorked(donorSecondary.adminCommand({replSetStepUp: 1}));
+    });
     hangBeforeTaskCompletion.off();
 
     TenantMigrationTest.assertAborted(

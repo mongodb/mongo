@@ -144,7 +144,7 @@ function runTest(tenantId,
     // this situation. Allow replication once again.
     fpAfterListCall.wait();
     const newDonorPrimary = otherNodes[0];
-    newDonorPrimary.adminCommand({replSetStepUp: 1});
+    donorRst.stepUp(newDonorPrimary, {awaitReplicationBeforeStepUp: false});
     restartServerReplication(otherNodes);
 
     // Advance the cluster time by applying new operations on the new primary. We insert documents

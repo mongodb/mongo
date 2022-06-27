@@ -123,7 +123,7 @@ function runTest({failPointName, failPointData = {}, batchSize = 10 * 1000}) {
     jsTestLog("Failing over to next primary");
     assert.commandWorked(
         donorA.adminCommand({replSetStepDown: ReplSetTest.kDefaultTimeoutMS, force: true}));
-    assert.commandWorked(nextPrimary.adminCommand({replSetStepUp: ReplSetTest.kDefaultTimeoutMS}));
+    donorRst.stepUp(nextPrimary, {awaitReplicationBeforeStepUp: false});
     assert.eq(nextPrimary, donorRst.getPrimary());
     restartServerReplication(nextPrimary);
     restartServerReplication(donorD);

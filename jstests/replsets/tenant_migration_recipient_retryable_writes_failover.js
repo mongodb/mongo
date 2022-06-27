@@ -87,9 +87,7 @@ const recipientSecondary = recipientRst.getSecondary();
 const fpAfterFetchingRetryableWritesEntries = configureFailPoint(
     recipientSecondary, "fpAfterFetchingRetryableWritesEntriesBeforeStartOpTime", {action: "hang"});
 
-recipientRst.awaitLastOpCommitted();
-assert.commandWorked(
-    recipientSecondary.adminCommand({replSetStepUp: ReplSetTest.kForeverSecs, force: true}));
+recipientRst.stepUp(recipientSecondary);
 
 fpPauseAfterRetrievingRetryableWritesBatch.off();
 const newRecipientPrimary = recipientRst.getPrimary();

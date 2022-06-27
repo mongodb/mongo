@@ -123,10 +123,7 @@ jsTestLog("Bytes copied after first batch of second database: " + bytesCopiedInc
 // original primary to the new primary. Then, step up the new primary.
 const fpAfterCreatingCollectionOfSecondDB =
     configureFailPoint(newRecipientPrimary, "tenantCollectionClonerHangAfterCreateCollection");
-assert.soon(() => {
-    tenantMigrationTest.getRecipientRst().awaitReplication();
-    return newRecipientPrimary.adminCommand({replSetStepUp: 1}).ok;
-});
+tenantMigrationTest.getRecipientRst().stepUp(newRecipientPrimary);
 fpAfterBatchOfSecondDB.off();
 
 jsTestLog("Wait until the new primary creates collection of second database.");

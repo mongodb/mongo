@@ -101,8 +101,7 @@ assert.soon(() => recipientColl.find().itcount() === batchSize);
 verifySyncSource(recipientPrimary, migrationId, donorPrimary.host);
 
 // Steps down the current donor's primary and wait for the new primary to be discovered.
-donorRst.awaitLastOpCommitted();
-assert.commandWorked(donorRst.getSecondary().adminCommand({replSetStepUp: 1}));
+donorRst.stepUp(donorRst.getSecondary());
 const newDonorPrimary = donorRst.getPrimary();
 assert.neq(newDonorPrimary.host, donorPrimary.host);
 
