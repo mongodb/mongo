@@ -32,6 +32,7 @@
 
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/coll_mod_reply_validation.h"
 #include "mongo/db/commands.h"
@@ -96,8 +97,17 @@ public:
                     "namespace"_attr = nss,
                     "command"_attr = redact(cmdObj));
 
-        const auto dbInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, cmd.getDbName()));
+        auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, cmd.getDbName());
+        if (swDbInfo == ErrorCodes::NamespaceNotFound) {
+            uassert(CollectionUUIDMismatchInfo(cmd.getDbName().toString(),
+                                               *cmd.getCollectionUUID(),
+                                               nss.coll().toString(),
+                                               boost::none),
+                    "Database does not exist",
+                    !cmd.getCollectionUUID());
+        }
+        const auto dbInfo = uassertStatusOK(swDbInfo);
+
         ShardsvrCollMod collModCommand(nss);
         collModCommand.setCollModRequest(cmd.getCollModRequest());
         auto cmdResponse =

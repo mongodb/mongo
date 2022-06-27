@@ -66,6 +66,16 @@ assert.eq(res.expectedCollection, coll2.getName());
 assert.eq(res.actualCollection, coll.getName());
 assert(!testDB.getCollectionNames().includes(coll2.getName()));
 
+// The command fails with CollectionUUIDMismatch even if the database does not exist.
+const nonexistentDB = testDB.getSiblingDB(testDB.getName() + '_nonexistent');
+res = assert.commandFailedWithCode(
+    nonexistentDB.runCommand({find: 'nonexistent', collectionUUID: uuid}),
+    ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, nonexistentDB.getName());
+assert.eq(res.collectionUUID, uuid);
+assert.eq(res.expectedCollection, 'nonexistent');
+assert.eq(res.actualCollection, null);
+
 // The command fails when the provided UUID corresponds to a different collection, even if the
 // provided namespace is a view.
 const viewName = 'view';

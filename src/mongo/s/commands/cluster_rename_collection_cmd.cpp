@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/rename_collection_common.h"
 #include "mongo/db/commands/rename_collection_gen.h"
@@ -94,7 +95,16 @@ public:
             renameCollRequest.setRenameCollectionRequest(renameCollReq);
 
             auto catalogCache = Grid::get(opCtx)->catalogCache();
-            const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, fromNss.db()));
+            auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, fromNss.db());
+            if (swDbInfo == ErrorCodes::NamespaceNotFound) {
+                uassert(CollectionUUIDMismatchInfo(fromNss.db().toString(),
+                                                   *request().getCollectionUUID(),
+                                                   fromNss.coll().toString(),
+                                                   boost::none),
+                        "Database does not exist",
+                        !request().getCollectionUUID());
+            }
+            const auto dbInfo = uassertStatusOK(swDbInfo);
             auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, fromNss));
 
             auto shard = uassertStatusOK(

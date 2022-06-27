@@ -32,6 +32,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/drop_gen.h"
 #include "mongo/db/operation_context.h"
@@ -118,6 +119,13 @@ public:
                 // Ensure our reply conforms to the IDL-defined reply structure.
                 return DropReply::parse({"drop"}, resultObj);
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                uassert(CollectionUUIDMismatchInfo(request().getDbName().toString(),
+                                                   *request().getCollectionUUID(),
+                                                   request().getNamespace().coll().toString(),
+                                                   boost::none),
+                        "Database does not exist",
+                        !request().getCollectionUUID());
+
                 // If the namespace isn't found, treat the drop as a success but inform about the
                 // failure.
                 DropReply reply;

@@ -516,6 +516,13 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     for (size_t retries = 1; retries <= kMaxRetries; ++retries) {
         auto swCM = getCollectionRoutingInfoForTxnCmd(opCtx, query.nss());
         if (swCM == ErrorCodes::NamespaceNotFound) {
+            uassert(CollectionUUIDMismatchInfo(query.nss().db().toString(),
+                                               *findCommand.getCollectionUUID(),
+                                               query.nss().coll().toString(),
+                                               boost::none),
+                    "Database does not exist",
+                    !findCommand.getCollectionUUID());
+
             // If the database doesn't exist, we successfully return an empty result set without
             // creating a cursor.
             return CursorId(0);

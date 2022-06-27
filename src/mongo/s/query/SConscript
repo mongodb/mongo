@@ -43,6 +43,7 @@ env.Library(
         'cluster_query',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
     ],
 )

@@ -36,6 +36,7 @@
 
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
@@ -327,6 +328,13 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, namespaces.executionNss);
 
         if (!executionNsRoutingInfoStatus.isOK()) {
+            uassert(CollectionUUIDMismatchInfo(request.getDbName().toString(),
+                                               *request.getCollectionUUID(),
+                                               request.getNamespace().coll().toString(),
+                                               boost::none),
+                    "Database does not exist",
+                    !request.getCollectionUUID());
+
             if (liteParsedPipeline.startsWithCollStats()) {
                 uassertStatusOKWithContext(executionNsRoutingInfoStatus,
                                            "Unable to retrieve information for $collStats stage");
