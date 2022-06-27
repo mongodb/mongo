@@ -372,35 +372,4 @@ void TransactionCoordinatorService::cancelIfCommitNotYetStarted(
     }
 }
 
-std::vector<SharedSemiFuture<void>>
-TransactionCoordinatorService::getAllRemovalFuturesForCoordinatorsForInternalTransactions(
-    OperationContext* opCtx) {
-    std::vector<SharedSemiFuture<void>> coordinatorStateDocRemovalFutures;
-    std::shared_ptr<CatalogAndScheduler> cas = _getCatalogAndScheduler(opCtx);
-    auto& catalog = cas->catalog;
-
-    // On step up, we want to wait until the catalog has recovered all active transaction
-    // coordinators before getting the removal futures.
-    cas->recoveryTaskCompleted->get(opCtx);
-
-    auto predicate = [](const LogicalSessionId lsid,
-                        const TxnNumberAndRetryCounter txnNumberAndRetryCounter,
-                        const std::shared_ptr<TransactionCoordinator> transactionCoordinator) {
-        TransactionCoordinator::Step step = transactionCoordinator->getStep();
-        if (step > TransactionCoordinator::Step::kInactive && isChildSession(lsid)) {
-            return true;
-        }
-        return false;
-    };
-
-    auto visitorAction = [&](const LogicalSessionId lsid,
-                             const TxnNumberAndRetryCounter txnNumberAndRetryCounter,
-                             const std::shared_ptr<TransactionCoordinator> transactionCoordinator) {
-        coordinatorStateDocRemovalFutures.push_back(
-            transactionCoordinator->getCoordinatorDocRemovalFuture());
-    };
-    catalog.filter(predicate, visitorAction);
-    return coordinatorStateDocRemovalFutures;
-}
-
 }  // namespace mongo

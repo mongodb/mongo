@@ -66,7 +66,7 @@ static constexpr StringData kNonDuplicateKeyErrorContext =
     "transaction failed."_sd;
 
 /**
- * TODO SERVER-62375: Remove this function.
+ * TODO SERVER-67429 Remove this function.
  *
  * Coordinating method and external point of entry for updating a document's shard key. This method
  * creates the necessary extra operations. It will then run each operation using the ClusterWriter.

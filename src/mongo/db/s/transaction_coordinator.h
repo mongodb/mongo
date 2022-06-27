@@ -131,16 +131,6 @@ public:
 
     Step getStep() const;
 
-    /**
-     * TODO: SERVER-62375 Remove upgrade/downgrade code for internal transactions.
-     * Returns a future that will be resolved when we remove the coordinator
-     * document.
-     */
-    SharedSemiFuture<void> getCoordinatorDocRemovalFuture() {
-        return _coordinatorDocRemovalPromise.getFuture();
-    }
-
-
 private:
     void _updateAssociatedClient(Client* client);
 
@@ -204,11 +194,6 @@ private:
     // collection
     bool _decisionDurable{false};
     SharedPromise<txn::CommitDecision> _decisionPromise;
-
-    // TODO: SERVER-62375 Remove upgrade/downgrade code for internal transactions.
-    // Promise that is set when we have successfully removed the coordinator
-    // document.
-    SharedPromise<void> _coordinatorDocRemovalPromise;
 
     // A list of all promises corresponding to futures that were returned to callers of
     // onCompletion.

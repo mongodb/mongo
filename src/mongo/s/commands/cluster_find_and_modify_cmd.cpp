@@ -583,7 +583,7 @@ private:
                         opCtx, nss, responseStatus, parsedRequest, result);
                 }
             } else {
-                // TODO SERVER-62375: Remove this branch.
+                // TODO SERVER-67429: Remove this branch.
                 if (isRetryableWrite) {
                     _handleWouldChangeOwningShardErrorRetryableWriteLegacy(
                         opCtx, shardId, shardVersion, dbVersion, nss, cmdObj, result);
@@ -606,7 +606,7 @@ private:
             CommandHelpers::filterCommandReplyForPassthrough(response.data));
     }
 
-    // TODO SERVER-62375: Remove after 6.0 is released.
+    // TODO SERVER-67429: Remove this function.
     static void _handleWouldChangeOwningShardErrorRetryableWriteLegacy(
         OperationContext* opCtx,
         const ShardId& shardId,

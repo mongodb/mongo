@@ -910,7 +910,6 @@ void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
         invariant(p().transactionOperations.empty());
     }
 
-    // TODO: (SERVER-62375): Remove upgrade/downgrade code for internal transactions
     if (_isInternalSession() && opCtx->writesAreReplicated()) {
         // Don't check the FCV and feature flag when starting an internal transaction on secondaries
         // since they must apply transaction oplog entries replicated from the primary whether or

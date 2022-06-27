@@ -308,7 +308,7 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
             upsertedId = std::move(updateResult.upsertedId);
         }
     } else {
-        // TODO SERVER-62375: Delete this branch.
+        // TODO SERVER-67429: Delete this branch.
         if (isRetryableWrite) {
             if (MONGO_unlikely(hangAfterThrowWouldChangeOwningShardRetryableWrite.shouldFail())) {
                 LOGV2(22759, "Hit hangAfterThrowWouldChangeOwningShardRetryableWrite failpoint");

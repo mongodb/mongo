@@ -245,7 +245,6 @@ bool isTransientTransactionError(ErrorCodes::Error code,
         case ErrorCodes::StaleDbVersion:
         case ErrorCodes::TenantMigrationAborted:
         case ErrorCodes::TenantMigrationCommitted:
-        // TODO: (SERVER-62375): Remove upgrade/downgrade code for internal transactions
         case ErrorCodes::TxnRetryCounterNotSupported:
             return true;
         default:
