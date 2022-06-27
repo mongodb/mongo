@@ -59,7 +59,7 @@ namespace mongo {
 namespace {
 void validateViewDefinitionBSON(OperationContext* opCtx,
                                 const BSONObj& viewDefinition,
-                                StringData dbName) {
+                                const DatabaseName& dbName) {
     // Internal callers should always pass in a valid 'dbName' against which to compare the
     // 'viewDefinition'.
     invariant(NamespaceString::validDBName(dbName));
@@ -81,7 +81,7 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
     // be valid. If not valid then the NamespaceString constructor will uassert.
     if (viewNameIsValid) {
         NamespaceString viewNss(viewName);
-        valid &= viewNss.isValid() && viewNss.dbName().db() == dbName;
+        valid &= viewNss.isValid() && viewNss.dbName() == dbName;
     }
 
     valid &= NamespaceString::validCollectionName(viewDefinition["viewOn"].str());
@@ -125,7 +125,7 @@ Status DurableViewCatalog::onExternalInsert(OperationContext* opCtx,
                                             const BSONObj& doc,
                                             const NamespaceString& name) {
     try {
-        validateViewDefinitionBSON(opCtx, doc, name.db());
+        validateViewDefinitionBSON(opCtx, doc, name.dbName());
     } catch (const DBException& e) {
         return e.toStatus();
     }
@@ -221,7 +221,7 @@ BSONObj DurableViewCatalogImpl::_validateViewDefinition(OperationContext* opCtx,
     fassert(40224, validateBSON(recordData.data(), recordData.size()));
     BSONObj viewDefinition = recordData.toBson();
 
-    validateViewDefinitionBSON(opCtx, viewDefinition, _db->name().db());
+    validateViewDefinitionBSON(opCtx, viewDefinition, _db->name());
     return viewDefinition;
 }
 
