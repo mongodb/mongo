@@ -94,4 +94,19 @@ std::unique_ptr<ShardingCatalogClient> ShardServerTestFixture::makeShardingCatal
     return std::make_unique<ShardingCatalogClientImpl>();
 }
 
+void ShardServerTestFixtureWithCatalogCacheMock::setUp() {
+    auto loader = std::make_unique<CatalogCacheLoaderMock>();
+    _cacheLoaderMock = loader.get();
+    setCatalogCacheLoader(std::move(loader));
+    ShardServerTestFixture::setUp();
+}
+
+std::unique_ptr<CatalogCache> ShardServerTestFixtureWithCatalogCacheMock::makeCatalogCache() {
+    return std::make_unique<CatalogCacheMock>(getServiceContext(), *_cacheLoaderMock);
+}
+
+CatalogCacheMock* ShardServerTestFixtureWithCatalogCacheMock::getCatalogCacheMock() {
+    return static_cast<CatalogCacheMock*>(catalogCache());
+}
+
 }  // namespace mongo

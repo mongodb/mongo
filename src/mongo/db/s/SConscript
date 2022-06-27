@@ -570,6 +570,7 @@ env.CppUnitTest(
         'persistent_task_queue_test.cpp',
         'range_deletion_util_test.cpp',
         'resharding/resharding_agg_test.cpp',
+        'resharding/resharding_collection_cloner_test.cpp',
         'resharding/resharding_collection_test.cpp',
         'resharding/resharding_data_replication_test.cpp',
         'resharding/resharding_destined_recipient_test.cpp',

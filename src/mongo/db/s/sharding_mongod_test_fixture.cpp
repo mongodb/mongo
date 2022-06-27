@@ -199,6 +199,11 @@ std::unique_ptr<BalancerConfiguration> ShardingMongodTestFixture::makeBalancerCo
     return std::make_unique<BalancerConfiguration>();
 }
 
+std::unique_ptr<CatalogCache> ShardingMongodTestFixture::makeCatalogCache() {
+    return std::make_unique<CatalogCache>(getServiceContext(),
+                                          CatalogCacheLoader::get(getServiceContext()));
+}
+
 Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(
     const ConnectionString& configConnStr) {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
@@ -212,12 +217,9 @@ Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(
         executorPoolPtr->startup();
     }
 
-    auto catalogCache = std::make_unique<CatalogCache>(
-        getServiceContext(), CatalogCacheLoader::get(getServiceContext()));
-
     auto const grid = Grid::get(operationContext());
     grid->init(makeShardingCatalogClient(),
-               std::move(catalogCache),
+               makeCatalogCache(),
                makeShardRegistry(configConnStr),
                makeClusterCursorManager(),
                makeBalancerConfiguration(),

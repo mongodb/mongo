@@ -58,6 +58,10 @@ protected:
     void setUp() override;
     void tearDown() override;
 
+    // Set a catalog cache to be used when initializing the Grid. Must be called before
+    // initializeGlobalShardingStateForMongodForTest() in order to take effect.
+    void setCatalogCache(std::unique_ptr<CatalogCache> cache);
+
     /**
      * Initializes sharding components according to the cluster role in
      * serverGlobalParams.clusterRole and puts the components on the Grid, mimicking the
@@ -121,6 +125,12 @@ protected:
      * Base class returns nullptr.
      */
     virtual std::unique_ptr<BalancerConfiguration> makeBalancerConfiguration();
+
+    /**
+     * Base class returns CatalogCache created from the CatalogCacheLoader set on the
+     * ServiceContext.
+     */
+    virtual std::unique_ptr<CatalogCache> makeCatalogCache();
 
     /**
      * Setups the op observer listeners depending on cluster role.

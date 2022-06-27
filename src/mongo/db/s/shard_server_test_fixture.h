@@ -30,6 +30,8 @@
 #pragma once
 
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
+#include "mongo/s/catalog_cache_loader_mock.h"
+#include "mongo/s/catalog_cache_mock.h"
 
 namespace mongo {
 
@@ -67,6 +69,16 @@ protected:
     OID _clusterId;
 
     std::unique_ptr<CatalogCacheLoader> _catalogCacheLoader;
+};
+
+class ShardServerTestFixtureWithCatalogCacheMock : public ShardServerTestFixture {
+protected:
+    void setUp() override;
+    virtual std::unique_ptr<CatalogCache> makeCatalogCache() override;
+    CatalogCacheMock* getCatalogCacheMock();
+
+private:
+    CatalogCacheLoaderMock* _cacheLoaderMock;
 };
 
 }  // namespace mongo
