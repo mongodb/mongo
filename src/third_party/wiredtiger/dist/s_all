@@ -72,7 +72,7 @@ run()
 	errchk "$1" $t "$2"
 }
 
-# Non parallelizable scripts The following scripts either modify files or
+# Non parallelizable scripts. The following scripts either modify files or
 # already parallelize internally.
 run "sh ./s_readme $force"
 run "sh ./s_install $force"
