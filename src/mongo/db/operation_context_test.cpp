@@ -40,6 +40,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_group.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
@@ -75,18 +76,24 @@ public:
     }
 };
 
-TEST(OperationContextTest, NoSessionIdNoTransactionNumber) {
-    auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("OperationContextTest");
+class OperationContextTest : public ServiceContextTest {
+public:
+    auto makeClient(std::string desc = "OperationContextTest",
+                    transport::SessionHandle session = nullptr) {
+        return getServiceContext()->makeClient(desc, session);
+    }
+};
+
+TEST_F(OperationContextTest, NoSessionIdNoTransactionNumber) {
+    auto client = makeClient();
     auto opCtx = client->makeOperationContext();
 
     ASSERT(!opCtx->getLogicalSessionId());
     ASSERT(!opCtx->getTxnNumber());
 }
 
-TEST(OperationContextTest, SessionIdNoTransactionNumber) {
-    auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("OperationContextTest");
+TEST_F(OperationContextTest, SessionIdNoTransactionNumber) {
+    auto client = makeClient();
     auto opCtx = client->makeOperationContext();
 
     const auto lsid = makeLogicalSessionIdForTest();
@@ -98,9 +105,8 @@ TEST(OperationContextTest, SessionIdNoTransactionNumber) {
     ASSERT(!opCtx->getTxnNumber());
 }
 
-TEST(OperationContextTest, SessionIdAndTransactionNumber) {
-    auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("OperationContextTest");
+TEST_F(OperationContextTest, SessionIdAndTransactionNumber) {
+    auto client = makeClient();
     auto opCtx = client->makeOperationContext();
 
     const auto lsid = makeLogicalSessionIdForTest();
@@ -111,39 +117,37 @@ TEST(OperationContextTest, SessionIdAndTransactionNumber) {
     ASSERT_EQUALS(5, *opCtx->getTxnNumber());
 }
 
-DEATH_TEST(OperationContextTest, SettingTransactionNumberWithoutSessionIdShouldCrash, "invariant") {
-    auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("OperationContextTest");
+DEATH_TEST_F(OperationContextTest,
+             SettingTransactionNumberWithoutSessionIdShouldCrash,
+             "invariant") {
+    auto client = makeClient();
     auto opCtx = client->makeOperationContext();
 
     opCtx->setTxnNumber(5);
 }
 
-DEATH_TEST(OperationContextTest, CallingMarkKillWithExtraInfoCrashes, "invariant") {
-    auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("OperationContextTest");
+DEATH_TEST_F(OperationContextTest, CallingMarkKillWithExtraInfoCrashes, "invariant") {
+    auto client = makeClient();
     auto opCtx = client->makeOperationContext();
 
     opCtx->markKilled(ErrorCodes::ForTestingErrorExtraInfo);
 }
 
-DEATH_TEST(OperationContextTest, CallingSetDeadlineWithExtraInfoCrashes, "invariant") {
-    auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("OperationContextTest");
+DEATH_TEST_F(OperationContextTest, CallingSetDeadlineWithExtraInfoCrashes, "invariant") {
+    auto client = makeClient();
     auto opCtx = client->makeOperationContext();
 
     opCtx->setDeadlineByDate(Date_t::now(), ErrorCodes::ForTestingErrorExtraInfo);
 }
 
-TEST(OperationContextTest, CallingMarkKillWithOptionalExtraInfoSucceeds) {
-    auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("OperationContextTest");
+TEST_F(OperationContextTest, CallingMarkKillWithOptionalExtraInfoSucceeds) {
+    auto client = makeClient();
     auto opCtx = client->makeOperationContext();
 
     opCtx->markKilled(ErrorCodes::ForTestingOptionalErrorExtraInfo);
 }
 
-TEST(OperationContextTest, OpCtxGroup) {
+TEST_F(OperationContextTest, OpCtxGroup) {
     OperationContextGroup group1;
     ASSERT_TRUE(group1.isEmpty());
     {
@@ -174,14 +178,14 @@ TEST(OperationContextTest, OpCtxGroup) {
     OperationContextGroup group2;
     {
         auto serviceCtx = ServiceContext::make();
-        auto client = serviceCtx->makeClient("OperationContextTest1");
-        auto opCtx2 = group2.adopt(client->makeOperationContext());
+        auto client = serviceCtx->makeClient("OperationContextTest");
+        auto opCtx = group2.adopt(client->makeOperationContext());
         ASSERT_FALSE(group2.isEmpty());
-        ASSERT_TRUE(opCtx2->checkForInterruptNoAssert().isOK());
+        ASSERT_TRUE(opCtx->checkForInterruptNoAssert().isOK());
         group2.interrupt(ErrorCodes::InternalError);
-        ASSERT_FALSE(opCtx2->checkForInterruptNoAssert().isOK());
-        opCtx2.discard();
-        ASSERT(opCtx2.opCtx() == nullptr);
+        ASSERT_FALSE(opCtx->checkForInterruptNoAssert().isOK());
+        opCtx.discard();
+        ASSERT(opCtx.opCtx() == nullptr);
         ASSERT_TRUE(group2.isEmpty());
     }
 
@@ -189,24 +193,23 @@ TEST(OperationContextTest, OpCtxGroup) {
     OperationContextGroup group4;
     {
         auto serviceCtx = ServiceContext::make();
-        auto client3 = serviceCtx->makeClient("OperationContextTest3");
-        auto opCtx3 = group3.makeOperationContext(*client3);
-        auto p3 = opCtx3.opCtx();
-        auto opCtx4 = group4.take(std::move(opCtx3));
-        ASSERT_EQ(p3, opCtx4.opCtx());
-        ASSERT(opCtx3.opCtx() == nullptr);  // NOLINT(bugprone-use-after-move)
+        auto client = serviceCtx->makeClient("OperationContextTest");
+        auto opCtx1 = group3.makeOperationContext(*client);
+        auto p1 = opCtx1.opCtx();
+        auto opCtx2 = group4.take(std::move(opCtx1));
+        ASSERT_EQ(p1, opCtx2.opCtx());
+        ASSERT(opCtx1.opCtx() == nullptr);  // NOLINT(bugprone-use-after-move)
         ASSERT_TRUE(group3.isEmpty());
         ASSERT_FALSE(group4.isEmpty());
         group3.interrupt(ErrorCodes::InternalError);
-        ASSERT_TRUE(opCtx4->checkForInterruptNoAssert().isOK());
+        ASSERT_TRUE(opCtx2->checkForInterruptNoAssert().isOK());
         group4.interrupt(ErrorCodes::InternalError);
-        ASSERT_FALSE(opCtx4->checkForInterruptNoAssert().isOK());
+        ASSERT_FALSE(opCtx2->checkForInterruptNoAssert().isOK());
     }
 }
 
-TEST(OperationContextTest, IgnoreInterruptsWorks) {
-    auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("OperationContextTest");
+TEST_F(OperationContextTest, IgnoreInterruptsWorks) {
+    auto client = makeClient();
     auto opCtx = client->makeOperationContext();
 
     opCtx->markKilled(ErrorCodes::BadValue);
@@ -222,7 +225,7 @@ TEST(OperationContextTest, IgnoreInterruptsWorks) {
 
     ASSERT_EQUALS(opCtx->getKillStatus(), ErrorCodes::BadValue);
 
-    serviceCtx->setKillAllOperations();
+    getServiceContext()->setKillAllOperations();
 
     opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {
         ASSERT_THROWS_CODE(
@@ -230,9 +233,8 @@ TEST(OperationContextTest, IgnoreInterruptsWorks) {
     });
 }
 
-TEST(OperationContextTest, setIsExecutingShutdownWorks) {
-    auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("OperationContextTest");
+TEST_F(OperationContextTest, setIsExecutingShutdownWorks) {
+    auto client = makeClient();
     auto opCtx = client->makeOperationContext();
 
     opCtx->markKilled(ErrorCodes::BadValue);
@@ -244,15 +246,14 @@ TEST(OperationContextTest, setIsExecutingShutdownWorks) {
     ASSERT_OK(opCtx->checkForInterruptNoAssert());
     ASSERT_OK(opCtx->getKillStatus());
 
-    serviceCtx->setKillAllOperations();
+    getServiceContext()->setKillAllOperations();
 
     ASSERT_OK(opCtx->checkForInterruptNoAssert());
     ASSERT_OK(opCtx->getKillStatus());
 }
 
-TEST(OperationContextTest, CancellationTokenIsCanceledWhenMarkKilledIsCalled) {
-    auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("OperationContextTest");
+TEST_F(OperationContextTest, CancellationTokenIsCanceledWhenMarkKilledIsCalled) {
+    auto client = makeClient();
     auto opCtx = client->makeOperationContext();
     auto cancelToken = opCtx->getCancellationToken();
 
@@ -265,22 +266,21 @@ TEST(OperationContextTest, CancellationTokenIsCanceledWhenMarkKilledIsCalled) {
     ASSERT_TRUE(cancelToken.isCanceled());
 }
 
-TEST(OperationContextTest, CancellationTokenIsCancelableAtFirst) {
-    auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("OperationContextTest");
+TEST_F(OperationContextTest, CancellationTokenIsCancelableAtFirst) {
+    auto client = makeClient();
     auto opCtx = client->makeOperationContext();
     auto cancelToken = opCtx->getCancellationToken();
     ASSERT_TRUE(cancelToken.isCancelable());
 }
 
-class OperationDeadlineTests : public unittest::Test {
+class OperationDeadlineTests : public OperationContextTest {
 public:
     void setUp() {
-        service = ServiceContext::make();
-        service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
-        service->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
-        service->setTickSource(std::make_unique<TickSourceMock<>>());
-        client = service->makeClient("OperationDeadlineTest");
+        ServiceContext* serviceCtx = getServiceContext();
+        serviceCtx->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
+        serviceCtx->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
+        serviceCtx->setTickSource(std::make_unique<TickSourceMock<>>());
+        client = serviceCtx->makeClient("OperationDeadlineTest");
     }
 
     void checkForInterruptForTimeout(OperationContext* opCtx) {
@@ -291,7 +291,6 @@ public:
     }
 
     const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
-    ServiceContext::UniqueServiceContext service;
     ServiceContext::UniqueClient client;
 };
 
@@ -992,8 +991,8 @@ TEST_F(ThreadedOperationDeadlineTests, SignalOne) {
 }
 
 TEST_F(ThreadedOperationDeadlineTests, KillOneSignalAnother) {
-    auto client1 = service->makeClient("client1");
-    auto client2 = service->makeClient("client2");
+    auto client1 = makeClient("client1");
+    auto client2 = makeClient("client2");
     auto txn1 = client1->makeOperationContext();
     auto txn2 = client2->makeOperationContext();
     WaitTestState state1;
@@ -1064,7 +1063,7 @@ TEST_F(ThreadedOperationDeadlineTests, SleepForWithExpiredForDoesNotBlock) {
     ASSERT_FALSE(fut.get());
 }
 
-TEST(OperationContextTest, TestWaitForConditionOrInterruptUntilAPI) {
+TEST_F(OperationContextTest, TestWaitForConditionOrInterruptUntilAPI) {
     // `waitForConditionOrInterruptUntil` can have three outcomes:
     //
     // 1) The condition is satisfied before any timeouts.
@@ -1079,8 +1078,7 @@ TEST(OperationContextTest, TestWaitForConditionOrInterruptUntilAPI) {
     // Case (1) is the hardest to test. The condition variable must be notified by a second thread
     // when the client is waiting on it. Case (1) is also the least in need of having the API
     // tested, thus it's omitted from being tested here.
-    auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("OperationContextTest");
+    auto client = makeClient();
     auto opCtx = client->makeOperationContext();
 
     auto mutex = MONGO_MAKE_LATCH();
@@ -1103,9 +1101,8 @@ TEST(OperationContextTest, TestWaitForConditionOrInterruptUntilAPI) {
     ASSERT_TRUE(opCtx->getCancellationToken().isCanceled());
 }
 
-TEST(OperationContextTest, TestIsWaitingForConditionOrInterrupt) {
-    auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("OperationContextTest");
+TEST_F(OperationContextTest, TestIsWaitingForConditionOrInterrupt) {
+    auto client = makeClient();
     auto optCtx = client->makeOperationContext();
 
     // Case (1) must return false (immediately after initialization)
@@ -1135,8 +1132,8 @@ TEST(OperationContextTest, TestIsWaitingForConditionOrInterrupt) {
     ASSERT_FALSE(optCtx->isWaitingForConditionOrInterrupt());
 }
 
-TEST(OperationContextTest, TestActiveClientOperationsForClientsWithoutSession) {
-    auto serviceCtx = ServiceContext::make();
+TEST_F(OperationContextTest, TestActiveClientOperationsForClientsWithoutSession) {
+    auto serviceCtx = getServiceContext();
     auto client = serviceCtx->makeClient("OperationContextTest");
     ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
     {
@@ -1146,11 +1143,11 @@ TEST(OperationContextTest, TestActiveClientOperationsForClientsWithoutSession) {
     ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
 }
 
-TEST(OperationContextTest, TestActiveClientOperations) {
+TEST_F(OperationContextTest, TestActiveClientOperations) {
     transport::TransportLayerMock transportLayer;
     transport::SessionHandle session = transportLayer.createSession();
 
-    auto serviceCtx = ServiceContext::make();
+    auto serviceCtx = getServiceContext();
     auto client = serviceCtx->makeClient("OperationContextTest", session);
     ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
 
@@ -1169,9 +1166,8 @@ TEST(OperationContextTest, TestActiveClientOperations) {
     ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
 }
 
-TEST(OperationContextTest, CurrentOpExcludesKilledOperations) {
-    auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("MainClient");
+TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
+    auto client = makeClient("MainClient");
     auto opCtx = client->makeOperationContext();
 
     for (auto truncateOps : {true, false}) {
@@ -1183,14 +1179,14 @@ TEST(OperationContextTest, CurrentOpExcludesKilledOperations) {
             stdx::thread thread([&]() mutable {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
 
-                auto threadClient = serviceCtx->makeClient("ThreadClient");
+                auto threadClient = makeClient("ThreadClient");
 
                 // Generate report in absence of any opCtx
                 CurOp::reportCurrentOpForClient(
                     opCtx.get(), threadClient.get(), truncateOps, backtraceMode, &bobNoOpCtx);
 
                 auto threadOpCtx = threadClient->makeOperationContext();
-                serviceCtx->killAndDelistOperation(threadOpCtx.get());
+                getServiceContext()->killAndDelistOperation(threadOpCtx.get());
 
                 // Generate report in presence of a killed opCtx
                 CurOp::reportCurrentOpForClient(
