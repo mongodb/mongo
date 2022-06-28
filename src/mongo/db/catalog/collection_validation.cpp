@@ -476,6 +476,8 @@ Status validate(OperationContext* opCtx,
 
     output->append("ns", validateState.nss().ns());
 
+    validateState.uuid().appendToBuilder(output, "uuid");
+
     // Foreground validation needs to ignore prepare conflicts, or else it would deadlock.
     // Repair mode cannot use ignore-prepare because it needs to be able to do writes, and there is
     // no danger of deadlock for this mode anyway since it is only used at startup (or in standalone
