@@ -29,9 +29,7 @@ __rollback_delete_hs(WT_SESSION_IMPL *session, WT_ITEM *key, wt_timestamp_t ts)
     WT_CURSOR *hs_cursor;
     WT_DECL_ITEM(hs_key);
     WT_DECL_RET;
-    wt_timestamp_t hs_start_ts;
-    uint64_t hs_counter;
-    uint32_t hs_btree_id;
+    WT_TIME_WINDOW *hs_tw;
 
     /* Open a history store table cursor. */
     WT_RET(__wt_curhs_open(session, NULL, &hs_cursor));
@@ -53,12 +51,14 @@ __rollback_delete_hs(WT_SESSION_IMPL *session, WT_ITEM *key, wt_timestamp_t ts)
     hs_cursor->set_key(hs_cursor, 4, S2BT(session)->id, key, WT_TS_MAX, UINT64_MAX);
     ret = __wt_curhs_search_near_before(session, hs_cursor);
     for (; ret == 0; ret = hs_cursor->prev(hs_cursor)) {
-        WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, hs_key, &hs_start_ts, &hs_counter));
-        if (hs_start_ts < ts)
+        /* Retrieve the time window from the history cursor. */
+        __wt_hs_upd_time_window(hs_cursor, &hs_tw);
+        if (hs_tw->start_ts < ts)
             break;
+
         WT_ERR(hs_cursor->remove(hs_cursor));
         WT_STAT_CONN_DATA_INCR(session, txn_rts_hs_removed);
-        if (hs_start_ts == ts)
+        if (hs_tw->start_ts == ts)
             WT_STAT_CONN_DATA_INCR(session, cache_hs_key_truncate_rts);
         else
             WT_STAT_CONN_DATA_INCR(session, cache_hs_key_truncate_rts_unstable);
@@ -405,7 +405,7 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
          * become obsolete according to the checkpoint.
          */
         if (__rollback_txn_visible_id(session, hs_tw->stop_txn) &&
-          hs_stop_durable_ts <= pinned_ts) {
+          hs_tw->durable_stop_ts <= pinned_ts) {
             __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
               "history store stop is obsolete with time window: %s and pinned timestamp: %s",
               __wt_time_window_to_string(hs_tw, tw_string),
@@ -427,7 +427,7 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
          * the written proper timestamp, so comparing against it with history store shouldn't have
          * any problem.
          */
-        if (hs_start_ts <= unpack->tw.start_ts || unpack->tw.prepare) {
+        if (hs_tw->start_ts <= unpack->tw.start_ts || unpack->tw.prepare) {
             if (type == WT_UPDATE_MODIFY)
                 WT_ERR(__wt_modify_apply_item(
                   session, S2BT(session)->value_format, full_value, hs_value->data));
@@ -437,11 +437,9 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
             }
         } else
             __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
-              "history store update more recent than on-disk update with start timestamp: %s,"
-              " durable timestamp: %s, stop timestamp: %s and type: %" PRIu8,
-              __wt_timestamp_to_string(hs_start_ts, ts_string[0]),
-              __wt_timestamp_to_string(hs_durable_ts, ts_string[1]),
-              __wt_timestamp_to_string(hs_stop_durable_ts, ts_string[2]), type);
+              "history store update more recent than on-disk update with time window: %s and type: "
+              "%" PRIu8,
+              __wt_time_window_to_string(hs_tw, tw_string), type);
 
         /*
          * Verify the history store timestamps are in order. The start timestamp may be equal to the
@@ -473,32 +471,38 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
             WT_STAT_CONN_DATA_INCR(session, txn_rts_hs_stop_older_than_newer_start);
 
         /*
+         * Validate the timestamps in the key and the cell are same. This must be validated only
+         * after verifying it's stop time window is not globally visible. The start timestamps of
+         * the time window are cleared when they are globally visible and there will be no stop
+         * timestamp in the history store whenever a prepared update is written to the data store.
+         */
+        WT_ASSERT(session,
+          (hs_tw->start_ts == WT_TS_NONE || hs_tw->start_ts == hs_start_ts) &&
+            (hs_tw->durable_start_ts == WT_TS_NONE || hs_tw->durable_start_ts == hs_durable_ts) &&
+            ((hs_tw->durable_stop_ts == 0 && hs_stop_durable_ts == WT_TS_MAX) ||
+              hs_tw->durable_stop_ts == hs_stop_durable_ts));
+
+        /*
          * Stop processing when we find a stable update according to the given timestamp and
          * transaction id.
          */
         if (__rollback_txn_visible_id(session, hs_tw->start_txn) &&
-          hs_durable_ts <= rollback_timestamp) {
+          hs_tw->durable_start_ts <= rollback_timestamp) {
             __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
-              "history store update valid with start timestamp: %s, durable timestamp: %s, stop "
-              "timestamp: %s, stable timestamp: %s, txnid: %" PRIu64 " and type: %" PRIu8,
-              __wt_timestamp_to_string(hs_start_ts, ts_string[0]),
-              __wt_timestamp_to_string(hs_durable_ts, ts_string[1]),
-              __wt_timestamp_to_string(hs_stop_durable_ts, ts_string[2]),
-              __wt_timestamp_to_string(rollback_timestamp, ts_string[3]), hs_tw->start_txn, type);
+              "history store update valid with time window: %s, type: %" PRIu8
+              " and stable timestamp: %s",
+              __wt_time_window_to_string(hs_tw, tw_string), type,
+              __wt_timestamp_to_string(rollback_timestamp, ts_string[0]));
             WT_ASSERT(session, unpack->tw.prepare || hs_tw->start_ts <= unpack->tw.start_ts);
             valid_update_found = true;
             break;
         }
 
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
-          "history store update aborted with start timestamp: %s, durable timestamp: %s, stop "
-          "timestamp: %s, stable timestamp: %s, start txnid: %" PRIu64 ", stop txnid: %" PRIu64
-          " and type: %" PRIu8,
-          __wt_timestamp_to_string(hs_start_ts, ts_string[0]),
-          __wt_timestamp_to_string(hs_durable_ts, ts_string[1]),
-          __wt_timestamp_to_string(hs_stop_durable_ts, ts_string[2]),
-          __wt_timestamp_to_string(rollback_timestamp, ts_string[3]), hs_tw->start_txn,
-          hs_tw->stop_txn, type);
+          "history store update aborted with time window: %s,  type: %" PRIu8
+          " and stable timestamp: %s",
+          __wt_time_window_to_string(hs_tw, tw_string), type,
+          __wt_timestamp_to_string(rollback_timestamp, ts_string[3]));
 
         /*
          * Start time point of the current record may be used as stop time point of the previous
@@ -555,7 +559,7 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
          * timestamp and txnid, we need to restore that as well.
          */
         if (__rollback_txn_visible_id(session, hs_tw->stop_txn) &&
-          hs_stop_durable_ts <= rollback_timestamp) {
+          hs_tw->durable_stop_ts <= rollback_timestamp) {
             /*
              * The restoring tombstone timestamp must be zero or less than previous update start
              * timestamp.
@@ -1406,10 +1410,11 @@ __rollback_to_stable_btree_hs_truncate(WT_SESSION_IMPL *session, uint32_t btree_
     WT_CURSOR *hs_cursor;
     WT_DECL_ITEM(hs_key);
     WT_DECL_RET;
+    WT_TIME_WINDOW *hs_tw;
     wt_timestamp_t hs_start_ts;
     uint64_t hs_counter;
     uint32_t hs_btree_id;
-    char ts_string[WT_TS_INT_STRING_SIZE];
+    char tw_string[WT_TIME_STRING_SIZE];
 
     hs_cursor = NULL;
 
@@ -1429,9 +1434,12 @@ __rollback_to_stable_btree_hs_truncate(WT_SESSION_IMPL *session, uint32_t btree_
         /* We shouldn't cross the btree search space. */
         WT_ASSERT(session, btree_id == hs_btree_id);
 
+        /* Retrieve the time window from the history cursor. */
+        __wt_hs_upd_time_window(hs_cursor, &hs_tw);
+
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
-          "rollback to stable history store cleanup of update with start timestamp: %s",
-          __wt_timestamp_to_string(hs_start_ts, ts_string));
+          "rollback to stable history store cleanup of update with time window: %s",
+          __wt_time_window_to_string(hs_tw, tw_string));
 
         WT_ERR(hs_cursor->remove(hs_cursor));
         WT_STAT_CONN_DATA_INCR(session, txn_rts_hs_removed);
