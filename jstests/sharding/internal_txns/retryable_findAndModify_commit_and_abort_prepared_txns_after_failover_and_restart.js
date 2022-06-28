@@ -184,8 +184,8 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts = {
 }
 
 {
-    jsTest.log("Test when the old primary restarts");
-    const st = new ShardingTest({shards: 1, rs: {nodes: 1}});
+    jsTest.log("Test when a participant shard restarts");
+    const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
     const restartShard0Func = () => {
         st.rs0.stopSet(null /* signal */, true /*forRestart */);
         st.rs0.startSet({restart: true});
