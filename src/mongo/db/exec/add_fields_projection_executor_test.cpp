@@ -113,10 +113,6 @@ TEST(AddFieldsProjectionExecutorSpec, ThrowsOnCreationWithInvalidObjectsOrExpres
     ASSERT_THROWS(AddFieldsProjectionExecutor::create(
                       expCtx, BSON("a" << false << "b" << BSON("$unknown" << BSON_ARRAY(4 << 2)))),
                   AssertionException);
-
-    // Empty nested objects are not allowed.
-    ASSERT_THROWS(AddFieldsProjectionExecutor::create(expCtx, BSON("a" << BSONObj())),
-                  AssertionException);
 }
 
 TEST(AddFieldsProjectionExecutor, DoesNotErrorOnEmptySpec) {

@@ -142,12 +142,6 @@ void ProjectionSpecValidator::parseElement(const BSONElement& elem, const FieldP
 
 void ProjectionSpecValidator::parseNestedObject(const BSONObj& thisLevelSpec,
                                                 const FieldPath& prefix) {
-    if (thisLevelSpec.isEmpty()) {
-        uasserted(
-            40180,
-            str::stream() << "an empty object is not a valid value. Found empty object at path "
-                          << prefix.fullPath());
-    }
     for (auto&& elem : thisLevelSpec) {
         auto fieldName = elem.fieldNameStringData();
         if (fieldName[0] == '$') {
@@ -250,7 +244,9 @@ bool AddFieldsProjectionExecutor::parseObjectAsExpression(
 void AddFieldsProjectionExecutor::parseSubObject(const BSONObj& subObj,
                                                  const VariablesParseState& variablesParseState,
                                                  const FieldPath& pathToObj) {
+    bool elemInSubObj = false;
     for (auto&& elem : subObj) {
+        elemInSubObj = true;
         auto fieldName = elem.fieldNameStringData();
         invariant(fieldName[0] != '$');
         // Dotted paths in a sub-object have already been detected and disallowed by the function
@@ -269,6 +265,11 @@ void AddFieldsProjectionExecutor::parseSubObject(const BSONObj& subObj,
             _root->addExpressionForPath(
                 currentPath, Expression::parseOperand(_expCtx.get(), elem, variablesParseState));
         }
+    }
+
+    if (!elemInSubObj) {
+        _root->addExpressionForPath(
+            pathToObj, Expression::parseObject(_expCtx.get(), subObj, variablesParseState));
     }
 }
 }  // namespace mongo::projection_executor
