@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -148,10 +149,28 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     }
 
     const IndexCatalog* indexCatalog = collection->getIndexCatalog();
-    result->append("nindexes", indexCatalog->numIndexesTotal(opCtx));
-
     BSONObjBuilder indexDetails;
     std::vector<std::string> indexBuilds;
+
+    auto numIndexes = indexCatalog->numIndexesTotal(opCtx);
+    if (collection->isClustered() && !collection->ns().isTimeseriesBucketsCollection()) {
+        // There is an implicit 'clustered' index on a clustered collection. Increment the total
+        // index count to reflect that.
+        numIndexes++;
+
+        BSONObj collation;
+        if (auto collator = collection->getDefaultCollator()) {
+            collation = collator->getSpec().toBSON();
+        }
+        auto clusteredSpec = clustered_util::formatClusterKeyForListIndexes(
+            collection->getClusteredInfo().get(), collation);
+        auto indexSpec = collection->getClusteredInfo()->getIndexSpec();
+        auto nameOptional = indexSpec.getName();
+        // An index name is always expected.
+        invariant(nameOptional);
+        indexDetails.append(*nameOptional, clusteredSpec);
+    }
+    result->append("nindexes", numIndexes);
 
     auto it = indexCatalog->getIndexIterator(
         opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);

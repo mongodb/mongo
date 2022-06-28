@@ -16,6 +16,8 @@ var CollInfos = class {
         this.connName = connName;
         this.dbName = dbName;
         this.collInfosRes = conn.getDB(dbName).getCollectionInfos(listCollectionsFilter);
+        const result = assert.commandWorked(conn.getDB("admin").runCommand({serverStatus: 1}));
+        this.binVersion = MongoRunner.getBinVersionFor(result.version);
     }
 
     ns(collName) {
@@ -27,6 +29,14 @@ var CollInfos = class {
      */
     filter(desiredCollNames) {
         this.collInfosRes = this.collInfosRes.filter(info => desiredCollNames.includes(info.name));
+    }
+
+    /**
+     * Get names for the clustered collections.
+     */
+    getClusteredCollNames() {
+        const infos = this.collInfosRes.filter(info => info.options.clusteredIndex);
+        return infos.map(info => info.name);
     }
 
     /**
@@ -417,6 +427,30 @@ var {DataConsistencyChecker} = (function() {
                 return true;
             };
 
+            // Returns true if we should skip comparing the index count between the source and the
+            // syncing node for a clustered collection. 6.1 added clustered indexes into collStat
+            // output. There will be a difference in the nindex count between versions before and
+            // after 6.1. So, skip comparing across 6.1 for clustered collections.
+            const skipIndexCountCheck = function(sourceCollInfos, syncingCollInfos, collName) {
+                const sourceVersion = sourceCollInfos.binVersion;
+                const syncingVersion = syncingCollInfos.binVersion;
+
+                // If both versions are before 6.1 or both are 6.1 onwards, we are good.
+                if ((MongoRunner.compareBinVersions(sourceVersion, "6.1") === -1 &&
+                     MongoRunner.compareBinVersions(syncingVersion, "6.1") === -1) ||
+                    (MongoRunner.compareBinVersions(sourceVersion, "6.1") >= 0 &&
+                     MongoRunner.compareBinVersions(syncingVersion, "6.1") >= 0)) {
+                    return false;
+                }
+
+                // Skip if this is a clustered collection
+                if (sourceCollInfos.getClusteredCollNames().includes(collName)) {
+                    return true;
+                }
+
+                return false;
+            };
+
             const sourceNode = sourceCollInfos.conn;
             const syncingNode = syncingCollInfos.conn;
 
@@ -447,7 +481,12 @@ var {DataConsistencyChecker} = (function() {
                     reasons.push('ns');
                 }
 
-                if (syncingHasIndexes && sourceCollStats.nindexes !== syncingCollStats.nindexes) {
+                if (skipIndexCountCheck(sourceCollInfos, syncingCollInfos, collName)) {
+                    prettyPrint(`Skipping comparison of collStats.nindex for clustered collection ${
+                        dbName}.${collName}. Versions ${sourceCollInfos.binVersion} and ${
+                        syncingCollInfos.binVersion} are expected to differ in the nindex count.`);
+                } else if (syncingHasIndexes &&
+                           sourceCollStats.nindexes !== syncingCollStats.nindexes) {
                     reasons.push('indexes');
                 }
 
