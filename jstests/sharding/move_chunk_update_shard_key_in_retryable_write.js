@@ -18,7 +18,13 @@ load('./jstests/libs/chunk_manipulation_util.js');
 // For startParallelOps to write its state
 let staticMongod = MongoRunner.runMongod({});
 
-let st = new ShardingTest({mongos: 2, shards: 3, rs: {nodes: 2}});
+let st = new ShardingTest({
+    mongos: 2,
+    shards: 3,
+    rs: {nodes: 2},
+    rsOptions:
+        {setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS}}
+});
 
 const dbName = "test";
 const collName = "foo";
