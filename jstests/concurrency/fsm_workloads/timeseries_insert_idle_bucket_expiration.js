@@ -8,6 +8,11 @@
  *   requires_timeseries,
  *   # Timeseries do not support multi-document transactions with inserts.
  *   does_not_support_transactions,
+ *   # Stepdowns can cause inserts to fail in some cases in sharded passthroughs and not be
+ *   # automatically retried. We aren't sure of the root cause yet, but we are excluding this tests
+ *   # from those suites for now.
+ *   # TODO (SERVER-67609): Remove this tag, or update the explanation above.
+ *   does_not_support_stepdowns,
  * ]
  */
 
