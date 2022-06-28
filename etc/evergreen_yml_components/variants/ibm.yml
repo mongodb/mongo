@@ -63,7 +63,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel72-zseries-test
-  cron: "0 0 1 1 *" # Every year at Jan 1st. 0000 UTC
+  cron: "0 4 * * 0"
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -119,7 +119,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel83-zseries-small
-  cron: "0 0 1 1 *" # Every year at Jan 1st. 0000 UTC
+  cron: "0 4 * * 0"
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
