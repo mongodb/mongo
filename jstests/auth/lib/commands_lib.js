@@ -324,7 +324,8 @@ var authCommandsLib = {
                 roles: {
                     dbAdminAnyDatabase: 1,
                     root: 1,
-                    __system: 1
+                    __system: 1,
+                    restore: 1,
                 },
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["createCollection"]},
@@ -354,7 +355,7 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: {__system: 1, root: 1},
+                roles: {__system: 1, root: 1, restore: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["createCollection"]},
                     {resource: {cluster: true}, actions: ["useUUID", "forceUUID", "applyOps"]},
@@ -413,7 +414,8 @@ var authCommandsLib = {
                 roles: {
                     dbAdminAnyDatabase: 1,
                     root: 1,
-                    __system: 1
+                    __system: 1,
+                    restore: 1,
                 },
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["dropCollection"]},
@@ -452,7 +454,7 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: {__system: 1, root: 1},
+                roles: {__system: 1, root: 1, restore: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["dropCollection"]},
                     {resource: {cluster: true}, actions: ["useUUID", "applyOps"]},
@@ -580,7 +582,7 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: {__system: 1, root: 1},
+                roles: {__system: 1, root: 1, restore: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["insert"]},
                     {resource: {cluster: true}, actions: ["applyOps"]},
@@ -616,7 +618,7 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: {__system: 1, root: 1},
+                roles: {__system: 1, root: 1, restore: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["insert"]},
                     {resource: {cluster: true}, actions: ["useUUID", "applyOps"]},
@@ -656,7 +658,7 @@ var authCommandsLib = {
                 // failure.
                 expectFail: true,
                 runOnDb: adminDbName,
-                roles: {__system: 1, root: 1},
+                roles: {__system: 1, root: 1, restore: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["insert"]},
                     {resource: {cluster: true}, actions: ["useUUID", "applyOps"]},
