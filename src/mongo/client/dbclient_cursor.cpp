@@ -140,6 +140,7 @@ bool DBClientCursor::init() {
         return false;
     }
     dataReceived(reply);
+    _isInitialized = true;
     return true;
 }
 
@@ -232,6 +233,7 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
 
 /** If true, safe to call next().  Requests more from server if necessary. */
 bool DBClientCursor::more() {
+    invariant(_isInitialized);
     if (!_putBack.empty())
         return true;
 
@@ -246,6 +248,7 @@ bool DBClientCursor::more() {
 }
 
 BSONObj DBClientCursor::next() {
+    invariant(_isInitialized);
     if (!_putBack.empty()) {
         BSONObj ret = _putBack.top();
         _putBack.pop();
@@ -271,6 +274,7 @@ BSONObj DBClientCursor::nextSafe() {
 }
 
 void DBClientCursor::peek(vector<BSONObj>& v, int atMost) {
+    invariant(_isInitialized);
     auto end = atMost >= static_cast<int>(_batch.objs.size() - _batch.pos)
         ? _batch.objs.end()
         : _batch.objs.begin() + _batch.pos + atMost;
@@ -288,6 +292,7 @@ BSONObj DBClientCursor::peekFirst() {
 }
 
 bool DBClientCursor::peekError(BSONObj* error) {
+    invariant(_isInitialized);
     if (!_wasError)
         return false;
 
@@ -334,6 +339,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       _client(client),
       _originalHost(_client->getServerAddress()),
       _nsOrUuid(nsOrUuid),
+      _isInitialized(true),
       _ns(nsOrUuid.nss() ? *nsOrUuid.nss() : NamespaceString(nsOrUuid.dbname())),
       _cursorId(cursorId),
       _isExhaust(isExhaust),
@@ -421,6 +427,7 @@ void DBClientCursor::kill() {
 
     // Mark this cursor as dead since we can't do any getMores.
     _cursorId = 0;
+    _isInitialized = false;
 }
 
 }  // namespace mongo

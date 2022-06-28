@@ -87,6 +87,7 @@ public:
     virtual bool more();
 
     bool hasMoreToCome() const {
+        invariant(_isInitialized);
         return _connectionHasPendingReplies;
     }
 
@@ -96,6 +97,7 @@ public:
      * whatever data has been fetched to the client already but then perhaps stop.
      */
     int objsLeftInBatch() const {
+        invariant(_isInitialized);
         return _putBack.size() + _batch.objs.size() - _batch.pos;
     }
     bool moreInCurrentBatch() {
@@ -116,6 +118,7 @@ public:
      * Restores an object previously returned by next() to the cursor.
      */
     void putBack(const BSONObj& o) {
+        invariant(_isInitialized);
         _putBack.push(o.getOwned());
     }
 
@@ -293,6 +296,10 @@ private:
     DBClientBase* _client;
     std::string _originalHost;
     NamespaceStringOrUUID _nsOrUuid;
+
+    // In order to fully initialize a DBClientCursor object, one must first call its constructor
+    // and then subsequently call DBClientCursor::init().
+    bool _isInitialized = false;
 
     // 'ns' is initially the NamespaceString passed in, or the dbName if doing a find by UUID.
     // After a successful 'find' command, 'ns' is updated to contain the namespace returned by that
