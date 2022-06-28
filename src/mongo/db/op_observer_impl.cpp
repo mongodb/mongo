@@ -2085,6 +2085,8 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
     shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, *statements, commitOpTime);
 }
 
+void OpObserverImpl::onBatchedWriteStart(OperationContext* opCtx) {}
+
 void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
     if (repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
             repl::ReplicationCoordinator::modeReplSet ||
@@ -2126,6 +2128,8 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
                     false,
                     wallClockTime);
 }
+
+void OpObserverImpl::onBatchedWriteAbort(OperationContext* opCtx) {}
 
 void OpObserverImpl::onPreparedTransactionCommit(
     OperationContext* opCtx,

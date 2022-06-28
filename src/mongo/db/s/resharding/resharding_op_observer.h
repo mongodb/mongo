@@ -231,7 +231,11 @@ public:
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) override {}
 
+    void onBatchedWriteStart(OperationContext* opCtx) final {}
+
     void onBatchedWriteCommit(OperationContext* opCtx) final {}
+
+    void onBatchedWriteAbort(OperationContext* opCtx) final {}
 
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) override {}

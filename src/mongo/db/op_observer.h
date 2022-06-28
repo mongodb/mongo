@@ -414,7 +414,26 @@ public:
         Timestamp commitTimestamp,
         const std::vector<repl::ReplOperation>& statements) noexcept = 0;
 
+    /**
+     * Events for logical grouping of writes to be replicated atomically.
+     * After onBatchedWriteStart(), the replication subsystem is prepared to
+     * start collecting operations to replicate in an applyOps oplog entry.
+     */
+    virtual void onBatchedWriteStart(OperationContext* opCtx) = 0;
+
+    /**
+     * The write operations between onBatchedWriteStart() and onBatchedWriteCommit()
+     * are gathered in a single applyOps oplog entry, similar to atomic applyOps and
+     * multi-doc transactions, and written to the oplog.
+     */
     virtual void onBatchedWriteCommit(OperationContext* opCtx) = 0;
+
+    /**
+     * Clears the accumulated write operations. No further writes is allowed in this storage
+     * transaction (WriteUnitOfWork). Calling this function after onBatchedWriteCommit()
+     * should be fine for cleanup purposes.
+     */
+    virtual void onBatchedWriteAbort(OperationContext* opCtx) = 0;
 
     /**
      * Contains "applyOps" oplog entries and oplog slots to be used for writing pre- and post- image

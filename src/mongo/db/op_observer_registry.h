@@ -432,10 +432,24 @@ public:
             o->onTransactionAbort(opCtx, abortOplogEntryOpTime);
     }
 
+    void onBatchedWriteStart(OperationContext* opCtx) override {
+        ReservedTimes times{opCtx};
+        for (auto& o : _observers) {
+            o->onBatchedWriteStart(opCtx);
+        }
+    }
+
     void onBatchedWriteCommit(OperationContext* opCtx) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
             o->onBatchedWriteCommit(opCtx);
+        }
+    }
+
+    void onBatchedWriteAbort(OperationContext* opCtx) override {
+        ReservedTimes times{opCtx};
+        for (auto& o : _observers) {
+            o->onBatchedWriteAbort(opCtx);
         }
     }
 
