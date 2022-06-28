@@ -37,6 +37,9 @@
 
 namespace mongo::repl {
 
+const OperationContext::Decoration<boost::optional<DocumentKey>> documentKeyDecoration =
+    OperationContext::declareDecoration<boost::optional<DocumentKey>>();
+
 /**
  * Given a raw collMod command object and associated collection metadata, create and return the
  * object for the 'o' field of a collMod oplog entry. For TTL index updates, we make sure the oplog

@@ -249,6 +249,4 @@ private:
     void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 };
 
-extern const OperationContext::Decoration<boost::optional<repl::DocumentKey>> documentKeyDecoration;
-
 }  // namespace mongo

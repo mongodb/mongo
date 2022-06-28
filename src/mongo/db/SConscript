@@ -1128,7 +1128,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/kill_sessions_local',
         '$BUILD_DIR/mongo/executor/egress_tag_closer_manager',
         'op_observer',
-        'op_observer_impl',
         'op_observer_util',
     ],
 )
@@ -2789,6 +2788,7 @@ if wiredtiger:
             'namespace_string',
             'op_observer',
             'op_observer_impl',
+            'op_observer_util',
             'operation_time_tracker',
             'query_exec',
             'range_arithmetic',

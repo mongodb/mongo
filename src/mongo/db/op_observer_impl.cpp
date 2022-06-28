@@ -89,8 +89,6 @@ namespace mongo {
 using repl::DurableOplogEntry;
 using repl::MutableOplogEntry;
 using ChangeStreamPreImageRecordingMode = repl::ReplOperation::ChangeStreamPreImageRecordingMode;
-const OperationContext::Decoration<boost::optional<repl::DocumentKey>> documentKeyDecoration =
-    OperationContext::declareDecoration<boost::optional<repl::DocumentKey>>();
 
 const OperationContext::Decoration<boost::optional<ShardId>> destinedRecipientDecoration =
     OperationContext::declareDecoration<boost::optional<ShardId>>();
@@ -295,7 +293,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     }
 
     oplogEntry->setOpType(repl::OpTypeEnum::kDelete);
-    oplogEntry->setObject(documentKeyDecoration(opCtx).get().getShardKeyAndId());
+    oplogEntry->setObject(repl::documentKeyDecoration(opCtx).get().getShardKeyAndId());
     oplogEntry->setFromMigrateIfTrue(fromMigrate);
     // oplogLink could have been changed to include preImageOpTime by the previous no-op write.
     repl::appendOplogEntryChainInfo(opCtx, oplogEntry, &oplogLink, {stmtId});
@@ -889,7 +887,7 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    NamespaceString const& nss,
                                    const UUID& uuid,
                                    BSONObj const& doc) {
-    documentKeyDecoration(opCtx).emplace(repl::getDocumentKey(opCtx, nss, doc));
+    repl::documentKeyDecoration(opCtx).emplace(repl::getDocumentKey(opCtx, nss, doc));
 
     ShardingWriteRouter shardingWriteRouter(opCtx, nss, Grid::get(opCtx)->catalogCache());
 
@@ -910,7 +908,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                               const UUID& uuid,
                               StmtId stmtId,
                               const OplogDeleteEntryArgs& args) {
-    auto optDocKey = documentKeyDecoration(opCtx);
+    auto optDocKey = repl::documentKeyDecoration(opCtx);
     invariant(optDocKey, nss.ns());
     auto& documentKey = optDocKey.get();
 
