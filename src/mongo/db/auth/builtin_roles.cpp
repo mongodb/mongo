@@ -677,7 +677,13 @@ void addRestorePrivileges(PrivilegeVector* privileges) {
     Privilege::addPrivilegeToPrivilegeVector(
         privileges,
         Privilege(ResourcePattern::forClusterResource(),
-                  {ActionType::forceUUID, ActionType::useUUID}));
+                  {
+                      // Need to be able to force UUID consistency in sharded restores
+                      ActionType::forceUUID,
+                      ActionType::useUUID,
+                      // Needed for `mongorestore --preserveUUID`
+                      ActionType::applyOps,
+                  }));
 }
 
 void addRootRolePrivileges(PrivilegeVector* privileges) {
