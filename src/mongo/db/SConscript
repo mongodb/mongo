@@ -1122,18 +1122,14 @@ env.Library(
     source=[
         "fcv_op_observer.cpp",
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        'catalog/collection_options',
-        'op_observer',
-        'op_observer_util',
-    ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/kill_sessions_local',
         '$BUILD_DIR/mongo/executor/egress_tag_closer_manager',
+        'op_observer',
         'op_observer_impl',
+        'op_observer_util',
     ],
 )
 

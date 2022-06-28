@@ -29,8 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/op_observer_noop.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/util/version/releases.h"
 
 namespace mongo {
