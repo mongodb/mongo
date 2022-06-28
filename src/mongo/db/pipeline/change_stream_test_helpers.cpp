@@ -75,13 +75,13 @@ Document makeResumeTokenWithEventId(Timestamp ts,
                                     ImplicitValue eventIdentifier,
                                     ResumeTokenData::FromInvalidate fromInvalidate,
                                     size_t txnOpIndex) {
-    ResumeTokenData tokenData;
-    tokenData.clusterTime = ts;
-    tokenData.eventIdentifier = eventIdentifier;
-    tokenData.fromInvalidate = fromInvalidate;
-    tokenData.txnOpIndex = txnOpIndex;
-    if (!uuid.missing())
-        tokenData.uuid = uuid.getUuid();
+    auto optionalUuid = uuid.missing() ? boost::none : boost::make_optional(uuid.getUuid());
+    ResumeTokenData tokenData{ts,
+                              ResumeTokenData::kDefaultTokenVersion,
+                              txnOpIndex,
+                              optionalUuid,
+                              eventIdentifier,
+                              fromInvalidate};
     return ResumeToken(tokenData).toDocument();
 }
 

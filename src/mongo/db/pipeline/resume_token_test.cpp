@@ -59,12 +59,12 @@ TEST(ResumeToken, EncodesFullTokenFromData) {
 }
 
 TEST(ResumeToken, EncodesTimestampOnlyTokenFromData) {
-    Timestamp ts(1001, 3);
-
-    ResumeTokenData resumeTokenDataIn;
-    resumeTokenDataIn.clusterTime = ts;
-    resumeTokenDataIn.eventIdentifier = Value(Document{{"operationType", "drop"_sd}});
-
+    ResumeTokenData resumeTokenDataIn{
+        Timestamp{1001, 3},
+        ResumeTokenData::kDefaultTokenVersion,
+        /* txnOpindex */ 0,
+        /* uuid */ boost::none,
+        /* eventIdentifier */ Value(Document{{"operationType", "drop"_sd}})};
     ResumeToken token(resumeTokenDataIn);
     ResumeTokenData tokenData = token.getData();
     ASSERT_EQ(resumeTokenDataIn, tokenData);
@@ -90,11 +90,12 @@ TEST(ResumeToken, ShouldRoundTripThroughHexEncoding) {
 }
 
 TEST(ResumeToken, TimestampOnlyTokenShouldRoundTripThroughHexEncoding) {
-    Timestamp ts(1001, 3);
-
-    ResumeTokenData resumeTokenDataIn;
-    resumeTokenDataIn.clusterTime = ts;
-    resumeTokenDataIn.eventIdentifier = Value(Document{{"operationType", "drop"_sd}});
+    ResumeTokenData resumeTokenDataIn{
+        Timestamp{1001, 3},
+        ResumeTokenData::kDefaultTokenVersion,
+        /* txnOpIndex */ 0,
+        /* uuid */ boost::none,
+        /* eventIdentifier */ Value(Document{{"operationType", "drop"_sd}})};
 
     // Test serialization/parsing through Document.
     auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
@@ -108,15 +109,14 @@ TEST(ResumeToken, TimestampOnlyTokenShouldRoundTripThroughHexEncoding) {
 }
 
 TEST(ResumeToken, NonDocumentKeyResumeTokenRoundTripsThroughHexEncoding) {
-    Timestamp ts(1001, 3);
-
-    ResumeTokenData resumeTokenDataIn;
-    resumeTokenDataIn.clusterTime = ts;
-    resumeTokenDataIn.uuid = UUID::gen();
-
-    resumeTokenDataIn.eventIdentifier = Value(BSON("operationType"
-                                                   << "create"
-                                                   << "operationDescription" << BSONObj()));
+    auto eventIdentifier = Value(BSON("operationType"
+                                      << "create"
+                                      << "operationDescription" << BSONObj()));
+    ResumeTokenData resumeTokenDataIn{Timestamp{1001, 3},
+                                      ResumeTokenData::kDefaultTokenVersion,
+                                      /* txnOpIndex */ 0,
+                                      UUID::gen(),
+                                      eventIdentifier};
 
     // Test serialization/parsing through Document.
     auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
@@ -244,10 +244,11 @@ TEST(ResumeToken, FailsToParseForInvalidTokenFormats) {
         AssertionException);
 
     // Valid data field, but wrong type typeBits.
-    Timestamp ts(1010, 4);
-    ResumeTokenData tokenData;
-    tokenData.clusterTime = ts;
-    tokenData.eventIdentifier = Value(Document{{"operationType", "drop"_sd}});
+    ResumeTokenData tokenData{Timestamp{1010, 4},
+                              ResumeTokenData::kDefaultTokenVersion,
+                              /* version */ 0,
+                              /* uuid */ boost::none,
+                              /* eventIdentifier */ Value(Document{{"operationType", "drop"_sd}})};
     auto goodTokenDocBinData = ResumeToken(tokenData).toDocument();
     auto goodData = goodTokenDocBinData["_data"].getStringData();
     ASSERT_THROWS(ResumeToken::parse(Document{{"_data"_sd, goodData}, {"_typeBits", "string"_sd}}),
@@ -260,11 +261,11 @@ TEST(ResumeToken, FailsToParseForInvalidTokenFormats) {
 }
 
 TEST(ResumeToken, FailsToDecodeInvalidKeyString) {
-    Timestamp ts(1010, 4);
-
-    ResumeTokenData tokenData;
-    tokenData.clusterTime = ts;
-    tokenData.eventIdentifier = Value(Document{{"operationType", "drop"_sd}});
+    ResumeTokenData tokenData{Timestamp{1010, 4},
+                              ResumeTokenData::kDefaultTokenVersion,
+                              /* txnOpIndex */ 0,
+                              /* uuid */ boost::none,
+                              /* eventIdentifier */ Value(Document{{"operationType", "drop"_sd}})};
 
     auto goodTokenDocBinData = ResumeToken(tokenData).toDocument();
     auto goodData = goodTokenDocBinData["_data"].getStringData();
@@ -314,13 +315,14 @@ TEST(ResumeToken, FailsToDecodeInvalidKeyString) {
 
 TEST(ResumeToken, WrongVersionToken) {
     Timestamp ts(1001, 3);
-
-    ResumeTokenData resumeTokenDataIn;
-    resumeTokenDataIn.clusterTime = ts;
-    resumeTokenDataIn.version = 0;
-    resumeTokenDataIn.fromInvalidate = ResumeTokenData::FromInvalidate::kFromInvalidate;
-    const auto eventIdentifier =
+    auto eventIdentifier =
         Value(Document{{"operationType", "insert"_sd}, {"documentKey", Document{{"_id", 1}}}});
+    ResumeTokenData resumeTokenDataIn{ts,
+                                      /* version */ 0,
+                                      /* txnOpIndex */ 0,
+                                      UUID::gen(),
+                                      eventIdentifier,
+                                      ResumeTokenData::FromInvalidate::kFromInvalidate};
 
     // This one with version 0 should succeed. Version 0 cannot encode the fromInvalidate bool, so
     // we expect it to be set to the default 'kNotFromInvalidate' after serialization.
@@ -337,8 +339,6 @@ TEST(ResumeToken, WrongVersionToken) {
     ASSERT_EQ(resumeTokenDataIn, tokenData);
 
     resumeTokenDataIn.version = 2;
-    resumeTokenDataIn.uuid = UUID::gen();
-    resumeTokenDataIn.eventIdentifier = eventIdentifier;
     rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
     tokenData = rtToken.getData();
     ASSERT_EQ(resumeTokenDataIn, tokenData);
@@ -350,10 +350,13 @@ TEST(ResumeToken, WrongVersionToken) {
 
     // For version 0, the 'tokenType' field is not encoded. We expect it to default from the value
     // 'kHighWaterMarkToken' back to 'kEventToken' after serialization.
-    resumeTokenDataIn = {};
-    resumeTokenDataIn.version = 0;
-    resumeTokenDataIn.tokenType = ResumeTokenData::kHighWaterMarkToken;
-
+    resumeTokenDataIn = ResumeTokenData{ts,
+                                        /* version */ 0,
+                                        /* txnOpIndex */ 0,
+                                        /* uuid */ boost::none,
+                                        /* eventIdentifier */ Value{},
+                                        ResumeTokenData::kNotFromInvalidate,
+                                        ResumeTokenData::TokenType::kHighWaterMarkToken};
     rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
     tokenData = rtToken.getData();
     ASSERT_NE(resumeTokenDataIn, tokenData);
@@ -383,12 +386,12 @@ TEST(ResumeToken, WrongVersionToken) {
 }
 
 TEST(ResumeToken, InvalidTxnOpIndex) {
-    Timestamp ts(1001, 3);
-
-    ResumeTokenData resumeTokenDataIn;
-    resumeTokenDataIn.clusterTime = ts;
-    resumeTokenDataIn.txnOpIndex = 1234;
-    resumeTokenDataIn.eventIdentifier = Value(Document{{"operationType", "drop"_sd}});
+    ResumeTokenData resumeTokenDataIn{
+        Timestamp{1001, 3},
+        ResumeTokenData::kDefaultTokenVersion,
+        /* txnOpIndex */ 1234,
+        /* uuid */ boost::none,
+        /* eventIdentifier */ Value(Document{{"operationType", "drop"_sd}})};
 
     // Should round trip with a non-negative txnOpIndex.
     auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());

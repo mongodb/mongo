@@ -70,12 +70,19 @@ public:
     Document makeResumeToken(ImplicitValue id = Value()) {
         const Timestamp ts(100, 1);
         if (id.missing()) {
-            ResumeTokenData tokenData;
-            tokenData.clusterTime = ts;
+            ResumeTokenData tokenData(ts,
+                                      ResumeTokenData::kDefaultTokenVersion,
+                                      /* txnOpIndex */ 0,
+                                      /* uuid */ boost::none,
+                                      /* eventIdentifier */ Value());
             return ResumeToken(tokenData).toDocument();
         }
-        return ResumeToken(ResumeTokenData(ts, 0, 0, testUuid(), Value(Document{{"_id", id}})))
-            .toDocument();
+        ResumeTokenData tokenData(ts,
+                                  /* version */ 0,
+                                  /* txnOpIndex */ 0,
+                                  testUuid(),
+                                  /* eventIdentifier */ Value(Document{{"_id", id}}));
+        return ResumeToken(tokenData).toDocument();
     }
 
     DocumentSourceChangeStreamSpec getSpec(

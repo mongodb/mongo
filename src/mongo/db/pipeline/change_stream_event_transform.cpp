@@ -46,6 +46,7 @@ namespace mongo {
 namespace {
 constexpr auto checkValueType = &DocumentSourceChangeStream::checkValueType;
 constexpr auto checkValueTypeOrMissing = &DocumentSourceChangeStream::checkValueTypeOrMissing;
+constexpr auto resolveResumeToken = &DocumentSourceChangeStream::resolveResumeTokenFromSpec;
 
 Document copyDocExceptFields(const Document& source, const std::set<StringData>& fieldNames) {
     MutableDocument doc(source);
@@ -93,11 +94,7 @@ NamespaceString createNamespaceStringFromOplogEntry(Value tid, StringData ns) {
 ChangeStreamEventTransformation::ChangeStreamEventTransformation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const DocumentSourceChangeStreamSpec& spec)
-    : _changeStreamSpec(spec), _expCtx(expCtx) {
-    // Extract the resume token from the spec and store it.
-    _resumeToken =
-        DocumentSourceChangeStream::resolveResumeTokenFromSpec(_expCtx, _changeStreamSpec);
-
+    : _changeStreamSpec(spec), _expCtx(expCtx), _resumeToken(resolveResumeToken(expCtx, spec)) {
     // Determine whether the user requested a point-in-time pre-image, which will affect this
     // stage's output.
     _preImageRequested =

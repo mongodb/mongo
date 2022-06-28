@@ -46,17 +46,6 @@ namespace mongo {
 constexpr StringData ResumeToken::kDataFieldName;
 constexpr StringData ResumeToken::kTypeBitsFieldName;
 
-namespace {
-// Helper function for makeHighWaterMarkToken and isHighWaterMarkToken.
-ResumeTokenData makeHighWaterMarkResumeTokenData(Timestamp clusterTime, int version) {
-    ResumeTokenData tokenData;
-    tokenData.version = version;
-    tokenData.clusterTime = clusterTime;
-    tokenData.tokenType = ResumeTokenData::kHighWaterMarkToken;
-    return tokenData;
-}
-}  // namespace
-
 ResumeTokenData::ResumeTokenData(Timestamp clusterTimeIn,
                                  int versionIn,
                                  size_t txnOpIndexIn,
@@ -297,12 +286,20 @@ ResumeToken ResumeToken::parse(const Document& resumeDoc) {
     return ResumeToken(resumeDoc);
 }
 
+ResumeTokenData ResumeToken::makeHighWaterMarkTokenData(Timestamp clusterTime, int version) {
+    ResumeTokenData tokenData;
+    tokenData.version = version;
+    tokenData.clusterTime = clusterTime;
+    tokenData.tokenType = ResumeTokenData::kHighWaterMarkToken;
+    return tokenData;
+}
+
 ResumeToken ResumeToken::makeHighWaterMarkToken(Timestamp clusterTime, int version) {
-    return ResumeToken(makeHighWaterMarkResumeTokenData(clusterTime, version));
+    return ResumeToken(makeHighWaterMarkTokenData(clusterTime, version));
 }
 
 bool ResumeToken::isHighWaterMarkToken(const ResumeTokenData& tokenData) {
-    return tokenData == makeHighWaterMarkResumeTokenData(tokenData.clusterTime, tokenData.version);
+    return tokenData == makeHighWaterMarkTokenData(tokenData.clusterTime, tokenData.version);
 }
 
 }  // namespace mongo

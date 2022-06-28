@@ -63,10 +63,11 @@ BSONObj makePostBatchResumeToken(Timestamp clusterTime) {
 }
 
 BSONObj makeResumeToken(Timestamp clusterTime, UUID uuid, BSONObj docKey) {
-    ResumeTokenData data;
-    data.clusterTime = clusterTime;
-    data.uuid = uuid;
-    data.eventIdentifier = Value(Document{docKey});
+    ResumeTokenData data(clusterTime,
+                         ResumeTokenData::kDefaultTokenVersion,
+                         /* txnOpIndex */ 0,
+                         uuid,
+                         /* eventIdentifier */ Value(Document{docKey}));
     return ResumeToken(data).toDocument().toBson();
 }
 

@@ -651,11 +651,13 @@ TEST_F(CheckResumeTokenTest, ShouldSwallowInvalidateFromEachShardForStartAfterIn
     // Create a resume token representing an 'invalidate' event, and use it to seed the stage. A
     // resume token with {fromInvalidate:true} can only be used with startAfter, to start a new
     // stream after the old stream is invalidated.
-    ResumeTokenData invalidateToken;
-    invalidateToken.clusterTime = resumeTimestamp;
-    invalidateToken.uuid = uuids[0];
-    invalidateToken.fromInvalidate = ResumeTokenData::kFromInvalidate;
-    invalidateToken.eventIdentifier = Value(Document{{"operationType", "drop"_sd}});
+    auto eventIdentifier = Value{Document{{"operationType", "drop"_sd}}};
+    ResumeTokenData invalidateToken{resumeTimestamp,
+                                    ResumeTokenData::kDefaultTokenVersion,
+                                    /* txnOpIndex */ 0,
+                                    uuids[0],
+                                    std::move(eventIdentifier),
+                                    ResumeTokenData::kFromInvalidate};
     auto checkResumeToken = createDSEnsureResumeTokenPresent(invalidateToken);
 
     // Add three documents which each have the invalidate resume token. We expect to see this in the
@@ -692,11 +694,13 @@ TEST_F(CheckResumeTokenTest, ShouldNotSwallowUnrelatedInvalidateForStartAfterInv
     // Create a resume token representing an 'invalidate' event, and use it to seed the stage. A
     // resume token with {fromInvalidate:true} can only be used with startAfter, to start a new
     // stream after the old stream is invalidated.
-    ResumeTokenData invalidateToken;
-    invalidateToken.clusterTime = resumeTimestamp;
-    invalidateToken.uuid = uuids[0];
-    invalidateToken.fromInvalidate = ResumeTokenData::kFromInvalidate;
-    invalidateToken.eventIdentifier = Value(Document{{"operationType", "drop"_sd}});
+    auto eventIdentifier = Value{Document{{"operationType", "drop"_sd}}};
+    ResumeTokenData invalidateToken{resumeTimestamp,
+                                    ResumeTokenData::kDefaultTokenVersion,
+                                    /* txnOpIndex */ 0,
+                                    uuids[0],
+                                    eventIdentifier,
+                                    ResumeTokenData::kFromInvalidate};
     auto checkResumeToken = createDSEnsureResumeTokenPresent(invalidateToken);
 
     // Create a second invalidate token with the same clusterTime but a different UUID.

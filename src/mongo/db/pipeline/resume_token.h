@@ -62,9 +62,6 @@ struct ResumeTokenData {
         kEventToken = 128,        // Token refers to an actual event in the stream.
     };
 
-    ResumeTokenData(){};
-
-    // TODO SERVER-65257: force all callers to go through this constructor.
     ResumeTokenData(Timestamp clusterTimeIn,
                     int versionIn,
                     size_t txnOpIndexIn,
@@ -78,10 +75,14 @@ struct ResumeTokenData {
                     int versionIn,
                     size_t txnOpIndexIn,
                     const boost::optional<UUID>& uuidIn,
-                    Value eventIdentifierIn)
+                    Value eventIdentifierIn,
+                    FromInvalidate fromInvalidate = FromInvalidate::kNotFromInvalidate,
+                    TokenType tokenType = TokenType::kEventToken)
         : clusterTime(clusterTimeIn),
           version(versionIn),
+          tokenType(tokenType),
           txnOpIndex(txnOpIndexIn),
+          fromInvalidate(fromInvalidate),
           uuid(uuidIn),
           eventIdentifier(std::move(eventIdentifierIn)){};
 
@@ -107,6 +108,12 @@ struct ResumeTokenData {
     // The eventIdentifier can be either be a document key for CRUD operations, or a more
     // descriptive operation details for non-CRUD operations.
     Value eventIdentifier;
+
+private:
+    // This private constructor should only ever be used internally or by the ResumeToken class.
+    ResumeTokenData() = default;
+
+    friend class ResumeToken;
 };
 
 std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData);
@@ -184,6 +191,9 @@ public:
     }
 
 private:
+    // Helper function for makeHighWaterMarkToken and isHighWaterMarkToken.
+    static ResumeTokenData makeHighWaterMarkTokenData(Timestamp clusterTime, int version);
+
     explicit ResumeToken(const Document& resumeData);
 
     // This is the hex-encoded string encoding all the pieces of the resume token.
