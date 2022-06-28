@@ -510,6 +510,25 @@ TEST(FTDCProcNetstat, TestLocalNetstat) {
     ASSERT_KEY("IpExt:InOctets");
 }
 
+// Test we can parse the /proc/net/snmp on this machine and assert we have some expected fields
+// Some keys can vary between distros, so we test only for the existence of a few basic ones
+TEST(FTDCProcNetstat, TestLocalNetSnmp) {
+
+    BSONObjBuilder builder;
+
+    std::vector<StringData> keys{"Tcp:"_sd, "Ip:"_sd};
+
+    ASSERT_OK(procparser::parseProcNetstatFile(keys, "/proc/net/snmp", &builder));
+
+    BSONObj obj = builder.obj();
+    auto stringMap = toStringMap(obj);
+    LOGV2(23367, "OBJ:{obj}", "obj"_attr = obj);
+    ASSERT_KEY("Ip:InReceives");
+    ASSERT_KEY("Ip:OutRequests");
+    ASSERT_KEY("Tcp:InSegs");
+    ASSERT_KEY("Tcp:OutSegs");
+}
+
 TEST(FTDCProcNetstat, TestLocalNonExistentNetstat) {
     std::vector<StringData> keys{};
     BSONObjBuilder builder;
