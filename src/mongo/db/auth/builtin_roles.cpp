@@ -687,6 +687,8 @@ void addRestorePrivileges(PrivilegeVector* privileges) {
                       // Need to be able to set and bypass write blocking mode for C2C replication
                       ActionType::bypassWriteBlockingMode,
                       ActionType::setUserWriteBlockMode,
+                      // Needed for `mongorestore --preserveUUID`
+                      ActionType::applyOps,
                   }));
 }
 
