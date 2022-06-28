@@ -987,8 +987,9 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
                                            sbe::makeSV(),
                                            nullptr,
                                            planNodeId),
-            boost::make_optional(shouldRegisterLowHighKeyInRuntimeEnv,
-                                 std::pair(*lowKeySlot, *highKeySlot))};
+            shouldRegisterLowHighKeyInRuntimeEnv
+                ? boost::make_optional(std::pair(*lowKeySlot, *highKeySlot))
+                : boost::none};
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
