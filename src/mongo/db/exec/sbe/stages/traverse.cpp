@@ -371,6 +371,10 @@ std::vector<DebugPrinter::Block> TraverseStage::debugPrint() const {
     }
     ret.emplace_back("`}");
 
+    if (_nestedArraysDepth) {
+        ret.emplace_back(std::to_string(*_nestedArraysDepth));
+    }
+
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addIdentifier(ret, "from");
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
