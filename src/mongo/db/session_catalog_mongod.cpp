@@ -170,6 +170,10 @@ LogicalSessionIdSet removeExpiredTransactionSessionsNotInUseFromMemory(
                 parentSessionActiveTxnNumber =
                     txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber();
                 if (txnParticipant.canBeReaped() && txnRouter.canBeReaped()) {
+                    LOGV2_DEBUG(6753702,
+                                5,
+                                "Marking parent transaction session for reap",
+                                "lsid"_attr = transactionSessionId);
                     // This is an external session so it can be reaped if and only if all of its
                     // internal sessions can be reaped.
                     parentSession.markForReap(ObservableSession::ReapMode::kNonExclusive);
@@ -182,10 +186,18 @@ LogicalSessionIdSet removeExpiredTransactionSessionsNotInUseFromMemory(
 
                 if (txnParticipant.canBeReaped() && txnRouter.canBeReaped()) {
                     if (isInternalSessionForNonRetryableWrite(transactionSessionId)) {
+                        LOGV2_DEBUG(6753703,
+                                    5,
+                                    "Marking child transaction session for reap",
+                                    "lsid"_attr = transactionSessionId);
                         // This is an internal session for a non-retryable write so it can be reaped
                         // independently of the external session that write ran in.
                         childSession.markForReap(ObservableSession::ReapMode::kExclusive);
                     } else if (isInternalSessionForRetryableWrite(transactionSessionId)) {
+                        LOGV2_DEBUG(6753704,
+                                    5,
+                                    "Marking child transaction session for reap",
+                                    "lsid"_attr = transactionSessionId);
                         // This is an internal session for a retryable write so it must be reaped
                         // atomically with the external session and internal sessions for that
                         // retryable write, unless the write is no longer active (i.e. there is
@@ -202,6 +214,11 @@ LogicalSessionIdSet removeExpiredTransactionSessionsNotInUseFromMemory(
         expiredTransactionSessionIdsStillInUse.insert(transactionSessionIdsNotReaped.begin(),
                                                       transactionSessionIdsNotReaped.end());
     }
+
+    LOGV2_DEBUG(6753705,
+                5,
+                "Expired sessions not reaped from the SessionCatalog",
+                "lsids"_attr = expiredTransactionSessionIdsStillInUse);
 
     return expiredTransactionSessionIdsStillInUse;
 }
