@@ -305,75 +305,87 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                                           const boost::optional<UUID>& migrationId,
                                           int numDocsToRemovePerBatch,
                                           Milliseconds delayBetweenBatches) {
-    return AsyncTry([=] {
-               return withTemporaryOperationContext(
-                   [=](OperationContext* opCtx) {
-                       LOGV2_DEBUG(5346200,
-                                   1,
-                                   "Starting batch deletion",
-                                   "namespace"_attr = nss,
-                                   "range"_attr = redact(range.toString()),
-                                   "numDocsToRemovePerBatch"_attr = numDocsToRemovePerBatch,
-                                   "delayBetweenBatches"_attr = delayBetweenBatches);
+    return ExecutorFuture<void>(executor)
+        .then([=] {
+            bool allDocsRemoved = false;
+            // Delete all batches in this range unless a stepdown error occurs. Do not yield the
+            // executor to ensure that this range is fully deleted before another range is
+            // processed.
+            while (!allDocsRemoved) {
+                try {
+                    allDocsRemoved = withTemporaryOperationContext(
+                        [=](OperationContext* opCtx) {
+                            LOGV2_DEBUG(5346200,
+                                        1,
+                                        "Starting batch deletion",
+                                        "namespace"_attr = nss,
+                                        "range"_attr = redact(range.toString()),
+                                        "numDocsToRemovePerBatch"_attr = numDocsToRemovePerBatch,
+                                        "delayBetweenBatches"_attr = delayBetweenBatches);
 
-                       if (migrationId) {
-                           ensureRangeDeletionTaskStillExists(opCtx, *migrationId);
-                       }
+                            if (migrationId) {
+                                ensureRangeDeletionTaskStillExists(opCtx, *migrationId);
+                            }
 
-                       int numDeleted;
+                            int numDeleted;
 
-                       {
-                           AutoGetCollection collection(opCtx, nss, MODE_IX);
+                            {
+                                AutoGetCollection collection(opCtx, nss, MODE_IX);
 
-                           // Ensure the collection exists and has not been dropped or dropped and
-                           // recreated
-                           uassert(ErrorCodes::
-                                       RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
-                                   "Collection has been dropped since enqueuing this range "
-                                   "deletion task. No need to delete documents.",
-                                   !collectionUuidHasChanged(
-                                       nss, collection.getCollection(), collectionUuid));
+                                // Ensure the collection exists and has not been dropped or dropped
+                                // and recreated
+                                uassert(
+                                    ErrorCodes::
+                                        RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
+                                    "Collection has been dropped since enqueuing this range "
+                                    "deletion task. No need to delete documents.",
+                                    !collectionUuidHasChanged(
+                                        nss, collection.getCollection(), collectionUuid));
 
-                           numDeleted = uassertStatusOK(deleteNextBatch(opCtx,
-                                                                        collection.getCollection(),
-                                                                        keyPattern,
-                                                                        range,
-                                                                        numDocsToRemovePerBatch));
-                       }
+                                numDeleted =
+                                    uassertStatusOK(deleteNextBatch(opCtx,
+                                                                    collection.getCollection(),
+                                                                    keyPattern,
+                                                                    range,
+                                                                    numDocsToRemovePerBatch));
+                            }
 
-                       LOGV2_DEBUG(23769,
-                                   1,
-                                   "Deleted documents in pass",
-                                   "numDeleted"_attr = numDeleted,
-                                   "namespace"_attr = nss.ns(),
-                                   "collectionUUID"_attr = collectionUuid,
-                                   "range"_attr = range.toString());
+                            LOGV2_DEBUG(23769,
+                                        1,
+                                        "Deleted documents in pass",
+                                        "numDeleted"_attr = numDeleted,
+                                        "namespace"_attr = nss.ns(),
+                                        "collectionUUID"_attr = collectionUuid,
+                                        "range"_attr = range.toString());
 
-                       if (numDeleted > 0) {
-                           // (SERVER-62368) The range-deleter executor is mono-threaded, so
-                           // sleeping synchronously for `delayBetweenBatches` ensures that no other
-                           // batch is going to be cleared up before the expected delay.
-                           opCtx->sleepFor(delayBetweenBatches);
-                       }
+                            if (numDeleted > 0) {
+                                // (SERVER-62368) The range-deleter executor is mono-threaded, so
+                                // sleeping synchronously for `delayBetweenBatches` ensures that no
+                                // other batch is going to be cleared up before the expected delay.
+                                opCtx->sleepFor(delayBetweenBatches);
+                            }
 
-                       return numDeleted == 0;
-                   },
-                   nss);
-           })
-        .until([=](StatusWith<bool> swAllDocumentsInRangeDeleted) {
-            // Continue iterating until there are no more documents to delete, retrying on any
-            // error that doesn't indicate that this node is stepping down.
-            return (swAllDocumentsInRangeDeleted.isOK() &&
-                    swAllDocumentsInRangeDeleted.getValue()) ||
-                swAllDocumentsInRangeDeleted ==
-                ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist ||
-                swAllDocumentsInRangeDeleted ==
-                ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist ||
-                swAllDocumentsInRangeDeleted == ErrorCodes::KeyPatternShorterThanBound ||
-                ErrorCodes::isShutdownError(swAllDocumentsInRangeDeleted.getStatus()) ||
-                ErrorCodes::isNotPrimaryError(swAllDocumentsInRangeDeleted.getStatus());
+                            return numDeleted < numDocsToRemovePerBatch;
+                        },
+                        nss);
+                } catch (const DBException& ex) {
+                    // Errors other than those indicating stepdown and those that indicate that the
+                    // range deletion can no longer occur should be retried.
+                    auto errorCode = ex.code();
+                    if (errorCode ==
+                            ErrorCodes::
+                                RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist ||
+                        errorCode ==
+                            ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist ||
+                        errorCode == ErrorCodes::KeyPatternShorterThanBound ||
+                        ErrorCodes::isShutdownError(errorCode) ||
+                        ErrorCodes::isNotPrimaryError(errorCode)) {
+                        return ex.toStatus();
+                    };
+                }
+            }
+            return Status::OK();
         })
-        .on(executor, CancellationToken::uncancelable())
         .ignoreValue();
 }
 
