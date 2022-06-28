@@ -35,12 +35,8 @@
 #include "mongo/db/batched_write_context.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
 
 namespace mongo {
 
