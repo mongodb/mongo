@@ -73,9 +73,9 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
     if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD) || F_ISSET(S2C(session), WT_CONN_CLOSING))
         __wt_page_modify_clear(session, page);
 
-    /* Assert we never discard a dirty page or a page queue for eviction. */
-    WT_ASSERT(session, !__wt_page_is_modified(page));
-    WT_ASSERT(session, !F_ISSET_ATOMIC_16(page, WT_PAGE_EVICT_LRU));
+    WT_ASSERT_ALWAYS(session, !__wt_page_is_modified(page), "Attempting to discard dirty page");
+    WT_ASSERT_ALWAYS(session, !F_ISSET_ATOMIC_16(page, WT_PAGE_EVICT_LRU),
+      "Attempting to discard page queued for eviction");
 
     /*
      * If a root page split, there may be one or more pages linked from the page; walk the list,

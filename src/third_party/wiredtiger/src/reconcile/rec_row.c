@@ -414,7 +414,8 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
              * information in the address cell, be sure to propagate the original fast-truncate
              * information.
              */
-            WT_ASSERT(session, cms.state == WT_CHILD_ORIGINAL);
+            WT_ASSERT_ALWAYS(session, cms.state == WT_CHILD_ORIGINAL,
+              "Not propagating the original fast-truncate information");
             __wt_cell_unpack_addr(session, page->dsk, ref->addr, vpack);
             if (F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED)) {
                 page_del = vpack->type == WT_CELL_ADDR_DEL ? &vpack->page_del : NULL;

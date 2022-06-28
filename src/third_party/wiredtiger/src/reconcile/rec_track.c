@@ -336,7 +336,8 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
         }
         *e = reuse->next[0];
 
-        WT_ASSERT(session, !F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED));
+        WT_ASSERT_ALWAYS(session, !F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED),
+          "Attempting to reuse dirty overflow record");
 
         if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
             WT_RET(__ovfl_reuse_verbose(session, page, reuse, "free"));

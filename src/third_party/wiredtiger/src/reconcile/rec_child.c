@@ -72,7 +72,8 @@ __rec_child_deleted(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref,
      */
     WT_ORDERED_READ(prepare_state, page_del->prepare_state);
     if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED) {
-        WT_ASSERT(session, !F_ISSET(r, WT_REC_EVICT));
+        WT_ASSERT_ALWAYS(session, !F_ISSET(r, WT_REC_EVICT),
+          "In progress prepares should never be seen in eviction");
 
         cmsp->state = WT_CHILD_ORIGINAL;
         r->leave_dirty = true;
@@ -145,6 +146,7 @@ __wt_rec_child_modify(
         switch (r->tested_ref_state = ref->state) {
         case WT_REF_DISK:
             /* On disk, not modified by definition. */
+            // 9417 IGNORE
             WT_ASSERT(session, ref->addr != NULL);
             /* DISK pages do not have fast-truncate info. */
             WT_ASSERT(session, ref->ft_info.del == NULL);

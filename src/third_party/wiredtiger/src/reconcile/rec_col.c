@@ -8,6 +8,8 @@
 
 #include "wt_internal.h"
 
+// 9417 IGNORE asserts in this file. Column store is not related to BF-25011
+
 /*
  * __rec_col_fix_bulk_insert_split_check --
  *     Check if a bulk-loaded fixed-length column store page needs to split.
