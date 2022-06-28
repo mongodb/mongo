@@ -325,81 +325,6 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
     Timestamp newTimestamp = now.clusterTime().asTimestamp();
     collType.setTimestamp(newTimestamp);
 
-    auto updateCollectionAndChunksFn =
-        [this, &nss, &collType, &timers, &newFields](OperationContext* opCtx, TxnNumber txnNumber) {
-            // Update the config.collections entry for the given namespace.
-            updateShardingCatalogEntryForCollectionInTxn(
-                opCtx, nss, collType, false /* upsert */, txnNumber);
-
-            LOGV2(21933,
-                  "refineCollectionShardKey updated collection entry for {namespace}: took "
-                  "{durationMillis} ms. Total time taken: {totalTimeMillis} ms.",
-                  "refineCollectionShardKey updated collection entry",
-                  "namespace"_attr = nss.ns(),
-                  "durationMillis"_attr = timers->executionTimer.millis(),
-                  "totalTimeMillis"_attr = timers->totalTimer.millis());
-            timers->executionTimer.reset();
-
-            if (MONGO_unlikely(hangRefineCollectionShardKeyBeforeUpdatingChunks.shouldFail())) {
-                LOGV2(21934, "Hit hangRefineCollectionShardKeyBeforeUpdatingChunks failpoint");
-                hangRefineCollectionShardKeyBeforeUpdatingChunks.pauseWhileSet(opCtx);
-            }
-
-            auto [chunkUpdates, tagUpdates] = makeChunkAndTagUpdatesForRefine(newFields);
-
-            // Update all config.chunks entries for the given namespace by setting (i) their bounds
-            // for each new field in the refined key to MinKey (except for the global max chunk
-            // where the max bounds are set to MaxKey), and unsetting (ii) their jumbo field.
-            const auto chunksQuery = BSON(ChunkType::collectionUUID << collType.getUuid());
-            writeToConfigDocumentInTxn(
-                opCtx,
-                ChunkType::ConfigNS,
-                BatchedCommandRequest::buildPipelineUpdateOp(ChunkType::ConfigNS,
-                                                             chunksQuery,
-                                                             chunkUpdates,
-                                                             false,  // upsert
-                                                             true    // useMultiUpdate
-                                                             ),
-                txnNumber);
-
-            LOGV2(21935,
-                  "refineCollectionShardKey: updated chunk entries for {namespace}: took "
-                  "{durationMillis} ms. Total time taken: {totalTimeMillis} ms.",
-                  "refineCollectionShardKey: updated chunk entries",
-                  "namespace"_attr = nss.ns(),
-                  "durationMillis"_attr = timers->executionTimer.millis(),
-                  "totalTimeMillis"_attr = timers->totalTimer.millis());
-            timers->executionTimer.reset();
-
-            // Update all config.tags entries for the given namespace by setting their bounds for
-            // each new field in the refined key to MinKey (except for the global max tag where the
-            // max bounds are set to MaxKey).
-            writeToConfigDocumentInTxn(
-                opCtx,
-                TagsType::ConfigNS,
-                BatchedCommandRequest::buildPipelineUpdateOp(TagsType::ConfigNS,
-                                                             BSON("ns" << nss.ns()),
-                                                             tagUpdates,
-                                                             false,  // upsert
-                                                             true    // useMultiUpdate
-                                                             ),
-                txnNumber);
-
-
-            LOGV2(21936,
-                  "refineCollectionShardKey: updated zone entries for {namespace}: took "
-                  "{durationMillis} ms. Total time taken: {totalTimeMillis} ms.",
-                  "refineCollectionShardKey: updated zone entries",
-                  "namespace"_attr = nss.ns(),
-                  "durationMillis"_attr = timers->executionTimer.millis(),
-                  "totalTimeMillis"_attr = timers->totalTimer.millis());
-
-            if (MONGO_unlikely(hangRefineCollectionShardKeyBeforeCommit.shouldFail())) {
-                LOGV2(21937, "Hit hangRefineCollectionShardKeyBeforeCommit failpoint");
-                hangRefineCollectionShardKeyBeforeCommit.pauseWhileSet(opCtx);
-            }
-        };
-
     auto updateCollectionAndChunksWithAPIFn =
         [collType, newFields, nss, timers](const txn_api::TransactionClient& txnClient,
                                            ExecutorPtr txnExec) -> SemiFuture<void> {
@@ -492,22 +417,17 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
             .semi();
     };
 
-    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        // The transaction API will use the write concern on the opCtx, which will have the default
-        // sharding wTimeout of 60 seconds. Refining a shard key may involve writing many more
-        // documents than a normal operation, so we override the write concern to not use a
-        // wTimeout, matching the behavior before the API was introduced.
-        WriteConcernOptions originalWC = opCtx->getWriteConcern();
-        opCtx->setWriteConcern(WriteConcernOptions{WriteConcernOptions::kMajority,
-                                                   WriteConcernOptions::SyncMode::UNSET,
-                                                   WriteConcernOptions::kNoTimeout});
-        ON_BLOCK_EXIT([opCtx, originalWC] { opCtx->setWriteConcern(originalWC); });
+    // The transaction API will use the write concern on the opCtx, which will have the default
+    // sharding wTimeout of 60 seconds. Refining a shard key may involve writing many more
+    // documents than a normal operation, so we override the write concern to not use a
+    // wTimeout, matching the behavior before the API was introduced.
+    WriteConcernOptions originalWC = opCtx->getWriteConcern();
+    opCtx->setWriteConcern(WriteConcernOptions{WriteConcernOptions::kMajority,
+                                               WriteConcernOptions::SyncMode::UNSET,
+                                               WriteConcernOptions::kNoTimeout});
+    ON_BLOCK_EXIT([opCtx, originalWC] { opCtx->setWriteConcern(originalWC); });
 
-        withTransactionAPI(opCtx, nss, std::move(updateCollectionAndChunksWithAPIFn));
-    } else {
-        withTransaction(opCtx, nss, std::move(updateCollectionAndChunksFn));
-    }
+    withTransactionAPI(opCtx, nss, std::move(updateCollectionAndChunksWithAPIFn));
 
     ShardingLogging::get(opCtx)->logChange(opCtx,
                                            "refineCollectionShardKey.end",

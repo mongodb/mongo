@@ -312,9 +312,6 @@ protected:
         serverGlobalParams.clusterRole = ClusterRole::None;
         TransactionParticipantRetryableWritesTest::tearDown();
     }
-
-private:
-    RAIIServerParameterControllerForTest _controller{"featureFlagInternalTransactions", true};
 };
 
 TEST_F(TransactionParticipantRetryableWritesTest, SessionEntryNotWrittenOnBegin) {

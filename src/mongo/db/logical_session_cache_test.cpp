@@ -119,8 +119,6 @@ private:
     std::shared_ptr<MockSessionsCollectionImpl> _sessions;
 
     std::unique_ptr<LogicalSessionCache> _cache;
-
-    RAIIServerParameterControllerForTest _controller{"featureFlagInternalTransactions", true};
 };
 
 TEST_F(LogicalSessionCacheTest, ParentAndChildSessionsHaveEqualLogicalSessionRecord) {

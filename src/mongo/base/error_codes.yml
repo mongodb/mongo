@@ -469,8 +469,6 @@ error_codes:
 
     - {code: 363, name: RetryableTransactionInProgress}
 
-    - {code: 364, name: TxnRetryCounterNotSupported}
-
     - {code: 365, name: TemporarilyUnavailable}
 
     - {code: 366, name: WouldChangeOwningShardDeletedNoDocument}

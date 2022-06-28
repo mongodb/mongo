@@ -478,13 +478,10 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
         invariant(sharedOptions.txnNumberAndRetryCounter.getTxnNumber() == *osi.getTxnNumber());
     }
 
-    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        if (auto txnRetryCounter = sharedOptions.txnNumberAndRetryCounter.getTxnRetryCounter();
-            txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
-            newCmd.append(OperationSessionInfoFromClient::kTxnRetryCounterFieldName,
-                          *sharedOptions.txnNumberAndRetryCounter.getTxnRetryCounter());
-        }
+    if (auto txnRetryCounter = sharedOptions.txnNumberAndRetryCounter.getTxnRetryCounter();
+        txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
+        newCmd.append(OperationSessionInfoFromClient::kTxnRetryCounterFieldName,
+                      *sharedOptions.txnNumberAndRetryCounter.getTxnRetryCounter());
     }
 
     return newCmd.obj();

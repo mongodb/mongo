@@ -35,12 +35,6 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 feature_flags:
-    featureFlagInternalTransactions:
-        description: Feature flag for enabling internal transactions.
-        cpp_varname: gFeatureFlagInternalTransactions
-        default: true
-        version: 6.0
-
     featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp:
         description: Feature flag to enable always creating the config.transactions partial index on step up to primary even if the collection is not empty.
         cpp_varname: gFeatureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp

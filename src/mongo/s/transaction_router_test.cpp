@@ -117,8 +117,6 @@ protected:
         StaleConfigInfo(kViewNss, ChunkVersion::UNSHARDED(), boost::none, shard1),
         "The metadata for the collection is not loaded"};
 
-    RAIIServerParameterControllerForTest _controller{"featureFlagInternalTransactions", true};
-
     void setUp() override {
         ShardingTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);

@@ -670,12 +670,6 @@ boost::optional<BSONObj> ShardingCatalogManager::findOneConfigDocumentInTxn(
 void ShardingCatalogManager::withTransactionAPI(OperationContext* opCtx,
                                                 const NamespaceString& namespaceForInitialFind,
                                                 txn_api::Callback callback) {
-    // Callers should check this, but including as a sanity check.
-    uassert(ErrorCodes::IllegalOperation,
-            "Internal transaction API not enabled",
-            feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                serverGlobalParams.featureCompatibility));
-
     auto txn =
         txn_api::SyncTransactionWithRetries(opCtx,
                                             Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),

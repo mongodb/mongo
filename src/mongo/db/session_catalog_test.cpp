@@ -109,8 +109,6 @@ protected:
         catalog()->scanSessions(matcherAllSessions, getAllSessionIdsWorkerFn);
         return lsidsFound;
     };
-
-    RAIIServerParameterControllerForTest _controller{"featureFlagInternalTransactions", true};
 };
 
 class SessionCatalogTestWithDefaultOpCtx : public SessionCatalogTest {

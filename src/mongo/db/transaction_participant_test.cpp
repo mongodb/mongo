@@ -1713,8 +1713,6 @@ protected:
             txnParticipant.commitUnpreparedTransaction(opCtx);
         });
     }
-
-    RAIIServerParameterControllerForTest _controller{"featureFlagInternalTransactions", true};
 };
 
 TEST_F(ShardTxnParticipantTest, CannotSpecifyStartTransactionOnInProgressTxn) {
@@ -5622,20 +5620,6 @@ TEST_F(ShardTxnParticipantTest, CannotModifyParentLsidOfNonChildSession) {
 }
 
 TEST_F(ShardTxnParticipantTest,
-       ThrowIfTxnRetryCounterIsSpecifiedOnStartTransactionWithFeatureFlagDisabled) {
-    MongoDOperationContextSession opCtxSession(opCtx());
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-
-    RAIIServerParameterControllerForTest controller{"featureFlagInternalTransactions", false};
-    ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      {*opCtx()->getTxnNumber(), 1},
-                                                      false /* autocommit */,
-                                                      true /* startTransaction */),
-                       AssertionException,
-                       ErrorCodes::TxnRetryCounterNotSupported);
-}
-
-TEST_F(ShardTxnParticipantTest,
        TxnRetryCounterShouldNotThrowIfWeContinueATransactionAfterDisablingFeatureFlag) {
     // We swap in a new opCtx in order to set a new active txnRetryCounter for this test.
     auto newClientOwned = getServiceContext()->makeClient("newClient");
@@ -5660,8 +5644,6 @@ TEST_F(ShardTxnParticipantTest,
     // the following statements.
     txnParticipant.unstashTransactionResources(newOpCtx.get(), "insert");
     txnParticipant.stashTransactionResources(newOpCtx.get());
-
-    RAIIServerParameterControllerForTest controller{"featureFlagInternalTransactions", false};
 
     txnParticipant.beginOrContinue(newOpCtx.get(),
                                    {*newOpCtx.get()->getTxnNumber(), 1},

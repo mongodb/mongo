@@ -183,7 +183,6 @@ protected:
 
     LogicalSessionId _lsid{makeLogicalSessionIdForTest()};
     TxnNumberAndRetryCounter _txnNumberAndRetryCounter{1, 1};
-    RAIIServerParameterControllerForTest _controller{"featureFlagInternalTransactions", true};
 };
 
 class TransactionCoordinatorDriverTest : public TransactionCoordinatorTestBase {
@@ -599,54 +598,6 @@ TEST_F(TransactionCoordinatorDriverTest,
 
 TEST_F(TransactionCoordinatorDriverTest,
        SendPrepareAndDecisionAttachTxnRetryCounterIfFeatureFlagIsEnabled) {
-    txn::AsyncWorkScheduler aws(getServiceContext());
-    auto prepareFuture = txn::sendPrepare(getServiceContext(),
-                                          aws,
-                                          _lsid,
-                                          _txnNumberAndRetryCounter,
-                                          APIParameters(),
-                                          kOneShardIdList);
-    onCommands({[&](const executor::RemoteCommandRequest& request) {
-        ASSERT_TRUE(request.cmdObj.hasField("txnRetryCounter"));
-        ASSERT_EQUALS(request.cmdObj.getIntField("txnRetryCounter"),
-                      *_txnNumberAndRetryCounter.getTxnRetryCounter());
-        return kNoSuchTransaction;
-    }});
-    prepareFuture.get();
-
-    auto commitFuture = txn::sendCommit(getServiceContext(),
-                                        aws,
-                                        _lsid,
-                                        _txnNumberAndRetryCounter,
-                                        APIParameters(),
-                                        kOneShardIdList,
-                                        {});
-    onCommands({[&](const executor::RemoteCommandRequest& request) {
-        ASSERT_TRUE(request.cmdObj.hasField("txnRetryCounter"));
-        ASSERT_EQUALS(request.cmdObj.getIntField("txnRetryCounter"),
-                      *_txnNumberAndRetryCounter.getTxnRetryCounter());
-        return kNoSuchTransaction;
-    }});
-    commitFuture.get();
-
-    auto abortFuture = txn::sendAbort(getServiceContext(),
-                                      aws,
-                                      _lsid,
-                                      _txnNumberAndRetryCounter,
-                                      APIParameters(),
-                                      kOneShardIdList);
-    onCommands({[&](const executor::RemoteCommandRequest& request) {
-        ASSERT_TRUE(request.cmdObj.hasField("txnRetryCounter"));
-        ASSERT_EQUALS(request.cmdObj.getIntField("txnRetryCounter"),
-                      *_txnNumberAndRetryCounter.getTxnRetryCounter());
-        return kNoSuchTransaction;
-    }});
-    abortFuture.get();
-}
-
-TEST_F(TransactionCoordinatorDriverTest,
-       SendPrepareAndDecisionContinuesToUseTxnRetryCounterIfNotDefault) {
-    RAIIServerParameterControllerForTest controller{"featureFlagInternalTransactions", false};
     txn::AsyncWorkScheduler aws(getServiceContext());
     auto prepareFuture = txn::sendPrepare(getServiceContext(),
                                           aws,

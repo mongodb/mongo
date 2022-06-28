@@ -58,8 +58,6 @@ public:
 
 protected:
     InternalSessionPool* _pool;
-    RAIIServerParameterControllerForTest _featureFlagInternalTransactions{
-        "featureFlagInternalTransactions", true};
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;

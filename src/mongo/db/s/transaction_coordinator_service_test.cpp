@@ -195,7 +195,6 @@ protected:
     }
 
     TxnNumberAndRetryCounter _txnNumberAndRetryCounter{1, 1};
-    RAIIServerParameterControllerForTest _controller{"featureFlagInternalTransactions", true};
 };
 
 using TransactionCoordinatorServiceStepUpStepDownTest = TransactionCoordinatorServiceTestFixture;

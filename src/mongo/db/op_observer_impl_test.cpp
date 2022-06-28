@@ -120,8 +120,6 @@ void beginRetryableInternalTransactionWithTxnNumber(
     OperationContext* opCtx,
     TxnNumber txnNumber,
     std::unique_ptr<MongoDOperationContextSession>& contextSession) {
-    RAIIServerParameterControllerForTest controller{"featureFlagInternalTransactions", true};
-
     opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     opCtx->setTxnNumber(txnNumber);
     opCtx->setInMultiDocumentTransaction();

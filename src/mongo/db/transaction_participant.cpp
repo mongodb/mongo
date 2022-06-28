@@ -102,8 +102,6 @@ MONGO_FAIL_POINT_DEFINE(restoreLocksFail);
 
 MONGO_FAIL_POINT_DEFINE(failTransactionNoopWrite);
 
-MONGO_FAIL_POINT_DEFINE(hangAfterCheckingInternalTransactionsFeatureFlag);
-
 const auto getTransactionParticipant = Session::declareDecoration<TransactionParticipant>();
 
 const auto retryableWriteTransactionParticipantCatalogDecoration =
@@ -908,24 +906,6 @@ void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
             now,
             *o().transactionExpireDate);
         invariant(p().transactionOperations.empty());
-    }
-
-    if (_isInternalSession() && opCtx->writesAreReplicated()) {
-        // Don't check the FCV and feature flag when starting an internal transaction on secondaries
-        // since they must apply transaction oplog entries replicated from the primary whether or
-        // not there have been changes to the FCV or feature flag.
-        uassert(ErrorCodes::InternalTransactionNotSupported,
-                "Internal transactions are not enabled",
-                feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                    serverGlobalParams.featureCompatibility));
-        hangAfterCheckingInternalTransactionsFeatureFlag.pauseWhileSet(opCtx);
-    }
-    if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
-        txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
-        uassert(ErrorCodes::TxnRetryCounterNotSupported,
-                "TxnRetryCounter support is not enabled",
-                feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                    serverGlobalParams.featureCompatibility));
     }
 }
 
@@ -2972,9 +2952,7 @@ void TransactionParticipant::Participant::_refreshSelfFromStorageIfNeeded(Operat
         }
     }
 
-    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
-        !_isInternalSession()) {
+    if (!_isInternalSession()) {
         const auto txnNumber = fetchHighestTxnNumberWithInternalSessions(opCtx, _sessionId());
         if (txnNumber > o().activeTxnNumberAndRetryCounter.getTxnNumber()) {
             _setNewTxnNumberAndRetryCounter(opCtx, {txnNumber, kUninitializedTxnRetryCounter});
@@ -3007,34 +2985,30 @@ void TransactionParticipant::Participant::_refreshActiveTransactionParticipantsF
         // Add parent Participant.
         retryableWriteTxnParticipantCatalog.addParticipant(parentTxnParticipant);
 
-        if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            // Add child participants.
-            std::vector<TransactionParticipant::Participant> childTxnParticipants;
+        // Add child participants.
+        std::vector<TransactionParticipant::Participant> childTxnParticipants;
 
-            // Make sure that every child session has a corresponding
-            // Session/TransactionParticipant.
-            try {
-                performReadWithNoTimestampDBDirectClient(opCtx, [&](DBDirectClient* client) {
-                    FindCommandRequest findRequest{
-                        NamespaceString::kSessionTransactionsTableNamespace};
-                    findRequest.setFilter(BSON(SessionTxnRecord::kParentSessionIdFieldName
-                                               << parentTxnParticipant._sessionId().toBSON()
-                                               << (SessionTxnRecord::kSessionIdFieldName + "." +
-                                                   LogicalSessionId::kTxnNumberFieldName)
-                                               << BSON("$gte" << *activeRetryableWriteTxnNumber)));
-                    findRequest.setProjection(BSON(SessionTxnRecord::kSessionIdFieldName << 1));
-                    findRequest.setHint(
-                        BSON("$hint" << MongoDSessionCatalog::kConfigTxnsPartialIndexName));
+        // Make sure that every child session has a corresponding
+        // Session/TransactionParticipant.
+        try {
+            performReadWithNoTimestampDBDirectClient(opCtx, [&](DBDirectClient* client) {
+                FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+                findRequest.setFilter(BSON(SessionTxnRecord::kParentSessionIdFieldName
+                                           << parentTxnParticipant._sessionId().toBSON()
+                                           << (SessionTxnRecord::kSessionIdFieldName + "." +
+                                               LogicalSessionId::kTxnNumberFieldName)
+                                           << BSON("$gte" << *activeRetryableWriteTxnNumber)));
+                findRequest.setProjection(BSON(SessionTxnRecord::kSessionIdFieldName << 1));
+                findRequest.setHint(
+                    BSON("$hint" << MongoDSessionCatalog::kConfigTxnsPartialIndexName));
 
-                    auto cursor = client->find(findRequest);
+                auto cursor = client->find(findRequest);
 
-                    while (cursor->more()) {
-                        const auto doc = cursor->next();
-                        const auto childLsid = LogicalSessionId::parse(
-                            IDLParserErrorContext("LogicalSessionId"), doc.getObjectField("_id"));
-                        uassert(
-                            6202001,
+                while (cursor->more()) {
+                    const auto doc = cursor->next();
+                    const auto childLsid = LogicalSessionId::parse(
+                        IDLParserErrorContext("LogicalSessionId"), doc.getObjectField("_id"));
+                    uassert(6202001,
                             str::stream()
                                 << "Refresh expected the highest transaction number in the session "
                                 << parentTxnParticipant._sessionId() << " to be "
@@ -3043,26 +3017,25 @@ void TransactionParticipant::Participant::_refreshActiveTransactionParticipantsF
                                 << " entry for an internal transaction for retryable writes with "
                                 << "transaction number " << *childLsid.getTxnNumber(),
                             *childLsid.getTxnNumber() == *activeRetryableWriteTxnNumber);
-                        auto sessionCatalog = SessionCatalog::get(opCtx);
-                        sessionCatalog->scanSession(
-                            childLsid,
-                            [&](const ObservableSession& osession) {
-                                auto childTxnParticipant =
-                                    TransactionParticipant::get(opCtx, osession.get());
-                                childTxnParticipants.push_back(childTxnParticipant);
-                            },
-                            SessionCatalog::ScanSessionCreateSession::kYes);
-                    }
-                });
-            } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
-                rethrowPartialIndexQueryBadValueWithContext(ex);
-                throw;
-            }
+                    auto sessionCatalog = SessionCatalog::get(opCtx);
+                    sessionCatalog->scanSession(
+                        childLsid,
+                        [&](const ObservableSession& osession) {
+                            auto childTxnParticipant =
+                                TransactionParticipant::get(opCtx, osession.get());
+                            childTxnParticipants.push_back(childTxnParticipant);
+                        },
+                        SessionCatalog::ScanSessionCreateSession::kYes);
+                }
+            });
+        } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
+            rethrowPartialIndexQueryBadValueWithContext(ex);
+            throw;
+        }
 
-            for (auto& childTxnParticipant : childTxnParticipants) {
-                childTxnParticipant._refreshSelfFromStorageIfNeeded(opCtx, fetchOplogEntries);
-                retryableWriteTxnParticipantCatalog.addParticipant(childTxnParticipant);
-            }
+        for (auto& childTxnParticipant : childTxnParticipants) {
+            childTxnParticipant._refreshSelfFromStorageIfNeeded(opCtx, fetchOplogEntries);
+            retryableWriteTxnParticipantCatalog.addParticipant(childTxnParticipant);
         }
     } else {
         retryableWriteTxnParticipantCatalog.reset();
