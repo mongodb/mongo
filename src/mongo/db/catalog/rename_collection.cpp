@@ -117,7 +117,10 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
                       str::stream() << "Source collection " << source.ns() << " does not exist");
     }
 
-    if (sourceColl->getCollectionOptions().encryptedFieldConfig) {
+    if (sourceColl->getCollectionOptions().encryptedFieldConfig &&
+        !AuthorizationSession::get(opCtx->getClient())
+             ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                ActionType::setUserWriteBlockMode)) {
         return Status(ErrorCodes::IllegalOperation, "Cannot rename an encrypted collection");
     }
 
@@ -130,7 +133,10 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
             return Status(ErrorCodes::NamespaceExists,
                           str::stream() << "a view already exists with that name: " << target);
     } else {
-        if (targetColl->getCollectionOptions().encryptedFieldConfig) {
+        if (targetColl->getCollectionOptions().encryptedFieldConfig &&
+            !AuthorizationSession::get(opCtx->getClient())
+                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                    ActionType::setUserWriteBlockMode)) {
             return Status(ErrorCodes::IllegalOperation,
                           "Cannot rename to an existing encrypted collection");
         }

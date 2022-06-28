@@ -123,6 +123,11 @@ structs:
                 type: uuid
                 description: "ID of the existing collection getting dropped."
                 optional: true
+            allowEncryptedCollectionRename:
+                description: "Encrypted Collection renames are usually disallowed to minimize user error.
+                              C2C needs to do the renames to replicate create collection."
+                type: bool
+                optional: true
 
     RenameCollectionParticipantDocument:
         description: "Represents a rename collection operation on a participant shard."

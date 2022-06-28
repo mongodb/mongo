@@ -93,6 +93,10 @@ public:
             ShardsvrRenameCollection renameCollRequest(fromNss);
             renameCollRequest.setDbName(fromNss.db());
             renameCollRequest.setRenameCollectionRequest(renameCollReq);
+            renameCollRequest.setAllowEncryptedCollectionRename(
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                       ActionType::setUserWriteBlockMode));
 
             auto catalogCache = Grid::get(opCtx)->catalogCache();
             auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, fromNss.db());

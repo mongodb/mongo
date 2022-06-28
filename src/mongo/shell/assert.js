@@ -110,7 +110,8 @@ assert = (function() {
                     doassert("msg function cannot expect any parameters.");
                 }
             } else if (typeof msg !== "string" && typeof msg !== "object") {
-                doassert("msg parameter must be a string, function or object.");
+                doassert("msg parameter must be a string, function or object. Found type: " +
+                         typeof (msg));
             }
 
             if (msg && assert._debug) {

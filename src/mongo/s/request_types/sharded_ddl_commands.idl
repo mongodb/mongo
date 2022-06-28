@@ -322,6 +322,12 @@ commands:
         api_version: ""
         chained_structs:
             RenameCollectionRequest: RenameCollectionRequest
+        fields:
+            allowEncryptedCollectionRename:
+                description: "Encrypted Collection renames are usually disallowed to minimize user error.
+                              C2C needs to do the renames to replicate create collection."
+                type: bool
+                optional: true
 
     _shardsvrSetAllowMigrations:
         command_name: _shardsvrSetAllowMigrations
@@ -367,7 +373,7 @@ commands:
         namespace: concatenate_with_db
         api_version: ""
         strict: false
-        chained_structs: 
+        chained_structs:
             RefineCollectionShardKeyRequest: RefineCollectionShardKeyRequest
 
     _configsvrRefineCollectionShardKey:
@@ -400,7 +406,7 @@ commands:
         namespace: concatenate_with_db
         api_version: ""
         strict: false
-        chained_structs: 
+        chained_structs:
             DropIndexesRequest: DropIndexesRequest
 
     _configsvrCreateDatabase:

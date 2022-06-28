@@ -32,6 +32,7 @@
 
 #include "mongo/db/s/rename_collection_coordinator.h"
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -156,7 +157,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                         uassert(ErrorCodes::IllegalOperation,
                                 "Cannot rename an encrypted collection",
-                                !coll || !coll->getCollectionOptions().encryptedFieldConfig);
+                                !coll || !coll->getCollectionOptions().encryptedFieldConfig ||
+                                    _doc.getAllowEncryptedCollectionRename().value_or(false));
                     }
 
                     // Make sure the source collection exists
@@ -229,7 +231,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             opCtx, toNss, *coll, _doc.getExpectedTargetUUID());
                         uassert(ErrorCodes::IllegalOperation,
                                 "Cannot rename to an existing encrypted collection",
-                                !coll || !coll->getCollectionOptions().encryptedFieldConfig);
+                                !coll || !coll->getCollectionOptions().encryptedFieldConfig ||
+                                    _doc.getAllowEncryptedCollectionRename().value_or(false));
                     }
 
                 } catch (const DBException&) {
