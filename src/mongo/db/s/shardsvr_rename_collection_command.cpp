@@ -96,6 +96,9 @@ public:
             coordinatorDoc.setRenameCollectionRequest(req.getRenameCollectionRequest());
             coordinatorDoc.setShardingDDLCoordinatorMetadata(
                 {{fromNss, DDLCoordinatorTypeEnum::kRenameCollection}});
+            coordinatorDoc.setAllowEncryptedCollectionRename(
+                req.getAllowEncryptedCollectionRename().value_or(false));
+
             auto service = ShardingDDLCoordinatorService::getService(opCtx);
             auto renameCollectionCoordinator = checked_pointer_cast<RenameCollectionCoordinator>(
                 service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
