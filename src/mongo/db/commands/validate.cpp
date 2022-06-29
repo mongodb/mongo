@@ -71,6 +71,7 @@ stdx::condition_variable _validationNotifier;
  *       validate: "collectionNameWithoutTheDBPart",
  *       full: <bool>  // If true, a more thorough (and slower) collection validation is performed.
  *       background: <bool>  // If true, performs validation on the checkpoint of the collection.
+ *       metadata: <bool>  // If true, performs a faster validation only on metadata.
  *   }
  */
 class ValidateCmd : public BasicCommand {
@@ -87,6 +88,7 @@ public:
                              << "\tAdd {full: true} option to do a more thorough check.\n"
                              << "\tAdd {background: true} to validate in the background.\n"
                              << "\tAdd {repair: true} to run repair mode.\n"
+                             << "\tAdd {metadata: true} to only check collection metadata.\n"
                              << "Cannot specify both {full: true, background: true}.";
     }
 

@@ -89,10 +89,6 @@ enum class RepairMode {
 /**
  * Expects the caller to hold no locks.
  *
- * Background validation does not support any type of full validation above.
- * The combination of background = true and options of anything other than kNoFullValidation is
- * prohibited.
- *
  * @return OK if the validate run successfully
  *         OK will be returned even if corruption is found
  *         details will be in 'results'.
