@@ -33,7 +33,7 @@
 
 #include <memory>
 
-#include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/util/assert_util.h"
@@ -61,6 +61,11 @@ ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest() {
 }
 
 ScopedGlobalServiceContextForTest::~ScopedGlobalServiceContextForTest() {
+    // TODO: SERVER-67478 Remove shutdown.
+    // Join all task executor and network thread in repl monitor to prevent it from racing with
+    // setGlobalServiceContext when they call getGlobalServiceContext.
+    ReplicaSetMonitorManager::get()->shutdown();
+
     setGlobalServiceContext({});
 }
 
