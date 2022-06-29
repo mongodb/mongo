@@ -82,4 +82,32 @@ WiredTigerCursor::~WiredTigerCursor() {
 void WiredTigerCursor::reset() {
     invariantWTOK(_cursor->reset(_cursor), _cursor->session);
 }
+
+WiredTigerBulkLoadCursor::WiredTigerBulkLoadCursor(const std::string& indexUri,
+                                                   OperationContext* opCtx)
+    : _session(WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->getSession()) {
+    // Open cursors can cause bulk open_cursor to fail with EBUSY.
+    // TODO any other cases that could cause EBUSY?
+    WiredTigerSession* outerSession = WiredTigerRecoveryUnit::get(opCtx)->getSession();
+    outerSession->closeAllCursors(indexUri);
+
+    // The 'checkpoint_wait=false' option is set to prefer falling back on the "non-bulk" cursor
+    // over waiting a potentially long time for a checkpoint.
+    WT_SESSION* sessionPtr = _session->getSession();
+    int err = sessionPtr->open_cursor(
+        sessionPtr, indexUri.c_str(), nullptr, "bulk,checkpoint_wait=false", &_cursor);
+    if (!err) {
+        return;  // Success
+    }
+
+    LOGV2_WARNING(51783,
+                  "failed to create WiredTiger bulk cursor: {error} falling back to non-bulk "
+                  "cursor for index {index}",
+                  "Failed to create WiredTiger bulk cursor, falling back to non-bulk",
+                  "error"_attr = wiredtiger_strerror(err),
+                  "index"_attr = indexUri);
+
+    invariantWTOK(sessionPtr->open_cursor(sessionPtr, indexUri.c_str(), nullptr, nullptr, &_cursor),
+                  sessionPtr);
+}
 }  // namespace mongo

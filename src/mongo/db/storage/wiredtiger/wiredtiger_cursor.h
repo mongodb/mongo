@@ -81,4 +81,31 @@ protected:
 
     WT_CURSOR* _cursor = nullptr;  // Owned
 };
+
+/**
+ * An owning object wrapper for a WT_SESSION and WT_CURSOR configured for bulk loading when
+ * possible. The cursor is created and closed independently of the cursor cache, which does not
+ * store bulk cursors. It uses its own session to avoid hijacking an existing transaction in the
+ * current session.
+ */
+class WiredTigerBulkLoadCursor {
+public:
+    WiredTigerBulkLoadCursor(const std::string& indexUri, OperationContext* opCtx);
+
+    ~WiredTigerBulkLoadCursor() {
+        _cursor->close(_cursor);
+    }
+
+    WT_CURSOR* get() const {
+        return _cursor;
+    }
+
+    WT_CURSOR* operator->() const {
+        return get();
+    }
+
+private:
+    UniqueWiredTigerSession const _session;
+    WT_CURSOR* _cursor = nullptr;  // Owned
+};
 }  // namespace mongo

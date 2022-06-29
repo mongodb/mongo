@@ -1291,11 +1291,11 @@ void SortedFileWriter<Key, Value>::addAlreadySorted(const Key& key, const Value&
         addDataToChecksum(_buffer.buf() + _nextObjPos, _buffer.len() - _nextObjPos, _checksum);
 
     if (_buffer.len() > static_cast<int>(kSortedFileBufferSize))
-        spill();
+        writeChunk();
 }
 
 template <typename Key, typename Value>
-void SortedFileWriter<Key, Value>::spill() {
+void SortedFileWriter<Key, Value>::writeChunk() {
     int32_t size = _buffer.len();
     char* outBuffer = _buffer.buf();
 
@@ -1340,7 +1340,7 @@ void SortedFileWriter<Key, Value>::spill() {
 
 template <typename Key, typename Value>
 SortIteratorInterface<Key, Value>* SortedFileWriter<Key, Value>::done() {
-    spill();
+    writeChunk();
 
     return new sorter::FileIterator<Key, Value>(
         _file, _fileStartOffset, _file->currentOffset(), _settings, _dbName, _checksum);

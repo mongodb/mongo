@@ -393,28 +393,26 @@ std::unique_ptr<ColumnStore::Cursor> WiredTigerColumnStore::newCursor(
 class WiredTigerColumnStore::BulkBuilder final : public ColumnStore::BulkBuilder {
 public:
     BulkBuilder(WiredTigerColumnStore* idx, OperationContext* opCtx)
-        : _opCtx(opCtx),
-          _session(WiredTigerRecoveryUnit::get(_opCtx)->getSessionCache()->getSession()),
-          _cursor(openBulkCursor(idx)) {}
-
-    ~BulkBuilder() {
-        _cursor->close(_cursor);
-    }
+        : _opCtx(opCtx), _cursor(idx->uri(), opCtx) {}
 
     void addCell(PathView path, const RecordId& rid, CellView cell) override {
-        uasserted(ErrorCodes::NotImplemented, "WiredTigerColumnStore bulk builder");
+        const std::string& key = makeKey(_buffer, path, rid);
+        WiredTigerItem keyItem(key.c_str(), key.size());
+        _cursor->set_key(_cursor.get(), keyItem.Get());
+
+        WiredTigerItem cellItem(cell.rawData(), cell.size());
+        _cursor->set_value(_cursor.get(), cellItem.Get());
+
+        invariantWTOK(wiredTigerCursorInsert(_opCtx, _cursor.get()), _cursor->session);
+
+        ResourceConsumption::MetricsCollector::get(_opCtx).incrementOneIdxEntryWritten(
+            std::string(_cursor->uri), keyItem.size);
     }
 
 private:
-    WT_CURSOR* openBulkCursor(WiredTigerColumnStore* idx) {
-        // TODO SERVER-65484: Much of this logic can be shared with standard WT index.
-        uasserted(ErrorCodes::NotImplemented, "WiredTigerColumnStore bulk builder");
-    }
-
     std::string _buffer;
     OperationContext* const _opCtx;
-    UniqueWiredTigerSession const _session;
-    WT_CURSOR* const _cursor;
+    WiredTigerBulkLoadCursor _cursor;
 };
 
 std::unique_ptr<ColumnStore::BulkBuilder> WiredTigerColumnStore::makeBulkBuilder(

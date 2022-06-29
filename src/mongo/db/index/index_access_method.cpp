@@ -50,7 +50,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
-#include "mongo/db/sorter/sorter.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
@@ -128,12 +127,12 @@ bool isMultikeyFromPaths(const MultikeyPaths& multikeyPaths) {
                        [](const MultikeyComponents& components) { return !components.empty(); });
 }
 
-SortOptions makeSortOptions(size_t maxMemoryUsageBytes, StringData dbName) {
+SortOptions makeSortOptions(size_t maxMemoryUsageBytes, StringData dbName, SorterFileStats* stats) {
     return SortOptions()
         .TempDir(storageGlobalParams.dbpath + "/_tmp")
         .ExtSortAllowed()
         .MaxMemoryUsageBytes(maxMemoryUsageBytes)
-        .FileStats(&indexBulkBuilderSSS.sorterFileStats)
+        .FileStats(stats)
         .DBName(dbName.toString());
 }
 
@@ -610,6 +609,51 @@ Ident* SortedDataIndexAccessMethod::getIdentPtr() const {
     return this->_newInterface.get();
 }
 
+void IndexAccessMethod::BulkBuilder::countNewBuildInStats() {
+    indexBulkBuilderSSS.count.addAndFetch(1);
+}
+
+void IndexAccessMethod::BulkBuilder::countResumedBuildInStats() {
+    indexBulkBuilderSSS.count.addAndFetch(1);
+    indexBulkBuilderSSS.resumed.addAndFetch(1);
+}
+
+SorterFileStats* IndexAccessMethod::BulkBuilder::bulkBuilderFileStats() {
+    return &indexBulkBuilderSSS.sorterFileStats;
+}
+
+void IndexAccessMethod::BulkBuilder::yield(OperationContext* opCtx,
+                                           const Yieldable* yieldable,
+                                           const NamespaceString& ns) {
+    // Releasing locks means a new snapshot should be acquired when restored.
+    opCtx->recoveryUnit()->abandonSnapshot();
+    yieldable->yield();
+
+    auto locker = opCtx->lockState();
+    Locker::LockSnapshot snapshot;
+    if (locker->saveLockStateAndUnlock(&snapshot)) {
+
+        // Track the number of yields in CurOp.
+        CurOp::get(opCtx)->yielded();
+
+        auto failPointHang = [opCtx, &ns](FailPoint* fp) {
+            fp->executeIf(
+                [fp](auto&&) {
+                    LOGV2(5180600, "Hanging index build during bulk load yield");
+                    fp->pauseWhileSet();
+                },
+                [opCtx, &ns](auto&& config) {
+                    return config.getStringField("namespace") == ns.ns();
+                });
+        };
+        failPointHang(&hangDuringIndexBuildBulkLoadYield);
+        failPointHang(&hangDuringIndexBuildBulkLoadYieldSecond);
+
+        locker->restoreLockState(opCtx, snapshot);
+    }
+    yieldable->restore();
+}
+
 class SortedDataIndexAccessMethod::BulkBuilderImpl final : public IndexAccessMethod::BulkBuilder {
 public:
     using Sorter = mongo::Sorter<KeyString::Value, mongo::NullValue>;
@@ -646,9 +690,6 @@ public:
     IndexStateInfo persistDataForShutdown() final;
 
 private:
-    void _yield(OperationContext* opCtx,
-                const Yieldable* yieldable,
-                const NamespaceString& ns) const;
     void _insertMultikeyMetadataKeysIntoSorter();
 
     Sorter* _makeSorter(
@@ -689,7 +730,7 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(SortedDataIndexAcc
                                                               size_t maxMemoryUsageBytes,
                                                               StringData dbName)
     : _iam(iam), _sorter(_makeSorter(maxMemoryUsageBytes, dbName)) {
-    indexBulkBuilderSSS.count.addAndFetch(1);
+    countNewBuildInStats();
 }
 
 SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(SortedDataIndexAccessMethod* iam,
@@ -702,8 +743,7 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(SortedDataIndexAcc
       _keysInserted(stateInfo.getNumKeys().value_or(0)),
       _isMultiKey(stateInfo.getIsMultikey()),
       _indexMultikeyPaths(createMultikeyPaths(stateInfo.getMultikeyPaths())) {
-    indexBulkBuilderSSS.count.addAndFetch(1);
-    indexBulkBuilderSSS.resumed.addAndFetch(1);
+    countResumedBuildInStats();
 }
 
 Status SortedDataIndexAccessMethod::BulkBuilderImpl::insert(
@@ -825,46 +865,16 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::_makeSorter(
     StringData dbName,
     boost::optional<StringData> fileName,
     const boost::optional<std::vector<SorterRange>>& ranges) const {
-    return fileName ? Sorter::makeFromExistingRanges(fileName->toString(),
-                                                     *ranges,
-                                                     makeSortOptions(maxMemoryUsageBytes, dbName),
-                                                     BtreeExternalSortComparison(),
-                                                     _makeSorterSettings())
-                    : Sorter::make(makeSortOptions(maxMemoryUsageBytes, dbName),
-                                   BtreeExternalSortComparison(),
-                                   _makeSorterSettings());
-}
-
-void SortedDataIndexAccessMethod::BulkBuilderImpl::_yield(OperationContext* opCtx,
-                                                          const Yieldable* yieldable,
-                                                          const NamespaceString& ns) const {
-    // Releasing locks means a new snapshot should be acquired when restored.
-    opCtx->recoveryUnit()->abandonSnapshot();
-    yieldable->yield();
-
-    auto locker = opCtx->lockState();
-    Locker::LockSnapshot snapshot;
-    if (locker->saveLockStateAndUnlock(&snapshot)) {
-
-        // Track the number of yields in CurOp.
-        CurOp::get(opCtx)->yielded();
-
-        auto failPointHang = [opCtx, &ns](FailPoint* fp) {
-            fp->executeIf(
-                [fp](auto&&) {
-                    LOGV2(5180600, "Hanging index build during bulk load yield");
-                    fp->pauseWhileSet();
-                },
-                [opCtx, &ns](auto&& config) {
-                    return config.getStringField("namespace") == ns.ns();
-                });
-        };
-        failPointHang(&hangDuringIndexBuildBulkLoadYield);
-        failPointHang(&hangDuringIndexBuildBulkLoadYieldSecond);
-
-        locker->restoreLockState(opCtx, snapshot);
-    }
-    yieldable->restore();
+    return fileName
+        ? Sorter::makeFromExistingRanges(
+              fileName->toString(),
+              *ranges,
+              makeSortOptions(maxMemoryUsageBytes, dbName, bulkBuilderFileStats()),
+              BtreeExternalSortComparison(),
+              _makeSorterSettings())
+        : Sorter::make(makeSortOptions(maxMemoryUsageBytes, dbName, bulkBuilderFileStats()),
+                       BtreeExternalSortComparison(),
+                       _makeSorterSettings());
 }
 
 Status SortedDataIndexAccessMethod::BulkBuilderImpl::commit(
@@ -979,7 +989,7 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::commit(
 
         // Starts yielding locks after the first non-zero 'yieldIterations' inserts.
         if (yieldIterations && (i + 1) % yieldIterations == 0) {
-            _yield(opCtx, &collection, ns);
+            yield(opCtx, &collection, ns);
         }
 
         // If we're here either it's a dup and we're cool with it or the addKey went just fine.

@@ -68,6 +68,7 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(constrainMemoryForBulkBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterSettingUpIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterSettingUpIndexBuildUnlocked);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
@@ -83,8 +84,16 @@ size_t getEachIndexBuildMaxMemoryUsageBytes(size_t numIndexSpecs) {
         return 0;
     }
 
-    return static_cast<std::size_t>(maxIndexBuildMemoryUsageMegabytes.load()) * 1024 * 1024 /
+    auto result = static_cast<std::size_t>(maxIndexBuildMemoryUsageMegabytes.load()) * 1024 * 1024 /
         numIndexSpecs;
+
+    // When enabled by a test, this failpoint allows the test to set the maximum allowed memory for
+    // an index build to an unreasonably low value that is below what the user configuration will
+    // allow.
+    constrainMemoryForBulkBuild.execute(
+        [&](const BSONObj& data) { result = data["maxBytes"].numberLong(); });
+
+    return result;
 }
 
 Status timeseriesMixedSchemaDataFailure(const Collection* collection) {
