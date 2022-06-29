@@ -31,6 +31,7 @@ import mongo.platform as mongo_platform
 import mongo.toolchain as mongo_toolchain
 import mongo.generators as mongo_generators
 import mongo.install_actions as install_actions
+from mongo.build_profiles import BUILD_PROFILES
 
 EnsurePythonVersion(3, 6)
 EnsureSConsVersion(3, 1, 1)
@@ -117,9 +118,22 @@ SetOption('random', 1)
 #
 
 add_option(
+    'build-profile',
+    choices=list(BUILD_PROFILES.keys()),
+    default='default',
+    type='choice',
+    help='''Short hand for common build options. These profiles are well supported by SDP and are 
+    kept up to date. Unless you need something specific, it is recommended that you only build with 
+    these. san is the recommeneded profile since it exposes bugs before they are found in patch 
+    builds. Check out site_scons/mongo/build_profiles.py to see each profile.''',
+)
+
+build_profile = BUILD_PROFILES[get_option('build-profile')]
+
+add_option(
     'ninja',
     choices=['enabled', 'disabled'],
-    default='disabled',
+    default=build_profile.ninja,
     nargs='?',
     const='enabled',
     type='choice',
@@ -278,7 +292,7 @@ add_option(
     'dbg',
     choices=['on', 'off'],
     const='on',
-    default='off',
+    default=build_profile.dbg,
     help='Enable runtime debugging checks',
     nargs='?',
     type='choice',
@@ -351,6 +365,7 @@ add_option(
     'sanitize',
     help='enable selected sanitizers',
     metavar='san1,san2,...sanN',
+    default=build_profile.sanitize,
 )
 
 add_option(
@@ -362,7 +377,7 @@ add_option(
 add_option(
     'allocator',
     choices=["auto", "system", "tcmalloc", "tcmalloc-experimental"],
-    default="auto",
+    default=build_profile.allocator,
     help='allocator to use (use "auto" for best choice for current platform)',
     type='choice',
 )
@@ -565,7 +580,7 @@ def find_mongo_custom_variables():
 
 add_option(
     'variables-files',
-    default=[],
+    default=build_profile.variables_files,
     action="append",
     help="Specify variables files to load.",
 )
@@ -574,7 +589,7 @@ link_model_choices = ['auto', 'object', 'static', 'dynamic', 'dynamic-strict', '
 add_option(
     'link-model',
     choices=link_model_choices,
-    default='auto',
+    default=build_profile.link_model,
     help='Select the linking model for the project',
     type='choice',
 )
@@ -896,6 +911,7 @@ env_vars.Add(
 env_vars.Add(
     'CCACHE',
     help='Tells SCons where the ccache binary is',
+    default=build_profile.CCACHE,
 )
 
 env_vars.Add(
@@ -1024,6 +1040,7 @@ env_vars.Add(
 env_vars.Add(
     'ICECC',
     help='Tells SCons where icecream icecc tool is',
+    default=build_profile.ICECC,
 )
 
 env_vars.Add(
@@ -1167,7 +1184,7 @@ env_vars.Add(
 
 env_vars.Add(
     'NINJA_PREFIX',
-    default="build",
+    default=build_profile.NINJA_PREFIX,
     help="""A prefix to add to the beginning of generated ninja
 files. Useful for when compiling multiple build ninja files for
 different configurations, for instance:
@@ -1180,7 +1197,7 @@ Will generate the files (respectively):
     asan.ninja
     tsan.ninja
 
-Defaults to build. Best used with the generate-ninja alias so you don't have to
+Defaults to build. Best used with the --ninja flag so you don't have to
 reiterate the prefix in the target name and variable.
 """,
 )
@@ -1304,7 +1321,7 @@ env_vars.Add(
 env_vars.Add(
     'VARIANT_DIR',
     help='Sets the name (or generator function) for the variant directory',
-    default=mongo_generators.default_variant_dir_generator,
+    default=build_profile.VARIANT_DIR,
 )
 
 env_vars.Add(

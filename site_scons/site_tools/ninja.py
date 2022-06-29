@@ -1498,7 +1498,6 @@ def generate(env):
     ninja_file_name = env.subst("${NINJA_PREFIX}.${NINJA_SUFFIX}")
     ninja_file = env.Ninja(target=ninja_file_name, source=[])
     env.AlwaysBuild(ninja_file)
-    env.Alias("$NINJA_ALIAS_NAME", ninja_file)
 
     # TODO: API for getting the SConscripts programmatically
     # exists upstream: https://github.com/SCons/scons/issues/3625
@@ -1617,6 +1616,12 @@ def generate(env):
 
     if not exists(env):
         return
+
+    # There is a target called generate-ninja which needs to be included
+    # with the --ninja flag in order to generate the ninja file. Because the --ninja
+    # flag is ONLY used with generate-ninja, we have combined the two by making the --ninja flag
+    # implicitly build the generate-ninja target.
+    SCons.Script.BUILD_TARGETS = SCons.Script.TargetList(env.Alias("$NINJA_ALIAS_NAME", ninja_file))
 
     # Set a known variable that other tools can query so they can
     # behave correctly during ninja generation.

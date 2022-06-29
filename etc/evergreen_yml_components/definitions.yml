@@ -2327,8 +2327,6 @@ tasks:
         default
       task_compile_flags: >-
         --ninja
-      targets:
-        generate-ninja
   - *f_expansions_write
   - command: subprocess.exec
     params:
@@ -2351,8 +2349,6 @@ tasks:
       task_compile_flags: >-
         --build-tools=next
         --ninja
-      targets:
-        generate-ninja
   - *f_expansions_write
   - command: subprocess.exec
     params:
