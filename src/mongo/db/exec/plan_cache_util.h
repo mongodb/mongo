@@ -172,7 +172,10 @@ void updatePlanCache(
 
     // Store the choice we just made in the cache, if the query is of a type that is safe to
     // cache.
-    if (shouldCacheQuery(query) && canCache) {
+    //
+    // TODO SERVER-67576: re-enable caching of "explode for sort" plans in the SBE cache.
+    if (shouldCacheQuery(query) && canCache &&
+        (!winningPlan.solution->hasExplodedForSort || std::is_same_v<PlanStageType, PlanStage*>)) {
         auto rankingDecision = ranking.get();
         auto cacheClassicPlan = [&]() {
             auto buildDebugInfoFn = [&]() -> plan_cache_debug_info::DebugInfo {

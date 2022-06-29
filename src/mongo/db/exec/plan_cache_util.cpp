@@ -81,8 +81,10 @@ void updatePlanCache(OperationContext* opCtx,
                      const stage_builder::PlanStageData& data) {
     // TODO SERVER-61507: Remove canUseSbePlanCache check once $group pushdown is
     // integrated with SBE plan cache.
+    //
+    // TODO SERVER-67576: re-enable caching of "explode for sort" plans in the SBE cache.
     if (shouldCacheQuery(query) && collections.getMainCollection() &&
-        canonical_query_encoder::canUseSbePlanCache(query) &&
+        !solution.hasExplodedForSort && canonical_query_encoder::canUseSbePlanCache(query) &&
         feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
         auto key = plan_cache_key_factory::make(query, collections);
         auto plan = std::make_unique<sbe::CachedSbePlan>(root.clone(), data);

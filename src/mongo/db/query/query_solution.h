@@ -403,6 +403,11 @@ public:
     // we would want to fall back on an alternate non-blocking solution.
     bool hasBlockingStage{false};
 
+    // Indicates whether this query solution represents an 'explode for sort' plan when an index
+    // scan over multiple point intervals is 'exploded' into a union of index scans in order to
+    // obtain an indexed sort.
+    bool hasExplodedForSort{false};
+
     // Runner executing this solution might be interested in knowing
     // if the planning process for this solution was based on filtered indices.
     bool indexFilterApplied{false};

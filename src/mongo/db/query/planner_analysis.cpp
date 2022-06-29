@@ -913,8 +913,13 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
     const CanonicalQuery& query,
     const QueryPlannerParams& params,
     std::unique_ptr<QuerySolutionNode> solnRoot,
-    bool* blockingSortOut) {
+    bool* blockingSortOut,
+    bool* explodeForSortOut) {
+    invariant(blockingSortOut);
+    invariant(explodeForSortOut);
+
     *blockingSortOut = false;
+    *explodeForSortOut = false;
 
     const FindCommandRequest& findCommand = query.getFindCommandRequest();
     if (params.traversalPreference) {
@@ -976,6 +981,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
     // index scans over point intervals to an OR of sub-scans in order to pull out a sort.
     // Let's try this.
     if (explodeForSort(query, params, &solnRoot)) {
+        *explodeForSortOut = true;
         return solnRoot;
     }
 
@@ -1076,7 +1082,8 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     }
 
     bool hasSortStage = false;
-    solnRoot = analyzeSort(query, params, std::move(solnRoot), &hasSortStage);
+    solnRoot =
+        analyzeSort(query, params, std::move(solnRoot), &hasSortStage, &soln->hasExplodedForSort);
 
     // This can happen if we need to create a blocking sort stage and we're not allowed to.
     if (!solnRoot) {
