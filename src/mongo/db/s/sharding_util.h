@@ -61,5 +61,18 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     const std::shared_ptr<executor::TaskExecutor>& executor,
     bool throwOnError = true);
 
+/**
+ * Creates the necessary indexes for the globalIndexes collections.
+ */
+Status createGlobalIndexesIndexes(OperationContext* opCtx);
+
+/**
+ * Helper function to create an index on a collection locally.
+ */
+Status createIndexOnCollection(OperationContext* opCtx,
+                               const NamespaceString& ns,
+                               const BSONObj& keys,
+                               bool unique);
+
 }  // namespace sharding_util
 }  // namespace mongo

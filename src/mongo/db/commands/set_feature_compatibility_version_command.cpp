@@ -74,6 +74,7 @@
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -530,6 +531,11 @@ private:
             createChangeStreamPreImagesCollection(opCtx);
         }
 
+        // TODO SERVER-67392: Remove once FCV 7.0 becomes last-lts.
+        if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
+            uassertStatusOK(sharding_util::createGlobalIndexesIndexes(opCtx));
+        }
+
         hangWhileUpgrading.pauseWhileSet(opCtx);
     }
 
@@ -668,6 +674,28 @@ private:
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(
                     opCtx, DDLCoordinatorTypeEnum::kReshardCollection);
+        }
+
+        // TODO SERVER-67392: Remove when 7.0 branches-out.
+        if (requestedVersion == GenericFCV::kLastLTS) {
+            NamespaceString indexCatalogNss;
+            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                indexCatalogNss = NamespaceString::kConfigsvrIndexCatalogNamespace;
+            } else {
+                indexCatalogNss = NamespaceString::kShardsIndexCatalogNamespace;
+            }
+            LOGV2(6280502, "Droping global indexes collection", "nss"_attr = indexCatalogNss);
+            DropReply dropReply;
+            const auto deletionStatus =
+                dropCollection(opCtx,
+                               indexCatalogNss,
+                               &dropReply,
+                               DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+            uassert(deletionStatus.code(),
+                    str::stream() << "Failed to drop " << indexCatalogNss
+                                  << causedBy(deletionStatus.reason()),
+                    deletionStatus.isOK() ||
+                        deletionStatus.code() == ErrorCodes::NamespaceNotFound);
         }
 
         uassert(ErrorCodes::Error(549181),

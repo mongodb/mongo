@@ -170,6 +170,12 @@ const NamespaceString NamespaceString::kClusterParametersNamespace(NamespaceStri
 const NamespaceString NamespaceString::kConfigsvrShardsNamespace(NamespaceString::kConfigDb,
                                                                  "shards");
 
+const NamespaceString NamespaceString::kConfigsvrIndexCatalogNamespace(NamespaceString::kConfigDb,
+                                                                       "csrs.indexes");
+
+const NamespaceString NamespaceString::kShardsIndexCatalogNamespace(NamespaceString::kConfigDb,
+                                                                    "shard.indexes");
+
 NamespaceString NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(StringData ns) {
     if (!gMultitenancySupport) {
         return NamespaceString(ns, boost::none);

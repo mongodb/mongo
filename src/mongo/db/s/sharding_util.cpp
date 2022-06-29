@@ -32,14 +32,19 @@
 
 #include <fmt/format.h>
 
+#include "mongo/db/catalog/index_builds_manager.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
+
 namespace sharding_util {
 
 using namespace fmt::literals;
@@ -105,6 +110,106 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
         }
     }
     return responses;
+}
+
+// TODO SERVER-67593: Investigate if DBDirectClient can be used instead.
+Status createIndexOnCollection(OperationContext* opCtx,
+                               const NamespaceString& ns,
+                               const BSONObj& keys,
+                               bool unique) {
+    try {
+        // TODO SERVER-50983: Create abstraction for creating collection when using
+        // AutoGetCollection
+        AutoGetCollection autoColl(opCtx, ns, MODE_X);
+        const Collection* collection = autoColl.getCollection().get();
+        if (!collection) {
+            CollectionOptions options;
+            options.uuid = UUID::gen();
+            writeConflictRetry(opCtx, "createIndexOnCollection", ns.ns(), [&] {
+                WriteUnitOfWork wunit(opCtx);
+                auto db = autoColl.ensureDbExists(opCtx);
+                collection = db->createCollection(opCtx, ns, options);
+                invariant(collection,
+                          str::stream() << "Failed to create collection " << ns.ns()
+                                        << " for indexes: " << keys);
+                wunit.commit();
+            });
+        }
+        auto indexCatalog = collection->getIndexCatalog();
+        IndexSpec index;
+        index.addKeys(keys);
+        index.unique(unique);
+        index.version(int(IndexDescriptor::kLatestIndexVersion));
+        auto removeIndexBuildsToo = false;
+        auto indexSpecs = indexCatalog->removeExistingIndexes(
+            opCtx,
+            CollectionPtr(collection, CollectionPtr::NoYieldTag{}),
+            uassertStatusOK(
+                collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, {index.toBSON()})),
+            removeIndexBuildsToo);
+
+        if (indexSpecs.empty()) {
+            return Status::OK();
+        }
+
+        auto fromMigrate = false;
+        if (!collection->isEmpty(opCtx)) {
+            // We typically create indexes on config/admin collections for sharding while setting up
+            // a sharded cluster, so we do not expect to see data in the collection.
+            // Therefore, it is ok to log this index build.
+            const auto& indexSpec = indexSpecs[0];
+            LOGV2(5173300,
+                  "Creating index on sharding collection with existing data",
+                  logAttrs(ns),
+                  "uuid"_attr = collection->uuid(),
+                  "index"_attr = indexSpec);
+            auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
+            IndexBuildsCoordinator::get(opCtx)->createIndex(
+                opCtx, collection->uuid(), indexSpec, indexConstraints, fromMigrate);
+        } else {
+            writeConflictRetry(opCtx, "createIndexOnConfigCollection", ns.ns(), [&] {
+                WriteUnitOfWork wunit(opCtx);
+                CollectionWriter collWriter(opCtx, collection->uuid());
+                IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
+                    opCtx, collWriter, indexSpecs, fromMigrate);
+                wunit.commit();
+            });
+        }
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
+
+    return Status::OK();
+}
+
+Status createGlobalIndexesIndexes(OperationContext* opCtx) {
+    bool unique = true;
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        auto result =
+            createIndexOnCollection(opCtx,
+                                    NamespaceString::kConfigsvrIndexCatalogNamespace,
+                                    BSON(IndexCatalogType::kCollectionUUIDFieldName
+                                         << 1 << IndexCatalogType::kLastModFieldName << 1),
+                                    !unique);
+        if (!result.isOK()) {
+            return result.withContext(str::stream()
+                                      << "couldn't create collectionUUID_1_lastmod_1 index on "
+                                      << NamespaceString::kConfigsvrIndexCatalogNamespace);
+        }
+    } else {
+        auto result =
+            createIndexOnCollection(opCtx,
+                                    NamespaceString::kShardsIndexCatalogNamespace,
+                                    BSON(IndexCatalogType::kCollectionUUIDFieldName
+                                         << 1 << IndexCatalogType::kLastModFieldName << 1),
+                                    !unique);
+        if (!result.isOK()) {
+            return result.withContext(str::stream()
+                                      << "couldn't create collectionUUID_1_lastmod_1 index on "
+                                      << NamespaceString::kShardsIndexCatalogNamespace);
+        }
+    }
+    return Status::OK();
 }
 
 }  // namespace sharding_util
