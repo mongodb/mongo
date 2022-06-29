@@ -3952,8 +3952,6 @@ tasks:
         task_compile_flags: >-
           --build-tools=next
           --ninja
-        targets:
-          generate-ninja
     - command: shell.exec
       params:
         working_dir: src
