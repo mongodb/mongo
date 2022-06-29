@@ -147,42 +147,44 @@ static WT_EVENT_HANDLER event_handler = {
  *     Configure stressing settings.
  */
 static void
-configure_timing_stress(char *p, size_t max)
+configure_timing_stress(char **p, size_t max)
 {
-    CONFIG_APPEND(p, ",timing_stress_for_test=[");
+    CONFIG_APPEND(*p, ",timing_stress_for_test=[");
     if (GV(STRESS_AGGRESSIVE_SWEEP))
-        CONFIG_APPEND(p, ",aggressive_sweep");
+        CONFIG_APPEND(*p, ",aggressive_sweep");
     if (GV(STRESS_CHECKPOINT))
-        CONFIG_APPEND(p, ",checkpoint_slow");
+        CONFIG_APPEND(*p, ",checkpoint_slow");
+    if (GV(STRESS_CHECKPOINT_EVICT_PAGE))
+        CONFIG_APPEND(*p, ",checkpoint_evict_page");
     if (GV(STRESS_CHECKPOINT_PREPARE))
-        CONFIG_APPEND(p, ",prepare_checkpoint_delay");
+        CONFIG_APPEND(*p, ",prepare_checkpoint_delay");
     if (GV(STRESS_CHECKPOINT_RESERVED_TXNID_DELAY))
-        CONFIG_APPEND(p, ",checkpoint_reserved_txnid_delay");
+        CONFIG_APPEND(*p, ",checkpoint_reserved_txnid_delay");
     if (GV(STRESS_EVICT_REPOSITION))
-        CONFIG_APPEND(p, ",evict_reposition");
+        CONFIG_APPEND(*p, ",evict_reposition");
     if (GV(STRESS_FAILPOINT_HS_DELETE_KEY_FROM_TS))
-        CONFIG_APPEND(p, ",failpoint_history_store_delete_key_from_ts");
+        CONFIG_APPEND(*p, ",failpoint_history_store_delete_key_from_ts");
     if (GV(STRESS_HS_CHECKPOINT_DELAY))
-        CONFIG_APPEND(p, ",history_store_checkpoint_delay");
+        CONFIG_APPEND(*p, ",history_store_checkpoint_delay");
     if (GV(STRESS_HS_SEARCH))
-        CONFIG_APPEND(p, ",history_store_search");
+        CONFIG_APPEND(*p, ",history_store_search");
     if (GV(STRESS_HS_SWEEP))
-        CONFIG_APPEND(p, ",history_store_sweep_race");
+        CONFIG_APPEND(*p, ",history_store_sweep_race");
     if (GV(STRESS_SPLIT_1))
-        CONFIG_APPEND(p, ",split_1");
+        CONFIG_APPEND(*p, ",split_1");
     if (GV(STRESS_SPLIT_2))
-        CONFIG_APPEND(p, ",split_2");
+        CONFIG_APPEND(*p, ",split_2");
     if (GV(STRESS_SPLIT_3))
-        CONFIG_APPEND(p, ",split_3");
+        CONFIG_APPEND(*p, ",split_3");
     if (GV(STRESS_SPLIT_4))
-        CONFIG_APPEND(p, ",split_4");
+        CONFIG_APPEND(*p, ",split_4");
     if (GV(STRESS_SPLIT_5))
-        CONFIG_APPEND(p, ",split_5");
+        CONFIG_APPEND(*p, ",split_5");
     if (GV(STRESS_SPLIT_6))
-        CONFIG_APPEND(p, ",split_6");
+        CONFIG_APPEND(*p, ",split_6");
     if (GV(STRESS_SPLIT_7))
-        CONFIG_APPEND(p, ",split_7");
-    CONFIG_APPEND(p, "]");
+        CONFIG_APPEND(*p, ",split_7");
+    CONFIG_APPEND(*p, "]");
 }
 
 /*
@@ -277,7 +279,7 @@ create_database(const char *home, WT_CONNECTION **connp)
         CONFIG_APPEND(p, ",statistics=(%s)", GV(STATISTICS) ? "fast" : "none");
 
     /* Optional timing stress. */
-    configure_timing_stress(p, max);
+    configure_timing_stress(&p, max);
 
     /* Extensions. */
     CONFIG_APPEND(p, ",extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
@@ -477,7 +479,7 @@ wts_open(const char *home, WT_CONNECTION **connp, WT_SESSION **sessionp, bool al
     CONFIG_APPEND(p, ",error_prefix=\"%s\"", progname);
 
     /* Optional timing stress. */
-    configure_timing_stress(p, max);
+    configure_timing_stress(&p, max);
 
     /* If in-memory, there's only a single, shared WT_CONNECTION handle. */
     if (GV(RUNS_IN_MEMORY) != 0)

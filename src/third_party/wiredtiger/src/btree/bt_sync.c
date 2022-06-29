@@ -610,7 +610,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
              * Once the transaction has given up it's snapshot it is no longer safe to reconcile
              * pages. That happens prior to the final metadata checkpoint.
              */
-            if (F_ISSET(walk, WT_REF_FLAG_LEAF) && page->read_gen == WT_READGEN_WONT_NEED &&
+            if (F_ISSET(walk, WT_REF_FLAG_LEAF) &&
+              (page->read_gen == WT_READGEN_WONT_NEED ||
+                FLD_ISSET(conn->timing_stress_flags, WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE)) &&
               !tried_eviction && F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT)) {
                 ret = __wt_page_release_evict(session, walk, 0);
                 walk = NULL;

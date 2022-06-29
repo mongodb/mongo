@@ -2248,6 +2248,7 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
     static const WT_NAME_FLAG stress_types[] = {
       {"aggressive_sweep", WT_TIMING_STRESS_AGGRESSIVE_SWEEP},
       {"backup_rename", WT_TIMING_STRESS_BACKUP_RENAME},
+      {"checkpoint_evict_page", WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE},
       {"checkpoint_reserved_txnid_delay", WT_TIMING_STRESS_CHECKPOINT_RESERVED_TXNID_DELAY},
       {"checkpoint_slow", WT_TIMING_STRESS_CHECKPOINT_SLOW},
       {"checkpoint_stop", WT_TIMING_STRESS_CHECKPOINT_STOP},

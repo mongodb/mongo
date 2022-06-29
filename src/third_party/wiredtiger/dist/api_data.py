@@ -780,11 +780,12 @@ connection_runtime_config = [
         stress testing of WiredTiger.''',
         type='list', undoc=True,
         choices=[
-        'aggressive_sweep', 'backup_rename', 'checkpoint_reserved_txnid_delay', 'checkpoint_slow',
-        'checkpoint_stop', 'compact_slow', 'evict_reposition',
-        'failpoint_history_store_delete_key_from_ts', 'history_store_checkpoint_delay',
-        'history_store_search', 'history_store_sweep_race', 'prepare_checkpoint_delay', 'split_1',
-        'split_2', 'split_3', 'split_4', 'split_5', 'split_6', 'split_7', 'tiered_flush_finish']),
+        'aggressive_sweep', 'backup_rename', 'checkpoint_evict_page',
+        'checkpoint_reserved_txnid_delay', 'checkpoint_slow', 'checkpoint_stop', 'compact_slow',
+        'evict_reposition','failpoint_history_store_delete_key_from_ts',
+        'history_store_checkpoint_delay', 'history_store_search', 'history_store_sweep_race',
+        'prepare_checkpoint_delay', 'split_1', 'split_2', 'split_3', 'split_4', 'split_5', 
+        'split_6', 'split_7', 'tiered_flush_finish']),
     Config('verbose', '[]', r'''
         enable messages for various subsystems and operations. Options are given as a list,
         where each message type can optionally define an associated verbosity level, such as
