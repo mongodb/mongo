@@ -222,7 +222,12 @@ let assertErrorOnRequestWhenFilesAreCorruptOrMissing = function(
  */
 let runWiredTigerTool = function(...args) {
     const cmd = ['wt'].concat(args);
-    assert.eq(run.apply(undefined, cmd), 0, "error executing: " + cmd.join(' '));
+    // TODO (SERVER-67632): Check the return code on Windows variants again.
+    if (_isWindows()) {
+        run.apply(undefined, cmd);
+    } else {
+        assert.eq(run.apply(undefined, cmd), 0, "error executing: " + cmd.join(' '));
+    }
 };
 
 /**
@@ -241,8 +246,9 @@ let truncateUriAndRestartMongod = function(uri, conn, mongodOptions) {
  */
 let rewriteTable = function(uri, conn, modifyData) {
     MongoRunner.stopMongod(conn, null, {skipValidation: true});
-    const tempDumpFile = conn.dbpath + "/temp_dump";
-    const newTableFile = conn.dbpath + "/new_table_file";
+    const separator = _isWindows() ? '\\' : '/';
+    const tempDumpFile = conn.dbpath + separator + "temp_dump";
+    const newTableFile = conn.dbpath + separator + "new_table_file";
     runWiredTigerTool("-h",
                       conn.dbpath,
                       "-r",
