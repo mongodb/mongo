@@ -115,12 +115,12 @@ __sync_dup_walk(WT_SESSION_IMPL *session, WT_REF *walk, uint32_t flags, WT_REF *
 }
 
 /*
- * __sync_ref_obsolete_check --
+ * __sync_delete_obsolete_ref --
  *     Check whether the ref is obsolete according to the newest stop time point and handle the
- *     obsolete page.
+ *     obsolete page by either remove it or mark it for urgent eviction.
  */
 static int
-__sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref)
+__sync_delete_obsolete_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_ADDR_COPY addr;
     WT_DECL_RET;
@@ -185,10 +185,9 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref)
         }
 
         if (obsolete) {
+            WT_RET(__wt_page_parent_modify_set(session, ref, true));
             WT_REF_UNLOCK(ref, WT_REF_DELETED);
             WT_STAT_CONN_DATA_INCR(session, cc_pages_removed);
-
-            WT_RET(__wt_page_parent_modify_set(session, ref, true));
         } else
             WT_REF_UNLOCK(ref, previous_state);
 
@@ -223,9 +222,16 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref)
     if (busy)
         return (0);
 
+    /*
+     * Skip the modified pages as their reconciliation results are not valid any more. Check for the
+     * page modification only after acquiring the hazard pointer to protect against the page being
+     * freed in parallel.
+     */
     WT_ASSERT(session, ref->page != NULL);
-    mod = ref->page->modify;
+    if (__wt_page_is_modified(ref->page))
+        goto err;
 
+    mod = ref->page->modify;
     if (mod != NULL && mod->rec_result == WT_PM_REC_EMPTY) {
         tag = "reconciled empty";
 
@@ -278,11 +284,8 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref)
             __wt_page_modify_set(session, ref->page);
         }
 
-        /*
-         * Set the obsolete page read generation number to a lower value indicating as it is no
-         * longer needed for any read operations to let the eviction to evict it sooner.
-         */
-        ref->page->read_gen = WT_READGEN_WONT_NEED;
+        /* Mark the obsolete page to evict soon. */
+        __wt_page_evict_soon(session, ref);
         WT_STAT_CONN_DATA_INCR(session, cc_pages_evict);
     }
 
@@ -318,7 +321,7 @@ __sync_ref_int_obsolete_cleanup(WT_SESSION_IMPL *session, WT_REF *parent)
     for (slot = 0; slot < pindex->entries; slot++) {
         ref = pindex->index[slot];
 
-        WT_RET(__sync_ref_obsolete_check(session, ref));
+        WT_RET(__sync_delete_obsolete_ref(session, ref));
     }
 
     WT_STAT_CONN_DATA_INCRV(session, cc_pages_visited, pindex->entries);
