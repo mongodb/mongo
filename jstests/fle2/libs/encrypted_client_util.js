@@ -4,9 +4,9 @@ load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // For isMong
  * Create a FLE client that has an unencrypted and encrypted client to the same database
  */
 
-const kSafeContentField = "__safeContent__";
+var kSafeContentField = "__safeContent__";
 
-class EncryptedClient {
+var EncryptedClient = class {
     /**
      * Create a new encrypted FLE connection to the target server with a local KMS
      *
@@ -318,7 +318,7 @@ class EncryptedClient {
             assert.eq(info.length, checkMap[coll], msg);
         });
     }
-}
+};
 
 function runEncryptedTest(db, dbName, collName, encryptedFields, runTestsCallback) {
     const dbTest = db.getSiblingDB(dbName);
