@@ -57,7 +57,7 @@ function commitShardSplitConcurrently() {
     }),
                                  117);  // ConflictingOperationInProgress
     fpAfterDecision.off();
-    splitThread.join();
+    assert.commandWorked(splitThread.returnData());
     forgetThread.join();
 
     test.cleanupSuccesfulCommitted(operation.migrationId, tenantIds);

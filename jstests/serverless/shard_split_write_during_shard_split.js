@@ -11,14 +11,7 @@ load("jstests/serverless/libs/shard_split_write_test.js");
 
 const recipientTagName = "recipientNode";
 const recipientSetName = "recipientSetName";
-const test = new BasicServerlessTest({
-    recipientTagName,
-    recipientSetName,
-    nodeOptions: {
-        // Set a short timeout to test that the operation times out waiting for replication
-        setParameter: "shardSplitTimeoutMS=100000"
-    }
-});
+const test = new BasicServerlessTest({recipientTagName, recipientSetName});
 
 test.addRecipientNodes();
 test.donor.awaitSecondaryNodes();

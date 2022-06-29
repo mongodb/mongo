@@ -12,32 +12,33 @@ const runAbortShardSplitAsync = function(primaryHost, migrationIdString) {
     return primary.adminCommand({abortShardSplit: 1, migrationId: UUID(migrationIdString)});
 };
 
-const runCommitShardSplitAsync = function(rstArgs,
-                                          migrationIdString,
-                                          tenantIds,
-                                          recipientTagName,
-                                          recipientSetName,
-                                          enableDonorStartMigrationFsync) {
+/**
+ * Convert arguments passed through the Thread interface and calls runShardSplitCommand.
+ */
+const runCommitSplitThreadWrapper = function(rstArgs,
+                                             migrationIdString,
+                                             tenantIds,
+                                             recipientTagName,
+                                             recipientSetName,
+                                             retryOnRetryableErrors,
+                                             enableDonorStartMigrationFsync) {
     load("jstests/replsets/rslib.js");
+    load("jstests/serverless/libs/basic_serverless_test.js");
 
     const donorRst = createRst(rstArgs, true);
-    const admin = donorRst.getPrimary().getDB("admin");
 
-    if (enableDonorStartMigrationFsync) {
-        donorRst.awaitLastOpCommitted();
-        assert.commandWorked(admin.runCommand({fsync: 1}));
-    }
-
-    const result = admin.runCommand({
+    const commitShardSplitCmdObj = {
         commitShardSplit: 1,
         migrationId: UUID(migrationIdString),
-        tenantIds,
-        recipientTagName,
-        recipientSetName
-    });
-    print(`commitShardSplit result: ${tojson(result)}`);
+        tenantIds: tenantIds,
+        recipientTagName: recipientTagName,
+        recipientSetName: recipientSetName
+    };
 
-    return result;
+    jsTestLog(`Running async split command ${tojson(commitShardSplitCmdObj)}`);
+
+    return runShardSplitCommand(
+        donorRst, commitShardSplitCmdObj, retryOnRetryableErrors, enableDonorStartMigrationFsync);
 };
 
 const runShardSplitCommand = function(
@@ -99,7 +100,7 @@ class ShardSplitOperation {
      * Starts a shard split synchronously.
      */
 
-    commit({retryOnRetryableErrors} = {retryOnRetryableErrors: true},
+    commit({retryOnRetryableErrors} = {retryOnRetryableErrors: false},
            {enableDonorStartMigrationFsync} = {enableDonorStartMigrationFsync: false}) {
         jsTestLog("Running commit command");
         const localCmdObj = {
@@ -118,18 +119,20 @@ class ShardSplitOperation {
      * Starts a shard split asynchronously and returns the Thread that runs it.
      * @returns the Thread running the commitShardSplit command.
      */
-    commitAsync({enableDonorStartMigrationFsync} = {enableDonorStartMigrationFsync: false}) {
-        jsTestLog("Running commitAsync command");
-
+    commitAsync({retryOnRetryableErrors, enableDonorStartMigrationFsync} = {
+        retryOnRetryableErrors: false,
+        enableDonorStartMigrationFsync: false
+    }) {
         const donorRst = createRstArgs(this.donorSet);
         const migrationIdString = extractUUIDFromObject(this.migrationId);
 
-        const thread = new Thread(runCommitShardSplitAsync,
+        const thread = new Thread(runCommitSplitThreadWrapper,
                                   donorRst,
                                   migrationIdString,
                                   this.tenantIds,
                                   this.recipientTagName,
                                   this.recipientSetName,
+                                  retryOnRetryableErrors,
                                   enableDonorStartMigrationFsync);
         thread.start();
 
