@@ -673,8 +673,16 @@ void encodeFindCommandRequest(const FindCommandRequest& findCommand, BufBuilder*
         bufBuilder->appendBuf(obj.objdata(), obj.objsize());
     };
     encodeBSONObj(findCommand.getResumeAfter());
-    encodeBSONObj(findCommand.getMin());
-    encodeBSONObj(findCommand.getMax());
+
+    // Read concern "available" results in SBE plans that do not perform shard filtering, so it must
+    // be encoded differently from other read concerns.
+    bool isAvailableReadConcern{false};
+    if (const auto readConcern = findCommand.getReadConcern()) {
+        isAvailableReadConcern =
+            readConcern->getField(repl::ReadConcernArgs::kLevelFieldName).valueStringDataSafe() ==
+            repl::readConcernLevels::kAvailableName;
+    }
+    bufBuilder->appendChar(isAvailableReadConcern ? 't' : 'f');
 }
 }  // namespace
 
