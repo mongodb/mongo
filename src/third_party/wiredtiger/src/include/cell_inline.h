@@ -662,11 +662,12 @@ __wt_cell_leaf_value_parse(WT_PAGE *page, WT_CELL *cell)
  * case, make sure all reads are inside the page image. If an error occurs, return an error code but
  * don't output messages, our caller handles that.
  */
-#define WT_CELL_LEN_CHK(t, len)                                                             \
-    do {                                                                                    \
-        if (end != NULL &&                                                                  \
-          ((uint8_t *)(t) < (uint8_t *)dsk || (((uint8_t *)(t)) + (len)) > (uint8_t *)end)) \
-            return (WT_ERROR);                                                              \
+#define WT_CELL_LEN_CHK(start, len, dsk, end)                   \
+    do {                                                        \
+        if ((end) != NULL &&                                    \
+          ((uint8_t *)(start) < (uint8_t *)(dsk) ||             \
+            (((uint8_t *)(start)) + (len)) > (uint8_t *)(end))) \
+            return (WT_ERROR);                                  \
     } while (0)
 
 /*
@@ -717,7 +718,7 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CE
     unpack->cell = cell;
 
 copy_cell_restart:
-    WT_CELL_LEN_CHK(cell, 0);
+    WT_CELL_LEN_CHK(cell, 0, dsk, end);
 
     /*
      * This path is performance critical for read-only trees, we're parsing on-page structures. For
@@ -737,7 +738,7 @@ copy_cell_restart:
      */
     switch (unpack->raw) {
     case WT_CELL_KEY_SHORT_PFX:
-        WT_CELL_LEN_CHK(cell, 1); /* skip prefix */
+        WT_CELL_LEN_CHK(cell, 1, dsk, end); /* skip prefix */
         unpack->prefix = cell->__chunk[1];
         unpack->data = cell->__chunk + 2;
         unpack->size = cell->__chunk[0] >> WT_CELL_SHORT_SHIFT;
@@ -765,7 +766,7 @@ copy_cell_restart:
      */
     if (unpack->raw == WT_CELL_KEY_PFX) {
         unpack->prefix = *p++; /* skip prefix */
-        WT_CELL_LEN_CHK(p, 0);
+        WT_CELL_LEN_CHK(p, 0, dsk, end);
     }
 
     /* Check for a validity window. */
@@ -781,7 +782,7 @@ copy_cell_restart:
         if ((cell->__chunk[0] & WT_CELL_SECOND_DESC) == 0)
             break;
         flags = *p++; /* skip second descriptor byte */
-        WT_CELL_LEN_CHK(p, 0);
+        WT_CELL_LEN_CHK(p, 0, dsk, end);
 
         if (LF_ISSET(WT_CELL_PREPARE))
             ta->prepare = 1;
@@ -825,7 +826,7 @@ copy_cell_restart:
         if ((cell->__chunk[0] & WT_CELL_SECOND_DESC) == 0)
             break;
         flags = *p++; /* skip second descriptor byte */
-        WT_CELL_LEN_CHK(p, 0);
+        WT_CELL_LEN_CHK(p, 0, dsk, end);
 
         if (LF_ISSET(WT_CELL_PREPARE))
             tw->prepare = 1;
@@ -964,7 +965,7 @@ done:
      * Check the original cell against the full cell length (this is a diagnostic as well, we may be
      * copying the cell from the page and we need the right length).
      */
-    WT_CELL_LEN_CHK(cell, unpack->__len);
+    WT_CELL_LEN_CHK(cell, unpack->__len, dsk, end);
     return (0);
 }
 
