@@ -335,8 +335,13 @@ constexpr int EXPONENTIAL_MAX_CHARS =
 constexpr int PRECISE_MAX_CHARS =
     lengthof("1.") + DTSC::kMaxPrecisionDigits - 1 + lengthof("e+999");
 
+#ifdef _GLIBCXX_DEBUG
+const int DTSC_MAX_CHARS =
+    std::max({FIXED_MAX_CHARS, EXPONENTIAL_MAX_CHARS, PRECISE_MAX_CHARS});
+#else
 constexpr int DTSC_MAX_CHARS =
     std::max({FIXED_MAX_CHARS, EXPONENTIAL_MAX_CHARS, PRECISE_MAX_CHARS});
+#endif
 
 /*
  * Convert a double precision floating point number into its printable
