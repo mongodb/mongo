@@ -52,9 +52,8 @@ jsTestLog("Current replica set topology: [node0 (Primary)] [node1, node2, node3]
 // This reconfig will not get propagated.
 const parallelShell = startParallelShell(
     funWithArgs(function(config) {
-        assert.commandFailedWithCode(db.getMongo().adminCommand({replSetReconfig: config}),
-                                     ErrorCodes.InterruptedDueToReplStateChange,
-                                     "Reconfig C1 should fail");
+        const res = db.getMongo().adminCommand({replSetReconfig: config});
+        assert(ErrorCodes.isNotPrimaryError(res.code), "Reconfig C1 should fail" + tojson(res));
     }, C1), node0.port);
 
 assert.commandWorked(node1.adminCommand({replSetStepUp: 1}));
@@ -77,7 +76,7 @@ node0.reconnect([node1, node2, node3]);
 // The newly connected node will receive a heartbeat with a higher term, and
 // step down from being primary. The reconfig command issued to this node, C1, will fail.
 rst.waitForState(node0, ReplSetTest.State.SECONDARY);
-rst.awaitNodesAgreeOnPrimary(rst.kDefaultTimeoutMS, [node0, node1, node3]);
+rst.awaitNodesAgreeOnPrimary(rst.kDefaultTimeoutMS, [node0, node1, node3], node1);
 rst.waitForConfigReplication(node1);
 assert.eq(C2, rst.getReplSetConfigFromNode());
 
