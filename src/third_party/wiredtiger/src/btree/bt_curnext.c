@@ -361,9 +361,10 @@ restart_read:
  */
 static inline int
 __cursor_row_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp,
-  WT_ITEM *prefix, bool *prefix_key_out_of_bounds)
+  WT_ITEM *prefix, bool *key_out_of_bounds)
 {
     WT_CELL_UNPACK_KV kpack;
+    WT_CURSOR *cursor;
     WT_INSERT *ins;
     WT_ITEM *key;
     WT_PAGE *page;
@@ -371,11 +372,12 @@ __cursor_row_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skip
     WT_SESSION_IMPL *session;
     bool prefix_search;
 
+    cursor = &cbt->iface;
     key = &cbt->iface.key;
     page = cbt->ref->page;
     session = CUR2S(cbt);
-    *prefix_key_out_of_bounds = false;
-    prefix_search = prefix != NULL && F_ISSET(&cbt->iface, WT_CURSTD_PREFIX_SEARCH);
+    *key_out_of_bounds = false;
+    prefix_search = prefix != NULL && F_ISSET(cursor, WT_CURSTD_PREFIX_SEARCH);
     *skippedp = 0;
 
     /* If restarting after a prepare conflict, jump to the right spot. */
@@ -428,10 +430,18 @@ restart_read_insert:
              * are visiting is after our prefix.
              */
             if (prefix_search && __wt_prefix_match(prefix, key) < 0) {
-                *prefix_key_out_of_bounds = true;
+                *key_out_of_bounds = true;
                 WT_STAT_CONN_DATA_INCR(session, cursor_search_near_prefix_fast_paths);
                 return (WT_NOTFOUND);
             }
+
+            /*
+             * If an upper bound has been set ensure that the key is within the range, otherwise
+             * early exit.
+             */
+            if (F_ISSET(cursor, WT_CURSTD_BOUND_UPPER))
+                WT_RET(__wt_btcur_bounds_early_exit(session, cbt, true, key_out_of_bounds));
+
             WT_RET(__wt_txn_read_upd_list(session, cbt, ins->upd));
             if (cbt->upd_value->type == WT_UPDATE_INVALID) {
                 ++*skippedp;
@@ -480,10 +490,17 @@ restart_read_page:
          * visiting is after our prefix.
          */
         if (prefix_search && __wt_prefix_match(prefix, &cbt->iface.key) < 0) {
-            *prefix_key_out_of_bounds = true;
+            *key_out_of_bounds = true;
             WT_STAT_CONN_DATA_INCR(session, cursor_search_near_prefix_fast_paths);
             return (WT_NOTFOUND);
         }
+
+        /*
+         * If an upper bound has been set ensure that the key is within the range, otherwise early
+         * exit.
+         */
+        if (F_ISSET(cursor, WT_CURSTD_BOUND_UPPER))
+            WT_RET(__wt_btcur_bounds_early_exit(session, cbt, true, key_out_of_bounds));
 
         /*
          * Read the on-disk value and/or history. Pass an update list: the update list may contain
@@ -732,13 +749,33 @@ __wt_btcur_next_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
     WT_SESSION_IMPL *session;
     size_t total_skipped, skipped;
     uint32_t flags;
-    bool newpage, prefix_key_out_of_bounds, restart;
+    bool key_out_of_bounds, newpage, restart, need_walk;
 
     cursor = &cbt->iface;
-    prefix_key_out_of_bounds = false;
+    key_out_of_bounds = false;
+    need_walk = false;
     session = CUR2S(cbt);
     total_skipped = 0;
-
+    /*
+     * If we have a bound set we should position our cursor appropriately if it isn't already
+     * positioned.
+     *
+     * In one scenario this function returns and needs to walk to the next record. In that case we
+     * set a boolean. We need to be careful that the entry flag isn't set so we don't re-enter
+     * search near.
+     *
+     * This logic must come before the call to __wt_cursor_func_init, as it will set the cbt active
+     * flag which changes the logic flow within the subsequent search near resulting in a
+     * segmentation fault. It is better to not set state prior to calling search near. Additionally
+     * the cursor initialization function does take a snapshot if required as does cursor search
+     * near.
+     */
+    if (F_ISSET(cursor, WT_CURSTD_BOUND_LOWER) && !WT_CURSOR_IS_POSITIONED(cbt) &&
+      !F_ISSET(cursor, WT_CURSTD_BOUND_ENTRY)) {
+        WT_ERR(__wt_btcur_bounds_row_position(session, cbt, true, &need_walk));
+        if (!need_walk)
+            return (0);
+    }
     WT_STAT_CONN_DATA_INCR(session, cursor_next);
 
     flags = WT_READ_NO_SPLIT | WT_READ_SKIP_INTL; /* tree walk flags */
@@ -793,23 +830,24 @@ __wt_btcur_next_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
                 total_skipped += skipped;
                 break;
             case WT_PAGE_ROW_LEAF:
-                ret = __cursor_row_next(
-                  cbt, newpage, restart, &skipped, prefix, &prefix_key_out_of_bounds);
+                ret =
+                  __cursor_row_next(cbt, newpage, restart, &skipped, prefix, &key_out_of_bounds);
                 total_skipped += skipped;
-                /*
-                 * If we are doing a search near with prefix key configured, we need to check if we
-                 * have exited the cursor row next function due to a prefix key mismatch. If so, we
-                 * can immediately return WT_NOTFOUND and we do not have to walk onto the next page.
-                 */
-                if (prefix_key_out_of_bounds) {
-                    WT_ASSERT(session, ret == WT_NOTFOUND);
-                    return (WT_NOTFOUND);
-                }
                 break;
             default:
                 WT_ERR(__wt_illegal_value(session, page->type));
             }
             if (ret != WT_NOTFOUND)
+                break;
+
+            /*
+             * If we are doing a search near with prefix key configured or the cursor has bounds
+             * set, we need to check if we have exited the next function due to a prefix key
+             * mismatch or the key is out of bounds. If so, we break instead of walking onto the
+             * next page. We're not directly returning here to allow the cursor to be reset first
+             * before we return WT_NOTFOUND.
+             */
+            if (key_out_of_bounds)
                 break;
 
             /*

@@ -2119,6 +2119,27 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32
 }
 
 /*
+ * __wt_btcur_bounds_early_exit --
+ *     Performs bound comparison to check if the key is within bounds, if not, increment the
+ *     appropriate stat, early exit, and return WT_NOTFOUND.
+ */
+static inline int
+__wt_btcur_bounds_early_exit(
+  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, bool next, bool *key_out_of_bounds)
+{
+    WT_RET(__wt_row_compare_bounds(
+      session, &cbt->iface, S2BT(session)->collator, next, key_out_of_bounds));
+    if (*key_out_of_bounds) {
+        if (next)
+            WT_STAT_CONN_DATA_INCR(session, cursor_bounds_next_early_exit);
+        else
+            WT_STAT_CONN_DATA_INCR(session, cursor_bounds_prev_early_exit);
+        return (WT_NOTFOUND);
+    }
+    return (0);
+}
+
+/*
  * __wt_btcur_skip_page --
  *     Return if the cursor is pointing to a page with deleted records and can be skipped for cursor
  *     traversal.
@@ -2207,5 +2228,66 @@ __wt_btcur_skip_page(
 
 unlock:
     WT_REF_UNLOCK(ref, previous_state);
+    return (0);
+}
+
+/*
+ * __wt_btcur_bounds_row_position --
+ *     A unpositioned bounded cursor need to start its cursor next and prev walk from the lower or
+ *     upper bound depending on which direction it is going. This function calls search near to
+ *     position the cursor appropriately.
+ */
+static inline int
+__wt_btcur_bounds_row_position(
+  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, bool next, bool *need_walk)
+{
+
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    WT_ITEM *bound;
+    int exact;
+    bool key_out_of_bounds;
+    uint64_t bound_flag, bound_flag_inclusive;
+
+    key_out_of_bounds = false;
+    cursor = &cbt->iface;
+    bound = next ? &cursor->lower_bound : &cursor->upper_bound;
+    bound_flag = next ? WT_CURSTD_BOUND_UPPER : WT_CURSTD_BOUND_LOWER;
+    bound_flag_inclusive = next ? WT_CURSTD_BOUND_LOWER_INCLUSIVE : WT_CURSTD_BOUND_UPPER_INCLUSIVE;
+    exact = 0;
+
+    if (next)
+        WT_STAT_CONN_DATA_INCR(session, cursor_bounds_next_unpositioned);
+    else
+        WT_STAT_CONN_DATA_INCR(session, cursor_bounds_prev_unpositioned);
+
+    WT_ASSERT(session, WT_DATA_IN_ITEM(bound));
+    __wt_cursor_set_raw_key(cursor, bound);
+    F_SET(cursor, WT_CURSTD_BOUND_ENTRY);
+    ret = cursor->search_near(cursor, &exact);
+    F_CLR(cursor, WT_CURSTD_BOUND_ENTRY);
+    WT_RET(ret);
+
+    /*
+     * FIXME-WT-9324: When search_near_bounded is implemented then remove this. If search near
+     * returns a higher value, ensure it's within the upper bound.
+     */
+    if (exact == 0 && F_ISSET(cursor, bound_flag_inclusive)) {
+        return (0);
+    } else if (next ? exact > 0 : exact < 0) {
+        /*
+         * If search near returns a non-exact key, check the returned key against the upper bound if
+         * doing a next, and the lower bound if doing a prev to ensure the key is within bounds. If
+         * not, there are no visible records, return WT_NOTFOUND.
+         */
+        if (F_ISSET(cursor, bound_flag)) {
+            WT_RET(__wt_row_compare_bounds(
+              session, cursor, S2BT(session)->collator, next, &key_out_of_bounds));
+            if (key_out_of_bounds)
+                return (WT_NOTFOUND);
+        }
+        return (0);
+    }
+    *need_walk = true;
     return (0);
 }

@@ -7,8 +7,8 @@
 #   - P threads will continuously update random keys.
 #   - Q threads will utilize the custom operation and will execute next() and prev() calls with
 # random bounds.
-duration_seconds=20,
-cache_size_mb=500,
+duration_seconds=120,
+cache_size_mb=1000,
 reverse_collator=false,
 timestamp_manager=
 (
@@ -26,9 +26,9 @@ workload_manager=
     ),
     insert_config=
     (
-        key_size=10,
+        key_size=100,
         op_rate=10ms,
-        thread_count=0,
+        thread_count=10,
         value_size=20
     ),
     read_config=
@@ -39,17 +39,17 @@ workload_manager=
     remove_config=
     (
         op_rate=500ms,
-        thread_count=0
+        thread_count=5
     ),
     update_config=
     (
         op_rate=15ms,
-        thread_count=0,
+        thread_count=10,
         value_size=20
     ),
     custom_config=
     (
-        thread_count=0
+        thread_count=10
     )
 ),
 operation_tracker=

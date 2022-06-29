@@ -138,6 +138,36 @@ __wt_prefix_match(const WT_ITEM *prefix, const WT_ITEM *tree_item)
 }
 
 /*
+ * __wt_row_compare_bounds --
+ *     Return if the cursor key is within the bounded range. If next is True, this indicates a next
+ *     call and the key is checked against the upper bound. If next is False, this indicates a prev
+ *     call and the key is then checked against the lower bound.
+ */
+static inline int
+__wt_row_compare_bounds(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_COLLATOR *collator,
+  bool next, bool *key_out_of_bounds)
+{
+    int cmpp;
+
+    if (next) {
+        WT_ASSERT(session, WT_DATA_IN_ITEM(&cursor->upper_bound));
+        WT_RET(__wt_compare(session, collator, &cursor->key, &cursor->upper_bound, &cmpp));
+        if (F_ISSET(cursor, WT_CURSTD_BOUND_UPPER_INCLUSIVE))
+            *key_out_of_bounds = (cmpp > 0);
+        else
+            *key_out_of_bounds = (cmpp >= 0);
+    } else {
+        WT_ASSERT(session, WT_DATA_IN_ITEM(&cursor->lower_bound));
+        WT_RET(__wt_compare(session, collator, &cursor->key, &cursor->lower_bound, &cmpp));
+        if (F_ISSET(cursor, WT_CURSTD_BOUND_LOWER_INCLUSIVE))
+            *key_out_of_bounds = (cmpp < 0);
+        else
+            *key_out_of_bounds = (cmpp <= 0);
+    }
+    return (0);
+}
+
+/*
  * __wt_lex_compare_skip --
  *     Lexicographic comparison routine, skipping leading bytes. Returns: < 0 if user_item is
  *     lexicographically < tree_item = 0 if user_item is lexicographically = tree_item > 0 if

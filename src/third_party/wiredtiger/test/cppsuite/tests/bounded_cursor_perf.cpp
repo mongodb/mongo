@@ -46,6 +46,7 @@ class bounded_cursor_perf : public test {
     static void
     set_bounds(scoped_cursor &cursor)
     {
+        testutil_check(cursor->reset(cursor.get()));
         std::string lower_bound(1, ('0' - 1));
         cursor->set_key(cursor.get(), lower_bound.c_str());
         testutil_check(cursor->bound(cursor.get(), "bound=lower"));
@@ -109,6 +110,8 @@ class bounded_cursor_perf : public test {
             }
             set_bounds(next_range_cursor);
             set_bounds(prev_range_cursor);
+            testutil_check(next_cursor->reset(next_cursor.get()));
+            testutil_check(prev_cursor->reset(prev_cursor.get()));
         }
     }
 };
