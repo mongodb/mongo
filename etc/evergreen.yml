@@ -1759,7 +1759,7 @@ functions:
           )"
           echo "Found mypy executable at '$MYPY'"
           export extra_flags=""
-          if [[ ${is_patch|false} == "true" ]]; then
+          if [[ "${is_patch}" == "true" ]]; then
             extra_flags="--lint-scope=changed"
           fi
 
