@@ -30,6 +30,7 @@
 
 static WT_THREAD_RET checkpointer(void *);
 static WT_THREAD_RET clock_thread(void *);
+static WT_THREAD_RET flush_thread(void *);
 static int compare_cursors(WT_CURSOR *, table_type, WT_CURSOR *, table_type);
 static int diagnose_key_error(WT_CURSOR *, table_type, int, WT_CURSOR *, table_type, int);
 static int real_checkpointer(void);
@@ -52,14 +53,18 @@ set_stable(void)
 }
 
 /*
- * start_checkpoints --
- *     Responsible for creating the checkpoint thread.
+ * start_threads --
+ *     Responsible for creating the service threads.
  */
 void
-start_checkpoints(void)
+start_threads(void)
 {
     set_stable();
     testutil_check(__wt_thread_create(NULL, &g.checkpoint_thread, checkpointer, NULL));
+    if (g.tiered) {
+        testutil_check(__wt_rwlock_init(NULL, &g.flush_lock));
+        testutil_check(__wt_thread_create(NULL, &g.flush_thread, flush_thread, NULL));
+    }
     if (g.use_timestamps) {
         testutil_check(__wt_rwlock_init(NULL, &g.clock_lock));
         testutil_check(__wt_thread_create(NULL, &g.clock_thread, clock_thread, NULL));
@@ -67,17 +72,22 @@ start_checkpoints(void)
 }
 
 /*
- * end_checkpoints --
- *     Responsible for cleanly shutting down the checkpoint thread.
+ * end_threads --
+ *     Responsible for cleanly shutting down the service threads.
  */
 void
-end_checkpoints(void)
+end_threads(void)
 {
-    testutil_check(__wt_thread_join(NULL, &g.checkpoint_thread));
+    if (g.tiered) {
+        testutil_check(__wt_thread_join(NULL, &g.flush_thread));
+        __wt_rwlock_destroy(NULL, &g.flush_lock);
+    }
     if (g.use_timestamps) {
         testutil_check(__wt_thread_join(NULL, &g.clock_thread));
         __wt_rwlock_destroy(NULL, &g.clock_lock);
     }
+    /* Shutdown checkpoint after flush thread completes because flush depends on checkpoint. */
+    testutil_check(__wt_thread_join(NULL, &g.checkpoint_thread));
 }
 
 /*
@@ -130,6 +140,52 @@ clock_thread(void *arg)
 }
 
 /*
+ * flush_thread --
+ *     Flush thread to call flush_tier.
+ */
+static WT_THREAD_RET
+flush_thread(void *arg)
+{
+    WT_RAND_STATE rnd;
+    WT_SESSION *wt_session;
+    WT_SESSION_IMPL *session;
+    uint64_t delay;
+    char tid[128];
+
+    WT_UNUSED(arg);
+
+    __wt_random_init(&rnd);
+    testutil_check(g.conn->open_session(g.conn, NULL, NULL, &wt_session));
+    session = (WT_SESSION_IMPL *)wt_session;
+
+    testutil_check(__wt_thread_str(tid, sizeof(tid)));
+    printf("flush thread starting: tid: %s\n", tid);
+    fflush(stdout);
+
+    while (g.running) {
+        /* FIXME-WT-7833 Remove this lock when that ticket merges. */
+        __wt_writelock(session, &g.flush_lock);
+        testutil_check(wt_session->flush_tier(wt_session, NULL));
+        __wt_writeunlock(session, &g.flush_lock);
+        printf("Finished a flush_tier\n");
+        fflush(stdout);
+
+        if (!g.running)
+            goto done;
+        /*
+         * Random value between 5000 and 10000.
+         */
+        delay = __wt_random(&rnd) % 5001;
+        __wt_sleep(0, delay + 5000);
+    }
+
+done:
+    testutil_check(wt_session->close(wt_session, NULL));
+
+    return (WT_THREAD_RET_VALUE);
+}
+
+/*
  * checkpointer --
  *     Checkpoint thread start function.
  */
@@ -171,7 +227,7 @@ real_checkpointer(void)
         return (log_print_err("Checkpoint thread started stopped\n", EINVAL, 1));
 
     __wt_random_init(&rnd);
-    while (g.ntables > g.ntables_created)
+    while (g.ntables > g.ntables_created && g.running)
         __wt_yield();
 
     if ((ret = g.conn->open_session(g.conn, NULL, NULL, &session)) != 0)

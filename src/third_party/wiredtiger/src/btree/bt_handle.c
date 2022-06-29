@@ -1017,12 +1017,18 @@ int
 __wt_btree_switch_object(WT_SESSION_IMPL *session, uint32_t objectid)
 {
     WT_BM *bm;
+    WT_BTREE *btree;
+
+    btree = S2BT(session);
+    /* If the btree is readonly, there is nothing to do. */
+    if (F_ISSET(btree, WT_BTREE_READONLY))
+        return (0);
 
     /*
      * When initially opening a tiered Btree, a tier switch is done internally without the btree
      * being fully opened. That's okay, the btree will be told later about the current object
      * number.
      */
-    bm = S2BT(session)->bm;
+    bm = btree->bm;
     return (bm == NULL ? 0 : bm->switch_object(bm, session, objectid));
 }

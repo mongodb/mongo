@@ -55,44 +55,51 @@ typedef struct {
 } COOKIE;
 
 typedef struct {
-    char *home;                           /* Home directory */
-    const char *checkpoint_name;          /* Checkpoint name */
-    WT_CONNECTION *conn;                  /* WiredTiger connection */
-    bool debug_mode;                      /* History store stress test */
-    u_int nkeys;                          /* Keys to load */
-    u_int nops;                           /* Operations per thread */
-    FILE *logfp;                          /* Message log file. */
-    int nworkers;                         /* Number workers configured */
-    int ntables;                          /* Number tables configured */
-    int ntables_created;                  /* Number tables opened */
-    volatile int running;                 /* Whether to stop */
-    int status;                           /* Exit status */
-    bool evict_reposition_timing_stress;  /* Reposition the cursor for read operations */
-    bool sweep_stress;                    /* Sweep stress test */
-    bool failpoint_hs_delete_key_from_ts; /* Failpoint for hs key deletion. */
-    bool hs_checkpoint_timing_stress;     /* History store checkpoint timing stress */
-    bool reserved_txnid_timing_stress;    /* Reserved transaction id timing stress */
-    bool checkpoint_slow_timing_stress;   /* Checkpoint slow timing stress */
+    char *home;                  /* Home directory */
+    const char *checkpoint_name; /* Checkpoint name */
+    WT_CONNECTION *conn;         /* WiredTiger connection */
+    bool debug_mode;             /* History store stress test */
+    u_int nkeys;                 /* Keys to load */
+    u_int nops;                  /* Operations per thread */
+    FILE *logfp;                 /* Message log file. */
+    int ntables;                 /* Number tables configured */
+    int ntables_created;         /* Number tables opened */
+    int nworkers;                /* Number workers configured */
+    volatile int running;        /* Whether to stop */
+    int status;                  /* Exit status */
+
+    bool checkpoint_slow_timing_stress;  /* Checkpoint slow timing stress */
+    bool evict_reposition_timing_stress; /* Reposition the cursor for read operations */
+    bool hs_checkpoint_timing_stress;    /* History store checkpoint timing stress */
+    bool reserved_txnid_timing_stress;   /* Reserved transaction id timing stress */
+    bool sweep_stress;                   /* Sweep stress test */
+
     uint64_t ts_oldest;                   /* Current oldest timestamp */
     uint64_t ts_stable;                   /* Current stable timestamp */
+    bool failpoint_hs_delete_key_from_ts; /* Failpoint for hs key deletion. */
     bool no_ts_deletes;                   /* Run with deletes without timestamps */
-    bool use_timestamps;                  /* Use txn timestamps */
-    bool race_timestamps;                 /* Async update to oldest timestamp */
     bool prepare;                         /* Use prepare transactions */
-    COOKIE *cookies;                      /* Per-thread info */
-    WT_RWLOCK clock_lock;                 /* Clock synchronization */
-    wt_thread_t checkpoint_thread;        /* Checkpoint thread */
-    wt_thread_t clock_thread;             /* Clock thread */
+    bool race_timestamps;                 /* Async update to oldest timestamp */
+
+    bool tiered;         /* Use tiered storage. Start flush thread */
+    bool use_timestamps; /* Use txn timestamps. Start clock thread */
+
+    COOKIE *cookies;               /* Per-thread info */
+    WT_RWLOCK clock_lock;          /* Clock synchronization */
+    WT_RWLOCK flush_lock;          /* Flush synchronization */
+    wt_thread_t checkpoint_thread; /* Checkpoint thread */
+    wt_thread_t clock_thread;      /* Clock thread */
+    wt_thread_t flush_thread;      /* Flush thread */
 } GLOBAL;
 extern GLOBAL g;
 
 #define log_print_err(m, e, fatal) log_print_err_worker(__func__, __LINE__, m, e, fatal)
 
-void end_checkpoints(void);
+void end_threads(void);
 uint8_t flcs_encode(const char *);
 uint8_t flcs_modify(WT_MODIFY *, int, uint8_t);
 int log_print_err_worker(const char *, int, const char *, int, int);
-void start_checkpoints(void);
+void start_threads(void);
 int start_workers(void);
 const char *type_to_string(table_type);
 int verify_consistency(WT_SESSION *, wt_timestamp_t, bool);

@@ -50,6 +50,18 @@ class test_tiered17(TieredConfigMixin, wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios(tiered_storage_sources, shutdown)
 
+    def get_object_files(self):
+        object_files = fnmatch.filter(os.listdir('.'), "*.wtobj") + fnmatch.filter(os.listdir('.'), '*.wt')
+        return object_files
+
+    def verify_checkpoint(self):
+        obj_files_orig = self.get_object_files()
+        ckpt_cursor = self.session.open_cursor(self.uri, None, 'checkpoint=WiredTigerCheckpoint')
+        ckpt_cursor.close()
+        obj_files = self.get_object_files()
+        # Check that no additional object files have been created after opening the checkpoint.
+        self.assertTrue(len(obj_files_orig) == len(obj_files))
+
     def populate(self):
         # Create and populate a table.
         self.session.create(self.uri, "key_format=S,value_format=S")
@@ -67,12 +79,9 @@ class test_tiered17(TieredConfigMixin, wttest.WiredTigerTestCase):
            c["d"] = "d"
         c.close()
 
-    def get_object_files(self):
-        object_files = fnmatch.filter(os.listdir('.'), "*.wtobj") + fnmatch.filter(os.listdir('.'), '*.wt')
-        return object_files
-
     def test_open_readonly_conn(self):
         self.populate()
+        self.verify_checkpoint()
         obj_files_orig = self.get_object_files()
 
         # Re-open the connection but in readonly mode.

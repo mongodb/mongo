@@ -76,8 +76,11 @@ main(int argc, char *argv[])
     runs = 1;
     verify_only = false;
 
-    while ((ch = __wt_getopt(progname, argc, argv, "C:c:Dh:k:l:mn:pr:s:T:t:vW:xX")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "BC:c:Dh:k:l:mn:pr:s:T:t:vW:xX")) != EOF)
         switch (ch) {
+        case 'B':
+            g.tiered = true;
+            break;
         case 'c':
             g.checkpoint_name = __wt_optarg;
             break;
@@ -202,9 +205,12 @@ main(int argc, char *argv[])
 
         for (i = 0; i < g.ntables; ++i) {
             g.cookies[i].id = i;
-            if (ttype == MIX)
+            if (ttype == MIX) {
                 g.cookies[i].type = (table_type)((i % MAX_TABLE_TYPE) + 1);
-            else
+                /* LSM is not supported with tiered storage. Just use ROW. */
+                if (g.tiered && g.cookies[i].type == LSM)
+                    g.cookies[i].type = ROW;
+            } else
                 g.cookies[i].type = ttype;
             testutil_check(__wt_snprintf(
               g.cookies[i].uri, sizeof(g.cookies[i].uri), "%s%04d", URI_BASE, g.cookies[i].id));
@@ -229,14 +235,14 @@ main(int argc, char *argv[])
             goto run_complete;
         }
 
-        start_checkpoints();
-        if ((ret = start_workers()) != 0) {
+        start_threads();
+        ret = start_workers();
+        g.running = 0;
+        end_threads();
+        if (ret != 0) {
             (void)log_print_err("Start workers failed", ret, 1);
             break;
         }
-
-        g.running = 0;
-        end_checkpoints();
 
 run_complete:
         free(g.cookies);
@@ -256,6 +262,11 @@ run_complete:
 }
 
 #define DEBUG_MODE_CFG ",debug_mode=(eviction=true,table_logging=true),verbose=(recovery)"
+#define SWEEP_CFG ",file_manager=(close_handle_minimum=1,close_idle_time=1,close_scan_interval=1)"
+#define TIER_CFG                                                    \
+    ",extensions=(../../ext/storage_sources/dir_store/"             \
+    "libwiredtiger_dir_store.so=(early_load=true)),tiered_storage=" \
+    "(bucket=bucket,bucket_prefix=ckpt-,local_retention=2,name=dir_store)"
 /*
  * wt_connect --
  *     Configure the WiredTiger connection.
@@ -268,25 +279,10 @@ wt_connect(const char *config_open)
     };
     WT_RAND_STATE rnd;
     int ret;
-    char config[512];
-    char timing_stress_config[512];
-    bool fast_eviction, timing_stress;
+    char buf[512], config[1024];
+    bool fast_eviction;
 
     fast_eviction = false;
-    timing_stress = false;
-    if (g.evict_reposition_timing_stress || g.sweep_stress || g.failpoint_hs_delete_key_from_ts ||
-      g.hs_checkpoint_timing_stress || g.reserved_txnid_timing_stress ||
-      g.checkpoint_slow_timing_stress) {
-        timing_stress = true;
-        testutil_check(__wt_snprintf(timing_stress_config, sizeof(timing_stress_config),
-          ",timing_stress_for_test=[%s%s%s%s%s%s]",
-          g.evict_reposition_timing_stress ? "evict_reposition" : "",
-          g.sweep_stress ? "aggressive_sweep" : "",
-          g.failpoint_hs_delete_key_from_ts ? "failpoint_history_store_delete_key_from_ts" : "",
-          g.hs_checkpoint_timing_stress ? "history_store_checkpoint_delay" : "",
-          g.reserved_txnid_timing_stress ? "checkpoint_reserved_txnid_delay" : "",
-          g.checkpoint_slow_timing_stress ? "checkpoint_slow" : ""));
-    }
 
     /*
      * Randomly decide on the eviction rate (fast or default).
@@ -295,26 +291,41 @@ wt_connect(const char *config_open)
     if ((__wt_random(&rnd) % 15) % 2 == 0)
         fast_eviction = true;
 
+    /* Set up the basic configuration string first. */
+    testutil_check(__wt_snprintf(config, sizeof(config),
+      "create,cache_cursors=false,statistics=(fast),statistics_log=(json,wait=1),log=(enabled),"
+      "error_prefix=\"%s\",cache_size=1G, eviction_dirty_trigger=%i, "
+      "eviction_dirty_target=%i,%s%s%s",
+      progname, fast_eviction ? 5 : 20, fast_eviction ? 1 : 5, g.debug_mode ? DEBUG_MODE_CFG : "",
+      config_open == NULL ? "" : ",", config_open == NULL ? "" : config_open));
+
+    if (g.evict_reposition_timing_stress || g.sweep_stress || g.failpoint_hs_delete_key_from_ts ||
+      g.hs_checkpoint_timing_stress || g.reserved_txnid_timing_stress ||
+      g.checkpoint_slow_timing_stress) {
+        testutil_check(__wt_snprintf(buf, sizeof(buf), ",timing_stress_for_test=[%s%s%s%s%s%s]",
+          g.checkpoint_slow_timing_stress ? "checkpoint_slow" : "",
+          g.evict_reposition_timing_stress ? "evict_reposition" : "",
+          g.failpoint_hs_delete_key_from_ts ? "failpoint_history_store_delete_key_from_ts" : "",
+          g.hs_checkpoint_timing_stress ? "history_store_checkpoint_delay" : "",
+          g.reserved_txnid_timing_stress ? "checkpoint_reserved_txnid_delay" : "",
+          g.sweep_stress ? "aggressive_sweep" : ""));
+        strcat(config, buf);
+    }
+
     /*
      * If we want to stress sweep, we have a lot of additional configuration settings to set.
      */
     if (g.sweep_stress)
-        testutil_check(__wt_snprintf(config, sizeof(config),
-          "create,cache_cursors=false,statistics=(fast),statistics_log=(json,wait=1),error_prefix="
-          "\"%s\",file_manager=(close_handle_minimum=1,close_idle_time=1,close_scan_interval=1),"
-          "log=(enabled),cache_size=1GB, eviction_dirty_trigger=%i, "
-          "eviction_dirty_target=%i,%s%s%s%s",
-          progname, fast_eviction ? 5 : 20, fast_eviction ? 1 : 5, timing_stress_config,
-          g.debug_mode ? DEBUG_MODE_CFG : "", config_open == NULL ? "" : ",",
-          config_open == NULL ? "" : config_open));
-    else
-        testutil_check(__wt_snprintf(config, sizeof(config),
-          "create,cache_cursors=false,statistics=(fast),statistics_log=(json,wait=1),log=(enabled),"
-          "error_prefix=\"%s\",cache_size=1G, eviction_dirty_trigger=%i, "
-          "eviction_dirty_target=%i,%s%s%s%s",
-          progname, fast_eviction ? 5 : 20, fast_eviction ? 1 : 5,
-          g.debug_mode ? DEBUG_MODE_CFG : "", config_open == NULL ? "" : ",",
-          config_open == NULL ? "" : config_open, timing_stress ? timing_stress_config : ""));
+        strcat(config, SWEEP_CFG);
+
+    /*
+     * If we are using tiered add in the extension and tiered storage configuration.
+     */
+    if (g.tiered) {
+        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/bucket", g.home));
+        testutil_make_work_dir(buf);
+        strcat(config, TIER_CFG);
+    }
 
     printf("WT open config: %s\n", config);
     fflush(stdout);
@@ -588,10 +599,11 @@ usage(void)
 {
     fprintf(stderr,
       "usage: %s\n"
-      "    [-DmpvXx] [-C wiredtiger-config] [-c checkpoint] [-h home] [-k keys] [-l log]\n"
+      "    [-BDmpvXx] [-C wiredtiger-config] [-c checkpoint] [-h home] [-k keys] [-l log]\n"
       "    [-n ops] [-r runs] [-s 1|2|3|4|5] [-T table-config] [-t f|r|v] [-W workers]\n",
       progname);
     fprintf(stderr, "%s",
+      "\t-B use tiered storage\n"
       "\t-C specify wiredtiger_open configuration arguments\n"
       "\t-c checkpoint name to used named checkpoints\n"
       "\t-D debug mode\n"
