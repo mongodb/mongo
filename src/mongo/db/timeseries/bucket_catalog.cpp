@@ -311,229 +311,114 @@ void BucketCatalog::ExecutionStatsController::incNumBucketsKeptOpenDueToLargeMea
     _globalStats->numBucketsKeptOpenDueToLargeMeasurements.fetchAndAddRelaxed(increment);
 }
 
-class BucketCatalog::Bucket {
-public:
-    friend class BucketCatalog;
+BucketCatalog::Bucket::Bucket(const OID& id,
+                              StripeNumber stripe,
+                              BucketKey::Hash hash,
+                              uint64_t era)
+    : _lastCheckedEra(era), _id(id), _stripe(stripe), _keyHash(hash) {}
 
-    Bucket(const OID& id, StripeNumber stripe, BucketKey::Hash hash)
-        : _id(id), _stripe(stripe), _keyHash(hash) {}
+uint64_t BucketCatalog::Bucket::era() const {
+    return _lastCheckedEra;
+}
 
-    /**
-     * Returns the ID for the underlying bucket.
-     */
-    const OID& id() const {
-        return _id;
-    }
+const OID& BucketCatalog::Bucket::id() const {
+    return _id;
+}
 
-    /**
-     * Returns the number of the stripe that owns the bucket
-     */
-    StripeNumber stripe() const {
-        return _stripe;
-    }
+BucketCatalog::StripeNumber BucketCatalog::Bucket::stripe() const {
+    return _stripe;
+}
 
-    /**
-     * Returns the pre-computed hash of the corresponding BucketKey
-     */
-    BucketKey::Hash keyHash() const {
-        return _keyHash;
-    }
+BucketCatalog::BucketKey::Hash BucketCatalog::Bucket::keyHash() const {
+    return _keyHash;
+}
 
-    // Returns the time associated with the bucket (id)
-    Date_t getTime() const {
-        return _minTime;
-    }
+Date_t BucketCatalog::Bucket::getTime() const {
+    return _minTime;
+}
 
-    /**
-     * Returns the timefield for the underlying bucket.
-     */
-    StringData getTimeField() {
-        return _timeField;
-    }
+StringData BucketCatalog::Bucket::getTimeField() {
+    return _timeField;
+}
 
-    /**
-     * Returns whether all measurements have been committed.
-     */
-    bool allCommitted() const {
-        return _batches.empty() && !_preparedBatch;
-    }
+bool BucketCatalog::Bucket::allCommitted() const {
+    return _batches.empty() && !_preparedBatch;
+}
 
-    /**
-     * Returns total number of measurements in the bucket.
-     */
-    uint32_t numMeasurements() const {
-        return _numMeasurements;
-    }
+uint32_t BucketCatalog::Bucket::numMeasurements() const {
+    return _numMeasurements;
+}
 
-    /**
-     * Determines if the schema for an incoming measurement is incompatible with those already
-     * stored in the bucket.
-     *
-     * Returns true if incompatible
-     */
-    bool schemaIncompatible(const BSONObj& input,
-                            boost::optional<StringData> metaField,
-                            const StringData::ComparatorInterface* comparator) {
-        auto result = _schema.update(input, metaField, comparator);
-        return (result == timeseries::Schema::UpdateStatus::Failed);
-    }
+bool BucketCatalog::Bucket::schemaIncompatible(const BSONObj& input,
+                                               boost::optional<StringData> metaField,
+                                               const StringData::ComparatorInterface* comparator) {
+    auto result = _schema.update(input, metaField, comparator);
+    return (result == timeseries::Schema::UpdateStatus::Failed);
+}
 
-private:
-    /**
-     * Determines the effect of adding 'doc' to this bucket. If adding 'doc' causes this bucket
-     * to overflow, we will create a new bucket and recalculate the change to the bucket size
-     * and data fields.
-     */
-    void _calculateBucketFieldsAndSizeChange(const BSONObj& doc,
-                                             boost::optional<StringData> metaField,
-                                             NewFieldNames* newFieldNamesToBeInserted,
-                                             uint32_t* sizeToBeAdded) const {
-        // BSON size for an object with an empty object field where field name is empty string.
-        // We can use this as an offset to know the size when we have real field names.
-        static constexpr int emptyObjSize = 12;
-        // Validate in debug builds that this size is correct
-        dassert(emptyObjSize == BSON("" << BSONObj()).objsize());
+void BucketCatalog::Bucket::_calculateBucketFieldsAndSizeChange(
+    const BSONObj& doc,
+    boost::optional<StringData> metaField,
+    NewFieldNames* newFieldNamesToBeInserted,
+    uint32_t* sizeToBeAdded) const {
+    // BSON size for an object with an empty object field where field name is empty string.
+    // We can use this as an offset to know the size when we have real field names.
+    static constexpr int emptyObjSize = 12;
+    // Validate in debug builds that this size is correct
+    dassert(emptyObjSize == BSON("" << BSONObj()).objsize());
 
-        newFieldNamesToBeInserted->clear();
-        *sizeToBeAdded = 0;
-        auto numMeasurementsFieldLength = numDigits(_numMeasurements);
-        for (const auto& elem : doc) {
-            auto fieldName = elem.fieldNameStringData();
-            if (fieldName == metaField) {
-                // Ignore the metadata field since it will not be inserted.
-                continue;
-            }
-
-            auto hashedKey = StringSet::hasher().hashed_key(fieldName);
-            if (!_fieldNames.contains(hashedKey)) {
-                // Record the new field name only if it hasn't been committed yet. There could be
-                // concurrent batches writing to this bucket with the same new field name, but
-                // they're not guaranteed to commit successfully.
-                newFieldNamesToBeInserted->push_back(hashedKey);
-
-                // Only update the bucket size once to account for the new field name if it isn't
-                // already pending a commit from another batch.
-                if (!_uncommittedFieldNames.contains(hashedKey)) {
-                    // Add the size of an empty object with that field name.
-                    *sizeToBeAdded += emptyObjSize + fieldName.size();
-
-                    // The control.min and control.max summaries don't have any information for this
-                    // new field name yet. Add two measurements worth of data to account for this.
-                    // As this is the first measurement for this field, min == max.
-                    *sizeToBeAdded += elem.size() * 2;
-                }
-            }
-
-            // Add the element size, taking into account that the name will be changed to its
-            // positional number. Add 1 to the calculation since the element's field name size
-            // accounts for a null terminator whereas the stringified position does not.
-            *sizeToBeAdded += elem.size() - elem.fieldNameSize() + numMeasurementsFieldLength + 1;
+    newFieldNamesToBeInserted->clear();
+    *sizeToBeAdded = 0;
+    auto numMeasurementsFieldLength = numDigits(_numMeasurements);
+    for (const auto& elem : doc) {
+        auto fieldName = elem.fieldNameStringData();
+        if (fieldName == metaField) {
+            // Ignore the metadata field since it will not be inserted.
+            continue;
         }
-    }
 
-    /**
-     * Returns whether BucketCatalog::commit has been called at least once on this bucket.
-     */
-    bool _hasBeenCommitted() const {
-        return _numCommittedMeasurements != 0 || _preparedBatch;
-    }
+        auto hashedKey = StringSet::hasher().hashed_key(fieldName);
+        if (!_fieldNames.contains(hashedKey)) {
+            // Record the new field name only if it hasn't been committed yet. There could
+            // be concurrent batches writing to this bucket with the same new field name,
+            // but they're not guaranteed to commit successfully.
+            newFieldNamesToBeInserted->push_back(hashedKey);
 
-    /**
-     * Return a pointer to the current, open batch.
-     */
-    std::shared_ptr<WriteBatch> _activeBatch(OperationId opId, ExecutionStatsController& stats) {
-        auto it = _batches.find(opId);
-        if (it == _batches.end()) {
-            it =
-                _batches
-                    .try_emplace(
-                        opId, std::make_shared<WriteBatch>(BucketHandle{_id, _stripe}, opId, stats))
-                    .first;
+            // Only update the bucket size once to account for the new field name if it
+            // isn't already pending a commit from another batch.
+            if (!_uncommittedFieldNames.contains(hashedKey)) {
+                // Add the size of an empty object with that field name.
+                *sizeToBeAdded += emptyObjSize + fieldName.size();
+
+                // The control.min and control.max summaries don't have any information for
+                // this new field name yet. Add two measurements worth of data to account
+                // for this. As this is the first measurement for this field, min == max.
+                *sizeToBeAdded += elem.size() * 2;
+            }
         }
-        return it->second;
+
+        // Add the element size, taking into account that the name will be changed to its
+        // positional number. Add 1 to the calculation since the element's field name size
+        // accounts for a null terminator whereas the stringified position does not.
+        *sizeToBeAdded += elem.size() - elem.fieldNameSize() + numMeasurementsFieldLength + 1;
     }
+}
 
-    // The bucket ID for the underlying document
-    const OID _id;
+bool BucketCatalog::Bucket::_hasBeenCommitted() const {
+    return _numCommittedMeasurements != 0 || _preparedBatch;
+}
 
-    // The stripe which owns this bucket.
-    const StripeNumber _stripe;
-
-    // The pre-computed hash of the associated BucketKey
-    const BucketKey::Hash _keyHash;
-
-    // The namespace that this bucket is used for.
-    NamespaceString _ns;
-
-    // The metadata of the data that this bucket contains.
-    BucketMetadata _metadata;
-
-    // Top-level hashed field names of the measurements that have been inserted into the bucket.
-    StringSet _fieldNames;
-
-    // Top-level hashed new field names that have not yet been committed into the bucket.
-    StringSet _uncommittedFieldNames;
-
-    // Time field for the measurements that have been inserted into the bucket.
-    std::string _timeField;
-
-    // Minimum timestamp over contained measurements
-    Date_t _minTime;
-
-    // The minimum and maximum values for each field in the bucket.
-    timeseries::MinMax _minmax;
-
-    // The reference schema for measurements in this bucket. May reflect schema of uncommitted
-    // measurements.
-    timeseries::Schema _schema;
-
-    // The total size in bytes of the bucket's BSON serialization, including measurements to be
-    // inserted.
-    uint64_t _size = 0;
-
-    // The total number of measurements in the bucket, including uncommitted measurements and
-    // measurements to be inserted.
-    uint32_t _numMeasurements = 0;
-
-    // The number of committed measurements in the bucket.
-    uint32_t _numCommittedMeasurements = 0;
-
-    // Whether the bucket has been marked for a rollover action. It can be marked for closure due to
-    // number of measurements, size, or schema changes, or it can be marked for archival due to time
-    // range.
-    RolloverAction _rolloverAction = RolloverAction::kNone;
-
-    // Whether this bucket was kept open after exceeding the bucket max size to improve bucketing
-    // performance for large measurements.
-    bool _keptOpenDueToLargeMeasurements = false;
-
-    // The batch that has been prepared and is currently in the process of being committed, if
-    // any.
-    std::shared_ptr<WriteBatch> _preparedBatch;
-
-    // Batches, per operation, that haven't been committed or aborted yet.
-    stdx::unordered_map<OperationId, std::shared_ptr<WriteBatch>> _batches;
-
-    // If the bucket is in idleBuckets, then its position is recorded here.
-    boost::optional<Stripe::IdleList::iterator> _idleListEntry = boost::none;
-
-    // Approximate memory usage of this bucket.
-    uint64_t _memoryUsage = sizeof(*this);
-};
-
-/**
- * Bundle of information that 'insert' needs to pass down to helper methods that may create a new
- * bucket.
- */
-struct BucketCatalog::CreationInfo {
-    const BucketKey& key;
-    StripeNumber stripe;
-    const Date_t& time;
-    const TimeseriesOptions& options;
-    ExecutionStatsController& stats;
-    ClosedBuckets* closedBuckets;
-    bool openedDuetoMetadata = true;
-};
+std::shared_ptr<BucketCatalog::WriteBatch> BucketCatalog::Bucket::_activeBatch(
+    OperationId opId, ExecutionStatsController& stats) {
+    auto it = _batches.find(opId);
+    if (it == _batches.end()) {
+        it = _batches
+                 .try_emplace(opId,
+                              std::make_shared<WriteBatch>(BucketHandle{_id, _stripe}, opId, stats))
+                 .first;
+    }
+    return it->second;
+}
 
 BucketCatalog::WriteBatch::WriteBatch(const BucketHandle& bucket,
                                       OperationId opId,
@@ -859,6 +744,11 @@ void BucketCatalog::clear(const OID& oid) {
 }
 
 void BucketCatalog::clear(const std::function<bool(const NamespaceString&)>& shouldClear) {
+    {
+        stdx::unique_lock<Mutex> lk(_mutex);
+        ++_era;
+    }
+
     for (auto& stripe : _stripes) {
         stdx::lock_guard stripeLock{stripe.mutex};
         for (auto it = stripe.allBuckets.begin(); it != stripe.allBuckets.end();) {
@@ -1124,7 +1014,8 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
     auto stripeNumber = _getStripeNumber(key);
 
     auto bucketId = bucketIdElem.OID();
-    std::unique_ptr<Bucket> bucket = std::make_unique<Bucket>(bucketId, stripeNumber, key.hash);
+    std::unique_ptr<Bucket> bucket =
+        std::make_unique<Bucket>(bucketId, stripeNumber, key.hash, _era);
 
     // Initialize the remaining member variables from the bucket document.
     bucket->_ns = ns;
@@ -1574,7 +1465,7 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
     auto [bucketId, roundedTime] = generateBucketId(info.time, info.options);
 
     auto [it, inserted] = stripe->allBuckets.try_emplace(
-        bucketId, std::make_unique<Bucket>(bucketId, info.stripe, info.key.hash));
+        bucketId, std::make_unique<Bucket>(bucketId, info.stripe, info.key.hash, _era));
     tassert(6130900, "Expected bucket to be inserted", inserted);
     Bucket* bucket = it->second.get();
     stripe->openBuckets[info.key] = bucket;

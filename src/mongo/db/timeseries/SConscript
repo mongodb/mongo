@@ -126,6 +126,7 @@ env.CppUnitTest(
     source=[
         'bucket_catalog_helpers_test.cpp',
         'bucket_catalog_test.cpp',
+        'bucket_catalog_era_test.cpp',
         'minmax_test.cpp',
         'timeseries_dotted_path_support_test.cpp',
         'timeseries_index_schema_conversion_functions_test.cpp',
