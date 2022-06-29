@@ -55,8 +55,9 @@ assert.eq(getLatestOp(secondary), lastOp);
 // Make sure shutdown won't take a long time due to I/O.
 secondary.adminCommand('fsync');
 
-// Shutting down shouldn't take long.
-assert.lt(Date.timeFunc(() => rst.stop(1)), 60 * 1000);
+// Shutting down shouldn't take long, but in case of a slow machine closing/opening of wiredTiger on
+// shutdown for reconfiguration takes extra time hence the two minutes wait.
+assert.lt(Date.timeFunc(() => rst.stop(1)), 2 * 60 * 1000);
 
 secondary = rst.restart(1);
 rst.awaitSecondaryNodes();
