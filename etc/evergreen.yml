@@ -1362,6 +1362,14 @@ buildvariants:
     - rhel80-xlarge
   - name: generate_buildid_to_debug_symbols_mapping
 
+- <<: *enterprise-rhel-80-64-bit-dynamic-required-template
+  name: enterprise-rhel-80-64-bit-dynamic-debug-mode
+  display_name: "Shared Library Enterprise RHEL 8.0 Debug Mode"
+  cron: "0 4 */3 * *" # Run once every three days
+  expansions:
+    <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --use-glibcxx-debug --dbg=on --allocator=system
+
 - name: enterprise-rhel-80-64-bit-dynamic-required-ninja
   display_name: "Ninja Build: Enterprise RHEL 8.0"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.

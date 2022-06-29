@@ -154,8 +154,18 @@ private:
     static constexpr std::size_t kSizeOfStringBuffer = sizeof(uint32_t)  // Length field
         + ColumnStore::Bytes::TinySize::kStringMax                       // String
         + 1;                                                             // Null terminator
+#ifdef _GLIBCXX_DEBUG
+    static constexpr std::size_t kSizeOfTemporary = 69;
+    static_assert(kSizeOfStringBuffer >
+                  (kSizeOfUUIDBinData + kSizeOfDecimal +
+                   OID::kOIDSize));  // kSizeOfStringBuffer should be the largest - this is
+                                     // shorthand for writing 4 checks
+    static_assert(kSizeOfStringBuffer == 69);  // kSizeOfStringBuffer is 69
+#else
     static constexpr std::size_t kSizeOfTemporary = std::max<std::size_t>(
         {kSizeOfDecimal, OID::kOIDSize, kSizeOfUUIDBinData, kSizeOfStringBuffer});
+#endif
+
     std::array<char, kSizeOfTemporary> temporaryStorage;
 };
 }  // namespace mongo::sbe::value
