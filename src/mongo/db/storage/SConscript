@@ -372,7 +372,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",
-        '$BUILD_DIR/mongo/db/batched_write_context',
         "$BUILD_DIR/mongo/db/storage/storage_options",
         '$BUILD_DIR/mongo/util/fail_point',
         'recovery_unit_base',

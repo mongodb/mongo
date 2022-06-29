@@ -2656,6 +2656,15 @@ struct DeleteTestCase {
 };
 
 class BatchedWriteOutputsTest : public OpObserverTest {
+public:
+    void setUp() override {
+        OpObserverTest::setUp();
+
+        auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
+        opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+        getServiceContext()->setOpObserver(std::move(opObserverRegistry));
+    }
+
 protected:
     // The maximum numbers of documents that can be deleted in a batch. Assumes _id of integer type.
     static const int maxDocsInBatch = 203669;
@@ -2753,9 +2762,6 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
     reset(opCtx, NamespaceString::kRsOplogNamespace);
-    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
-    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
-    opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
 
     // Run the test with WUOW's grouping 1 to 5 deletions.
     for (size_t docsToBeBatched = 1; docsToBeBatched <= nDocsToDelete; docsToBeBatched++) {
@@ -2814,9 +2820,6 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
     reset(opCtx, NamespaceString::kRsOplogNamespace);
-    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
-    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
-    opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
 
     // Start a WUOW with groupOplogEntries=true. Verify that initialises the
     // BatchedWriteContext.
@@ -2903,9 +2906,6 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) 
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
     reset(opCtx, NamespaceString::kRsOplogNamespace);
-    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
-    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
-    opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
 
     // Start a WUOW with groupOplogEntries=true. Verify that initialises the
     // BatchedWriteContext.
@@ -3016,9 +3016,6 @@ TEST_F(BatchedWriteOutputsTest, testEmptyWUOW) {
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
     reset(opCtx, NamespaceString::kRsOplogNamespace);
-    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
-    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
-    opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
 
     // Start and commit an empty WUOW.
     WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
@@ -3034,9 +3031,6 @@ TEST_F(BatchedWriteOutputsTest, testWUOWLarge) {
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
     reset(opCtx, NamespaceString::kRsOplogNamespace);
-    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
-    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
-    opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
 
     AutoGetCollection locks(opCtx, _nss, LockMode::MODE_IX);
 
@@ -3084,9 +3078,6 @@ TEST_F(BatchedWriteOutputsTest, testWUOWTooLarge) {
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
     reset(opCtx, NamespaceString::kRsOplogNamespace);
-    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
-    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
-    opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
 
     AutoGetCollection locks(opCtx, _nss, LockMode::MODE_IX);
 

@@ -2083,7 +2083,10 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
     shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, *statements, commitOpTime);
 }
 
-void OpObserverImpl::onBatchedWriteStart(OperationContext* opCtx) {}
+void OpObserverImpl::onBatchedWriteStart(OperationContext* opCtx) {
+    auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
+    batchedWriteContext.setWritesAreBatched(true);
+}
 
 void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
     if (repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
@@ -2127,7 +2130,11 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
                     wallClockTime);
 }
 
-void OpObserverImpl::onBatchedWriteAbort(OperationContext* opCtx) {}
+void OpObserverImpl::onBatchedWriteAbort(OperationContext* opCtx) {
+    auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
+    batchedWriteContext.clearBatchedOperations(opCtx);
+    batchedWriteContext.setWritesAreBatched(false);
+}
 
 void OpObserverImpl::onPreparedTransactionCommit(
     OperationContext* opCtx,
