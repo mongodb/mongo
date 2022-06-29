@@ -10,6 +10,9 @@
 // Tests for accessing logLevel server parameter using getParameter/setParameter commands
 // and shell helpers.
 
+(function() {
+'use strict';
+
 function scrub(obj) {
     delete obj["operationTime"];
     delete obj["$clusterTime"];
@@ -21,12 +24,12 @@ function scrub(obj) {
     return obj;
 }
 
-old = scrub(assert.commandWorked(db.adminCommand({"getParameter": "*"})));
+const old = scrub(assert.commandWorked(db.adminCommand({"getParameter": "*"})));
 // the first time getParameter sends a request to with a shardingTaskExecutor and this sets an
 // operationTime. The following commands do not use shardingTaskExecutor.
-tmp1 = assert.commandWorked(db.adminCommand({"setParameter": 1, "logLevel": 5}));
-tmp2 = assert.commandWorked(db.adminCommand({"setParameter": 1, "logLevel": old.logLevel}));
-now = scrub(assert.commandWorked(db.adminCommand({"getParameter": "*"})));
+const tmp1 = assert.commandWorked(db.adminCommand({"setParameter": 1, "logLevel": 5}));
+const tmp2 = assert.commandWorked(db.adminCommand({"setParameter": 1, "logLevel": old.logLevel}));
+const now = scrub(assert.commandWorked(db.adminCommand({"getParameter": "*"})));
 
 assert.eq(old, now, "A");
 assert.eq(old.logLevel, tmp1.was, "B");
@@ -68,8 +71,8 @@ assert.commandWorked(db.adminCommand({
     }
 }));
 
-var result = assert.commandWorked(db.adminCommand({"getParameter": 1, logComponentVerbosity: 1}))
-                 .logComponentVerbosity;
+const result = assert.commandWorked(db.adminCommand({"getParameter": 1, logComponentVerbosity: 1}))
+                   .logComponentVerbosity;
 
 assert.eq(2, result.verbosity);
 assert.eq(0, result.accessControl.verbosity);
@@ -92,8 +95,8 @@ assert.commandFailed(db.adminCommand({
     }
 }));
 
-var result = assert.commandWorked(db.adminCommand({"getParameter": 1, logComponentVerbosity: 1}))
-                 .logComponentVerbosity;
+const result = assert.commandWorked(db.adminCommand({"getParameter": 1, logComponentVerbosity: 1}))
+                   .logComponentVerbosity;
 
 assert.eq(2, result.verbosity);
 assert.eq(0, result.accessControl.verbosity);
@@ -108,8 +111,8 @@ assert.commandWorked(db.adminCommand({
     logComponentVerbosity: {verbosity: -1, storage: {journal: {verbosity: -1}}}
 }));
 
-var result = assert.commandWorked(db.adminCommand({"getParameter": 1, logComponentVerbosity: 1}))
-                 .logComponentVerbosity;
+const result = assert.commandWorked(db.adminCommand({"getParameter": 1, logComponentVerbosity: 1}))
+                   .logComponentVerbosity;
 
 assert.eq(0, result.verbosity);
 assert.eq(0, result.accessControl.verbosity);
@@ -123,8 +126,8 @@ assert.eq(-1, result.storage.journal.verbosity);
 assert.commandWorked(
     db.adminCommand({"setParameter": 1, logComponentVerbosity: {accessControl: 5}}));
 
-var result = assert.commandWorked(db.adminCommand({"getParameter": 1, logComponentVerbosity: 1}))
-                 .logComponentVerbosity;
+const result = assert.commandWorked(db.adminCommand({"getParameter": 1, logComponentVerbosity: 1}))
+                   .logComponentVerbosity;
 
 assert.eq(5, result.accessControl.verbosity);
 })();
@@ -133,12 +136,12 @@ assert.eq(5, result.accessControl.verbosity);
 assert.commandWorked(
     db.adminCommand({"setParameter": 1, logComponentVerbosity: old.logComponentVerbosity}));
 
-var isMongos = (db.hello().msg === 'isdbgrid');
+const isMongos = (db.hello().msg === 'isdbgrid');
 if (!isMongos) {
     //
     // oplogFetcherSteadyStateMaxFetcherRestarts
     //
-    var origRestarts = assert
+    let origRestarts = assert
                            .commandWorked(db.adminCommand(
                                {getParameter: 1, oplogFetcherSteadyStateMaxFetcherRestarts: 1}))
                            .oplogFetcherSteadyStateMaxFetcherRestarts;
@@ -189,3 +192,4 @@ if (!isMongos) {
     assert.commandWorked(db.adminCommand(
         {setParameter: 1, oplogFetcherInitialSyncMaxFetcherRestarts: origRestarts}));
 }
+})();
