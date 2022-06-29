@@ -61,6 +61,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_curop.h"
 #include "mongo/db/s/transaction_coordinator_worker_curop_repository.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/stats/storage_stats.h"
@@ -789,14 +790,21 @@ write_ops::UpdateCommandRequest CommonMongodProcessInterface::buildUpdateOp(
 
 BSONObj CommonMongodProcessInterface::_convertRenameToInternalRename(
     OperationContext* opCtx,
-    const BSONObj& renameCommandObj,
+    const NamespaceString& sourceNs,
+    const NamespaceString& targetNs,
     const BSONObj& originalCollectionOptions,
     const std::list<BSONObj>& originalIndexes) {
 
     BSONObjBuilder newCmd;
     newCmd.append("internalRenameIfOptionsAndIndexesMatch", 1);
-    newCmd.append("from", renameCommandObj["renameCollection"].String());
-    newCmd.append("to", renameCommandObj["to"].String());
+    // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
+    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+        newCmd.append("from", sourceNs.ns());
+        newCmd.append("to", targetNs.ns());
+    } else {
+        newCmd.append("from", sourceNs.toStringWithTenantId());
+        newCmd.append("to", targetNs.toStringWithTenantId());
+    }
     newCmd.append("collectionOptions", originalCollectionOptions);
     BSONArrayBuilder indexArrayBuilder(newCmd.subarrayStart("indexes"));
     for (auto&& index : originalIndexes) {

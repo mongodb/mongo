@@ -176,14 +176,15 @@ void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
 }
 void NonShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     OperationContext* opCtx,
-    const BSONObj& renameCommandObj,
+    const NamespaceString& sourceNs,
     const NamespaceString& targetNs,
+    bool dropTarget,
+    bool stayTemp,
     const BSONObj& originalCollectionOptions,
     const std::list<BSONObj>& originalIndexes) {
-    NamespaceString sourceNs = NamespaceString(renameCommandObj["renameCollection"].String());
     RenameCollectionOptions options;
-    options.dropTarget = renameCommandObj["dropTarget"].trueValue();
-    options.stayTemp = renameCommandObj["stayTemp"].trueValue();
+    options.dropTarget = dropTarget;
+    options.stayTemp = stayTemp;
     // skip sharding validation on non sharded servers
     doLocalRenameIfOptionsAndIndexesHaveNotChanged(
         opCtx, sourceNs, targetNs, options, originalIndexes, originalCollectionOptions);

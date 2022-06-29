@@ -171,11 +171,13 @@ void DocumentSourceOut::finalize() {
     DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
 
     const auto& outputNs = getOutputNs();
-    auto renameCommandObj =
-        BSON("renameCollection" << _tempNs.ns() << "to" << outputNs.ns() << "dropTarget" << true);
-
-    pExpCtx->mongoProcessInterface->renameIfOptionsAndIndexesHaveNotChanged(
-        pExpCtx->opCtx, renameCommandObj, outputNs, _originalOutOptions, _originalIndexes);
+    pExpCtx->mongoProcessInterface->renameIfOptionsAndIndexesHaveNotChanged(pExpCtx->opCtx,
+                                                                            _tempNs,
+                                                                            outputNs,
+                                                                            true /* dropTarget */,
+                                                                            false /* stayTemp */,
+                                                                            _originalOutOptions,
+                                                                            _originalIndexes);
 
     // The rename succeeded, so the temp collection no longer exists.
     _tempNs = {};

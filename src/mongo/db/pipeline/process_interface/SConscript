@@ -55,6 +55,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/operation_time_tracker',
         '$BUILD_DIR/mongo/db/ops/write_ops',
         '$BUILD_DIR/mongo/db/repl/primary_only_service',
+        '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/session_catalog',
         '$BUILD_DIR/mongo/db/stats/fill_locker_info',
         '$BUILD_DIR/mongo/db/storage/backup_cursor_hooks',

@@ -181,7 +181,8 @@ protected:
      * Converts a renameCollection command into an internalRenameIfOptionsAndIndexesMatch command.
      */
     BSONObj _convertRenameToInternalRename(OperationContext* opCtx,
-                                           const BSONObj& renameCommandObj,
+                                           const NamespaceString& sourceNs,
+                                           const NamespaceString& targetNs,
                                            const BSONObj& originalCollectionOptions,
                                            const std::list<BSONObj>& originalIndexes);
 

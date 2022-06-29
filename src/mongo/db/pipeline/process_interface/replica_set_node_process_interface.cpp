@@ -126,18 +126,26 @@ void ReplicaSetNodeProcessInterface::createIndexesOnEmptyCollection(
 
 void ReplicaSetNodeProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     OperationContext* opCtx,
-    const BSONObj& renameCommandObj,
+    const NamespaceString& sourceNs,
     const NamespaceString& targetNs,
+    bool dropTarget,
+    bool stayTemp,
     const BSONObj& originalCollectionOptions,
     const std::list<BSONObj>& originalIndexes) {
     if (_canWriteLocally(opCtx, targetNs)) {
         return NonShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
-            opCtx, renameCommandObj, targetNs, originalCollectionOptions, originalIndexes);
+            opCtx,
+            sourceNs,
+            targetNs,
+            dropTarget,
+            stayTemp,
+            originalCollectionOptions,
+            originalIndexes);
     }
     // internalRenameIfOptionsAndIndexesMatch can only be run against the admin DB.
     NamespaceString adminNs{NamespaceString::kAdminDb};
     auto cmd = CommonMongodProcessInterface::_convertRenameToInternalRename(
-        opCtx, renameCommandObj, originalCollectionOptions, originalIndexes);
+        opCtx, sourceNs, targetNs, originalCollectionOptions, originalIndexes);
     uassertStatusOK(_executeCommandOnPrimary(opCtx, adminNs, cmd));
 }
 

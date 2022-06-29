@@ -172,14 +172,16 @@ std::unique_ptr<ShardFilterer> ShardServerProcessInterface::getShardFilterer(
 
 void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     OperationContext* opCtx,
-    const BSONObj& renameCommandObj,
-    const NamespaceString& destinationNs,
+    const NamespaceString& sourceNs,
+    const NamespaceString& targetNs,
+    bool dropTarget,
+    bool stayTemp,
     const BSONObj& originalCollectionOptions,
     const std::list<BSONObj>& originalIndexes) {
     auto cachedDbInfo =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, destinationNs.db()));
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, targetNs.db()));
     auto newCmdObj = CommonMongodProcessInterface::_convertRenameToInternalRename(
-        opCtx, renameCommandObj, originalCollectionOptions, originalIndexes);
+        opCtx, sourceNs, targetNs, originalCollectionOptions, originalIndexes);
     BSONObjBuilder newCmdWithWriteConcernBuilder(std::move(newCmdObj));
     newCmdWithWriteConcernBuilder.append(WriteConcernOptions::kWriteConcernField,
                                          opCtx->getWriteConcern().toBSON());
