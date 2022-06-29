@@ -89,7 +89,7 @@ functions:
         source venv/bin/activate
         pip3 install requirements_parser
         pip3 install -r etc/pip/compile-requirements.txt
-        ./buildscripts/scons.py --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --link-model=dynamic --ninja generate-ninja ICECC=icecc CCACHE=ccache
+        ./buildscripts/scons.py --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --link-model=dynamic --ninja ICECC=icecc CCACHE=ccache
         ninja -j$(nproc --all) install-mongod
   "configure wiredtiger": &configure_wiredtiger
     command: shell.exec
