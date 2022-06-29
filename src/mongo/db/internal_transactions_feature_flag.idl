@@ -44,3 +44,8 @@ feature_flags:
         description: Feature flag to enable usage of the transaction api for update findAndModify and update commands that change a document's shard key.
         cpp_varname: gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi
         default: false
+
+    featureFlagUpdateOneWithoutShardKey:
+        description: Feature flag to enable updateOne, deleteOne, and findAndModify without a shard key or _id equality in their filter against a sharded collection.
+        cpp_varname: gfeatureFlagUpdateOneWithoutShardKey
+        default: false
