@@ -50,9 +50,9 @@ using std::string;
 using std::stringstream;
 
 // Testing only, enabled via command-line.
-class CmdHashElt : public ErrmsgCommandDeprecated {
+class CmdHashElt : public BasicCommand {
 public:
-    CmdHashElt() : ErrmsgCommandDeprecated("_hashBSONElement"){};
+    CmdHashElt() : BasicCommand("_hashBSONElement"){};
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
@@ -79,17 +79,17 @@ public:
      *>  "out" : NumberLong(6271151123721111923),
      *>  "ok" : 1 }
      **/
-    bool errmsgRun(OperationContext* opCtx,
-                   const string& db,
-                   const BSONObj& cmdObj,
-                   string& errmsg,
-                   BSONObjBuilder& result) {
+    bool run(OperationContext* opCtx,
+             const string& db,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         result.appendAs(cmdObj.firstElement(), "key");
 
         int seed = 0;
         if (cmdObj.hasField("seed")) {
             if (!cmdObj["seed"].isNumber()) {
-                errmsg += "seed must be a number";
+                CommandHelpers::appendSimpleCommandStatus(
+                    result, false /* ok */, "seed must be a number" /* errmsg */);
                 return false;
             }
             seed = cmdObj["seed"].numberInt();
