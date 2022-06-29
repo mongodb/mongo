@@ -603,6 +603,48 @@ private:
                         return preImagesFeatureFlagDisabledOnDowngradeVersion &&
                             collection->isChangeStreamPreAndPostImagesEnabled();
                     });
+
+                catalog::forEachCollectionFromDb(
+                    opCtx,
+                    dbName,
+                    MODE_S,
+                    [&](const CollectionPtr& collection) {
+                        invariant(collection->getTimeseriesOptions());
+
+                        auto indexCatalog = collection->getIndexCatalog();
+                        auto indexIt = indexCatalog->getIndexIterator(
+                            opCtx,
+                            IndexCatalog::InclusionPolicy::kReady |
+                                IndexCatalog::InclusionPolicy::kUnfinished);
+
+                        while (indexIt->more()) {
+                            auto indexEntry = indexIt->next();
+                            // Fail to downgrade if the time-series collection has a partial, TTL
+                            // index.
+                            if (indexEntry->descriptor()->isPartial()) {
+                                // TODO (SERVER-67659): Remove partial, TTL index check once FCV 7.0
+                                // becomes last-lts.
+                                uassert(
+                                    ErrorCodes::CannotDowngrade,
+                                    str::stream()
+                                        << "Cannot downgrade the cluster when there are secondary "
+                                           "TTL indexes with partial filters on time-series "
+                                           "collections. Drop all partial, TTL indexes on "
+                                           "time-series collections before downgrading. First "
+                                           "detected incompatible index name: '"
+                                        << indexEntry->descriptor()->indexName()
+                                        << "' on collection: '"
+                                        << collection->ns().getTimeseriesViewNamespace() << "'",
+                                    !indexEntry->descriptor()->infoObj().hasField(
+                                        IndexDescriptor::kExpireAfterSecondsFieldName));
+                            }
+                        }
+
+                        return true;
+                    },
+                    [&](const CollectionPtr& collection) {
+                        return collection->getTimeseriesOptions() != boost::none;
+                    });
             }
 
             // Drop the pre-images collection if 'changeStreamPreAndPostImages' feature flag is not
