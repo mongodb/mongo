@@ -35,9 +35,11 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/column_cell.h"
 #include "mongo/db/index/column_key_generator.h"
+#include "mongo/db/index/column_store_sorter.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/progress_meter.h"
 
@@ -96,23 +98,29 @@ public:
 
 private:
     ColumnStoreAccessMethod* const _columnsAccess;
-    // For now we'll just collect all the docs to insert before inserting them.
-    // TODO SERVER-65481 Do an actual optimized bulk insert with sorting.
-    std::list<BSONObj> _ownedObjects;
-    std::vector<BsonRecord> _deferredInserts;
+
+    ColumnStoreSorter _sorter;
+    BufBuilder _cellBuilder;
+
     int64_t _keysInserted = 0;
 };
 
 ColumnStoreAccessMethod::BulkBuilder::BulkBuilder(ColumnStoreAccessMethod* index,
                                                   size_t maxMemoryUsageBytes,
                                                   StringData dbName)
-    : _columnsAccess(index) {}
+    : _columnsAccess(index), _sorter(maxMemoryUsageBytes, dbName, bulkBuilderFileStats()) {
+    countNewBuildInStats();
+}
 
 ColumnStoreAccessMethod::BulkBuilder::BulkBuilder(ColumnStoreAccessMethod* index,
                                                   size_t maxMemoryUsageBytes,
                                                   const IndexStateInfo& stateInfo,
                                                   StringData dbName)
-    : _columnsAccess(index) {}
+    : _columnsAccess(index), _sorter(maxMemoryUsageBytes, dbName, bulkBuilderFileStats()) {
+    countResumedBuildInStats();
+    // TODO SERVER-66925: Add this support.
+    tasserted(6548103, "No support for resuming interrupted columnstore index builds.");
+}
 
 Status ColumnStoreAccessMethod::BulkBuilder::insert(
     OperationContext* opCtx,
@@ -123,15 +131,20 @@ Status ColumnStoreAccessMethod::BulkBuilder::insert(
     const InsertDeleteOptions& options,
     const std::function<void()>& saveCursorBeforeWrite,
     const std::function<void()>& restoreCursorAfterWrite) {
-    // TODO SERVER-65481 Do an actual optimized bulk insert with sorting.
-    _ownedObjects.push_back(obj.getOwned());
-    BsonRecord record;
-    record.docPtr = &_ownedObjects.back();
-    record.id = rid;
-    _deferredInserts.push_back(record);
+    column_keygen::visitCellsForInsert(
+        obj, [&](PathView path, const column_keygen::UnencodedCellView& cell) {
+            _cellBuilder.reset();
+            writeEncodedCell(cell, &_cellBuilder);
+            _sorter.add(path, rid, CellView(_cellBuilder.buf(), _cellBuilder.len()));
+
+            ++_keysInserted;
+        });
+
     return Status::OK();
 }
 
+// The "multikey" property does not apply to columnstore indexes, because the array key does not
+// represent a field in a document and
 const MultikeyPaths& ColumnStoreAccessMethod::BulkBuilder::getMultikeyPaths() const {
     const static MultikeyPaths empty;
     return empty;
@@ -156,21 +169,79 @@ Status ColumnStoreAccessMethod::BulkBuilder::commit(OperationContext* opCtx,
                                                     int32_t yieldIterations,
                                                     const KeyHandlerFn& onDuplicateKeyInserted,
                                                     const RecordIdHandlerFn& onDuplicateRecord) {
-    static constexpr size_t kBufferBlockSize = 1024;
-    SharedBufferFragmentBuilder pooledBufferBuilder(kBufferBlockSize);
+    Timer timer;
 
-    WriteUnitOfWork wunit(opCtx);
-    auto status = _columnsAccess->insert(opCtx,
-                                         pooledBufferBuilder,
-                                         collection,
-                                         _deferredInserts,
-                                         InsertDeleteOptions{},
-                                         &_keysInserted);
-    if (!status.isOK()) {
-        return status;
+    auto ns = _columnsAccess->_indexCatalogEntry->getNSSFromCatalog(opCtx);
+
+    static constexpr char message[] =
+        "Index Build: inserting keys from external sorter into columnstore index";
+    ProgressMeterHolder pm;
+    {
+        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        pm.set(
+            CurOp::get(opCtx)->setProgress_inlock(message, _keysInserted, 3 /* secondsBetween */));
     }
 
-    wunit.commit();
+    auto builder = _columnsAccess->_store->makeBulkBuilder(opCtx);
+
+    int64_t iterations = 0;
+    boost::optional<std::pair<PathValue, RecordId>> previousPathAndRecordId;
+    std::unique_ptr<ColumnStoreSorter::Iterator> it(_sorter.done());
+    while (it->more()) {
+        opCtx->checkForInterrupt();
+
+        auto columnStoreKeyWithValue = it->next();
+        const auto& key = columnStoreKeyWithValue.first;
+
+        // In debug mode only, assert that keys are retrieved from the sorter in strictly increasing
+        // order.
+        if (kDebugBuild) {
+            if (previousPathAndRecordId &&
+                !(ColumnStoreSorter::Key{previousPathAndRecordId->first,
+                                         previousPathAndRecordId->second} < key)) {
+                LOGV2_FATAL_NOTRACE(6548100,
+                                    "Out-of-order result from sorter for column store bulk loader",
+                                    "prevPathName"_attr = previousPathAndRecordId->first,
+                                    "prevRecordId"_attr = previousPathAndRecordId->second,
+                                    "nextPathName"_attr = key.path,
+                                    "nextRecordId"_attr = key.recordId,
+                                    "index"_attr = _columnsAccess->_descriptor->indexName());
+            }
+
+            // It is not safe to safe to directly store the 'key' object, because it includes a
+            // PathView, which may be invalid the next time we read it.
+            previousPathAndRecordId.emplace(key.path, key.recordId);
+        }
+
+        try {
+            writeConflictRetry(opCtx, "addingKey", ns.ns(), [&] {
+                WriteUnitOfWork wunit(opCtx);
+                auto& [columnStoreKey, columnStoreValue] = columnStoreKeyWithValue;
+                builder->addCell(
+                    columnStoreKey.path, columnStoreKey.recordId, columnStoreValue.cell);
+                wunit.commit();
+            });
+        } catch (DBException& e) {
+            return e.toStatus();
+        }
+
+        // Yield locks every 'yieldIterations' key insertions.
+        if (yieldIterations > 0 && (++iterations % yieldIterations == 0)) {
+            yield(opCtx, &collection, ns);
+        }
+
+        pm.hit();
+    }
+
+    pm.finished();
+
+    LOGV2(6548101,
+          "Index build: bulk sorter inserted {keysInserted} keys into index {index} on namespace "
+          "{namespace} in {duration} seconds",
+          "keysInserted"_attr = _keysInserted,
+          "index"_attr = _columnsAccess->_descriptor->indexName(),
+          logAttrs(ns),
+          "duration"_attr = Seconds(timer.seconds()));
     return Status::OK();
 }
 
@@ -185,7 +256,7 @@ Status ColumnStoreAccessMethod::insert(OperationContext* opCtx,
         auto cursor = _store->newWriteCursor(opCtx);
         column_keygen::visitCellsForInsert(
             bsonRecords,
-            [&](StringData path,
+            [&](PathView path,
                 const BsonRecord& rec,
                 const column_keygen::UnencodedCellView& cell) {
                 if (!rec.ts.isNull()) {
@@ -214,7 +285,7 @@ void ColumnStoreAccessMethod::remove(OperationContext* opCtx,
                                      int64_t* keysDeletedOut,
                                      CheckRecordId checkRecordId) {
     auto cursor = _store->newWriteCursor(opCtx);
-    column_keygen::visitPathsForDelete(obj, [&](StringData path) {
+    column_keygen::visitPathsForDelete(obj, [&](PathView path) {
         cursor->remove(path, rid);
         inc(keysDeletedOut);
     });

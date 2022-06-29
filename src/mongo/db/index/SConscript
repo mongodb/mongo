@@ -84,9 +84,9 @@ env.Library(
     ],
 )
 
-serveronlyEnv = env.Clone()
-serveronlyEnv.InjectThirdParty(libraries=['snappy'])
-serveronlyEnv.Library(
+iamEnv = env.Clone()
+iamEnv.InjectThirdParty(libraries=['snappy'])
+iamEnv.Library(
     target="index_access_method",
     source=[
         'duplicate_key_tracker.cpp',
@@ -119,6 +119,22 @@ serveronlyEnv.Library(
     ],
 )
 
+iamEnv.Library(
+    target="column_store_index",
+    source=[
+        'column_cell.cpp',
+        "column_store_sorter.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/sorter/sorter_idl',
+        '$BUILD_DIR/mongo/db/storage/encryption_hooks',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/s/is_mongos',
+        '$BUILD_DIR/third_party/shim_snappy',
+    ],
+)
+
 env.Library(
     target="index_access_methods",
     source=[
@@ -137,31 +153,26 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
+        '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/fts/base_fts',
         '$BUILD_DIR/mongo/db/index_names',
-        'columnar_index',
+        'column_store_index',
         'expression_params',
         'key_generator',
     ],
 )
 
-env.Library(
-    target="columnar_index",
-    source=[
-        'column_cell.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.CppUnitTest(
+indexTestEnv = env.Clone()
+indexTestEnv.InjectThirdParty(libraries=['snappy'])
+indexTestEnv.CppUnitTest(
     target='db_index_test',
     source=[
         '2d_key_generator_test.cpp',
         'btree_key_generator_test.cpp',
         'column_cell_test.cpp',
         'column_key_generator_test.cpp',
+        'column_store_sorter_test.cpp',
         'hash_key_generator_test.cpp',
         's2_key_generator_test.cpp',
         's2_bucket_key_generator_test.cpp',
@@ -177,7 +188,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/query/sort_pattern',
         '$BUILD_DIR/mongo/db/record_id_helpers',
-        'columnar_index',
+        'column_store_index',
         'expression_params',
         'key_generator',
     ],

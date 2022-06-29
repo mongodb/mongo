@@ -124,6 +124,14 @@ public:
         s = readCStr().toString();
     }
 
+    /**
+     * Return a view of the next len bytes and advance by len.
+     */
+    StringData readBytes(size_t len) {
+        // Note: the call to skip() includes a check that at least 'len' bytes remain in the buffer.
+        return StringData(reinterpret_cast<const char*>(skip(len)), len);
+    }
+
     const void* pos() {
         return _pos;
     }

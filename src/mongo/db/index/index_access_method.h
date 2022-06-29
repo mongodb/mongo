@@ -40,6 +40,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/sorter/sorter.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/yieldable.h"
 
@@ -219,6 +220,19 @@ public:
          * Persists on disk the keys that have been inserted using this BulkBuilder.
          */
         virtual IndexStateInfo persistDataForShutdown() = 0;
+
+    protected:
+        static void countNewBuildInStats();
+        static void countResumedBuildInStats();
+        static SorterFileStats* bulkBuilderFileStats();
+
+        /**
+         * Abandon the current snapshot and release then reacquire locks. Tests that target the
+         * behavior of bulk index builds that yield can use failpoints to stall this yield.
+         */
+        static void yield(OperationContext* opCtx,
+                          const Yieldable* yieldable,
+                          const NamespaceString& ns);
     };
 
     /**
