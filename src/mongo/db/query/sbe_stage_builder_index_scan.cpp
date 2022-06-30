@@ -318,8 +318,8 @@ generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
                                                  indexSnapshotSlot,
                                                  indexKeysToInclude,
                                                  std::move(indexKeySlots),
-                                                 lowKeySlot,
-                                                 highKeySlot,
+                                                 makeVariable(lowKeySlot),
+                                                 makeVariable(highKeySlot),
                                                  yieldPolicy,
                                                  planNodeId);
 
@@ -453,8 +453,8 @@ makeRecursiveBranchForGenericIndexScan(const CollectionPtr& collection,
                                                   snapshotIdSlot,
                                                   indexKeysToInclude,
                                                   std::move(savedIndexKeySlots),
-                                                  lowKeySlot,
-                                                  boost::none,
+                                                  makeVariable(lowKeySlot),
+                                                  nullptr /* seekKeyHigh */,
                                                   yieldPolicy,
                                                   planNodeId);
 
@@ -838,10 +838,24 @@ bool canGenerateSingleIntervalIndexScan(const std::vector<interval_evaluation_tr
 }  // namespace
 
 /**
- * Constructs an index scan plan which scans just a single contiguous range of an index.
+ * Constructs the most simple version of an index scan from the single interval index bounds. The
+ * generated subtree will have the following form:
  *
- * In case when the 'lowKey' and 'highKey' are not specified, slots will be registered for them in
- * the runtime environment and their slot ids returned as a pair in the third element of the tuple.
+ *         nlj [indexIdSlot, keyPatternSlot] []
+ *              left
+ *                  project [indexIdSlot = <indexName>, keyPatternSlot = <index key pattern>]
+ *                  limit 1
+ *                  coscan
+ *               right
+ *                  ixseek lowKeySlot highKeySlot recordIdSlot [] @coll @index
+ *
+ * The inner branch of the nested loop join produces a single row with indexName and index key
+ * pattern to be consumed above for the index key consistency check done when we do a fetch. In
+ * case when the 'lowKey' and 'highKey' are not specified, slots will be registered for them in the
+ * runtime environment and their slot ids returned as a pair in the third element of the tuple.
+ *
+ * If 'recordSlot' is provided, than the corresponding slot will be filled out with each KeyString
+ * in the index.
  */
 std::tuple<sbe::value::SlotId,
            std::unique_ptr<sbe::PlanStage>,
@@ -868,28 +882,36 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
             (lowKey && highKey) || (!lowKey && !highKey));
     const bool shouldRegisterLowHighKeyInRuntimeEnv = !lowKey;
 
-    // Construct a constant table scan to deliver a single row with two fields 'lowKeySlot' and
-    // 'highKeySlot', representing seek boundaries, into the index scan if 'lowKey' and 'highKey'
-    // are present. Otherwise the low and high keys will be obtained via variable references to
-    // runtime environment slots.
-    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
-    auto makeKeySlot = [&](std::unique_ptr<KeyString::Value> key) {
+    // This helper function returns a pair of 'EExpression' and an optional slotId depending on the
+    // presence of the 'key' argument. If the 'key' argument is present, we return a copy of the
+    // 'key' as wrapped in an 'EConstant' and 'boost::none' for the second part of the
+    // pair. The 'EConstant' can be embedded into the ixscan stage and eliminates the need for a
+    // 'LoopJoinStage' to feed the 'lowKey' and 'highKey' slots into the ixscan. Otherwise, a
+    // slot is generated in the runtime environment and this function returns the slot wrapped in
+    // an 'EVariable' as well as the slotId itself.
+    auto makeKeyExpr = [&](std::unique_ptr<KeyString::Value> key)
+        -> std::pair<std::unique_ptr<sbe::EExpression>, boost::optional<sbe::value::SlotId>> {
         if (key) {
-            auto keySlot = slotIdGenerator->generate();
-            projects.emplace(
-                keySlot,
+            return std::pair{
                 makeConstant(sbe::value::TypeTags::ksValue,
-                             sbe::value::bitcastFrom<KeyString::Value*>(key.release())));
-            return keySlot;
+                             sbe::value::bitcastFrom<KeyString::Value*>(key.release())),
+                boost::none};
         } else {
             auto keySlot = state.data->env->registerSlot(
                 sbe::value::TypeTags::Nothing, 0, true /* owned */, slotIdGenerator);
-            return keySlot;
+            return std::pair{makeVariable(keySlot), keySlot};
         }
     };
-    auto lowKeySlot = makeKeySlot(std::move(lowKey));
-    auto highKeySlot = makeKeySlot(std::move(highKey));
 
+    std::unique_ptr<sbe::EExpression> lowKeyExpr;
+    boost::optional<sbe::value::SlotId> lowKeySlot;
+    std::tie(lowKeyExpr, lowKeySlot) = makeKeyExpr(std::move(lowKey));
+
+    std::unique_ptr<sbe::EExpression> highKeyExpr;
+    boost::optional<sbe::value::SlotId> highKeySlot;
+    std::tie(highKeyExpr, highKeySlot) = makeKeyExpr(std::move(highKey));
+
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
     if (indexIdSlot) {
         // Construct a copy of 'indexName' to project for use in the index consistency check.
         projects.emplace(*indexIdSlot, makeConstant(indexName));
@@ -924,8 +946,8 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
         return sbe::makeS<sbe::FilterStage</* IsConst */ true, /* IsEof */ false>>(
             std::move(childStage),
             makeBinaryOp(sbe::EPrimBinary::logicAnd,
-                         makeFunction("exists", makeVariable(lowKeySlot)),
-                         makeFunction("exists", makeVariable(highKeySlot))),
+                         makeFunction("exists", lowKeyExpr->clone()),
+                         makeFunction("exists", highKeyExpr->clone())),
             planNodeId);
     }();
 
@@ -948,8 +970,8 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
                                                  indexSnapshotSlot,
                                                  indexKeysToInclude,
                                                  std::move(indexKeySlots),
-                                                 lowKeySlot,
-                                                 highKeySlot,
+                                                 std::move(lowKeyExpr),
+                                                 std::move(highKeyExpr),
                                                  yieldPolicy,
                                                  planNodeId);
 
@@ -975,11 +997,12 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
             sbe::makeS<sbe::LoopJoinStage>(std::move(lowHighKeyBranch),
                                            std::move(stage),
                                            std::move(outerSv),
-                                           sbe::makeSV(lowKeySlot, highKeySlot),
+                                           sbe::makeSV(),
                                            nullptr,
                                            planNodeId),
-            boost::make_optional(shouldRegisterLowHighKeyInRuntimeEnv,
-                                 std::pair(lowKeySlot, highKeySlot))};
+            shouldRegisterLowHighKeyInRuntimeEnv
+                ? boost::make_optional(std::pair(*lowKeySlot, *highKeySlot))
+                : boost::none};
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(

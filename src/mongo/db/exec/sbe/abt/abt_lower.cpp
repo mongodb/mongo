@@ -1012,52 +1012,23 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n, co
     const bool hasUpperBound = upperBoundExpr != nullptr;
     uassert(6624234, "Invalid bounds combination", hasLowerBound || !hasUpperBound);
 
-    boost::optional<sbe::value::SlotId> seekKeySlotLower;
-    boost::optional<sbe::value::SlotId> seekKeySlotUpper;
-    sbe::value::SlotVector correlatedSlotsForJoin;
-
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
-    auto projectForKeyStringBounds = sbe::makeS<sbe::LimitSkipStage>(
-        sbe::makeS<sbe::CoScanStage>(planNodeId), 1, boost::none, planNodeId);
-    if (hasLowerBound) {
-        seekKeySlotLower = _slotIdGenerator.generate();
-        correlatedSlotsForJoin.push_back(seekKeySlotLower.value());
-        projectForKeyStringBounds = sbe::makeProjectStage(std::move(projectForKeyStringBounds),
-                                                          planNodeId,
-                                                          seekKeySlotLower.value(),
-                                                          std::move(lowerBoundExpr));
-    }
-    if (hasUpperBound) {
-        seekKeySlotUpper = _slotIdGenerator.generate();
-        correlatedSlotsForJoin.push_back(seekKeySlotUpper.value());
-        projectForKeyStringBounds = sbe::makeProjectStage(std::move(projectForKeyStringBounds),
-                                                          planNodeId,
-                                                          seekKeySlotUpper.value(),
-                                                          std::move(upperBoundExpr));
-    }
 
     // Unused.
     boost::optional<sbe::value::SlotId> resultSlot;
 
-    auto result = sbe::makeS<sbe::IndexScanStage>(nss.uuid().get(),
-                                                  indexDefName,
-                                                  !indexSpec.isReverseOrder(),
-                                                  resultSlot,
-                                                  ridSlot,
-                                                  boost::none,
-                                                  indexKeysToInclude,
-                                                  vars,
-                                                  seekKeySlotLower,
-                                                  seekKeySlotUpper,
-                                                  nullptr /*yieldPolicy*/,
-                                                  planNodeId);
-
-    return sbe::makeS<sbe::LoopJoinStage>(std::move(projectForKeyStringBounds),
-                                          std::move(result),
-                                          sbe::makeSV(),
-                                          std::move(correlatedSlotsForJoin),
-                                          nullptr,
-                                          planNodeId);
+    return sbe::makeS<sbe::IndexScanStage>(nss.uuid().get(),
+                                           indexDefName,
+                                           !indexSpec.isReverseOrder(),
+                                           resultSlot,
+                                           ridSlot,
+                                           boost::none,
+                                           indexKeysToInclude,
+                                           vars,
+                                           std::move(lowerBoundExpr),
+                                           std::move(upperBoundExpr),
+                                           nullptr /*yieldPolicy*/,
+                                           planNodeId);
 }
 
 std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SeekNode& n,

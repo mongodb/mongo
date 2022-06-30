@@ -31,22 +31,22 @@
 
 #include "mongo/bson/ordering.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo::sbe {
 /**
  * A stage that iterates the entries of a collection index, starting from a bound specified by the
- * value in 'seekKeySlotLow' and ending (via IS_EOF) with the 'seekKeySlotHigh' bound. (An
- * unspecified 'seekKeySlotHigh' scans to the end of the index. Leaving both bounds unspecified
- * scans the index from beginning to end.)
+ * value in 'seekKeyLow' and ending (via IS_EOF) with the 'seekKeyHigh' bound. (A null 'seekKeyHigh'
+ * scans to the end of the index. Leaving both bounds as null scans the index from beginning to
+ * end.)
  *
- * The input 'seekKeySlotLow' and 'seekKeySlotHigh' slots get read as part of the open (or re-open)
- * call. A common use case for an IndexScanStage is to place it as the inner child of LoopJoinStage.
- * The outer side of the LoopJoinStage determines the bounds, and the inner IndexScanStage iterates
- * through all the entries within those bounds.
+ * The input 'seekKeyLow' and 'seekKeyHigh' EExpressions get evaluated as part of the open
+ * (or re-open) call.
  *
  * The "output" slots are
  *   - 'recordSlot': the "KeyString" representing the index entry,
@@ -80,8 +80,8 @@ public:
                    boost::optional<value::SlotId> snapshotIdSlot,
                    IndexKeysInclusionSet indexKeysToInclude,
                    value::SlotVector vars,
-                   boost::optional<value::SlotId> seekKeySlotLow,
-                   boost::optional<value::SlotId> seekKeySlotHigh,
+                   std::unique_ptr<EExpression> seekKeyLow,
+                   std::unique_ptr<EExpression> seekKeyHigh,
                    PlanYieldPolicy* yieldPolicy,
                    PlanNodeId planNodeId,
                    bool participateInTrialRunTracking = true);
@@ -128,8 +128,15 @@ private:
     const boost::optional<value::SlotId> _snapshotIdSlot;
     const IndexKeysInclusionSet _indexKeysToInclude;
     const value::SlotVector _vars;
-    const boost::optional<value::SlotId> _seekKeySlotLow;
-    const boost::optional<value::SlotId> _seekKeySlotHigh;
+
+    std::unique_ptr<EExpression> _seekKeyLow;
+    std::unique_ptr<EExpression> _seekKeyHigh;
+
+    // Carries the compiled bytecode for the above '_seekKeyLow' and '_seekKeyHigh'.
+    std::unique_ptr<vm::CodeFragment> _seekKeyLowCode;
+    std::unique_ptr<vm::CodeFragment> _seekKeyHighCode;
+
+    vm::ByteCode _bytecode;
 
     // These members are default constructed to boost::none and are initialized when 'prepare()'
     // is called. Once they are set, they are never modified again.
