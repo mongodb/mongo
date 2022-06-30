@@ -52,7 +52,7 @@ assert.commandWorked(collB.insert({a: 7, b: 7}));
 
 try {
     // TODO: these results need to be updated as the lookup implementation is completed. See
-    // comments visitor of DocumentSourceLookUp in abt_document_source_visitor.
+    // comments visitor of DocumentSourceLookUp in abt/document_source_visitor.
 
     // Prevent unwind and sort from being reordered with lookup.
     assert.commandWorked(

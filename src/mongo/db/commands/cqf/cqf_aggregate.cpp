@@ -31,7 +31,7 @@
 
 #include "mongo/db/commands/cqf/cqf_command_utils.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
-#include "mongo/db/pipeline/abt/abt_document_source_visitor.h"
+#include "mongo/db/pipeline/abt/document_source_visitor.h"
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
 #include "mongo/db/query/ce/ce_sampling.h"
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"

@@ -32,6 +32,7 @@
 #include <stack>
 
 #include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
 
 namespace mongo::optimizer {
 
@@ -42,15 +43,24 @@ public:
                                 const std::string& rootProjection,
                                 const std::string& uniqueIdPrefix);
 
+    /**
+     * Push an ABT onto the stack. Optionally perform a check on the type of the ABT based on
+     * 'assertExprSort' and 'assertPathSort'
+     */
     template <typename T, typename... Args>
     inline auto push(Args&&... args) {
-        push(std::move(ABT::make<T>(std::forward<Args>(args)...)));
+        push(ABT::make<T>(std::forward<Args>(args)...));
     }
-
     void push(ABT node);
 
+    /*
+     * Pop the most recent ABT from the stack. Asserts if there is no node in the stack.
+     */
     ABT pop();
 
+    /*
+     * Asserts if there are not at least 'arity' nodes in the stack.
+     */
     void ensureArity(size_t arity);
 
     const std::string& getRootProjection() const;
@@ -58,14 +68,26 @@ public:
 
     const std::string& getUniqueIdPrefix() const;
 
+    /**
+     * Returns a unique string for a new projection name. It will be prefixed by 'uniqueIdPrefix'.
+     */
+    std::string getNextId(const std::string& key);
+
 private:
     const bool _assertExprSort;
     const bool _assertPathSort;
 
+    // The name of the input projection on which the top-level expression will be evaluated.
     const std::string _rootProjection;
     const ABT _rootProjVar;
-    const std::string _uniqueIdPrefix;
 
+    // Used to vend out unique strings for projection names.
+    const std::string _uniqueIdPrefix;
+    PrefixId _prefixId;
+
+    // Used to track the parts of the expression tree that have so far been translated to ABT.
+    // Maintained as a stack so parent expressions can easily compose the ABTs representing their
+    // child expressions.
     std::stack<ABT> _stack;
 };
 

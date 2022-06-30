@@ -27,7 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/abt/abt_document_source_visitor.h"
+#include "mongo/db/pipeline/abt/document_source_visitor.h"
+
 #include "mongo/db/exec/add_fields_projection_executor.h"
 #include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
@@ -79,6 +80,10 @@
 
 namespace mongo::optimizer {
 
+/**
+ * Used to track information including the current root node of the ABT and the current projection
+ * representing output documents.
+ */
 class DSAlgebrizerContext {
 public:
     struct NodeWithRootProjection {
@@ -147,7 +152,6 @@ public:
     }
 
     void visit(const GroupFromFirstDocumentTransformation* transformer) override {
-        // TODO: Is this internal-only?
         unsupportedTransformer(transformer);
     }
 
@@ -160,6 +164,8 @@ public:
         _ctx.setNode<EvaluationNode>(projName, projName, std::move(expr), std::move(entry._node));
     }
 
+    // Creates a single EvaluationNode representing simple projections (e.g. inclusion projections)
+    // and computed projections, if present, and updates the context with the new node.
     void generateCombinedProjection() const {
         auto result = _builder.generateABT();
         if (!result) {
@@ -185,7 +191,12 @@ private:
                 !FieldRef(path).hasNumericPathComponents());
     }
 
+    /**
+     * Handles simple inclusion projections.
+     */
     void processProjectedPaths(const projection_executor::InclusionNode& node) {
+        // For each preserved path, mark that each path element along the field path should be
+        // included.
         std::set<std::string> preservedPaths;
         node.reportProjectedPaths(&preservedPaths);
 
@@ -200,6 +211,9 @@ private:
         }
     }
 
+    /**
+     * Handles renamed fields and computed projections.
+     */
     void processComputedPaths(const projection_executor::InclusionNode& node,
                               const std::string& rootProjection,
                               const bool isAddingFields) {
@@ -279,12 +293,13 @@ private:
     }
 
     void visitExclusionNode(const projection_executor::ExclusionNode& node) {
-        std::set<std::string> preservedPaths;
-        node.reportProjectedPaths(&preservedPaths);
-
-        for (const std::string& preservedPathStr : preservedPaths) {
-            assertSupportedPath(preservedPathStr);
-            _builder.integrateFieldPath(FieldPath(preservedPathStr),
+        // Handle simple exclusion projections: for each excluded path, mark that the last field
+        // path element should be dropped.
+        std::set<std::string> excludedPaths;
+        node.reportProjectedPaths(&excludedPaths);
+        for (const std::string& excludedPathStr : excludedPaths) {
+            assertSupportedPath(excludedPathStr);
+            _builder.integrateFieldPath(FieldPath(excludedPathStr),
                                         [](const bool isLastElement, FieldMapEntry& entry) {
                                             if (isLastElement) {
                                                 entry._hasDrop = true;
@@ -634,7 +649,7 @@ public:
                                                 entry._rootProjection,
                                                 _ctx.getNextId("matchExpression"));
 
-        // If we have a top-level composition, create separate filters.
+        // If we have a top-level composition, flatten it into a chain of separate FilterNodes.
         const auto& composition = collectComposed(matchExpr);
         for (const auto& path : composition) {
             _ctx.setNode<FilterNode>(entry._rootProjection,

@@ -37,8 +37,8 @@ namespace mongo::optimizer {
 
 /**
  * Represents a tree of paths with attached properties. For example adding "a.b" and "a.c" results
- * in a root node "a" with two children "b" and "c". By setting appropriate we can create a path
- * tree for a $project expression:
+ * in a root node "a" with two children "b" and "c". By setting appropriate properties we can create
+ * a path tree for a $project expression:
  *   Field "a" * Keep "a"
  *      |
  *      Traverse
@@ -57,6 +57,9 @@ struct FieldMapEntry {
     bool _hasDrop = false;
     std::string _constVarName;
 
+    // TODO SERVER-66846: Consider maintaining children as a vector of FieldMapEntry's. Then we can
+    // remove the _fieldMap member of FieldMapBuilder.
+    // Child paths are potentially dotted field paths.
     std::set<std::string> _childPaths;
 };
 
@@ -67,10 +70,28 @@ public:
     FieldMapBuilder(const ProjectionName& rootProjName, bool isRootSameAsScanProj)
         : _rootProjName(rootProjName), _isRootSameAsScanProj(isRootSameAsScanProj) {}
 
+    /**
+     * Adds 'fieldPath' as a projected field, creating FieldMapEntries for each element along the
+     * path as necessary, and applying 'fn' to each created FieldMapEntry.
+     */
     void integrateFieldPath(
         const FieldPath& fieldPath,
         const std::function<void(const bool isLastElement, FieldMapEntry& entry)>& fn);
 
+    /**
+     * Produce an ABT representing all fields integrated so far under a single EvalPath. For
+     * example, assuming "a.b" and "a.c" were integrated as fields in an inclusion projection, an
+     * output may look like:
+     *  EvalPath
+     *  |                        |
+     *  Field "a" * Keep "a"     Variable[rootProjName]
+     *      |
+     *      Traverse
+     *        |
+     *        Obj * Keep "b", "c"
+     *
+     * Returns boost::none when no fields have been integrated so far.
+     */
     boost::optional<ABT> generateABT() const;
 
 private:
@@ -79,6 +100,7 @@ private:
     const ProjectionName& _rootProjName;
     const bool _isRootSameAsScanProj;
 
+    // Maps from potentially dotted field path to FieldMapEntry.
     opt::unordered_map<std::string, FieldMapEntry> _fieldMap;
 };
 

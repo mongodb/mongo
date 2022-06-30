@@ -104,9 +104,13 @@ ABT FieldMapBuilder::generateABTForField(const FieldMapEntry& entry) const {
                                          make<PathConstant>(make<Variable>(varMapEntry.second))));
     }
 
+    // By this point we have constructed an ABT which contains the appropriate keep/drop logic up to
+    // and including the child paths of 'entry'. For example, if 'entry' represents path 'a' with
+    // children 'b' and 'c', paths 'a.b' and 'a.c' are appropriately kept or dropped.
     for (const std::string& childPath : entry._childPaths) {
         const FieldMapEntry& childEntry = _fieldMap.at(childPath);
 
+        // Recursively construct ABTs for the paths below each child entry.
         ABT childResult = generateABTForField(childEntry);
         if (!childResult.is<PathIdentity>()) {
             maybeComposePath(

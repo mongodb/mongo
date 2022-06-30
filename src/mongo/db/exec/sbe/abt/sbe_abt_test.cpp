@@ -29,7 +29,7 @@
 
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
-#include "mongo/db/pipeline/abt/abt_document_source_visitor.h"
+#include "mongo/db/pipeline/abt/document_source_visitor.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"

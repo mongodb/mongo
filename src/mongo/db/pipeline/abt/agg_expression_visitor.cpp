@@ -42,7 +42,7 @@ namespace mongo::optimizer {
 
 class ABTAggExpressionVisitor final : public ExpressionConstVisitor {
 public:
-    ABTAggExpressionVisitor(ExpressionAlgebrizerContext& ctx) : _prefixId(), _ctx(ctx){};
+    ABTAggExpressionVisitor(ExpressionAlgebrizerContext& ctx) : _ctx(ctx){};
 
     void visit(const ExpressionConstant* expr) override final {
         auto [tag, val] = convertFrom(expr->getValue());
@@ -846,16 +846,10 @@ private:
         return os.str();
     }
 
-    std::string getNextId(const std::string& key) {
-        return _ctx.getUniqueIdPrefix() + "_" + _prefixId.getNextId(key);
-    }
-
     void unsupportedExpression(const char* op) const {
         uasserted(ErrorCodes::InternalErrorNotSupported,
                   str::stream() << "Expression is not supported: " << op);
     }
-
-    PrefixId _prefixId;
 
     // We don't own this.
     ExpressionAlgebrizerContext& _ctx;

@@ -69,7 +69,7 @@ namespace mongo::optimizer {
 class ABTMatchExpressionVisitor : public MatchExpressionConstVisitor {
 public:
     ABTMatchExpressionVisitor(ExpressionAlgebrizerContext& ctx, const bool allowAggExpressions)
-        : _prefixId(), _allowAggExpressions(allowAggExpressions), _ctx(ctx) {}
+        : _allowAggExpressions(allowAggExpressions), _ctx(ctx) {}
 
     void visit(const AlwaysFalseMatchExpression* expr) override {
         generateBoolConstant(false);
@@ -112,6 +112,8 @@ public:
     }
 
     void visit(const ExistsMatchExpression* expr) override {
+        assertSupportedPathExpression(expr);
+
         ABT result = make<PathDefault>(Constant::boolean(false));
         if (!expr->path().empty()) {
             result = generateFieldPath(FieldPath(expr->path().toString()), std::move(result));
@@ -322,8 +324,7 @@ public:
     }
 
     void visit(const NotMatchExpression* expr) override {
-        ABT result = generateMatchExpression(
-            expr->getChild(0), _allowAggExpressions, _ctx.getRootProjection(), getNextId("not"));
+        ABT result = _ctx.pop();
         _ctx.push(make<PathConstant>(make<UnaryOp>(
             Operations::Not,
             make<EvalFilter>(std::move(result), make<Variable>(_ctx.getRootProjection())))));
@@ -338,7 +339,9 @@ public:
     }
 
     void visit(const SizeMatchExpression* expr) override {
-        const std::string lambdaProjName = getNextId("lambda_sizeMatch");
+        assertSupportedPathExpression(expr);
+
+        const std::string lambdaProjName = _ctx.getNextId("lambda_sizeMatch");
         ABT result = make<PathLambda>(make<LambdaAbstraction>(
             lambdaProjName,
             make<BinaryOp>(
@@ -371,7 +374,9 @@ public:
     }
 
     void visit(const TypeMatchExpression* expr) override {
-        const std::string lambdaProjName = getNextId("lambda_typeMatch");
+        assertSupportedPathExpression(expr);
+
+        const std::string lambdaProjName = _ctx.getNextId("lambda_typeMatch");
         ABT result = make<PathLambda>(make<LambdaAbstraction>(
             lambdaProjName,
             make<FunctionCall>("typeMatch",
@@ -462,14 +467,14 @@ private:
             if constexpr (isMin) {
                 return {Constant::str(""), true};
             } else {
-                // TODO: we need limit string from above.
+                // TODO SERVER-67369: we need limit string from above.
                 return {boost::none, false};
             }
         } else if (tag == sbe::value::TypeTags::Null) {
             // Same bound above and below.
             return {Constant::null(), true};
         } else {
-            // TODO: compute bounds for other types based on bsonobjbuilder.cpp.
+            // TODO SERVER-67369: compute bounds for other types based on bsonobjbuilder.cpp.
             return {boost::none, false};
         }
 
@@ -574,18 +579,12 @@ private:
         _ctx.push(std::move(node));
     }
 
-    std::string getNextId(const std::string& key) {
-        return _ctx.getUniqueIdPrefix() + "_" + _prefixId.getNextId(key);
-    }
-
     void unsupportedExpression(const MatchExpression* expr) const {
         uasserted(ErrorCodes::InternalErrorNotSupported,
                   str::stream() << "Match expression is not supported: " << expr->matchType());
     }
 
-    PrefixId _prefixId;
-
-    // If we are parsing a partial index filter, we don't allow match expressions.
+    // If we are parsing a partial index filter, we don't allow agg expressions.
     const bool _allowAggExpressions;
 
     // We don't own this
