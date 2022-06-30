@@ -592,23 +592,16 @@ public:
     void addAlreadySorted(const Key&, const Value&);
 
     /**
-     * Writes any data remaining in the buffer to disk and then closes the file to which data was
+     * Spills any data remaining in the buffer to disk and then closes the file to which data was
      * written.
      *
      * No more data can be added via addAlreadySorted() after calling done().
      */
     Iterator* done();
 
-    /**
-     * The SortedFileWriter organizes data into chunks, with a chunk getting written to the output
-     * file when it exceends a maximum chunks size. A SortedFilerWriter client can produce a short
-     * chunk by manually calling this function.
-     *
-     * If no new data has been added since the last chunk was written, this function is a no-op.
-     */
-    void writeChunk();
-
 private:
+    void spill();
+
     const Settings _settings;
     std::shared_ptr<typename Sorter<Key, Value>::File> _file;
     BufBuilder _buffer;
