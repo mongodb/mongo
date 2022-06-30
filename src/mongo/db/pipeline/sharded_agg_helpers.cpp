@@ -64,7 +64,7 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -734,7 +734,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     boost::optional<BSONObj> readConcern) {
     auto&& [aggRequest, pipeline] = [&] {
         return stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [&](std::unique_ptr<Pipeline, PipelineDeleter>&& pipeline) {
                     return std::make_pair(
                         AggregateCommandRequest(expCtx->ns, pipeline->serializeToBson()),

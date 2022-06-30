@@ -35,8 +35,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/text.h"
-#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 namespace {
@@ -95,7 +95,7 @@ void DuplicateKeyErrorInfo::serialize(BSONObjBuilder* bob) const {
     }
 
     stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [](stdx::monostate) {},
             [bob](const RecordId& rid) { rid.serializeToken("foundValue", bob); },
             [bob](const BSONObj& obj) {

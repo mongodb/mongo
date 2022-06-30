@@ -231,7 +231,7 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
     sb << builderForErrmsg.obj();
 
     stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [](stdx::monostate) {},
             [&sb](const RecordId& rid) { sb << " found value: " << rid; },
             [&sb](const BSONObj& obj) {

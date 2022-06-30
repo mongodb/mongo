@@ -34,7 +34,7 @@
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 
 using boost::intrusive_ptr;
 using boost::optional;
@@ -493,7 +493,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::finishDensifyingPar
         return DocumentSource::GetNextResult::makeEOF();
     }
     return stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [&](Full) {
                 // Densify between partitions's last seen value and global max.
                 tassert(5733707, "_current must be set if partitionTable is non-empty", _current);
@@ -518,7 +518,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::finishDensifyingPar
 DocumentSource::GetNextResult DocumentSourceInternalDensify::handleSourceExhausted() {
     _eof = true;
     return stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [&](RangeStatement::Full) {
                 if (_partitionExpr) {
                     return finishDensifyingPartitionedInput();
@@ -705,7 +705,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
             }
 
             return stdx::visit(
-                visit_helper::Overloaded{
+                OverloadedVisitor{
                     [&](Full) {
                         _current = val;
                         _globalMin = val;
@@ -742,59 +742,64 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
             auto val = getDensifyValue(currentDoc);
 
             return stdx::visit(
-                visit_helper::Overloaded{
-                    [&](Full) {
-                        if (_partitionExpr) {
-                            // Keep track of '_globalMax' for later. The latest document from the
-                            // source is always the max.
-                            _globalMax = val;
-                            // If we haven't seen this partition before, densify between
-                            // '_globalMin' and this value.
-                            auto partitionVal = getDensifyPartition(currentDoc);
-                            auto foundPartitionVal = _partitionTable.find(partitionVal);
-                            if (foundPartitionVal == _partitionTable.end()) {
-                                // _current represents the last value seen. We want to generate
-                                // _globalMin, so pretend we've seen the value before that.
-                                _current = _globalMin->decrement(_range);
-                                // Insert the new partition into the table.
-                                setPartitionValue(currentDoc);
-                                return handleNeedGen(currentDoc);
-                            }
-                            // Otherwise densify between the last seen value and this one.
-                            _current = foundPartitionVal->second;
-                        }
-                        return handleNeedGen(currentDoc);
-                    },
-                    [&](Partition) {
-                        // If we haven't seen this partition before, add it to the table then
-                        // return.
-                        auto partitionVal = getDensifyPartition(currentDoc);
-                        auto foundPartitionVal = _partitionTable.find(partitionVal);
-                        if (foundPartitionVal == _partitionTable.end()) {
-                            setPartitionValue(currentDoc);
-                            return nextDoc;
-                        }
-                        // Reset current to be the last value in this partition.
-                        _current = foundPartitionVal->second;
-                        return handleNeedGen(currentDoc);
-                    },
-                    [&](ExplicitBounds bounds) {
-                        if (_partitionExpr) {
-                            // If we haven't seen this partition before, add it to the table
-                            // then check where it is in the range.
-                            auto partitionVal = getDensifyPartition(currentDoc);
-                            auto foundPartitionVal = _partitionTable.find(partitionVal);
-                            if (foundPartitionVal == _partitionTable.end()) {
-                                setPartitionValue(currentDoc);
-                                // This partition has seen no values.
-                                _current = boost::none;
-                                return processFirstDocForExplicitRange(currentDoc);
-                            }
-                            // Otherwise reset current to be the last value in this partition.
-                            _current = foundPartitionVal->second;
-                        }
-                        return handleNeedGenExplicit(nextDoc.getDocument());
-                    }},
+                OverloadedVisitor{[&](Full) {
+                                      if (_partitionExpr) {
+                                          // Keep track of '_globalMax' for later. The latest
+                                          // document from the source is always the max.
+                                          _globalMax = val;
+                                          // If we haven't seen this partition before, densify
+                                          // between
+                                          // '_globalMin' and this value.
+                                          auto partitionVal = getDensifyPartition(currentDoc);
+                                          auto foundPartitionVal =
+                                              _partitionTable.find(partitionVal);
+                                          if (foundPartitionVal == _partitionTable.end()) {
+                                              // _current represents the last value seen. We want to
+                                              // generate _globalMin, so pretend we've seen the
+                                              // value before that.
+                                              _current = _globalMin->decrement(_range);
+                                              // Insert the new partition into the table.
+                                              setPartitionValue(currentDoc);
+                                              return handleNeedGen(currentDoc);
+                                          }
+                                          // Otherwise densify between the last seen value and this
+                                          // one.
+                                          _current = foundPartitionVal->second;
+                                      }
+                                      return handleNeedGen(currentDoc);
+                                  },
+                                  [&](Partition) {
+                                      // If we haven't seen this partition before, add it to the
+                                      // table then return.
+                                      auto partitionVal = getDensifyPartition(currentDoc);
+                                      auto foundPartitionVal = _partitionTable.find(partitionVal);
+                                      if (foundPartitionVal == _partitionTable.end()) {
+                                          setPartitionValue(currentDoc);
+                                          return nextDoc;
+                                      }
+                                      // Reset current to be the last value in this partition.
+                                      _current = foundPartitionVal->second;
+                                      return handleNeedGen(currentDoc);
+                                  },
+                                  [&](ExplicitBounds bounds) {
+                                      if (_partitionExpr) {
+                                          // If we haven't seen this partition before, add it to the
+                                          // table then check where it is in the range.
+                                          auto partitionVal = getDensifyPartition(currentDoc);
+                                          auto foundPartitionVal =
+                                              _partitionTable.find(partitionVal);
+                                          if (foundPartitionVal == _partitionTable.end()) {
+                                              setPartitionValue(currentDoc);
+                                              // This partition has seen no values.
+                                              _current = boost::none;
+                                              return processFirstDocForExplicitRange(currentDoc);
+                                          }
+                                          // Otherwise reset current to be the last value in this
+                                          // partition.
+                                          _current = foundPartitionVal->second;
+                                      }
+                                      return handleNeedGenExplicit(nextDoc.getDocument());
+                                  }},
                 _range.getBounds());
         }
         case DensifyState::kHaveGenerator: {
@@ -805,50 +810,49 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
             auto generatedDoc = _docGenerator->getNextDocument();
 
             return stdx::visit(
-                visit_helper::Overloaded{[&](Full) {
-                                             if (_docGenerator->done()) {
-                                                 _docGenerator = boost::none;
-                                                 if (_eof && _partitionExpr) {
-                                                     _densifyState =
-                                                         DensifyState::kFinishingDensify;
-                                                 } else {
-                                                     _densifyState = DensifyState::kNeedGen;
-                                                 }
-                                             }
-                                             // The generator's final document may not be on the
-                                             // step.
-                                             auto genDensifyVal = getDensifyValue(generatedDoc);
-                                             if (genDensifyVal == _current->increment(_range)) {
-                                                 _current = genDensifyVal;
-                                                 setPartitionValue(generatedDoc);
-                                             }
-                                             return generatedDoc;
-                                         },
-                                         [&](Partition) {
-                                             if (_docGenerator->done()) {
-                                                 _docGenerator = boost::none;
-                                                 _densifyState = DensifyState::kNeedGen;
-                                             }
-                                             // The generator's final document may not be on the
-                                             // step.
-                                             auto genDensifyVal = getDensifyValue(generatedDoc);
-                                             if (genDensifyVal == _current->increment(_range)) {
-                                                 _current = genDensifyVal;
-                                                 setPartitionValue(generatedDoc);
-                                             }
-                                             return generatedDoc;
-                                         },
-                                         [&](ExplicitBounds bounds) {
-                                             auto val = getDensifyValue(generatedDoc);
-                                             // Only want to update the rangeMin if the value -
-                                             // current is divisible by the step.
-                                             if (val.isOnStepRelativeTo(*_current, _range)) {
-                                                 _current = val;
-                                                 setPartitionValue(generatedDoc);
-                                             }
-                                             resetDocGen(bounds);
-                                             return generatedDoc;
-                                         }},
+                OverloadedVisitor{[&](Full) {
+                                      if (_docGenerator->done()) {
+                                          _docGenerator = boost::none;
+                                          if (_eof && _partitionExpr) {
+                                              _densifyState = DensifyState::kFinishingDensify;
+                                          } else {
+                                              _densifyState = DensifyState::kNeedGen;
+                                          }
+                                      }
+                                      // The generator's final document may not be on the
+                                      // step.
+                                      auto genDensifyVal = getDensifyValue(generatedDoc);
+                                      if (genDensifyVal == _current->increment(_range)) {
+                                          _current = genDensifyVal;
+                                          setPartitionValue(generatedDoc);
+                                      }
+                                      return generatedDoc;
+                                  },
+                                  [&](Partition) {
+                                      if (_docGenerator->done()) {
+                                          _docGenerator = boost::none;
+                                          _densifyState = DensifyState::kNeedGen;
+                                      }
+                                      // The generator's final document may not be on the
+                                      // step.
+                                      auto genDensifyVal = getDensifyValue(generatedDoc);
+                                      if (genDensifyVal == _current->increment(_range)) {
+                                          _current = genDensifyVal;
+                                          setPartitionValue(generatedDoc);
+                                      }
+                                      return generatedDoc;
+                                  },
+                                  [&](ExplicitBounds bounds) {
+                                      auto val = getDensifyValue(generatedDoc);
+                                      // Only want to update the rangeMin if the value -
+                                      // current is divisible by the step.
+                                      if (val.isOnStepRelativeTo(*_current, _range)) {
+                                          _current = val;
+                                          setPartitionValue(generatedDoc);
+                                      }
+                                      resetDocGen(bounds);
+                                      return generatedDoc;
+                                  }},
                 _range.getBounds());
         }
         case DensifyState::kFinishingDensify: {
@@ -875,7 +879,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
 
 DensifyValue DensifyValue::increment(const RangeStatement& range) const {
     return stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [&](Value val) {
                 return DensifyValue(uassertStatusOK(ExpressionAdd::apply(val, range.getStep())));
             },
@@ -888,7 +892,7 @@ DensifyValue DensifyValue::increment(const RangeStatement& range) const {
 
 DensifyValue DensifyValue::decrement(const RangeStatement& range) const {
     return stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [&](Value val) {
                 return DensifyValue(
                     uassertStatusOK(ExpressionSubtract::apply(val, range.getStep())));
@@ -902,7 +906,7 @@ DensifyValue DensifyValue::decrement(const RangeStatement& range) const {
 
 bool DensifyValue::isOnStepRelativeTo(DensifyValue base, RangeStatement range) const {
     return stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [&](Value val) {
                 Value diff = uassertStatusOK(ExpressionSubtract::apply(val, base.getNumber()));
                 Value remainder = uassertStatusOK(ExpressionMod::apply(diff, range.getStep()));

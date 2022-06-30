@@ -37,7 +37,7 @@
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo::cst_sort_translation {
 
@@ -50,7 +50,7 @@ SortPattern translateSortSpec(const CNode& cst,
         auto&& path = path::vectorToString(
             std::move(stdx::get<SortPath>(stdx::get<FieldnamePath>(keyValPair.first)).components));
         stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [&](const CNode::ObjectChildren& object) {
                     // $meta is always the only key in the object, and always has a KeyValue as its
                     // value.

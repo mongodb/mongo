@@ -42,7 +42,7 @@
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/matcher_type_set.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo::cst_match_translation {
 namespace {
@@ -90,17 +90,17 @@ std::unique_ptr<MatchExpression> translateNot(const UserFieldname& fieldName,
 std::unique_ptr<MatchExpression> translateExists(const CNode::Fieldname& fieldName,
                                                  const CNode& argument) {
     auto root = std::make_unique<ExistsMatchExpression>(stdx::get<UserFieldname>(fieldName));
-    if (stdx::visit(
-            visit_helper::Overloaded{
-                [&](const UserLong& userLong) { return userLong != 0; },
-                [&](const UserDouble& userDbl) { return userDbl != 0; },
-                [&](const UserDecimal& userDc) { return userDc.isNotEqual(Decimal128(0)); },
-                [&](const UserInt& userInt) { return userInt != 0; },
-                [&](const UserBoolean& b) { return b; },
-                [&](const UserNull&) { return false; },
-                [&](const UserUndefined&) { return false; },
-                [&](auto&&) { return true; }},
-            argument.payload)) {
+    if (stdx::visit(OverloadedVisitor{[&](const UserLong& userLong) { return userLong != 0; },
+                                      [&](const UserDouble& userDbl) { return userDbl != 0; },
+                                      [&](const UserDecimal& userDc) {
+                                          return userDc.isNotEqual(Decimal128(0));
+                                      },
+                                      [&](const UserInt& userInt) { return userInt != 0; },
+                                      [&](const UserBoolean& b) { return b; },
+                                      [&](const UserNull&) { return false; },
+                                      [&](const UserUndefined&) { return false; },
+                                      [&](auto&&) { return true; }},
+                    argument.payload)) {
         return root;
     }
     return std::make_unique<NotMatchExpression>(root.release());
@@ -110,7 +110,7 @@ MatcherTypeSet getMatcherTypeSet(const CNode& argument) {
     MatcherTypeSet ts;
     auto add_individual_to_type_set = [&](const CNode& a) {
         return stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [&](const UserLong& userLong) {
                     auto valueAsInt =
                         BSON("" << userLong).firstElement().parseIntegerElementToInt();
@@ -275,7 +275,7 @@ std::unique_ptr<MatchExpression> translateMatchPredicate(
     } else {
         // Expression is over a user fieldname.
         return stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [&](const CNode::ObjectChildren& userObject) -> std::unique_ptr<MatchExpression> {
                     return translatePathExpression(stdx::get<UserFieldname>(fieldName), userObject);
                 },

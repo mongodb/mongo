@@ -109,7 +109,7 @@ private:
     void initialize() {
         auto needMore = [&](int index) {
             return stdx::visit(
-                visit_helper::Overloaded{
+                OverloadedVisitor{
                     [&](const WindowBounds::Unbounded&) { return true; },
                     [&](const WindowBounds::Current&) { return index == 0; },
                     [&](const int& n) { return index <= n; },

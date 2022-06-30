@@ -31,7 +31,7 @@
 
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 
 #include "mongo/bson/bsonobj.h"
 
@@ -116,27 +116,27 @@ std::size_t BatchedCommandRequest::sizeWriteOps() const {
 }
 
 bool BatchedCommandRequest::hasLegacyRuntimeConstants() const {
-    return _visit(visit_helper::Overloaded{[](write_ops::InsertCommandRequest&) { return false; },
-                                           [&](write_ops::UpdateCommandRequest& op) {
-                                               return op.getLegacyRuntimeConstants().has_value();
-                                           },
-                                           [&](write_ops::DeleteCommandRequest& op) {
-                                               return op.getLegacyRuntimeConstants().has_value();
-                                           }});
-}
-
-void BatchedCommandRequest::setLegacyRuntimeConstants(LegacyRuntimeConstants runtimeConstants) {
-    _visit(visit_helper::Overloaded{[](write_ops::InsertCommandRequest&) {},
+    return _visit(OverloadedVisitor{[](write_ops::InsertCommandRequest&) { return false; },
                                     [&](write_ops::UpdateCommandRequest& op) {
-                                        op.setLegacyRuntimeConstants(std::move(runtimeConstants));
+                                        return op.getLegacyRuntimeConstants().has_value();
                                     },
                                     [&](write_ops::DeleteCommandRequest& op) {
-                                        op.setLegacyRuntimeConstants(std::move(runtimeConstants));
+                                        return op.getLegacyRuntimeConstants().has_value();
                                     }});
 }
 
+void BatchedCommandRequest::setLegacyRuntimeConstants(LegacyRuntimeConstants runtimeConstants) {
+    _visit(OverloadedVisitor{[](write_ops::InsertCommandRequest&) {},
+                             [&](write_ops::UpdateCommandRequest& op) {
+                                 op.setLegacyRuntimeConstants(std::move(runtimeConstants));
+                             },
+                             [&](write_ops::DeleteCommandRequest& op) {
+                                 op.setLegacyRuntimeConstants(std::move(runtimeConstants));
+                             }});
+}
+
 void BatchedCommandRequest::unsetLegacyRuntimeConstants() {
-    _visit(visit_helper::Overloaded{
+    _visit(OverloadedVisitor{
         [](write_ops::InsertCommandRequest&) {},
         [&](write_ops::UpdateCommandRequest& op) { op.setLegacyRuntimeConstants(boost::none); },
         [&](write_ops::DeleteCommandRequest& op) { op.setLegacyRuntimeConstants(boost::none); }});

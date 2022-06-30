@@ -260,63 +260,64 @@ public:
             return;
         }
         stdx::visit(
-            visit_helper::Overloaded{
-                [&](const MergeInfo& mergeAction) {
-                    auto& mergeResponse = stdx::get<Status>(response);
-                    auto& shardingPendingActions = _pendingActionsByShards[mergeAction.shardId];
-                    handleActionResult(
-                        opCtx,
-                        _nss,
-                        _uuid,
-                        getType(),
-                        mergeResponse,
-                        [&]() {
-                            shardingPendingActions.rangesWithoutDataSize.emplace_back(
-                                mergeAction.chunkRange);
-                        },
-                        [&]() {
-                            shardingPendingActions.rangesToMerge.emplace_back(
-                                mergeAction.chunkRange);
-                        },
-                        [&]() { _abort(getType()); });
-                },
-                [&](const DataSizeInfo& dataSizeAction) {
-                    auto& dataSizeResponse = stdx::get<StatusWith<DataSizeResponse>>(response);
-                    handleActionResult(
-                        opCtx,
-                        _nss,
-                        _uuid,
-                        getType(),
-                        dataSizeResponse.getStatus(),
-                        [&]() {
-                            ChunkType chunk(dataSizeAction.uuid,
-                                            dataSizeAction.chunkRange,
-                                            dataSizeAction.version,
-                                            dataSizeAction.shardId);
-                            auto catalogManager = ShardingCatalogManager::get(opCtx);
-                            catalogManager->setChunkEstimatedSize(
-                                opCtx,
-                                chunk,
-                                dataSizeResponse.getValue().sizeBytes,
-                                ShardingCatalogClient::kMajorityWriteConcern);
-                        },
-                        [&]() {
-                            auto& shardingPendingActions =
-                                _pendingActionsByShards[dataSizeAction.shardId];
-                            shardingPendingActions.rangesWithoutDataSize.emplace_back(
-                                dataSizeAction.chunkRange);
-                        },
-                        [&]() { _abort(getType()); });
-                },
-                [&](const AutoSplitVectorInfo& _) {
-                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                },
-                [&](const SplitInfoWithKeyPattern& _) {
-                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                },
-                [&](const MigrateInfo& _) {
-                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                }},
+            OverloadedVisitor{[&](const MergeInfo& mergeAction) {
+                                  auto& mergeResponse = stdx::get<Status>(response);
+                                  auto& shardingPendingActions =
+                                      _pendingActionsByShards[mergeAction.shardId];
+                                  handleActionResult(
+                                      opCtx,
+                                      _nss,
+                                      _uuid,
+                                      getType(),
+                                      mergeResponse,
+                                      [&]() {
+                                          shardingPendingActions.rangesWithoutDataSize.emplace_back(
+                                              mergeAction.chunkRange);
+                                      },
+                                      [&]() {
+                                          shardingPendingActions.rangesToMerge.emplace_back(
+                                              mergeAction.chunkRange);
+                                      },
+                                      [&]() { _abort(getType()); });
+                              },
+                              [&](const DataSizeInfo& dataSizeAction) {
+                                  auto& dataSizeResponse =
+                                      stdx::get<StatusWith<DataSizeResponse>>(response);
+                                  handleActionResult(
+                                      opCtx,
+                                      _nss,
+                                      _uuid,
+                                      getType(),
+                                      dataSizeResponse.getStatus(),
+                                      [&]() {
+                                          ChunkType chunk(dataSizeAction.uuid,
+                                                          dataSizeAction.chunkRange,
+                                                          dataSizeAction.version,
+                                                          dataSizeAction.shardId);
+                                          auto catalogManager = ShardingCatalogManager::get(opCtx);
+                                          catalogManager->setChunkEstimatedSize(
+                                              opCtx,
+                                              chunk,
+                                              dataSizeResponse.getValue().sizeBytes,
+                                              ShardingCatalogClient::kMajorityWriteConcern);
+                                      },
+                                      [&]() {
+                                          auto& shardingPendingActions =
+                                              _pendingActionsByShards[dataSizeAction.shardId];
+                                          shardingPendingActions.rangesWithoutDataSize.emplace_back(
+                                              dataSizeAction.chunkRange);
+                                      },
+                                      [&]() { _abort(getType()); });
+                              },
+                              [&](const AutoSplitVectorInfo& _) {
+                                  uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                              },
+                              [&](const SplitInfoWithKeyPattern& _) {
+                                  uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                              },
+                              [&](const MigrateInfo& _) {
+                                  uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                              }},
             action);
     }
 
@@ -472,7 +473,7 @@ public:
                            const DefragmentationAction& action,
                            const DefragmentationActionResponse& response) override {
         stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [&](const MigrateInfo& migrationAction) {
                     auto& migrationResponse = stdx::get<Status>(response);
                     auto match =
@@ -1095,36 +1096,35 @@ public:
             return;
         }
         stdx::visit(
-            visit_helper::Overloaded{
-                [&](const MergeInfo& mergeAction) {
-                    auto& mergeResponse = stdx::get<Status>(response);
-                    auto onSuccess = [] {};
-                    auto onRetriableError = [&] {
-                        _unmergedRangesByShard[mergeAction.shardId].emplace_back(
-                            mergeAction.chunkRange);
-                    };
-                    auto onNonretriableError = [this] { _abort(getType()); };
-                    handleActionResult(opCtx,
-                                       _nss,
-                                       _uuid,
-                                       getType(),
-                                       mergeResponse,
-                                       onSuccess,
-                                       onRetriableError,
-                                       onNonretriableError);
-                },
-                [&](const DataSizeInfo& _) {
-                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                },
-                [&](const AutoSplitVectorInfo& _) {
-                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                },
-                [&](const SplitInfoWithKeyPattern& _) {
-                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                },
-                [&](const MigrateInfo& _) {
-                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
-                }},
+            OverloadedVisitor{[&](const MergeInfo& mergeAction) {
+                                  auto& mergeResponse = stdx::get<Status>(response);
+                                  auto onSuccess = [] {};
+                                  auto onRetriableError = [&] {
+                                      _unmergedRangesByShard[mergeAction.shardId].emplace_back(
+                                          mergeAction.chunkRange);
+                                  };
+                                  auto onNonretriableError = [this] { _abort(getType()); };
+                                  handleActionResult(opCtx,
+                                                     _nss,
+                                                     _uuid,
+                                                     getType(),
+                                                     mergeResponse,
+                                                     onSuccess,
+                                                     onRetriableError,
+                                                     onNonretriableError);
+                              },
+                              [&](const DataSizeInfo& _) {
+                                  uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                              },
+                              [&](const AutoSplitVectorInfo& _) {
+                                  uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                              },
+                              [&](const SplitInfoWithKeyPattern& _) {
+                                  uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                              },
+                              [&](const MigrateInfo& _) {
+                                  uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                              }},
             action);
     }
 
@@ -1280,7 +1280,7 @@ public:
             return;
         }
         stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [&](const MergeInfo& _) {
                     uasserted(ErrorCodes::BadValue, "Unexpected action type");
                 },

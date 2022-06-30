@@ -46,7 +46,7 @@ WindowFunctionExecRemovableDocument::WindowFunctionExecRemovableDocument(
 
                                   memTracker) {
     stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [](const WindowBounds::Unbounded&) {
                 // If the window is left unbounded we should use the non-removable executor.
                 MONGO_UNREACHABLE_TASSERT(5339802);
@@ -57,7 +57,7 @@ WindowFunctionExecRemovableDocument::WindowFunctionExecRemovableDocument(
         bounds.lower);
 
     stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [](const WindowBounds::Unbounded&) {
                 // Pass. _upperBound defaults to boost::none which represents no upper
                 // bound.

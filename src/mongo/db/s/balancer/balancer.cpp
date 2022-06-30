@@ -556,7 +556,7 @@ void Balancer::_consumeActionStreamLoop() {
 
         _outstandingStreamingOps.fetchAndAdd(1);
         stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [&, selectedStream](MergeInfo&& mergeAction) {
                     applyThrottling();
                     auto result =

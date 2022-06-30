@@ -47,8 +47,8 @@
 #include "mongo/db/query/sbe_stage_builder_filter.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/str.h"
-#include "mongo/util/visit_helper.h"
 
 namespace mongo::stage_builder {
 namespace {

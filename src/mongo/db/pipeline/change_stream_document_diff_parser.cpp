@@ -189,7 +189,7 @@ void buildUpdateDescriptionWithDeltaOplog(
     }
 
     stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [&](DocumentDiffReader* reader) {
                 boost::optional<BSONElement> nextMod;
                 while ((nextMod = reader->nextUpdate()) || (nextMod = reader->nextInsert())) {
@@ -202,10 +202,9 @@ void buildUpdateDescriptionWithDeltaOplog(
 
                 while (auto nextSubDiff = reader->nextSubDiff()) {
                     stdx::variant<DocumentDiffReader*, ArrayDiffReader*> nextReader;
-                    stdx::visit(visit_helper::Overloaded{[&nextReader](auto& reader) {
-                                    nextReader = &reader;
-                                }},
-                                nextSubDiff->second);
+                    stdx::visit(
+                        OverloadedVisitor{[&nextReader](auto& reader) { nextReader = &reader; }},
+                        nextSubDiff->second);
                     buildUpdateDescriptionWithDeltaOplog(
                         nextReader, builder, {{nextSubDiff->first}});
                 }
@@ -222,7 +221,7 @@ void buildUpdateDescriptionWithDeltaOplog(
 
                 for (auto nextMod = reader->next(); nextMod; nextMod = reader->next()) {
                     stdx::visit(
-                        visit_helper::Overloaded{
+                        OverloadedVisitor{
                             [&](BSONElement elem) {
                                 builder->addToUpdatedFields(nextMod->first, Value(elem));
                             },

@@ -62,7 +62,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo::cst_pipeline_translation {
 namespace {
@@ -102,14 +102,14 @@ auto translateLiteralObjectToValue(const CNode::ObjectChildren& object) {
  * uncollapsed otherwise.
  */
 Value translateLiteralToValue(const CNode& cst) {
-    return stdx::visit(
-        visit_helper::Overloaded{
-            [](const CNode::ArrayChildren& array) { return translateLiteralArrayToValue(array); },
-            [](const CNode::ObjectChildren& object) {
-                return translateLiteralObjectToValue(object);
-            },
-            [&](auto&& payload) { return translateLiteralLeaf(cst); }},
-        cst.payload);
+    return stdx::visit(OverloadedVisitor{[](const CNode::ArrayChildren& array) {
+                                             return translateLiteralArrayToValue(array);
+                                         },
+                                         [](const CNode::ObjectChildren& object) {
+                                             return translateLiteralObjectToValue(object);
+                                         },
+                                         [&](auto&& payload) { return translateLiteralLeaf(cst); }},
+                       cst.payload);
 }
 
 /**
@@ -155,7 +155,7 @@ auto transformInputExpression(const CNode::ObjectChildren& object,
                               const VariablesParseState& vps) {
     auto expressions = std::vector<boost::intrusive_ptr<Expression>>{};
     stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [&](const CNode::ArrayChildren& array) {
                 static_cast<void>(std::transform(
                     array.begin(), array.end(), std::back_inserter(expressions), [&](auto&& elem) {
@@ -860,7 +860,7 @@ boost::intrusive_ptr<Expression> translateExpression(const CNode& cst,
                                                      ExpressionContext* expCtx,
                                                      const VariablesParseState& vps) {
     return stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             // When we're not inside an agg operator/function, this is a non-leaf literal.
             [&](const CNode::ArrayChildren& array) -> boost::intrusive_ptr<Expression> {
                 return translateLiteralArray(array, expCtx, vps);
@@ -885,15 +885,14 @@ boost::intrusive_ptr<Expression> translateExpression(const CNode& cst,
             [](const NonZeroKey&) -> boost::intrusive_ptr<Expression> { MONGO_UNREACHABLE; },
             [&](const ValuePath& vp) -> boost::intrusive_ptr<Expression> {
                 return stdx::visit(
-                    visit_helper::Overloaded{
-                        [&](const AggregationPath& ap) {
-                            return ExpressionFieldPath::createPathFromString(
-                                expCtx, path::vectorToString(ap.components), vps);
-                        },
-                        [&](const AggregationVariablePath& avp) {
-                            return ExpressionFieldPath::createVarFromString(
-                                expCtx, path::vectorToString(avp.components), vps);
-                        }},
+                    OverloadedVisitor{[&](const AggregationPath& ap) {
+                                          return ExpressionFieldPath::createPathFromString(
+                                              expCtx, path::vectorToString(ap.components), vps);
+                                      },
+                                      [&](const AggregationVariablePath& avp) {
+                                          return ExpressionFieldPath::createVarFromString(
+                                              expCtx, path::vectorToString(avp.components), vps);
+                                      }},
                     vp);
             },
             // Everything else is a literal leaf.
@@ -921,24 +920,23 @@ std::unique_ptr<Pipeline, PipelineDeleter> translatePipeline(
  */
 Value translateLiteralLeaf(const CNode& cst) {
     return stdx::visit(
-        visit_helper::Overloaded{
-            // These are illegal since they're non-leaf.
-            [](const CNode::ArrayChildren&) -> Value { MONGO_UNREACHABLE; },
-            [](const CNode::ObjectChildren&) -> Value { MONGO_UNREACHABLE; },
-            [](const CompoundInclusionKey&) -> Value { MONGO_UNREACHABLE; },
-            [](const CompoundExclusionKey&) -> Value { MONGO_UNREACHABLE; },
-            [](const CompoundInconsistentKey&) -> Value { MONGO_UNREACHABLE; },
-            // These are illegal since they're non-literal.
-            [](const KeyValue&) -> Value { MONGO_UNREACHABLE; },
-            [](const NonZeroKey&) -> Value { MONGO_UNREACHABLE; },
-            [](const ValuePath&) -> Value { MONGO_UNREACHABLE; },
-            // These payloads require a special translation to DocumentValue parlance.
-            [](const UserUndefined&) { return Value{BSONUndefined}; },
-            [](const UserNull&) { return Value{BSONNULL}; },
-            [](const UserMinKey&) { return Value{MINKEY}; },
-            [](const UserMaxKey&) { return Value{MAXKEY}; },
-            // The rest convert directly.
-            [](auto&& payload) { return Value{payload}; }},
+        OverloadedVisitor{// These are illegal since they're non-leaf.
+                          [](const CNode::ArrayChildren&) -> Value { MONGO_UNREACHABLE; },
+                          [](const CNode::ObjectChildren&) -> Value { MONGO_UNREACHABLE; },
+                          [](const CompoundInclusionKey&) -> Value { MONGO_UNREACHABLE; },
+                          [](const CompoundExclusionKey&) -> Value { MONGO_UNREACHABLE; },
+                          [](const CompoundInconsistentKey&) -> Value { MONGO_UNREACHABLE; },
+                          // These are illegal since they're non-literal.
+                          [](const KeyValue&) -> Value { MONGO_UNREACHABLE; },
+                          [](const NonZeroKey&) -> Value { MONGO_UNREACHABLE; },
+                          [](const ValuePath&) -> Value { MONGO_UNREACHABLE; },
+                          // These payloads require a special translation to DocumentValue parlance.
+                          [](const UserUndefined&) { return Value{BSONUndefined}; },
+                          [](const UserNull&) { return Value{BSONNULL}; },
+                          [](const UserMinKey&) { return Value{MINKEY}; },
+                          [](const UserMaxKey&) { return Value{MAXKEY}; },
+                          // The rest convert directly.
+                          [](auto&& payload) { return Value{payload}; }},
         cst.payload);
 }
 

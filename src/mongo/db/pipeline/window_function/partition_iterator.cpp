@@ -30,7 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 
 using boost::optional;
 
@@ -196,7 +196,7 @@ PartitionIterator::AdvanceResult PartitionIterator::advanceInternal() {
 namespace {
 optional<int> numericBound(WindowBounds::Bound<int> bound) {
     return stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [](WindowBounds::Unbounded) -> optional<int> { return boost::none; },
             [](WindowBounds::Current) -> optional<int> { return 0; },
             [](int i) -> optional<int> { return i; },
@@ -259,7 +259,7 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
 
     // 'lower' is the smallest offset in the partition that's within the lower bound of the window.
     optional<int> lower = stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [&](WindowBounds::Current) -> optional<int> {
                 // 'range: ["current", _]' means the current document, which is always offset 0.
                 return 0;
@@ -318,7 +318,7 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
 
     // 'upper' is the largest offset in the partition that's within the upper bound of the window.
     optional<int> upper = stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [&](WindowBounds::Current) -> optional<int> {
                 // 'range: [_, "current"]' means the current document, which is offset 0.
                 return 0;
@@ -445,7 +445,7 @@ optional<std::pair<int, int>> PartitionIterator::getEndpoints(
     tassert(5423301, "getEndpoints assumes there is a current document", (*this)[0] != boost::none);
 
     return stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [&](const WindowBounds::DocumentBased docBounds) {
                 return getEndpointsDocumentBased(docBounds, hint);
             },

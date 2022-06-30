@@ -1964,7 +1964,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         }
 
         with self._with_template(template_params):
-            with self._block('stdx::visit(visit_helper::Overloaded{', '}, ${access_member});'):
+            with self._block('stdx::visit(OverloadedVisitor{', '}, ${access_member});'):
                 for variant_type in itertools.chain(
                         field.type.variant_types,
                     [field.type.variant_struct_type] if field.type.variant_struct_type else []):
@@ -2626,7 +2626,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         header_list = [
             'mongo/bson/bsonobjbuilder.h', 'mongo/db/auth/authorization_contract.h',
             'mongo/db/commands.h', 'mongo/idl/command_generic_argument.h',
-            'mongo/util/visit_helper.h'
+            'mongo/util/overloaded_visitor.h'
         ]
 
         if spec.server_parameters:

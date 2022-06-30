@@ -37,7 +37,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 #include <string>
 
 namespace mongo {

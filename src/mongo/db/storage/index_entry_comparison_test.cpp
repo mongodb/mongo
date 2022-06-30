@@ -51,7 +51,7 @@ void buildDupKeyErrorStatusProducesExpectedErrorObject(
     expectedObjBuilder.append("keyPattern", keyPattern);
     expectedObjBuilder.append("keyValue", keyValueWithFieldName);
     stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [](stdx::monostate) {},
             [&](const RecordId& rid) { rid.serializeToken("foundValue", &expectedObjBuilder); },
             [&](const BSONObj& obj) { expectedObjBuilder.append("foundValue", obj); },

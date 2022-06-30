@@ -383,7 +383,7 @@ void ClusterChunksResizePolicyImpl::applyActionResult(OperationContext* opCtx,
     }
 
     auto updatedEntryIt = stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [&](const AutoSplitVectorInfo& act) mutable {
                 auto& swSplitVectorResult = stdx::get<StatusWith<AutoSplitVectorResponse>>(result);
                 auto match = _collectionsBeingProcessed.find(act.uuid);

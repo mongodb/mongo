@@ -30,27 +30,23 @@
 #pragma once
 
 namespace mongo {
-namespace visit_helper {
 
 /**
- * This is the "overload pattern" designed to be used with std::visit. Example usage:
+ * This is the "overload pattern" for use with variant visit calls.
+ * See https://www.modernescpp.com/index.php/visiting-a-std-variant-with-the-overload-pattern
+ * Example usage:
  *
- * auto result = std::visit(
- *    visit_helper::Overloaded{
- *        [](int a) {
- *            ...
- *        },
- *        [](StringData b) {
- *            ...
- *        },
- *    },
- * someVariant);
+ * auto r = stdx::visit(OverloadedVisitor{
+ *                         [](int v) { return intStuff(v); },
+ *                         [](StringData v) { return stringStuff(v); },
+ *                      },
+ *                      someStdxVariant);
  */
-template <class... Ts>
-struct Overloaded : Ts... {
+template <typename... Ts>
+struct OverloadedVisitor : Ts... {
     using Ts::operator()...;
 };
-template <class... Ts>
-Overloaded(Ts...)->Overloaded<Ts...>;
-}  // namespace visit_helper
+template <typename... Ts>
+OverloadedVisitor(Ts...)->OverloadedVisitor<Ts...>;
+
 }  // namespace mongo

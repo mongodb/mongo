@@ -121,20 +121,19 @@ void appendElementToBuilder(stdx::variant<mutablebson::Element, BSONElement> ele
                             StringData fieldName,
                             BSONObjBuilder* builder) {
     stdx::visit(
-        visit_helper::Overloaded{
-            [&](const mutablebson::Element& element) {
-                if (element.hasValue()) {
-                    builder->appendAs(element.getValue(), fieldName);
-                } else if (element.getType() == BSONType::Object) {
-                    BSONObjBuilder subBuilder(builder->subobjStart(fieldName));
-                    element.writeChildrenTo(&subBuilder);
-                } else {
-                    invariant(element.getType() == BSONType::Array);
-                    BSONArrayBuilder subBuilder(builder->subarrayStart(fieldName));
-                    element.writeArrayTo(&subBuilder);
-                }
-            },
-            [&](BSONElement element) { builder->appendAs(element, fieldName); }},
+        OverloadedVisitor{[&](const mutablebson::Element& element) {
+                              if (element.hasValue()) {
+                                  builder->appendAs(element.getValue(), fieldName);
+                              } else if (element.getType() == BSONType::Object) {
+                                  BSONObjBuilder subBuilder(builder->subobjStart(fieldName));
+                                  element.writeChildrenTo(&subBuilder);
+                              } else {
+                                  invariant(element.getType() == BSONType::Array);
+                                  BSONArrayBuilder subBuilder(builder->subarrayStart(fieldName));
+                                  element.writeArrayTo(&subBuilder);
+                              }
+                          },
+                          [&](BSONElement element) { builder->appendAs(element, fieldName); }},
         elem);
 }
 
@@ -486,11 +485,9 @@ boost::optional<std::pair<size_t, ArrayDiffReader::ArrayModification>> ArrayDiff
                 str::stream() << "expected sub diff at index " << idx << " but got " << next,
                 next.type() == BSONType::Object);
 
-        auto modification =
-            stdx::visit(visit_helper::Overloaded{[](const auto& reader) -> ArrayModification {
-                            return {reader};
-                        }},
-                        getReader(next.embeddedObject()));
+        auto modification = stdx::visit(
+            OverloadedVisitor{[](const auto& reader) -> ArrayModification { return {reader}; }},
+            getReader(next.embeddedObject()));
         return {{idx, modification}};
     } else {
         uasserted(4770502,

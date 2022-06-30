@@ -318,11 +318,11 @@ struct ValidationErrorContext {
     void appendLatestCompleteError(BSONObjBuilder* builder) {
         const static std::string kDetailsString = "details";
         stdx::visit(
-            visit_helper::Overloaded{[&](const auto& details) -> void {
-                                         verifySizeAndAppend(details, kDetailsString, builder);
-                                     },
-                                     [&](const std::monostate& state) -> void { MONGO_UNREACHABLE },
-                                     [&](const std::string& str) -> void { MONGO_UNREACHABLE }},
+            OverloadedVisitor{[&](const auto& details) -> void {
+                                  verifySizeAndAppend(details, kDetailsString, builder);
+                              },
+                              [&](const std::monostate& state) -> void { MONGO_UNREACHABLE },
+                              [&](const std::string& str) -> void { MONGO_UNREACHABLE }},
             latestCompleteError);
     }
     /**
@@ -331,7 +331,7 @@ struct ValidationErrorContext {
      */
     void appendLatestCompleteError(BSONArrayBuilder* builder) {
         stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [&](const BSONObj& obj) -> void { verifySizeAndAppend(obj, builder); },
                 [&](const std::string& str) -> void { builder->append(str); },
                 [&](const BSONArray& arr) -> void {

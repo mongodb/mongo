@@ -119,7 +119,7 @@ Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement
         ChangeStreamOptions newOptions = ChangeStreamOptions::parse(ctxt, changeStreamOptionsObj);
         auto preAndPostImages = newOptions.getPreAndPostImages();
         stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [&](const std::string& expireAfterSeconds) {
                     if (expireAfterSeconds != "off"_sd) {
                         validateStatus = {

@@ -33,7 +33,7 @@
 
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/db/query/collation/collation_index_key.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
 
@@ -223,7 +223,7 @@ boost::optional<Value> SortKeyGenerator::extractKeyPart(
         auto keyVariant = doc.getNestedFieldNonCaching(*patternPart.fieldPath);
 
         auto key = stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 // In this case, the document has an array along the path given. This means the
                 // document is ineligible for taking the fast path for index key generation.
                 [](Document::TraversesArrayTag) -> boost::optional<Value> { return boost::none; },

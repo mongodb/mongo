@@ -65,7 +65,7 @@ WindowBounds::Bound<T> parseBound(ExpressionContext* expCtx,
 template <class T>
 Value serializeBound(const WindowBounds::Bound<T>& bound) {
     return stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [](const WindowBounds::Unbounded&) { return Value(WindowBounds::kValUnbounded); },
             [](const WindowBounds::Current&) { return Value(WindowBounds::kValCurrent); },
             [](const T& n) { return Value(n); },
@@ -220,7 +220,7 @@ WindowBounds WindowBounds::parse(BSONObj args,
 }
 void WindowBounds::serialize(MutableDocument& args) const {
     stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [&](const DocumentBased& docBounds) {
                 args[kArgDocuments] = Value{std::vector<Value>{
                     serializeBound(docBounds.lower),

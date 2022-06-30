@@ -31,7 +31,7 @@
 
 #include "mongo/db/exec/mock_stage.h"
 
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
 
@@ -55,7 +55,7 @@ PlanStage::StageState MockStage::doWork(WorkingSetID* out) {
     _results.pop();
 
     auto returnState = stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [](WorkingSetID wsid) -> PlanStage::StageState { return PlanStage::ADVANCED; },
             [](PlanStage::StageState state) -> PlanStage::StageState { return state; },
             [](Status status) -> PlanStage::StageState {

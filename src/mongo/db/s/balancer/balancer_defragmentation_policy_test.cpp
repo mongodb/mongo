@@ -565,7 +565,7 @@ TEST_F(BalancerDefragmentationPolicyTest, PhaseOneNotConsecutive) {
     uint8_t timesMiddleRangeDataSizeFound = 0;
     auto inspectAction = [&](const DefragmentationAction& action) {
         stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [&](const MergeInfo& mergeAction) {
                     if (mergeAction.chunkRange.getMin().woCompare(kKeyAtMin) == 0 &&
                         mergeAction.chunkRange.getMax().woCompare(BSON("x" << 5)) == 0) {

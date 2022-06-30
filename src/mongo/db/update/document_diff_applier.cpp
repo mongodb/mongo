@@ -34,8 +34,8 @@
 #include "mongo/db/update_index_data.h"
 
 #include "mongo/stdx/variant.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/string_map.h"
-#include "mongo/util/visit_helper.h"
 
 namespace mongo::doc_diff {
 namespace {
@@ -250,7 +250,7 @@ int32_t computeDamageOnObject(const BSONObj& preImageRoot,
         }
 
         stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [&](Delete) {
                     appendDamage(damages, 0, 0, targetOffset, elt.size());
                     diffSize -= elt.size();
@@ -332,7 +332,7 @@ int32_t computeDamageForArrayIndex(const BSONObj& preImageRoot,
                                    bool mustCheckExistenceForInsertOperations) {
     int32_t diffSize = 0;
     stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [&](const BSONElement& update) {
                 invariant(!update.eoo());
                 auto preValuePos = arrayPreImage.end()->rawdata();
@@ -520,7 +520,7 @@ public:
             FieldRef::FieldRefTempAppend tempAppend(*path, elt.fieldNameStringData());
 
             stdx::visit(
-                visit_helper::Overloaded{
+                OverloadedVisitor{
                     [this, &path](Delete) {
                         // Do not append anything.
                         updateIndexesAffected(path);
@@ -615,7 +615,7 @@ private:
                                      const ArrayDiffReader::ArrayModification& modification,
                                      BSONArrayBuilder* builder) {
         stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [this, &path, builder](const BSONElement& update) {
                     invariant(!update.eoo());
                     builder->append(update);

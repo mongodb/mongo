@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/util/assert_util.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 #include <boost/optional.hpp>
 
 #include "mongo/base/string_data.h"

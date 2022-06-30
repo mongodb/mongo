@@ -81,7 +81,7 @@ public:
             renameCollReq.setStayTemp(request().getStayTemp());
             renameCollReq.setExpectedSourceUUID(request().getCollectionUUID());
             stdx::visit(
-                visit_helper::Overloaded{
+                OverloadedVisitor{
                     [&renameCollReq](bool dropTarget) { renameCollReq.setDropTarget(dropTarget); },
                     [&renameCollReq](const UUID& uuid) {
                         renameCollReq.setDropTarget(true);

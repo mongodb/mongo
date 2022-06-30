@@ -61,43 +61,45 @@ GetClusterParameterInvocation::retrieveRequestedParameters(OperationContext* opC
     };
 
     stdx::visit(
-        visit_helper::Overloaded{
-            [&](const std::string& strParameterName) {
-                if (strParameterName == "*"_sd) {
-                    // Retrieve all cluster parameter values.
-                    Map clusterParameterMap = clusterParameters->getMap();
-                    parameterValues.reserve(clusterParameterMap.size());
-                    parameterNames.reserve(clusterParameterMap.size());
-                    for (const auto& param : clusterParameterMap) {
-                        makeBSON(param.second);
-                    }
-                } else {
-                    // Any other string must correspond to a single parameter name. Return
-                    // an error if a disabled cluster parameter is explicitly requested.
-                    ServerParameter* sp = clusterParameters->get(strParameterName);
-                    uassert(ErrorCodes::BadValue,
-                            str::stream() << "Server parameter: '" << strParameterName
-                                          << "' is currently disabled",
-                            sp->isEnabled());
-                    makeBSON(sp);
-                }
-            },
-            [&](const std::vector<std::string>& listParameterNames) {
-                uassert(ErrorCodes::BadValue,
-                        "Must supply at least one cluster server parameter name to "
-                        "getClusterParameter",
-                        listParameterNames.size() > 0);
-                parameterValues.reserve(listParameterNames.size());
-                parameterNames.reserve(listParameterNames.size());
-                for (const auto& requestedParameterName : listParameterNames) {
-                    ServerParameter* sp = clusterParameters->get(requestedParameterName);
-                    uassert(ErrorCodes::BadValue,
-                            str::stream() << "Server parameter: '" << requestedParameterName
-                                          << "' is currently disabled'",
-                            sp->isEnabled());
-                    makeBSON(sp);
-                }
-            }},
+        OverloadedVisitor{[&](const std::string& strParameterName) {
+                              if (strParameterName == "*"_sd) {
+                                  // Retrieve all cluster parameter values.
+                                  Map clusterParameterMap = clusterParameters->getMap();
+                                  parameterValues.reserve(clusterParameterMap.size());
+                                  parameterNames.reserve(clusterParameterMap.size());
+                                  for (const auto& param : clusterParameterMap) {
+                                      makeBSON(param.second);
+                                  }
+                              } else {
+                                  // Any other string must correspond to a single parameter name.
+                                  // Return an error if a disabled cluster parameter is explicitly
+                                  // requested.
+                                  ServerParameter* sp = clusterParameters->get(strParameterName);
+                                  uassert(ErrorCodes::BadValue,
+                                          str::stream() << "Server parameter: '" << strParameterName
+                                                        << "' is currently disabled",
+                                          sp->isEnabled());
+                                  makeBSON(sp);
+                              }
+                          },
+                          [&](const std::vector<std::string>& listParameterNames) {
+                              uassert(ErrorCodes::BadValue,
+                                      "Must supply at least one cluster server parameter name to "
+                                      "getClusterParameter",
+                                      listParameterNames.size() > 0);
+                              parameterValues.reserve(listParameterNames.size());
+                              parameterNames.reserve(listParameterNames.size());
+                              for (const auto& requestedParameterName : listParameterNames) {
+                                  ServerParameter* sp =
+                                      clusterParameters->get(requestedParameterName);
+                                  uassert(ErrorCodes::BadValue,
+                                          str::stream()
+                                              << "Server parameter: '" << requestedParameterName
+                                              << "' is currently disabled'",
+                                          sp->isEnabled());
+                                  makeBSON(sp);
+                              }
+                          }},
         cmdBody);
 
     return {std::move(parameterNames), std::move(parameterValues)};

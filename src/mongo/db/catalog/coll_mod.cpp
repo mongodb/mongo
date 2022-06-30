@@ -62,8 +62,8 @@
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/version/releases.h"
-#include "mongo/util/visit_helper.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -522,7 +522,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
         }
 
         auto status = stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [&oplogEntryBuilder](const std::string& value) -> Status {
                     if (value != "off") {
                         return {ErrorCodes::InvalidOptions,
@@ -579,7 +579,7 @@ void _setClusteredExpireAfterSeconds(
     boost::optional<int64_t> oldExpireAfterSeconds = oldCollOptions.expireAfterSeconds;
 
     stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [&](const std::string& newExpireAfterSeconds) {
                 invariant(newExpireAfterSeconds == "off");
                 if (!oldExpireAfterSeconds) {

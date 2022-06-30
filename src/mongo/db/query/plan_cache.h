@@ -366,15 +366,15 @@ public:
                           "number of scores in decision must match viable candidates");
         }
 
-        auto newWorks = stdx::visit(
-            visit_helper::Overloaded{[](const plan_ranker::StatsDetails& details) {
-                                         return details.candidatePlanStats[0]->common.works;
-                                     },
-                                     [](const plan_ranker::SBEStatsDetails& details) {
-                                         return calculateNumberOfReads(
-                                             details.candidatePlanStats[0].get());
-                                     }},
-            why.stats);
+        auto newWorks =
+            stdx::visit(OverloadedVisitor{[](const plan_ranker::StatsDetails& details) {
+                                              return details.candidatePlanStats[0]->common.works;
+                                          },
+                                          [](const plan_ranker::SBEStatsDetails& details) {
+                                              return calculateNumberOfReads(
+                                                  details.candidatePlanStats[0].get());
+                                          }},
+                        why.stats);
 
         auto partition = _partitionedCache->lockOnePartition(key);
         auto [queryHash, planCacheKey, isNewEntryActive, shouldBeCreated, increasedWorks] = [&]() {

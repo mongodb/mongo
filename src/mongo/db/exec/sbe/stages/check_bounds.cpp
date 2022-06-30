@@ -66,13 +66,14 @@ void CheckBoundsStage::prepare(CompileCtx& ctx) {
     _inRecordIdAccessor = _children[0]->getAccessor(ctx, _inRecordIdSlot);
 
     // Set up the IndexBounds accessor for the slot where IndexBounds will be stored.
-    _indexBoundsAccessor = stdx::visit(
-        visit_helper::Overloaded{
-            [](const IndexBounds&) -> RuntimeEnvironment::Accessor* { return nullptr; },
-            [&ctx](CheckBoundsParams::RuntimeEnvironmentSlotId slot) {
-                return ctx.getRuntimeEnvAccessor(slot);
-            }},
-        _params.indexBounds);
+    _indexBoundsAccessor =
+        stdx::visit(OverloadedVisitor{[](const IndexBounds&) -> RuntimeEnvironment::Accessor* {
+                                          return nullptr;
+                                      },
+                                      [&ctx](CheckBoundsParams::RuntimeEnvironmentSlotId slot) {
+                                          return ctx.getRuntimeEnvAccessor(slot);
+                                      }},
+                    _params.indexBounds);
 }
 
 value::SlotAccessor* CheckBoundsStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -93,7 +94,7 @@ void CheckBoundsStage::open(bool reOpen) {
     // Set up the IndexBoundsChecker by extracting the IndexBounds from the RuntimeEnvironment if
     // value is provided there.
     auto indexBoundsPtr = stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [](const IndexBounds& indexBounds) { return &indexBounds; },
             [&](CheckBoundsParams::RuntimeEnvironmentSlotId) -> const IndexBounds* {
                 tassert(6579900, "'_indexBoundsAccessor' must be populated", _indexBoundsAccessor);
@@ -212,7 +213,7 @@ size_t CheckBoundsStage::estimateCompileTimeSize() const {
     size += size_estimator::estimate(_specificStats);
     size += size_estimator::estimate(_params.keyPattern);
     size += stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [](const IndexBounds& indexBounds) { return size_estimator::estimate(indexBounds); },
             [](CheckBoundsParams::RuntimeEnvironmentSlotId) -> size_t { return 0; }},
         _params.indexBounds);

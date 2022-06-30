@@ -35,8 +35,8 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/itoa.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/string_map.h"
-#include "mongo/util/visit_helper.h"
 
 // This file contains classes for serializing document diffs to a format that can be stored in the
 // oplog. Any code/machinery which manipulates document diffs should do so through these classes.

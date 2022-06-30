@@ -33,14 +33,14 @@
 
 #include "mongo/db/cst/c_node_disambiguation.h"
 #include "mongo/stdx/variant.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo::c_node_disambiguation {
 namespace {
 
 ProjectionType disambiguateCNode(const CNode& cst) {
     return stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [](const CNode::ObjectChildren& children) {
                 return *std::accumulate(
                     children.begin(),

@@ -36,7 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/stdx/variant.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
 
@@ -67,7 +67,7 @@ public:
     std::string toString() const {
         std::ostringstream stream;
         stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [&](const BSONElement& elem) { stream << "'" << elem.toString(false) << "'"; },
                 [&](const StringData& elem) { stream << "'" << elem << "'"; }},
             _location);
@@ -75,21 +75,20 @@ public:
         // point to the parser (e.g. the 'pipeline' argument for an aggregation command).
         invariant(_prefix.size() > 0);
         for (auto it = _prefix.rbegin(); it != _prefix.rend() - 1; ++it) {
-            stdx::visit(visit_helper::Overloaded{[&](const unsigned int& index) {
-                                                     stream << " within array at index " << index;
-                                                 },
-                                                 [&](const StringData& pref) {
-                                                     stream << " within '" << pref << "'";
-                                                 }},
+            stdx::visit(OverloadedVisitor{[&](const unsigned int& index) {
+                                              stream << " within array at index " << index;
+                                          },
+                                          [&](const StringData& pref) {
+                                              stream << " within '" << pref << "'";
+                                          }},
                         *it);
         }
 
         // The final prefix (or first element in the vector) is the input description.
-        stdx::visit(visit_helper::Overloaded{[&](const unsigned int& index) { MONGO_UNREACHABLE; },
-                                             [&](const StringData& pref) {
-                                                 stream << " of input " << pref;
-                                             }},
-                    _prefix[0]);
+        stdx::visit(
+            OverloadedVisitor{[&](const unsigned int& index) { MONGO_UNREACHABLE; },
+                              [&](const StringData& pref) { stream << " of input " << pref; }},
+            _prefix[0]);
         return stream.str();
     }
 

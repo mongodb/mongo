@@ -144,7 +144,7 @@ std::unique_ptr<ReshardingMetrics> ReshardingMetrics::makeInstance(UUID instance
 
 StringData ReshardingMetrics::getStateString() const noexcept {
     return stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [](CoordinatorStateEnum state) { return CoordinatorState_serializer(state); },
             [](RecipientStateEnum state) { return RecipientState_serializer(state); },
             [](DonorStateEnum state) { return DonorState_serializer(state); }},

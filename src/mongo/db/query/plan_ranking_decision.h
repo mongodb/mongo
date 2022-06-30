@@ -32,7 +32,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/util/container_size_helper.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo::plan_ranker {
 struct StatsDetails {
@@ -72,26 +72,25 @@ struct PlanRankingDecision {
     std::unique_ptr<PlanRankingDecision> clone() const {
         auto decision = std::make_unique<PlanRankingDecision>();
         stdx::visit(
-            visit_helper::Overloaded{
-                [&decision](const StatsDetails& details) {
-                    std::vector<std::unique_ptr<PlanStageStats>> copy;
-                    copy.reserve(details.candidatePlanStats.size());
-                    for (auto&& stats : details.candidatePlanStats) {
-                        invariant(stats);
-                        copy.emplace_back(stats->clone());
-                    }
-                    decision->stats = StatsDetails{std::move(copy)};
-                },
-                [&decision](const SBEStatsDetails& details) {
-                    std::vector<std::unique_ptr<mongo::sbe::PlanStageStats>> copy;
-                    copy.reserve(details.candidatePlanStats.size());
-                    for (auto&& stats : details.candidatePlanStats) {
-                        invariant(stats);
-                        copy.emplace_back(stats->clone());
-                    }
-                    decision->stats =
-                        SBEStatsDetails{std::move(copy), details.serializedWinningPlan};
-                }},
+            OverloadedVisitor{[&decision](const StatsDetails& details) {
+                                  std::vector<std::unique_ptr<PlanStageStats>> copy;
+                                  copy.reserve(details.candidatePlanStats.size());
+                                  for (auto&& stats : details.candidatePlanStats) {
+                                      invariant(stats);
+                                      copy.emplace_back(stats->clone());
+                                  }
+                                  decision->stats = StatsDetails{std::move(copy)};
+                              },
+                              [&decision](const SBEStatsDetails& details) {
+                                  std::vector<std::unique_ptr<mongo::sbe::PlanStageStats>> copy;
+                                  copy.reserve(details.candidatePlanStats.size());
+                                  for (auto&& stats : details.candidatePlanStats) {
+                                      invariant(stats);
+                                      copy.emplace_back(stats->clone());
+                                  }
+                                  decision->stats = SBEStatsDetails{std::move(copy),
+                                                                    details.serializedWinningPlan};
+                              }},
             stats);
         decision->scores = scores;
         decision->candidateOrder = candidateOrder;
@@ -102,7 +101,7 @@ struct PlanRankingDecision {
     uint64_t estimateObjectSizeInBytes() const {
         return  // Add size of 'stats' instance.
             stdx::visit(
-                visit_helper::Overloaded{
+                OverloadedVisitor{
                     [](const StatsDetails& details) {
                         return container_size_helper::estimateObjectSizeInBytes(
                             details.candidatePlanStats,

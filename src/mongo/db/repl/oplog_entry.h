@@ -36,7 +36,7 @@
 #include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
 namespace repl {
@@ -47,8 +47,8 @@ std::vector<T> toVector(boost::optional<stdx::variant<T, std::vector<T>>> optVal
     if (!optVals) {
         return {};
     }
-    return stdx::visit(visit_helper::Overloaded{[](T val) { return std::vector<T>{val}; },
-                                                [](const std::vector<T>& vals) { return vals; }},
+    return stdx::visit(OverloadedVisitor{[](T val) { return std::vector<T>{val}; },
+                                         [](const std::vector<T>& vals) { return vals; }},
                        *optVals);
 }
 }  // namespace variant_util

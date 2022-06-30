@@ -42,7 +42,7 @@
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/stdx/variant.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo::c_node_validation {
 using namespace std::string_literals;
@@ -220,7 +220,7 @@ Status addPathsFromTreeToSet(const CNode::ObjectChildren& children,
                  stdx::get<KeyFieldname>(child.first) == KeyFieldname::id));
 
         if (auto status = stdx::visit(
-                visit_helper::Overloaded{
+                OverloadedVisitor{
                     [&](const CompoundInclusionKey& compoundKey) {
                         // In this context we have a compound inclusion key to descend into.
                         return addPathsFromTreeToSet(
@@ -275,7 +275,7 @@ Status validateNumericType(T num) {
 
 Status validateSingleType(const CNode& element) {
     return stdx::visit(
-        visit_helper::Overloaded{
+        OverloadedVisitor{
             [&](const UserDouble& dbl) { return validateNumericType(dbl); },
             [&](const UserInt& num) { return validateNumericType(num); },
             [&](const UserLong& lng) { return validateNumericType(lng); },

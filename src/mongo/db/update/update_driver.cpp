@@ -49,8 +49,8 @@
 #include "mongo/db/update/update_oplog_entry_version.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/embedded_builder.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/str.h"
-#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 

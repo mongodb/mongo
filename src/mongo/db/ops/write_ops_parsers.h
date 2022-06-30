@@ -36,7 +36,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/stdx/variant.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
 namespace write_ops {
@@ -175,7 +175,7 @@ public:
         StringBuilder sb;
 
         stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [&sb](const ReplacementUpdate& replacement) {
                     sb << "{type: Replacement, update: " << replacement.bson << "}";
                 },

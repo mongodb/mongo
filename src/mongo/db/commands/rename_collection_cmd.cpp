@@ -107,7 +107,7 @@ public:
         options.stayTemp = renameRequest.getStayTemp();
         options.expectedSourceUUID = renameRequest.getCollectionUUID();
         stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [&options](bool dropTarget) { options.dropTarget = dropTarget; },
                 [&options](const UUID& uuid) {
                     options.dropTarget = true;

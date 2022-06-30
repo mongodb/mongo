@@ -407,16 +407,17 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
         ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nss->db().toString());
 
         const auto& collection = coll.getCollection();
-        return stdx::visit(
-            visit_helper::Overloaded{[&](const TTLCollectionCache::ClusteredId&) {
-                                         return _deleteExpiredWithCollscan(
-                                             opCtx, ttlCollectionCache, collection);
-                                     },
-                                     [&](const TTLCollectionCache::IndexName& indexName) {
-                                         return _deleteExpiredWithIndex(
-                                             opCtx, ttlCollectionCache, collection, indexName);
-                                     }},
-            info);
+        return stdx::visit(OverloadedVisitor{[&](const TTLCollectionCache::ClusteredId&) {
+                                                 return _deleteExpiredWithCollscan(
+                                                     opCtx, ttlCollectionCache, collection);
+                                             },
+                                             [&](const TTLCollectionCache::IndexName& indexName) {
+                                                 return _deleteExpiredWithIndex(opCtx,
+                                                                                ttlCollectionCache,
+                                                                                collection,
+                                                                                indexName);
+                                             }},
+                           info);
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
         // The exception is relevant to the entire TTL monitoring process, not just the specific TTL
         // index. Let the exception escape so it can be addressed at the higher monitoring layer.

@@ -42,8 +42,8 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/idl/command_generic_argument.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/str.h"
-#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 namespace {
@@ -375,7 +375,7 @@ CollectionOptions CollectionOptions::fromCreateCommand(const NamespaceString& ns
     }
     if (auto clusteredIndex = cmd.getClusteredIndex()) {
         stdx::visit(
-            visit_helper::Overloaded{
+            OverloadedVisitor{
                 [&](bool isClustered) {
                     if (isClustered) {
                         options.clusteredIndex =

@@ -222,14 +222,13 @@ WriteConcernW deserializeWriteConcernW(BSONElement wEl) {
 }
 
 void serializeWriteConcernW(const WriteConcernW& w, StringData fieldName, BSONObjBuilder* builder) {
-    stdx::visit(
-        visit_helper::Overloaded{[&](int64_t wNumNodes) {
-                                     builder->appendNumber(fieldName,
-                                                           static_cast<long long>(wNumNodes));
-                                 },
-                                 [&](std::string wMode) { builder->append(fieldName, wMode); },
-                                 [&](WTags wTags) { builder->append(fieldName, wTags); }},
-        w);
+    stdx::visit(OverloadedVisitor{[&](int64_t wNumNodes) {
+                                      builder->appendNumber(fieldName,
+                                                            static_cast<long long>(wNumNodes));
+                                  },
+                                  [&](std::string wMode) { builder->append(fieldName, wMode); },
+                                  [&](WTags wTags) { builder->append(fieldName, wTags); }},
+                w);
 }
 
 std::int64_t parseWTimeoutFromBSON(BSONElement element) {
