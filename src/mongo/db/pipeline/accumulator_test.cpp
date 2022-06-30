@@ -208,7 +208,6 @@ TEST(Accumulators, First) {
 }
 
 TEST(Accumulators, FirstN) {
-    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
     auto expCtx = ExpressionContextForTest{};
     auto n = Value(2);
 
@@ -283,7 +282,6 @@ TEST(Accumulators, Last) {
 }
 
 TEST(Accumulators, LastN) {
-    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
     auto expCtx = ExpressionContextForTest{};
     auto n = Value(2);
     assertExpectedResults<AccumulatorLastN>(
@@ -384,7 +382,6 @@ TEST(Accumulators, MinRespectsCollation) {
 }
 
 TEST(Accumulators, MinN) {
-    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
     auto expCtx = ExpressionContextForTest{};
     const auto n = Value(3);
     assertExpectedResults<AccumulatorMinN>(
@@ -418,7 +415,6 @@ TEST(Accumulators, MinN) {
 }
 
 TEST(Accumulators, MinNRespectsCollation) {
-    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
     auto expCtx = ExpressionContextForTest{};
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
@@ -433,7 +429,6 @@ TEST(Accumulators, MinNRespectsCollation) {
 }
 
 TEST(Accumulators, MaxN) {
-    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
     auto expCtx = ExpressionContextForTest{};
     const auto n = Value(3);
     assertExpectedResults<AccumulatorMaxN>(
@@ -467,7 +462,6 @@ TEST(Accumulators, MaxN) {
 }
 
 TEST(Accumulators, MaxNRespectsCollation) {
-    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
     auto expCtx = ExpressionContextForTest{};
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
@@ -598,7 +592,6 @@ TEST(Accumulators, Sum) {
 }
 
 TEST(Accumulators, TopBottomNRespectsCollation) {
-    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
@@ -662,7 +655,6 @@ TEST(Accumulators, TopBottomNRespectsCollation) {
 }
 
 TEST(Accumulators, TopNDescendingBottomNAscending) {
-    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     const auto n3 = Value(3);
     const auto n1 = Value(1);
@@ -801,7 +793,6 @@ TEST(Accumulators, TopNDescendingBottomNAscending) {
 }
 
 TEST(Accumulators, TopNAscendingBottomNDescending) {
-    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     const auto n3 = Value(3);
     const auto n1 = Value(1);
@@ -973,7 +964,6 @@ void testSingle(OperationsType cases, ExpressionContext* const expCtx, const BSO
 }
 
 TEST(Accumulators, TopBottomSingle) {
-    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     const auto n = Value(1);
     auto mkdoc = [](Value a) {
