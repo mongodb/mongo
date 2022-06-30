@@ -51,3 +51,7 @@ feature_flags:
     description: "Feature flag for enabling sharding catalog features for global indexes"
     cpp_varname: feature_flags::gGlobalIndexesShardingCatalog
     default: false
+  featureFlagRangeDeleterService:
+    description: "Feature flag protecting instantiation and usages of the range deleter service"
+    cpp_varname: feature_flags::gRangeDeleterService
+    default: false
