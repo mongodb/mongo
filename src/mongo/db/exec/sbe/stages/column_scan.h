@@ -32,6 +32,7 @@
 #include "mongo/config.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/storage/column_store.h"
 
@@ -79,10 +80,18 @@ protected:
         TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) override;
 
 private:
+    /**
+     * A representation of a cursor for one column.
+     * This object also maintains statistics for how many times this column was accessed.
+     */
     class ColumnCursor {
     public:
-        ColumnCursor(std::unique_ptr<ColumnStore::CursorForPath> curs, bool includeInResult)
-            : _cursor(std::move(curs)), _includeInOutput(includeInResult) {}
+        /**
+         * The '_stats' object must outlive this 'ColumnCursor'.
+         */
+        ColumnCursor(std::unique_ptr<ColumnStore::CursorForPath> cursor,
+                     ColumnScanStats::CursorStats& stats)
+            : _cursor(std::move(cursor)), _stats(stats) {}
 
 
         boost::optional<FullCellView>& next() {
@@ -92,6 +101,7 @@ private:
             _lastCell.reset();
             _lastCell = _cursor->next();
             clearOwned();
+            ++_stats.numNexts;
             return _lastCell;
         }
 
@@ -99,6 +109,15 @@ private:
             _lastCell.reset();
             _lastCell = _cursor->seekAtOrPast(id);
             clearOwned();
+            ++_stats.numSeeks;
+            return _lastCell;
+        }
+
+        boost::optional<FullCellView>& seekExact(RecordId id) {
+            _lastCell.reset();
+            _lastCell = _cursor->seekExact(id);
+            clearOwned();
+            ++_stats.numSeeks;
             return _lastCell;
         }
 
@@ -124,10 +143,18 @@ private:
             return *_cursor;
         }
         bool includeInOutput() const {
-            return _includeInOutput;
+            return _stats.includeInOutput;
         }
         boost::optional<FullCellView>& lastCell() {
             return _lastCell;
+        }
+
+        size_t numNexts() const {
+            return _stats.numNexts;
+        }
+
+        size_t numSeeks() const {
+            return _stats.numSeeks;
         }
 
     private:
@@ -137,7 +164,6 @@ private:
         }
 
         std::unique_ptr<ColumnStore::CursorForPath> _cursor;
-        bool _includeInOutput = false;
 
         boost::optional<FullCellView> _lastCell;
 
@@ -145,6 +171,9 @@ private:
         // for yield.
         std::string _pathOwned;
         std::vector<char> _cellOwned;
+
+        // The _stats must outlive this.
+        ColumnScanStats::CursorStats& _stats;
     };
 
     void readParentsIntoObj(StringData path,
@@ -188,7 +217,7 @@ private:
     std::unique_ptr<SeekableRecordCursor> _rowStoreCursor;
 
     std::vector<ColumnCursor> _columnCursors;
-    StringMap<std::unique_ptr<ColumnStore::CursorForPath>> _parentPathCursors;
+    StringMap<std::unique_ptr<ColumnCursor>> _parentPathCursors;
 
     RecordId _recordId;
 
@@ -198,7 +227,7 @@ private:
     // run is complete, this pointer is reset to nullptr.
     TrialRunTracker* _tracker{nullptr};
 
-    ScanStats _specificStats;
+    ColumnScanStats _specificStats;
 };
 }  // namespace sbe
 }  // namespace mongo

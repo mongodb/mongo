@@ -35,6 +35,7 @@ namespace mongo {
 namespace sbe {
 
 struct ScanStats;
+struct ColumnScanStats;
 struct IndexScanStats;
 struct FilterStats;
 struct LimitSkipStats;
@@ -96,6 +97,7 @@ class PlanStatsVisitor {
 public:
     virtual ~PlanStatsVisitor() = default;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::ScanStats> stats) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::ColumnScanStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::IndexScanStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::FilterStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::LimitSkipStats> stats) = 0;
@@ -150,6 +152,7 @@ public:
 template <bool IsConst>
 struct PlanStatsVisitorBase : public PlanStatsVisitor<IsConst> {
     void visit(tree_walker::MaybeConstPtr<IsConst, sbe::ScanStats> stats) override {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, sbe::ColumnScanStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, sbe::IndexScanStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, sbe::FilterStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, sbe::LimitSkipStats> stats) override {}

@@ -61,7 +61,7 @@ ColumnScanStage::ColumnScanStage(UUID collectionUuid,
                                  PlanYieldPolicy* yieldPolicy,
                                  PlanNodeId nodeId,
                                  bool participateInTrialRunTracking)
-    : PlanStage("columnscan"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
+    : PlanStage("COLUMN_SCAN"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
       _collUuid(collectionUuid),
       _columnIndexName(columnIndexName),
       _fieldSlots(std::move(fieldSlots)),
@@ -167,7 +167,7 @@ void ColumnScanStage::doSaveState(bool relinquishCursor) {
         cursor.cursor().save();
     }
     for (auto& [path, cursor] : _parentPathCursors) {
-        cursor->saveUnpositioned();
+        cursor->cursor().saveUnpositioned();
     }
 
     _coll.reset();
@@ -201,7 +201,7 @@ void ColumnScanStage::doRestoreState(bool relinquishCursor) {
         cursor.cursor().restore();
     }
     for (auto& [path, cursor] : _parentPathCursors) {
-        cursor->restore();
+        cursor->cursor().restore();
     }
 }
 
@@ -213,7 +213,7 @@ void ColumnScanStage::doDetachFromOperationContext() {
         cursor.cursor().detachFromOperationContext();
     }
     for (auto& [path, cursor] : _parentPathCursors) {
-        cursor->detachFromOperationContext();
+        cursor->cursor().detachFromOperationContext();
     }
 }
 
@@ -225,7 +225,7 @@ void ColumnScanStage::doAttachToOperationContext(OperationContext* opCtx) {
         cursor.cursor().reattachToOperationContext(opCtx);
     }
     for (auto& [path, cursor] : _parentPathCursors) {
-        cursor->reattachToOperationContext(opCtx);
+        cursor->cursor().reattachToOperationContext(opCtx);
     }
 }
 
@@ -276,12 +276,16 @@ void ColumnScanStage::open(bool reOpen) {
 
         // Eventually we can not include this column for the cases where a known dense column (_id)
         // is being read anyway.
-        _columnCursors.push_back(ColumnCursor(iam->storage()->newCursor(_opCtx, "\xFF"_sd),
-                                              false /* add to document */));
+
+        // Add a stats struct that will be shared by overall ColumnScanStats and individual
+        // cursor.
+        _columnCursors.emplace_back(
+            iam->storage()->newCursor(_opCtx, ColumnStore::kRowIdPath),
+            _specificStats.cursorStats.emplace_back(ColumnStore::kRowIdPath.toString(), false));
 
         for (auto&& path : _paths) {
-            _columnCursors.push_back(
-                ColumnCursor(iam->storage()->newCursor(_opCtx, path), true /* add to document */));
+            _columnCursors.emplace_back(iam->storage()->newCursor(_opCtx, path),
+                                        _specificStats.cursorStats.emplace_back(path, true));
         }
     }
 
@@ -318,14 +322,16 @@ void ColumnScanStage::readParentsIntoObj(StringData path,
 
     // If we inserted a new entry, replace the null with an actual cursor.
     if (inserted) {
-        invariant(it->second == nullptr);
-
+        invariant(!it->second);
         auto entry = _weakIndexCatalogEntry.lock();
         tassert(6610211,
                 str::stream() << "expected IndexCatalogEntry for index named: " << _columnIndexName,
                 static_cast<bool>(entry));
         auto iam = static_cast<ColumnStoreAccessMethod*>(entry->accessMethod());
-        it->second = iam->storage()->newCursor(_opCtx, *parent);
+
+        it->second = std::make_unique<ColumnCursor>(
+            iam->storage()->newCursor(_opCtx, *parent),
+            _specificStats.parentCursorStats.emplace_back(parent->toString(), false));
     }
 
     boost::optional<SplitCellView> splitCellView;
@@ -405,6 +411,7 @@ PlanState ColumnScanStage::getNext() {
     }
 
     if (useRowStore) {
+        ++_specificStats.numRowStoreFetches;
         // TODO: In some cases we can avoid calling seek() on the row store cursor, and instead do
         // a next() which should be much cheaper.
         auto record = _rowStoreCursor->seekExact(_recordId);
@@ -435,7 +442,6 @@ PlanState ColumnScanStage::getNext() {
         _outputFields[idx].reset(owned, tag, val);
     }
 
-    ++_specificStats.numReads;
     if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumReads>(1)) {
         // If we're collecting execution stats during multi-planning and reached the end of the
         // trial period because we've performed enough physical reads, bail out from the trial run
@@ -461,12 +467,36 @@ void ColumnScanStage::close() {
 
 std::unique_ptr<PlanStageStats> ColumnScanStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    ret->specific = std::make_unique<ScanStats>(_specificStats);
+    ret->specific = std::make_unique<ColumnScanStats>(_specificStats);
 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
         bob.append("columnIndexName", _columnIndexName);
-        bob.appendNumber("numReads", static_cast<long long>(_specificStats.numReads));
+        bob.appendNumber("numRowStoreFetches",
+                         static_cast<long long>(_specificStats.numRowStoreFetches));
+        BSONObjBuilder columns(bob.subobjStart("columns"));
+        for (ColumnScanStats::CursorStats cursorStat : _specificStats.cursorStats) {
+            StringData path = cursorStat.path;
+            if (path == ColumnStore::kRowIdPath) {
+                path = "<<RowId Column>>";
+            }
+            BSONObjBuilder column(columns.subobjStart(path));
+            column.appendBool("usedInOutput", cursorStat.includeInOutput);
+            column.appendNumber("numNexts", static_cast<long long>(cursorStat.numNexts));
+            column.appendNumber("numSeeks", static_cast<long long>(cursorStat.numSeeks));
+            column.done();
+        }
+        columns.done();
+
+        BSONObjBuilder parentColumns(bob.subobjStart("parentColumns"));
+        for (ColumnScanStats::CursorStats cursorStat : _specificStats.parentCursorStats) {
+            StringData path = cursorStat.path;
+            BSONObjBuilder column(parentColumns.subobjStart(path));
+            column.appendNumber("numNexts", static_cast<long long>(cursorStat.numNexts));
+            column.appendNumber("numSeeks", static_cast<long long>(cursorStat.numSeeks));
+            column.done();
+        }
+        parentColumns.done();
 
         bob.append("paths", _paths);
         bob.append("outputSlots", _fieldSlots.begin(), _fieldSlots.end());

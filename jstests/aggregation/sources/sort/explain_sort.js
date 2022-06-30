@@ -2,6 +2,8 @@
 // designed to reproduce SERVER-33084.
 // @tags: [
 //   do_not_wrap_aggregations_in_facets,
+//   # Asserts on the number of documents examined in an explain plan.
+//   assumes_no_implicit_index_creation
 // ]
 (function() {
 "use strict";
