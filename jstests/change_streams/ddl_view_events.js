@@ -24,15 +24,6 @@ assert.commandWorked(testDB["base"].insert({_id: 1}));
 const dbName = testDB.getName();
 const viewPipeline = [{$match: {a: 2}}, {$project: {a: 1}}];
 
-if (!isChangeStreamsVisibilityEnabled(testDB)) {
-    const cursor =
-        db.getSiblingDB("admin").aggregate([{$changeStream: {allChangesForCluster: true}}]);
-    assert.commandWorked(testDB.createView("view", "base", viewPipeline));
-
-    assert(!cursor.hasNext(), () => tojson(cursor.next()));
-    return;
-}
-
 (function runViewEventAndResumeTest() {
     let cursor = testDB.aggregate([{$changeStream: {showExpandedEvents: true}}]);
 

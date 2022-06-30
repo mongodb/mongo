@@ -71,12 +71,6 @@ feature_flags:
       cpp_varname: gFeatureFlagSbePlanCache
       default: false
 
-    featureFlagChangeStreamsVisibility:
-      description: "Feature flag for enabling improved change streams visibility"
-      cpp_varname: gFeatureFlagChangeStreamsVisibility
-      default: true
-      version: 6.0
-
     featureFlagChangeStreamsFurtherEnrichedEvents:
       description: "Feature flag for enabling the reshardCollection and refineCollectionShardKey events, as well as enhancements to the updateDescription field for update events"
       cpp_varname: gFeatureFlagChangeStreamsFurtherEnrichedEvents

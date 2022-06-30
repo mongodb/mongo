@@ -5,7 +5,6 @@
  * @tags: [
  *     uses_transactions,
  *     requires_majority_read_concern,
- *     featureFlagChangeStreamsVisibility,
  *     requires_fcv_60,
  *     # In order to run this test with sharding we would have to create a transaction that creates
  *     # the collection, shards it, and then creates the index. however sharding a collection in a

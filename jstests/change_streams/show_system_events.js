@@ -18,16 +18,6 @@ load('jstests/libs/collection_drop_recreate.js');  // For 'assertDropCollection'
 
 const testDB = db.getSiblingDB(jsTestName());
 
-if (!isChangeStreamsVisibilityEnabled(testDB)) {
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: 1,
-        pipeline: [{$changeStream: {showSystemEvents: true}}],
-        cursor: {},
-    }),
-                                 6189301);
-    return;
-}
-
 // Assert that the flag is not allowed with 'apiStrict'.
 assert.commandFailedWithCode(testDB.runCommand({
     aggregate: 1,

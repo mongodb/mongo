@@ -20,9 +20,6 @@ load('jstests/libs/change_stream_util.js');        // For 'ChangeStreamTest' and
 
 const testDB = db.getSiblingDB(jsTestName());
 const collName = "coll1";
-if (!isChangeStreamsVisibilityEnabled(testDB)) {
-    return;
-}
 
 const test = new ChangeStreamTest(testDB);
 const ns = {

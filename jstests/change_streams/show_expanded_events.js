@@ -19,16 +19,6 @@ load('jstests/libs/change_stream_util.js');        // For 'ChangeStreamTest' and
 
 const testDB = db.getSiblingDB(jsTestName());
 
-if (!isChangeStreamsVisibilityEnabled(testDB)) {
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: 1,
-        pipeline: [{$changeStream: {showExpandedEvents: true}}],
-        cursor: {},
-    }),
-                                 6188501);
-    return;
-}
-
 // Assert that the flag is not allowed with 'apiStrict'.
 assert.commandFailedWithCode(testDB.runCommand({
     aggregate: 1,

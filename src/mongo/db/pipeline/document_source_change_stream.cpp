@@ -427,24 +427,6 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
                     spec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup);
     }
 
-    uassert(6188501,
-            "the 'featureFlagChangeStreamsVisibility' should be enabled to use "
-            "'showExpandedEvents:true' in the change stream spec",
-            feature_flags::gFeatureFlagChangeStreamsVisibility.isEnabledAndIgnoreFCV() ||
-                !spec.getShowExpandedEvents());
-
-    uassert(6189400,
-            "the 'featureFlagChangeStreamsVisibility' should be enabled to use "
-            "'showRawUpdateDescription:true' in the change stream spec",
-            feature_flags::gFeatureFlagChangeStreamsVisibility.isEnabledAndIgnoreFCV() ||
-                !spec.getShowRawUpdateDescription());
-
-    uassert(6189301,
-            "the 'featureFlagChangeStreamsVisibility' should be enabled to use "
-            "'showSystemEvents:true' in the change stream spec",
-            feature_flags::gFeatureFlagChangeStreamsVisibility.isEnabledAndIgnoreFCV() ||
-                !spec.getShowSystemEvents());
-
     uassert(31123,
             "Change streams from mongos may not show migration events",
             !(expCtx->inMongos && spec.getShowMigrationEvents()));

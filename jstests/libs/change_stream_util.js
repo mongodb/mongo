@@ -55,15 +55,6 @@ function isChangeStreamsRewriteEnabled(db) {
 }
 
 /**
- * Returns true if feature flag 'featureFlagChangeStreamsVisibility' is enabled, false otherwise.
- */
-function isChangeStreamsVisibilityEnabled(db) {
-    const getParam = db.adminCommand({getParameter: 1, featureFlagChangeStreamsVisibility: 1});
-    return getParam.hasOwnProperty("featureFlagChangeStreamsVisibility") &&
-        getParam.featureFlagChangeStreamsVisibility.value;
-}
-
-/**
  * Helper function used internally by ChangeStreamTest. If no passthrough is active, it is exactly
  * the same as calling db.runCommand. If a passthrough is active and has defined a function
  * 'changeStreamPassthroughAwareRunCommand', then this method will be overridden to allow individual

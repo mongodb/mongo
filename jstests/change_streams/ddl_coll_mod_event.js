@@ -16,10 +16,6 @@ load("jstests/libs/fixture_helpers.js");
 
 const testDB = db.getSiblingDB(jsTestName());
 
-if (!isChangeStreamsVisibilityEnabled(testDB)) {
-    return;
-}
-
 const dbName = testDB.getName();
 const collName = jsTestName();
 const ns = {

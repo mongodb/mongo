@@ -12,15 +12,10 @@
 "use strict";
 
 load("jstests/libs/change_stream_rewrite_util.js");  // For rewrite helpers.
-load('jstests/libs/change_stream_util.js');          // For isChangeStreamsVisibilityEnabled.
 
 const dbName = "change_stream_rewrite_null_existence_test";
 const collName = "coll1";
-
 const testDB = db.getSiblingDB(dbName);
-if (!isChangeStreamsVisibilityEnabled(testDB)) {
-    return;
-}
 
 // Establish a resume token at a point before anything actually happens in the test.
 const startPoint = db.getMongo().watch().getResumeToken();

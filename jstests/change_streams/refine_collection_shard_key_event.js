@@ -8,7 +8,6 @@
  *    change_stream_does_not_expect_txns,
  *    assumes_unsharded_collection,
  *    assumes_read_preference_unchanged,
- *    featureFlagChangeStreamsVisibility,
  *    featureFlagChangeStreamsFurtherEnrichedEvents
  * ]
  */

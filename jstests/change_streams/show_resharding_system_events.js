@@ -5,7 +5,6 @@
  *
  * @tags: [
  *  requires_fcv_61,
- *  featureFlagChangeStreamsVisibility,
  *  featureFlagChangeStreamsFurtherEnrichedEvents,
  *  requires_sharding,
  *  uses_change_streams,
