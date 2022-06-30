@@ -413,12 +413,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
             }
 
             if (nullptr != dlOut) {
-                if (member->hasRecordId()) {
-                    *dlOut = member->recordId;
-                } else {
-                    _workingSet->free(id);
-                    hasRequestedData = false;
-                }
+                tassert(6297500, "Working set member has no record ID", member->hasRecordId());
+                *dlOut = member->recordId;
             }
 
             if (hasRequestedData) {
