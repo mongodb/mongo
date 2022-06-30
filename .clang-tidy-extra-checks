@@ -1,0 +1,523 @@
+---
+# Generated with /opt/mongodbtoolchain/v3/bin/clang-tidy --dump-config and /opt/mongodbtoolchain/v3/bin/clang-tidy --list-checks --checks=*
+# We want to be explicit about what checks we enable (rather than bugprone-*) to forwards compatibility with clang-tidy.
+# Forwards compatibility is useful to upgrade clang tidy AND for code hinting tools that might use a newer version fo clang tidy
+
+# Here is an explanation for why some of the checks are disabled:
+#
+#  -bugprone-throw-keyword-missing: based on having exception in the name
+#  -bugprone-virtual-near-miss: based on naming this can be avoid by using the virtual, override, final paradigm
+#  -bugprone-easily-swappable-parameters: too many false positives
+#  -/+cert*: see details in https://releases.llvm.org/7.0.0/tools/clang/tools/extra/docs/clang-tidy/checks/list.html
+#      +cert-err34-c: warn use of atoi vs strtol (the latter has error reporting)
+#      +cert-err52-cpp: do not use longjmp or setjmp
+#      +cert-err60-cpp: exception objects must be no-throw copy ctor
+#      +cert-flp30-c: do not use floating point values in for loops
+#  -cppcoreguidelines-pro-type-vararg: warns about c style va_args, these are use sparingly and mostly for printfs
+#  -cppcoreguidelines-pro-type-reinterpret-cast: warns about reinterpret_cast, used frequently in our codebase
+#  -cppcoreguidelines-pro-type-const-cast: warns of using const_cast, this is a well known anti-pattern so almost all cases of this will just be ignored 
+#  -cppcoreguidelines-pro-bounds-array-to-pointer-decay: warns when decaying and array to pointer. This can be fixed by adding an explicit cast.
+#  -cppcoreguidelines-owning-memory (requires gsl::owner<int*>): superseded by using unique_ptr
+#  -cppcoreguidelines-narrowing-conversions (int i = 0; i += 0.1): Too many false positives - TODO enabled
+#  -cppcoreguidelines-pro-bounds-constant-array-index: requires gsl
+#  -cppcoreguidelines-pro-bounds-pointer-arithmetic: too many false positives (will flag char* data = ...; data[i] = 4;)
+#  -cppcoreguidelines-pro-type-union-access: We already have a lot of union code and this check will flag every instance of usiong a union
+#  -cppcoreguidelines-*: Most checks here are style problems rather than real bugs
+#  -hicpp-no-assembler: we use inline assembly and if we don't we should not warn about using it
+#  -hicpp-special-member-functions: alias for cppcoreguidelines-special-member-functions
+#  -google-runtime-references: disallows non-cost references as function args
+#  -google-readability-todo: todos should follow a specific format
+#  -readability-identifier-naming: like function size this is super opinionated. I want to avoid this for now and revist when we can write out own rules.
+#  -readability-function-size: I am not sure how we would want to use this. I also cannot be the only one deciding on what makes a function too complex.
+#  -readability-named-parameter: Not helpful
+#  -modernize-return-braced-init-list: I think this hurts readability
+#  -modernize-redundant-void-arg: I think this hurts readability
+#
+
+Checks: >
+  clang-diagnostic-*,
+  -clang-analyzer-*,
+  -abseil-string-find-startswith
+  -android-cloexec-accept,
+  -android-cloexec-accept4,
+  -android-cloexec-creat,
+  -android-cloexec-dup,
+  -android-cloexec-epoll-create,
+  -android-cloexec-epoll-create1,
+  -android-cloexec-fopen,
+  -android-cloexec-inotify-init,
+  -android-cloexec-inotify-init1,
+  -android-cloexec-memfd-create,
+  -android-cloexec-open,
+  -android-cloexec-socket,
+  boost-use-to-string,
+  bugprone-argument-comment,
+  bugprone-assert-side-effect,
+  bugprone-bool-pointer-implicit-conversion,
+  bugprone-copy-constructor-init,
+  bugprone-dangling-handle,
+  bugprone-exception-escape,
+  bugprone-fold-init-type,
+  bugprone-forward-declaration-namespace,
+  bugprone-forwarding-reference-overload,
+  bugprone-inaccurate-erase,
+  bugprone-incorrect-roundings,
+  bugprone-integer-division,
+  bugprone-lambda-function-name,
+  bugprone-macro-parentheses,
+  bugprone-macro-repeated-side-effects,
+  bugprone-misplaced-operator-in-strlen-in-alloc,
+  bugprone-misplaced-widening-cast,
+  bugprone-move-forwarding-reference,
+  bugprone-multiple-statement-macro,
+  bugprone-narrowing-conversions,
+  bugprone-parent-virtual-call,
+  bugprone-sizeof-container,
+  bugprone-sizeof-expression,
+  bugprone-string-constructor,
+  bugprone-string-integer-assignment,
+  bugprone-string-literal-with-embedded-nul,
+  bugprone-suspicious-enum-usage,
+  bugprone-suspicious-memset-usage,
+  bugprone-suspicious-missing-comma,
+  bugprone-suspicious-semicolon,
+  bugprone-suspicious-string-compare,
+  bugprone-swapped-arguments,
+  bugprone-terminating-continue,
+  -bugprone-throw-keyword-missing,
+  bugprone-undefined-memory-manipulation,
+  bugprone-undelegated-constructor,
+  bugprone-unused-raii,
+  bugprone-unused-return-value,
+  bugprone-use-after-move,
+  -bugprone-virtual-near-miss,
+  -cert-dcl03-c,
+  -cert-dcl21-cpp,
+  -cert-dcl50-cpp,
+  -cert-dcl54-cpp,
+  -cert-dcl58-cpp,
+  -cert-dcl59-cpp,
+  -cert-env33-c,
+  -cert-err09-cpp,
+  cert-err34-c,
+  cert-err52-cpp,
+  -cert-err58-cpp,
+  cert-err60-cpp,
+  -cert-err61-cpp,
+  -cert-fio38-c,
+  cert-flp30-c,
+  -cert-msc30-c,
+  -cert-msc32-c,
+  -cert-msc50-cpp,
+  -cert-msc51-cpp,
+  -cert-oop11-cpp,
+  cppcoreguidelines-avoid-goto,
+  cppcoreguidelines-c-copy-assignment-signature,
+  cppcoreguidelines-interfaces-global-init,
+  cppcoreguidelines-narrowing-conversions,
+  -cppcoreguidelines-no-malloc,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-const-cast,
+  -cppcoreguidelines-pro-type-cstyle-cast,
+  -cppcoreguidelines-pro-type-member-init,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-type-static-cast-downcast,
+  -cppcoreguidelines-pro-type-union-access,
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-slicing,
+  -cppcoreguidelines-special-member-functions,
+  -fuchsia-default-arguments,
+  -fuchsia-header-anon-namespaces,
+  -fuchsia-multiple-inheritance,
+  -fuchsia-overloaded-operator,
+  -fuchsia-restrict-system-includes,
+  -fuchsia-statically-constructed-objects,
+  -fuchsia-trailing-return,
+  -fuchsia-virtual-inheritance,
+  google-build-explicit-make-pair,
+  google-build-namespaces,
+  -google-build-using-namespace,
+  -google-default-arguments,
+  -google-explicit-constructor,
+  google-global-names-in-headers,
+  google-objc-avoid-throwing-exception,
+  google-objc-global-variable-declaration,
+  -google-readability-braces-around-statements,
+  -google-readability-casting,
+  google-readability-function-size,
+  google-readability-namespace-comments,
+  -google-readability-todo,
+  -google-runtime-int,
+  google-runtime-operator,
+  -google-runtime-references,
+  hicpp-avoid-goto,
+  -hicpp-braces-around-statements,
+  -hicpp-deprecated-headers,
+  -hicpp-exception-baseclass,
+  -hicpp-explicit-conversions,
+  hicpp-function-size,
+  hicpp-invalid-access-moved,
+  -hicpp-member-init,
+  hicpp-move-const-arg,
+  -hicpp-multiway-paths-covered,
+  hicpp-named-parameter,
+  -hicpp-new-delete-operators,
+  -hicpp-no-array-decay,
+  -hicpp-no-assembler,
+  -hicpp-no-malloc,
+  -hicpp-noexcept-move,
+  -hicpp-signed-bitwise,
+  -hicpp-special-member-functions,
+  hicpp-static-assert,
+  hicpp-undelegated-constructor,
+  -hicpp-use-auto,
+  -hicpp-use-emplace,
+  hicpp-use-equals-default,
+  hicpp-use-equals-delete,
+  hicpp-use-noexcept,
+  -hicpp-use-nullptr,
+  -hicpp-use-override,
+  hicpp-vararg,
+  -llvm-header-guard,
+  -llvm-include-order,
+  -llvm-namespace-comment,
+  -llvm-twine-local,
+  misc-definitions-in-headers,
+  misc-misplaced-const,
+  -misc-new-delete-overloads,
+  misc-non-copyable-objects,
+  misc-redundant-expression,
+  misc-static-assert,
+  misc-throw-by-value-catch-by-reference,
+  misc-unconventional-assign-operator,
+  misc-uniqueptr-reset-release,
+  misc-unused-alias-decls,
+  -misc-unused-parameters,
+  -misc-unused-using-decls,
+  modernize-avoid-bind,
+  -modernize-deprecated-headers,
+  -modernize-loop-convert,
+  modernize-make-shared,
+  -modernize-make-unique,
+  -modernize-pass-by-value,
+  -modernize-raw-string-literal,
+  -modernize-redundant-void-arg,
+  modernize-replace-auto-ptr,
+  modernize-replace-random-shuffle,
+  -modernize-return-braced-init-list,
+  modernize-shrink-to-fit,
+  modernize-unary-static-assert,
+  -modernize-use-auto,
+  modernize-use-bool-literals,
+  -modernize-use-default-member-init,
+  modernize-use-emplace,
+  -modernize-use-equals-default,
+  -modernize-use-equals-delete,
+  modernize-use-noexcept,
+  -modernize-use-nullptr,
+  -modernize-use-override,
+  -modernize-use-transparent-functors,
+  modernize-use-uncaught-exceptions,
+  -modernize-use-using,
+  -mpi-buffer-deref,
+  -mpi-type-mismatch,
+  -objc-avoid-nserror-init,
+  -objc-avoid-spinlock,
+  -objc-forbidden-subclassing,
+  -objc-property-declaration,
+  performance-faster-string-find,
+  performance-for-range-copy,
+  performance-implicit-conversion-in-loop,
+  performance-inefficient-algorithm,
+  performance-inefficient-string-concatenation,
+  performance-inefficient-vector-operation,
+  -performance-move-const-arg,
+  performance-move-constructor-init,
+  -performance-noexcept-move-constructor,
+  performance-type-promotion-in-math-fn,
+  -performance-unnecessary-copy-initialization,
+  performance-unnecessary-value-param,
+  -portability-simd-intrinsics,
+  readability-avoid-const-params-in-decls,
+  -readability-braces-around-statements,
+  -readability-container-size-empty,
+  readability-delete-null-pointer,
+  readability-deleted-default,
+  -readability-else-after-return,
+  -readability-function-size,
+  -readability-identifier-naming,
+  -readability-implicit-bool-conversion,
+  readability-inconsistent-declaration-parameter-name,
+  -readability-misleading-indentation,
+  readability-misplaced-array-index,
+  -readability-named-parameter,
+  readability-non-const-parameter,
+  readability-redundant-control-flow,
+  -readability-redundant-declaration,
+  readability-redundant-function-ptr-dereference,
+  -readability-redundant-member-init,
+  -readability-redundant-smartptr-get,
+  -readability-redundant-string-cstr,
+  -readability-redundant-string-init,
+  -readability-simplify-boolean-expr,
+  readability-simplify-subscript-expr,
+  readability-static-accessed-through-instance,
+  -readability-static-definition-in-anonymous-namespace,
+  readability-string-compare,
+  readability-uniqueptr-delete-release,
+  -zircon-temporary-objects
+WarningsAsErrors: '*'
+HeaderFilterRegex: '(mongo/.*|build/.*)'
+AnalyzeTemporaryDtors: false
+FormatStyle:     none
+User:            ubuntu
+CheckOptions:    
+  - key:             bugprone-argument-comment.StrictMode
+    value:           '0'
+  - key:             bugprone-assert-side-effect.AssertMacros
+    value:           assert
+  - key:             bugprone-assert-side-effect.CheckFunctionCalls
+    value:           '0'
+  - key:             bugprone-dangling-handle.HandleClasses
+    value:           'std::basic_string_view;std::experimental::basic_string_view'
+  - key:             bugprone-exception-escape.FunctionsThatShouldNotThrow
+    value:           ''
+  - key:             bugprone-exception-escape.IgnoredExceptions
+    value:           ''
+  - key:             bugprone-misplaced-widening-cast.CheckImplicitCasts
+    value:           '0'
+  - key:             bugprone-sizeof-expression.WarnOnSizeOfCompareToConstant
+    value:           '1'
+  - key:             bugprone-sizeof-expression.WarnOnSizeOfConstant
+    value:           '1'
+  - key:             bugprone-sizeof-expression.WarnOnSizeOfIntegerExpression
+    value:           '0'
+  - key:             bugprone-sizeof-expression.WarnOnSizeOfThis
+    value:           '1'
+  - key:             bugprone-string-constructor.LargeLengthThreshold
+    value:           '8388608'
+  - key:             bugprone-string-constructor.WarnOnLargeLength
+    value:           '1'
+  - key:             bugprone-suspicious-enum-usage.StrictMode
+    value:           '0'
+  - key:             bugprone-suspicious-missing-comma.MaxConcatenatedTokens
+    value:           '5'
+  - key:             bugprone-suspicious-missing-comma.RatioThreshold
+    value:           '0.200000'
+  - key:             bugprone-suspicious-missing-comma.SizeThreshold
+    value:           '5'
+  - key:             bugprone-suspicious-string-compare.StringCompareLikeFunctions
+    value:           ''
+  - key:             bugprone-suspicious-string-compare.WarnOnImplicitComparison
+    value:           '1'
+  - key:             bugprone-suspicious-string-compare.WarnOnLogicalNotComparison
+    value:           '0'
+  - key:             bugprone-unused-return-value.CheckedFunctions
+    value:           '::std::async;::std::launder;::std::remove;::std::remove_if;::std::unique;::std::unique_ptr::release;::std::basic_string::empty;::std::vector::empty'
+  - key:             cppcoreguidelines-no-malloc.Allocations
+    value:           '::malloc;::calloc'
+  - key:             cppcoreguidelines-no-malloc.Deallocations
+    value:           '::free'
+  - key:             cppcoreguidelines-no-malloc.Reallocations
+    value:           '::realloc'
+  - key:             cppcoreguidelines-pro-bounds-constant-array-index.GslHeader
+    value:           ''
+  - key:             cppcoreguidelines-pro-bounds-constant-array-index.IncludeStyle
+    value:           '0'
+  - key:             cppcoreguidelines-pro-type-member-init.IgnoreArrays
+    value:           '0'
+  - key:             cppcoreguidelines-special-member-functions.AllowMissingMoveFunctions
+    value:           '0'
+  - key:             cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor
+    value:           '1'
+  - key:             google-build-namespaces.HeaderFileExtensions
+    value:           ',h,hh,hpp,hxx'
+  - key:             google-global-names-in-headers.HeaderFileExtensions
+    value:           ',h,hh,hpp,hxx'
+  - key:             google-readability-braces-around-statements.ShortStatementLines
+    value:           '1'
+  - key:             google-readability-function-size.BranchThreshold
+    value:           '4294967295'
+  - key:             google-readability-function-size.LineThreshold
+    value:           '4294967295'
+  - key:             google-readability-function-size.NestingThreshold
+    value:           '4294967295'
+  - key:             google-readability-function-size.ParameterThreshold
+    value:           '4294967295'
+  - key:             google-readability-function-size.StatementThreshold
+    value:           '800'
+  - key:             google-readability-function-size.VariableThreshold
+    value:           '4294967295'
+  - key:             google-readability-namespace-comments.ShortNamespaceLines
+    value:           '10'
+  - key:             google-readability-namespace-comments.SpacesBeforeComments
+    value:           '2'
+  - key:             google-runtime-int.SignedTypePrefix
+    value:           int
+  - key:             google-runtime-int.TypeSuffix
+    value:           ''
+  - key:             google-runtime-int.UnsignedTypePrefix
+    value:           uint
+  - key:             hicpp-braces-around-statements.ShortStatementLines
+    value:           '0'
+  - key:             hicpp-function-size.BranchThreshold
+    value:           '4294967295'
+  - key:             hicpp-function-size.LineThreshold
+    value:           '4294967295'
+  - key:             hicpp-function-size.NestingThreshold
+    value:           '4294967295'
+  - key:             hicpp-function-size.ParameterThreshold
+    value:           '4294967295'
+  - key:             hicpp-function-size.StatementThreshold
+    value:           '800'
+  - key:             hicpp-function-size.VariableThreshold
+    value:           '4294967295'
+  - key:             hicpp-member-init.IgnoreArrays
+    value:           '0'
+  - key:             hicpp-move-const-arg.CheckTriviallyCopyableMove
+    value:           '1'
+  - key:             hicpp-multiway-paths-covered.WarnOnMissingElse
+    value:           '0'
+  - key:             hicpp-named-parameter.IgnoreFailedSplit
+    value:           '0'
+  - key:             hicpp-no-malloc.Allocations
+    value:           '::malloc;::calloc'
+  - key:             hicpp-no-malloc.Deallocations
+    value:           '::free'
+  - key:             hicpp-no-malloc.Reallocations
+    value:           '::realloc'
+  - key:             hicpp-special-member-functions.AllowMissingMoveFunctions
+    value:           '0'
+  - key:             hicpp-special-member-functions.AllowSoleDefaultDtor
+    value:           '0'
+  - key:             hicpp-use-auto.MinTypeNameLength
+    value:           '5'
+  - key:             hicpp-use-auto.RemoveStars
+    value:           '0'
+  - key:             hicpp-use-emplace.ContainersWithPushBack
+    value:           '::std::vector;::std::list;::std::deque'
+  - key:             hicpp-use-emplace.SmartPointers
+    value:           '::std::shared_ptr;::std::unique_ptr;::std::auto_ptr;::std::weak_ptr'
+  - key:             hicpp-use-emplace.TupleMakeFunctions
+    value:           '::std::make_pair;::std::make_tuple'
+  - key:             hicpp-use-emplace.TupleTypes
+    value:           '::std::pair;::std::tuple'
+  - key:             hicpp-use-equals-default.IgnoreMacros
+    value:           '1'
+  - key:             hicpp-use-noexcept.ReplacementString
+    value:           ''
+  - key:             hicpp-use-noexcept.UseNoexceptFalse
+    value:           '1'
+  - key:             hicpp-use-nullptr.NullMacros
+    value:           ''
+  - key:             llvm-namespace-comment.ShortNamespaceLines
+    value:           '1'
+  - key:             llvm-namespace-comment.SpacesBeforeComments
+    value:           '1'
+  - key:             misc-definitions-in-headers.HeaderFileExtensions
+    value:           ',h,hh,hpp,hxx'
+  - key:             misc-definitions-in-headers.UseHeaderFileExtension
+    value:           '1'
+  - key:             misc-throw-by-value-catch-by-reference.CheckThrowTemporaries
+    value:           '1'
+  - key:             misc-unused-parameters.StrictMode
+    value:           '0'
+  - key:             modernize-loop-convert.MaxCopySize
+    value:           '16'
+  - key:             modernize-loop-convert.MinConfidence
+    value:           reasonable
+  - key:             modernize-loop-convert.NamingStyle
+    value:           CamelCase
+  - key:             modernize-make-shared.IgnoreMacros
+    value:           '1'
+  - key:             modernize-make-shared.IncludeStyle
+    value:           '0'
+  - key:             modernize-make-shared.MakeSmartPtrFunction
+    value:           'std::make_shared'
+  - key:             modernize-make-shared.MakeSmartPtrFunctionHeader
+    value:           memory
+  - key:             modernize-make-unique.IgnoreMacros
+    value:           '1'
+  - key:             modernize-make-unique.IncludeStyle
+    value:           '0'
+  - key:             modernize-make-unique.MakeSmartPtrFunction
+    value:           'std::make_unique'
+  - key:             modernize-make-unique.MakeSmartPtrFunctionHeader
+    value:           memory
+  - key:             modernize-pass-by-value.IncludeStyle
+    value:           llvm
+  - key:             modernize-pass-by-value.ValuesOnly
+    value:           '0'
+  - key:             modernize-raw-string-literal.ReplaceShorterLiterals
+    value:           '0'
+  - key:             modernize-replace-auto-ptr.IncludeStyle
+    value:           llvm
+  - key:             modernize-replace-random-shuffle.IncludeStyle
+    value:           llvm
+  - key:             modernize-use-auto.MinTypeNameLength
+    value:           '5'
+  - key:             modernize-use-auto.RemoveStars
+    value:           '0'
+  - key:             modernize-use-default-member-init.IgnoreMacros
+    value:           '1'
+  - key:             modernize-use-default-member-init.UseAssignment
+    value:           '0'
+  - key:             modernize-use-emplace.ContainersWithPushBack
+    value:           '::std::vector;::std::list;::std::deque'
+  - key:             modernize-use-emplace.SmartPointers
+    value:           '::std::shared_ptr;::std::unique_ptr;::std::auto_ptr;::std::weak_ptr'
+  - key:             modernize-use-emplace.TupleMakeFunctions
+    value:           '::std::make_pair;::std::make_tuple'
+  - key:             modernize-use-emplace.TupleTypes
+    value:           '::std::pair;::std::tuple'
+  - key:             modernize-use-equals-default.IgnoreMacros
+    value:           '1'
+  - key:             modernize-use-noexcept.ReplacementString
+    value:           ''
+  - key:             modernize-use-noexcept.UseNoexceptFalse
+    value:           '1'
+  - key:             modernize-use-nullptr.NullMacros
+    value:           'NULL'
+  - key:             modernize-use-transparent-functors.SafeMode
+    value:           '0'
+  - key:             modernize-use-using.IgnoreMacros
+    value:           '1'
+  - key:             performance-faster-string-find.StringLikeClasses
+    value:           'std::basic_string'
+  - key:             performance-for-range-copy.WarnOnAllAutoCopies
+    value:           '0'
+  - key:             performance-inefficient-string-concatenation.StrictMode
+    value:           '0'
+  - key:             performance-inefficient-vector-operation.VectorLikeClasses
+    value:           '::std::vector'
+  - key:             performance-move-const-arg.CheckTriviallyCopyableMove
+    value:           '1'
+  - key:             performance-move-constructor-init.IncludeStyle
+    value:           llvm
+  - key:             performance-type-promotion-in-math-fn.IncludeStyle
+    value:           llvm
+  - key:             performance-unnecessary-value-param.IncludeStyle
+    value:           llvm
+  - key:             readability-braces-around-statements.ShortStatementLines
+    value:           '0'
+  - key:             readability-implicit-bool-conversion.AllowIntegerConditions
+    value:           '0'
+  - key:             readability-implicit-bool-conversion.AllowPointerConditions
+    value:           '0'
+  - key:             readability-inconsistent-declaration-parameter-name.IgnoreMacros
+    value:           '1'
+  - key:             readability-inconsistent-declaration-parameter-name.Strict
+    value:           '0'
+  - key:             readability-simplify-boolean-expr.ChainedConditionalAssignment
+    value:           '0'
+  - key:             readability-simplify-boolean-expr.ChainedConditionalReturn
+    value:           '0'
+  - key:             readability-simplify-subscript-expr.Types
+    value:           '::std::basic_string;::std::basic_string_view;::std::vector;::std::array'
+  - key:             readability-static-accessed-through-instance.NameSpecifierNestingThreshold
+    value:           '3'
+...
+
