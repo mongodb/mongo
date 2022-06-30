@@ -40,8 +40,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
@@ -84,22 +82,12 @@ ValidateState::ValidateState(OperationContext* opCtx,
         _collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, _nss);
 
     if (!_collection) {
-        if (!CollectionCatalog::get(opCtx)->lookupView(opCtx, _nss)) {
-            uasserted(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "Collection '" << _nss << "' does not exist to validate.");
-        } else {
-            // Uses the bucket collection in place of the time-series collection view.
-            if (feature_flags::gExtendValidateCommand.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                auto bucketNss = _nss.makeTimeseriesBucketsNamespace();
-                _collection =
-                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, bucketNss);
-            }
-
-            if (!(_collection && _collection->getTimeseriesOptions())) {
-                uasserted(ErrorCodes::CommandNotSupportedOnView, "Cannot validate a view");
-            }
+        if (CollectionCatalog::get(opCtx)->lookupView(opCtx, _nss)) {
+            uasserted(ErrorCodes::CommandNotSupportedOnView, "Cannot validate a view");
         }
+
+        uasserted(ErrorCodes::NamespaceNotFound,
+                  str::stream() << "Collection '" << _nss << "' does not exist to validate.");
     }
 
     // RepairMode is incompatible with the ValidateModes kBackground and
