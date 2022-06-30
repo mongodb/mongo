@@ -176,6 +176,15 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
                         std::make_unique<FifoTicketHolder>(readTransactions, svcCtx),
                         std::make_unique<FifoTicketHolder>(writeTransactions, svcCtx));
                     break;
+                case QueueingPolicyEnum::SchedulingQueue:
+                    LOGV2_DEBUG(6615200, 1, "Using Scheduling Queue-based ticketing scheduler");
+                    ticketHolders.setGlobalThrottling(std::make_unique<StochasticTicketHolder>(
+                                                          readTransactions + writeTransactions,
+                                                          readTransactions,
+                                                          writeTransactions,
+                                                          svcCtx),
+                                                      nullptr);
+                    break;
             }
         } else {
             ticketHolders.setGlobalThrottling(

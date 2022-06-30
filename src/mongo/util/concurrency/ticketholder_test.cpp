@@ -249,7 +249,7 @@ TEST_F(TicketHolderTest, FifoCanceled) {
         auto ticket =
             holder.waitForTicket(_opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
 
-        stdx::thread waiting([this, &holder]() {
+        stdx::thread waiting([&]() {
             auto client = this->getServiceContext()->makeClient("waiting");
             auto opCtx = client->makeOperationContext();
 

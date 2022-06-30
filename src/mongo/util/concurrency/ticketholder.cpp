@@ -189,9 +189,9 @@ void tsFromDate(const Date_t& deadline, struct timespec& ts) {
 }
 }  // namespace
 
-SemaphoreTicketHolder::SemaphoreTicketHolder(int num, ServiceContext* serviceContext)
-    : TicketHolder(num, serviceContext) {
-    check(sem_init(&_sem, 0, num));
+SemaphoreTicketHolder::SemaphoreTicketHolder(int numTickets, ServiceContext* serviceContext)
+    : TicketHolder(numTickets, serviceContext) {
+    check(sem_init(&_sem, 0, numTickets));
 }
 
 SemaphoreTicketHolder::~SemaphoreTicketHolder() {
@@ -268,8 +268,8 @@ int SemaphoreTicketHolder::available() const {
 
 #else
 
-SemaphoreTicketHolder::SemaphoreTicketHolder(int num, ServiceContext* svcCtx)
-    : TicketHolder(num, svcCtx), _num(num) {}
+SemaphoreTicketHolder::SemaphoreTicketHolder(int numTickets, ServiceContext* svcCtx)
+    : TicketHolder(numTickets, svcCtx), _num(numTickets) {}
 
 SemaphoreTicketHolder::~SemaphoreTicketHolder() = default;
 
@@ -335,9 +335,9 @@ void SemaphoreTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
     b.append("totalTimeQueuedMicros", _totalTimeQueuedMicros.loadRelaxed());
 }
 
-FifoTicketHolder::FifoTicketHolder(int num, ServiceContext* serviceContext)
-    : TicketHolder(num, serviceContext) {
-    _ticketsAvailable.store(num);
+FifoTicketHolder::FifoTicketHolder(int numTickets, ServiceContext* serviceContext)
+    : TicketHolder(numTickets, serviceContext) {
+    _ticketsAvailable.store(numTickets);
     _enqueuedElements.store(0);
 }
 
@@ -472,4 +472,196 @@ void FifoTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
     b.append("totalTimeQueuedMicros", _totalTimeQueuedMicros.loadRelaxed());
 }
 
+SchedulingTicketHolder::SchedulingTicketHolder(int numTickets,
+                                               unsigned int numQueues,
+                                               ServiceContext* serviceContext)
+    : TicketHolder(numTickets, serviceContext), _serviceContext(serviceContext) {
+    for (std::size_t i = 0; i < numQueues; i++) {
+        _queues.emplace_back(this);
+    }
+    _queues.shrink_to_fit();
+    _ticketsAvailable.store(numTickets);
+}
+
+SchedulingTicketHolder::~SchedulingTicketHolder() {}
+
+int SchedulingTicketHolder::available() const {
+    return _ticketsAvailable.load();
+}
+
+void SchedulingTicketHolder::_release(AdmissionContext* admCtx) noexcept {
+    invariant(admCtx);
+
+    // The idea behind the release mechanism consists of a consistent view of queued elements
+    // waiting for a ticket and many threads releasing tickets simultaneously. The releasers will
+    // proceed to attempt to dequeue an element by seeing if there are threads not woken and waking
+    // one, having increased the number of woken threads for accuracy. Once the thread gets woken it
+    // will then decrease the number of woken threads (as it has been woken) and then attempt to
+    // acquire a ticket. The two possible states are either one or more releasers releasing or a
+    // thread waking up due to the RW mutex.
+    //
+    // Under this lock the queues cannot be modified in terms of someone attempting to enqueue on
+    // them, only waking threads is allowed.
+    ReleaserLockGuard lk(_queueMutex);  // NOLINT
+    _ticketsAvailable.addAndFetch(1);
+    if (std::all_of(_queues.begin(), _queues.end(), [](const Queue& queue) {
+            return queue.queuedElems() == 0;
+        })) {
+        return;
+    }
+    _dequeueWaitingThread();
+}
+
+bool SchedulingTicketHolder::_tryAcquireTicket() {
+    auto remaining = _ticketsAvailable.subtractAndFetch(1);
+    if (remaining < 0) {
+        _ticketsAvailable.addAndFetch(1);
+        return false;
+    }
+    return true;
+}
+
+boost::optional<Ticket> SchedulingTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
+    invariant(admCtx);
+
+    auto hasAcquired = _tryAcquireTicket();
+    if (hasAcquired) {
+        return Ticket{this, admCtx};
+    }
+    return boost::none;
+}
+
+boost::optional<Ticket> SchedulingTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
+                                                                        AdmissionContext* admCtx,
+                                                                        Date_t until,
+                                                                        WaitMode waitMode) {
+    invariant(admCtx);
+
+    auto interruptible =
+        waitMode == WaitMode::kInterruptible ? opCtx : Interruptible::notInterruptible();
+
+    auto& queue = _getQueueToUse(opCtx, admCtx);
+
+    bool assigned;
+    {
+        stdx::unique_lock lk(_queueMutex);
+        assigned = queue.enqueue(interruptible, lk, until);
+    }
+    if (assigned) {
+        return Ticket{this, admCtx};
+    } else {
+        return boost::none;
+    }
+}
+
+bool SchedulingTicketHolder::Queue::attemptToDequeue() {
+    auto threadsToBeWoken = _threadsToBeWoken.load();
+    while (threadsToBeWoken < _queuedThreads) {
+        auto canDequeue = _threadsToBeWoken.compareAndSwap(&threadsToBeWoken, threadsToBeWoken + 1);
+        if (canDequeue) {
+            _queue.notify_one();
+            return true;
+        }
+    }
+    return false;
+}
+
+void SchedulingTicketHolder::Queue::_signalThreadWoken() {
+    auto currentThreadsToBeWoken = _threadsToBeWoken.load();
+    while (currentThreadsToBeWoken > 0) {
+        if (_threadsToBeWoken.compareAndSwap(&currentThreadsToBeWoken,
+                                             currentThreadsToBeWoken - 1)) {
+            return;
+        }
+    }
+}
+
+bool SchedulingTicketHolder::Queue::enqueue(Interruptible* interruptible,
+                                            EnqueuerLockGuard& queueLock,
+                                            const Date_t& until) {
+    _queuedThreads++;
+    // Before exiting we remove ourselves from the count of queued threads, we are still holding the
+    // lock here so this is safe.
+    ON_BLOCK_EXIT([&] { _queuedThreads--; });
+    bool isFirstCheck = true;
+    do {
+        try {
+            interruptible->waitForConditionOrInterruptUntil(_queue, queueLock, until, [&] {
+                // As this block is executed when getting woken we must modify the woken count.
+                // Otherwise we are prone to deadlocking if we get woken and there are no tickets
+                // available, permanently signalling that a thread has been woken.
+                //
+                // We don't signal that a thread has been woken during the first predicate check as
+                // the underlying implementation does the following:
+                //
+                // while(!pred()) {
+                //     cv.wait(lk);
+                // }
+                //
+                // Thus the predicate will always be called once before waiting.
+                if (isFirstCheck) {
+                    isFirstCheck = false;
+                } else {
+                    _signalThreadWoken();
+                }
+                return _holder->_ticketsAvailable.load() > 0;
+            });
+        } catch (...) {
+            _signalThreadWoken();
+            throw;
+        }
+        if (Date_t::now() >= until) {
+            return false;
+        }
+    } while (!_holder->_tryAcquireTicket());
+    return true;
+}
+
+void StochasticTicketHolder::_dequeueWaitingThread() {
+    QueueType preferredQueue = QueueType::ReaderQueue;
+    if (auto client = Client::getCurrent()) {
+        auto& prng = client->getPrng();
+        auto randomNumber =
+            std::uniform_int_distribution<std::uint32_t>(1, _totalWeight)(prng.urbg());
+        if (randomNumber <= _readerWeight) {
+            preferredQueue = QueueType::ReaderQueue;
+        } else {
+            preferredQueue = QueueType::WriterQueue;
+        }
+    }
+    if (!_queues[static_cast<unsigned int>(preferredQueue)].attemptToDequeue()) {
+        std::size_t otherQueueIndex;
+        switch (preferredQueue) {
+            case QueueType::ReaderQueue:
+                otherQueueIndex = static_cast<std::size_t>(QueueType::WriterQueue);
+                break;
+            case QueueType::WriterQueue:
+                otherQueueIndex = static_cast<std::size_t>(QueueType::ReaderQueue);
+                break;
+        }
+        _queues[otherQueueIndex].attemptToDequeue();
+    }
+}
+
+SchedulingTicketHolder::Queue& StochasticTicketHolder::_getQueueToUse(
+    OperationContext* opCtx, const AdmissionContext* admCtx) {
+    auto lockMode = admCtx->getLockMode();
+    invariant(lockMode != MODE_NONE);
+    switch (lockMode) {
+        case MODE_IS:
+        case MODE_S:
+            return _queues[static_cast<unsigned int>(QueueType::ReaderQueue)];
+        case MODE_IX:
+            return _queues[static_cast<unsigned int>(QueueType::WriterQueue)];
+        default:
+            MONGO_UNREACHABLE;
+    };
+}
+StochasticTicketHolder::StochasticTicketHolder(int numTickets,
+                                               int readerWeight,
+                                               int writerWeight,
+                                               ServiceContext* serviceContext)
+    : SchedulingTicketHolder(numTickets, 2, serviceContext),
+      _readerWeight(readerWeight),
+      _totalWeight(readerWeight + writerWeight) {}
 }  // namespace mongo

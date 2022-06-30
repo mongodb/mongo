@@ -70,12 +70,25 @@ void TicketHolders::setGlobalThrottling(std::unique_ptr<TicketHolder> reading,
 }
 
 TicketHolder* TicketHolders::getTicketHolder(LockMode mode) {
+    // TODO SERVER-67542: Refactor this code to remove confusion between TicketHolder and
+    // TicketHolders.
+    //
+    // If there is a single ticketholder (for example a StochasticTicketHolder) we return it for all
+    // lock mode cases as it means it is a centralised instance of it instead of two separate
+    // queues.
+    auto readerTicketHolder = _openReadTransaction.get();
+    auto writerTicketHolder = _openWriteTransaction.get();
+    if (!(readerTicketHolder && writerTicketHolder)) {
+        // One might be a nullptr, thus the non 0 is the maximum of both pointers
+        readerTicketHolder = writerTicketHolder =
+            std::max(_openReadTransaction.get(), _openWriteTransaction.get());
+    }
     switch (mode) {
         case MODE_S:
         case MODE_IS:
-            return _openReadTransaction.get();
+            return readerTicketHolder;
         case MODE_IX:
-            return _openWriteTransaction.get();
+            return writerTicketHolder;
         default:
             return nullptr;
     }

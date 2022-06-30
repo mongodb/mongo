@@ -46,6 +46,8 @@ Status TicketQueueingPolicy::setFromString(const std::string& protocolStr) {
         gTicketQueueingPolicy = QueueingPolicyEnum::Semaphore;
     } else if (protocolStr == QueueingPolicy_serializer(QueueingPolicyEnum::FifoQueue)) {
         gTicketQueueingPolicy = QueueingPolicyEnum::FifoQueue;
+    } else if (protocolStr == QueueingPolicy_serializer(QueueingPolicyEnum::SchedulingQueue)) {
+        gTicketQueueingPolicy = QueueingPolicyEnum::SchedulingQueue;
     } else {
         return Status{ErrorCodes::BadValue,
                       str::stream() << "Unrecognized ticketQueueingPolicy '" << protocolStr << "'"};

@@ -80,3 +80,4 @@ enums:
     values:
       Semaphore: semaphore
       FifoQueue: fifoQueue
+      SchedulingQueue: schedulingQueue

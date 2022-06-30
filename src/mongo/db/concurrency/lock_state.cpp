@@ -367,9 +367,11 @@ bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t d
     auto holder = shouldAcquireTicket() ? _ticketHolders->getTicketHolder(mode) : nullptr;
     if (holder) {
         _clientState.store(reader ? kQueuedReader : kQueuedWriter);
-
         // If the ticket wait is interrupted, restore the state of the client.
-        ScopeGuard restoreStateOnErrorGuard([&] { _clientState.store(kInactive); });
+        ScopeGuard restoreStateOnErrorGuard([&] {
+            _clientState.store(kInactive);
+            _admCtx.setLockMode(MODE_NONE);
+        });
 
         // Acquiring a ticket is a potentially blocking operation. This must not be called after a
         // transaction timestamp has been set, indicating this transaction has created an oplog
@@ -378,6 +380,7 @@ bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t d
 
         auto waitMode = _uninterruptibleLocksRequested ? TicketHolder::WaitMode::kUninterruptible
                                                        : TicketHolder::WaitMode::kInterruptible;
+        _admCtx.setLockMode(mode);
         if (deadline == Date_t::max()) {
             _ticket = holder->waitForTicket(opCtx, &_admCtx, waitMode);
         } else if (auto ticket = holder->waitForTicketUntil(opCtx, &_admCtx, deadline, waitMode)) {
@@ -1076,6 +1079,7 @@ void LockerImpl::releaseTicket() {
 
 void LockerImpl::_releaseTicket() {
     _ticket.reset();
+    _admCtx.setLockMode(MODE_NONE);
     _clientState.store(kInactive);
 }
 
