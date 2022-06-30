@@ -193,7 +193,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
                                      boost::optional<size_t> taskExecutorPoolSize) {
     ConnectionPool::Options connPoolOptions;
     std::shared_ptr<ShardRegistry> srsp(std::move(shardRegistry));
-    connPoolOptions.controllerFactory = [srwp = std::weak_ptr(srsp)] {
+    connPoolOptions.controllerFactory = [srwp = std::weak_ptr<ShardRegistry>(srsp)] {
         return std::make_shared<ShardingTaskExecutorPoolController>(srwp);
     };
 
