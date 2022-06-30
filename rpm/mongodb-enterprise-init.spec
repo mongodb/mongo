@@ -316,11 +316,6 @@ fi
 %attr(0755,mongod,mongod) %dir %{_localstatedir}/log/mongodb
 %attr(0755,mongod,mongod) %dir %{_rundir}/mongodb
 %attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) %{_localstatedir}/log/mongodb/mongod.log
-%doc snmp/MONGOD-MIB.txt
-%doc snmp/MONGODBINC-MIB.txt
-%doc snmp/mongod.conf.master
-%doc snmp/mongod.conf.subagent
-%doc snmp/README-snmp.txt
 %doc LICENSE-Enterprise.txt
 %doc README
 %doc THIRD-PARTY-NOTICES

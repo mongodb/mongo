@@ -1,8 +1,3 @@
-snmp/mongod.conf.master
-snmp/mongod.conf.subagent
-snmp/README-snmp.txt
-snmp/MONGOD-MIB.txt
-snmp/MONGODBINC-MIB.txt
 LICENSE-Enterprise.txt
 README
 THIRD-PARTY-NOTICES
