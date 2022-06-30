@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/query/sbe_runtime_planner.h"
 
@@ -40,26 +39,20 @@
 namespace mongo::sbe {
 namespace {
 
-Counter64 sbeMicrosTotal;
-Counter64 sbeNumReadsTotal;
-Counter64 sbeCount;
-
 /**
  * Aggregation of the total number of microseconds spent (in SBE multiplanner).
  */
-ServerStatusMetricField<Counter64> sbeMicrosTotalDisplay("query.multiPlanner.sbeMicros",
-                                                         &sbeMicrosTotal);
+CounterMetric sbeMicrosTotal("query.multiPlanner.sbeMicros");
 
 /**
  * Aggregation of the total number of reads done (in SBE multiplanner).
  */
-ServerStatusMetricField<Counter64> sbeNumReadsTotalDisplay("query.multiPlanner.sbeNumReads",
-                                                           &sbeNumReadsTotal);
+CounterMetric sbeNumReadsTotal("query.multiPlanner.sbeNumReads");
 
 /**
  * Aggregation of the total number of invocations (of the SBE multiplanner).
  */
-ServerStatusMetricField<Counter64> sbeCountDisplay("query.multiPlanner.sbeCount", &sbeCount);
+CounterMetric sbeCount("query.multiPlanner.sbeCount");
 
 /**
  * An element in this histogram is the number of microseconds spent in an invocation (of the SBE

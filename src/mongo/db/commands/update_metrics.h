@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/counter.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/server_status_metric.h"
@@ -73,16 +72,9 @@ public:
 private:
     // A counter for how many times this command has been executed with an aggregation
     // pipeline-style update parameter.
-    Counter64 _commandsWithAggregationPipeline;
+    CounterMetric _commandsWithAggregationPipeline;
 
     // A counter for how many times this command has been executed with the arrayFilters option.
-    Counter64 _commandsWithArrayFilters;
-
-    // A server metric field for the command executions with an aggregation pipeline-style update
-    // parameter counter.
-    ServerStatusMetricField<Counter64> _commandsWithAggregationPipelineMetric;
-
-    // A server metric field for the command executions with arrayFilters option counter.
-    ServerStatusMetricField<Counter64> _commandsWithArrayFiltersMetric;
+    CounterMetric _commandsWithArrayFilters;
 };
 }  // namespace mongo

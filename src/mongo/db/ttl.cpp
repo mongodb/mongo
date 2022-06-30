@@ -28,11 +28,8 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/ttl.h"
 
-#include "mongo/base/counter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/catalog/collection.h"
@@ -197,14 +194,10 @@ MONGO_FAIL_POINT_DEFINE(hangTTLMonitorBetweenPasses);
 // consist of multiple sub-passes. Each sub-pass deletes all the expired documents it can up to
 // 'ttlSubPassTargetSecs'. It is possible for a sub-pass to complete before all expired documents
 // have been removed.
-Counter64 ttlPasses;
-Counter64 ttlSubPasses;
-Counter64 ttlDeletedDocuments;
+CounterMetric ttlPasses("ttl.passes");
+CounterMetric ttlSubPasses("ttl.subPasses");
+CounterMetric ttlDeletedDocuments("ttl.deletedDocuments");
 
-ServerStatusMetricField<Counter64> ttlPassesDisplay("ttl.passes", &ttlPasses);
-ServerStatusMetricField<Counter64> ttlSubPassesDisplay("ttl.subPasses", &ttlSubPasses);
-ServerStatusMetricField<Counter64> ttlDeletedDocumentsDisplay("ttl.deletedDocuments",
-                                                              &ttlDeletedDocuments);
 using MtabType = TenantMigrationAccessBlocker::BlockerType;
 
 TTLMonitor* TTLMonitor::get(ServiceContext* serviceCtx) {

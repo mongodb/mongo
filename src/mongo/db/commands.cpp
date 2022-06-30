@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/commands.h"
 
 #include <string>
@@ -976,8 +974,8 @@ std::unique_ptr<CommandInvocation> BasicCommandWithReplyBuilderInterface::parse(
 Command::Command(StringData name, std::vector<StringData> aliases)
     : _name(name.toString()),
       _aliases(std::move(aliases)),
-      _commandsExecutedMetric("commands." + _name + ".total", &_commandsExecuted),
-      _commandsFailedMetric("commands." + _name + ".failed", &_commandsFailed) {
+      _commandsExecuted("commands." + _name + ".total"),
+      _commandsFailed("commands." + _name + ".failed") {
     globalCommandRegistry()->registerCommand(this, _name, _aliases);
 }
 

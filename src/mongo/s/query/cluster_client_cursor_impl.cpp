@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 
 #include <memory>
@@ -41,12 +39,8 @@
 
 namespace mongo {
 
-static Counter64 mongosCursorStatsTotalOpened;
-static Counter64 mongosCursorStatsMoreThanOneBatch;
-static ServerStatusMetricField<Counter64> displayMongosCursorStatsTotalOpened(
-    "mongos.cursor.totalOpened", &mongosCursorStatsTotalOpened);
-static ServerStatusMetricField<Counter64> displayMongosCursorStatsMoreThanOneBatch(
-    "mongos.cursor.moreThanOneBatch", &mongosCursorStatsMoreThanOneBatch);
+static CounterMetric mongosCursorStatsTotalOpened("mongos.cursor.totalOpened");
+static CounterMetric mongosCursorStatsMoreThanOneBatch("mongos.cursor.moreThanOneBatch");
 
 ClusterClientCursorGuard ClusterClientCursorImpl::make(
     OperationContext* opCtx,

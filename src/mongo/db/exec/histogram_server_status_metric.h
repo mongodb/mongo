@@ -53,7 +53,8 @@ namespace mongo {
 class HistogramServerStatusMetric {
 public:
     HistogramServerStatusMetric(std::string name, std::vector<uint64_t> bounds)
-        : _hist{std::move(bounds)}, _metric{std::move(name), this} {}
+        : _hist{std::move(bounds)},
+          _metric(addMetricToTree(std::make_unique<Metric>(std::move(name), this))) {}
 
     void increment(uint64_t value) {
         _hist.increment(value);
@@ -95,7 +96,7 @@ private:
     }
 
     Histogram<uint64_t> _hist;
-    Metric _metric;
+    Metric& _metric;
 };
 
 }  // namespace mongo

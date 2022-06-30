@@ -30,7 +30,6 @@
 
 #include "mongo/db/concurrency/exception_util.h"
 
-#include "mongo/base/counter.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/exception_util_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -57,17 +56,10 @@ void logWriteConflictAndBackoff(int attempt, StringData operation, StringData ns
 
 namespace {
 
-Counter64 temporarilyUnavailableErrors;
-Counter64 temporarilyUnavailableErrorsEscaped;
-Counter64 temporarilyUnavailableErrorsConvertedToWriteConflict;
-
-ServerStatusMetricField<Counter64> displayTemporarilyUnavailableErrors(
-    "operation.temporarilyUnavailableErrors", &temporarilyUnavailableErrors);
-ServerStatusMetricField<Counter64> displayTemporarilyUnavailableErrorsEscaped(
-    "operation.temporarilyUnavailableErrorsEscaped", &temporarilyUnavailableErrorsEscaped);
-ServerStatusMetricField<Counter64> displayTemporarilyUnavailableErrorsConverted(
-    "operation.temporarilyUnavailableErrorsConvertedToWriteConflict",
-    &temporarilyUnavailableErrorsConvertedToWriteConflict);
+CounterMetric temporarilyUnavailableErrors{"operation.temporarilyUnavailableErrors"};
+CounterMetric temporarilyUnavailableErrorsEscaped{"operation.temporarilyUnavailableErrorsEscaped"};
+CounterMetric temporarilyUnavailableErrorsConvertedToWriteConflict{
+    "operation.temporarilyUnavailableErrorsConvertedToWriteConflict"};
 
 }  // namespace
 

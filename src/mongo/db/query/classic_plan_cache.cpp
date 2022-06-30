@@ -32,12 +32,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 
 namespace mongo {
-namespace {
-ServerStatusMetricField<Counter64> totalPlanCacheSizeEstimateBytesMetric(
-    "query.planCacheTotalSizeEstimateBytes", &mongo::planCacheTotalSizeEstimateBytes);
-}  // namespace
-
-Counter64 planCacheTotalSizeEstimateBytes;
+CounterMetric planCacheTotalSizeEstimateBytes("query.planCacheTotalSizeEstimateBytes");
 
 std::ostream& operator<<(std::ostream& stream, const PlanCacheKey& key) {
     stream << key.toString();

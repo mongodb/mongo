@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 
 #include <functional>
@@ -146,14 +144,7 @@ const NamespaceString configCollectionNS{"local", "system.replset"};
 MONGO_FAIL_POINT_DEFINE(dropPendingCollectionReaperHang);
 
 // The count of items in the buffer
-OplogBuffer::Counters bufferGauge;
-ServerStatusMetricField<Counter64> displayBufferCount("repl.buffer.count", &bufferGauge.count);
-// The size (bytes) of items in the buffer
-ServerStatusMetricField<Counter64> displayBufferSize("repl.buffer.sizeBytes", &bufferGauge.size);
-// The max size (bytes) of the buffer. If the buffer does not have a size constraint, this is
-// set to 0.
-ServerStatusMetricField<Counter64> displayBufferMaxSize("repl.buffer.maxSizeBytes",
-                                                        &bufferGauge.maxSize);
+OplogBuffer::Counters bufferGauge("repl.buffer");
 
 /**
  * Returns new thread pool for thread pool task executor.

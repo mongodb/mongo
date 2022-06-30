@@ -28,11 +28,8 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/reporter.h"
 
-#include "mongo/base/counter.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/repl/update_position_args.h"
@@ -50,9 +47,7 @@ namespace repl {
 namespace {
 
 // The number of replSetUpdatePosition commands a node sent to its sync source.
-Counter64 numUpdatePosition;
-ServerStatusMetricField<Counter64> displayNumUpdatePosition(
-    "repl.network.replSetUpdatePosition.num", &numUpdatePosition);
+CounterMetric numUpdatePosition("repl.network.replSetUpdatePosition.num");
 
 }  // namespace
 

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/catalog/util/partitioned.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/plan_cache_callbacks.h"
 #include "mongo/db/query/plan_cache_debug_info.h"
@@ -46,7 +47,7 @@ class PlanCacheEntryBase;
 /**
  * Tracks the approximate cumulative size of the plan cache entries across all the collections.
  */
-extern Counter64 planCacheTotalSizeEstimateBytes;
+extern CounterMetric planCacheTotalSizeEstimateBytes;
 
 /**
  * Information returned from a get(...) query.

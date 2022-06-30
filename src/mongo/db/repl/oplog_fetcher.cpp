@@ -30,7 +30,6 @@
 
 #include "mongo/db/repl/oplog_fetcher.h"
 
-#include "mongo/base/counter.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
@@ -91,19 +90,13 @@ BSONObj OplogBatchStats::getReport() const {
 }
 
 // The number and time spent reading batches off the network
-OplogBatchStats oplogBatchStats;
-ServerStatusMetricField<OplogBatchStats> displayBatchesRecieved("repl.network.getmores",
-                                                                &oplogBatchStats);
+auto& oplogBatchStats = makeServerStatusMetric<OplogBatchStats>("repl.network.getmores");
 // The oplog entries read via the oplog reader
-Counter64 opsReadStats;
-ServerStatusMetricField<Counter64> displayOpsRead("repl.network.ops", &opsReadStats);
+CounterMetric opsReadStats("repl.network.ops");
 // The bytes read via the oplog reader
-Counter64 networkByteStats;
-ServerStatusMetricField<Counter64> displayBytesRead("repl.network.bytes", &networkByteStats);
+CounterMetric networkByteStats("repl.network.bytes");
 
-Counter64 readersCreatedStats;
-ServerStatusMetricField<Counter64> displayReadersCreated("repl.network.readersCreated",
-                                                         &readersCreatedStats);
+CounterMetric readersCreatedStats("repl.network.readersCreated");
 
 const Milliseconds maximumAwaitDataTimeoutMS(30 * 1000);
 

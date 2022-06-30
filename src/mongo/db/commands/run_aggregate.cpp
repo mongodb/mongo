@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/commands/run_aggregate.h"
 
 #include <boost/optional.hpp>
@@ -101,12 +99,9 @@ using std::string;
 using std::stringstream;
 using std::unique_ptr;
 
-Counter64 allowDiskUseFalseCounter;
+CounterMetric allowDiskUseFalseCounter("query.allowDiskUseFalse");
 
 namespace {
-ServerStatusMetricField<Counter64> allowDiskUseMetric{"query.allowDiskUseFalse",
-                                                      &allowDiskUseFalseCounter};
-
 /**
  * If a pipeline is empty (assuming that a $cursor stage hasn't been created yet), it could mean
  * that we were able to absorb all pipeline stages and pull them into a single PlanExecutor. So,

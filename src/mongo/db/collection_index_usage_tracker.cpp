@@ -28,13 +28,10 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/collection_index_usage_tracker.h"
 
 #include <atomic>
 
-#include "mongo/base/counter.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/util/assert_util.h"
@@ -45,14 +42,8 @@
 
 namespace mongo {
 namespace {
-Counter64 collectionScansCounter;
-Counter64 collectionScansNonTailableCounter;
-
-ServerStatusMetricField<Counter64> displayCollectionScans("queryExecutor.collectionScans.total",
-                                                          &collectionScansCounter);
-ServerStatusMetricField<Counter64> displayCollectionScansNonTailable(
-    "queryExecutor.collectionScans.nonTailable", &collectionScansNonTailableCounter);
-
+CounterMetric collectionScansCounter("queryExecutor.collectionScans.total");
+CounterMetric collectionScansNonTailableCounter("queryExecutor.collectionScans.nonTailable");
 }  // namespace
 
 CollectionIndexUsageTracker::CollectionIndexUsageTracker(

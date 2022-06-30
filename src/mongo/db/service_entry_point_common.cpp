@@ -131,15 +131,11 @@ MONGO_FAIL_POINT_DEFINE(hangAfterCheckingWritabilityForMultiDocumentTransactions
 
 // Tracks the number of times a legacy unacknowledged write failed due to
 // not primary error resulted in network disconnection.
-Counter64 notPrimaryLegacyUnackWrites;
-ServerStatusMetricField<Counter64> displayNotPrimaryLegacyUnackWrites(
-    "repl.network.notPrimaryLegacyUnacknowledgedWrites", &notPrimaryLegacyUnackWrites);
+CounterMetric notPrimaryLegacyUnackWrites("repl.network.notPrimaryLegacyUnacknowledgedWrites");
 
 // Tracks the number of times an unacknowledged write failed due to not primary error
 // resulted in network disconnection.
-Counter64 notPrimaryUnackWrites;
-ServerStatusMetricField<Counter64> displayNotPrimaryUnackWrites(
-    "repl.network.notPrimaryUnacknowledgedWrites", &notPrimaryUnackWrites);
+CounterMetric notPrimaryUnackWrites("repl.network.notPrimaryUnacknowledgedWrites");
 
 namespace {
 

@@ -28,11 +28,8 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/write_concern.h"
 
-#include "mongo/base/counter.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
@@ -60,20 +57,10 @@ namespace mongo {
 using repl::OpTime;
 using std::string;
 
-static TimerStats gleWtimeStats;
-static ServerStatusMetricField<TimerStats> displayGleLatency("getLastError.wtime", &gleWtimeStats);
-
-static Counter64 gleWtimeouts;
-static ServerStatusMetricField<Counter64> gleWtimeoutsDisplay("getLastError.wtimeouts",
-                                                              &gleWtimeouts);
-
-static Counter64 gleDefaultWtimeouts;
-static ServerStatusMetricField<Counter64> gleDefaultWtimeoutsDisplay(
-    "getLastError.default.wtimeouts", &gleDefaultWtimeouts);
-
-static Counter64 gleDefaultUnsatisfiable;
-static ServerStatusMetricField<Counter64> gleDefaultUnsatisfiableDisplay(
-    "getLastError.default.unsatisfiable", &gleDefaultUnsatisfiable);
+static TimerStats& gleWtimeStats = makeServerStatusMetric<TimerStats>("getLastError.wtime");
+static CounterMetric gleWtimeouts("getLastError.wtimeouts");
+static CounterMetric gleDefaultWtimeouts("getLastError.default.wtimeouts");
+static CounterMetric gleDefaultUnsatisfiable("getLastError.default.unsatisfiable");
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForWriteConcern);
 

@@ -27,10 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/commands/server_status.h"
 #include "mongo/db/stats/api_version_metrics.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
@@ -122,6 +120,9 @@ public:
             .appendAPIVersionMetricsInfo(&apiVersionBob);
         apiVersionBob.done();
     }
-} apiVersionMetricsSSM;
+};
+
+auto& apiVersionMetricsSSM =
+    addMetricToTree(std::make_unique<APIVersionMetrics::APIVersionMetricsSSM>());
 
 }  // namespace mongo

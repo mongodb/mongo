@@ -35,7 +35,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/counter.h"
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -640,11 +639,8 @@ private:
     const std::vector<StringData> _aliases;
 
     // Counters for how many times this command has been executed and failed
-    mutable Counter64 _commandsExecuted;
-    mutable Counter64 _commandsFailed;
-    // Pointers to hold the metrics tree references
-    ServerStatusMetricField<Counter64> _commandsExecutedMetric;
-    ServerStatusMetricField<Counter64> _commandsFailedMetric;
+    CounterMetric _commandsExecuted;
+    CounterMetric _commandsFailed;
 };
 
 /**
@@ -1339,8 +1335,7 @@ class CommandRegistry {
 public:
     using CommandMap = Command::CommandMap;
 
-    CommandRegistry() : _unknownsMetricField("commands.<UNKNOWN>", &_unknowns) {}
-
+    CommandRegistry() = default;
     CommandRegistry(const CommandRegistry&) = delete;
     CommandRegistry& operator=(const CommandRegistry&) = delete;
 
@@ -1357,9 +1352,7 @@ public:
     }
 
 private:
-    Counter64 _unknowns;
-    ServerStatusMetricField<Counter64> _unknownsMetricField;
-
+    CounterMetric _unknowns{"commands.<UNKNOWN>"};
     CommandMap _commands;
 };
 

@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/multi_plan.h"
 
 #include <algorithm>
@@ -72,27 +70,20 @@ void markShouldCollectTimingInfoOnSubtree(PlanStage* root) {
     }
 }
 
-Counter64 classicMicrosTotal;
-Counter64 classicWorksTotal;
-Counter64 classicCount;
-
 /**
  * Aggregation of the total number of microseconds spent (in the classic multiplanner).
  */
-ServerStatusMetricField<Counter64> classicMicrosTotalDisplay("query.multiPlanner.classicMicros",
-                                                             &classicMicrosTotal);
+CounterMetric classicMicrosTotal("query.multiPlanner.classicMicros");
 
 /**
  * Aggregation of the total number of "works" performed (in the classic multiplanner).
  */
-ServerStatusMetricField<Counter64> classicWorksTotalDisplay("query.multiPlanner.classicWorks",
-                                                            &classicWorksTotal);
+CounterMetric classicWorksTotal("query.multiPlanner.classicWorks");
 
 /**
  * Aggregation of the total number of invocations (of the classic multiplanner).
  */
-ServerStatusMetricField<Counter64> classicCountDisplay("query.multiPlanner.classicCount",
-                                                       &classicCount);
+CounterMetric classicCount("query.multiPlanner.classicCount");
 
 /**
  * An element in this histogram is the number of microseconds spent in an invocation (of the

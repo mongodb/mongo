@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <map>
+#include <memory>
 #include <string>
 
 #include "mongo/db/jsobj.h"
@@ -37,14 +39,7 @@ namespace mongo {
 
 class ServerStatusMetric {
 public:
-    /**
-     * @param name is a dotted path of a counter name
-     *             if name starts with . its treated as a path from the serverStatus root
-     *             otherwise it will live under the "counters" namespace
-     *             so foo.bar would be serverStatus().counters.foo.bar
-     */
-    ServerStatusMetric(const std::string& name);
-    virtual ~ServerStatusMetric() {}
+    virtual ~ServerStatusMetric() = default;
 
     std::string getMetricName() const {
         return _name;
@@ -55,33 +50,143 @@ public:
 protected:
     static std::string _parseLeafName(const std::string& name);
 
+    /**
+     * The parameter name is a string where periods have a special meaning.
+     * It represents the path where the metric can be found into the tree.
+     * If name starts with ".", it will be treated as a path from
+     * the serverStatus root otherwise it will live under the "counters"
+     * namespace so foo.bar would be serverStatus().counters.foo.bar
+     */
+    explicit ServerStatusMetric(const std::string& name);
+
     const std::string _name;
     const std::string _leafName;
 };
 
 /**
- * usage
+ * ServerStatusMetricField is the generic class for storing and reporting server
+ * status metrics.
+ * Its recommended usage is through the addMetricToTree helper function. Here is an
+ * example of a ServerStatusMetricField holding a Counter64.
  *
- * declared once
- *    Counter counter;
- *    ServerStatusMetricField myAwesomeCounterDisplay( "path.to.counter", &counter );
+ * auto& metric =
+ *      addMetricToTree(std::make_unique<ServerStatusMetricField<Counter64>>("path.to.counter"));
+ *      ...
+ *      metric.value().increment();
  *
- * call
- *    counter.hit();
+ * Or with `makeServerStatusMetric`:
  *
- * will show up in db.serverStatus().metrics.path.to.counter
+ *     auto& counter = makeServerStatusMetric<Counter64>("path.to.counter");
+ *     ...
+ *     counter.increment();
+ *
+ * To read the metric from JavaScript:
+ *      db.serverStatus().metrics.path.to.counter
  */
 template <typename T>
 class ServerStatusMetricField : public ServerStatusMetric {
 public:
-    ServerStatusMetricField(const std::string& name, const T* t)
-        : ServerStatusMetric(name), _t(t) {}
+    explicit ServerStatusMetricField(const std::string& name) : ServerStatusMetric(name) {}
 
-    virtual void appendAtLeaf(BSONObjBuilder& b) const {
-        b.append(_leafName, *_t);
+    void appendAtLeaf(BSONObjBuilder& b) const override {
+        b.append(_leafName, _t);
+    }
+
+    T& value() {
+        return _t;
+    }
+
+    T _t;
+};
+
+class MetricTree {
+public:
+    ~MetricTree() = default;
+
+    void add(std::unique_ptr<ServerStatusMetric> metric);
+
+    /**
+     * Append the metrics tree to the given BSON builder.
+     */
+    void appendTo(BSONObjBuilder& b) const;
+
+    /**
+     * Overload of appendTo which allows tree of exclude paths. The alternative overload is
+     * preferred to avoid overhead when no excludes are present.
+     */
+    void appendTo(const BSONObj& excludePaths, BSONObjBuilder& b) const;
+
+private:
+    void _add(const std::string& path, std::unique_ptr<ServerStatusMetric> metric);
+
+    std::map<std::string, std::unique_ptr<MetricTree>> _subtrees;
+    std::map<std::string, std::unique_ptr<ServerStatusMetric>> _metrics;
+};
+
+/**
+ * globalMetricTree is responsible for creating and returning a MetricTree instance
+ * statically stored inside. The create parameter bypasses its creation returning a
+ * null pointer for when it has not been created yet.
+ */
+MetricTree* globalMetricTree(bool create = true);
+
+template <typename T>
+T& addMetricToTree(std::unique_ptr<T> metric, MetricTree* metricTree = globalMetricTree()) {
+    invariant(metric);
+    invariant(metricTree);
+    T& reference = *metric;
+    metricTree->add(std::move(metric));
+    return reference;
+}
+
+template <typename TYPE>
+TYPE& makeServerStatusMetric(std::string path) {
+    return addMetricToTree(std::make_unique<ServerStatusMetricField<TYPE>>(std::move(path)))
+        .value();
+}
+
+class CounterMetric {
+public:
+    CounterMetric(std::string name)
+        : _counter{makeServerStatusMetric<Counter64>(std::move(name))} {}
+    CounterMetric(CounterMetric&) = delete;
+    CounterMetric& operator=(CounterMetric&) = delete;
+
+    operator Counter64&() {
+        return _counter;
+    }
+
+    /**
+     * replicates the same public interface found in Counter64.
+     */
+
+    /**
+     * Atomically increment.
+     */
+    void increment(uint64_t n = 1) const {
+        _counter.increment(n);
+    }
+
+    /**
+     * Atomically decrement.
+     */
+    void decrement(uint64_t n = 1) const {
+        _counter.decrement(n);
+    }
+
+    /**
+     * Return the current value.
+     */
+    long long get() const {
+        return _counter.get();
+    }
+
+    operator long long() const {
+        return get();
     }
 
 private:
-    const T* _t;
+    Counter64& _counter;
 };
+
 }  // namespace mongo

@@ -38,16 +38,9 @@ namespace mongo {
 namespace repl {
 namespace initial_sync_common_stats {
 
-Counter64 initialSyncFailedAttempts;
-Counter64 initialSyncFailures;
-Counter64 initialSyncCompletes;
-
-ServerStatusMetricField<Counter64> displaySSInitialSyncFailedAttempts(
-    "repl.initialSync.failedAttempts", &initialSyncFailedAttempts);
-ServerStatusMetricField<Counter64> displaySSInitialSyncFailures("repl.initialSync.failures",
-                                                                &initialSyncFailures);
-ServerStatusMetricField<Counter64> displaySSInitialSyncCompleted("repl.initialSync.completed",
-                                                                 &initialSyncCompletes);
+CounterMetric initialSyncFailedAttempts("repl.initialSync.failedAttempts");
+CounterMetric initialSyncFailures("repl.initialSync.failures");
+CounterMetric initialSyncCompletes("repl.initialSync.completed");
 
 void LogInitialSyncAttemptStats(const StatusWith<OpTimeAndWallTime>& attemptResult,
                                 bool hasRetries,

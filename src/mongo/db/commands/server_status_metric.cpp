@@ -29,24 +29,122 @@
 
 #include "mongo/db/commands/server_status_metric.h"
 
-#include "mongo/db/commands/server_status_internal.h"
+#include <fmt/format.h>
+
+#include "mongo/bson/bsontypes.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 
 namespace mongo {
 
-using std::string;
+using namespace fmt::literals;
 
-ServerStatusMetric::ServerStatusMetric(const string& nameIn)
-    : _name(nameIn), _leafName(_parseLeafName(nameIn)) {
-    if (MetricTree::theMetricTree == nullptr)
-        MetricTree::theMetricTree = new MetricTree();
-    MetricTree::theMetricTree->add(this);
-}
+ServerStatusMetric::ServerStatusMetric(const std::string& nameIn)
+    : _name(nameIn), _leafName(_parseLeafName(nameIn)) {}
 
-string ServerStatusMetric::_parseLeafName(const string& name) {
+std::string ServerStatusMetric::_parseLeafName(const std::string& name) {
     size_t idx = name.rfind(".");
-    if (idx == string::npos)
+    if (idx == std::string::npos)
         return name;
-
     return name.substr(idx + 1);
 }
+
+MetricTree* globalMetricTree(bool create) {
+    static struct {
+        stdx::mutex* mutex = new stdx::mutex();  // NOLINT
+        MetricTree* metricTree = nullptr;
+    } instance;
+    stdx::lock_guard lock(*instance.mutex);
+    if (create && !instance.metricTree)
+        instance.metricTree = new MetricTree();
+    return instance.metricTree;
+}
+
+void MetricTree::add(std::unique_ptr<ServerStatusMetric> metric) {
+    std::string name = metric->getMetricName();
+    if (!name.empty()) {
+        if (auto begin = name.begin(); *begin == '.')
+            name.erase(begin);
+        else
+            name = "metrics.{}"_format(name);
+    }
+
+    if (!name.empty())
+        _add(name, std::move(metric));
+}
+
+void MetricTree::_add(const std::string& path, std::unique_ptr<ServerStatusMetric> metric) {
+    size_t idx = path.find('.');
+    if (idx == std::string::npos) {
+        if (_subtrees.count(path) > 0)
+            LOGV2_FATAL(6483100, "metric conflict", "path"_attr = path);
+
+        if (!_metrics.try_emplace(path, std::move(metric)).second)
+            LOGV2_FATAL(6483102, "duplicate metric", "path"_attr = path);
+
+        return;
+    }
+
+    std::string myLevel = path.substr(0, idx);
+    if (_metrics.count(myLevel) > 0)
+        LOGV2_FATAL(16461, "metric conflict", "path"_attr = path);
+
+    auto& sub = _subtrees[myLevel];
+    if (!sub)
+        sub = std::make_unique<MetricTree>();
+    sub->_add(path.substr(idx + 1), std::move(metric));
+}
+
+void MetricTree::appendTo(BSONObjBuilder& b) const {
+    for (const auto& i : _metrics) {
+        i.second->appendAtLeaf(b);
+    }
+
+    for (const auto& i : _subtrees) {
+        BSONObjBuilder bb(b.subobjStart(i.first));
+        i.second->appendTo(bb);
+        bb.done();
+    }
+}
+
+void MetricTree::appendTo(const BSONObj& excludePaths, BSONObjBuilder& b) const {
+    auto fieldNamesInExclude = excludePaths.getFieldNames<stdx::unordered_set<std::string>>();
+    for (const auto& i : _metrics) {
+        auto key = i.first;
+        auto el = fieldNamesInExclude.contains(key) ? excludePaths.getField(key) : BSONElement();
+        if (el) {
+            uassert(ErrorCodes::InvalidBSONType,
+                    "Exclusion value for a leaf must be a boolean.",
+                    el.type() == Bool);
+            if (el.boolean() == false) {
+                continue;
+            }
+        }
+        i.second->appendAtLeaf(b);
+    }
+
+    for (const auto& i : _subtrees) {
+        auto key = i.first;
+        auto el = fieldNamesInExclude.contains(key) ? excludePaths.getField(key) : BSONElement();
+        if (el) {
+            uassert(ErrorCodes::InvalidBSONType,
+                    "Exclusion value must be a boolean or a nested object.",
+                    el.type() == Bool || el.type() == Object);
+            if (el.isBoolean() && el.boolean() == false) {
+                continue;
+            }
+        }
+
+        BSONObjBuilder bb(b.subobjStart(key));
+        if (el.type() == Object) {
+            i.second->appendTo(el.embeddedObject(), bb);
+        } else {
+            i.second->appendTo(bb);
+        }
+    }
+}
+
 }  // namespace mongo

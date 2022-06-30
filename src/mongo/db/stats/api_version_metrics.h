@@ -58,9 +58,9 @@ public:
 
     APIVersionMetricsMap getAPIVersionMetrics_forTest();
 
-private:
     class APIVersionMetricsSSM;
 
+private:
     void _removeStaleTimestamps(WithLock lk, Date_t now);
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("APIVersionMetrics::_mutex");

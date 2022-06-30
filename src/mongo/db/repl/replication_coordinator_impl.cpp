@@ -32,8 +32,6 @@
     LOGV2_DEBUG_OPTIONS(                             \
         ID, DLEVEL, {logv2::LogComponent::kReplicationElection}, MESSAGE, ##__VA_ARGS__)
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/replication_coordinator_impl.h"
 
 #include <algorithm>
@@ -159,31 +157,22 @@ MONGO_FAIL_POINT_DEFINE(setCustomErrorInHelloResponseMongoD);
 MONGO_FAIL_POINT_DEFINE(throwBeforeRecoveringTenantMigrationAccessBlockers);
 
 // Number of times we tried to go live as a secondary.
-Counter64 attemptsToBecomeSecondary;
-ServerStatusMetricField<Counter64> displayAttemptsToBecomeSecondary(
-    "repl.apply.attemptsToBecomeSecondary", &attemptsToBecomeSecondary);
+CounterMetric attemptsToBecomeSecondary("repl.apply.attemptsToBecomeSecondary");
 
 // Tracks the last state transition performed in this replca set.
-std::string lastStateTransition;
-ServerStatusMetricField<std::string> displayLastStateTransition(
-    "repl.stateTransition.lastStateTransition", &lastStateTransition);
+std::string& lastStateTransition =
+    makeServerStatusMetric<std::string>("repl.stateTransition.lastStateTransition");
 
 // Tracks the number of operations killed on state transition.
-Counter64 userOpsKilled;
-ServerStatusMetricField<Counter64> displayUserOpsKilled("repl.stateTransition.userOperationsKilled",
-                                                        &userOpsKilled);
+CounterMetric userOpsKilled("repl.stateTransition.userOperationsKilled");
 
 // Tracks the number of operations left running on state transition.
-Counter64 userOpsRunning;
-ServerStatusMetricField<Counter64> displayUserOpsRunning(
-    "repl.stateTransition.userOperationsRunning", &userOpsRunning);
+CounterMetric userOpsRunning("repl.stateTransition.userOperationsRunning");
 
 // Tracks the number of times we have successfully performed automatic reconfigs to remove
 // 'newlyAdded' fields.
-Counter64 numAutoReconfigsForRemovalOfNewlyAddedFields;
-ServerStatusMetricField<Counter64> displayNumAutoReconfigs(
-    "repl.reconfig.numAutoReconfigsForRemovalOfNewlyAddedFields",
-    &numAutoReconfigsForRemovalOfNewlyAddedFields);
+CounterMetric numAutoReconfigsForRemovalOfNewlyAddedFields(
+    "repl.reconfig.numAutoReconfigsForRemovalOfNewlyAddedFields");
 
 using namespace fmt::literals;
 

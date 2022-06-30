@@ -28,13 +28,10 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/bgsync.h"
 
 #include <memory>
 
-#include "mongo/base/counter.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_pool.h"
@@ -81,27 +78,19 @@ const Milliseconds kRollbackOplogSocketTimeout(10 * 60 * 1000);
 // The number of times a node attempted to choose a node to sync from among the available sync
 // source options. This occurs if we re-evaluate our sync source, receive an error from the source,
 // or step down.
-Counter64 numSyncSourceSelections;
-ServerStatusMetricField<Counter64> displayNumSyncSourceSelections("repl.syncSource.numSelections",
-                                                                  &numSyncSourceSelections);
+CounterMetric numSyncSourceSelections("repl.syncSource.numSelections");
 
 // The number of times a node kept it's original sync source after re-evaluating if its current sync
 // source was optimal.
-Counter64 numTimesChoseSameSyncSource;
-ServerStatusMetricField<Counter64> displayNumTimesChoseSameSyncSource(
-    "repl.syncSource.numTimesChoseSame", &numTimesChoseSameSyncSource);
+CounterMetric numTimesChoseSameSyncSource("repl.syncSource.numTimesChoseSame");
 
 // The number of times a node chose a new sync source after re-evaluating if its current sync source
 // was optimal.
-Counter64 numTimesChoseDifferentSyncSource;
-ServerStatusMetricField<Counter64> displayNumTimesChoseDifferentSyncSource(
-    "repl.syncSource.numTimesChoseDifferent", &numTimesChoseDifferentSyncSource);
+CounterMetric numTimesChoseDifferentSyncSource("repl.syncSource.numTimesChoseDifferent");
 
 // The number of times a node could not find a sync source when choosing a node to sync from among
 // the available options.
-Counter64 numTimesCouldNotFindSyncSource;
-ServerStatusMetricField<Counter64> displayNumTimesCouldNotFindSyncSource(
-    "repl.syncSource.numTimesCouldNotFind", &numTimesCouldNotFindSyncSource);
+CounterMetric numTimesCouldNotFindSyncSource("repl.syncSource.numTimesCouldNotFind");
 
 /**
  * Extends DataReplicatorExternalStateImpl to be member state aware.

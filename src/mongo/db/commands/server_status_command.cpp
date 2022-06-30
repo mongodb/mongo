@@ -28,12 +28,9 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/commands/server_status_internal.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
@@ -140,17 +137,13 @@ public:
         }
 
         // --- counters
-        bool includeMetricTree = MetricTree::theMetricTree != nullptr;
+        MetricTree* metricTree = globalMetricTree(/* create */ false);
         auto metricsEl = cmdObj["metrics"_sd];
-        if (metricsEl.type() && !metricsEl.trueValue())
-            includeMetricTree = false;
-
-        if (includeMetricTree) {
+        if (metricTree && (metricsEl.eoo() || metricsEl.trueValue())) {
             if (metricsEl.type() == BSONType::Object) {
-                MetricTree::theMetricTree->appendTo(BSON("metrics" << metricsEl.embeddedObject()),
-                                                    result);
+                metricTree->appendTo(BSON("metrics" << metricsEl.embeddedObject()), result);
             } else {
-                MetricTree::theMetricTree->appendTo(result);
+                metricTree->appendTo(result);
             }
         }
 
@@ -252,7 +245,8 @@ public:
 class MemBase : public ServerStatusMetric {
 public:
     MemBase() : ServerStatusMetric(".mem.bits") {}
-    virtual void appendAtLeaf(BSONObjBuilder& b) const {
+
+    void appendAtLeaf(BSONObjBuilder& b) const override {
         b.append("bits", sizeof(int*) == 4 ? 32 : 64);
 
         ProcessInfo p;
@@ -267,7 +261,9 @@ public:
             b.appendBool("supported", false);
         }
     }
-} memBase;
+};
+
+MemBase& memBase = addMetricToTree(std::make_unique<MemBase>());
 
 class HttpClientServerStatus : public ServerStatusSection {
 public:

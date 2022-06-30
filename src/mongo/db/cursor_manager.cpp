@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/cursor_manager.h"
 
 #include <memory>
@@ -63,28 +61,14 @@
 
 namespace mongo {
 
-static Counter64 cursorStatsLifespanLessThan1Second;
-static Counter64 cursorStatsLifespanLessThan5Seconds;
-static Counter64 cursorStatsLifespanLessThan15Seconds;
-static Counter64 cursorStatsLifespanLessThan30Seconds;
-static Counter64 cursorStatsLifespanLessThan1Minute;
-static Counter64 cursorStatsLifespanLessThan10Minutes;
-static Counter64 cursorStatsLifespanGreaterThanOrEqual10Minutes;
-
-static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan1Second(
-    "cursor.lifespan.lessThan1Second", &cursorStatsLifespanLessThan1Second);
-static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan5Seconds(
-    "cursor.lifespan.lessThan5Seconds", &cursorStatsLifespanLessThan5Seconds);
-static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan15Seconds(
-    "cursor.lifespan.lessThan15Seconds", &cursorStatsLifespanLessThan15Seconds);
-static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan30Seconds(
-    "cursor.lifespan.lessThan30Seconds", &cursorStatsLifespanLessThan30Seconds);
-static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan1Minute(
-    "cursor.lifespan.lessThan1Minute", &cursorStatsLifespanLessThan1Minute);
-static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan10Minutes(
-    "cursor.lifespan.lessThan10Minutes", &cursorStatsLifespanLessThan10Minutes);
-static ServerStatusMetricField<Counter64> dCursorStatsLifespanGreaterThanOrEqual10Minutes(
-    "cursor.lifespan.greaterThanOrEqual10Minutes", &cursorStatsLifespanGreaterThanOrEqual10Minutes);
+static CounterMetric cursorStatsLifespanLessThan1Second{"cursor.lifespan.lessThan1Second"};
+static CounterMetric cursorStatsLifespanLessThan5Seconds{"cursor.lifespan.lessThan5Seconds"};
+static CounterMetric cursorStatsLifespanLessThan15Seconds{"cursor.lifespan.lessThan15Seconds"};
+static CounterMetric cursorStatsLifespanLessThan30Seconds{"cursor.lifespan.lessThan30Seconds"};
+static CounterMetric cursorStatsLifespanLessThan1Minute{"cursor.lifespan.lessThan1Minute"};
+static CounterMetric cursorStatsLifespanLessThan10Minutes{"cursor.lifespan.lessThan10Minutes"};
+static CounterMetric cursorStatsLifespanGreaterThanOrEqual10Minutes{
+    "cursor.lifespan.greaterThanOrEqual10Minutes"};
 
 constexpr int CursorManager::kNumPartitions;
 

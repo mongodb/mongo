@@ -2685,6 +2685,7 @@ if wiredtiger:
             'logical_session_cache_test.cpp',
             'logical_session_id_test.cpp',
             'logical_time_test.cpp',
+            'metric_tree_test.cpp',
             'mirroring_sampler_test.cpp',
             'multi_key_path_tracker_test.cpp',
             'namespace_string_test.cpp',

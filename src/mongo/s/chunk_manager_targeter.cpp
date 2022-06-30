@@ -28,11 +28,8 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/chunk_manager_targeter.h"
 
-#include "mongo/base/counter.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -75,9 +72,8 @@ using UpdateType = write_ops::UpdateModification::Type;
 
 // Tracks the number of {multi:false} updates with an exact match on _id that are broadcasted to
 // multiple shards.
-Counter64 updateOneOpStyleBroadcastWithExactIDCount;
-ServerStatusMetricField<Counter64> updateOneOpStyleBroadcastWithExactIDStats(
-    "query.updateOneOpStyleBroadcastWithExactIDCount", &updateOneOpStyleBroadcastWithExactIDCount);
+CounterMetric updateOneOpStyleBroadcastWithExactIDCount(
+    "query.updateOneOpStyleBroadcastWithExactIDCount");
 
 /**
  * Update expressions are bucketed into one of two types for the purposes of shard targeting:

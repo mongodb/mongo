@@ -32,8 +32,6 @@
     LOGV2_DEBUG_OPTIONS(                               \
         ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
 
-#include "mongo/platform/basic.h"
-
 #include <boost/algorithm/string.hpp>
 
 #include "mongo/db/repl/repl_set_command.h"
@@ -85,7 +83,9 @@ public:
     virtual void appendAtLeaf(BSONObjBuilder& b) const {
         ReplicationCoordinator::get(getGlobalServiceContext())->appendDiagnosticBSON(&b);
     }
-} replExecutorSSM;
+};
+
+auto& replExecutorSSM = addMetricToTree(std::make_unique<ReplExecutorSSM>());
 
 // Testing only, enabled via command-line.
 class CmdReplSetTest : public ReplSetCommand {
@@ -533,12 +533,8 @@ public:
         return false;
     }
 
-    CmdReplSetStepDown()
-        : ReplSetCommand("replSetStepDown"),
-          _stepDownCmdsWithForceExecutedMetric("commands.replSetStepDownWithForce.total",
-                                               &_stepDownCmdsWithForceExecuted),
-          _stepDownCmdsWithForceFailedMetric("commands.replSetStepDownWithForce.failed",
-                                             &_stepDownCmdsWithForceFailed) {}
+    CmdReplSetStepDown() : ReplSetCommand("replSetStepDown") {}
+
     virtual bool run(OperationContext* opCtx,
                      const string&,
                      const BSONObj& cmdObj,
@@ -604,10 +600,8 @@ public:
     }
 
 private:
-    mutable Counter64 _stepDownCmdsWithForceExecuted;
-    mutable Counter64 _stepDownCmdsWithForceFailed;
-    ServerStatusMetricField<Counter64> _stepDownCmdsWithForceExecutedMetric;
-    ServerStatusMetricField<Counter64> _stepDownCmdsWithForceFailedMetric;
+    CounterMetric _stepDownCmdsWithForceExecuted{"commands.replSetStepDownWithForce.total"};
+    CounterMetric _stepDownCmdsWithForceFailed{"commands.replSetStepDownWithForce.failed"};
 
     ActionSet getAuthActionSet() const override {
         return ActionSet{ActionType::replSetStateChange};

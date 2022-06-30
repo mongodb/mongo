@@ -27,15 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/clientcursor.h"
 
 #include <string>
 #include <time.h>
 #include <vector>
 
-#include "mongo/base/counter.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -62,24 +59,12 @@ namespace mongo {
 using std::string;
 using std::stringstream;
 
-static Counter64 cursorStatsOpen;           // gauge
-static Counter64 cursorStatsOpenPinned;     // gauge
-static Counter64 cursorStatsOpenNoTimeout;  // gauge
-static Counter64 cursorStatsTimedOut;
-static Counter64 cursorStatsTotalOpened;
-static Counter64 cursorStatsMoreThanOneBatch;
-
-static ServerStatusMetricField<Counter64> dCursorStatsOpen("cursor.open.total", &cursorStatsOpen);
-static ServerStatusMetricField<Counter64> dCursorStatsOpenPinned("cursor.open.pinned",
-                                                                 &cursorStatsOpenPinned);
-static ServerStatusMetricField<Counter64> dCursorStatsOpenNoTimeout("cursor.open.noTimeout",
-                                                                    &cursorStatsOpenNoTimeout);
-static ServerStatusMetricField<Counter64> dCursorStatusTimedout("cursor.timedOut",
-                                                                &cursorStatsTimedOut);
-static ServerStatusMetricField<Counter64> dCursorStatsTotalOpened("cursor.totalOpened",
-                                                                  &cursorStatsTotalOpened);
-static ServerStatusMetricField<Counter64> dCursorStatsMoreThanOneBatch(
-    "cursor.moreThanOneBatch", &cursorStatsMoreThanOneBatch);
+static CounterMetric cursorStatsOpen{"cursor.open.total"};
+static CounterMetric cursorStatsOpenPinned{"cursor.open.pinned"};
+static CounterMetric cursorStatsOpenNoTimeout{"cursor.open.noTimeout"};
+static CounterMetric cursorStatsTimedOut{"cursor.timedOut"};
+static CounterMetric cursorStatsTotalOpened{"cursor.totalOpened"};
+static CounterMetric cursorStatsMoreThanOneBatch{"cursor.moreThanOneBatch"};
 
 ClientCursor::ClientCursor(ClientCursorParams params,
                            CursorId cursorId,

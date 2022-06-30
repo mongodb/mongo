@@ -302,10 +302,8 @@ class AggStageCounters {
 public:
     // Container for a stage count metric along with its corresponding counter.
     struct StageCounter {
-        StageCounter(StringData name) : metric("aggStageCounters." + name, &counter) {}
-
-        Counter64 counter;
-        ServerStatusMetricField<Counter64> metric;
+        StageCounter(StringData name) : counter("aggStageCounters." + name) {}
+        CounterMetric counter;
     };
 
     // Map of aggregation stages to the number of occurrences.
@@ -316,10 +314,6 @@ extern AggStageCounters aggStageCounters;
 
 class DotsAndDollarsFieldsCounters {
 public:
-    DotsAndDollarsFieldsCounters()
-        : insertMetric("dotsAndDollarsFields.inserts", &inserts),
-          updateMetric("dotsAndDollarsFields.updates", &updates) {}
-
     void incrementForUpsert(bool didInsert) {
         if (didInsert) {
             inserts.increment();
@@ -328,28 +322,15 @@ public:
         }
     }
 
-    Counter64 inserts;
-    Counter64 updates;
-    ServerStatusMetricField<Counter64> insertMetric;
-    ServerStatusMetricField<Counter64> updateMetric;
+    CounterMetric inserts{"dotsAndDollarsFields.inserts"};
+    CounterMetric updates{"dotsAndDollarsFields.updates"};
 };
 
 extern DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
 
 class QueryEngineCounters {
 public:
-    QueryEngineCounters()
-        : sbeFindQueryMetric("query.queryExecutionEngine.find.sbe", &sbeFindQueryCounter),
-          classicFindQueryMetric("query.queryExecutionEngine.find.classic",
-                                 &classicFindQueryCounter),
-          sbeOnlyAggregationMetric("query.queryExecutionEngine.aggregate.sbeOnly",
-                                   &sbeOnlyAggregationCounter),
-          classicOnlyAggregationMetric("query.queryExecutionEngine.aggregate.classicOnly",
-                                       &classicOnlyAggregationCounter),
-          sbeHybridAggregationMetric("query.queryExecutionEngine.aggregate.sbeHybrid",
-                                     &sbeHybridAggregationCounter),
-          classicHybridAggregationMetric("query.queryExecutionEngine.aggregate.classicHybrid",
-                                         &classicHybridAggregationCounter) {}
+    QueryEngineCounters() = default;
 
     void incrementQueryEngineCounters(CurOp* curop) {
         auto& debug = curop->debug();
@@ -381,21 +362,17 @@ public:
     // Query counters that record whether a find query was fully or partially executed in SBE, or
     // fully executed using the classic engine. One or the other will always be incremented during a
     // query.
-    Counter64 sbeFindQueryCounter;
-    Counter64 classicFindQueryCounter;
-    ServerStatusMetricField<Counter64> sbeFindQueryMetric;
-    ServerStatusMetricField<Counter64> classicFindQueryMetric;
+    CounterMetric sbeFindQueryCounter{"query.queryExecutionEngine.find.sbe"};
+    CounterMetric classicFindQueryCounter{"query.queryExecutionEngine.find.classic"};
+
     // Aggregation query counters that record whether an aggregation was fully or partially executed
     // in DocumentSource (an sbe/classic hybrid plan), or fully pushed down to the sbe/classic
     // layer. Only incremented during aggregations.
-    Counter64 sbeOnlyAggregationCounter;
-    Counter64 classicOnlyAggregationCounter;
-    Counter64 sbeHybridAggregationCounter;
-    Counter64 classicHybridAggregationCounter;
-    ServerStatusMetricField<Counter64> sbeOnlyAggregationMetric;
-    ServerStatusMetricField<Counter64> classicOnlyAggregationMetric;
-    ServerStatusMetricField<Counter64> sbeHybridAggregationMetric;
-    ServerStatusMetricField<Counter64> classicHybridAggregationMetric;
+    CounterMetric sbeOnlyAggregationCounter{"query.queryExecutionEngine.aggregate.sbeOnly"};
+    CounterMetric classicOnlyAggregationCounter{"query.queryExecutionEngine.aggregate.classicOnly"};
+    CounterMetric sbeHybridAggregationCounter{"query.queryExecutionEngine.aggregate.sbeHybrid"};
+    CounterMetric classicHybridAggregationCounter{
+        "query.queryExecutionEngine.aggregate.classicHybrid"};
 };
 extern QueryEngineCounters queryEngineCounters;
 
@@ -405,9 +382,8 @@ extern QueryEngineCounters queryEngineCounters;
 class OperatorCounters {
 private:
     struct ExprCounter {
-        ExprCounter(const std::string name) : metric(name, &counter) {}
-        Counter64 counter;
-        ServerStatusMetricField<Counter64> metric;
+        ExprCounter(const std::string& name) : counter(name) {}
+        CounterMetric counter;
     };
 
 public:

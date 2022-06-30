@@ -35,8 +35,6 @@
     LOGV2_DEBUG_OPTIONS(                               \
         ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/topology_coordinator_gen.h"
 
@@ -84,10 +82,8 @@ constexpr Milliseconds TopologyCoordinator::PingStats::UninitializedPingTime;
 
 // Tracks the number of times we decide to change sync sources in order to sync from a significantly
 // closer node.
-Counter64 numSyncSourceChangesDueToSignificantlyCloserNode;
-ServerStatusMetricField<Counter64> displayNumSyncSourceChangesDueToSignificantlyCloserNode(
-    "repl.syncSource.numSyncSourceChangesDueToSignificantlyCloserNode",
-    &numSyncSourceChangesDueToSignificantlyCloserNode);
+CounterMetric numSyncSourceChangesDueToSignificantlyCloserNode(
+    "repl.syncSource.numSyncSourceChangesDueToSignificantlyCloserNode");
 
 using namespace fmt::literals;
 
