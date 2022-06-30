@@ -560,7 +560,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
         createChangeStreamPreImagesCollection(opCtx);
     }
 
-    // TODO: SERVER-65948 move the change collection creation logic from here to the PM-2502 hooks.
+    // TODO: SERVER-66631 move the change collection creation logic from here to the PM-2502 hooks.
     // The change collection will be created when the change stream is enabled.
     if (ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive()) {
         auto status = ChangeStreamChangeCollectionManager::get(opCtx).createChangeCollection(
