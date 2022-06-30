@@ -691,6 +691,14 @@ public:
             // New style update position command has metadata, which may inform the
             // upstream of a higher term.
             const auto& metadata = metadataResult.getValue();
+            if (metadata.hasReplicaSetId()) {
+                auto config = replCoord->getConfig();
+                uassert(ErrorCodes::InconsistentReplicaSetNames,
+                        "The current replicaSetId does not match the one in replSetMetaData",
+                        !config.isInitialized() ||
+                            config.getReplicaSetId() == metadata.getReplicaSetId());
+            }
+
             replCoord->processReplSetMetadata(metadata);
         }
 

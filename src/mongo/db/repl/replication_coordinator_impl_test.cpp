@@ -7317,6 +7317,7 @@ TEST_F(ReplCoordTest, OnlyForwardSyncProgressForOtherNodesWhenTheNodesAreBelieve
 }
 
 TEST_F(ReplCoordTest, UpdatePositionCmdHasMetadata) {
+    const auto replicaSetId = OID::gen();
     assertStartSuccess(
         BSON("_id"
              << "mySet"
@@ -7328,7 +7329,8 @@ TEST_F(ReplCoordTest, UpdatePositionCmdHasMetadata) {
                            << BSON("_id" << 2 << "host"
                                          << "test3:1234"))
              << "protocolVersion" << 1 << "settings"
-             << BSON("electionTimeoutMillis" << 2000 << "heartbeatIntervalMillis" << 40000)),
+             << BSON("electionTimeoutMillis" << 2000 << "heartbeatIntervalMillis" << 40000
+                                             << "replicaSetId" << replicaSetId)),
         HostAndPort("test1", 1234));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
@@ -7355,6 +7357,7 @@ TEST_F(ReplCoordTest, UpdatePositionCmdHasMetadata) {
     auto metadata = unittest::assertGet(rpc::ReplSetMetadata::readFromMetadata(cmd));
     ASSERT_EQUALS(metadata.getTerm(), getReplCoord()->getTerm());
     ASSERT_EQUALS(metadata.getLastOpVisible(), optime);
+    ASSERT_EQUALS(metadata.getReplicaSetId(), replicaSetId);
 
     auto oqMetadataStatus = rpc::OplogQueryMetadata::readFromMetadata(cmd);
     ASSERT_EQUALS(oqMetadataStatus.getStatus(), ErrorCodes::NoSuchKey);
