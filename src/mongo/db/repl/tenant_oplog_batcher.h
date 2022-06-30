@@ -101,7 +101,7 @@ private:
 
     void _pushEntry(OperationContext* opCtx, TenantOplogBatch* batch, OplogEntry&& op);
 
-    Status _doStartup_inlock() noexcept final;
+    void _doStartup_inlock() final;
 
     void _doShutdown_inlock() noexcept final;
 

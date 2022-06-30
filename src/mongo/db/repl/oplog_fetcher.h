@@ -326,7 +326,7 @@ private:
     /**
      * Schedules the _runQuery function to run in a separate thread.
      */
-    Status _doStartup_inlock() noexcept override;
+    void _doStartup_inlock() override;
 
     /**
      * Shuts down the DBClientCursor and DBClientConnection. Uses the connection's

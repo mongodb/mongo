@@ -183,7 +183,6 @@ private:
      * Invoked by startup() to run startup procedure after a successful transition from PreStart to
      * Running.
      * Invoked at most once by AbstractAsyncComponent.
-     * May not throw exceptions.
      *
      * If _doStartup_inlock() fails, startup() will transition this component from Running to
      * Complete. Subsequent startup() attempts will return an IllegalOperation error.
@@ -195,7 +194,7 @@ private:
      * It is the responsibility of the implementation to transition the component state to Complete
      * by calling _transitionToComplete_inlock() once the component has finished its processing.
      */
-    virtual Status _doStartup_inlock() noexcept = 0;
+    virtual void _doStartup_inlock() = 0;
 
     /**
      * Runs shutdown procedure after a successful transition from Running to ShuttingDown.

@@ -171,7 +171,7 @@ void OplogFetcherMock::waitForshutdown() {
     }
 }
 
-Status OplogFetcherMock::_doStartup_inlock() noexcept {
+void OplogFetcherMock::_doStartup_inlock() {
     // Create a thread that waits on the _finishPromise and call _finishCallback once with the
     // finish status. This is to synchronize the OplogFetcher shutdown between the test thread and
     // the OplogFetcher's owner. For example, the OplogFetcher could be shut down by the test thread
@@ -189,7 +189,6 @@ Status OplogFetcherMock::_doStartup_inlock() noexcept {
         auto status = future.getNoThrow();
         _finishCallback(status);
     });
-    return Status::OK();
 }
 
 void OplogFetcherMock::_doShutdown_inlock() noexcept {

@@ -206,8 +206,8 @@ void OplogFetcher::setConnection(std::unique_ptr<DBClientConnection>&& _connecte
     _conn = std::move(_connectedClient);
 }
 
-Status OplogFetcher::_doStartup_inlock() noexcept {
-    return _scheduleWorkAndSaveHandle_inlock(
+void OplogFetcher::_doStartup_inlock() {
+    uassertStatusOK(_scheduleWorkAndSaveHandle_inlock(
         [this](const executor::TaskExecutor::CallbackArgs& args) {
             // Tests use this failpoint to prevent the oplog fetcher from starting.  If those
             // tests fail and the oplog fetcher is canceled, we want to continue so we see
@@ -218,7 +218,7 @@ Status OplogFetcher::_doStartup_inlock() noexcept {
             _runQuery(args);
         },
         &_runQueryHandle,
-        "_runQuery");
+        "_runQuery"));
 }
 
 void OplogFetcher::_doShutdown_inlock() noexcept {

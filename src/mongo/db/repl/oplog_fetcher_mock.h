@@ -76,7 +76,7 @@ public:
 private:
     // =============== AbstractAsyncComponent overrides ================
 
-    Status _doStartup_inlock() noexcept override;
+    void _doStartup_inlock() override;
 
     void _doShutdown_inlock() noexcept override;
 

@@ -93,7 +93,7 @@ public:
     void shutdownComponent_forTest(const std::unique_ptr<MockAsyncComponent>& component);
 
 private:
-    Status _doStartup_inlock() noexcept override;
+    void _doStartup_inlock() override;
     void _doShutdown_inlock() noexcept override;
     void _preJoin() noexcept override {}
     Mutex* _getMutex() noexcept override;
@@ -102,7 +102,7 @@ private:
     Mutex _mutex = MONGO_MAKE_LATCH("MockAsyncComponent::_mutex");
 
 public:
-    // Returned by _doStartup_inlock(). Override for testing.
+    // Asserted to be OK by _doStartup_inlock(). Override for testing.
     Status doStartupResult = Status::OK();
 
     // Set to true when _doStartup_inlock() is called.
@@ -154,9 +154,9 @@ void MockAsyncComponent::shutdownComponent_forTest(
     _shutdownComponent(component);
 }
 
-Status MockAsyncComponent::_doStartup_inlock() noexcept {
+void MockAsyncComponent::_doStartup_inlock() {
     doStartupCalled = true;
-    return doStartupResult;
+    uassertStatusOK(doStartupResult);
 }
 
 void MockAsyncComponent::_doShutdown_inlock() noexcept {}

@@ -263,7 +263,7 @@ SemiFuture<TenantOplogBatch> TenantOplogBatcher::getNextBatch(BatchLimits limits
     return _scheduleNextBatch(lk, limits);
 }
 
-Status TenantOplogBatcher::_doStartup_inlock() noexcept {
+void TenantOplogBatcher::_doStartup_inlock() {
     LOGV2_DEBUG(
         4885604, 1, "Tenant Oplog Batcher starting up", "component"_attr = _getComponentName());
     if (!_resumeBatchingTs.isNull()) {
@@ -287,7 +287,6 @@ Status TenantOplogBatcher::_doStartup_inlock() noexcept {
                     "Tenant Oplog Batcher will resume batching from after timestamp",
                     "timestamp"_attr = _resumeBatchingTs);
     }
-    return Status::OK();
 }
 
 void TenantOplogBatcher::_doShutdown_inlock() noexcept {

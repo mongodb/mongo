@@ -113,7 +113,7 @@ public:
     Timestamp getResumeBatchingTs() const;
 
 private:
-    Status _doStartup_inlock() noexcept final;
+    void _doStartup_inlock() final;
     void _doShutdown_inlock() noexcept final;
     void _preJoin() noexcept final;
     void _finishShutdown(WithLock lk, Status status);

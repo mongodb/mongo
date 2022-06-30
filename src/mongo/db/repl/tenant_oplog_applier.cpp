@@ -128,13 +128,10 @@ void TenantOplogApplier::setCloneFinishedRecipientOpTime(OpTime cloneFinishedRec
     _cloneFinishedRecipientOpTime = cloneFinishedRecipientOpTime;
 }
 
-Status TenantOplogApplier::_doStartup_inlock() noexcept {
+void TenantOplogApplier::_doStartup_inlock() {
     _oplogBatcher = std::make_shared<TenantOplogBatcher>(
         _migrationUuid, _oplogBuffer, _executor, _resumeBatchingTs, _startApplyingAfterOpTime);
-    auto status = _oplogBatcher->startup();
-    if (!status.isOK())
-        return status;
-
+    uassertStatusOK(_oplogBatcher->startup());
     auto fut = _oplogBatcher->getNextBatch(
         TenantOplogBatcher::BatchLimits(std::size_t(tenantApplierBatchSizeBytes.load()),
                                         std::size_t(tenantApplierBatchSizeOps.load())));
@@ -147,7 +144,6 @@ Status TenantOplogApplier::_doStartup_inlock() noexcept {
             invariant(_shouldStopApplying(status));
         })
         .getAsync([](auto status) {});
-    return Status::OK();
 }
 
 void TenantOplogApplier::_setFinalStatusIfOk(WithLock, Status newStatus) {
