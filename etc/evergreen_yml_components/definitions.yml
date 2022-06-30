@@ -4372,13 +4372,6 @@ tasks:
   - func: "generate resmoke tasks"
 
 - <<: *task_template
-  name: change_streams_update_v1_oplog
-  tags: ["change_streams"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
   name: change_streams_mongos_sessions_passthrough
   tags: ["change_streams"]
   depends_on:
@@ -5011,12 +5004,6 @@ tasks:
   - func: "run tests"
 
 - <<: *gen_task_template
-  name: replica_sets_update_v1_oplog_jscore_passthrough_gen
-  tags: ["replica_sets", "non_maj_read"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
   name: replica_sets_initsync_jscore_passthrough_gen
   tags: ["replica_sets", "san", "large"]
   commands:
@@ -5179,15 +5166,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       fallback_num_sub_suites: 5
-
-- <<: *task_template
-  name: sharding_update_v1_oplog_jscore_passthrough
-  tags: ["sharding", "jscore"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: sharding_jscore_passthrough
 
 - <<: *task_template
   name: sharded_multi_stmt_txn_jscore_passthrough
@@ -5781,12 +5759,6 @@ tasks:
   - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
-  name: replica_sets_update_v1_oplog_gen
-  tags: ["replica_sets", "san"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
   name: replica_sets_multiversion_gen
   tags: ["random_multiversion_ds", "multiversion"]
   commands:
@@ -5886,14 +5858,6 @@ tasks:
 - <<: *gen_task_template
   name: sharding_last_lts_mongos_and_mixed_shards_gen
   tags: ["sharding", "common", "multiversion", "no_version_combination"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: sharding_update_v1_oplog_gen
-  tags: ["sharding", "common"]
   commands:
   - func: "generate resmoke tasks"
     vars:

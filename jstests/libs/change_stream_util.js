@@ -125,22 +125,6 @@ function canonicalizeEventForTesting(event, expected) {
     if (!expected.hasOwnProperty("updateDescription"))
         delete event.updateDescription;
 
-    // TODO SERVER-50301: The 'truncatedArrays' field may not appear in the updateDescription
-    // depending on whether $v:2 update oplog entries are enabled. When the expected event has an
-    // empty 'truncatedFields' we do not require that the actual event contain the field. This
-    // logic can be removed when $v:2 update oplog entries are enabled on all configurations.
-    if (
-        // If the expected event has an empty 'truncatedArrays' field...
-        expected.hasOwnProperty("updateDescription") &&
-        Array.isArray(expected.updateDescription.truncatedArrays) &&
-        expected.updateDescription.truncatedArrays.length == 0 &&
-        // ...And the actual event has no truncated arrays field.
-        event.hasOwnProperty("updateDescription") &&
-        !event.updateDescription.hasOwnProperty("truncatedArrays")) {
-        // Treat the actual event as if it had an empty 'truncatedArrays' field.
-        event.updateDescription.truncatedArrays = [];
-    }
-
     return event;
 }
 

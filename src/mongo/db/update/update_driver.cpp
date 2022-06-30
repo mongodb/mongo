@@ -86,19 +86,7 @@ bool parseUpdateExpression(
     const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters) {
     bool positional = false;
     std::set<std::string> foundIdentifiers;
-    bool foundVersionField = false;
     for (auto&& mod : updateExpr) {
-        // If there is a "$v" field among the modifiers, it should have already been used by the
-        // caller to determine that this is the correct parsing function.
-        if (mod.fieldNameStringData() == kUpdateOplogEntryVersionFieldName) {
-            uassert(
-                ErrorCodes::BadValue, "Duplicate $v in oplog update document", !foundVersionField);
-            foundVersionField = true;
-            invariant(mod.numberLong() ==
-                      static_cast<long long>(UpdateOplogEntryVersion::kUpdateNodeV1));
-            continue;
-        }
-
         auto modType = validateMod(mod);
         for (auto&& field : mod.Obj()) {
             auto statusWithPositional = UpdateObjectNode::parseAndMerge(
@@ -180,25 +168,15 @@ void UpdateDriver::parse(
 
     invariant(_updateType == UpdateType::kOperator);
 
-    // By this point we are expecting a "classic" update. This version of mongod only supports $v:
-    // 1 (modifier language) and $v: 2 (delta) (older versions support $v: 0). We've already
-    // checked whether this is a delta update so we check that the $v field isn't present, or has a
-    // value of 1.
-
-    auto updateExpr = updateMod.getUpdateModifier();
-    BSONElement versionElement = updateExpr[kUpdateOplogEntryVersionFieldName];
-    if (versionElement) {
-        uassert(ErrorCodes::FailedToParse,
-                "The $v update field is only recognized internally",
-                _fromOplogApplication);
-
-        // The UpdateModification should have verified that the value of $v is valid.
-        invariant(versionElement.numberInt() ==
-                  static_cast<int>(UpdateOplogEntryVersion::kUpdateNodeV1));
-    }
-
+    // By this point we are expecting a "kModifier" update. This version of mongod only supports
+    // $v: 2 (delta) (older versions support $v: 0 and $v: 1). We've already checked whether
+    // this is a delta update, so we verify that we're not on the oplog application path.
+    tassert(5030100,
+            "An oplog update can only be of type 'kReplacement' or 'kDelta'",
+            !_fromOplogApplication);
     auto root = std::make_unique<UpdateObjectNode>();
-    _positional = parseUpdateExpression(updateExpr, root.get(), _expCtx, arrayFilters);
+    _positional =
+        parseUpdateExpression(updateMod.getUpdateModifier(), root.get(), _expCtx, arrayFilters);
     _updateExecutor = std::make_unique<UpdateTreeExecutor>(std::move(root));
 }
 
@@ -284,9 +262,7 @@ Status UpdateDriver::update(OperationContext* opCtx,
     }
 
     if (_logOp && logOpRec) {
-        applyParams.logMode = internalQueryEnableLoggingV2OplogEntries.load()
-            ? ApplyParams::LogMode::kGenerateOplogEntry
-            : ApplyParams::LogMode::kGenerateOnlyV1OplogEntry;
+        applyParams.logMode = ApplyParams::LogMode::kGenerateOplogEntry;
 
         if (MONGO_unlikely(hangAfterPipelineUpdateFCVCheck.shouldFail()) &&
             type() == UpdateType::kPipeline) {

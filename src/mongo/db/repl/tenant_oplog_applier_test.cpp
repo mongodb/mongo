@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
@@ -52,12 +51,12 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/log_test.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 
@@ -662,8 +661,12 @@ TEST_F(TenantOplogApplierTest, ApplyInserts_Grouped) {
 TEST_F(TenantOplogApplierTest, ApplyUpdate_MissingDocument) {
     NamespaceString nss(_dbName.toStringWithTenantId(), "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
-    auto entry = makeOplogEntry(
-        repl::OpTypeEnum::kUpdate, nss, uuid, BSON("$set" << BSON("a" << 1)), BSON("_id" << 0));
+    auto entry = makeOplogEntry(repl::OpTypeEnum::kUpdate,
+                                nss,
+                                uuid,
+                                update_oplog_entry::makeDeltaOplogEntry(
+                                    BSON(doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
+                                BSON("_id" << 0));
     bool onInsertsCalled = false;
     bool onUpdateCalled = false;
     _opObserver->onInsertsFn = [&](OperationContext* opCtx,
@@ -698,8 +701,12 @@ TEST_F(TenantOplogApplierTest, ApplyUpdate_Success) {
     NamespaceString nss(_dbName.toStringWithTenantId(), "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {BSON("_id" << 0)}, 0));
-    auto entry = makeOplogEntry(
-        repl::OpTypeEnum::kUpdate, nss, uuid, BSON("$set" << BSON("a" << 1)), BSON("_id" << 0));
+    auto entry = makeOplogEntry(repl::OpTypeEnum::kUpdate,
+                                nss,
+                                uuid,
+                                update_oplog_entry::makeDeltaOplogEntry(
+                                    BSON(doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
+                                BSON("_id" << 0));
     bool onUpdateCalled = false;
     _opObserver->onUpdateFn = [&](OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
         onUpdateCalled = true;

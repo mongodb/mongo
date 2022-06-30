@@ -47,6 +47,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog_mongod.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/unittest/unittest.h"
@@ -456,7 +457,10 @@ TEST_F(ReshardingOplogCrudApplicationTest, UpdateOpModifiesStashCollectionAfterI
     {
         auto opCtx = makeOperationContext();
         ASSERT_OK(applier()->applyOperation(
-            opCtx.get(), makeUpdateOp(BSON("_id" << 0), BSON("$set" << BSON("x" << 1)))));
+            opCtx.get(),
+            makeUpdateOp(BSON("_id" << 0),
+                         update_oplog_entry::makeDeltaOplogEntry(
+                             BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 1))))));
     }
 
     // We should have applied rule #1 and updated the document with {_id: 0} in the stash collection
@@ -488,7 +492,10 @@ TEST_F(ReshardingOplogCrudApplicationTest, UpdateOpIsNoopWhenDifferentOwningDono
     {
         auto opCtx = makeOperationContext();
         ASSERT_OK(applier()->applyOperation(
-            opCtx.get(), makeUpdateOp(BSON("_id" << 0), BSON("$set" << BSON("x" << 1)))));
+            opCtx.get(),
+            makeUpdateOp(BSON("_id" << 0),
+                         update_oplog_entry::makeDeltaOplogEntry(
+                             BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 1))))));
     }
 
     // The document {_id: 0, sk: -1} that exists in the output collection does not belong to this
@@ -504,7 +511,10 @@ TEST_F(ReshardingOplogCrudApplicationTest, UpdateOpIsNoopWhenDifferentOwningDono
     {
         auto opCtx = makeOperationContext();
         ASSERT_OK(applier()->applyOperation(
-            opCtx.get(), makeUpdateOp(BSON("_id" << 2), BSON("$set" << BSON("x" << 1)))));
+            opCtx.get(),
+            makeUpdateOp(BSON("_id" << 2),
+                         update_oplog_entry::makeDeltaOplogEntry(
+                             BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 1))))));
     }
 
     // There does not exist a document with {_id: 2} in the output collection, so we should have
@@ -535,9 +545,15 @@ TEST_F(ReshardingOplogCrudApplicationTest, UpdateOpModifiesOutputCollection) {
     {
         auto opCtx = makeOperationContext();
         ASSERT_OK(applier()->applyOperation(
-            opCtx.get(), makeUpdateOp(BSON("_id" << 1), BSON("$set" << BSON("x" << 1)))));
+            opCtx.get(),
+            makeUpdateOp(BSON("_id" << 1),
+                         update_oplog_entry::makeDeltaOplogEntry(
+                             BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 1))))));
         ASSERT_OK(applier()->applyOperation(
-            opCtx.get(), makeUpdateOp(BSON("_id" << 2), BSON("$set" << BSON("x" << 2)))));
+            opCtx.get(),
+            makeUpdateOp(BSON("_id" << 2),
+                         update_oplog_entry::makeDeltaOplogEntry(
+                             BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 2))))));
     }
 
     // We should have updated both documents in the output collection to include the new field "x".

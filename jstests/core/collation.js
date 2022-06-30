@@ -1603,31 +1603,37 @@ if (!isMongos) {
 
     // preCondition.q respects collection default collation.
     assert.commandFailed(db.runCommand({
-        applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$set: {x: 6}}}],
+        applyOps:
+            [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$v: 2, diff: {u: {x: 6}}}}],
         preCondition: [{ns: coll.getFullName(), q: {_id: "not foo"}, res: {str: "bar"}}]
     }));
     assert.eq(5, coll.findOne({_id: "foo"}).x);
     assert.commandWorked(db.runCommand({
-        applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$set: {x: 6}}}],
+        applyOps:
+            [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$v: 2, diff: {u: {x: 6}}}}],
         preCondition: [{ns: coll.getFullName(), q: {_id: "FOO"}, res: {str: "bar"}}]
     }));
     assert.eq(6, coll.findOne({_id: "foo"}).x);
 
     // preCondition.res respects collection default collation.
     assert.commandFailed(db.runCommand({
-        applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$set: {x: 7}}}],
+        applyOps:
+            [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$v: 2, diff: {u: {x: 7}}}}],
         preCondition: [{ns: coll.getFullName(), q: {_id: "foo"}, res: {str: "not bar"}}]
     }));
     assert.eq(6, coll.findOne({_id: "foo"}).x);
     assert.commandWorked(db.runCommand({
-        applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$set: {x: 7}}}],
+        applyOps:
+            [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$v: 2, diff: {u: {x: 7}}}}],
         preCondition: [{ns: coll.getFullName(), q: {_id: "foo"}, res: {str: "BAR"}}]
     }));
     assert.eq(7, coll.findOne({_id: "foo"}).x);
 
     // <operation>.o2 respects collection default collation.
-    assert.commandWorked(db.runCommand(
-        {applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: "FOO"}, o: {$set: {x: 8}}}]}));
+    assert.commandWorked(db.runCommand({
+        applyOps:
+            [{op: "u", ns: coll.getFullName(), o2: {_id: "FOO"}, o: {$v: 2, diff: {u: {x: 8}}}}]
+    }));
     assert.eq(8, coll.findOne({_id: "foo"}).x);
 }
 

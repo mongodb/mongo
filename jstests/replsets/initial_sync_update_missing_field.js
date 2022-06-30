@@ -54,20 +54,36 @@ assert.commandWorked(coll.updateOne({_id: 3}, {$set: {'array.0': 1, 'scalar': 1}
 assert.commandWorked(coll.updateOne({_id: 2}, {$set: {'array.0': 1}}));
 
 assert.commandWorked(primary.adminCommand({
-    applyOps:
-        [{op: 'u', ns: coll.getFullName(), o2: {_id: 5}, o: {$set: {'doc.field': 1, 'scalar': 1}}}]
+    applyOps: [{
+        op: 'u',
+        ns: coll.getFullName(),
+        o2: {_id: 5},
+        o: {$v: 2, diff: {u: {'scalar': 1}, sdoc: {u: {field: 1}}}}
+    }]
 }));
-
-assert.commandWorked(primary.adminCommand(
-    {applyOps: [{op: 'u', ns: coll.getFullName(), o2: {_id: 4}, o: {$set: {'doc.field': 1}}}]}));
 
 assert.commandWorked(primary.adminCommand({
     applyOps:
-        [{op: 'u', ns: coll.getFullName(), o2: {_id: 7}, o: {$set: {'array.0': 1, 'scalar': 1}}}]
+        [{op: 'u', ns: coll.getFullName(), o2: {_id: 4}, o: {$v: 2, diff: {sdoc: {u: {field: 1}}}}}]
 }));
 
-assert.commandWorked(primary.adminCommand(
-    {applyOps: [{op: 'u', ns: coll.getFullName(), o2: {_id: 6}, o: {$set: {'array.0': 1}}}]}));
+assert.commandWorked(primary.adminCommand({
+    applyOps: [{
+        op: 'u',
+        ns: coll.getFullName(),
+        o2: {_id: 7},
+        o: {$v: 2, diff: {u: {'scalar': 1}, sarray: {a: true, u0: 1}}}
+    }]
+}));
+
+assert.commandWorked(primary.adminCommand({
+    applyOps: [{
+        op: 'u',
+        ns: coll.getFullName(),
+        o2: {_id: 6},
+        o: {$v: 2, diff: {sarray: {a: true, u0: 1}}}
+    }]
+}));
 
 jsTestLog("Set array and subdoc fields to strings on primary");
 

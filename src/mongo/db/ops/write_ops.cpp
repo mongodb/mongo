@@ -158,17 +158,16 @@ UpdateModification UpdateModification::parseFromOplogEntry(const BSONObj& oField
     BSONElement idField = oField["_id"];
 
     // If _id field is present, we're getting a replacement style update in which $v can be a user
-    // field. Otherwise, $v field has to be either missing or be one of the version flag $v:1 /
-    // $v:2.
+    // field. Otherwise, $v field has to be $v:2.
     uassert(4772600,
-            str::stream() << "Expected _id field or $v field missing or $v:1/$v:2, but got: "
-                          << vField,
-            idField.ok() || !vField.ok() ||
-                vField.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kUpdateNodeV1) ||
-                vField.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2));
+            str::stream() << "Expected _id field or $v:2, but got: " << vField,
+            idField.ok() ||
+                (vField.ok() &&
+                 vField.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)));
 
-    if (!idField.ok() && vField.ok() &&
-        vField.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)) {
+    // It is important to check for '_id' field first, because a replacement style update can still
+    // have a '$v' field in the object.
+    if (!idField.ok()) {
         // Make sure there's a diff field.
         BSONElement diff = oField[update_oplog_entry::kDiffObjectFieldName];
         uassert(4772601,
@@ -176,15 +175,14 @@ UpdateModification UpdateModification::parseFromOplogEntry(const BSONObj& oField
                               << diff.type(),
                 diff.type() == BSONType::Object);
 
-        return UpdateModification(doc_diff::Diff{diff.embeddedObject()}, options);
+        return UpdateModification(doc_diff::Diff{diff.embeddedObject()}, DeltaTag{}, options);
     } else {
-        // Treat it as a "classic" update which can either be a full replacement or a
-        // modifier-style update. Use "_id" field to determine whether which style it is.
-        return UpdateModification(oField, ClassicTag{}, idField.ok());
+        // Treat it as a a full replacement update.
+        return UpdateModification(oField, ReplacementTag{});
     }
 }
 
-UpdateModification::UpdateModification(doc_diff::Diff diff, DiffOptions options)
+UpdateModification::UpdateModification(doc_diff::Diff diff, DeltaTag, DiffOptions options)
     : _update(DeltaUpdate{std::move(diff), options}) {}
 
 UpdateModification::UpdateModification(TransformFunc transform)
@@ -193,7 +191,7 @@ UpdateModification::UpdateModification(TransformFunc transform)
 UpdateModification::UpdateModification(BSONElement update) {
     const auto type = update.type();
     if (type == BSONType::Object) {
-        _update = UpdateModification(update.Obj(), ClassicTag{})._update;
+        _update = UpdateModification(update.Obj())._update;
         return;
     }
 
@@ -204,21 +202,19 @@ UpdateModification::UpdateModification(BSONElement update) {
     _update = PipelineUpdate{parsePipelineFromBSON(update)};
 }
 
-// If we know whether the update is a replacement, use that value. For example, when we're parsing
-// the oplog entry, we know if the update is a replacement by checking whether there's an _id field.
-UpdateModification::UpdateModification(const BSONObj& update, ClassicTag, bool isReplacement) {
-    if (isReplacement) {
+UpdateModification::UpdateModification(const BSONObj& update) {
+    if (isClassicalUpdateReplacement(update)) {
         _update = ReplacementUpdate{update};
     } else {
         _update = ModifierUpdate{update};
     }
 }
 
-// If we don't know whether the update is a replacement, for example while we are parsing a user
-// request, we infer this by checking whether the first element is a $-field to distinguish modifier
-// style updates.
-UpdateModification::UpdateModification(const BSONObj& update, ClassicTag)
-    : UpdateModification(update, ClassicTag{}, isClassicalUpdateReplacement(update)) {}
+UpdateModification::UpdateModification(const BSONObj& update, ModifierUpdateTag)
+    : _update{ModifierUpdate{update}} {}
+UpdateModification::UpdateModification(const BSONObj& update, ReplacementTag)
+    : _update{ReplacementUpdate{update}} {}
+
 
 UpdateModification::UpdateModification(std::vector<BSONObj> pipeline)
     : _update{PipelineUpdate{std::move(pipeline)}} {}

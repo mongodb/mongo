@@ -42,9 +42,7 @@
 namespace mongo {
 namespace {
 
-using BitNodeTest = UpdateNodeTest;
-using mongo::mutablebson::countChildren;
-using mongo::mutablebson::Element;
+using BitNodeTest = UpdateTestFixture;
 
 TEST(BitNodeTest, InitWithDoubleFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -164,7 +162,7 @@ TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentAnd) {
     ASSERT_EQUALS(fromjson("{a: 0}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: 0}}"), fromjson("{$v: 2, diff: {i: {a: 0}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {i: {a: 0}}}"));
 }
 
 TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentOr) {
@@ -180,7 +178,7 @@ TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentOr) {
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: 1}}"), fromjson("{$v: 2, diff: {i: {a: 1}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {i: {a: 1}}}"));
 }
 
 TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentXor) {
@@ -196,7 +194,7 @@ TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentXor) {
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: 1}}"), fromjson("{$v: 2, diff: {i: {a: 1}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {i: {a: 1}}}"));
 }
 
 TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentAnd) {
@@ -212,8 +210,7 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentAnd) {
     ASSERT_EQUALS(BSON("a" << 0b0100), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(BSON("$set" << BSON("a" << 0b0100)),
-                     BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b0100))));
+    assertOplogEntry(BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b0100))));
 }
 
 TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentOr) {
@@ -229,8 +226,7 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentOr) {
     ASSERT_EQUALS(BSON("a" << 0b0111), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(BSON("$set" << BSON("a" << 0b0111)),
-                     BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b0111))));
+    assertOplogEntry(BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b0111))));
 }
 
 TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentXor) {
@@ -246,8 +242,7 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentXor) {
     ASSERT_EQUALS(BSON("a" << 0b0011), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(BSON("$set" << BSON("a" << 0b0011)),
-                     BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b0011))));
+    assertOplogEntry(BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b0011))));
 }
 
 TEST_F(BitNodeTest, ApplyShouldReportNoOp) {
@@ -284,8 +279,7 @@ TEST_F(BitNodeTest, ApplyMultipleBitOps) {
     ASSERT_EQUALS(BSON("a" << 0b0101011001100110), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(BSON("$set" << BSON("a" << 0b0101011001100110)),
-                     BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b0101011001100110))));
+    assertOplogEntry(BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b0101011001100110))));
 }
 
 TEST_F(BitNodeTest, ApplyRepeatedBitOps) {
@@ -301,8 +295,7 @@ TEST_F(BitNodeTest, ApplyRepeatedBitOps) {
     ASSERT_EQUALS(BSON("a" << 0b10010110), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(BSON("$set" << BSON("a" << 0b10010110)),
-                     BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b10010110))));
+    assertOplogEntry(BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b10010110))));
 }
 
 }  // namespace

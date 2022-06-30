@@ -212,7 +212,8 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(
     write_ops::UpdateModification::DiffOptions options;
     options.mustCheckExistenceForInsertOperations =
         static_cast<bool>(repl::tenantMigrationRecipientInfo(opCtx));
-    write_ops::UpdateModification u(updateBuilder.obj(), options);
+    write_ops::UpdateModification u(
+        updateBuilder.obj(), write_ops::UpdateModification::DeltaTag{}, options);
     write_ops::UpdateOpEntry update(BSON("_id" << batch->bucket().id), std::move(u));
     invariant(!update.getMulti(), batch->bucket().id.toString());
     invariant(!update.getUpsert(), batch->bucket().id.toString());

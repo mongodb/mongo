@@ -57,10 +57,6 @@ public:
             // Indicates that no oplog entry should be produced.
             kDoNotGenerateOplogEntry,
 
-            // Indicates that the update executor should produce an oplog entry. Only the $v: 1
-            // format or replacement-style format may be used, however.
-            kGenerateOnlyV1OplogEntry,
-
             // Indicates that the update executor should produce an oplog entry, and may use any
             // format.
             kGenerateOplogEntry

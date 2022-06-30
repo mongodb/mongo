@@ -42,18 +42,30 @@ const originalDoc = {
 coll.insert(originalDoc);
 
 // Update field "a", which is null, but apply an operation intended for an array.
-applyOps([{ns: coll.getFullName(), op: "u", o2: {_id: 1}, o: {$set: {'a.0': 2}}}]);
+applyOps(
+    [{ns: coll.getFullName(), op: "u", o2: {_id: 1}, o: {$v: 2, diff: {sa: {a: true, u0: 1}}}}]);
 assert.eq(originalDoc, coll.findOne());
 
 // Same, but also set a new field 'b' to 1.
-applyOps([{ns: coll.getFullName(), op: "u", o2: {_id: 1}, o: {$set: {'a.0': 2, b: 1}}}]);
+applyOps([{
+    ns: coll.getFullName(),
+    op: "u",
+    o2: {_id: 1},
+    o: {$v: 2, diff: {u: {b: 1}, sa: {a: true, u0: 1}}}
+}]);
 assert.eq({_id: 1, a: null, b: 1}, coll.findOne());
 
 // An operation intended for a subdocument.
-applyOps([{ns: coll.getFullName(), op: "u", o2: {_id: 1}, o: {$set: {'a.field': 2}}}]);
+applyOps(
+    [{ns: coll.getFullName(), op: "u", o2: {_id: 1}, o: {$v: 2, diff: {sa: {u: {field: 2}}}}}]);
 assert.eq({_id: 1, a: null, b: 1}, coll.findOne());
 
 // Same, but set 'b' to 2.
-applyOps([{ns: coll.getFullName(), op: "u", o2: {_id: 1}, o: {$set: {'a.field': 2, b: 2}}}]);
+applyOps([{
+    ns: coll.getFullName(),
+    op: "u",
+    o2: {_id: 1},
+    o: {$v: 2, diff: {u: {b: 2}, sa: {u: {field: 2}}}}
+}]);
 assert.eq({_id: 1, a: null, b: 2}, coll.findOne());
 }());

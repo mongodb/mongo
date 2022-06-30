@@ -308,7 +308,7 @@ if (!isMongos) {
     // Test $jsonSchema in the precondition checking for applyOps.
     res = testDB.adminCommand({
         applyOps: [
-            {op: "u", ns: coll.getFullName(), o2: {_id: 0}, o: {$set: {a: false}}},
+            {op: "u", ns: coll.getFullName(), o2: {_id: 0}, o: {$v: 2, diff: {u: {a: false}}}},
         ],
         preCondition: [{
             ns: coll.getFullName(),

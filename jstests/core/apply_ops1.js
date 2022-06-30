@@ -245,7 +245,8 @@ function testCrudOperationOnNonExistentNamespace(optype, o, o2, expectedErrorCod
 // Insert and update operations on non-existent collections/databases should return
 // NamespaceNotFound.
 testCrudOperationOnNonExistentNamespace('i', {_id: 0}, {}, ErrorCodes.NamespaceNotFound);
-testCrudOperationOnNonExistentNamespace('u', {x: 0}, {_id: 0}, ErrorCodes.NamespaceNotFound);
+testCrudOperationOnNonExistentNamespace(
+    'u', {$v: 2, diff: {x: 0}}, {_id: 0}, ErrorCodes.NamespaceNotFound);
 
 // TODO(SERVER-46221): These oplog entries are inserted as given.  After SERVER-21700 and with
 // steady-state oplog constraint enforcement on, they will result in secondary crashes.  We
@@ -280,8 +281,8 @@ assert.commandFailed(db.adminCommand({applyOps: [{op: 'i', ns: t.getFullName(), 
 
 var res = assert.commandWorked(db.runCommand({
     applyOps: [
-        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 18}}},
-        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 19}}}
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 18}}}},
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 19}}}}
     ]
 }));
 
@@ -296,8 +297,8 @@ assert.eq(true, res.results[1], "Bad result value for valid update");
 // preCondition fully matches
 res = db.runCommand({
     applyOps: [
-        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 20}}},
-        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 21}}}
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 20}}}},
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 21}}}}
     ],
     preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}]
 });
@@ -306,7 +307,7 @@ res = db.runCommand({
 // with {allowAtomic: false}.
 assert.commandFailedWithCode(
     db.runCommand({
-        applyOps: [{op: 'u', ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 22}}}],
+        applyOps: [{op: 'u', ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 22}}}}],
         preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 21}}],
         allowAtomic: false,
     }),
@@ -333,8 +334,8 @@ assert.eq(true, res.results[1], "Bad result value for valid update");
 // preCondition doesn't match ns
 res = db.runCommand({
     applyOps: [
-        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 22}}},
-        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 23}}}
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 22}}}},
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 23}}}}
     ],
     preCondition: [{ns: "foo.otherName", q: {_id: 5}, res: {x: 21}}]
 });
@@ -344,8 +345,8 @@ assert.eq(o, t.findOne(), "preCondition didn't match, but ops were still applied
 // preCondition doesn't match query
 res = db.runCommand({
     applyOps: [
-        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 22}}},
-        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 23}}}
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 22}}}},
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 23}}}}
     ],
     preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}]
 });
@@ -354,8 +355,8 @@ assert.eq(o, t.findOne(), "preCondition didn't match, but ops were still applied
 
 res = db.runCommand({
     applyOps: [
-        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 22}}},
-        {op: "u", ns: t.getFullName(), o2: {_id: 6}, o: {$set: {x: 23}}}
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 22}}}},
+        {op: "u", ns: t.getFullName(), o2: {_id: 6}, o: {$v: 2, diff: {u: {x: 23}}}}
     ]
 });
 
@@ -381,7 +382,7 @@ res = db.runCommand({
             op: "u",
             ns: t.getFullName(),
             o2: {_id: 8},
-            o: {$set: {x: 25}},
+            o: {$v: 2, diff: {u: {x: 25}}},
             lsid: lsid,
             txnNumber: NumberLong(1),
             stmtId: NumberInt(1)
@@ -416,7 +417,7 @@ res = db.runCommand({
             op: "u",
             ns: t.getFullName(),
             o2: {_id: 8},
-            o: {$set: {x: 25}},
+            o: {$v: 2, diff: {u: {x: 25}}},
             lsid: lsid,
             txnNumber: NumberLong(3),
             stmtId: [NumberInt(2), NumberInt(3)]
@@ -436,15 +437,14 @@ assert.eq(true, res.results[0], "Valid insert with multiple statement IDs failed
 assert.eq(true, res.results[1], "Valid update with multiple statement IDs failed");
 assert.eq(true, res.results[2], "Valid delete with multiple statement IDs failed");
 
-// When applying a "u" (update) op, we default to 'UpdateNode' update semantics, and $set
-// operations add new fields in lexicographic order.
+// When applying a "u" (update) op in the $v: 2 format, the
 res = assert.commandWorked(db.adminCommand({
     applyOps: [
         {"op": "i", "ns": t.getFullName(), "o": {_id: 9}},
-        {"op": "u", "ns": t.getFullName(), "o2": {_id: 9}, "o": {$set: {z: 1, a: 2}}}
+        {"op": "u", "ns": t.getFullName(), "o2": {_id: 9}, "o": {$v: 2, diff: {u: {z: 1, a: 2}}}},
     ]
 }));
-assert.eq(t.findOne({_id: 9}), {_id: 9, a: 2, z: 1});  // Note: 'a' and 'z' have been sorted.
+assert.eq(t.findOne({_id: 9}), {_id: 9, z: 1, a: 2});  // Note: 'a' and 'z' have been sorted.
 
 // 'ModifierInterface' semantics are not supported, so an update with {$v: 0} should fail.
 res = assert.commandFailed(db.adminCommand({
@@ -460,9 +460,8 @@ res = assert.commandFailed(db.adminCommand({
 }));
 assert.eq(res.code, 4772600);
 
-// When we explicitly specify {$v: 1}, we should get 'UpdateNode' update semantics, and $set
-// operations get performed in lexicographic order.
-res = assert.commandWorked(db.adminCommand({
+// When we explicitly specify {$v: 1} it should fail because this version is no longer supported.
+assert.commandFailedWithCode(db.adminCommand({
     applyOps: [
         {"op": "i", "ns": t.getFullName(), "o": {_id: 10}},
         {
@@ -472,8 +471,8 @@ res = assert.commandWorked(db.adminCommand({
             "o": {$v: NumberInt(1), $set: {z: 1, a: 2}}
         }
     ]
-}));
-assert.eq(t.findOne({_id: 10}), {_id: 10, a: 2, z: 1});  // Note: 'a' and 'z' have been sorted.
+}),
+                             4772600);
 
 // {$v: 2} entries encode diffs differently, and operations are applied in the order specified
 // rather than in lexicographic order.
@@ -544,13 +543,13 @@ assert.commandWorked(db.adminCommand({
                             op: 'u',
                             ns: t.getFullName(),
                             o2: {_id: 13},
-                            o: {$set: {x: 'nested apply op update1'}}
+                            o: {$v: 2, diff: {u: {x: 'nested apply op update1'}}},
                         },
                         {
                             op: 'u',
                             ns: t.getFullName(),
                             o2: {_id: 14},
-                            o: {$set: {x: 'nested apply op update2'}}
+                            o: {$v: 2, diff: {u: {x: 'nested apply op update2'}}},
                         }
                     ]
                 }

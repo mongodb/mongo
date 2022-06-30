@@ -160,7 +160,7 @@ void upsertNullDocument(FLEQueryInterface* queryImpl,
         updateEntry.setUpsert(false);
         updateEntry.setQ(newNullDoc.getField("_id").wrap());
         updateEntry.setU(mongo::write_ops::UpdateModification(
-            newNullDoc, write_ops::UpdateModification::ClassicTag(), true));
+            newNullDoc, write_ops::UpdateModification::ReplacementTag{}));
         write_ops::UpdateCommandRequest updateRequest(nss, {std::move(updateEntry)});
         auto [reply, originalDoc] =
             queryImpl->updateWithPreimage(nss, EncryptionInformation(BSONObj()), updateRequest);

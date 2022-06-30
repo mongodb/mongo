@@ -209,7 +209,7 @@ function getCollections(db) {
     assertPreImagesWrittenForOps(testDB, function() {
         assert.commandWorked(testDB.runCommand({
             applyOps: [
-                {op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$set: {a: 2}}},
+                {op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$v: 2, diff: {u: {a: 2}}}},
                 {op: "d", ns: coll.getFullName(), o: {_id: 2}}
             ],
             allowAtomic: false,
@@ -226,7 +226,7 @@ function getCollections(db) {
     assertPreImagesWrittenForOps(testDB, function() {
         assert.commandWorked(testDB.runCommand({
             applyOps: [
-                {op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$set: {a: 2}}},
+                {op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$v: 2, diff: {u: {a: 2}}}},
                 {op: "d", ns: coll.getFullName(), o: {_id: 2}}
             ],
         }));

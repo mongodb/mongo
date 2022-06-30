@@ -67,6 +67,7 @@
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/transaction_participant_gen.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/unittest/death_test.h"
@@ -308,8 +309,12 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
        applyOplogEntryOrGroupedInsertsUpdateMissingDocument) {
     const NamespaceString nss("test.t");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
-    auto op = makeOplogEntry(
-        repl::OpTypeEnum::kUpdate, nss, uuid, BSON("$set" << BSON("a" << 1)), BSON("_id" << 0));
+    auto op = makeOplogEntry(repl::OpTypeEnum::kUpdate,
+                             nss,
+                             uuid,
+                             update_oplog_entry::makeDeltaOplogEntry(
+                                 BSON(doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
+                             BSON("_id" << 0));
     int prevUpdateOnMissingDoc = replOpCounters.getUpdateOnMissingDoc()->load();
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, true);
     auto postUpdateOnMissingDoc = replOpCounters.getUpdateOnMissingDoc()->load();
@@ -326,8 +331,12 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
        applyOplogEntryOrGroupedInsertsUpdateMissingDocument) {
     const NamespaceString nss("test.t");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
-    auto op = makeOplogEntry(
-        repl::OpTypeEnum::kUpdate, nss, uuid, BSON("$set" << BSON("a" << 1)), BSON("_id" << 0));
+    auto op = makeOplogEntry(repl::OpTypeEnum::kUpdate,
+                             nss,
+                             uuid,
+                             update_oplog_entry::makeDeltaOplogEntry(
+                                 BSON(doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
+                             BSON("_id" << 0));
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::UpdateOperationFailed, op, false);
 }
 
@@ -446,8 +455,10 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {
             testCase.opType,
             nss,
             options.uuid,
-            testCase.opType == repl::OpTypeEnum::kUpdate ? BSON("$set" << BSON("a" << 1))
-                                                         : documentId,
+            testCase.opType == repl::OpTypeEnum::kUpdate
+                ? update_oplog_entry::makeDeltaOplogEntry(
+                      BSON(doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}")))
+                : documentId,
             {documentId},
             testCase.fromMigrate);
 
@@ -2221,7 +2232,9 @@ TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnUpdate) {
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
     ASSERT_OK(runOpInitialSync(createCollection(kUuid)));
     auto insertOp = insert(fromjson("{_id: 1, loc: 'hi'}"));
-    auto updateOp = update(1, fromjson("{$set: {loc: [1, 2]}}"));
+    auto updateOp = update(1,
+                           update_oplog_entry::makeDeltaOplogEntry(BSON(
+                               doc_diff::kUpdateSectionFieldName << fromjson("{loc: [1, 2]}"))));
     auto indexOp =
         buildIndex(fromjson("{loc: '2dsphere'}"), BSON("2dsphereIndexVersion" << 3), kUuid);
 
@@ -2251,7 +2264,9 @@ TEST_F(IdempotencyTest, Geo2dIndex) {
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
     ASSERT_OK(runOpInitialSync(createCollection(kUuid)));
     auto insertOp = insert(fromjson("{_id: 1, loc: [1]}"));
-    auto updateOp = update(1, fromjson("{$set: {loc: [1, 2]}}"));
+    auto updateOp = update(1,
+                           update_oplog_entry::makeDeltaOplogEntry(BSON(
+                               doc_diff::kUpdateSectionFieldName << fromjson("{loc: [1, 2]}"))));
     auto indexOp = buildIndex(fromjson("{loc: '2d'}"), BSONObj(), kUuid);
 
     auto ops = {insertOp, updateOp, indexOp};
@@ -2267,7 +2282,9 @@ TEST_F(IdempotencyTest, UniqueKeyIndex) {
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
     ASSERT_OK(runOpInitialSync(createCollection(kUuid)));
     auto insertOp = insert(fromjson("{_id: 1, x: 5}"));
-    auto updateOp = update(1, fromjson("{$set: {x: 6}}"));
+    auto updateOp = update(1,
+                           update_oplog_entry::makeDeltaOplogEntry(
+                               BSON(doc_diff::kUpdateSectionFieldName << fromjson("{x: 6}"))));
     auto insertOp2 = insert(fromjson("{_id: 2, x: 5}"));
     auto indexOp = buildIndex(fromjson("{x: 1}"), fromjson("{unique: true}"), kUuid);
 
@@ -2286,9 +2303,16 @@ TEST_F(IdempotencyTest, ParallelArrayError) {
     ASSERT_OK(runOpInitialSync(createCollection(kUuid)));
     ASSERT_OK(runOpInitialSync(insert(fromjson("{_id: 1}"))));
 
-    auto updateOp1 = update(1, fromjson("{$set: {x: [1, 2]}}"));
-    auto updateOp2 = update(1, fromjson("{$set: {x: 1}}"));
-    auto updateOp3 = update(1, fromjson("{$set: {y: [3, 4]}}"));
+    auto updateOp1 = update(1,
+                            update_oplog_entry::makeDeltaOplogEntry(BSON(
+                                doc_diff::kUpdateSectionFieldName << fromjson("{x: [1, 2]}"))));
+    auto updateOp2 = update(1,
+                            update_oplog_entry::makeDeltaOplogEntry(
+                                BSON(doc_diff::kUpdateSectionFieldName << fromjson("{x: 1}"))));
+    auto updateOp3 = update(1,
+                            update_oplog_entry::makeDeltaOplogEntry(BSON(
+                                doc_diff::kUpdateSectionFieldName << fromjson("{y: [3, 4]}"))));
+
     auto indexOp = buildIndex(fromjson("{x: 1, y: 1}"), BSONObj(), kUuid);
 
     auto ops = {updateOp1, updateOp2, updateOp3, indexOp};
@@ -2322,7 +2346,10 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageField) {
 
     ASSERT_OK(runOpInitialSync(createCollection(kUuid)));
     auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', language: 1}"));
-    auto updateOp = update(1, fromjson("{$unset: {language: 1}}"));
+    auto updateOp =
+        update(1,
+               update_oplog_entry::makeDeltaOplogEntry(
+                   BSON(doc_diff::kDeleteSectionFieldName << fromjson("{language: false}"))));
     auto indexOp = buildIndex(fromjson("{x: 'text'}"), BSONObj(), kUuid);
 
     auto ops = {insertOp, updateOp, indexOp};
@@ -2352,7 +2379,9 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageOverrideField) {
 
     ASSERT_OK(runOpInitialSync(createCollection(kUuid)));
     auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', y: 1}"));
-    auto updateOp = update(1, fromjson("{$unset: {y: 1}}"));
+    auto updateOp = update(1,
+                           update_oplog_entry::makeDeltaOplogEntry(
+                               BSON(doc_diff::kDeleteSectionFieldName << fromjson("{y: false}"))));
     auto indexOp = buildIndex(fromjson("{x: 'text'}"), fromjson("{language_override: 'y'}"), kUuid);
 
     auto ops = {insertOp, updateOp, indexOp};
@@ -2382,7 +2411,10 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasUnknownLanguage) {
 
     ASSERT_OK(runOpInitialSync(createCollection(kUuid)));
     auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', language: 'bad'}"));
-    auto updateOp = update(1, fromjson("{$unset: {language: 1}}"));
+    auto updateOp =
+        update(1,
+               update_oplog_entry::makeDeltaOplogEntry(
+                   BSON(doc_diff::kDeleteSectionFieldName << fromjson("{language: false}"))));
     auto indexOp = buildIndex(fromjson("{x: 'text'}"), BSONObj(), kUuid);
 
     auto ops = {insertOp, updateOp, indexOp};
@@ -2441,7 +2473,9 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
         auto createColl = makeCreateCollectionOplogEntry(nextOpTime(), nss, options);
         auto insertOp1 = insert(fromjson("{ _id: 'foo' }"));
         auto insertOp2 = insert(fromjson("{ _id: 'Foo', x: 1 }"));
-        auto updateOp = update("foo", BSON("$set" << BSON("x" << 2)));
+        auto updateOp = update("foo",
+                               update_oplog_entry::makeDeltaOplogEntry(
+                                   BSON(doc_diff::kUpdateSectionFieldName << fromjson("{x: 2}"))));
 
         // We don't drop and re-create the collection since we don't have ways
         // to wait until second-phase drop to completely finish.
@@ -2888,13 +2922,15 @@ TEST_F(OplogApplierImplTxnTableTest, InterleavedWriteWithTxnMixedWithDirectUpdat
                                    date);
 
     repl::OpTime newWriteOpTime(Timestamp(2, 0), 1);
-    auto updateOp = makeOplogEntry(NamespaceString::kSessionTransactionsTableNamespace,
-                                   {Timestamp(4, 0), 1},
-                                   repl::OpTypeEnum::kUpdate,
-                                   BSON("$set" << BSON("lastWriteOpTime" << newWriteOpTime)),
-                                   BSON("_id" << sessionInfo.getSessionId()->toBSON()),
-                                   {},
-                                   Date_t::now());
+    auto updateOp = makeOplogEntry(
+        NamespaceString::kSessionTransactionsTableNamespace,
+        {Timestamp(4, 0), 1},
+        repl::OpTypeEnum::kUpdate,
+        update_oplog_entry::makeDeltaOplogEntry(
+            BSON(doc_diff::kUpdateSectionFieldName << BSON("lastWriteOpTime" << newWriteOpTime))),
+        BSON("_id" << sessionInfo.getSessionId()->toBSON()),
+        {},
+        Date_t::now());
 
     auto writerPool = makeReplWriterPool();
     NoopOplogApplierObserver observer;
@@ -3292,10 +3328,16 @@ TEST_F(IdempotencyTest, UpdateTwoFields) {
 
     ASSERT_OK(runOpInitialSync(createCollection(kUuid)));
     ASSERT_OK(runOpInitialSync(insert(fromjson("{_id: 1, y: [0]}"))));
-
-    auto updateOp1 = update(1, fromjson("{$set: {x: 1}}"));
-    auto updateOp2 = update(1, fromjson("{$set: {x: 2, 'y.0': 2}}"));
-    auto updateOp3 = update(1, fromjson("{$set: {y: 3}}"));
+    auto updateOp1 = update(1,
+                            update_oplog_entry::makeDeltaOplogEntry(
+                                BSON(doc_diff::kUpdateSectionFieldName << fromjson("{x: 1}"))));
+    auto updateOp2 =
+        update(1,
+               update_oplog_entry::makeDeltaOplogEntry(
+                   BSON(doc_diff::kUpdateSectionFieldName << fromjson("{x: 2, 'y.0': 2}"))));
+    auto updateOp3 = update(1,
+                            update_oplog_entry::makeDeltaOplogEntry(
+                                BSON(doc_diff::kUpdateSectionFieldName << fromjson("{y: 3}"))));
 
     auto ops = {updateOp1, updateOp2, updateOp3};
     testOpsAreIdempotent(ops);

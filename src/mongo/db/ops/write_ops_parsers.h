@@ -89,29 +89,39 @@ public:
     struct DiffOptions {
         bool mustCheckExistenceForInsertOperations = true;
     };
-    struct ClassicTag {};
+
+    /**
+     * Tags used to disambiguate between the constructors for different update types.
+     */
+    struct ModifierUpdateTag {};
+    struct ReplacementTag {};
+    struct DeltaTag {};
 
     // Given the 'o' field of an update oplog entry, will return an UpdateModification that can be
     // applied. The `options` parameter will be applied only in the case a Delta update is parsed.
     static UpdateModification parseFromOplogEntry(const BSONObj& oField,
                                                   const DiffOptions& options);
     static UpdateModification parseFromClassicUpdate(const BSONObj& modifiers) {
-        return UpdateModification(modifiers, ClassicTag{});
+        return UpdateModification(modifiers);
     }
     static UpdateModification parseFromV2Delta(const doc_diff::Diff& diff,
                                                DiffOptions const& options) {
-        return UpdateModification(diff, options);
+        return UpdateModification(diff, DeltaTag{}, options);
     }
 
     UpdateModification() = default;
     UpdateModification(BSONElement update);
     UpdateModification(std::vector<BSONObj> pipeline);
-    UpdateModification(doc_diff::Diff, DiffOptions);
+    UpdateModification(doc_diff::Diff, DeltaTag, DiffOptions);
     // Creates an transform-style update. The transform function MUST preserve the _id element.
     UpdateModification(TransformFunc transform);
-    // This constructor exists only to provide a fast-path for constructing classic-style updates.
-    UpdateModification(const BSONObj& update, ClassicTag, bool isReplacement);
-    UpdateModification(const BSONObj& update, ClassicTag);
+    // These constructors exists only to provide a fast-path.
+    UpdateModification(const BSONObj& update, ModifierUpdateTag);
+    UpdateModification(const BSONObj& update, ReplacementTag);
+    // If we don't know whether the update is a replacement or a modifier style update, for example
+    // while we are parsing a user request, we infer this by checking whether the first element is a
+    // $-field to distinguish modifier style updates.
+    UpdateModification(const BSONObj& update);
 
     /**
      * These methods support IDL parsing of the "u" field from the update command and OP_UPDATE.

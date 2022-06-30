@@ -87,6 +87,7 @@
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/transaction_participant_gen.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -987,17 +988,34 @@ TEST_F(StorageTimestampTest, SecondaryUpdateTimes) {
     // clock. `pair.first` is the update to perform and `pair.second` is the full value of the
     // document after the transformation.
     const std::vector<std::pair<BSONObj, BSONObj>> updates = {
-        {BSON("$set" << BSON("val" << 1)), BSON("_id" << 0 << "val" << 1)},
-        {BSON("$unset" << BSON("val" << 1)), BSON("_id" << 0)},
-        {BSON("$addToSet" << BSON("theSet" << 1)), BSON("_id" << 0 << "theSet" << BSON_ARRAY(1))},
-        {BSON("$addToSet" << BSON("theSet" << 2)),
+        {update_oplog_entry::makeDeltaOplogEntry(
+             BSON(doc_diff::kUpdateSectionFieldName << fromjson("{val: 1}"))),
+         BSON("_id" << 0 << "val" << 1)},
+        {update_oplog_entry::makeDeltaOplogEntry(
+             BSON(doc_diff::kDeleteSectionFieldName << fromjson("{val: false}"))),
+         BSON("_id" << 0)},
+        {update_oplog_entry::makeDeltaOplogEntry(
+             BSON(doc_diff::kUpdateSectionFieldName << fromjson("{theSet: [1]}"))),
+         BSON("_id" << 0 << "theSet" << BSON_ARRAY(1))},
+        {update_oplog_entry::makeDeltaOplogEntry(BSON(
+             "stheSet" << BSON(doc_diff::kArrayHeader << true << doc_diff::kResizeSectionFieldName
+                                                      << 2 << "u1" << 2))),
          BSON("_id" << 0 << "theSet" << BSON_ARRAY(1 << 2))},
-        {BSON("$pull" << BSON("theSet" << 1)), BSON("_id" << 0 << "theSet" << BSON_ARRAY(2))},
-        {BSON("$pull" << BSON("theSet" << 2)), BSON("_id" << 0 << "theSet" << BSONArray())},
-        {BSON("$set" << BSON("theMap.val" << 1)),
+        {update_oplog_entry::makeDeltaOplogEntry(BSON(
+             "stheSet" << BSON(doc_diff::kArrayHeader << true << doc_diff::kResizeSectionFieldName
+                                                      << 1 << "u0" << 2))),
+         BSON("_id" << 0 << "theSet" << BSON_ARRAY(2))},
+        {update_oplog_entry::makeDeltaOplogEntry(
+             BSON("stheSet" << BSON(doc_diff::kArrayHeader
+                                    << true << doc_diff::kResizeSectionFieldName << 0))),
+         BSON("_id" << 0 << "theSet" << BSONArray())},
+        {update_oplog_entry::makeDeltaOplogEntry(
+             BSON(doc_diff::kUpdateSectionFieldName << fromjson("{theMap: {val: 1}}"))),
          BSON("_id" << 0 << "theSet" << BSONArray() << "theMap" << BSON("val" << 1))},
-        {BSON("$rename" << BSON("theSet"
-                                << "theOtherSet")),
+        {update_oplog_entry::makeDeltaOplogEntry(BSON(doc_diff::kDeleteSectionFieldName
+                                                      << fromjson("{theSet: false}")
+                                                      << doc_diff::kUpdateSectionFieldName
+                                                      << fromjson("{theOtherSet: []}"))),
          BSON("_id" << 0 << "theMap" << BSON("val" << 1) << "theOtherSet" << BSONArray())}};
 
     const LogicalTime firstUpdateTime = _clock->tickClusterTime(updates.size());
@@ -1544,9 +1562,9 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
     const LogicalTime updateTime1 = _clock->tickClusterTime(1);
     const LogicalTime updateTime2 = _clock->tickClusterTime(1);
 
-    BSONObj doc0 = BSON("_id" << 0 << "a" << 3);
-    BSONObj doc1 = BSON("$v" << 1 << "$set" << BSON("a" << BSON_ARRAY(1 << 2)));
-    BSONObj doc2 = BSON("$v" << 1 << "$set" << BSON("a" << BSON_ARRAY(1 << 2)));
+    BSONObj doc0 = fromjson("{_id: 0, a: 3}");
+    BSONObj doc1 = fromjson("{$v: 2, diff: {u: {a: [1,2]}}}");
+    BSONObj doc2 = fromjson("{$v: 2, diff: {u: {a: [1,2]}}}");
     auto op0 = repl::OplogEntry(
         BSON("ts" << insertTime0.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
                   << "i"

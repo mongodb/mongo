@@ -538,7 +538,7 @@ void FleCrudTest::doSingleUpdate(int id, BSONElement element) {
 void FleCrudTest::doSingleUpdateWithUpdateDoc(int id, BSONObj update) {
     doSingleUpdateWithUpdateDoc(
         id,
-        write_ops::UpdateModification(update, write_ops::UpdateModification::ClassicTag{}, false));
+        write_ops::UpdateModification(update, write_ops::UpdateModification::ModifierUpdateTag{}));
 }
 
 void FleCrudTest::doSingleUpdateWithUpdateDoc(int id,
@@ -944,8 +944,7 @@ TEST_F(FleCrudTest, UpdateOneReplace) {
     auto result = FLEClientCrypto::transformPlaceholders(replaceEP, &_keyVault);
 
     doSingleUpdateWithUpdateDoc(
-        1,
-        write_ops::UpdateModification(result, write_ops::UpdateModification::ClassicTag{}, true));
+        1, write_ops::UpdateModification(result, write_ops::UpdateModification::ReplacementTag{}));
 
 
     assertDocumentCounts(1, 2, 1, 3);
@@ -1024,7 +1023,7 @@ TEST_F(FleCrudTest, FindAndModify_UpdateOne) {
     write_ops::FindAndModifyCommandRequest req(_edcNs);
     req.setQuery(BSON("_id" << 1));
     req.setUpdate(
-        write_ops::UpdateModification(result, write_ops::UpdateModification::ClassicTag{}, false));
+        write_ops::UpdateModification(result, write_ops::UpdateModification::ModifierUpdateTag{}));
     doFindAndModify(req);
 
     assertDocumentCounts(1, 2, 1, 3);
@@ -1075,7 +1074,7 @@ TEST_F(FleCrudTest, FindAndModify_RenameSafeContent) {
     write_ops::FindAndModifyCommandRequest req(_edcNs);
     req.setQuery(BSON("_id" << 1));
     req.setUpdate(
-        write_ops::UpdateModification(result, write_ops::UpdateModification::ClassicTag{}, false));
+        write_ops::UpdateModification(result, write_ops::UpdateModification::ModifierUpdateTag{}));
 
     ASSERT_THROWS_CODE(doFindAndModify(req), DBException, 6371506);
 }
@@ -1101,7 +1100,7 @@ TEST_F(FleCrudTest, FindAndModify_SetSafeContent) {
     write_ops::FindAndModifyCommandRequest req(_edcNs);
     req.setQuery(BSON("_id" << 1));
     req.setUpdate(
-        write_ops::UpdateModification(result, write_ops::UpdateModification::ClassicTag{}, false));
+        write_ops::UpdateModification(result, write_ops::UpdateModification::ModifierUpdateTag{}));
 
     ASSERT_THROWS_CODE(doFindAndModify(req), DBException, 6666200);
 }

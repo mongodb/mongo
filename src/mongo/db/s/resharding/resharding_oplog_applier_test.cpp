@@ -48,6 +48,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -398,7 +399,8 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
                                 boost::none));
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
                                 repl::OpTypeEnum::kUpdate,
-                                BSON("$set" << BSON("x" << 1)),
+                                update_oplog_entry::makeDeltaOplogEntry(
+                                    BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 1))),
                                 BSON("_id" << 2)));
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
                                 repl::OpTypeEnum::kDelete,
@@ -536,7 +538,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringFirstBatchApply) {
     auto cancelToken = operationContext()->getCancellationToken();
     CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
-    ASSERT_EQ(future.getNoThrow(), ErrorCodes::FailedToParse);
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::duplicateCodeForTest(4772600));
 
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs(), BSON("_id" << 1));
@@ -579,7 +581,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringSecondBatchApply) {
     auto cancelToken = operationContext()->getCancellationToken();
     CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
-    ASSERT_EQ(future.getNoThrow(), ErrorCodes::FailedToParse);
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::duplicateCodeForTest(4772600));
 
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs(), BSON("_id" << 1));
@@ -834,7 +836,11 @@ TEST_F(ReshardingOplogApplierTest, MetricsAreReported) {
         std::deque<repl::OplogEntry>{
             easyOp(5, OpT::kDelete, BSON("_id" << 1)),
             easyOp(6, OpT::kInsert, BSON("_id" << 2)),
-            easyOp(7, OpT::kUpdate, BSON("$set" << BSON("x" << 1)), BSON("_id" << 2)),
+            easyOp(7,
+                   OpT::kUpdate,
+                   update_oplog_entry::makeDeltaOplogEntry(
+                       BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 1))),
+                   BSON("_id" << 2)),
             easyOp(8, OpT::kDelete, BSON("_id" << 1)),
             easyOp(9, OpT::kInsert, BSON("_id" << 3))},
         2);

@@ -46,13 +46,13 @@ assert.commandWorked(primaryDB.runCommand({
 
 // Test non-atomic applyOps upserts. These will be logged as insert oplog entries.
 assert.commandWorked(primaryDB.runCommand({
-    applyOps: [{op: "u", ns: nss(dbName, collName), o2: {_id: 2}, o: {$set: {x: 2}}}],
+    applyOps: [{op: "u", ns: nss(dbName, collName), o2: {_id: 2}, o: {$v: 2, diff: {u: {x: 2}}}}],
     allowAtomic: false
 }));
 
 assert.commandWorked(primaryDB.runCommand({
     applyOps: [
-        {op: "u", ns: nss(dbName, collName), o2: {_id: 3}, o: {$set: {x: 3}}},
+        {op: "u", ns: nss(dbName, collName), o2: {_id: 3}, o: {$v: 2, diff: {u: {x: 3}}}},
         {op: "c", ns: nss(dbName, "$cmd"), o: {create: "other2"}}
     ]
 }));

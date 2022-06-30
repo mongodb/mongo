@@ -842,7 +842,7 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
         auto pushUpdate = EDCServerCollection::finalizeForUpdate(updateModifier, serverPayload);
 
         newUpdateOpEntry.setU(mongo::write_ops::UpdateModification(
-            pushUpdate, write_ops::UpdateModification::ClassicTag(), false));
+            pushUpdate, write_ops::UpdateModification::ModifierUpdateTag{}));
     } else {
         auto replacementDocument = updateModification.getUpdateReplacement();
         EDCServerCollection::validateEncryptedFieldInfo(
@@ -857,7 +857,7 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
             EDCServerCollection::finalizeForInsert(replacementDocument, serverPayload);
 
         newUpdateOpEntry.setU(mongo::write_ops::UpdateModification(
-            safeContentReplace, write_ops::UpdateModification::ClassicTag(), true));
+            safeContentReplace, write_ops::UpdateModification::ReplacementTag{}));
     }
 
     // Step 3 ----
@@ -908,7 +908,7 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
     pullUpdateOpEntry.setMulti(false);
     pullUpdateOpEntry.setQ(BSON("_id"_sd << idElement));
     pullUpdateOpEntry.setU(mongo::write_ops::UpdateModification(
-        pullUpdate, write_ops::UpdateModification::ClassicTag(), false));
+        pullUpdate, write_ops::UpdateModification::ModifierUpdateTag{}));
     newUpdateRequest.setUpdates({pullUpdateOpEntry});
     newUpdateRequest.getWriteCommandRequestBase().setStmtId(boost::none);
     newUpdateRequest.setLegacyRuntimeConstants(boost::none);
@@ -1089,7 +1089,7 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
 
             // Step 2 ----
             newUpdateModification = write_ops::UpdateModification(
-                pushUpdate, write_ops::UpdateModification::ClassicTag(), false);
+                pushUpdate, write_ops::UpdateModification::ModifierUpdateTag{});
         } else {
             auto replacementDocument = updateModification.getUpdateReplacement();
             EDCServerCollection::validateEncryptedFieldInfo(
@@ -1104,7 +1104,7 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
                 EDCServerCollection::finalizeForInsert(replacementDocument, serverPayload);
 
             newUpdateModification = write_ops::UpdateModification(
-                safeContentReplace, write_ops::UpdateModification::ClassicTag(), true);
+                safeContentReplace, write_ops::UpdateModification::ReplacementTag{});
         }
 
         // Step 3 ----
@@ -1165,7 +1165,7 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
         pullUpdateOpEntry.setMulti(false);
         pullUpdateOpEntry.setQ(BSON("_id"_sd << idElement));
         pullUpdateOpEntry.setU(mongo::write_ops::UpdateModification(
-            pullUpdate, write_ops::UpdateModification::ClassicTag(), false));
+            pullUpdate, write_ops::UpdateModification::ModifierUpdateTag{}));
         newUpdateRequest.setUpdates({pullUpdateOpEntry});
         newUpdateRequest.setLegacyRuntimeConstants(boost::none);
         newUpdateRequest.getWriteCommandRequestBase().setStmtId(boost::none);

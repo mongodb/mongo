@@ -43,7 +43,7 @@
 namespace mongo {
 namespace {
 
-using CompareNodeTest = UpdateNodeTest;
+using CompareNodeTest = UpdateTestFixture;
 using mongo::mutablebson::countChildren;
 using mongo::mutablebson::Element;
 
@@ -197,7 +197,7 @@ TEST_F(CompareNodeTest, ApplyMissingFieldMinNumber) {
     ASSERT_EQUALS(fromjson("{a: 0}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: 0}}"), fromjson("{$v:2, diff: {i: {a: 0}}}"));
+    assertOplogEntry(fromjson("{$v:2, diff: {i: {a: 0}}}"));
 }
 
 TEST_F(CompareNodeTest, ApplyExistingNumberMinNumber) {
@@ -215,7 +215,7 @@ TEST_F(CompareNodeTest, ApplyExistingNumberMinNumber) {
     ASSERT_EQUALS(fromjson("{a: 0}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: 0}}"), fromjson("{$v:2, diff: {u: {a: 0}}}"));
+    assertOplogEntry(fromjson("{$v:2, diff: {u: {a: 0}}}"));
 }
 
 TEST_F(CompareNodeTest, ApplyMissingFieldMaxNumber) {
@@ -233,7 +233,7 @@ TEST_F(CompareNodeTest, ApplyMissingFieldMaxNumber) {
     ASSERT_EQUALS(fromjson("{a: 0}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: 0}}"), fromjson("{$v:2, diff: {i: {a: 0}}}"));
+    assertOplogEntry(fromjson("{$v:2, diff: {i: {a: 0}}}"));
 }
 
 TEST_F(CompareNodeTest, ApplyExistingNumberMaxNumber) {
@@ -251,7 +251,7 @@ TEST_F(CompareNodeTest, ApplyExistingNumberMaxNumber) {
     ASSERT_EQUALS(fromjson("{a: 2}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: 2}}"), fromjson("{$v:2, diff: {u: {a: 2}}}"));
+    assertOplogEntry(fromjson("{$v:2, diff: {u: {a: 2}}}"));
 }
 
 TEST_F(CompareNodeTest, ApplyExistingDateMaxDate) {
@@ -269,8 +269,7 @@ TEST_F(CompareNodeTest, ApplyExistingDateMaxDate) {
     ASSERT_EQUALS(fromjson("{a: {$date: 123123123}}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: {$date: 123123123}}}"),
-                     fromjson("{$v:2, diff: {u: {a: {$date: 123123123}}}}"));
+    assertOplogEntry(fromjson("{$v:2, diff: {u: {a: {$date: 123123123}}}}"));
 }
 
 TEST_F(CompareNodeTest, ApplyExistingEmbeddedDocMaxDoc) {
@@ -288,7 +287,7 @@ TEST_F(CompareNodeTest, ApplyExistingEmbeddedDocMaxDoc) {
     ASSERT_EQUALS(fromjson("{a: {b: 3}}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: {b: 3}}}"), fromjson("{$v:2, diff: {u: {a: {b: 3}}}}"));
+    assertOplogEntry(fromjson("{$v:2, diff: {u: {a: {b: 3}}}}"));
 }
 
 TEST_F(CompareNodeTest, ApplyExistingEmbeddedDocMaxNumber) {
@@ -327,7 +326,7 @@ TEST_F(CompareNodeTest, ApplyMinRespectsCollation) {
     ASSERT_EQUALS(fromjson("{a: 'dba'}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: 'dba'}}"), fromjson("{$v:2, diff: {u: {a: 'dba'}}}"));
+    assertOplogEntry(fromjson("{$v:2, diff: {u: {a: 'dba'}}}"));
 }
 
 TEST_F(CompareNodeTest, ApplyMinRespectsCollationFromSetCollator) {
@@ -349,7 +348,7 @@ TEST_F(CompareNodeTest, ApplyMinRespectsCollationFromSetCollator) {
     ASSERT_EQUALS(fromjson("{a: 'dba'}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: 'dba'}}"), fromjson("{$v:2, diff: {u: {a: 'dba'}}}"));
+    assertOplogEntry(fromjson("{$v:2, diff: {u: {a: 'dba'}}}"));
 }
 
 TEST_F(CompareNodeTest, ApplyMaxRespectsCollationFromSetCollator) {
@@ -371,7 +370,7 @@ TEST_F(CompareNodeTest, ApplyMaxRespectsCollationFromSetCollator) {
     ASSERT_EQUALS(fromjson("{a: 'abd'}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: 'abd'}}"), fromjson("{$v:2, diff: {u: {a: 'abd'}}}"));
+    assertOplogEntry(fromjson("{$v:2, diff: {u: {a: 'abd'}}}"));
 }
 
 DEATH_TEST_REGEX(CompareNodeTest,
@@ -415,7 +414,7 @@ TEST_F(CompareNodeTest, ApplyIndexesNotAffected) {
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: 1}}"), fromjson("{$v:2, diff: {u: {a: 1}}}"));
+    assertOplogEntry(fromjson("{$v:2, diff: {u: {a: 1}}}"));
 }
 
 TEST_F(CompareNodeTest, ApplyNoIndexDataOrLogBuilder) {

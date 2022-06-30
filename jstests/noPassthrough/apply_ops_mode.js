@@ -17,7 +17,7 @@ var coll = db.getCollection("apply_ops_mode1");
 var id = ObjectId();
 for (let updateOp of [
          // An update with a modifier.
-         {op: 'u', ns: coll.getFullName(), o: {$set: {x: 1}}, o2: {_id: id}},
+         {op: 'u', ns: coll.getFullName(), o: {$v: 2, diff: {u: {x: 1}}}, o2: {_id: id}},
          // A full-document replace.
          {op: 'u', ns: coll.getFullName(), o: {_id: id, x: 1}, o2: {_id: id}},
 ]) {

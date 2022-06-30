@@ -112,9 +112,12 @@ function validateInsertApplyOpsInOplog(conn, ns, uuid, id) {
     assert.eq(0, coll.find({"_id": idUnexisting}).itcount());
     assert.eq(0, coll.find({"_id": idUpserted}).itcount());
     const op = {
-        applyOps: [
-            {op: 'u', ns: coll.getFullName(), o2: {_id: idUnexisting}, o: {$set: {_id: idUpserted}}}
-        ]
+        applyOps: [{
+            op: 'u',
+            ns: coll.getFullName(),
+            o2: {_id: idUnexisting},
+            o: {$v: 2, diff: {u: {_id: idUpserted}}}
+        }]
     };
     assert.commandWorked(db.runCommand(op));
     assert.eq(0, coll.find({"_id": idUnexisting}).itcount());
@@ -137,7 +140,7 @@ function validateInsertApplyOpsInOplog(conn, ns, uuid, id) {
             op: 'u',
             ns: coll.getFullName(),
             o2: {_id: 1},
-            o: {$set: {a: "b"}},
+            o: {$v: 2, diff: {u: {a: "b"}}},
         }]
     }));
     assert.eq(1, coll.find().itcount());

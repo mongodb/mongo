@@ -29,7 +29,7 @@ function constructOplogEntry(oplog) {
     const toInsertTS = Timestamp(highestTS.getTime(), highestTS.getInc() + 1);
     return Object.extend(
         testCollOplogEntry,
-        {op: "u", ns: "test.coll", o: {$set: {a: 1}}, o2: {_id: 0}, ts: toInsertTS});
+        {op: "u", ns: "test.coll", o: {$v: 2, diff: {u: {a: 1}}}, o2: {_id: 0}, ts: toInsertTS});
 }
 
 let toInsert = constructOplogEntry(oplog);

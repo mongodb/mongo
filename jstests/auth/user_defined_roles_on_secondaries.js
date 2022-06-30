@@ -208,7 +208,7 @@ assert.commandWorked(rstest.getPrimary().getDB("admin").runCommand({
         {
             op: "u",
             ns: "admin.system.roles",
-            o: {$set: {roles: [{role: "readWrite", db: "db1"}]}},
+            o: {$v: 2, diff: {u: {roles: [{role: "readWrite", db: "db1"}]}}},
             o2: {_id: "db1.t2"}
         }
     ]

@@ -50,7 +50,9 @@ numDocuments++;
 
 function applyOps({documentId, alwaysUpsert, allowAtomic}) {
     let command = {
-        applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: documentId}, o: {$set: {x: 1}}}]
+        applyOps: [
+            {op: "u", ns: coll.getFullName(), o2: {_id: documentId}, o: {$v: 2, diff: {u: {x: 1}}}}
+        ]
     };
 
     if (alwaysUpsert !== null) {

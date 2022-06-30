@@ -27,13 +27,6 @@ if (!isFeatureEnabled) {
     return;
 }
 
-const oplogV2FlagName = "internalQueryEnableLoggingV2OplogEntries";
-const oplogV2Enabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, [oplogV2FlagName]: 1}))[oplogV2FlagName];
-if (!oplogV2Enabled) {
-    return;
-}
-
 // Drop and recreate the collections to be used in this set of tests.
 assertDropAndRecreateCollection(db, "t1");
 assertDropAndRecreateCollection(db, "t2");

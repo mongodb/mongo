@@ -42,8 +42,8 @@ let documents2 = [{
 assert.commandWorked(db.t2.insert(documents2));
 
 //
-// Test $_internalApplyOplogUpdate with v1 oplog and v2 oplog update descriptions. For each
-// update description, we execute $_internalApplyOplogUpdate twice to verify idempotency.
+// Test $_internalApplyOplogUpdate with v2 oplog update descriptions. For each update description,
+// we execute $_internalApplyOplogUpdate twice to verify idempotency.
 //
 
 function testUpdate(expected, coll, filter, oplogUpdate, opts = {}) {
@@ -62,25 +62,12 @@ documents1[1].b = 3;
 testUpdate(documents1, db.t1, {_id: 3}, oplogUpdate);
 
 oplogUpdate = {
-    "$v": NumberInt(1),
-    "$set": {b: 2}
+    "$v": NumberInt(2),
+    diff: {d: {b: false}}
 };
-documents1[2].b = 2;
-documents1[3].b = 2;
-testUpdate(documents1, db.t1, {a: 0}, oplogUpdate, {multi: true});
 
-oplogUpdate = {
-    "$unset": {b: true}
-};
 delete documents1[1].b;
 testUpdate(documents1, db.t1, {_id: 3}, oplogUpdate);
-
-oplogUpdate = {
-    "$v": NumberInt(1),
-    "$set": {"b.d": 2}
-};
-documents1[4].b.d = 2;
-testUpdate(documents1, db.t1, {_id: 8}, oplogUpdate);
 
 // Test an update with upsert=true where no documents match the filter prior to the update.
 oplogUpdate = {

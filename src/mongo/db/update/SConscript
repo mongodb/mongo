@@ -26,7 +26,6 @@ env.Library(
         'field_checker.cpp',
         'path_support.cpp',
         'storage_validation.cpp',
-        'v1_log_builder.cpp',
         'v2_log_builder.cpp',
         'update_oplog_entry_serialization.cpp',
     ],
@@ -158,7 +157,6 @@ env.CppUnitTest(
         'update_driver_test.cpp',
         'update_object_node_test.cpp',
         'update_serialization_test.cpp',
-        'v1_log_builder_test.cpp',
         'v2_log_builder_test.cpp',
     ],
     LIBDEPS=[

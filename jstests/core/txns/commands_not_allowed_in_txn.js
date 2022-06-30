@@ -133,8 +133,16 @@ const commands = [
 
 // There is no applyOps command on mongos.
 if (!isMongos) {
-    commands.push(
-        {applyOps: [{op: "u", ns: testColl.getFullName(), o2: {_id: 0}, o: {$set: {a: 5}}}]});
+    commands.push({
+        applyOps: [{
+            op: "u",
+            ns: testColl.getFullName(),
+            o2: {_id: 0},
+            o:
+
+                {$v: 2, diff: {u: {a: 5}}}
+        }]
+    });
 }
 
 commands.forEach(testCommand);

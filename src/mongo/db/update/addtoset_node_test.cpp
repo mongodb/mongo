@@ -43,7 +43,7 @@
 namespace mongo {
 namespace {
 
-using AddToSetNodeTest = UpdateNodeTest;
+using AddToSetNodeTest = UpdateTestFixture;
 using mongo::mutablebson::countChildren;
 using mongo::mutablebson::Element;
 
@@ -136,7 +136,7 @@ TEST_F(AddToSetNodeTest, ApplyNonEach) {
     ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: [0, 1]}}"), fromjson("{$v: 2, diff: {u: {a: [0, 1]}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [0, 1]}}}"));
 
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
@@ -156,8 +156,7 @@ TEST_F(AddToSetNodeTest, ApplyNonEachArray) {
     ASSERT_EQUALS(fromjson("{a: [0, [1]]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: [0, [1]]}}"),
-                     fromjson("{$v: 2, diff: {u: {a: [0, [1]]}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [0, [1]]}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
@@ -176,8 +175,7 @@ TEST_F(AddToSetNodeTest, ApplyEach) {
     ASSERT_EQUALS(fromjson("{a: [0, 1, 2]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: [0, 1, 2]}}"),
-                     fromjson("{$v: 2, diff: {u: {a: [0, 1, 2]}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [0, 1, 2]}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
@@ -196,7 +194,7 @@ TEST_F(AddToSetNodeTest, ApplyToEmptyArray) {
     ASSERT_EQUALS(fromjson("{a: [1, 2]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: [1, 2]}}"), fromjson("{$v: 2, diff: {u: {a: [1, 2]}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [1, 2]}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
@@ -215,7 +213,7 @@ TEST_F(AddToSetNodeTest, ApplyDeduplicateElementsToAdd) {
     ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: [0, 1]}}"), fromjson("{$v: 2, diff: {u: {a: [0, 1]}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [0, 1]}}}"));
 
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
@@ -235,7 +233,7 @@ TEST_F(AddToSetNodeTest, ApplyDoNotAddExistingElements) {
     ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: [0, 1]}}"), fromjson("{$v: 2, diff: {u: {a: [0, 1]}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [0, 1]}}}"));
 
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
@@ -255,8 +253,7 @@ TEST_F(AddToSetNodeTest, ApplyDoNotDeduplicateExistingElements) {
     ASSERT_EQUALS(fromjson("{a: [0, 0, 1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: [0, 0, 1]}}"),
-                     fromjson("{$v: 2, diff: {u: {a: [0, 0, 1]}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [0, 0, 1]}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
@@ -313,7 +310,7 @@ TEST_F(AddToSetNodeTest, ApplyCreateArray) {
     ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: [0, 1]}}"), fromjson("{$v: 2, diff: {i: {a: [0, 1]}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {i: {a: [0, 1]}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
@@ -332,7 +329,7 @@ TEST_F(AddToSetNodeTest, ApplyCreateEmptyArrayIsNotNoop) {
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: []}}"), fromjson("{$v: 2, diff: {i: {a: []}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {i: {a: []}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
@@ -354,8 +351,7 @@ TEST_F(AddToSetNodeTest, ApplyDeduplicationOfElementsToAddRespectsCollation) {
     ASSERT_EQUALS(fromjson("{a: ['abc', 'def']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: ['abc', 'def']}}"),
-                     fromjson("{$v: 2, diff: {u: {a: ['abc', 'def']}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: ['abc', 'def']}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
@@ -377,8 +373,7 @@ TEST_F(AddToSetNodeTest, ApplyComparisonToExistingElementsRespectsCollation) {
     ASSERT_EQUALS(fromjson("{a: ['ABC', 'def']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: ['ABC', 'def']}}"),
-                     fromjson("{$v: 2, diff: {u: {a: ['ABC', 'def']}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: ['ABC', 'def']}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
@@ -401,8 +396,7 @@ TEST_F(AddToSetNodeTest, ApplyRespectsCollationFromSetCollator) {
     ASSERT_EQUALS(fromjson("{a: ['abc', 'def']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: ['abc', 'def']}}"),
-                     fromjson("{$v: 2, diff: {u: {a: ['abc', 'def']}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: ['abc', 'def']}}}"));
 
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
@@ -447,8 +441,7 @@ TEST_F(AddToSetNodeTest, ApplyNestedArray) {
     ASSERT_EQUALS(fromjson("{ _id : 1, a : [1, [1]] }"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{ $set : { 'a.1' : [1] } }"),
-                     fromjson("{$v: 2, diff: {sa: {a: true, u1: [1]}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {sa: {a: true, u1: [1]}}}"));
 
     ASSERT_EQUALS(getModifiedPaths(), "{a.1}");
 }
@@ -467,7 +460,7 @@ TEST_F(AddToSetNodeTest, ApplyIndexesNotAffected) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: [0, 1]}}"), fromjson("{$v: 2, diff: {u: {a: [0, 1]}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [0, 1]}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 

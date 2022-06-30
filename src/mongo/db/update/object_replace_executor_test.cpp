@@ -41,7 +41,7 @@
 namespace mongo {
 namespace {
 
-using ObjectReplaceExecutorTest = UpdateNodeTest;
+using ObjectReplaceExecutorTest = UpdateTestFixture;
 using mongo::mutablebson::countChildren;
 using mongo::mutablebson::Element;
 

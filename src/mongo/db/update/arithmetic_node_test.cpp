@@ -42,9 +42,7 @@
 namespace mongo {
 namespace {
 
-using ArithmeticNodeTest = UpdateNodeTest;
-using mongo::mutablebson::countChildren;
-using mongo::mutablebson::Element;
+using ArithmeticNodeTest = UpdateTestFixture;
 
 DEATH_TEST_REGEX(ArithmeticNodeTest,
                  InitFailsForEmptyElement,
@@ -185,7 +183,7 @@ TEST_F(ArithmeticNodeTest, ApplyEmptyPathToCreate) {
     ASSERT_EQUALS(fromjson("{a: 11}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: 11}}"), fromjson("{$v: 2, diff: {u: {a: 11}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: 11}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
@@ -205,8 +203,7 @@ TEST_F(ArithmeticNodeTest, ApplyCreatePath) {
     ASSERT_EQUALS(fromjson("{a: {d: 5, b: {c: 6}}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {'a.b.c': 6}}"),
-                     fromjson("{$v: 2, diff: {sa: {i: {b: {c: 6}}}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {sa: {i: {b: {c: 6}}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.b.c}");
 }
 
@@ -243,7 +240,7 @@ TEST_F(ArithmeticNodeTest, ApplyCreatePathFromRoot) {
     ASSERT_EQUALS(fromjson("{c: 5, a: {b: 6}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {'a.b': 6}}"), fromjson("{$v: 2, diff: {i: {a: {b: 6}}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {i: {a: {b: 6}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.b}");
 }
 
@@ -263,8 +260,7 @@ TEST_F(ArithmeticNodeTest, ApplyPositional) {
     ASSERT_EQUALS(fromjson("{a: [0, 7, 2]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {'a.1': 7}}"),
-                     fromjson("{$v: 2, diff: {sa: {a: true, u1: 7}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {sa: {a: true, u1: 7}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.1}");
 }
 
@@ -389,8 +385,7 @@ TEST_F(ArithmeticNodeTest, TypePromotionFromIntToDecimalIsNotANoOp) {
     ASSERT_EQUALS(fromjson("{a: NumberDecimal(\"5.0\")}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: NumberDecimal('5.0')}}"),
-                     fromjson("{$v: 2, diff: {u: {a: NumberDecimal('5.0')}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: NumberDecimal('5.0')}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
@@ -409,8 +404,7 @@ TEST_F(ArithmeticNodeTest, TypePromotionFromLongToDecimalIsNotANoOp) {
     ASSERT_EQUALS(fromjson("{a: NumberDecimal(\"5.0\")}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: NumberDecimal('5.0')}}"),
-                     fromjson("{$v: 2, diff: {u: {a: NumberDecimal('5.0')}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: NumberDecimal('5.0')}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
@@ -430,7 +424,6 @@ TEST_F(ArithmeticNodeTest, TypePromotionFromDoubleToDecimalIsNotANoOp) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
     assertOplogEntry(
-        fromjson("{$set: {a: NumberDecimal('5.25')}}"),
         fromjson("{$v: 2, diff: {u: {a: NumberDecimal('5.25')}}}"),
         false  // Not checking binary equality because the NumberDecimal in the expected output may
                // not be bitwise identical to the result produced by the update system.
@@ -471,7 +464,6 @@ TEST_F(ArithmeticNodeTest, IncrementedDecimalStaysDecimal) {
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
     assertOplogEntry(
-        fromjson("{$set: {a: NumberDecimal('11.5')}}"),
         fromjson("{$v: 2, diff: {u: {a: NumberDecimal('11.5')}}}"),
         false  // Not checking binary equality because the NumberDecimal in the expected output may
                // not be bitwise identical to the result produced by the update system.
@@ -696,7 +688,7 @@ TEST_F(ArithmeticNodeTest, ApplyEmptyIndexData) {
     ASSERT_EQUALS(fromjson("{a: 3}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: 3}}"), fromjson("{$v: 2, diff: {u: {a: 3}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: 3}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
@@ -1029,8 +1021,7 @@ TEST_F(ArithmeticNodeTest, ApplyLogDottedPath) {
     ASSERT_EQUALS(fromjson("{a: [{b:0}, {b:1}, {b:2}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {'a.2.b': 2}}"),
-                     fromjson("{$v: 2, diff: {sa: {a: true, u2: {b: 2}}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {sa: {a: true, u2: {b: 2}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
@@ -1047,8 +1038,7 @@ TEST_F(ArithmeticNodeTest, LogEmptyArray) {
     ASSERT_EQUALS(fromjson("{a: [null, null, {b:2}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {'a.2.b': 2}}"),
-                     fromjson("{$v: 2, diff: {sa: {a: true, u2: {b: 2}}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {sa: {a: true, u2: {b: 2}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
@@ -1065,8 +1055,7 @@ TEST_F(ArithmeticNodeTest, LogEmptyObject) {
     ASSERT_EQUALS(fromjson("{a: {'2': {b: 2}}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {'a.2.b': 2}}"),
-                     fromjson("{$v: 2, diff: {sa: {i: {'2': {b: 2}}}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {sa: {i: {'2': {b: 2}}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.2.b}");
 }
 
@@ -1087,7 +1076,7 @@ TEST_F(ArithmeticNodeTest, ApplyDeserializedDocNotNoOp) {
     ASSERT_EQUALS(fromjson("{a: 1, b: NumberInt(0)}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {b: NumberInt(0)}}"), fromjson("{$v: 2, diff: {i: {b: 0}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {i: {b: 0}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{b}");
 }
 
@@ -1150,7 +1139,7 @@ TEST_F(ArithmeticNodeTest, ApplyToDeserializedDocNestedNotNoop) {
     ASSERT_EQUALS(fromjson("{a: {b: 3}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {'a.b': 3}}"), fromjson("{$v: 2, diff: {sa: {u: {b: 3}}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {sa: {u: {b: 3}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.b}");
 }
 

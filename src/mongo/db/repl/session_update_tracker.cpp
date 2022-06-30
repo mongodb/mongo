@@ -38,6 +38,7 @@
 #include "mongo/db/session.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/transaction_participant_gen.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
@@ -343,9 +344,10 @@ boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateF
                         // The prepare oplog entry is the first operation of the transaction.
                         newTxnRecord.setStartOpTime(entry.getOpTime());
                     } else {
-                        // Update the transaction record using $set to avoid overwriting the
-                        // startOpTime.
-                        return BSON("$set" << newTxnRecord.toBSON());
+                        // Update the transaction record using a delta oplog entry to avoid
+                        // overwriting the startOpTime.
+                        return update_oplog_entry::makeDeltaOplogEntry(
+                            BSON(doc_diff::kUpdateSectionFieldName << newTxnRecord.toBSON()));
                     }
                 } else {
                     newTxnRecord.setState(DurableTxnStateEnum::kCommitted);

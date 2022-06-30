@@ -51,6 +51,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
@@ -829,7 +830,10 @@ TEST_F(ReplicationRecoveryTest, RecoveryAppliesUpdatesIdempotently) {
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx,
         oplogNs,
-        {_makeUpdateOplogEntry(ts, BSON("_id" << 1), BSON("$set" << BSON("a" << 7)))
+        {_makeUpdateOplogEntry(ts,
+                               BSON("_id" << 1),
+                               update_oplog_entry::makeDeltaOplogEntry(
+                                   BSON(doc_diff::kUpdateSectionFieldName << fromjson("{a: 7}"))))
              .getEntry()
              .toBSON(),
          Timestamp(ts, ts)},
@@ -845,7 +849,10 @@ TEST_F(ReplicationRecoveryTest, RecoveryAppliesUpdatesIdempotently) {
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx,
         oplogNs,
-        {_makeUpdateOplogEntry(ts, BSON("_id" << 2), BSON("$set" << BSON("a" << 7)))
+        {_makeUpdateOplogEntry(ts,
+                               BSON("_id" << 2),
+                               update_oplog_entry::makeDeltaOplogEntry(
+                                   BSON(doc_diff::kUpdateSectionFieldName << fromjson("{a: 7}"))))
              .getEntry()
              .toBSON(),
          Timestamp(ts, ts)},
@@ -861,7 +868,10 @@ TEST_F(ReplicationRecoveryTest, RecoveryAppliesUpdatesIdempotently) {
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx,
         oplogNs,
-        {_makeUpdateOplogEntry(ts, BSON("_id" << 3), BSON("$set" << BSON("a" << 7)))
+        {_makeUpdateOplogEntry(ts,
+                               BSON("_id" << 3),
+                               update_oplog_entry::makeDeltaOplogEntry(
+                                   BSON(doc_diff::kUpdateSectionFieldName << fromjson("{a: 7}"))))
              .getEntry()
              .toBSON(),
          Timestamp(ts, ts)},
@@ -886,7 +896,10 @@ DEATH_TEST_F(ReplicationRecoveryTest, RecoveryFailsWithBadOp, "terminate() calle
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx,
         oplogNs,
-        {_makeUpdateOplogEntry(2, BSON("bad_op" << 1), BSON("$set" << BSON("a" << 7)))
+        {_makeUpdateOplogEntry(2,
+                               BSON("bad_op" << 1),
+                               update_oplog_entry::makeDeltaOplogEntry(
+                                   BSON(doc_diff::kUpdateSectionFieldName << fromjson("{a: 7}"))))
              .getEntry()
              .toBSON(),
          Timestamp(2, 2)},

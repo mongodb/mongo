@@ -16,14 +16,6 @@ const primary = replTest.getPrimary();
 const coll = primary.getDB("o").fake;
 const cdb = coll.getDB();
 
-const v2FlagName = "internalQueryEnableLoggingV2OplogEntries";
-
-const getParamCommandRes =
-    assert.commandWorked(cdb.adminCommand({getParameter: 1, [v2FlagName]: 1}));
-// The flag may be unrecognized (in which case $v:2 is not enabled), or we may be running in a
-// configuration where it is disabled.
-const v2Enabled = getParamCommandRes[v2FlagName];
-
 function getLastOplogEntry() {
     return primary.getDB("local").oplog.rs.find().limit(1).sort({$natural: -1}).next();
 }
@@ -52,11 +44,7 @@ assertLastOplog({_id: 1, a: 2}, {_id: 1}, "save " + msg);
 var res = assert.commandWorked(coll.update({}, {$inc: {a: 1}, $set: {b: 2}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: 3, b: 2}, coll.findOne({}), msg);
-if (v2Enabled) {
-    assertLastOplog({$v: 2, diff: {u: {a: 3}, i: {b: 2}}}, {_id: 1}, msg);
-} else {
-    assertLastOplog({$v: 1, $set: {a: 3, b: 2}}, {_id: 1}, msg);
-}
+assertLastOplog({$v: 2, diff: {u: {a: 3}, i: {b: 2}}}, {_id: 1}, msg);
 
 var msg = "IncRewriteNonExistingField: $inc $set";
 coll.save({_id: 1, c: 0});
@@ -64,11 +52,7 @@ assertLastOplog({_id: 1, c: 0}, {_id: 1}, "save " + msg);
 res = assert.commandWorked(coll.update({}, {$inc: {a: 1}, $set: {b: 2}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, c: 0, a: 1, b: 2}, coll.findOne({}), msg);
-if (v2Enabled) {
-    assertLastOplog({"$v": 2, "diff": {"i": {"a": 1, "b": 2}}}, {_id: 1}, msg);
-} else {
-    assertLastOplog({$v: 1, $set: {a: 1, b: 2}}, {_id: 1}, msg);
-}
+assertLastOplog({"$v": 2, "diff": {"i": {"a": 1, "b": 2}}}, {_id: 1}, msg);
 
 var msg = "TwoNestedPulls: two $pull";
 coll.save({_id: 1, a: {b: [1, 2], c: [1, 2]}});
@@ -76,11 +60,7 @@ assertLastOplog({_id: 1, a: {b: [1, 2], c: [1, 2]}}, {_id: 1}, "save " + msg);
 res = assert.commandWorked(coll.update({}, {$pull: {'a.b': 2, 'a.c': 2}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: {b: [1], c: [1]}}, coll.findOne({}), msg);
-if (v2Enabled) {
-    assertLastOplog({"$v": 2, "diff": {"sa": {"u": {"b": [1], "c": [1]}}}}, {_id: 1}, msg);
-} else {
-    assertLastOplog({$v: 1, $set: {'a.b': [1], 'a.c': [1]}}, {_id: 1}, msg);
-}
+assertLastOplog({"$v": 2, "diff": {"sa": {"u": {"b": [1], "c": [1]}}}}, {_id: 1}, msg);
 
 var msg = "MultiSets: two $set";
 coll.save({_id: 1, a: 1, b: 1});
@@ -88,11 +68,7 @@ assertLastOplog({_id: 1, a: 1, b: 1}, {_id: 1}, "save " + msg);
 res = assert.commandWorked(coll.update({}, {$set: {a: 2, b: 2}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: 2, b: 2}, coll.findOne({}), msg);
-if (v2Enabled) {
-    assertLastOplog({"$v": 2, "diff": {"u": {"a": 2, "b": 2}}}, {_id: 1}, msg);
-} else {
-    assertLastOplog({$v: 1, $set: {a: 2, b: 2}}, {_id: 1}, msg);
-}
+assertLastOplog({"$v": 2, "diff": {"u": {"a": 2, "b": 2}}}, {_id: 1}, msg);
 
 // More tests to validate the oplog format and correct excution
 
@@ -102,31 +78,19 @@ assertLastOplog({_id: 1, a: 1}, {_id: 1}, "save " + msg);
 res = assert.commandWorked(coll.update({}, {$set: {a: 2}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: 2}, coll.findOne({}), msg);
-if (v2Enabled) {
-    assertLastOplog({"$v": 2, "diff": {"u": {"a": 2}}}, {_id: 1}, msg);
-} else {
-    assertLastOplog({$v: 1, $set: {a: 2}}, {_id: 1}, msg);
-}
+assertLastOplog({"$v": 2, "diff": {"u": {"a": 2}}}, {_id: 1}, msg);
 
 var msg = "bad single $inc";
 res = assert.commandWorked(coll.update({}, {$inc: {a: 1}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: 3}, coll.findOne({}), msg);
-if (v2Enabled) {
-    assertLastOplog({"$v": 2, "diff": {"u": {"a": 3}}}, {_id: 1}, msg);
-} else {
-    assertLastOplog({$v: 1, $set: {a: 3}}, {_id: 1}, msg);
-}
+assertLastOplog({"$v": 2, "diff": {"u": {"a": 3}}}, {_id: 1}, msg);
 
 var msg = "bad double $set";
 res = assert.commandWorked(coll.update({}, {$set: {a: 2, b: 2}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: 2, b: 2}, coll.findOne({}), msg);
-if (v2Enabled) {
-    assertLastOplog({"$v": 2, "diff": {"u": {"a": 2}, "i": {"b": 2}}}, {_id: 1}, msg);
-} else {
-    assertLastOplog({$v: 1, $set: {a: 2, b: 2}}, {_id: 1}, msg);
-}
+assertLastOplog({"$v": 2, "diff": {"u": {"a": 2}, "i": {"b": 2}}}, {_id: 1}, msg);
 
 var msg = "bad save";
 assert.commandWorked(coll.save({_id: 1, a: [2]}));
@@ -137,12 +101,7 @@ var msg = "bad array $inc";
 res = assert.commandWorked(coll.update({}, {$inc: {"a.0": 1}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: [3]}, coll.findOne({}), msg);
-let lastTS;
-if (v2Enabled) {
-    lastTS = assertLastOplog({"$v": 2, "diff": {"sa": {"a": true, "u0": 3}}}, {_id: 1}, msg);
-} else {
-    lastTS = assertLastOplog({$v: 1, $set: {"a.0": 3}}, {_id: 1}, msg);
-}
+var lastTS = assertLastOplog({"$v": 2, "diff": {"sa": {"a": true, "u0": 3}}}, {_id: 1}, msg);
 
 var msg = "bad $setOnInsert";
 res = assert.commandWorked(coll.update({}, {$setOnInsert: {a: -1}}));
@@ -169,11 +128,7 @@ coll.save({_id: 1, a: "foo"});
 res = assert.commandWorked(coll.update({}, {$push: {c: 18}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: "foo", c: [18]}, coll.findOne({}), msg);
-if (v2Enabled) {
-    assertLastOplog({"$v": 2, "diff": {"i": {"c": [18]}}}, {_id: 1}, msg);
-} else {
-    assertLastOplog({$v: 1, $set: {"c": [18]}}, {_id: 1}, msg);
-}
+assertLastOplog({"$v": 2, "diff": {"i": {"c": [18]}}}, {_id: 1}, msg);
 
 var msg = "bad array $push $slice";
 coll.save({_id: 1, a: {b: [18]}});
@@ -181,11 +136,7 @@ res = assert.commandWorked(
     coll.update({_id: {$gt: 0}}, {$push: {"a.b": {$each: [1, 2], $slice: -2}}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: {b: [1, 2]}}, coll.findOne({}), msg);
-if (v2Enabled) {
-    assertLastOplog({"$v": 2, "diff": {"sa": {"u": {"b": [1, 2]}}}}, {_id: 1}, msg);
-} else {
-    assertLastOplog({$v: 1, $set: {"a.b": [1, 2]}}, {_id: 1}, msg);
-}
+assertLastOplog({"$v": 2, "diff": {"sa": {"u": {"b": [1, 2]}}}}, {_id: 1}, msg);
 
 var msg = "bad array $push $sort ($slice -100)";
 coll.save({_id: 1, a: {b: [{c: 2}, {c: 1}]}});
@@ -193,12 +144,8 @@ res = assert.commandWorked(
     coll.update({}, {$push: {"a.b": {$each: [{c: -1}], $sort: {c: 1}, $slice: -100}}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: {b: [{c: -1}, {c: 1}, {c: 2}]}}, coll.findOne({}), msg);
-if (v2Enabled) {
-    assertLastOplog(
-        {"$v": 2, "diff": {"sa": {"u": {"b": [{"c": -1}, {"c": 1}, {"c": 2}]}}}}, {_id: 1}, msg);
-} else {
-    assertLastOplog({$v: 1, $set: {"a.b": [{c: -1}, {c: 1}, {c: 2}]}}, {_id: 1}, msg);
-}
+assertLastOplog(
+    {"$v": 2, "diff": {"sa": {"u": {"b": [{"c": -1}, {"c": 1}, {"c": 2}]}}}}, {_id: 1}, msg);
 
 var msg = "bad array $push $slice $sort";
 coll.save({_id: 1, a: [{b: 2}, {b: 1}]});
@@ -206,11 +153,7 @@ res = assert.commandWorked(
     coll.update({_id: {$gt: 0}}, {$push: {a: {$each: [{b: -1}], $slice: -2, $sort: {b: 1}}}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: [{b: 1}, {b: 2}]}, coll.findOne({}), msg);
-if (v2Enabled) {
-    assertLastOplog({"$v": 2, "diff": {"u": {"a": [{"b": 1}, {"b": 2}]}}}, {_id: 1}, msg);
-} else {
-    assertLastOplog({$v: 1, $set: {a: [{b: 1}, {b: 2}]}}, {_id: 1}, msg);
-}
+assertLastOplog({"$v": 2, "diff": {"u": {"a": [{"b": 1}, {"b": 2}]}}}, {_id: 1}, msg);
 
 var msg = "bad array $push $slice $sort first two";
 coll.save({_id: 1, a: {b: [{c: 2}, {c: 1}]}});
@@ -218,11 +161,7 @@ res = assert.commandWorked(
     coll.update({_id: {$gt: 0}}, {$push: {"a.b": {$each: [{c: -1}], $slice: -2, $sort: {c: 1}}}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: {b: [{c: 1}, {c: 2}]}}, coll.findOne({}), msg);
-if (v2Enabled) {
-    assertLastOplog({"$v": 2, "diff": {"sa": {"u": {"b": [{"c": 1}, {"c": 2}]}}}}, {_id: 1}, msg);
-} else {
-    assertLastOplog({$v: 1, $set: {"a.b": [{c: 1}, {c: 2}]}}, {_id: 1}, msg);
-}
+assertLastOplog({"$v": 2, "diff": {"sa": {"u": {"b": [{"c": 1}, {"c": 2}]}}}}, {_id: 1}, msg);
 
 var msg = "bad array $push $slice $sort reversed first two";
 coll.save({_id: 1, a: {b: [{c: 1}, {c: 2}]}});
@@ -230,11 +169,7 @@ res = assert.commandWorked(
     coll.update({_id: {$gt: 0}}, {$push: {"a.b": {$each: [{c: -1}], $slice: -2, $sort: {c: -1}}}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: {b: [{c: 1}, {c: -1}]}}, coll.findOne({}), msg);
-if (v2Enabled) {
-    assertLastOplog({"$v": 2, "diff": {"sa": {"u": {"b": [{"c": 1}, {"c": -1}]}}}}, {_id: 1}, msg);
-} else {
-    assertLastOplog({$v: 1, $set: {"a.b": [{c: 1}, {c: -1}]}}, {_id: 1}, msg);
-}
+assertLastOplog({"$v": 2, "diff": {"sa": {"u": {"b": [{"c": 1}, {"c": -1}]}}}}, {_id: 1}, msg);
 
 replTest.stopSet();
 })();

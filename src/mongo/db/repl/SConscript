@@ -653,7 +653,6 @@ env.Library(
     source=[
         'idempotency_document_structure.cpp',
         'idempotency_scalar_generator.cpp',
-        'idempotency_update_sequence.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -1647,7 +1646,6 @@ if wiredtiger:
             'delayable_timeout_callback_test.cpp',
             'drop_pending_collection_reaper_test.cpp',
             'idempotency_document_structure_test.cpp',
-            'idempotency_update_sequence_test.cpp',
             'initial_syncer_test.cpp',
             'isself_test.cpp',
             'member_config_test.cpp',

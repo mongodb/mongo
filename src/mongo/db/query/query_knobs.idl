@@ -535,13 +535,6 @@ server_parameters:
       gt: 0
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
-  internalQueryEnableLoggingV2OplogEntries:
-    description: "If true, this node may log $v:2 delta-style oplog entries."
-    set_at: [ startup, runtime ]
-    cpp_varname: "internalQueryEnableLoggingV2OplogEntries"
-    cpp_vartype: AtomicWord<bool>
-    default: true
-
   internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals:
     description: "Limits the number of statically known intervals that SBE can decompose index
     bounds into when possible."

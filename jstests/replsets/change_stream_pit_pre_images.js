@@ -116,7 +116,7 @@ for (const [collectionName, collectionOptions] of [
         assert.commandWorked(coll.insert([{_id: 9, a: 1}, {_id: 10, a: 1}]));
         assert.commandWorked(testDB.runCommand({
             applyOps: [
-                {op: "u", ns: coll.getFullName(), o2: {_id: 9}, o: {$set: {a: 2}}},
+                {op: "u", ns: coll.getFullName(), o2: {_id: 9}, o: {$v: 2, diff: {u: {a: 2}}}},
                 {op: "d", ns: coll.getFullName(), o: {_id: 10}}
             ],
             allowAtomic: false,

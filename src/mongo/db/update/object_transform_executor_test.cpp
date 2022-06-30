@@ -40,7 +40,7 @@
 
 namespace mongo {
 namespace {
-using ObjectTransformExecutorTest = UpdateNodeTest;
+using ObjectTransformExecutorTest = UpdateTestFixture;
 using mongo::mutablebson::countChildren;
 using mongo::mutablebson::Element;
 

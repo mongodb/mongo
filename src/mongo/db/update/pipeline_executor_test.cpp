@@ -43,50 +43,7 @@
 namespace mongo {
 namespace {
 
-/**
- * Harness for running the tests with both $v:2 oplog entries enabled and disabled.
- */
-class PipelineExecutorTest : public UpdateNodeTest {
-public:
-    void resetApplyParams() override {
-        UpdateNodeTest::resetApplyParams();
-    }
-
-    UpdateExecutor::ApplyParams getApplyParams(mutablebson::Element element) override {
-        auto applyParams = UpdateNodeTest::getApplyParams(element);
-
-        // Use the same parameters as the parent test fixture, but make sure a v2 log builder
-        // is provided and a normal log builder is not.
-        applyParams.logMode = _allowDeltaOplogEntries
-            ? ApplyParams::LogMode::kGenerateOplogEntry
-            : ApplyParams::LogMode::kGenerateOnlyV1OplogEntry;
-        return applyParams;
-    }
-
-    void run() {
-        _allowDeltaOplogEntries = false;
-        UpdateNodeTest::run();
-        _allowDeltaOplogEntries = true;
-        UpdateNodeTest::run();
-    }
-
-    bool deltaOplogEntryAllowed() const {
-        return _allowDeltaOplogEntries;
-    }
-
-protected:
-    bool _allowDeltaOplogEntries = false;
-};
-
-class PipelineExecutorV2ModeTest : public PipelineExecutorTest {
-public:
-    void run() {
-        _allowDeltaOplogEntries = true;
-        UpdateNodeTest::run();
-    }
-};
-
-TEST_F(PipelineExecutorTest, Noop) {
+TEST_F(UpdateTestFixture, Noop) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {a: 1, b: 2}}")};
@@ -101,7 +58,7 @@ TEST_F(PipelineExecutorTest, Noop) {
     ASSERT_TRUE(result.oplogEntry.isEmpty());
 }
 
-TEST_F(PipelineExecutorTest, ShouldNotCreateIdIfNoIdExistsAndNoneIsSpecified) {
+TEST_F(UpdateTestFixture, ShouldNotCreateIdIfNoIdExistsAndNoneIsSpecified) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {a: 1, b: 2}}")};
@@ -112,17 +69,11 @@ TEST_F(PipelineExecutorTest, ShouldNotCreateIdIfNoIdExistsAndNoneIsSpecified) {
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(fromjson("{c: 1, d: 'largeStringValue', a: 1, b: 2}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    if (deltaOplogEntryAllowed()) {
-        ASSERT_FALSE(result.indexesAffected);
-        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{$v: 2, diff: {i: {a: 1, b: 2}}}"), result.oplogEntry);
-    } else {
-        ASSERT_TRUE(result.indexesAffected);
-        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{c: 1, d: 'largeStringValue', a: 1, b: 2}"),
-                                 result.oplogEntry);
-    }
+    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_BSONOBJ_BINARY_EQ(fromjson("{$v: 2, diff: {i: {a: 1, b: 2}}}"), result.oplogEntry);
 }
 
-TEST_F(PipelineExecutorTest, ShouldPreserveIdOfExistingDocumentIfIdNotReplaced) {
+TEST_F(UpdateTestFixture, ShouldPreserveIdOfExistingDocumentIfIdNotReplaced) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {a: 1, b: 2}}"),
@@ -138,7 +89,7 @@ TEST_F(PipelineExecutorTest, ShouldPreserveIdOfExistingDocumentIfIdNotReplaced) 
     ASSERT_BSONOBJ_BINARY_EQ(fromjson("{_id: 0, a: 1, b: 2}"), result.oplogEntry);
 }
 
-TEST_F(PipelineExecutorTest, ShouldSucceedWhenImmutableIdIsNotModified) {
+TEST_F(UpdateTestFixture, ShouldSucceedWhenImmutableIdIsNotModified) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {_id: 0, a: 1, b: 2}}")};
@@ -151,17 +102,11 @@ TEST_F(PipelineExecutorTest, ShouldSucceedWhenImmutableIdIsNotModified) {
 
     ASSERT_EQUALS(fromjson("{_id: 0, c: 1, d: 'largeStringValue', a: 1, b: 2}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    if (deltaOplogEntryAllowed()) {
-        ASSERT_FALSE(result.indexesAffected);
-        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{$v: 2, diff: {i: {a: 1, b: 2 }}}"), result.oplogEntry);
-    } else {
-        ASSERT_TRUE(result.indexesAffected);
-        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{_id: 0, c: 1, d: 'largeStringValue', a: 1, b: 2}"),
-                                 result.oplogEntry);
-    }
+    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_BSONOBJ_BINARY_EQ(fromjson("{$v: 2, diff: {i: {a: 1, b: 2 }}}"), result.oplogEntry);
 }
 
-TEST_F(PipelineExecutorTest, ComplexDoc) {
+TEST_F(UpdateTestFixture, ComplexDoc) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {a: 1, b: [0, 1, 2], c: {d: 1}}}")};
@@ -173,18 +118,12 @@ TEST_F(PipelineExecutorTest, ComplexDoc) {
 
     ASSERT_EQUALS(fromjson("{a: 1, b: [0, 1, 2], e: ['val1', 'val2'], c: {d: 1}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    if (deltaOplogEntryAllowed()) {
-        ASSERT_FALSE(result.indexesAffected);
-        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{$v: 2, diff: {i: {c: {d: 1}}, sb: {a: true, u1: 1} }}"),
-                                 result.oplogEntry);
-    } else {
-        ASSERT_TRUE(result.indexesAffected);
-        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{a: 1, b: [0, 1, 2], e: ['val1', 'val2'], c: {d: 1}}"),
-                                 result.oplogEntry);
-    }
+    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_BSONOBJ_BINARY_EQ(fromjson("{$v: 2, diff: {i: {c: {d: 1}}, sb: {a: true, u1: 1} }}"),
+                             result.oplogEntry);
 }
 
-TEST_F(PipelineExecutorTest, CannotRemoveImmutablePath) {
+TEST_F(UpdateTestFixture, CannotRemoveImmutablePath) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     std::vector<BSONObj> pipeline{fromjson("{$project: {c: 1}}")};
@@ -200,7 +139,7 @@ TEST_F(PipelineExecutorTest, CannotRemoveImmutablePath) {
 }
 
 
-TEST_F(PipelineExecutorTest, IdFieldIsNotRemoved) {
+TEST_F(UpdateTestFixture, IdFieldIsNotRemoved) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     std::vector<BSONObj> pipeline{fromjson("{$project: {a: 1, _id: 0}}")};
@@ -216,7 +155,7 @@ TEST_F(PipelineExecutorTest, IdFieldIsNotRemoved) {
     ASSERT_BSONOBJ_BINARY_EQ(fromjson("{_id: 0}"), result.oplogEntry);
 }
 
-TEST_F(PipelineExecutorTest, CannotReplaceImmutablePathWithArrayField) {
+TEST_F(UpdateTestFixture, CannotReplaceImmutablePathWithArrayField) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {_id: 0, a: [{b: 1}]}}")};
@@ -231,7 +170,7 @@ TEST_F(PipelineExecutorTest, CannotReplaceImmutablePathWithArrayField) {
                                 "'a.b' was found to be an array or array descendant.");
 }
 
-TEST_F(PipelineExecutorTest, CannotMakeImmutablePathArrayDescendant) {
+TEST_F(UpdateTestFixture, CannotMakeImmutablePathArrayDescendant) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {_id: 0, a: [1]}}")};
@@ -246,7 +185,7 @@ TEST_F(PipelineExecutorTest, CannotMakeImmutablePathArrayDescendant) {
                                 "'a.0' was found to be an array or array descendant.");
 }
 
-TEST_F(PipelineExecutorTest, CannotModifyImmutablePath) {
+TEST_F(UpdateTestFixture, CannotModifyImmutablePath) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {_id: 0, a: {b: 2}}}")};
@@ -261,7 +200,7 @@ TEST_F(PipelineExecutorTest, CannotModifyImmutablePath) {
                                 "to have been altered to b: 2");
 }
 
-TEST_F(PipelineExecutorTest, CannotModifyImmutableId) {
+TEST_F(UpdateTestFixture, CannotModifyImmutableId) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {_id: 1}}")};
@@ -276,7 +215,7 @@ TEST_F(PipelineExecutorTest, CannotModifyImmutableId) {
                                 "to have been altered to _id: 1");
 }
 
-TEST_F(PipelineExecutorTest, CanAddImmutableField) {
+TEST_F(UpdateTestFixture, CanAddImmutableField) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {a: {b: 1}}}")};
@@ -292,7 +231,7 @@ TEST_F(PipelineExecutorTest, CanAddImmutableField) {
     ASSERT_BSONOBJ_BINARY_EQ(fromjson("{c: 1, a: {b: 1}}"), result.oplogEntry);
 }
 
-TEST_F(PipelineExecutorTest, CanAddImmutableId) {
+TEST_F(UpdateTestFixture, CanAddImmutableId) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {_id: 0}}")};
@@ -308,14 +247,14 @@ TEST_F(PipelineExecutorTest, CanAddImmutableId) {
     ASSERT_BSONOBJ_BINARY_EQ(fromjson("{c: 1, _id: 0}"), result.oplogEntry);
 }
 
-TEST_F(PipelineExecutorTest, CannotCreateDollarPrefixedName) {
+TEST_F(UpdateTestFixture, CannotCreateDollarPrefixedName) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {'a.$bad': 1}}")};
     ASSERT_THROWS_CODE(PipelineExecutor(expCtx, pipeline), AssertionException, 16410);
 }
 
-TEST_F(PipelineExecutorTest, NoLogBuilder) {
+TEST_F(UpdateTestFixture, NoLogBuilder) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {a: 1}}")};
@@ -330,7 +269,7 @@ TEST_F(PipelineExecutorTest, NoLogBuilder) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST_F(PipelineExecutorTest, SerializeTest) {
+TEST_F(UpdateTestFixture, SerializeTest) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {_id: 0, a: [{b: 1}]}}"),
@@ -345,7 +284,7 @@ TEST_F(PipelineExecutorTest, SerializeTest) {
     ASSERT_VALUE_EQ(serialized, Value(BSONArray(doc)));
 }
 
-TEST_F(PipelineExecutorTest, RejectsInvalidConstantNames) {
+TEST_F(UpdateTestFixture, RejectsInvalidConstantNames) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     const std::vector<BSONObj> pipeline;
 
@@ -368,7 +307,7 @@ TEST_F(PipelineExecutorTest, RejectsInvalidConstantNames) {
                        ErrorCodes::FailedToParse);
 }
 
-TEST_F(PipelineExecutorTest, CanUseConstants) {
+TEST_F(UpdateTestFixture, CanUseConstants) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     const std::vector<BSONObj> pipeline{fromjson("{$set: {b: '$$var1', c: '$$var2'}}")};
@@ -384,7 +323,7 @@ TEST_F(PipelineExecutorTest, CanUseConstants) {
     ASSERT_BSONOBJ_BINARY_EQ(fromjson("{a: 1, b: 10, c : {x: 1, y: 2}}"), result.oplogEntry);
 }
 
-TEST_F(PipelineExecutorTest, CanUseConstantsAcrossMultipleUpdates) {
+TEST_F(UpdateTestFixture, CanUseConstantsAcrossMultipleUpdates) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     const std::vector<BSONObj> pipeline{fromjson("{$set: {b: '$$var1'}}")};
@@ -412,7 +351,7 @@ TEST_F(PipelineExecutorTest, CanUseConstantsAcrossMultipleUpdates) {
     ASSERT_BSONOBJ_BINARY_EQ(fromjson("{a: 2, b: 'foo'}"), result.oplogEntry);
 }
 
-TEST_F(PipelineExecutorTest, NoopWithConstants) {
+TEST_F(UpdateTestFixture, NoopWithConstants) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     const std::vector<BSONObj> pipeline{fromjson("{$set: {a: '$$var1', b: '$$var2'}}")};
@@ -428,7 +367,7 @@ TEST_F(PipelineExecutorTest, NoopWithConstants) {
     ASSERT_TRUE(result.oplogEntry.isEmpty());
 }
 
-TEST_F(PipelineExecutorV2ModeTest, TestIndexesAffectedWithDeletes) {
+TEST_F(UpdateTestFixture, TestIndexesAffectedWithDeletes) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BSONObj preImage(
         fromjson("{f1: {a: {b: {c: 1, paddingField: 'largeValueString'}, c: 1, paddingField: "
@@ -497,7 +436,7 @@ TEST_F(PipelineExecutorV2ModeTest, TestIndexesAffectedWithDeletes) {
     }
 }
 
-TEST_F(PipelineExecutorV2ModeTest, TestIndexesAffectedWithUpdatesAndInserts) {
+TEST_F(UpdateTestFixture, TestIndexesAffectedWithUpdatesAndInserts) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BSONObj preImage(
         fromjson("{f1: {a: {b: {c: 1, paddingField: 'largeValueString'}, c: 1, paddingField: "
@@ -565,7 +504,7 @@ TEST_F(PipelineExecutorV2ModeTest, TestIndexesAffectedWithUpdatesAndInserts) {
     }
 }
 
-TEST_F(PipelineExecutorV2ModeTest, TestIndexesAffectedWithArraysAlongIndexPath) {
+TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAlongIndexPath) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BSONObj preImage(
         fromjson("{f1: [0, {a: {b: ['someStringValue', {c: 1, paddingField: 'largeValueString'}], "
@@ -656,7 +595,7 @@ TEST_F(PipelineExecutorV2ModeTest, TestIndexesAffectedWithArraysAlongIndexPath) 
     }
 }
 
-TEST_F(PipelineExecutorV2ModeTest, TestIndexesAffectedWithArraysAfterIndexPath) {
+TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAfterIndexPath) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BSONObj preImage(
         fromjson("{f1: {a: {b: {c: [{paddingField: 'largeValueString'}, 1]}, c: 1, paddingField: "

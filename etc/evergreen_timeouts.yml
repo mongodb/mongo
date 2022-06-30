@@ -47,8 +47,6 @@ overrides:
   enterprise-windows-all-feature-flags-suggested:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 180  # 3 hours.
-  - task: replica_sets_update_v1_oplog_jscore_passthrough
-    exec_timeout: 150  # 2.5 hours.
 
   enterprise-windows-inmem:
   - task: replica_sets_jscore_passthrough
@@ -57,8 +55,6 @@ overrides:
   enterprise-windows-required:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 180  # 3 hours.
-  - task: replica_sets_update_v1_oplog_jscore_passthrough
-    exec_timeout: 150  # 2.5 hours.
 
   linux-64-debug:
   - task: auth
@@ -119,5 +115,3 @@ overrides:
     exec_timeout: 150  # 2.5 hours.
   - task: replica_sets_jscore_passthrough
     exec_timeout: 180  # 3 hours.
-  - task: replica_sets_update_v1_oplog_jscore_passthrough
-    exec_timeout: 150  # 2.5 hours.

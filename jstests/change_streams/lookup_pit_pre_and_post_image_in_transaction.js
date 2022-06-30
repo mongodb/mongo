@@ -136,7 +136,7 @@ if (!FixtureHelpers.isMongos(testDB)) {
     assert.commandWorked(coll.insert([{_id: 5, a: 1}, {_id: 6, a: 1}]));
     assert.commandWorked(testDB.runCommand({
         applyOps: [
-            {op: "u", ns: coll.getFullName(), o2: {_id: 5}, o: {$set: {a: 2}}},
+            {op: "u", ns: coll.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {a: 2}}}},
             {op: "d", ns: coll.getFullName(), o: {_id: 6}}
         ],
         allowAtomic: false,
