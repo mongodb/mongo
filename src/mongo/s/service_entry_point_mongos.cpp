@@ -72,7 +72,7 @@ BSONObj buildErrReply(const DBException& ex) {
 
 // Allows for decomposing `handleRequest` into parts and simplifies composing the future-chain.
 struct HandleRequest : public std::enable_shared_from_this<HandleRequest> {
-    struct OpRunnerBase;
+    struct CommandOpRunner;
 
     HandleRequest(OperationContext* opCtx, const Message& message)
         : rec(std::make_shared<RequestExecutionContext>(opCtx, message)),
@@ -126,19 +126,12 @@ void HandleRequest::setupEnvironment() {
     CurOp::get(opCtx)->ensureStarted();
 }
 
-// The base for various operation runners that handle the request, and often generate a DbResponse.
-struct HandleRequest::OpRunnerBase {
-    explicit OpRunnerBase(std::shared_ptr<HandleRequest> hr) : hr(std::move(hr)) {}
-    virtual ~OpRunnerBase() = default;
-    virtual Future<DbResponse> run() = 0;
-    const std::shared_ptr<HandleRequest> hr;
-};
-
-struct CommandOpRunner final : public HandleRequest::OpRunnerBase {
-    using HandleRequest::OpRunnerBase::OpRunnerBase;
-    Future<DbResponse> run() override {
+struct HandleRequest::CommandOpRunner {
+    explicit CommandOpRunner(std::shared_ptr<HandleRequest> hr) : hr(std::move(hr)) {}
+    Future<DbResponse> run() {
         return Strategy::clientCommand(hr->rec);
     }
+    const std::shared_ptr<HandleRequest> hr;
 };
 
 Future<DbResponse> HandleRequest::handleRequest() {
