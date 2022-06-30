@@ -92,7 +92,7 @@ Cloner::Cloner() {}
 
 struct Cloner::BatchHandler {
     BatchHandler(OperationContext* opCtx, const std::string& dbName)
-        : lastLog(0), opCtx(opCtx), _dbName(dbName) {}
+        : lastLog(0), opCtx(opCtx), _dbName(dbName), numSeen(0), saveLast(0) {}
 
     void operator()(DBClientCursor& cursor) {
         boost::optional<Lock::DBLock> dbLock;
