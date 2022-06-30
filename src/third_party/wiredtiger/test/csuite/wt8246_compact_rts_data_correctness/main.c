@@ -323,6 +323,7 @@ static void
 large_updates(WT_SESSION *session, const char *uri, char *value, int commit_ts)
 {
     WT_CURSOR *cursor;
+    WT_DECL_RET;
     WT_RAND_STATE rnd;
     uint64_t val;
     int i;
@@ -337,8 +338,12 @@ large_updates(WT_SESSION *session, const char *uri, char *value, int commit_ts)
         cursor->set_key(cursor, i + 1);
         val = (uint64_t)__wt_random(&rnd);
         cursor->set_value(cursor, val, val, val, value);
-        testutil_check(cursor->insert(cursor));
-        testutil_check(session->commit_transaction(session, tscfg));
+        if ((ret = cursor->insert(cursor)) == WT_ROLLBACK)
+            testutil_check(session->rollback_transaction(session, NULL));
+        else {
+            testutil_check(ret);
+            testutil_check(session->commit_transaction(session, tscfg));
+        }
     }
 
     testutil_check(cursor->close(cursor));
