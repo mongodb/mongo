@@ -75,19 +75,15 @@ bool modifiedSortPaths(const SortPattern& pat, const DocumentSource::GetModPaths
 }
 }  // namespace
 
-REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(
-    setWindowFields,
-    LiteParsedDocumentSourceDefault::parse,
-    document_source_set_window_fields::createFromBson,
-    AllowedWithApiStrict::kAlways,
-    multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
+REGISTER_DOCUMENT_SOURCE(setWindowFields,
+                         LiteParsedDocumentSourceDefault::parse,
+                         document_source_set_window_fields::createFromBson,
+                         AllowedWithApiStrict::kAlways);
 
-REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(
-    _internalSetWindowFields,
-    LiteParsedDocumentSourceDefault::parse,
-    DocumentSourceInternalSetWindowFields::createFromBson,
-    AllowedWithApiStrict::kAlways,
-    multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
+REGISTER_DOCUMENT_SOURCE(_internalSetWindowFields,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceInternalSetWindowFields::createFromBson,
+                         AllowedWithApiStrict::kAlways);
 
 list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {

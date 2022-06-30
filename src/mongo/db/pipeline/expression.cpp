@@ -7759,12 +7759,8 @@ void ExpressionDateTrunc::_doAddDependencies(DepsTracker* deps) const {
 }
 
 /* -------------------------- ExpressionGetField ------------------------------ */
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    getField,
-    ExpressionGetField::parse,
-    AllowedWithApiStrict::kAlways,
-    AllowedWithClientType::kAny,
-    multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
+
+REGISTER_STABLE_EXPRESSION(getField, ExpressionGetField::parse);
 
 intrusive_ptr<Expression> ExpressionGetField::parse(ExpressionContext* const expCtx,
                                                     BSONElement expr,
@@ -7871,20 +7867,11 @@ Value ExpressionGetField::serialize(const bool explain) const {
 }
 
 /* -------------------------- ExpressionSetField ------------------------------ */
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    setField,
-    ExpressionSetField::parse,
-    AllowedWithApiStrict::kAlways,
-    AllowedWithClientType::kAny,
-    multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
+
+REGISTER_STABLE_EXPRESSION(setField, ExpressionSetField::parse);
 
 // $unsetField is syntactic sugar for $setField where value is set to $$REMOVE.
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    unsetField,
-    ExpressionSetField::parse,
-    AllowedWithApiStrict::kNeverInVersion1,
-    AllowedWithClientType::kAny,
-    multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
+REGISTER_STABLE_EXPRESSION(unsetField, ExpressionSetField::parse);
 
 intrusive_ptr<Expression> ExpressionSetField::parse(ExpressionContext* const expCtx,
                                                     BSONElement expr,
@@ -8015,12 +8002,7 @@ Value ExpressionTsSecond::evaluate(const Document& root, Variables* variables) c
     return Value(static_cast<long long>(operand.getTimestamp().getSecs()));
 }
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    tsSecond,
-    ExpressionTsSecond::parse,
-    AllowedWithApiStrict::kAlways,
-    AllowedWithClientType::kAny,
-    multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
+REGISTER_STABLE_EXPRESSION(tsSecond, ExpressionTsSecond::parse);
 
 /* ------------------------- ExpressionTsIncrement ----------------------------- */
 
@@ -8039,12 +8021,7 @@ Value ExpressionTsIncrement::evaluate(const Document& root, Variables* variables
     return Value(static_cast<long long>(operand.getTimestamp().getInc()));
 }
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    tsIncrement,
-    ExpressionTsIncrement::parse,
-    AllowedWithApiStrict::kAlways,
-    AllowedWithClientType::kAny,
-    multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
+REGISTER_STABLE_EXPRESSION(tsIncrement, ExpressionTsIncrement::parse);
 
 MONGO_INITIALIZER_GROUP(BeginExpressionRegistration, ("default"), ("EndExpressionRegistration"))
 MONGO_INITIALIZER_GROUP(EndExpressionRegistration, ("BeginExpressionRegistration"), ())

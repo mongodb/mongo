@@ -103,12 +103,11 @@ UpdateExecutor::ApplyResult PipelineExecutor::applyUpdate(ApplyParams applyParam
 
     // Replace the pre-image document in applyParams with the post image we got from running the
     // post image.
-    bool allowTopLevelDollarPrefixedFields =
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
-    auto ret = ObjectReplaceExecutor::applyReplacementUpdate(
-        applyParams, transformedDoc, transformedDocHasIdField, allowTopLevelDollarPrefixedFields);
+    auto ret =
+        ObjectReplaceExecutor::applyReplacementUpdate(applyParams,
+                                                      transformedDoc,
+                                                      transformedDocHasIdField,
+                                                      true /* allowTopLevelDollarPrefixedFields */);
 
     // The oplog entry should not have been populated yet.
     invariant(ret.oplogEntry.isEmpty());

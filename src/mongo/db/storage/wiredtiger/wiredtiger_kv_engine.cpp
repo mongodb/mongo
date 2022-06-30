@@ -207,16 +207,20 @@ std::string WiredTigerFileVersion::getDowngradeString() {
     // With the introduction of continuous releases, there are two downgrade paths from kLatest.
     // Either to kLastContinuous or kLastLTS. It's possible for the data format to differ between
     // kLastContinuous and kLastLTS and we'll need to handle that appropriately here. We only
-    // consider downgrading when FCV has been fully downgraded. This will have to be updated for new
-    // releases.
+    // consider downgrading when FCV has been fully downgraded.
     const auto currentVersion = serverGlobalParams.featureCompatibility.getVersion();
-    if (currentVersion == multiversion::FeatureCompatibilityVersion::kVersion_5_1) {
-        // If the data format between kLatest (v5.2) and kLastContinuous (v5.1) differs, change the
+    // (Generic FCV reference): This FCV check should exist across LTS binary versions because the
+    // logic for keeping the WiredTiger release version compatible with the server FCV version will
+    // be the same across different LTS binary versions.
+    if (currentVersion == multiversion::GenericFCV::kLastContinuous) {
+        // If the data format between kLatest and kLastContinuous differs, change the
         // 'kLastContinuousWTRelease' version.
         return kLastContinuousWTRelease;
-    } else if (currentVersion ==
-               multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0) {
-        // If the data format between kLatest (v5.2) and kLastLTS (v5.0) differs, change the
+        // (Generic FCV reference): This FCV check should exist across LTS binary versions because
+        // the logic for keeping the WiredTiger release version compatible with the server FCV
+        // version will be the same across different LTS binary versions.
+    } else if (currentVersion == multiversion::GenericFCV::kLastLTS) {
+        // If the data format between kLatest and kLastLTS differs, change the
         // 'kLastLTSWTRelease' version.
         return kLastLTSWTRelease;
     }

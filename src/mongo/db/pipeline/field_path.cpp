@@ -100,12 +100,7 @@ FieldPath::FieldPath(std::string inputPath)
 void FieldPath::uassertValidFieldName(StringData fieldName) {
     uassert(15998, "FieldPath field names may not be empty strings.", !fieldName.empty());
 
-    const auto dotsAndDollarsHint =
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0)
-        ? " Consider using $getField or $setField."
-        : "";
+    const auto dotsAndDollarsHint = " Consider using $getField or $setField.";
 
     if (fieldName[0] == '$' && !kAllowedDollarPrefixedFields.count(fieldName)) {
         uasserted(16410,

@@ -299,9 +299,7 @@ StatusWithMatchExpression parse(const BSONObj& obj,
                 std::string hint = "";
                 if (name == "not") {
                     hint = ". If you are trying to negate an entire expression, use $nor.";
-                } else if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                           serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                               multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0)) {
+                } else {
                     hint =
                         ". If you have a field name that starts with a '$' symbol, consider using "
                         "$getField or $setField.";

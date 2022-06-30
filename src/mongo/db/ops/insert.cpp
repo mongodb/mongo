@@ -112,20 +112,12 @@ StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx,
 
             auto fieldName = e.fieldNameStringData();
 
-            if (fieldName[0] == '$') {
-                if (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
-                    !serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                        multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0)) {
-                    return StatusWith<BSONObj>(ErrorCodes::BadValue,
-                                               str::stream()
-                                                   << "Document can't have $ prefixed field names: "
-                                                   << fieldName);
-                } else if (containsDotsAndDollarsField) {
-                    *containsDotsAndDollarsField = true;
-                    // If the internal validation is disabled and we confirm this doc contains
-                    // dots/dollars field name, we can skip other validations below.
-                    if (validationDisabled)
-                        return StatusWith<BSONObj>(BSONObj());
+            if (fieldName[0] == '$' && containsDotsAndDollarsField) {
+                *containsDotsAndDollarsField = true;
+                // If the internal validation is disabled and we confirm this doc contains
+                // dots/dollars field name, we can skip other validations below.
+                if (validationDisabled) {
+                    return StatusWith<BSONObj>(BSONObj());
                 }
             }
 

@@ -24,6 +24,7 @@ const stablePipelines = [
     [{$set: {x: {$dateDiff: {startDate: "$date", endDate: "$date", unit: "day"}}}}],
     [{$set: {x: {$getField: {input: "$$ROOT", field: "x"}}}}],
     [{$set: {x: {$setField: {input: "$$ROOT", field: "x", value: "foo"}}}}],
+    [{$set: {x: {$unsetField: {input: "$$ROOT", field: "x"}}}}],
 ];
 
 for (let pipeline of stablePipelines) {
