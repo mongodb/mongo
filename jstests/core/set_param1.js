@@ -136,6 +136,17 @@ assert.eq(5, result.accessControl.verbosity);
 assert.commandWorked(
     db.adminCommand({"setParameter": 1, logComponentVerbosity: old.logComponentVerbosity}));
 
+// Checks server parameter for redaction of encrypted fields in BSON Objects.
+assert(old.hasOwnProperty('redactEncryptedFields'),
+       'server parameter for toggling bindata 6 redaction not available: ' + tojson(old));
+assert.commandWorked(db.adminCommand({"setParameter": 1, redactEncryptedFields: false}));
+const result = assert.commandWorked(db.adminCommand({"getParameter": 1, redactEncryptedFields: 1}))
+                   .redactEncryptedFields;
+assert(!result,
+       'setParameter worked on redaction setting but getParameter returned unexpected result.');
+assert.commandWorked(
+    db.adminCommand({"setParameter": 1, redactEncryptedFields: old.redactEncryptedFields}));
+
 const isMongos = (db.hello().msg === 'isdbgrid');
 if (!isMongos) {
     //
