@@ -735,6 +735,7 @@ icuEnv.CppUnitTest(
         'registry_list_test.cpp',
         'represent_as_test.cpp',
         'safe_num_test.cpp',
+        'scoped_unlock_test.cpp',
         'secure_zero_memory_test.cpp',
         'signal_handlers_synchronous_test.cpp' if not env.TargetOSIs('windows') else [],
         'str_test.cpp',
