@@ -290,6 +290,10 @@ std::pair<std::vector<BSONObj>, std::vector<BSONObj>> makeChunkAndTagUpdatesForR
 void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       const ShardKeyPattern& newShardKeyPattern) {
+    // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
+    // under the exclusive _kChunkOpLock happen on the same term.
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection versions
     Lock::ExclusiveLock chunkLk(opCtx, opCtx->lockState(), _kChunkOpLock);
