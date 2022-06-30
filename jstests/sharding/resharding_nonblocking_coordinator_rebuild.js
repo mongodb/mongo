@@ -109,19 +109,7 @@ reshardingTest.withReshardingInBackground(
         }
     },
     {
-        // As a result of the elections intentionally triggered on the config server replica sets,
-        // the primary shard of the database may retry the _configsvrReshardCollection command. It
-        // is possible for the resharding operation from the first _configsvrReshardCollection
-        // command to have entirely finished executing to the point of removing the coordinator
-        // state document. A retry of the _configsvrReshardCollection command in this situation will
-        // lead to a second resharding operation to run. The second resharding operation will have
-        // the duplicate documents cloned by the ReshardingCollectionCloner rather than applied by
-        // the ReshardingOplogApplier as intended. This results in the reshardCollection command
-        // failing with a DuplicateKey error rather than the error code for the stash collections
-        // being non-empty. The recipient must have been able to successfully update its state to
-        // "applying" in the first resharding operation even when the ReshardingCoordinatorService
-        // had yet to be rebuilt so we accept DuplicateKey as an error too.
-        expectedErrorCode: [5356800, ErrorCodes.DuplicateKey],
+        expectedErrorCode: 5356800,
     });
 
 reshardingTest.teardown();
