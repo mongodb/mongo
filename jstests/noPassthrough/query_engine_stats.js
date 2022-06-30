@@ -6,9 +6,9 @@
 (function() {
 "use strict";
 
-// For 'getLatestProfilerEntry()'.
-load("jstests/libs/profiler.js");
+load("jstests/libs/profiler.js");  // For 'getLatestProfilerEntry()'.
 load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled()'.
+load("jstests/libs/log.js");       // For 'verifySlowQueryLog()'.
 
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
@@ -49,19 +49,6 @@ const engine = {
         classicOnly: "classicOnly"
     }
 };
-
-// Ensure the slow query log contains the correct information about the queryExecutionEngine used.
-function verifySlowQueryLog(expectedComment, execEngine) {
-    const logId = 51803;
-    const expectedLog = {};
-    expectedLog.command = {};
-    expectedLog.command.comment = expectedComment;
-    if (execEngine) {
-        expectedLog.queryExecutionEngine = execEngine;
-    }
-    assert(checkLog.checkContainsWithCountJson(db, logId, expectedLog, 1, null, true),
-           "failed to find [" + tojson(expectedLog) + "] in the slow query log");
-}
 
 // Ensure the profile filter contains the correct information about the queryExecutionEngine used.
 function verifyProfiler(expectedComment, execEngine) {
@@ -122,7 +109,7 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceClassic
 let expectedCounters = generateExpectedCounters(engine.find.classic);
 let queryComment = "findSbeOff";
 assert.eq(coll.find({a: 3}).comment(queryComment).itcount(), 1);
-verifySlowQueryLog(queryComment, engine.find.classic);
+verifySlowQueryLog(db, queryComment, engine.find.classic);
 compareQueryEngineCounters(expectedCounters);
 verifyProfiler(queryComment, engine.find.classic);
 
@@ -130,7 +117,7 @@ verifyProfiler(queryComment, engine.find.classic);
 expectedCounters = generateExpectedCounters(engine.aggregate.classicOnly);
 queryComment = "aggSbeOff";
 assert.eq(coll.aggregate([{$match: {b: 1, c: 3}}], {comment: queryComment}).itcount(), 1);
-verifySlowQueryLog(queryComment, engine.find.classic);
+verifySlowQueryLog(db, queryComment, engine.find.classic);
 compareQueryEngineCounters(expectedCounters);
 verifyProfiler(queryComment, engine.find.classic);
 
@@ -146,7 +133,7 @@ assert.eq(coll.aggregate(
                   {comment: queryComment})
               .itcount(),
           0);
-verifySlowQueryLog(queryComment, engine.find.classic);
+verifySlowQueryLog(db, queryComment, engine.find.classic);
 compareQueryEngineCounters(expectedCounters);
 verifyProfiler(queryComment, engine.find.classic);
 
@@ -157,7 +144,7 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceClassic
 expectedCounters = generateExpectedCounters(engine.find.sbe);
 queryComment = "findSbeOn";
 assert.eq(coll.find({a: 3}).comment(queryComment).itcount(), 1);
-verifySlowQueryLog(queryComment, engine.find.sbe);
+verifySlowQueryLog(db, queryComment, engine.find.sbe);
 compareQueryEngineCounters(expectedCounters);
 verifyProfiler(queryComment, engine.find.sbe);
 
@@ -165,7 +152,7 @@ verifyProfiler(queryComment, engine.find.sbe);
 expectedCounters = generateExpectedCounters(engine.aggregate.sbeOnly);
 queryComment = "aggSbeOn";
 assert.eq(coll.aggregate([{$match: {b: 1, c: 3}}], {comment: queryComment}).itcount(), 1);
-verifySlowQueryLog(queryComment, engine.find.sbe);
+verifySlowQueryLog(db, queryComment, engine.find.sbe);
 compareQueryEngineCounters(expectedCounters);
 verifyProfiler(queryComment, engine.find.sbe);
 
@@ -181,7 +168,7 @@ assert.eq(coll.aggregate(
                   {comment: queryComment})
               .itcount(),
           0);
-verifySlowQueryLog(queryComment, engine.find.sbe);
+verifySlowQueryLog(db, queryComment, engine.find.sbe);
 compareQueryEngineCounters(expectedCounters);
 verifyProfiler(queryComment, engine.find.sbe);
 

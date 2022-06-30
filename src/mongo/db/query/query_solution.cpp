@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include <fmt/format.h>
 #include <queue>
 #include <vector>
 
@@ -230,6 +231,21 @@ std::string QuerySolution::summaryString() const {
                     auto tn = static_cast<const TextMatchNode*>(node);
                     const KeyPattern keyPattern{tn->indexPrefix};
                     sb << " " << keyPattern;
+                    break;
+                }
+                case STAGE_COLUMN_SCAN: {
+                    auto cixn = static_cast<const ColumnIndexScanNode*>(node);
+                    auto concat = [](const std::string& a, const std::string& b) {
+                        return a.empty() ? "'{}'"_format(b) : "{},'{}'"_format(a, b);
+                    };
+                    const std::string matchColumns = std::accumulate(
+                        cixn->matchFields.begin(), cixn->matchFields.end(), std::string{}, concat);
+                    const std::string outputColumns = std::accumulate(cixn->outputFields.begin(),
+                                                                      cixn->outputFields.end(),
+                                                                      std::string{},
+                                                                      concat);
+
+                    sb << " {{'match':[{}],'output':[{}]}}"_format(matchColumns, outputColumns);
                     break;
                 }
                 default:
