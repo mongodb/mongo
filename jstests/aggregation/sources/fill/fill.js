@@ -37,6 +37,23 @@ assert.commandWorked(coll.insert(documents));
 
 const testCases = [
     [
+        // Verify $fill partitionBy works with type string and object.
+        [{$fill: {sortBy: {_id: 1}, partitionBy: "$part", output: {linear: {method: "linear"}}}}],
+
+        [
+            {_id: 1, linear: 1, other: 1, part: 1},
+            {_id: 3, linear: 3, other: null, part: 1},
+            {_id: 5, linear: 5, other: 10, part: 1},
+            {_id: 7, linear: 6, other: null, part: 1},
+            {_id: 9, linear: 7, other: 15, part: 1},
+            {_id: 2, linear: 1, other: 1, part: 2},
+            {_id: 4, linear: 3.5, other: null, part: 2},
+            {_id: 6, linear: 6, other: 2, part: 2},
+            {_id: 8, linear: 3, other: 5, part: 2},
+            {_id: 10, linear: null, other: null, part: 2},
+        ]
+    ],  // 0
+    [
         [
             {$match: {part: 1}},
             {$project: {other: 0, part: 0}},
@@ -49,7 +66,7 @@ const testCases = [
             {_id: 7, linear: 6},
             {_id: 9, linear: 7}
         ]
-    ],  // 0
+    ],  // 1
     [
         [
             {$project: {linear: 0, part: 0}},
@@ -67,7 +84,7 @@ const testCases = [
             {_id: 9, other: 15},
             {_id: 10, other: 15}
         ]
-    ],  // 1
+    ],  // 2
     [
         [
             {$match: {part: 2}},
@@ -85,7 +102,8 @@ const testCases = [
             {_id: 8, linear: 3, other: 5, part: 2},
             {_id: 10, linear: null, other: 5, part: 2}
         ]
-    ],  // 2
+
+    ],  // 3
     [
         [{
             $fill:
@@ -104,7 +122,7 @@ const testCases = [
             {_id: 10, linear: null, other: 5, part: 2}
         ]
 
-    ],  // 3
+    ],  // 4
     [
         [{
             $fill:
@@ -123,7 +141,7 @@ const testCases = [
             {_id: 10, linear: null, other: 5, part: 2}
         ]
 
-    ],  // 4
+    ],  // 5
     [
         [{
             $fill: {
@@ -145,7 +163,7 @@ const testCases = [
             {_id: 10, linear: null, other: null, part: 2}
         ]
 
-    ],  // 5
+    ],  // 6
     [
         [{
             $fill: {
@@ -167,7 +185,7 @@ const testCases = [
             {_id: 10, linear: null, other: null, part: 2}
         ]
 
-    ],  // 6
+    ],  // 7
     [
         [{
             $fill: {
@@ -188,8 +206,7 @@ const testCases = [
             {_id: 8, linear: 3, other: 5, part: 2},
             {_id: 10, linear: null, other: 5, part: 2}
         ]
-
-    ],  // 7
+    ],  // 8
     // Test with first element in partition having a null fill field.
     [
         [
@@ -214,7 +231,7 @@ const testCases = [
             {_id: 8, linear: 3, other: 5, part: 2},
             {_id: 10, linear: null, other: 5, part: 2}
         ]
-    ],  // 8
+    ],  // 9
     // Test $fill with arbitrary values.
     [
         [
@@ -229,7 +246,7 @@ const testCases = [
             {_id: 7, other: 7},
             {_id: 9, other: 15},
         ]
-    ],  // 9
+    ],  // 10
     [
         [
             {$match: {part: 1}},
@@ -243,7 +260,7 @@ const testCases = [
             {_id: 7, other: -1},
             {_id: 9, other: 15},
         ]
-    ],  // 10
+    ],  // 11
     [
         [
             {$match: {part: 1}},
@@ -262,7 +279,8 @@ const testCases = [
             {_id: 7, other: -1, linear: 2},
             {_id: 9, other: 15, linear: 7},
         ]
-    ],  // 11
+
+    ],  // 12
     // Verify behavior if the filling expression can evaluate to missing or null.
     [
         [
@@ -280,10 +298,9 @@ const testCases = [
             {_id: 5, other: 10},
             {_id: 7, other: null},
             {_id: 9, other: 15},
-
         ]
 
-    ],  // 12
+    ],  // 13
 
 ];
 

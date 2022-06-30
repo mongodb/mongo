@@ -57,7 +57,8 @@ structs:
         optional: true
       partitionBy:
         description: "An expression to be used to partition the input."
-        type: object
+        type:
+            variant: [object, string]
         optional: true
       output:
         description: "An object where each field is a field to be filled and values are the fill functions"

@@ -29,13 +29,16 @@
 
 #include "mongo/db/pipeline/document_source_fill.h"
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/visit_helper.h"
+#include <string>
 
 namespace mongo {
 
@@ -113,7 +116,11 @@ std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         uassert(6050204,
                 "Maximum one of 'partitionBy' and 'partitionByFields can be specified in '$fill'",
                 !spec.getPartitionByFields());
-        setWindowFieldsSpec.append("partitionBy", partitionByUnparsedExpr.value());
+        auto partitionByField = partitionByUnparsedExpr.get();
+        if (std::string* partitionByString = stdx::get_if<std::string>(&partitionByField)) {
+            setWindowFieldsSpec.append("partitionBy", *partitionByString);
+        } else
+            setWindowFieldsSpec.append("partitionBy", stdx::get<BSONObj>(partitionByField));
     }
 
     if (auto&& partitionByFields = spec.getPartitionByFields()) {
