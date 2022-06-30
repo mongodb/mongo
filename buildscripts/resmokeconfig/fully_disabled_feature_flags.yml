@@ -12,3 +12,6 @@
 # released create the transactions collection index and is only meant to be enabled adhoc, so only
 # its targeted tests should enable it.
 - featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp
+# Disable 'featureFlagServerlessChangeStreams' until the change collection becomes stable.
+# TODO SERVER-67267 remove the flag.
+- featureFlagServerlessChangeStreams

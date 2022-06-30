@@ -1,0 +1,65 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/change_streams/**/*.js
+  exclude_files:
+  # TODO SERVER-66840 investigate the failing test case.
+  - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
+  - jstests/change_streams/projection_fakes_internal_event.js
+  exclude_with_any_tags:
+  ##
+  # The next tags correspond to the special errors thrown by the
+  # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
+  # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
+  # warranted.
+  ##
+  # "Cowardly refusing to override write concern of command: ..."
+  - assumes_write_concern_unchanged
+  # Exclude any that assume sharding is disabled.
+  - assumes_against_mongod_not_mongos
+  # This passthrough implicitly shards the accessed collections. Do not run tests that assume
+  # unsharded collections.
+  - assumes_unsharded_collection
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          defaultReadConcernLevel: null
+          enableMajorityReadConcern: ''
+      # Enable causal consistency for change streams suites using 1 node replica sets. See
+      # change_streams.yml for detailed explanation.
+      eval: >-
+        var testingReplication = true;
+        load('jstests/libs/override_methods/set_read_and_write_concerns.js');
+        load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+        load('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
+        load('jstests/libs/override_methods/override_fixtures_changestream_multitenancy.js');
+  hooks:
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ShardedClusterFixture
+    num_shards: 2
+    mongos_options:
+      bind_ip_all: ''
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      bind_ip_all: ''
+      set_parameters:
+        enableTestCommands: 1
+        periodicNoopIntervalSecs: 1
+        writePeriodicNoops: true
+        # TODO SERVER-67267 check if the feature flag can be removed.
+        failpoint.forceEnableChangeCollectionsMode: "{mode: 'alwaysOn'}"
+        failpoint.assertChangeStreamNssCollection:
+          "{'mode': 'alwaysOn', 'data': {'collectionName': 'system.change_collection'}}"

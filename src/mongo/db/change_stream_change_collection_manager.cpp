@@ -44,6 +44,11 @@
 #include "mongo/logv2/log.h"
 
 namespace mongo {
+
+// Sharded clusters do not support serverless mode at present, but this failpoint allows us to
+// nonetheless test the behaviour of change collections in a sharded environment.
+MONGO_FAIL_POINT_DEFINE(forceEnableChangeCollectionsMode);
+
 namespace {
 const auto getChangeCollectionManager =
     ServiceContext::declareDecoration<boost::optional<ChangeStreamChangeCollectionManager>>();
@@ -160,9 +165,14 @@ void ChangeStreamChangeCollectionManager::create(ServiceContext* service) {
 }
 
 bool ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive() {
+    // If the force fail point is enabled then declare the change collection mode as active.
+    if (MONGO_unlikely(forceEnableChangeCollectionsMode.shouldFail())) {
+        return true;
+    }
+
+    // TODO SERVER-67267 guard with 'multitenancySupport' and 'isServerless' flag.
     return feature_flags::gFeatureFlagServerlessChangeStreams.isEnabled(
-               serverGlobalParams.featureCompatibility) &&
-        gMultitenancySupport;
+        serverGlobalParams.featureCompatibility);
 }
 
 bool ChangeStreamChangeCollectionManager::hasChangeCollection(

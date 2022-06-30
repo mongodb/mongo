@@ -1,15 +1,20 @@
 // Tests that entries are written to the change collection for collection create, drop and document
 // modification operations.
 // @tags: [
-//   featureFlagServerlessChangeStreams,
 //   multiversion_incompatible,
 //   featureFlagMongoStore,
+//   requires_fcv_61,
 // ]
 (function() {
 "use strict";
 
 const replSetTest = new ReplSetTest({nodes: 2});
-replSetTest.startSet({setParameter: "multitenancySupport=true"});
+
+// TODO SERVER-67267 add 'featureFlagServerlessChangeStreams', 'multitenancySupport' and
+// 'serverless' flags and remove 'failpoint.forceEnableChangeCollectionsMode'.
+replSetTest.startSet(
+    {setParameter: "failpoint.forceEnableChangeCollectionsMode=" + tojson({mode: "alwaysOn"})});
+
 replSetTest.initiate();
 
 const primary = replSetTest.getPrimary();

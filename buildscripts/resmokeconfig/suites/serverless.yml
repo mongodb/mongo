@@ -3,6 +3,7 @@ test_kind: js_test
 selector:
   roots:
   - jstests/serverless/*.js
+  - jstests/serverless/change_streams/**/*.js
 
 executor:
   config:
