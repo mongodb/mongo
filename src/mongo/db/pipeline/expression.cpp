@@ -4802,12 +4802,7 @@ Value ExpressionSortArray::evaluate(const Document& root, Variables* variables) 
     return Value(array);
 }
 
-REGISTER_EXPRESSION_CONDITIONALLY(sortArray,
-                                  ExpressionSortArray::parse,
-                                  AllowedWithApiStrict::kAlways,
-                                  AllowedWithClientType::kAny,
-                                  feature_flags::gFeatureFlagSortArray.getVersion(),
-                                  feature_flags::gFeatureFlagSortArray.isEnabledAndIgnoreFCV());
+REGISTER_STABLE_EXPRESSION(sortArray, ExpressionSortArray::parse);
 
 const char* ExpressionSortArray::getOpName() const {
     return kName.rawData();
