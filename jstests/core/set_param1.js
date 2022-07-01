@@ -1,6 +1,7 @@
 // @tags: [
 //   assumes_superuser_permissions,
 //   does_not_support_stepdowns,
+//   requires_fcv_61,
 //   # This test attempts to compare the response from running the {getParameter: "*"}
 //   # command multiple times, which may observe the change to the failpoint enabled by the
 //   # migration hook.
