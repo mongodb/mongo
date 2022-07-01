@@ -31,6 +31,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
+#include "mongo/db/s/sharding_data_transform_instance_metrics_field_name_provider.h"
 #include "mongo/db/s/sharding_data_transform_metrics.h"
 #include "mongo/db/s/sharding_data_transform_metrics_observer_interface.h"
 #include "mongo/util/duration.h"
@@ -41,14 +42,8 @@ class ShardingDataTransformInstanceMetrics {
 public:
     using Role = ShardingDataTransformMetrics::Role;
     using ObserverPtr = std::unique_ptr<ShardingDataTransformMetricsObserverInterface>;
-
-    ShardingDataTransformInstanceMetrics(UUID instanceId,
-                                         BSONObj originalCommand,
-                                         NamespaceString sourceNs,
-                                         Role role,
-                                         Date_t startTime,
-                                         ClockSource* clockSource,
-                                         ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
+    using FieldNameProviderPtr =
+        std::unique_ptr<ShardingDataTransformInstanceMetricsFieldNameProvider>;
 
     ShardingDataTransformInstanceMetrics(UUID instanceId,
                                          BSONObj originalCommand,
@@ -57,6 +52,16 @@ public:
                                          Date_t startTime,
                                          ClockSource* clockSource,
                                          ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+                                         FieldNameProviderPtr fieldNames);
+
+    ShardingDataTransformInstanceMetrics(UUID instanceId,
+                                         BSONObj originalCommand,
+                                         NamespaceString sourceNs,
+                                         Role role,
+                                         Date_t startTime,
+                                         ClockSource* clockSource,
+                                         ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+                                         FieldNameProviderPtr fieldNames,
                                          ObserverPtr observer);
     virtual ~ShardingDataTransformInstanceMetrics();
 
@@ -77,16 +82,16 @@ public:
     void onCopyingEnd();
     void onApplyingBegin();
     void onApplyingEnd();
-    void onDocumentsCopied(int64_t documentCount,
-                           int64_t totalDocumentsSizeBytes,
-                           Milliseconds elapsed);
+    void onDocumentsProcessed(int64_t documentCount,
+                              int64_t totalDocumentsSizeBytes,
+                              Milliseconds elapsed);
     Date_t getCopyingBegin() const;
     Date_t getCopyingEnd() const;
-    int64_t getDocumentsCopiedCount() const;
-    int64_t getBytesCopiedCount() const;
-    int64_t getApproxBytesToCopyCount() const;
-    void restoreDocumentsCopied(int64_t documentCount, int64_t totalDocumentsSizeBytes);
-    void setDocumentsToCopyCounts(int64_t documentCount, int64_t totalDocumentsSizeBytes);
+    int64_t getDocumentsProcessedCount() const;
+    int64_t getBytesWrittenCount() const;
+    int64_t getApproxBytesToScanCount() const;
+    void restoreDocumentsProcessed(int64_t documentCount, int64_t totalDocumentsSizeBytes);
+    void setDocumentsToProcessCounts(int64_t documentCount, int64_t totalDocumentsSizeBytes);
     void setCoordinatorHighEstimateRemainingTimeMillis(Milliseconds milliseconds);
     void setCoordinatorLowEstimateRemainingTimeMillis(Milliseconds milliseconds);
     void onLocalInsertDuringOplogFetching(Milliseconds elapsed);
@@ -138,29 +143,7 @@ protected:
     const BSONObj _originalCommand;
     const NamespaceString _sourceNs;
     const Role _role;
-    static constexpr auto kType = "type";
-    static constexpr auto kDescription = "desc";
-    static constexpr auto kNamespace = "ns";
-    static constexpr auto kOp = "op";
-    static constexpr auto kOriginatingCommand = "originatingCommand";
-    static constexpr auto kOpTimeElapsed = "totalOperationTimeElapsedSecs";
-    static constexpr auto kCriticalSectionTimeElapsed = "totalCriticalSectionTimeElapsedSecs";
-    static constexpr auto kRemainingOpTimeEstimated = "remainingOperationTimeEstimatedSecs";
-    static constexpr auto kCopyTimeElapsed = "totalCopyTimeElapsedSecs";
-    static constexpr auto kApproxDocumentsToCopy = "approxDocumentsToCopy";
-    static constexpr auto kApproxBytesToCopy = "approxBytesToCopy";
-    static constexpr auto kBytesCopied = "bytesCopied";
-    static constexpr auto kCountWritesToStashCollections = "countWritesToStashCollections";
-    static constexpr auto kDocumentsCopied = "documentsCopied";
-    static constexpr auto kCountWritesDuringCriticalSection = "countWritesDuringCriticalSection";
-    static constexpr auto kCountReadsDuringCriticalSection = "countReadsDuringCriticalSection";
-    static constexpr auto kCoordinatorState = "coordinatorState";
-    static constexpr auto kDonorState = "donorState";
-    static constexpr auto kRecipientState = "recipientState";
-    static constexpr auto kAllShardsLowestRemainingOperationTimeEstimatedSecs =
-        "allShardsLowestRemainingOperationTimeEstimatedSecs";
-    static constexpr auto kAllShardsHighestRemainingOperationTimeEstimatedSecs =
-        "allShardsHighestRemainingOperationTimeEstimatedSecs";
+    FieldNameProviderPtr _fieldNames;
 
 private:
     const Date_t _startTime;
@@ -172,10 +155,10 @@ private:
 
     AtomicWord<Date_t> _copyingStartTime;
     AtomicWord<Date_t> _copyingEndTime;
-    AtomicWord<int32_t> _approxDocumentsToCopy;
-    AtomicWord<int32_t> _documentsCopied;
-    AtomicWord<int32_t> _approxBytesToCopy;
-    AtomicWord<int32_t> _bytesCopied;
+    AtomicWord<int32_t> _approxDocumentsToProcess;
+    AtomicWord<int32_t> _documentsProcessed;
+    AtomicWord<int32_t> _approxBytesToScan;
+    AtomicWord<int32_t> _bytesWritten;
 
     AtomicWord<int64_t> _writesToStashCollections;
 

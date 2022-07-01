@@ -41,6 +41,28 @@
 
 namespace mongo {
 namespace {
+class ShardingDataTransformInstanceMetricsFieldNameProviderForTest
+    : public ShardingDataTransformInstanceMetricsFieldNameProvider {
+public:
+    StringData getForDocumentsProcessed() const override {
+        return kDocumentsProcessed;
+    }
+    StringData getForBytesWritten() const override {
+        return kBytesWritten;
+    }
+    StringData getForApproxDocumentsToProcess() const override {
+        return kApproxDocumentsToProcess;
+    }
+    StringData getForApproxBytesToScan() const override {
+        return kApproxBytesToScan;
+    }
+
+protected:
+    static constexpr auto kDocumentsProcessed = "documentsProcessed";
+    static constexpr auto kBytesWritten = "bytesWritten";
+    static constexpr auto kApproxDocumentsToProcess = "approxDocumentsToProcess";
+    static constexpr auto kApproxBytesToScan = "approxBytesToScan";
+};
 
 class ShardingDataTransformInstanceMetricsForTest : public ShardingDataTransformInstanceMetrics {
 public:
@@ -52,13 +74,15 @@ public:
         Date_t startTime,
         ClockSource* clockSource,
         ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
-        : ShardingDataTransformInstanceMetrics{std::move(instanceId),
-                                               std::move(shardKey),
-                                               std::move(nss),
-                                               role,
-                                               startTime,
-                                               clockSource,
-                                               cumulativeMetrics} {}
+        : ShardingDataTransformInstanceMetrics{
+              std::move(instanceId),
+              std::move(shardKey),
+              std::move(nss),
+              role,
+              startTime,
+              clockSource,
+              cumulativeMetrics,
+              std::make_unique<ShardingDataTransformInstanceMetricsFieldNameProviderForTest>()} {}
     ShardingDataTransformInstanceMetricsForTest(
         UUID instanceId,
         BSONObj shardKey,
@@ -67,6 +91,7 @@ public:
         Date_t startTime,
         ClockSource* clockSource,
         ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+        FieldNameProviderPtr fieldNameProvider,
         ObserverPtr observer)
         : ShardingDataTransformInstanceMetrics{std::move(instanceId),
                                                std::move(shardKey),
@@ -75,6 +100,7 @@ public:
                                                startTime,
                                                clockSource,
                                                cumulativeMetrics,
+                                               std::move(fieldNameProvider),
                                                std::move(observer)} {}
 
     Milliseconds getRecipientHighEstimateRemainingTimeMillis() const {
@@ -96,6 +122,7 @@ public:
                 startTime,
                 clockSource,
                 cumulativeMetrics,
+                std::make_unique<ShardingDataTransformInstanceMetricsFieldNameProviderForTest>(),
                 std::make_unique<ObserverMock>(startTime, timeRemaining)} {}
 
 
@@ -118,7 +145,9 @@ public:
     }
 
     std::unique_ptr<ShardingDataTransformInstanceMetricsForTest> createInstanceMetrics(
-        std::unique_ptr<ObserverMock> mock) {
+        std::unique_ptr<ObserverMock> mock,
+        std::unique_ptr<ShardingDataTransformInstanceMetricsFieldNameProviderForTest>
+            fieldNameProvider) {
         return std::make_unique<ShardingDataTransformInstanceMetricsForTest>(
             UUID::gen(),
             kTestCommand,
@@ -127,6 +156,7 @@ public:
             getClockSource()->now(),
             getClockSource(),
             &_cumulativeMetrics,
+            std::move(fieldNameProvider),
             std::move(mock));
     }
 };
@@ -226,31 +256,31 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientSetsDocumentsAndBytesT
     auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
 
     auto report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("approxDocumentsToCopy"), 0);
-    ASSERT_EQ(report.getIntField("approxBytesToCopy"), 0);
-    metrics->setDocumentsToCopyCounts(5, 1000);
+    ASSERT_EQ(report.getIntField("approxDocumentsToProcess"), 0);
+    ASSERT_EQ(report.getIntField("approxBytesToScan"), 0);
+    metrics->setDocumentsToProcessCounts(5, 1000);
 
     report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("approxDocumentsToCopy"), 5);
-    ASSERT_EQ(report.getIntField("approxBytesToCopy"), 1000);
+    ASSERT_EQ(report.getIntField("approxDocumentsToProcess"), 5);
+    ASSERT_EQ(report.getIntField("approxBytesToScan"), 1000);
 
-    metrics->setDocumentsToCopyCounts(3, 750);
+    metrics->setDocumentsToProcessCounts(3, 750);
     report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("approxDocumentsToCopy"), 3);
-    ASSERT_EQ(report.getIntField("approxBytesToCopy"), 750);
+    ASSERT_EQ(report.getIntField("approxDocumentsToProcess"), 3);
+    ASSERT_EQ(report.getIntField("approxBytesToScan"), 750);
 }
 
-TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientIncrementsDocumentsAndBytesCopied) {
+TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientIncrementsDocumentsAndBytesWritten) {
     auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
 
     auto report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("documentsCopied"), 0);
-    ASSERT_EQ(report.getIntField("bytesCopied"), 0);
-    metrics->onDocumentsCopied(5, 1000, Milliseconds(1));
+    ASSERT_EQ(report.getIntField("documentsProcessed"), 0);
+    ASSERT_EQ(report.getIntField("bytesWritten"), 0);
+    metrics->onDocumentsProcessed(5, 1000, Milliseconds(1));
 
     report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("documentsCopied"), 5);
-    ASSERT_EQ(report.getIntField("bytesCopied"), 1000);
+    ASSERT_EQ(report.getIntField("documentsProcessed"), 5);
+    ASSERT_EQ(report.getIntField("bytesWritten"), 1000);
 }
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsCopyingTime) {

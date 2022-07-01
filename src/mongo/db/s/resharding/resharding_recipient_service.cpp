@@ -132,9 +132,9 @@ void buildStateDocumentApplyMetricsForUpdate(BSONObjBuilder& bob, ReshardingMetr
         getIntervalStartFieldName<DocT>(ReshardingRecipientMetrics::kOplogApplicationFieldName),
         metrics->getApplyingBegin());
     bob.append(metricsPrefix + ReshardingRecipientMetrics::kFinalDocumentsCopiedCountFieldName,
-               metrics->getDocumentsCopiedCount());
+               metrics->getDocumentsProcessedCount());
     bob.append(metricsPrefix + ReshardingRecipientMetrics::kFinalBytesCopiedCountFieldName,
-               metrics->getBytesCopiedCount());
+               metrics->getBytesWrittenCount());
 }
 
 void buildStateDocumentStrictConsistencyMetricsForUpdate(BSONObjBuilder& bob,
@@ -557,8 +557,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                   ReshardingRecipientService::RecipientStateMachine::CloneDetails cloneDetails) {
             _transitionToCreatingCollection(
                 cloneDetails, (*executor)->now() + _minimumOperationDuration, factory);
-            _metrics->setDocumentsToCopyCounts(cloneDetails.approxDocumentsToCopy,
-                                               cloneDetails.approxBytesToCopy);
+            _metrics->setDocumentsToProcessCounts(cloneDetails.approxDocumentsToCopy,
+                                                  cloneDetails.approxBytesToCopy);
         });
 }
 
@@ -1162,7 +1162,7 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
             // metrics section of the recipient state document and restored during metrics
             // initialization. This is so that applied oplog entries that add or remove documents do
             // not affect the cloning metrics.
-            _metrics->restoreDocumentsCopied(documentCountCopied, documentBytesCopied);
+            _metrics->restoreDocumentsProcessed(documentCountCopied, documentBytesCopied);
         }
     }
 

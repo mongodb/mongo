@@ -174,13 +174,13 @@ protected:
         auto opCtx = operationContext();
         AutoGetCollection tempColl{opCtx, tempNss, MODE_IS};
         while (_cloner->doOneBatch(operationContext(), *_pipeline)) {
-            ASSERT_EQ(tempColl->numRecords(opCtx), _metrics->getDocumentsCopiedCount());
-            ASSERT_EQ(tempColl->dataSize(opCtx), _metrics->getBytesCopiedCount());
+            ASSERT_EQ(tempColl->numRecords(opCtx), _metrics->getDocumentsProcessedCount());
+            ASSERT_EQ(tempColl->dataSize(opCtx), _metrics->getBytesWrittenCount());
         }
         ASSERT_EQ(tempColl->numRecords(operationContext()), expectedDocumentsCount);
-        ASSERT_EQ(_metrics->getDocumentsCopiedCount(), expectedDocumentsCount);
+        ASSERT_EQ(_metrics->getDocumentsProcessedCount(), expectedDocumentsCount);
         ASSERT_GT(tempColl->dataSize(opCtx), 0);
-        ASSERT_EQ(tempColl->dataSize(opCtx), _metrics->getBytesCopiedCount());
+        ASSERT_EQ(tempColl->dataSize(opCtx), _metrics->getBytesWrittenCount());
         verifyFunction(tempColl->getCursor(opCtx));
     }
 

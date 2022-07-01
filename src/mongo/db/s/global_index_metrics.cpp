@@ -54,13 +54,15 @@ GlobalIndexMetrics::GlobalIndexMetrics(UUID instanceId,
                                        Date_t startTime,
                                        ClockSource* clockSource,
                                        ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
-    : ShardingDataTransformInstanceMetrics{std::move(instanceId),
-                                           std::move(originatingCommand),
-                                           std::move(nss),
-                                           role,
-                                           startTime,
-                                           clockSource,
-                                           cumulativeMetrics} {}
+    : ShardingDataTransformInstanceMetrics{
+          std::move(instanceId),
+          std::move(originatingCommand),
+          std::move(nss),
+          role,
+          startTime,
+          clockSource,
+          cumulativeMetrics,
+          std::make_unique<GlobalIndexMetricsFieldNameProvider>()} {}
 
 std::string GlobalIndexMetrics::createOperationDescription() const noexcept {
     return fmt::format("GlobalIndexMetrics{}Service {}",

@@ -29,36 +29,36 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/s/global_index_metrics_field_name_provider.h"
-#include "mongo/db/s/sharding_data_transform_instance_metrics.h"
-#include "mongo/util/uuid.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
-
-class GlobalIndexMetrics : public ShardingDataTransformInstanceMetrics {
+class ShardingDataTransformInstanceMetricsFieldNameProvider {
 public:
-    GlobalIndexMetrics(UUID instanceId,
-                       BSONObj originatingCommand,
-                       NamespaceString nss,
-                       Role role,
-                       Date_t startTime,
-                       ClockSource* clockSource,
-                       ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
+    ShardingDataTransformInstanceMetricsFieldNameProvider() {}
+    virtual ~ShardingDataTransformInstanceMetricsFieldNameProvider() = default;
 
-    static std::unique_ptr<GlobalIndexMetrics> makeInstance(UUID uuid,
-                                                            NamespaceString nss,
-                                                            Role role,
-                                                            BSONObj keyPattern,
-                                                            bool unique,
-                                                            ServiceContext* serviceContext);
-
-    Milliseconds getRecipientHighEstimateRemainingTimeMillis() const;
-
-private:
-    std::string createOperationDescription() const noexcept override;
+    virtual StringData getForApproxDocumentsToProcess() const = 0;
+    virtual StringData getForApproxBytesToScan() const = 0;
+    virtual StringData getForBytesWritten() const = 0;
+    virtual StringData getForDocumentsProcessed() const = 0;
+    StringData getForType() const;
+    StringData getForDescription() const;
+    StringData getForNamespace() const;
+    StringData getForOp() const;
+    StringData getForOriginatingCommand() const;
+    StringData getForOpTimeElapsed() const;
+    StringData getForCriticalSectionTimeElapsed() const;
+    StringData getForRemainingOpTimeEstimated() const;
+    StringData getForCopyTimeElapsed() const;
+    StringData getForCountWritesDuringCriticalSection() const;
+    StringData getForCountWritesToStashCollections() const;
+    StringData getForCountReadsDuringCriticalSection() const;
+    StringData getForCoordinatorState() const;
+    StringData getForDonorState() const;
+    StringData getForRecipientState() const;
+    StringData getForAllShardsLowestRemainingOperationTimeEstimatedSecs() const;
+    StringData getForAllShardsHighestRemainingOperationTimeEstimatedSecs() const;
 };
-
 }  // namespace mongo

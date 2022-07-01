@@ -83,7 +83,8 @@ ReshardingMetrics::ReshardingMetrics(UUID instanceId,
                                            role,
                                            startTime,
                                            clockSource,
-                                           cumulativeMetrics},
+                                           cumulativeMetrics,
+                                           std::make_unique<ReshardingMetricsFieldNameProvider>()},
       _state{getDefaultState(role)},
       _deletesApplied{0},
       _insertsApplied{0},
@@ -91,7 +92,8 @@ ReshardingMetrics::ReshardingMetrics(UUID instanceId,
       _oplogEntriesApplied{0},
       _oplogEntriesFetched{0},
       _applyingStartTime{kNoDate},
-      _applyingEndTime{kNoDate} {}
+      _applyingEndTime{kNoDate},
+      _reshardingFieldNames{static_cast<ReshardingMetricsFieldNameProvider*>(_fieldNames.get())} {}
 
 ReshardingMetrics::ReshardingMetrics(const CommonReshardingMetadata& metadata,
                                      Role role,
@@ -113,8 +115,8 @@ std::string ReshardingMetrics::createOperationDescription() const noexcept {
 
 Milliseconds ReshardingMetrics::getRecipientHighEstimateRemainingTimeMillis() const {
     auto estimate = resharding::estimateRemainingRecipientTime(_applyingStartTime.load() != kNoDate,
-                                                               getBytesCopiedCount(),
-                                                               getApproxBytesToCopyCount(),
+                                                               getBytesWrittenCount(),
+                                                               getApproxBytesToScanCount(),
                                                                getCopyingElapsedTimeSecs(),
                                                                _oplogEntriesApplied.load(),
                                                                _oplogEntriesFetched.load(),
@@ -153,20 +155,23 @@ StringData ReshardingMetrics::getStateString() const noexcept {
 
 BSONObj ReshardingMetrics::reportForCurrentOp() const noexcept {
     BSONObjBuilder builder;
-    builder.append(kDescription, createOperationDescription());
     switch (_role) {
         case Role::kCoordinator:
-            builder.append(kApplyTimeElapsed, getApplyingElapsedTimeSecs().count());
+            builder.append(_reshardingFieldNames->getForApplyTimeElapsed(),
+                           getApplyingElapsedTimeSecs().count());
             break;
         case Role::kDonor:
             break;
         case Role::kRecipient:
-            builder.append(kApplyTimeElapsed, getApplyingElapsedTimeSecs().count());
-            builder.append(kInsertsApplied, _insertsApplied.load());
-            builder.append(kUpdatesApplied, _updatesApplied.load());
-            builder.append(kDeletesApplied, _deletesApplied.load());
-            builder.append(kOplogEntriesApplied, _oplogEntriesApplied.load());
-            builder.append(kOplogEntriesFetched, _oplogEntriesFetched.load());
+            builder.append(_reshardingFieldNames->getForApplyTimeElapsed(),
+                           getApplyingElapsedTimeSecs().count());
+            builder.append(_reshardingFieldNames->getForInsertsApplied(), _insertsApplied.load());
+            builder.append(_reshardingFieldNames->getForUpdatesApplied(), _updatesApplied.load());
+            builder.append(_reshardingFieldNames->getForDeletesApplied(), _deletesApplied.load());
+            builder.append(_reshardingFieldNames->getForOplogEntriesApplied(),
+                           _oplogEntriesApplied.load());
+            builder.append(_reshardingFieldNames->getForOplogEntriesFetched(),
+                           _oplogEntriesFetched.load());
             break;
         default:
             MONGO_UNREACHABLE;
@@ -193,12 +198,12 @@ void ReshardingMetrics::restoreRecipientSpecificFields(
     auto docsToCopy = metrics->getApproxDocumentsToCopy();
     auto bytesToCopy = metrics->getApproxBytesToCopy();
     if (docsToCopy && bytesToCopy) {
-        setDocumentsToCopyCounts(*docsToCopy, *bytesToCopy);
+        setDocumentsToProcessCounts(*docsToCopy, *bytesToCopy);
     }
     auto docsCopied = metrics->getFinalDocumentsCopiedCount();
     auto bytesCopied = metrics->getFinalBytesCopiedCount();
     if (docsCopied && bytesCopied) {
-        restoreDocumentsCopied(*docsCopied, *bytesCopied);
+        restoreDocumentsProcessed(*docsCopied, *bytesCopied);
     }
     restorePhaseDurationFields(document);
 }

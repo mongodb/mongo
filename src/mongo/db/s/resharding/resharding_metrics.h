@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/resharding/resharding_metrics_field_name_provider.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/sharding_data_transform_instance_metrics.h"
@@ -41,7 +42,6 @@ namespace mongo {
 class ReshardingMetrics : public ShardingDataTransformInstanceMetrics {
 public:
     using State = stdx::variant<CoordinatorStateEnum, RecipientStateEnum, DonorStateEnum>;
-
     class DonorState {
     public:
         using MetricsType = ShardingDataTransformCumulativeMetrics::DonorStateEnum;
@@ -77,7 +77,10 @@ public:
     private:
         CoordinatorStateEnum _enumVal;
     };
-
+    ReshardingMetrics(const CommonReshardingMetadata& metadata,
+                      Role role,
+                      ClockSource* clockSource,
+                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
     ReshardingMetrics(UUID instanceId,
                       BSONObj shardKey,
                       NamespaceString nss,
@@ -85,11 +88,6 @@ public:
                       Date_t startTime,
                       ClockSource* clockSource,
                       ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
-    ReshardingMetrics(const CommonReshardingMetadata& metadata,
-                      Role role,
-                      ClockSource* clockSource,
-                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
-
     static std::unique_ptr<ReshardingMetrics> makeInstance(UUID instanceId,
                                                            BSONObj shardKey,
                                                            NamespaceString nss,
@@ -166,19 +164,6 @@ public:
 
 protected:
     virtual StringData getStateString() const noexcept override;
-
-    static constexpr auto kInsertsApplied = "insertsApplied";
-    static constexpr auto kUpdatesApplied = "updatesApplied";
-    static constexpr auto kDeletesApplied = "deletesApplied";
-    static constexpr auto kOplogEntriesApplied = "oplogEntriesApplied";
-    static constexpr auto kOplogEntriesFetched = "oplogEntriesFetched";
-    static constexpr auto kApplyTimeElapsed = "totalApplyTimeElapsedSecs";
-    static constexpr auto kAllShardsLowestRemainingOperationTimeEstimatedSecs =
-        "allShardsLowestRemainingOperationTimeEstimatedSecs";
-    static constexpr auto kAllShardsHighestRemainingOperationTimeEstimatedSecs =
-        "allShardsHighestRemainingOperationTimeEstimatedSecs";
-    static constexpr auto kRemainingOpTimeEstimated = "remainingOperationTimeEstimatedSecs";
-
     void restoreApplyingBegin(Date_t date);
     void restoreApplyingEnd(Date_t date);
 
@@ -238,6 +223,8 @@ private:
     AtomicWord<int64_t> _oplogEntriesFetched;
     AtomicWord<Date_t> _applyingStartTime;
     AtomicWord<Date_t> _applyingEndTime;
+
+    ReshardingMetricsFieldNameProvider* _reshardingFieldNames;
 };
 
 }  // namespace mongo

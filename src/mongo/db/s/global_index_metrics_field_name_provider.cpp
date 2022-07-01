@@ -27,38 +27,29 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/global_index_metrics_field_name_provider.h"
-#include "mongo/db/s/sharding_data_transform_instance_metrics.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
+namespace {
+constexpr auto kBytesWritten = "bytesWritten";
+constexpr auto kKeysWrittenFromScan = "keysWrittenFromScan ";
+constexpr auto kApproxBytesToScan = "approxBytesToScan";
+constexpr auto kApproxDocumentsToScan = "approxDocumentsToScan";
+}  // namespace
 
+StringData GlobalIndexMetricsFieldNameProvider::getForBytesWritten() const {
+    return kBytesWritten;
+}
 
-class GlobalIndexMetrics : public ShardingDataTransformInstanceMetrics {
-public:
-    GlobalIndexMetrics(UUID instanceId,
-                       BSONObj originatingCommand,
-                       NamespaceString nss,
-                       Role role,
-                       Date_t startTime,
-                       ClockSource* clockSource,
-                       ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
+StringData GlobalIndexMetricsFieldNameProvider::getForDocumentsProcessed() const {
+    return kKeysWrittenFromScan;
+}
 
-    static std::unique_ptr<GlobalIndexMetrics> makeInstance(UUID uuid,
-                                                            NamespaceString nss,
-                                                            Role role,
-                                                            BSONObj keyPattern,
-                                                            bool unique,
-                                                            ServiceContext* serviceContext);
+StringData GlobalIndexMetricsFieldNameProvider::getForApproxDocumentsToProcess() const {
+    return kApproxDocumentsToScan;
+}
 
-    Milliseconds getRecipientHighEstimateRemainingTimeMillis() const;
-
-private:
-    std::string createOperationDescription() const noexcept override;
-};
-
+StringData GlobalIndexMetricsFieldNameProvider::getForApproxBytesToScan() const {
+    return kApproxBytesToScan;
+}
 }  // namespace mongo

@@ -29,36 +29,19 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/s/global_index_metrics_field_name_provider.h"
-#include "mongo/db/s/sharding_data_transform_instance_metrics.h"
-#include "mongo/util/uuid.h"
+#include "mongo/db/s/sharding_data_transform_instance_metrics_field_name_provider.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
-
-class GlobalIndexMetrics : public ShardingDataTransformInstanceMetrics {
+class GlobalIndexMetricsFieldNameProvider
+    : public ShardingDataTransformInstanceMetricsFieldNameProvider {
 public:
-    GlobalIndexMetrics(UUID instanceId,
-                       BSONObj originatingCommand,
-                       NamespaceString nss,
-                       Role role,
-                       Date_t startTime,
-                       ClockSource* clockSource,
-                       ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
-
-    static std::unique_ptr<GlobalIndexMetrics> makeInstance(UUID uuid,
-                                                            NamespaceString nss,
-                                                            Role role,
-                                                            BSONObj keyPattern,
-                                                            bool unique,
-                                                            ServiceContext* serviceContext);
-
-    Milliseconds getRecipientHighEstimateRemainingTimeMillis() const;
-
-private:
-    std::string createOperationDescription() const noexcept override;
+    StringData getForDocumentsProcessed() const override;
+    StringData getForBytesWritten() const override;
+    StringData getForApproxDocumentsToProcess() const override;
+    StringData getForApproxBytesToScan() const override;
 };
 
 }  // namespace mongo
