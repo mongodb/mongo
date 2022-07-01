@@ -321,10 +321,8 @@ var ReshardingTest = class {
             configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeBlockingWrites");
         this._pauseCoordinatorBeforeDecisionPersistedFailpoint =
             configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeDecisionPersisted");
-        this._pauseCoordinatorBeforeCompletionFailpoint =
-            configureFailPoint(configPrimary,
-                               "reshardingPauseCoordinatorBeforeCompletion",
-                               {"sourceNamespace": this._ns});
+        this._pauseCoordinatorBeforeCompletionFailpoint = configureFailPoint(
+            configPrimary, "reshardingPauseCoordinatorBeforeCompletion", {}, {times: 1});
 
         this._commandDoneSignal = new CountDownLatch(1);
 
