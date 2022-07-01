@@ -9,6 +9,11 @@
  *   requires_replication,
  *   # Tenant migrations don't support applyOps.
  *   tenant_migration_incompatible,
+ *   # This test will fail on a mixed 6.1/6.0 cluster because a 6.0 node can successfully apply
+ *   # a $v: 1 oplog entry, but a 6.1 node cannot successfully replicate it. This isn't an issue
+ *   # because applyOps is an internal command, so users aren't expected to manually insert $v: 1
+ *   # entries into the oplog.
+ *   requires_fcv_61,
  * ]
  */
 
