@@ -15,7 +15,10 @@ var TimeseriesTest = class {
      * Returns whether time-series scalability improvements (like bucket reopening) are enabled.
      */
     static timeseriesScalabilityImprovementsEnabled(conn) {
-        return FeatureFlagUtil.isEnabled(conn, "TimeseriesScalabilityImprovements");
+        return assert
+            .commandWorked(conn.adminCommand(
+                {getParameter: 1, featureFlagTimeseriesScalabilityImprovements: 1}))
+            .featureFlagTimeseriesScalabilityImprovements.value;
     }
 
     /**

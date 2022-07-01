@@ -56,6 +56,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
@@ -216,6 +217,33 @@ Status _createView(OperationContext* opCtx,
     });
 }
 
+Status _createDefaultTimeseriesIndex(OperationContext* opCtx, CollectionWriter& collection) {
+    if (!feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        return Status::OK();
+    }
+
+    auto tsOptions = collection->getCollectionOptions().timeseries;
+    if (!tsOptions->getMetaField()) {
+        return Status::OK();
+    }
+
+    StatusWith<BSONObj> swBucketsSpec = timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
+        *tsOptions, BSON(*tsOptions->getMetaField() << 1 << tsOptions->getTimeField() << 1));
+    if (!swBucketsSpec.isOK()) {
+        return swBucketsSpec.getStatus();
+    }
+
+    const std::string indexName = str::stream()
+        << *tsOptions->getMetaField() << "_1_" << tsOptions->getTimeField() << "_1";
+    IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
+        opCtx,
+        collection,
+        {BSON("v" << 2 << "name" << indexName << "key" << swBucketsSpec.getValue())},
+        /*fromMigrate=*/false);
+    return Status::OK();
+}
+
 Status _createTimeseries(OperationContext* opCtx,
                          const NamespaceString& ns,
                          const CollectionOptions& optionsArg) {
@@ -286,7 +314,7 @@ Status _createTimeseries(OperationContext* opCtx,
     Status ret =
         writeConflictRetry(opCtx, "createBucketCollection", bucketsNs.ns(), [&]() -> Status {
             AutoGetDb autoDb(opCtx, bucketsNs.db(), MODE_IX);
-            Lock::CollectionLock bucketsCollLock(opCtx, bucketsNs, MODE_IX);
+            Lock::CollectionLock bucketsCollLock(opCtx, bucketsNs, MODE_X);
             auto db = autoDb.ensureDbExists(opCtx);
 
             // Check if there already exist a Collection on the namespace we will later create a
@@ -354,6 +382,9 @@ Status _createTimeseries(OperationContext* opCtx,
             // Create the buckets collection that will back the view.
             const bool createIdIndex = false;
             uassertStatusOK(db->userCreateNS(opCtx, bucketsNs, bucketsOptions, createIdIndex));
+
+            CollectionWriter collectionWriter(opCtx, bucketsNs);
+            uassertStatusOK(_createDefaultTimeseriesIndex(opCtx, collectionWriter));
             wuow.commit();
             return Status::OK();
         });

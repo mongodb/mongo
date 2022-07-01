@@ -38,6 +38,12 @@ const generateTest = (useHint) => {
                 coll.getName(),
                 Object.assign({timeseries: {timeField: timeFieldName, metaField: metaFieldName}},
                               collOpts)));
+            if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
+                // When enabled, the {meta: 1, time: 1} index gets built by default on the
+                // time-series bucket collection. When this index is present, the query planner will
+                // use it, changing the expected behaviour of this test. Drop the index.
+                assert.commandWorked(coll.dropIndex({[metaFieldName]: 1, [timeFieldName]: 1}));
+            }
 
             const dbCollNames = testDB.getCollectionNames();
             assert.contains(bucketsColl.getName(),

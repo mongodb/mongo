@@ -102,8 +102,17 @@ TimeseriesTest.run((insert) => {
 
         // Check for the index.
         const keys = timeseriesListIndexesCursor.firstBatch.map(d => d.key);
-        const expectedKeys = FixtureHelpers.isSharded(bucketscoll) ? [{tm: 1}, timeseriesIndexSpec]
-                                                                   : [timeseriesIndexSpec];
+        let expectedKeys = [];
+        if (FixtureHelpers.isSharded(bucketscoll)) {
+            expectedKeys.push({tm: 1});
+        }
+        if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
+            // When enabled, the {meta: 1, time: 1} index gets built by default on the time-series
+            // bucket collection.
+            expectedKeys.push({mm: 1, tm: 1});
+        }
+        expectedKeys.push(timeseriesIndexSpec);
+
         assert.sameMembers(expectedKeys,
                            keys,
                            "Found unexpected index spec: " + tojson(timeseriesListIndexesCursor));

@@ -153,17 +153,15 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(
         bucketsColl.createIndex({"control.max.x.y": -1, "control.min.x.y": -1, "data.x": 1}));
 
-    if (FixtureHelpers.isSharded(bucketsColl)) {
-        // There are more indexes for sharded collections because it includes the shard key index.
-        userIndexes = coll.getIndexes();
-        assert.eq(1, userIndexes.length);
-        bucketIndexes = bucketsColl.getIndexes();
-        assert.eq(14, bucketIndexes.length);
-    } else {
-        userIndexes = coll.getIndexes();
-        assert.eq(0, userIndexes.length);
-        bucketIndexes = bucketsColl.getIndexes();
-        assert.eq(13, bucketIndexes.length);
-    }
+    // There are more indexes for sharded collections because it includes the shard key index. When
+    // time-series scalability improvements are enabled, the {meta: 1, time: 1} index gets built by
+    // default on the time-series bucket collection.
+    const numExtraIndexes = (FixtureHelpers.isSharded(bucketsColl) ? 1 : 0) +
+        (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db) ? 1 : 0);
+
+    userIndexes = coll.getIndexes();
+    assert.eq(numExtraIndexes, userIndexes.length);
+    bucketIndexes = bucketsColl.getIndexes();
+    assert.eq(13 + numExtraIndexes, bucketIndexes.length);
 });
 }());

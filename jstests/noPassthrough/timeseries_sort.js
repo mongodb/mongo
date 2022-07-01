@@ -100,8 +100,11 @@ assert.eq(1, counts[otherShard.shardName], counts);
 assert.eq(coll.count(), 100);
 assert.eq(bucketsColl.count(), 4);
 
-assert.eq(coll.getIndexes().length, 1);
-assert.eq(coll.getIndexes()[0].name, "control.min.t_1");
+// When enabled, the {meta: 1, time: 1} index gets built by default on the time-series bucket
+// collection.
+const numExtraIndexes = TimeseriesTest.timeseriesScalabilityImprovementsEnabled(st.shard0) ? 1 : 0;
+assert.eq(coll.getIndexes().length, 1 + numExtraIndexes);
+assert.eq(coll.getIndexes()[numExtraIndexes].name, "control.min.t_1");
 
 const forwardSort = {
     $sort: {t: 1}

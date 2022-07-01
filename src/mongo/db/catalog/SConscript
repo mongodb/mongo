@@ -507,6 +507,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
         '$BUILD_DIR/mongo/db/storage/key_string',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/db/ttl_collection_cache',
         '$BUILD_DIR/mongo/db/views/view_catalog_helpers',

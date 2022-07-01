@@ -27,6 +27,7 @@ const metaField = 'm';
 
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField, metaField}}));
+
 const buckets = db.getCollection('system.buckets.' + coll.getName());
 let extraIndexes = [];
 let extraBucketIndexes = [];
@@ -45,6 +46,22 @@ if (FixtureHelpers.isSharded(buckets)) {
         "name": "control.min.time_1",
     });
 }
+
+if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
+    // When enabled, the {meta: 1, time: 1} index gets built by default on the time-series
+    // bucket collection.
+    extraIndexes.push({
+        "v": 2,
+        "key": {"m": 1, "time": 1},
+        "name": "m_1_time_1",
+    });
+    extraBucketIndexes.push({
+        "v": 2,
+        "key": {"meta": 1, "control.min.time": 1, "control.max.time": 1},
+        "name": "m_1_time_1",
+    });
+}
+
 assert.sameMembers(coll.getIndexes(), extraIndexes);
 assert.sameMembers(buckets.getIndexes(), extraBucketIndexes);
 
@@ -178,7 +195,7 @@ assert.commandWorked(coll.createIndex({a: 1}, {
         ]
     }
 }));
-assert.docEq(buckets.getIndexes(), extraBucketIndexes.concat([
+assert.sameMembers(buckets.getIndexes(), extraBucketIndexes.concat([
     {
         "v": 2,
         "key": {"control.min.a": 1, "control.max.a": 1},
@@ -226,6 +243,7 @@ assert.docEq(buckets.getIndexes(), extraBucketIndexes.concat([
         timeseries: {timeField, metaField},
         collation: numericCollation,
     }));
+
     assert.commandWorked(coll.insert([
         {[timeField]: ISODate(), [metaField]: {x: "1000", y: 1}, a: "120"},
         {[timeField]: ISODate(), [metaField]: {x: "1000", y: 2}, a: "3"},
@@ -361,7 +379,7 @@ assert.docEq(buckets.getIndexes(), extraBucketIndexes.concat([
 // partialFilterExpression is what we expect.
 {
     assert.commandWorked(coll.dropIndex({a: 1}));
-    assert.eq(coll.getIndexes(), extraIndexes);
+    assert.sameMembers(coll.getIndexes(), extraIndexes);
     function checkPredicateDisallowed(predicate) {
         assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: predicate}),
                                      [5916301]);

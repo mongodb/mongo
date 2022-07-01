@@ -62,7 +62,8 @@ TimeseriesTest.run((insert) => {
         assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
         // When the collection is sharded, there is 1 extra index for the shard key.
-        const numExtraIndexes = FixtureHelpers.isSharded(bucketsColl) ? 1 : 0;
+        const numExtraIndexes = (FixtureHelpers.isSharded(bucketsColl) ? 1 : 0) +
+            (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db) ? 1 : 0);
         {
             const indexes = bucketsColl.getIndexes();
             assert.eq(numExtraIndexes,
@@ -285,7 +286,8 @@ TimeseriesTest.run((insert) => {
     const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     assert.commandWorked(bucketsColl.createIndex({not_metadata: 1}),
                          'failed to create index: ' + tojson({not_metadata: 1}));
-    const numExtraIndexes = FixtureHelpers.isSharded(bucketsColl) ? 1 : 0;
+    const numExtraIndexes = (FixtureHelpers.isSharded(bucketsColl) ? 1 : 0) +
+        (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db) ? 1 : 0);
     assert.eq(
         1 + numExtraIndexes, bucketsColl.getIndexes().length, tojson(bucketsColl.getIndexes()));
     assert.eq(0 + numExtraIndexes, coll.getIndexes().length, tojson(coll.getIndexes()));

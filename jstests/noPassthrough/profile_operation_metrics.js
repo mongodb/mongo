@@ -1312,8 +1312,13 @@ const operations = [
                 assert.eq(profileDoc.docBytesWritten, 207);
             }
             assert.eq(profileDoc.docUnitsWritten, 2);
-            assert.eq(profileDoc.idxEntryBytesWritten, 0);
-            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
+                assert.eq(profileDoc.idxEntryBytesWritten, 34);
+                assert.eq(profileDoc.idxEntryUnitsWritten, 3);
+            } else {
+                assert.eq(profileDoc.idxEntryBytesWritten, 0);
+                assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            }
             assert.eq(profileDoc.totalUnitsWritten, 2);
             assert.eq(profileDoc.cursorSeeks, 0);
             assert.eq(profileDoc.keysSorted, 0);
@@ -1338,8 +1343,13 @@ const operations = [
                 assert.eq(profileDoc.docBytesWritten, 207);
             }
             assert.eq(profileDoc.docUnitsWritten, 2);
-            assert.eq(profileDoc.idxEntryBytesWritten, 0);
-            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
+                assert.eq(profileDoc.idxEntryBytesWritten, 35);
+                assert.eq(profileDoc.idxEntryUnitsWritten, 3);
+            } else {
+                assert.eq(profileDoc.idxEntryBytesWritten, 0);
+                assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            }
             assert.eq(profileDoc.cursorSeeks, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
@@ -1365,9 +1375,15 @@ const operations = [
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.docUnitsWritten, 2);
-            assert.eq(profileDoc.idxEntryBytesWritten, 0);
-            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
-            assert.eq(profileDoc.totalUnitsWritten, 2);
+            if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
+                assert.eq(profileDoc.idxEntryBytesWritten, 68);
+                assert.eq(profileDoc.idxEntryUnitsWritten, 6);
+                assert.eq(profileDoc.totalUnitsWritten, 3);
+            } else {
+                assert.eq(profileDoc.idxEntryBytesWritten, 0);
+                assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+                assert.eq(profileDoc.totalUnitsWritten, 2);
+            }
             assert.eq(profileDoc.cursorSeeks, 2);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
@@ -1392,8 +1408,13 @@ const operations = [
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.docUnitsWritten, 2);
-            assert.eq(profileDoc.idxEntryBytesWritten, 0);
-            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
+                assert.eq(profileDoc.idxEntryBytesWritten, 70);
+                assert.eq(profileDoc.idxEntryUnitsWritten, 6);
+            } else {
+                assert.eq(profileDoc.idxEntryBytesWritten, 0);
+                assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            }
             assert.eq(profileDoc.cursorSeeks, 2);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);

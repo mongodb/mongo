@@ -79,6 +79,16 @@ function generateDoc(time, metaValue) {
     assert.eq(1, counts[otherShard.shardName], counts);
 
     const coll = mongosDB.getCollection(collName);
+
+    let extraIndexes = [];
+    let extraBucketIndexes = [];
+    if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(st.shard0)) {
+        // When enabled, the {meta: 1, time: 1} index gets built by default on the time-series
+        // bucket collection.
+        extraIndexes.push({[metaField]: 1, [timeField]: 1});
+        extraBucketIndexes.push({"meta": 1, "control.min.time": 1, "control.max.time": 1});
+    }
+
     for (let i = 0; i < 2; i++) {
         assert.commandWorked(coll.insert(generateDoc("2019-11-11", -1)));
         assert.commandWorked(coll.insert(generateDoc("2019-12-31", -1)));
@@ -101,21 +111,24 @@ function generateDoc(time, metaValue) {
     assert.eq(coll.getFullName(), listIndexesOutput.cursor.ns, listIndexesOutput);
 
     let indexKeys = listIndexesOutput.cursor.firstBatch.map(x => x.key);
-    assert.sameMembers([{[subField1]: 1}, {[subField2]: 1}, {[timeField]: 1}, {[metaField]: 1}],
-                       indexKeys);
+    assert.sameMembers(
+        [{[subField1]: 1}, {[subField2]: 1}, {[timeField]: 1}, {[metaField]: 1}].concat(
+            extraIndexes),
+        indexKeys);
 
     assert.commandWorked(coll.dropIndex({[subField2]: 1}));
     indexKeys = coll.getIndexes().map(x => x.key);
-    assert.sameMembers([{[subField1]: 1}, {[timeField]: 1}, {[metaField]: 1}], indexKeys);
+    assert.sameMembers([{[subField1]: 1}, {[timeField]: 1}, {[metaField]: 1}].concat(extraIndexes),
+                       indexKeys);
 
     plan = coll.find({[metaField]: 0}).explain();
     assert.eq(getAggPlanStages(plan, "IXSCAN").length, 2, plan);
 
     assert.commandWorked(coll.dropIndex({[metaField]: 1}));
     indexKeys = coll.getIndexes().map(x => x.key);
-    assert.sameMembers([{[subField1]: 1}, {[timeField]: 1}], indexKeys);
+    assert.sameMembers([{[subField1]: 1}, {[timeField]: 1}].concat(extraIndexes), indexKeys);
 
-    plan = coll.find({[metaField]: 0}).explain();
+    plan = coll.find({[subField2]: 0}).explain();
     assert.eq(getAggPlanStages(plan, "COLLSCAN").length, 2, plan);
 
     // Verify that running the commands on the buckets collection should work.
@@ -126,11 +139,12 @@ function generateDoc(time, metaValue) {
 
     assert.commandWorked(bucketsColl.dropIndex({'meta.subField1': 1}));
     indexKeys = bucketsColl.getIndexes().map(x => x.key);
-    assert.sameMembers([{'control.min.time': 1}], indexKeys);
+    assert.sameMembers([{'control.min.time': 1}].concat(extraBucketIndexes), indexKeys);
 
     assert.commandWorked(bucketsColl.createIndex({'meta.subField2': 1}));
     indexKeys = bucketsColl.getIndexes().map(x => x.key);
-    assert.sameMembers([{'control.min.time': 1}, {'meta.subField2': 1}], indexKeys);
+    assert.sameMembers([{'control.min.time': 1}, {'meta.subField2': 1}].concat(extraBucketIndexes),
+                       indexKeys);
 
     assert(coll.drop());
 })();

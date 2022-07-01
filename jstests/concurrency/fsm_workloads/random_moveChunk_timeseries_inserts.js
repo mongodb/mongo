@@ -152,7 +152,7 @@ var $config = extendWorkload($config, function($config, $super) {
             }
         };
         verifyBucketIndex({"control.min.t": 1});
-        verifyBucketIndex({meta: 1});
+        verifyBucketIndex({meta: 1, "control.min._id": 1, "control.max._id": 1});
         verifyBucketIndex({meta: 1, "control.min.t": 1, "control.max.t": 1});
     };
 
@@ -172,8 +172,8 @@ var $config = extendWorkload($config, function($config, $super) {
 
         // Create indexes to verify index integrity during the teardown state.
         assert.commandWorked(db[this.nonShardCollName].createIndex({t: 1}));
-        assert.commandWorked(db[collName].createIndex({m: 1}));
-        assert.commandWorked(db[this.nonShardCollName].createIndex({m: 1}));
+        assert.commandWorked(db[collName].createIndex({m: 1, _id: 1}));
+        assert.commandWorked(db[this.nonShardCollName].createIndex({m: 1, _id: 1}));
         assert.commandWorked(db[collName].createIndex({m: 1, t: 1}));
         assert.commandWorked(db[this.nonShardCollName].createIndex({m: 1, t: 1}));
         assert.commandWorked(db[this.nonShardCollName].createIndex({m: 1, t: 1, _id: 1}));

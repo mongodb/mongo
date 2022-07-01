@@ -39,6 +39,12 @@ TimeseriesTest.run((insert) => {
         index2: {[metaFieldName + '.tag3']: 1, [metaFieldName + '.tag4']: 1},
     };
 
+    if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
+        // When enabled, the {meta: 1, time: 1} index gets built by default on the
+        // time-series bucket collection.
+        indexKeys["mm_1_tm_1"] = {[metaFieldName]: 1, [timeFieldName]: 1};
+    }
+
     // Create a few indexes on the time-series collections that $indexStats should return.
     for (const [indexName, indexKey] of Object.entries(indexKeys)) {
         assert.commandWorked(coll.createIndex(indexKey, {name: indexName}),
