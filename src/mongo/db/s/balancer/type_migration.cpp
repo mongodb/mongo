@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/idl/idl_parser.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/balancer/type_migration.h"
@@ -35,6 +36,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
 
 namespace mongo {
 
@@ -61,7 +63,7 @@ MigrationType::MigrationType(
     const ShardId& toShard,
     const ChunkVersion& chunkVersion,
     bool waitForDelete,
-    MoveChunkRequest::ForceJumbo forceJumbo,
+    ForceJumbo forceJumbo,
     const boost::optional<int64_t>& maxChunkSizeBytes,
     const boost::optional<MigrationSecondaryThrottleOptions>& secondaryThrottle)
     : _nss(nss),
@@ -71,7 +73,7 @@ MigrationType::MigrationType(
       _toShard(toShard),
       _chunkVersion(chunkVersion),
       _waitForDelete(waitForDelete),
-      _forceJumbo(MoveChunkRequest::forceJumboToString(forceJumbo)),
+      _forceJumbo(forceJumbo),
       _maxChunkSizeBytes(maxChunkSizeBytes),
       _secondaryThrottle(secondaryThrottle) {}
 
@@ -129,18 +131,13 @@ StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
     }
 
     {
-        std::string forceJumboVal;
-        Status status = bsonExtractStringField(source, forceJumbo.name(), &forceJumboVal);
+        long long forceJumboVal;
+        Status status = bsonExtractIntegerField(source, forceJumbo.name(), &forceJumboVal);
         if (!status.isOK())
             return status;
 
-        auto forceJumbo = MoveChunkRequest::parseForceJumbo(forceJumboVal);
-        if (forceJumbo != MoveChunkRequest::ForceJumbo::kDoNotForce &&
-            forceJumbo != MoveChunkRequest::ForceJumbo::kForceManual &&
-            forceJumbo != MoveChunkRequest::ForceJumbo::kForceBalancer) {
-            return Status{ErrorCodes::BadValue, "Unknown value for forceJumbo"};
-        }
-        migrationType._forceJumbo = std::move(forceJumboVal);
+        migrationType._forceJumbo = ForceJumbo_parse(IDLParserErrorContext("ForceJumbo"),
+                                                     static_cast<int32_t>(forceJumboVal));
     }
 
     {

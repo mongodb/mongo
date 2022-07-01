@@ -34,7 +34,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/s/request_types/move_chunk_request.h"
+#include "mongo/s/commands/cluster_commands_gen.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
 

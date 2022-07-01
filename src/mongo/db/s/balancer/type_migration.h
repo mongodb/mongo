@@ -33,6 +33,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
 
 namespace mongo {
 
@@ -64,7 +65,7 @@ public:
                   const ShardId& toShard,
                   const ChunkVersion& chunkVersion,
                   bool waitForDelete,
-                  MoveChunkRequest::ForceJumbo forceJumbo,
+                  const ForceJumbo forceJumbo,
                   const boost::optional<int64_t>& maxChunkSizeBytes,
                   const boost::optional<MigrationSecondaryThrottleOptions>& secondaryTrottle);
 
@@ -103,8 +104,8 @@ public:
         return _waitForDelete;
     }
 
-    MoveChunkRequest::ForceJumbo getForceJumbo() const {
-        return MoveChunkRequest::parseForceJumbo(_forceJumbo);
+    ForceJumbo getForceJumbo() const {
+        return _forceJumbo;
     }
 
     const boost::optional<int64_t>& getMaxChunkSizeBytes() const {
@@ -127,7 +128,7 @@ private:
     ShardId _toShard;
     ChunkVersion _chunkVersion;
     bool _waitForDelete{false};
-    std::string _forceJumbo{0};
+    ForceJumbo _forceJumbo{0};
     boost::optional<int64_t> _maxChunkSizeBytes;
     boost::optional<MigrationSecondaryThrottleOptions> _secondaryThrottle;
 };

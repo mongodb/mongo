@@ -39,6 +39,8 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/request_types/auto_split_vector_gen.h"
+#include "mongo/s/request_types/migration_secondary_throttle_options.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 
@@ -157,7 +159,7 @@ public:
                          int64_t maxChunkSizeBytes,
                          const MigrationSecondaryThrottleOptions& secondaryThrottle,
                          bool waitForDelete,
-                         MoveChunkRequest::ForceJumbo forceJumbo,
+                         ForceJumbo forceJumbo,
                          const ChunkVersion& version,
                          boost::optional<ExternalClientInfo>&& clientInfo,
                          bool requiresRecoveryOnCrash = true)
@@ -192,18 +194,30 @@ public:
     }
 
     BSONObj serialise() const override {
+
+
+        ShardsvrMoveRange request(getNameSpace(), getTarget(), _maxChunkSizeBytes);
+
+        MoveRangeRequestBase baseRequest;
+        baseRequest.setWaitForDelete(_waitForDelete);
+        baseRequest.setMin(_chunkBoundaries.getMin());
+        baseRequest.setMax(_chunkBoundaries.getMax());
+        baseRequest.setToShard(_recipient);
+        request.setMoveRangeRequestBase(baseRequest);
+
+        request.setForceJumbo(_forceJumbo);
+        request.setEpoch(_version.epoch());
+
         BSONObjBuilder commandBuilder;
-        MoveChunkRequest::appendAsCommand(&commandBuilder,
-                                          getNameSpace(),
-                                          _version,
-                                          getTarget(),
-                                          _recipient,
-                                          _chunkBoundaries,
-                                          _maxChunkSizeBytes,
-                                          _secondaryThrottle,
-                                          _waitForDelete,
-                                          _forceJumbo);
-        appendCommandMetadataTo(&commandBuilder);
+        request.serialize({}, &commandBuilder);
+        _secondaryThrottle.append(&commandBuilder);
+
+        if (!_secondaryThrottle.isWriteConcernSpecified()) {
+            commandBuilder.append(WriteConcernOptions::kWriteConcernField,
+                                  WriteConcernOptions::kInternalWriteDefault);
+        }
+
+
         return commandBuilder.obj();
     }
 
@@ -250,7 +264,7 @@ private:
     int64_t _maxChunkSizeBytes;
     MigrationSecondaryThrottleOptions _secondaryThrottle;
     bool _waitForDelete;
-    MoveChunkRequest::ForceJumbo _forceJumbo;
+    ForceJumbo _forceJumbo;
     bool _requiresRecoveryOnCrash;
 };
 

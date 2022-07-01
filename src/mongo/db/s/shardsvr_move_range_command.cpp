@@ -38,8 +38,8 @@
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/s/commands/cluster_commands_gen.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

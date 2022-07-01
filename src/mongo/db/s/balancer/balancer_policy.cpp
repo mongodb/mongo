@@ -430,7 +430,7 @@ MigrateInfo chooseRandomMigration(const ShardStatisticsVector& shardStats,
     return {destShardId,
             distribution.nss(),
             chunks[getRandomIndex(chunks.size())],
-            MoveChunkRequest::ForceJumbo::kDoNotForce};
+            ForceJumbo::kDoNotForce};
 }
 
 MigrateInfosWithReason BalancerPolicy::balance(
@@ -497,8 +497,7 @@ MigrateInfosWithReason BalancerPolicy::balance(
                 }
 
                 invariant(to != stat.shardId);
-                migrations.emplace_back(
-                    to, distribution.nss(), chunk, MoveChunkRequest::ForceJumbo::kForceBalancer);
+                migrations.emplace_back(to, distribution.nss(), chunk, ForceJumbo::kForceBalancer);
                 if (firstReason == MigrationReason::none) {
                     firstReason = MigrationReason::drain;
                 }
@@ -564,8 +563,8 @@ MigrateInfosWithReason BalancerPolicy::balance(
                 migrations.emplace_back(to,
                                         distribution.nss(),
                                         chunk,
-                                        forceJumbo ? MoveChunkRequest::ForceJumbo::kForceBalancer
-                                                   : MoveChunkRequest::ForceJumbo::kDoNotForce);
+                                        forceJumbo ? ForceJumbo::kForceBalancer
+                                                   : ForceJumbo::kDoNotForce);
                 if (firstReason == MigrationReason::none) {
                     firstReason = MigrationReason::zoneViolation;
                 }
@@ -610,26 +609,24 @@ MigrateInfosWithReason BalancerPolicy::balance(
 
         auto singleZoneBalance = [&]() {
             if (collDataSizeInfo.has_value()) {
-                return _singleZoneBalanceBasedOnDataSize(
-                    shardStats,
-                    distribution,
-                    *collDataSizeInfo,
-                    tag,
-                    &migrations,
-                    usedShards,
-                    forceJumbo ? MoveChunkRequest::ForceJumbo::kForceBalancer
-                               : MoveChunkRequest::ForceJumbo::kDoNotForce);
+                return _singleZoneBalanceBasedOnDataSize(shardStats,
+                                                         distribution,
+                                                         *collDataSizeInfo,
+                                                         tag,
+                                                         &migrations,
+                                                         usedShards,
+                                                         forceJumbo ? ForceJumbo::kForceBalancer
+                                                                    : ForceJumbo::kDoNotForce);
             }
 
-            return _singleZoneBalanceBasedOnChunks(
-                shardStats,
-                distribution,
-                tag,
-                totalNumberOfShardsWithTag,
-                &migrations,
-                usedShards,
-                forceJumbo ? MoveChunkRequest::ForceJumbo::kForceBalancer
-                           : MoveChunkRequest::ForceJumbo::kDoNotForce);
+            return _singleZoneBalanceBasedOnChunks(shardStats,
+                                                   distribution,
+                                                   tag,
+                                                   totalNumberOfShardsWithTag,
+                                                   &migrations,
+                                                   usedShards,
+                                                   forceJumbo ? ForceJumbo::kForceBalancer
+                                                              : ForceJumbo::kDoNotForce);
         };
 
         while (singleZoneBalance()) {
@@ -657,8 +654,7 @@ boost::optional<MigrateInfo> BalancerPolicy::balanceSingleChunk(
         return boost::optional<MigrateInfo>();
     }
 
-    return MigrateInfo(
-        newShardId, distribution.nss(), chunk, MoveChunkRequest::ForceJumbo::kDoNotForce);
+    return MigrateInfo(newShardId, distribution.nss(), chunk, ForceJumbo::kDoNotForce);
 }
 
 bool BalancerPolicy::_singleZoneBalanceBasedOnChunks(const ShardStatisticsVector& shardStats,
@@ -667,7 +663,7 @@ bool BalancerPolicy::_singleZoneBalanceBasedOnChunks(const ShardStatisticsVector
                                                      size_t totalNumberOfShardsWithTag,
                                                      vector<MigrateInfo>* migrations,
                                                      stdx::unordered_set<ShardId>* usedShards,
-                                                     MoveChunkRequest::ForceJumbo forceJumbo) {
+                                                     ForceJumbo forceJumbo) {
     // Calculate the rounded optimal number of chunks per shard
     const size_t totalNumberOfChunksWithTag =
         (tag.empty() ? distribution.totalChunks() : distribution.totalChunksWithTag(tag));
@@ -763,7 +759,7 @@ bool BalancerPolicy::_singleZoneBalanceBasedOnDataSize(
     const string& tag,
     vector<MigrateInfo>* migrations,
     stdx::unordered_set<ShardId>* usedShards,
-    MoveChunkRequest::ForceJumbo forceJumbo) {
+    ForceJumbo forceJumbo) {
     const auto [from, fromSize] =
         _getMostOverloadedShard(shardStats, distribution, collDataSizeInfo, tag, *usedShards);
     if (!from.isValid())
@@ -847,7 +843,7 @@ string ZoneRange::toString() const {
 MigrateInfo::MigrateInfo(const ShardId& a_to,
                          const NamespaceString& a_nss,
                          const ChunkType& a_chunk,
-                         const MoveChunkRequest::ForceJumbo a_forceJumbo)
+                         const ForceJumbo a_forceJumbo)
     : nss(a_nss), uuid(a_chunk.getCollectionUUID()) {
     invariant(a_to.isValid());
 
@@ -867,7 +863,7 @@ MigrateInfo::MigrateInfo(const ShardId& a_to,
                          const BSONObj& a_min,
                          const boost::optional<BSONObj>& a_max,
                          const ChunkVersion& a_version,
-                         const MoveChunkRequest::ForceJumbo a_forceJumbo,
+                         const ForceJumbo a_forceJumbo,
                          boost::optional<int64_t> maxChunkSizeBytes)
     : nss(a_nss),
       uuid(a_uuid),

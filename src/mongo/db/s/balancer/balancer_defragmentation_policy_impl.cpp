@@ -36,6 +36,7 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 
 #include <fmt/format.h>
@@ -713,7 +714,7 @@ private:
                                chunkToMove->range.getMin(),
                                chunkToMove->range.getMax(),
                                version,
-                               MoveChunkRequest::ForceJumbo::kForceBalancer);
+                               ForceJumbo::kForceBalancer);
         }
 
         ChunkRange asMergedRange() const {

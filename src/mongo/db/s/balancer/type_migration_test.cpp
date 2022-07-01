@@ -30,6 +30,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -55,8 +56,7 @@ TEST(MigrationTypeTest, FromAndToBSONWithoutOptionalFields) {
     builder.append(MigrationType::toShard(), kToShard.toString());
     version.serializeToBSON("chunkVersion", &builder);
     builder.append(MigrationType::waitForDelete(), kWaitForDelete);
-    builder.append(MigrationType::forceJumbo(),
-                   MoveChunkRequest::forceJumboToString(MoveChunkRequest::ForceJumbo::kDoNotForce));
+    builder.append(MigrationType::forceJumbo(), ForceJumbo_serializer(ForceJumbo::kDoNotForce));
 
     BSONObj obj = builder.obj();
 
@@ -78,8 +78,7 @@ TEST(MigrationTypeTest, FromAndToBSONWitOptionalFields) {
     builder.append(MigrationType::toShard(), kToShard.toString());
     version.serializeToBSON("chunkVersion", &builder);
     builder.append(MigrationType::waitForDelete(), kWaitForDelete);
-    builder.append(MigrationType::forceJumbo(),
-                   MoveChunkRequest::forceJumboToString(MoveChunkRequest::ForceJumbo::kDoNotForce));
+    builder.append(MigrationType::forceJumbo(), ForceJumbo_serializer(ForceJumbo::kDoNotForce));
     builder.append(MigrationType::maxChunkSizeBytes(), 512 * 1024 * 1024);
     secondaryThrottle.append(&builder);
 

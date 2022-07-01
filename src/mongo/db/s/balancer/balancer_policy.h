@@ -39,7 +39,7 @@
 #include "mongo/db/s/balancer/cluster_statistics.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/request_types/auto_split_vector_gen.h"
-#include "mongo/s/request_types/move_chunk_request.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
@@ -59,7 +59,7 @@ struct MigrateInfo {
     MigrateInfo(const ShardId& a_to,
                 const NamespaceString& a_nss,
                 const ChunkType& a_chunk,
-                MoveChunkRequest::ForceJumbo a_forceJumbo);
+                ForceJumbo a_forceJumbo);
 
     MigrateInfo(const ShardId& a_to,
                 const ShardId& a_from,
@@ -68,7 +68,7 @@ struct MigrateInfo {
                 const BSONObj& a_min,
                 const boost::optional<BSONObj>& a_max,
                 const ChunkVersion& a_version,
-                MoveChunkRequest::ForceJumbo a_forceJumbo,
+                ForceJumbo a_forceJumbo,
                 boost::optional<int64_t> maxChunkSizeBytes = boost::none);
 
     std::string getName() const;
@@ -86,7 +86,7 @@ struct MigrateInfo {
     // May be optional in case of moveRange
     boost::optional<BSONObj> maxKey;
     ChunkVersion version;
-    MoveChunkRequest::ForceJumbo forceJumbo;
+    ForceJumbo forceJumbo;
 
     // Set only in case of data-size aware balancing
     // TODO SERVER-65322 make `optMaxChunkSizeBytes` non-optional
@@ -458,7 +458,7 @@ private:
                                                 size_t totalNumberOfShardsWithTag,
                                                 std::vector<MigrateInfo>* migrations,
                                                 stdx::unordered_set<ShardId>* usedShards,
-                                                MoveChunkRequest::ForceJumbo forceJumbo);
+                                                ForceJumbo forceJumbo);
 
     /**
      * Selects one range for the specified zone (if appropriate) to be moved in order to bring the
@@ -475,7 +475,7 @@ private:
         const std::string& tag,
         std::vector<MigrateInfo>* migrations,
         stdx::unordered_set<ShardId>* usedShards,
-        MoveChunkRequest::ForceJumbo forceJumbo);
+        ForceJumbo forceJumbo);
 };
 
 }  // namespace mongo

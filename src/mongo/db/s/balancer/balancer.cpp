@@ -380,11 +380,8 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
     const auto maxChunkSize = getMaxChunkSizeBytes(opCtx, coll);
 
     MoveChunkSettings settings(maxChunkSize, secondaryThrottle, waitForDelete);
-    MigrateInfo migrateInfo(newShardId,
-                            nss,
-                            chunk,
-                            forceJumbo ? MoveChunkRequest::ForceJumbo::kForceManual
-                                       : MoveChunkRequest::ForceJumbo::kDoNotForce);
+    MigrateInfo migrateInfo(
+        newShardId, nss, chunk, forceJumbo ? ForceJumbo::kForceManual : ForceJumbo::kDoNotForce);
     auto response =
         _commandScheduler
             ->requestMoveChunk(opCtx, migrateInfo, settings, true /* issuedByRemoteUser */)

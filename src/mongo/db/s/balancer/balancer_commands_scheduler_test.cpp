@@ -32,6 +32,8 @@
 #include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
+
 
 namespace mongo {
 namespace {
@@ -75,7 +77,7 @@ public:
                            BSON("x" << min),
                            BSON("x" << min + 10),
                            ChunkVersion({OID::gen(), Timestamp(10)}, {1, 1}),
-                           MoveChunkRequest::ForceJumbo::kDoNotForce);
+                           ForceJumbo::kDoNotForce);
     }
 
     MoveChunkSettings getMoveChunkSettings(int64_t maxChunkSize = kDefaultMaxChunkSizeBytes) {
