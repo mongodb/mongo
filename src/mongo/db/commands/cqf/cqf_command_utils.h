@@ -72,8 +72,7 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
 /**
  * Returns whether the given find command is eligible to use the bonsai optimizer.
  */
-bool isEligibleForBonsai(const FindCommandRequest& request,
-                         const MatchExpression& expression,
+bool isEligibleForBonsai(const CanonicalQuery& cq,
                          OperationContext* opCtx,
                          const CollectionPtr& collection);
 

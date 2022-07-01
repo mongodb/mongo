@@ -875,6 +875,7 @@ buildvariants:
     external_auth_jobs_max: 1
   tasks:
   - name: cqf
+  - name: cqf_passthrough
   - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
@@ -1419,6 +1420,7 @@ buildvariants:
       --excludeWithAnyTags=incompatible_with_shard_merge
   tasks: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-tasks
   - name: cqf
+  - name: cqf_passthrough
   - name: cqf_parallel
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -2214,6 +2216,7 @@ buildvariants:
     separate_debug: off
   tasks:
   - name: cqf
+  - name: cqf_passthrough
   - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG
   - name: .aggregation
@@ -2371,6 +2374,7 @@ buildvariants:
     large_distro_name: rhel80-build
   tasks:
   - name: cqf
+  - name: cqf_passthrough
   - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG
   - name: .aggregation

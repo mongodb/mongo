@@ -1,0 +1,110 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+  exclude_files:
+  # TODO SERVER-67427 Fix conjunctions over an array field.
+  - jstests/core/all2.js
+  - jstests/core/index_check2.js
+  - jstests/core/or5.js
+  # TODO SERVER-67369 enable once full type bracketing is supported.
+  - jstests/core/array_comparison_correctness.js
+  - jstests/core/arrayfind10.js
+  - jstests/core/arrayfind3.js
+  - jstests/core/date2.js
+  - jstests/core/expressions_matching_whole_array.js
+  - jstests/core/index_decimal.js
+  - jstests/core/min_max_key.js
+  - jstests/core/nan.js
+  # TODO SERVER-67506
+  - jstests/core/arrayfind5.js
+  - jstests/core/arrayfind8.js
+  # TODO SERVER-67371 These tests all use unsupported command options.
+  - jstests/core/batch_size.js
+  - jstests/core/find_getmore_cmd.js
+  - jstests/core/finda.js
+  - jstests/core/idhack.js
+  - jstests/core/index_diag.js
+  - jstests/core/kill_cursors.js
+  - jstests/core/minmax.js
+  - jstests/core/show_record_id.js
+  # TODO SERVER-67510
+  - jstests/core/collation_with_reverse_index.js
+  - jstests/core/find_covered_projection.js
+  # TODO SERVER-67548 Fix equality to null with indexes.
+  - jstests/core/cover_null_queries.js
+  - jstests/core/null_query_semantics.js
+  # TODO SERVER-62407 translate to ABT directly from find.
+  - jstests/core/currentop_cursors.js
+  - jstests/core/profile_getmore.js
+  # TODO SERVER-67503
+  - jstests/core/elemmatch_object.js
+  # TODO SERVER-67517
+  - jstests/core/field_name_empty.js
+  - jstests/core/field_name_validation.js
+  # TODO SERVER-67638
+  - jstests/core/grow_hash_table.js
+  - jstests/core/profile2.js
+  # TODO SERVER-67639
+  - jstests/core/index_stats.js
+  # TODO SERVER-67640
+  - jstests/core/operation_latency_histogram.js
+  - jstests/core/top.js
+  # TODO SERVER-64007 Enable yielding for plans generated from bonsai.
+  - jstests/core/ord.js
+  # TODO SERVER-67607
+  - jstests/core/cached_plan_trial_does_not_discard_work.js
+  - jstests/core/index_filter_commands_invalidate_plan_cache_entries.js
+  - jstests/core/plan_cache_clear.js
+  - jstests/core/plan_cache_list_shapes.js
+  - jstests/core/plan_cache_list_plans.js
+  - jstests/core/plan_cache_sbe.js
+  - jstests/core/plan_cache_shell_helpers.js
+  - jstests/core/plan_cache_stats_shard_and_host.js
+  - jstests/core/profile_query_hash.js
+  - jstests/core/sbe/plan_cache_sbe_with_or_queries.js
+  - jstests/core/sbe_plan_cache_autoparameterize_collscan.js
+  # TODO SERVER-67596 Allow reads to system.js collection.
+  - jstests/core/where_system_js.js
+  - jstests/core/find_and_modify_concurrent_update.js
+  - jstests/core/find_and_modify_where.js
+  # TODO SERVER-67637 Verify projection and sort for find command.
+  - jstests/core/plan_cache_positional_projection.js
+  - jstests/core/projection_meta_index_key.js
+  - jstests/core/positional_projection.js
+  - jstests/core/positional_projection_multiple_array_fields.js
+  - jstests/core/elemmatch_projection.js
+  - jstests/core/slice1.js
+  - jstests/core/explain_sort_type.js
+  - jstests/core/sortl.js
+  - jstests/core/index_filter_commands.js
+  - jstests/core/introspect_hidden_index_plan_cache_entries.js
+  # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests in the
+  # 'core' suite. Instead we run them against a 1-node replica set in the 'core_txns' suite.
+  - jstests/core/txns/**/*.js
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      crashOnInvalidBSONError: ""
+      objcheck: ""
+      eval: load("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+  hooks:
+  - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData:
+          skipValidationOnNamespaceNotFound: false
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagCommonQueryFramework: true
+        internalQueryEnableCascadesOptimizer: true

@@ -7298,6 +7298,13 @@ tasks:
   - func: "run tests"
 
 - <<: *task_template
+  name: cqf_passthrough
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
   name: cqf_parallel
   tags: []
   commands:

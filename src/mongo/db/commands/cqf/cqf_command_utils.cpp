@@ -366,18 +366,32 @@ public:
     ABTTransformerVisitor(bool& eligible) : _eligible(eligible) {}
 
     void visit(const projection_executor::ExclusionProjectionExecutor* transformer) override {
-        std::set<std::string> preservedPaths;
-        transformer->getRoot()->reportProjectedPaths(&preservedPaths);
-
-        for (const std::string& path : preservedPaths) {
-            if (FieldRef(path).hasNumericPathComponents()) {
-                unsupportedTransformer(transformer);
-                return;
-            }
-        }
+        checkUnsupportedInclusionExclusion(transformer);
     }
 
     void visit(const projection_executor::InclusionProjectionExecutor* transformer) override {
+        checkUnsupportedInclusionExclusion(transformer);
+    }
+
+    void visit(const projection_executor::AddFieldsProjectionExecutor* transformer) override {
+        unsupportedTransformer(transformer);
+    }
+
+    void visit(const GroupFromFirstDocumentTransformation* transformer) override {
+        unsupportedTransformer(transformer);
+    }
+
+    void visit(const ReplaceRootTransformation* transformer) override {
+        unsupportedTransformer(transformer);
+    }
+
+private:
+    void unsupportedTransformer(const TransformerInterface* transformer) {
+        _eligible = false;
+    }
+
+    template <typename T>
+    void checkUnsupportedInclusionExclusion(const T* transformer) {
         std::set<std::string> computedPaths;
         StringMap<std::string> renamedPaths;
         transformer->getRoot()->reportComputedPaths(&computedPaths, &renamedPaths);
@@ -397,23 +411,6 @@ public:
                 return;
             }
         }
-    }
-
-    void visit(const projection_executor::AddFieldsProjectionExecutor* transformer) override {
-        unsupportedTransformer(transformer);
-    }
-
-    void visit(const GroupFromFirstDocumentTransformation* transformer) override {
-        unsupportedTransformer(transformer);
-    }
-
-    void visit(const ReplaceRootTransformation* transformer) override {
-        unsupportedTransformer(transformer);
-    }
-
-private:
-    void unsupportedTransformer(const TransformerInterface* transformer) const {
-        _eligible = false;
     }
 
     bool& _eligible;
@@ -627,7 +624,8 @@ bool isEligibleCommon(const RequestType& request,
         return false;
     }();
 
-    return !unsupportedCmdOption && !unsupportedIndexType && !unsupportedCollectionType;
+    return !unsupportedCmdOption && !unsupportedIndexType && !unsupportedCollectionType &&
+        !storageGlobalParams.noTableScan.load();
 }
 
 boost::optional<bool> shouldForceBonsai() {
@@ -665,32 +663,52 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
 
     bool commandOptionsEligible = isEligibleCommon(request, opCtx, collection) &&
         !request.getUnwrappedReadPref() && !request.getRequestReshardingResumeToken().has_value() &&
-        !request.getExchange();
+        !request.getExchange() && !request.getExplain();
+
+    // Early return to avoid unnecessary work of walking the input pipeline.
+    if (!commandOptionsEligible) {
+        return false;
+    }
 
     ABTUnsupportedDocumentSourceVisitor visitor;
     DocumentSourceWalker walker(nullptr /*preVisitor*/, &visitor);
-    walker.walk(pipeline);
-    bool eligiblePipeline = visitor.eligible;
 
-    return commandOptionsEligible && eligiblePipeline;
+    // The rudimentary walker may throw if it reaches a stage that it isn't aware about, so catch it
+    // here and return ineligible.
+    // TODO SERVER-62027 this should no longer be needed once all stages require a visit.
+    try {
+        walker.walk(pipeline);
+    } catch (DBException&) {
+        visitor.eligible = false;
+    }
+
+    return visitor.eligible;
 }
 
-bool isEligibleForBonsai(const FindCommandRequest& request,
-                         const MatchExpression& expression,
+bool isEligibleForBonsai(const CanonicalQuery& cq,
                          OperationContext* opCtx,
                          const CollectionPtr& collection) {
     if (auto forceBonsai = shouldForceBonsai(); forceBonsai.has_value()) {
         return *forceBonsai;
     }
 
-    bool commandOptionsEligible = isEligibleCommon(request, opCtx, collection);
+    auto request = cq.getFindCommandRequest();
+    auto expression = cq.root();
+    bool commandOptionsEligible = isEligibleCommon(request, opCtx, collection) &&
+        !cq.getExplain() && !request.getReturnKey() && !request.getSingleBatch() &&
+        !request.getTailable();
+
+    // Early return to avoid unnecessary work of walking the input expression.
+    if (!commandOptionsEligible) {
+        return false;
+    }
 
     bool eligibleMatch = true;
     ABTMatchExpressionVisitor visitor(eligibleMatch);
     MatchExpressionWalker walker(nullptr /*preVisitor*/, nullptr /*inVisitor*/, &visitor);
-    tree_walker::walk<true, MatchExpression>(&expression, &walker);
+    tree_walker::walk<true, MatchExpression>(expression, &walker);
 
-    return commandOptionsEligible && eligibleMatch;
+    return eligibleMatch;
 }
 
 }  // namespace mongo

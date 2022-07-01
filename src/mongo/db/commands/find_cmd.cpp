@@ -306,9 +306,7 @@ public:
 
             // If we are running a query against a view, or if we are trying to test the new
             // optimizer, redirect this query through the aggregation system.
-            if (ctx->getView() ||
-                isEligibleForBonsai(
-                    cq->getFindCommandRequest(), *cq->root(), opCtx, ctx->getCollection())) {
+            if (ctx->getView() || isEligibleForBonsai(*cq, opCtx, ctx->getCollection())) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 ctx.reset();
 
@@ -511,9 +509,7 @@ public:
 
             // If we are running a query against a view, or if we are trying to test the new
             // optimizer, redirect this query through the aggregation system.
-            if (ctx->getView() ||
-                isEligibleForBonsai(
-                    cq->getFindCommandRequest(), *cq->root(), opCtx, ctx->getCollection())) {
+            if (ctx->getView() || isEligibleForBonsai(*cq, opCtx, ctx->getCollection())) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 ctx.reset();
 
