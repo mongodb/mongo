@@ -117,12 +117,6 @@ public:
             auto donor = TenantMigrationDonorService::Instance::getOrCreate(
                 opCtx, donorService, stateDocBson);
 
-            // If the conflict is discovered here, it implies that there is an existing instance
-            // with the same migrationId but different options (e.g. tenantId or
-            // recipientConnectionString or readPreference).
-            uassertStatusOK(donor->checkIfOptionsConflict(stateDoc));
-
-
             // always ensure we wait for the initial state document to be inserted.
             donor->getInitialStateDocumentDurableFuture().get(opCtx);
             auto durableState = donor->getDurableState();

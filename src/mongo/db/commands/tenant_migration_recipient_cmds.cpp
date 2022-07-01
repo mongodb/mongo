@@ -114,12 +114,6 @@ public:
             auto recipientInstance = repl::TenantMigrationRecipientService::Instance::getOrCreate(
                 opCtx, recipientService, stateDocBson);
 
-            // Ensure that the options (e.g. tenantId, recipientConnectionString, or readPreference)
-            // received by this migration match the options it was created with. If there is a
-            // conflict, it means there exists a migration with the same migrationId, but different
-            // options.
-            uassertStatusOK(recipientInstance->checkIfOptionsConflict(stateDoc));
-
             auto returnAfterReachingDonorTs = cmd.getReturnAfterReachingDonorTimestamp();
 
             if (!returnAfterReachingDonorTs) {
@@ -292,7 +286,7 @@ public:
             }
 
             auto recipientInstance = repl::TenantMigrationRecipientService::Instance::getOrCreate(
-                opCtx, recipientService, stateDoc.toBSON());
+                opCtx, recipientService, stateDoc.toBSON(), false);
 
             // Instruct the instance run() function to mark this migration garbage collectable.
             recipientInstance->onReceiveRecipientForgetMigration(opCtx);

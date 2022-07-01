@@ -77,8 +77,6 @@ public:
                 opCtx, donorService, stateDoc.toBSON());
             invariant(donorPtr);
 
-            uassertStatusOK(donorPtr->checkIfOptionsConflict(stateDoc));
-
             auto state = donorPtr->decisionFuture().get(opCtx);
 
             uassert(ErrorCodes::TenantMigrationAborted,
@@ -156,7 +154,8 @@ public:
                 opCtx,
                 splitService,
                 BSON("_id" << cmd.getMigrationId() << ShardSplitDonorDocument::kStateFieldName
-                           << ShardSplitDonorState_serializer(ShardSplitDonorStateEnum::kAborted)));
+                           << ShardSplitDonorState_serializer(ShardSplitDonorStateEnum::kAborted)),
+                false);
 
             invariant(instance);
 

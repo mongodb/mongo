@@ -51,6 +51,8 @@ public:
         MongoProcessInterface::CurrentOpConnectionsMode connMode,
         MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
+    void checkIfOptionsConflict(const BSONObj& stateDoc) const override {}
+
 private:
     StateDoc _doc;
 

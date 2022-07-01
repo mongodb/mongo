@@ -56,15 +56,6 @@ public:
 
     ~ShardingDDLCoordinator();
 
-    /*
-     * Check if the given coordinator document has the same options as this.
-     *
-     * This is used to decide if we can join a previously created coordinator.
-     * In the case the given coordinator document has incompatible options with this,
-     * this function must throw a ConflictingOperationInProgress exception with an adequate message.
-     */
-    virtual void checkIfOptionsConflict(const BSONObj& coorDoc) const = 0;
-
     /**
      * Whether this coordinator is allowed to start when user write blocking is enabled, even if the
      * writeBlockingBypass flag is not set. Coordinators that don't affect user data shall always be

@@ -60,6 +60,8 @@ public:
         return _coordId.getCoordinatorType();
     }
 
+    void checkIfOptionsConflict(const BSONObj& stateDoc) const override {}
+
 protected:
     const ConfigsvrCoordinatorId _coordId;
 

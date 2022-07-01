@@ -428,24 +428,22 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     return bob.obj();
 }
 
-Status TenantMigrationDonorService::Instance::checkIfOptionsConflict(
-    const TenantMigrationDonorDocument& stateDoc) {
-    stdx::lock_guard<Latch> lg(_mutex);
+void TenantMigrationDonorService::Instance::checkIfOptionsConflict(const BSONObj& options) const {
+    auto stateDoc = tenant_migration_access_blocker::parseDonorStateDocument(options);
+
     invariant(stateDoc.getId() == _migrationUuid);
     invariant(stateDoc.getProtocol());
 
-    if (stateDoc.getProtocol().value() == _protocol && stateDoc.getTenantId() == _tenantId &&
-        stateDoc.getRecipientConnectionString() == _recipientConnectionString &&
-        stateDoc.getReadPreference().equals(_readPreference) &&
-        stateDoc.getDonorCertificateForRecipient() == _donorCertificateForRecipient &&
-        stateDoc.getRecipientCertificateForDonor() == _recipientCertificateForDonor) {
-        return Status::OK();
-    }
-
-    return Status(ErrorCodes::ConflictingOperationInProgress,
+    if (stateDoc.getProtocol().value() != _protocol || stateDoc.getTenantId() != _tenantId ||
+        stateDoc.getRecipientConnectionString() != _recipientConnectionString ||
+        !stateDoc.getReadPreference().equals(_readPreference) ||
+        stateDoc.getDonorCertificateForRecipient() != _donorCertificateForRecipient ||
+        stateDoc.getRecipientCertificateForDonor() != _recipientCertificateForDonor) {
+        uasserted(ErrorCodes::ConflictingOperationInProgress,
                   str::stream() << "Found active migration for migrationId \""
                                 << _migrationUuid.toBSON() << "\" with different options "
                                 << tenant_migration_util::redactStateDoc(_stateDoc.toBSON()));
+    }
 }
 
 boost::optional<TenantMigrationDonorService::Instance::DurableState>

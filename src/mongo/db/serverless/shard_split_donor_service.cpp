@@ -286,21 +286,22 @@ void ShardSplitDonorService::DonorStateMachine::tryForget() {
     _forgetShardSplitReceivedPromise.emplaceValue();
 }
 
-Status ShardSplitDonorService::DonorStateMachine::checkIfOptionsConflict(
-    const ShardSplitDonorDocument& stateDoc) const {
+void ShardSplitDonorService::DonorStateMachine::checkIfOptionsConflict(
+    const BSONObj& stateDocBson) const {
+    auto stateDoc =
+        ShardSplitDonorDocument::parse(IDLParserErrorContext("donorStateDoc"), stateDocBson);
+
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(stateDoc.getId() == _stateDoc.getId());
 
-    if (_stateDoc.getTenantIds() == stateDoc.getTenantIds() &&
-        _stateDoc.getRecipientTagName() == stateDoc.getRecipientTagName() &&
-        _stateDoc.getRecipientSetName() == stateDoc.getRecipientSetName()) {
-        return Status::OK();
-    }
-
-    return Status(ErrorCodes::ConflictingOperationInProgress,
+    if (_stateDoc.getTenantIds() != stateDoc.getTenantIds() ||
+        _stateDoc.getRecipientTagName() != stateDoc.getRecipientTagName() ||
+        _stateDoc.getRecipientSetName() != stateDoc.getRecipientSetName()) {
+        uasserted(ErrorCodes::ConflictingOperationInProgress,
                   str::stream() << "Found active migration for migrationId \""
                                 << _stateDoc.getId().toBSON() << "\" with different options "
                                 << _stateDoc.toBSON());
+    }
 }
 
 SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(

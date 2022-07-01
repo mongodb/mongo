@@ -179,6 +179,8 @@ public:
                 .semi();
         }
 
+        void checkIfOptionsConflict(const BSONObj&) const final {}
+
         void interrupt(Status status) override {
             // Currently unused. Functionality has been put into cancellation logic.
         }

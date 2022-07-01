@@ -133,6 +133,8 @@ public:
      */
     void abort(bool isUserCancelled);
 
+    void checkIfOptionsConflict(const BSONObj& stateDoc) const final {}
+
 private:
     /**
      * Runs up until the donor is either in state kBlockingWrites or encountered an error.

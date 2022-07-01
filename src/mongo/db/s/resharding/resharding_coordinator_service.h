@@ -300,6 +300,8 @@ public:
 
     std::shared_ptr<ReshardingCoordinatorObserver> getObserver();
 
+    void checkIfOptionsConflict(const BSONObj& stateDoc) const final {}
+
 private:
     struct ChunksAndZones {
         std::vector<ChunkType> initialChunks;

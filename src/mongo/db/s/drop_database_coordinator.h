@@ -47,7 +47,7 @@ public:
           _dbName(nss().db()) {}
     ~DropDatabaseCoordinator() = default;
 
-    void checkIfOptionsConflict(const BSONObj& doc) const override {}
+    void checkIfOptionsConflict(const BSONObj& doc) const final {}
 
 private:
     StringData serializePhase(const Phase& phase) const override {

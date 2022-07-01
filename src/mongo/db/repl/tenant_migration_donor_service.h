@@ -100,12 +100,7 @@ public:
             MongoProcessInterface::CurrentOpConnectionsMode connMode,
             MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
-        /**
-         * To be called on the instance returned by PrimaryOnlyService::getOrCreate. Returns an
-         * error if the options this Instance was created with are incompatible with the options
-         * given in 'stateDoc'.
-         */
-        Status checkIfOptionsConflict(const TenantMigrationDonorDocument& stateDoc);
+        void checkIfOptionsConflict(const BSONObj& stateDoc) const final;
 
         /**
          * Returns the latest durable migration state, or boost::none if no state document has been

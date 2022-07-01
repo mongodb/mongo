@@ -47,7 +47,7 @@ public:
 
     ~DropCollectionCoordinator() = default;
 
-    void checkIfOptionsConflict(const BSONObj& doc) const override {}
+    void checkIfOptionsConflict(const BSONObj& doc) const final {}
 
     /**
      * Locally drops a collection, cleans its CollectionShardingRuntime metadata and refreshes the

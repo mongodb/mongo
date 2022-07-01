@@ -139,6 +139,13 @@ public:
         virtual boost::optional<BSONObj> reportForCurrentOp(
             MongoProcessInterface::CurrentOpConnectionsMode connMode,
             MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept = 0;
+
+        /**
+         * Validate the found instance matches options in the state document of a new instance.
+         * Called in PrimaryOnlyService::getOrCreateInstance to check found instances for conflict.
+         * Throws an exception if state document conflicts with found instance.
+         */
+        virtual void checkIfOptionsConflict(const BSONObj& stateDoc) const = 0;
     };
 
     /**
@@ -173,8 +180,10 @@ public:
          */
         static std::shared_ptr<InstanceType> getOrCreate(OperationContext* opCtx,
                                                          PrimaryOnlyService* service,
-                                                         BSONObj initialState) {
-            auto [instance, _] = service->getOrCreateInstance(opCtx, std::move(initialState));
+                                                         BSONObj initialState,
+                                                         bool checkOptions = true) {
+            auto [instance, _] =
+                service->getOrCreateInstance(opCtx, std::move(initialState), checkOptions);
             return checked_pointer_cast<InstanceType>(instance);
         }
     };
@@ -327,7 +336,8 @@ protected:
      * Throws NotWritablePrimary if the node is not currently primary.
      */
     std::pair<std::shared_ptr<Instance>, bool> getOrCreateInstance(OperationContext* opCtx,
-                                                                   BSONObj initialState);
+                                                                   BSONObj initialState,
+                                                                   bool checkOptions = true);
 
     /**
      * Since, scoped task executor shuts down on stepdown, we might need to run some instance work,

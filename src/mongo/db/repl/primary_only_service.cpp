@@ -505,7 +505,9 @@ void PrimaryOnlyService::shutdown() {
 }
 
 std::pair<std::shared_ptr<PrimaryOnlyService::Instance>, bool>
-PrimaryOnlyService::getOrCreateInstance(OperationContext* opCtx, BSONObj initialState) {
+PrimaryOnlyService::getOrCreateInstance(OperationContext* opCtx,
+                                        BSONObj initialState,
+                                        bool checkOptions) {
     const auto idElem = initialState["_id"];
     uassert(4908702,
             str::stream() << "Missing _id element when adding new instance of PrimaryOnlyService \""
@@ -526,7 +528,12 @@ PrimaryOnlyService::getOrCreateInstance(OperationContext* opCtx, BSONObj initial
 
     auto it = _activeInstances.find(instanceID);
     if (it != _activeInstances.end()) {
-        return {it->second.getInstance(), false};
+        auto foundInstance = it->second.getInstance();
+        if (checkOptions) {
+            foundInstance->checkIfOptionsConflict(initialState);
+        }
+
+        return {foundInstance, false};
     }
 
     std::vector<const Instance*> existingInstances;

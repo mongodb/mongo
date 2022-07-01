@@ -189,6 +189,8 @@ public:
      */
     void abort(bool isUserCancelled);
 
+    void checkIfOptionsConflict(const BSONObj& stateDoc) const final {}
+
 private:
     /**
      * The work inside this function must be run regardless of any work on _scopedExecutor ever

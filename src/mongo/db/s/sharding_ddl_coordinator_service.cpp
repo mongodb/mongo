@@ -291,11 +291,6 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx, BSON
         }
     }();
 
-    // If the existing instance doesn't have conflicting options just return that one
-    if (!created) {
-        coordinator->checkIfOptionsConflict(coorDoc);
-    }
-
     return coordinator;
 }
 

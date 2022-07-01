@@ -154,12 +154,7 @@ public:
          */
         TenantMigrationRecipientDocument getState() const;
 
-        /**
-         * To be called on the instance returned by PrimaryOnlyService::getOrCreate(). Returns an
-         * error if the options this Instance was created with are incompatible with the options
-         * given in 'stateDoc'.
-         */
-        Status checkIfOptionsConflict(const TenantMigrationRecipientDocument& stateDoc) const;
+        void checkIfOptionsConflict(const BSONObj& stateDoc) const final;
 
         /*
          * Blocks the thread until the tenant migration reaches consistent state in an interruptible

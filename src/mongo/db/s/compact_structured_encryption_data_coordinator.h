@@ -63,7 +63,7 @@ public:
         return *_response;
     }
 
-    void checkIfOptionsConflict(const BSONObj& doc) const final {}
+    void checkIfOptionsConflict(const BSONObj& stateDoc) const final {}
 
 private:
     StringData serializePhase(const Phase& phase) const override {
