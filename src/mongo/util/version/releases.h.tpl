@@ -77,9 +77,8 @@
 ## Format a Version as `{major}_{minor}`.
 #def underscores(v): ${'{}_{}'.format(v.major, v.minor)}
 #def dotted(v): ${'{}.{}'.format(v.major, v.minor)}
-## TODO (SERVER-65400): Avoid generating the LTS FCV with 'kFullyDowngradedTo...'
-#def fcv_prefix(v): ${'kFullyDowngradedTo_' if v == $lower_bound_override else 'kVersion_'}
-#def fcv_cpp_name(v): ${'{}{}'.format($fcv_prefix(v), $underscores(v))}
+
+#def fcv_cpp_name(v): ${'kVersion_{}'.format($underscores(v))}
 ##
 #def transition_enum_name(transition, first, second):
 k$(transition)_$(underscores(first))_To_$(underscores(second))#slurp
@@ -140,10 +139,6 @@ for fcv_x in fcvs[bisect_left(fcvs, lts_cutoff):bisect_right(fcvs, latest)]:
  * features of the older of the two versions.
  *
  * For versions X and Y, the legal enums and featureCompatibilityVersion documents are:
- *
- * kFullyDowngradedTo_X
- * (X, Unset, Unset): Only version X features are available, and new and existing storage
- *                    engine entries use the X format
  *
  * kUpgradingFrom_X_To_Y
  * (X, Y, Unset): Only version X features are available, but new storage engine entries
