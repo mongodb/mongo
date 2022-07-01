@@ -67,4 +67,9 @@ std::string GlobalIndexMetrics::createOperationDescription() const noexcept {
                        ShardingDataTransformMetrics::getRoleName(_role),
                        _instanceId.toString());
 }
+
+Milliseconds GlobalIndexMetrics::getRecipientHighEstimateRemainingTimeMillis() const {
+    return Milliseconds{0};
+}
+
 }  // namespace mongo

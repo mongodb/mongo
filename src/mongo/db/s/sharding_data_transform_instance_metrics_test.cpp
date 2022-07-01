@@ -42,6 +42,46 @@
 namespace mongo {
 namespace {
 
+class ShardingDataTransformInstanceMetricsForTest : public ShardingDataTransformInstanceMetrics {
+public:
+    ShardingDataTransformInstanceMetricsForTest(
+        UUID instanceId,
+        BSONObj shardKey,
+        NamespaceString nss,
+        Role role,
+        Date_t startTime,
+        ClockSource* clockSource,
+        ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
+        : ShardingDataTransformInstanceMetrics{std::move(instanceId),
+                                               std::move(shardKey),
+                                               std::move(nss),
+                                               role,
+                                               startTime,
+                                               clockSource,
+                                               cumulativeMetrics} {}
+    ShardingDataTransformInstanceMetricsForTest(
+        UUID instanceId,
+        BSONObj shardKey,
+        NamespaceString nss,
+        Role role,
+        Date_t startTime,
+        ClockSource* clockSource,
+        ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+        ObserverPtr observer)
+        : ShardingDataTransformInstanceMetrics{std::move(instanceId),
+                                               std::move(shardKey),
+                                               std::move(nss),
+                                               role,
+                                               startTime,
+                                               clockSource,
+                                               cumulativeMetrics,
+                                               std::move(observer)} {}
+
+    Milliseconds getRecipientHighEstimateRemainingTimeMillis() const {
+        return Milliseconds{0};
+    }
+};
+
 class InstanceMetricsWithObserverMock {
 public:
     InstanceMetricsWithObserverMock(Date_t startTime,
@@ -60,25 +100,26 @@ public:
 
 
 private:
-    ShardingDataTransformInstanceMetrics _impl;
+    ShardingDataTransformInstanceMetricsForTest _impl;
 };
 
 class ShardingDataTransformInstanceMetricsTest : public ShardingDataTransformMetricsTestFixture {
 public:
-    std::unique_ptr<ShardingDataTransformInstanceMetrics> createInstanceMetrics(
+    std::unique_ptr<ShardingDataTransformInstanceMetricsForTest> createInstanceMetrics(
         UUID instanceId = UUID::gen(), Role role = Role::kDonor) {
-        return std::make_unique<ShardingDataTransformInstanceMetrics>(instanceId,
-                                                                      kTestCommand,
-                                                                      kTestNamespace,
-                                                                      role,
-                                                                      getClockSource()->now(),
-                                                                      getClockSource(),
-                                                                      &_cumulativeMetrics);
+        return std::make_unique<ShardingDataTransformInstanceMetricsForTest>(
+            instanceId,
+            kTestCommand,
+            kTestNamespace,
+            role,
+            getClockSource()->now(),
+            getClockSource(),
+            &_cumulativeMetrics);
     }
 
-    std::unique_ptr<ShardingDataTransformInstanceMetrics> createInstanceMetrics(
+    std::unique_ptr<ShardingDataTransformInstanceMetricsForTest> createInstanceMetrics(
         std::unique_ptr<ObserverMock> mock) {
-        return std::make_unique<ShardingDataTransformInstanceMetrics>(
+        return std::make_unique<ShardingDataTransformInstanceMetricsForTest>(
             UUID::gen(),
             kTestCommand,
             kTestNamespace,
@@ -87,43 +128,6 @@ public:
             getClockSource(),
             &_cumulativeMetrics,
             std::move(mock));
-    }
-
-    using MetricsMutator = std::function<void(ShardingDataTransformInstanceMetrics*)>;
-    void runTimeReportTest(const std::string& testName,
-                           const std::initializer_list<Role>& roles,
-                           const std::string& timeField,
-                           const MetricsMutator& beginTimedSection,
-                           const MetricsMutator& endTimedSection) {
-        constexpr auto kIncrement = Milliseconds(5000);
-        const auto kIncrementInSeconds = durationCount<Seconds>(kIncrement);
-        for (const auto& role : roles) {
-            LOGV2(6437400, "", "TestName"_attr = testName, "Role"_attr = role);
-            auto uuid = UUID::gen();
-            const auto& clock = getClockSource();
-            auto metrics = std::make_unique<ShardingDataTransformInstanceMetrics>(
-                uuid, kTestCommand, kTestNamespace, role, clock->now(), clock, &_cumulativeMetrics);
-
-            // Reports 0 before timed section entered.
-            clock->advance(kIncrement);
-            auto report = metrics->reportForCurrentOp();
-            ASSERT_EQ(report.getIntField(timeField), 0);
-
-            // Reports time so far during critical section.
-            beginTimedSection(metrics.get());
-            clock->advance(kIncrement);
-            report = metrics->reportForCurrentOp();
-            ASSERT_EQ(report.getIntField(timeField), kIncrementInSeconds);
-            clock->advance(kIncrement);
-            report = metrics->reportForCurrentOp();
-            ASSERT_EQ(report.getIntField(timeField), kIncrementInSeconds * 2);
-
-            // Still reports total time after critical section ends.
-            endTimedSection(metrics.get());
-            clock->advance(kIncrement);
-            report = metrics->reportForCurrentOp();
-            ASSERT_EQ(report.getIntField(timeField), kIncrementInSeconds * 2);
-        }
     }
 };
 
@@ -137,7 +141,7 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, RegisterAndDeregisterMetrics) {
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, RegisterAndDeregisterMetricsAtOnce) {
     {
-        std::vector<std::unique_ptr<ShardingDataTransformInstanceMetrics>> registered;
+        std::vector<std::unique_ptr<ShardingDataTransformInstanceMetricsForTest>> registered;
         for (auto i = 0; i < 100; i++) {
             registered.emplace_back(createInstanceMetrics());
             ASSERT_EQ(_cumulativeMetrics.getObservedMetricsCount(), registered.size());
@@ -183,53 +187,6 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, GetRoleNameShouldReturnCorrectN
     });
 }
 
-
-TEST_F(ShardingDataTransformInstanceMetricsTest, OnInsertAppliedShouldIncrementInsertsApplied) {
-    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
-
-    auto report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("insertsApplied"), 0);
-    metrics->onInsertApplied();
-
-    report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("insertsApplied"), 1);
-}
-
-
-TEST_F(ShardingDataTransformInstanceMetricsTest, OnUpdateAppliedShouldIncrementUpdatesApplied) {
-    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
-
-    auto report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("updatesApplied"), 0);
-    metrics->onUpdateApplied();
-
-    report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("updatesApplied"), 1);
-}
-
-TEST_F(ShardingDataTransformInstanceMetricsTest, OnDeleteAppliedShouldIncrementDeletesApplied) {
-    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
-
-    auto report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("deletesApplied"), 0);
-    metrics->onDeleteApplied();
-
-    report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("deletesApplied"), 1);
-}
-
-TEST_F(ShardingDataTransformInstanceMetricsTest,
-       OnOplogsEntriesAppliedShouldIncrementOplogsEntriesApplied) {
-    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
-
-    auto report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("oplogEntriesApplied"), 0);
-    metrics->onOplogEntriesApplied(100);
-
-    report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("oplogEntriesApplied"), 100);
-}
-
 TEST_F(ShardingDataTransformInstanceMetricsTest, DonorIncrementWritesDuringCriticalSection) {
     auto metrics = createInstanceMetrics(UUID::gen(), Role::kDonor);
 
@@ -252,39 +209,17 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, DonorIncrementReadsDuringCritic
     ASSERT_EQ(report.getIntField("countReadsDuringCriticalSection"), 1);
 }
 
-TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientIncrementFetchedOplogEntries) {
-    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
-
-    auto report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("oplogEntriesFetched"), 0);
-    metrics->onOplogEntriesFetched(50, Milliseconds(1));
-
-    report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("oplogEntriesFetched"), 50);
-}
-
-TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientRestoreFetchedOplogEntries) {
-    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
-
-    auto report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("oplogEntriesFetched"), 0);
-
-    metrics->restoreOplogEntriesFetched(100);
-    report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("oplogEntriesFetched"), 100);
-
-    metrics->restoreOplogEntriesFetched(50);
-    report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("oplogEntriesFetched"), 50);
-}
-
 TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsCriticalSectionTime) {
-    runTimeReportTest(
+    runTimeReportTest<ShardingDataTransformInstanceMetricsForTest>(
         "CurrentOpReportsCriticalSectionTime",
         {Role::kDonor, Role::kCoordinator},
         "totalCriticalSectionTimeElapsedSecs",
-        [](ShardingDataTransformInstanceMetrics* metrics) { metrics->onCriticalSectionBegin(); },
-        [](ShardingDataTransformInstanceMetrics* metrics) { metrics->onCriticalSectionEnd(); });
+        [](ShardingDataTransformInstanceMetricsForTest* metrics) {
+            metrics->onCriticalSectionBegin();
+        },
+        [](ShardingDataTransformInstanceMetricsForTest* metrics) {
+            metrics->onCriticalSectionEnd();
+        });
 }
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientSetsDocumentsAndBytesToCopy) {
@@ -318,90 +253,13 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientIncrementsDocumentsAnd
     ASSERT_EQ(report.getIntField("bytesCopied"), 1000);
 }
 
-TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientReportsRemainingTime) {
-    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
-    const auto& clock = getClockSource();
-    constexpr auto kIncrement = Milliseconds(5000);
-    constexpr auto kOpsPerIncrement = 25;
-    const auto kIncrementSecs = durationCount<Seconds>(kIncrement);
-    const auto kExpectedTotal = kIncrementSecs * 8;
-    metrics->setDocumentsToCopyCounts(0, kOpsPerIncrement * 4);
-    metrics->onOplogEntriesFetched(kOpsPerIncrement * 4, Milliseconds(1));
-
-    // Before cloning.
-    auto report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"), 0);
-
-    // During cloning.
-    metrics->onCopyingBegin();
-    metrics->onDocumentsCopied(0, kOpsPerIncrement, Milliseconds(1));
-    clock->advance(kIncrement);
-    report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"),
-              kExpectedTotal - kIncrementSecs);
-
-    metrics->onDocumentsCopied(0, kOpsPerIncrement * 2, Milliseconds(1));
-    clock->advance(kIncrement * 2);
-    report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"),
-              kExpectedTotal - (kIncrementSecs * 3));
-
-    // During applying.
-    metrics->onDocumentsCopied(0, kOpsPerIncrement, Milliseconds(1));
-    clock->advance(kIncrement);
-    metrics->onCopyingEnd();
-    metrics->onApplyingBegin();
-    metrics->onOplogEntriesApplied(kOpsPerIncrement);
-    clock->advance(kIncrement);
-    report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"),
-              kExpectedTotal - (kIncrementSecs * 5));
-
-    metrics->onOplogEntriesApplied(kOpsPerIncrement * 2);
-    clock->advance(kIncrement * 2);
-    report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"),
-              kExpectedTotal - (kIncrementSecs * 7));
-
-    // Done.
-    metrics->onOplogEntriesApplied(kOpsPerIncrement);
-    clock->advance(kIncrement);
-    metrics->onApplyingEnd();
-    report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"), 0);
-}
-
-TEST_F(ShardingDataTransformInstanceMetricsTest, RecipientRestoreAppliedOplogEntries) {
-    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
-
-    auto report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("oplogEntriesApplied"), 0);
-
-    metrics->restoreOplogEntriesApplied(120);
-    report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("oplogEntriesApplied"), 120);
-
-    metrics->restoreOplogEntriesApplied(30);
-    report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("oplogEntriesApplied"), 30);
-}
-
 TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsCopyingTime) {
-    runTimeReportTest(
+    runTimeReportTest<ShardingDataTransformInstanceMetricsForTest>(
         "CurrentOpReportsCopyingTime",
         {Role::kRecipient, Role::kCoordinator},
         "totalCopyTimeElapsedSecs",
-        [](ShardingDataTransformInstanceMetrics* metrics) { metrics->onCopyingBegin(); },
-        [](ShardingDataTransformInstanceMetrics* metrics) { metrics->onCopyingEnd(); });
-}
-
-TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsApplyingTime) {
-    runTimeReportTest(
-        "CurrentOpReportsApplyingTime",
-        {Role::kRecipient, Role::kCoordinator},
-        "totalApplyTimeElapsedSecs",
-        [](ShardingDataTransformInstanceMetrics* metrics) { metrics->onApplyingBegin(); },
-        [](ShardingDataTransformInstanceMetrics* metrics) { metrics->onApplyingEnd(); });
+        [](ShardingDataTransformInstanceMetricsForTest* metrics) { metrics->onCopyingBegin(); },
+        [](ShardingDataTransformInstanceMetricsForTest* metrics) { metrics->onCopyingEnd(); });
 }
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsRunningTime) {
@@ -409,13 +267,14 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsRunningTime) {
     auto now = getClockSource()->now();
     constexpr auto kTimeElapsed = 15;
     auto start = now - Seconds(kTimeElapsed);
-    auto metrics = std::make_unique<ShardingDataTransformInstanceMetrics>(uuid,
-                                                                          kTestCommand,
-                                                                          kTestNamespace,
-                                                                          Role::kCoordinator,
-                                                                          start,
-                                                                          getClockSource(),
-                                                                          &_cumulativeMetrics);
+    auto metrics =
+        std::make_unique<ShardingDataTransformInstanceMetricsForTest>(uuid,
+                                                                      kTestCommand,
+                                                                      kTestNamespace,
+                                                                      Role::kCoordinator,
+                                                                      start,
+                                                                      getClockSource(),
+                                                                      &_cumulativeMetrics);
     auto report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("totalOperationTimeElapsedSecs"), kTimeElapsed);
 }

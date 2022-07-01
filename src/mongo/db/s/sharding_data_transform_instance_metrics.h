@@ -60,9 +60,11 @@ public:
                                          ObserverPtr observer);
     virtual ~ShardingDataTransformInstanceMetrics();
 
-    BSONObj reportForCurrentOp() const noexcept;
+    virtual BSONObj reportForCurrentOp() const noexcept;
+
     Milliseconds getHighEstimateRemainingTimeMillis() const;
     Milliseconds getLowEstimateRemainingTimeMillis() const;
+    virtual Milliseconds getRecipientHighEstimateRemainingTimeMillis() const = 0;
     Date_t getStartTimestamp() const;
     const UUID& getInstanceId() const;
 
@@ -80,23 +82,15 @@ public:
                            Milliseconds elapsed);
     Date_t getCopyingBegin() const;
     Date_t getCopyingEnd() const;
-    Date_t getApplyingBegin() const;
-    Date_t getApplyingEnd() const;
     int64_t getDocumentsCopiedCount() const;
     int64_t getBytesCopiedCount() const;
+    int64_t getApproxBytesToCopyCount() const;
     void restoreDocumentsCopied(int64_t documentCount, int64_t totalDocumentsSizeBytes);
     void setDocumentsToCopyCounts(int64_t documentCount, int64_t totalDocumentsSizeBytes);
     void setCoordinatorHighEstimateRemainingTimeMillis(Milliseconds milliseconds);
     void setCoordinatorLowEstimateRemainingTimeMillis(Milliseconds milliseconds);
-    void onInsertApplied();
-    void onUpdateApplied();
-    void onDeleteApplied();
-    void onOplogEntriesFetched(int64_t numEntries, Milliseconds elapsed);
-    void restoreOplogEntriesFetched(int64_t numEntries);
     void onLocalInsertDuringOplogFetching(Milliseconds elapsed);
     void onBatchRetrievedDuringOplogApplying(Milliseconds elapsed);
-    void onOplogEntriesApplied(int64_t numEntries);
-    void restoreOplogEntriesApplied(int64_t numEntries);
     void onCloningTotalRemoteBatchRetrieval(Milliseconds elapsed);
     void onOplogLocalBatchApplied(Milliseconds elapsed);
     void onWriteToStashedCollections();
@@ -115,19 +109,30 @@ public:
     void setLastOpEndingChunkImbalance(int64_t imbalanceCount);
 
 protected:
+    static constexpr auto kNoDate = Date_t::min();
+
+    template <typename T>
+    T getElapsed(const AtomicWord<Date_t>& startTime,
+                 const AtomicWord<Date_t>& endTime,
+                 ClockSource* clock) const {
+        auto start = startTime.load();
+        if (start == kNoDate) {
+            return T{0};
+        }
+        auto end = endTime.load();
+        if (end == kNoDate) {
+            end = clock->now();
+        }
+        return duration_cast<T>(end - start);
+    }
     void restoreCopyingBegin(Date_t date);
     void restoreCopyingEnd(Date_t date);
-    void restoreApplyingBegin(Date_t date);
-    void restoreApplyingEnd(Date_t date);
     virtual std::string createOperationDescription() const noexcept;
     virtual StringData getStateString() const noexcept;
-
-    void accumulateValues(int64_t insertsApplied,
-                          int64_t updatesApplied,
-                          int64_t deletesApplied,
-                          int64_t writesToStashCollections);
+    void accumulateWritesToStashCollections(int64_t writesToStashCollections);
 
     ShardingDataTransformCumulativeMetrics* getCumulativeMetrics();
+    ClockSource* getClockSource() const;
 
     const UUID _instanceId;
     const BSONObj _originalCommand;
@@ -141,17 +146,11 @@ protected:
     static constexpr auto kOpTimeElapsed = "totalOperationTimeElapsedSecs";
     static constexpr auto kCriticalSectionTimeElapsed = "totalCriticalSectionTimeElapsedSecs";
     static constexpr auto kRemainingOpTimeEstimated = "remainingOperationTimeEstimatedSecs";
-    static constexpr auto kApplyTimeElapsed = "totalApplyTimeElapsedSecs";
     static constexpr auto kCopyTimeElapsed = "totalCopyTimeElapsedSecs";
     static constexpr auto kApproxDocumentsToCopy = "approxDocumentsToCopy";
     static constexpr auto kApproxBytesToCopy = "approxBytesToCopy";
     static constexpr auto kBytesCopied = "bytesCopied";
     static constexpr auto kCountWritesToStashCollections = "countWritesToStashCollections";
-    static constexpr auto kInsertsApplied = "insertsApplied";
-    static constexpr auto kUpdatesApplied = "updatesApplied";
-    static constexpr auto kDeletesApplied = "deletesApplied";
-    static constexpr auto kOplogEntriesApplied = "oplogEntriesApplied";
-    static constexpr auto kOplogEntriesFetched = "oplogEntriesFetched";
     static constexpr auto kDocumentsCopied = "documentsCopied";
     static constexpr auto kCountWritesDuringCriticalSection = "countWritesDuringCriticalSection";
     static constexpr auto kCountReadsDuringCriticalSection = "countReadsDuringCriticalSection";
@@ -178,14 +177,6 @@ private:
     AtomicWord<int32_t> _approxBytesToCopy;
     AtomicWord<int32_t> _bytesCopied;
 
-    AtomicWord<Date_t> _applyingStartTime;
-    AtomicWord<Date_t> _applyingEndTime;
-    AtomicWord<int64_t> _oplogEntriesFetched;
-
-    AtomicWord<int64_t> _insertsApplied;
-    AtomicWord<int64_t> _updatesApplied;
-    AtomicWord<int64_t> _deletesApplied;
-    AtomicWord<int64_t> _oplogEntriesApplied;
     AtomicWord<int64_t> _writesToStashCollections;
 
     AtomicWord<Milliseconds> _coordinatorHighEstimateRemainingTimeMillis;

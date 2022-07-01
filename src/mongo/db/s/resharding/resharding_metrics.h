@@ -147,9 +147,40 @@ public:
     }
 
     void accumulateFrom(const ReshardingOplogApplierProgress& progressDoc);
+    BSONObj reportForCurrentOp() const noexcept override;
+
+    void onUpdateApplied();
+    void onInsertApplied();
+    void onDeleteApplied();
+    void onOplogEntriesFetched(int64_t numEntries, Milliseconds elapsed);
+    void restoreOplogEntriesFetched(int64_t numEntries);
+    void onOplogEntriesApplied(int64_t numEntries);
+    void restoreOplogEntriesApplied(int64_t numEntries);
+    void onApplyingBegin();
+    void onApplyingEnd();
+
+    Seconds getApplyingElapsedTimeSecs() const;
+    Date_t getApplyingBegin() const;
+    Date_t getApplyingEnd() const;
+    Milliseconds getRecipientHighEstimateRemainingTimeMillis() const;
 
 protected:
     virtual StringData getStateString() const noexcept override;
+
+    static constexpr auto kInsertsApplied = "insertsApplied";
+    static constexpr auto kUpdatesApplied = "updatesApplied";
+    static constexpr auto kDeletesApplied = "deletesApplied";
+    static constexpr auto kOplogEntriesApplied = "oplogEntriesApplied";
+    static constexpr auto kOplogEntriesFetched = "oplogEntriesFetched";
+    static constexpr auto kApplyTimeElapsed = "totalApplyTimeElapsedSecs";
+    static constexpr auto kAllShardsLowestRemainingOperationTimeEstimatedSecs =
+        "allShardsLowestRemainingOperationTimeEstimatedSecs";
+    static constexpr auto kAllShardsHighestRemainingOperationTimeEstimatedSecs =
+        "allShardsHighestRemainingOperationTimeEstimatedSecs";
+    static constexpr auto kRemainingOpTimeEstimated = "remainingOperationTimeEstimatedSecs";
+
+    void restoreApplyingBegin(Date_t date);
+    void restoreApplyingEnd(Date_t date);
 
 private:
     std::string createOperationDescription() const noexcept override;
@@ -200,6 +231,13 @@ private:
     }
 
     AtomicWord<State> _state;
+    AtomicWord<int64_t> _deletesApplied;
+    AtomicWord<int64_t> _insertsApplied;
+    AtomicWord<int64_t> _updatesApplied;
+    AtomicWord<int64_t> _oplogEntriesApplied;
+    AtomicWord<int64_t> _oplogEntriesFetched;
+    AtomicWord<Date_t> _applyingStartTime;
+    AtomicWord<Date_t> _applyingEndTime;
 };
 
 }  // namespace mongo

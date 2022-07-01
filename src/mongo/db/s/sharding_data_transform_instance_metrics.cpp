@@ -28,31 +28,10 @@
  */
 
 #include "mongo/db/s/sharding_data_transform_instance_metrics.h"
-#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_data_transform_metrics_observer.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
-
-namespace {
-constexpr auto kNoDate = Date_t::min();
-
-template <typename T>
-T getElapsed(const AtomicWord<Date_t>& startTime,
-             const AtomicWord<Date_t>& endTime,
-             ClockSource* clock) {
-    auto start = startTime.load();
-    if (start == kNoDate) {
-        return T{0};
-    }
-    auto end = endTime.load();
-    if (end == kNoDate) {
-        end = clock->now();
-    }
-    return duration_cast<T>(end - start);
-}
-
-}  // namespace
 
 ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
     UUID instanceId,
@@ -96,13 +75,6 @@ ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
       _documentsCopied{0},
       _approxBytesToCopy{0},
       _bytesCopied{0},
-      _applyingStartTime{kNoDate},
-      _applyingEndTime{kNoDate},
-      _oplogEntriesFetched{0},
-      _insertsApplied{0},
-      _updatesApplied{0},
-      _deletesApplied{0},
-      _oplogEntriesApplied{0},
       _coordinatorHighEstimateRemainingTimeMillis{Milliseconds{0}},
       _coordinatorLowEstimateRemainingTimeMillis{Milliseconds{0}},
       _criticalSectionStartTime{kNoDate},
@@ -117,20 +89,8 @@ ShardingDataTransformInstanceMetrics::~ShardingDataTransformInstanceMetrics() {
 
 Milliseconds ShardingDataTransformInstanceMetrics::getHighEstimateRemainingTimeMillis() const {
     switch (_role) {
-        case Role::kRecipient: {
-            auto estimate =
-                resharding::estimateRemainingRecipientTime(_applyingStartTime.load() != kNoDate,
-                                                           _bytesCopied.load(),
-                                                           _approxBytesToCopy.load(),
-                                                           getCopyingElapsedTimeSecs(),
-                                                           _oplogEntriesApplied.load(),
-                                                           _oplogEntriesFetched.load(),
-                                                           getApplyingElapsedTimeSecs());
-            if (!estimate) {
-                return Milliseconds{0};
-            }
-            return *estimate;
-        }
+        case Role::kRecipient:
+            return getRecipientHighEstimateRemainingTimeMillis();
         case Role::kCoordinator:
             return Milliseconds{_coordinatorHighEstimateRemainingTimeMillis.load()};
         case Role::kDonor:
@@ -190,7 +150,6 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
             builder.append(kAllShardsLowestRemainingOperationTimeEstimatedSecs,
                            durationCount<Seconds>(getLowEstimateRemainingTimeMillis()));
             builder.append(kCoordinatorState, getStateString());
-            builder.append(kApplyTimeElapsed, getApplyingElapsedTimeSecs().count());
             builder.append(kCopyTimeElapsed, getCopyingElapsedTimeSecs().count());
             builder.append(kCriticalSectionTimeElapsed,
                            getCriticalSectionElapsedTimeSecs().count());
@@ -204,7 +163,6 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
             break;
         case Role::kRecipient:
             builder.append(kRecipientState, getStateString());
-            builder.append(kApplyTimeElapsed, getApplyingElapsedTimeSecs().count());
             builder.append(kCopyTimeElapsed, getCopyingElapsedTimeSecs().count());
             builder.append(kRemainingOpTimeEstimated,
                            durationCount<Seconds>(getHighEstimateRemainingTimeMillis()));
@@ -212,11 +170,6 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
             builder.append(kApproxBytesToCopy, _approxBytesToCopy.load());
             builder.append(kBytesCopied, _bytesCopied.load());
             builder.append(kCountWritesToStashCollections, _writesToStashCollections.load());
-            builder.append(kInsertsApplied, _insertsApplied.load());
-            builder.append(kUpdatesApplied, _updatesApplied.load());
-            builder.append(kDeletesApplied, _deletesApplied.load());
-            builder.append(kOplogEntriesApplied, _oplogEntriesApplied.load());
-            builder.append(kOplogEntriesFetched, _oplogEntriesFetched.load());
             builder.append(kDocumentsCopied, _documentsCopied.load());
             break;
         default:
@@ -232,22 +185,6 @@ void ShardingDataTransformInstanceMetrics::onCopyingBegin() {
 
 void ShardingDataTransformInstanceMetrics::onCopyingEnd() {
     _copyingEndTime.store(_clockSource->now());
-}
-
-void ShardingDataTransformInstanceMetrics::onApplyingBegin() {
-    _applyingStartTime.store(_clockSource->now());
-}
-
-void ShardingDataTransformInstanceMetrics::onApplyingEnd() {
-    _applyingEndTime.store(_clockSource->now());
-}
-
-void ShardingDataTransformInstanceMetrics::restoreApplyingBegin(Date_t date) {
-    _applyingStartTime.store(date);
-}
-
-void ShardingDataTransformInstanceMetrics::restoreApplyingEnd(Date_t date) {
-    _applyingEndTime.store(date);
 }
 
 void ShardingDataTransformInstanceMetrics::restoreCopyingBegin(Date_t date) {
@@ -266,14 +203,6 @@ Date_t ShardingDataTransformInstanceMetrics::getCopyingEnd() const {
     return _copyingEndTime.load();
 }
 
-Date_t ShardingDataTransformInstanceMetrics::getApplyingBegin() const {
-    return _applyingStartTime.load();
-}
-
-Date_t ShardingDataTransformInstanceMetrics::getApplyingEnd() const {
-    return _applyingEndTime.load();
-}
-
 void ShardingDataTransformInstanceMetrics::onDocumentsCopied(int64_t documentCount,
                                                              int64_t totalDocumentsSizeBytes,
                                                              Milliseconds elapsed) {
@@ -288,6 +217,10 @@ int64_t ShardingDataTransformInstanceMetrics::getDocumentsCopiedCount() const {
 
 int64_t ShardingDataTransformInstanceMetrics::getBytesCopiedCount() const {
     return _bytesCopied.load();
+}
+
+int64_t ShardingDataTransformInstanceMetrics::getApproxBytesToCopyCount() const {
+    return _approxBytesToCopy.load();
 }
 
 void ShardingDataTransformInstanceMetrics::restoreDocumentsCopied(int64_t documentCount,
@@ -312,31 +245,6 @@ void ShardingDataTransformInstanceMetrics::setCoordinatorLowEstimateRemainingTim
     _coordinatorLowEstimateRemainingTimeMillis.store(milliseconds);
 }
 
-void ShardingDataTransformInstanceMetrics::onInsertApplied() {
-    _insertsApplied.addAndFetch(1);
-    _cumulativeMetrics->onInsertApplied();
-}
-
-void ShardingDataTransformInstanceMetrics::onUpdateApplied() {
-    _updatesApplied.addAndFetch(1);
-    _cumulativeMetrics->onUpdateApplied();
-}
-
-void ShardingDataTransformInstanceMetrics::onDeleteApplied() {
-    _deletesApplied.addAndFetch(1);
-    _cumulativeMetrics->onDeleteApplied();
-}
-
-void ShardingDataTransformInstanceMetrics::onOplogEntriesFetched(int64_t numEntries,
-                                                                 Milliseconds elapsed) {
-    _oplogEntriesFetched.addAndFetch(numEntries);
-    _cumulativeMetrics->onOplogEntriesFetched(numEntries, elapsed);
-}
-
-void ShardingDataTransformInstanceMetrics::restoreOplogEntriesFetched(int64_t numEntries) {
-    _oplogEntriesFetched.store(numEntries);
-}
-
 void ShardingDataTransformInstanceMetrics::onLocalInsertDuringOplogFetching(Milliseconds elapsed) {
     _cumulativeMetrics->onLocalInsertDuringOplogFetching(elapsed);
 }
@@ -344,15 +252,6 @@ void ShardingDataTransformInstanceMetrics::onLocalInsertDuringOplogFetching(Mill
 void ShardingDataTransformInstanceMetrics::onBatchRetrievedDuringOplogApplying(
     Milliseconds elapsed) {
     _cumulativeMetrics->onBatchRetrievedDuringOplogApplying(elapsed);
-}
-
-void ShardingDataTransformInstanceMetrics::onOplogEntriesApplied(int64_t numEntries) {
-    _oplogEntriesApplied.addAndFetch(numEntries);
-    _cumulativeMetrics->onOplogEntriesApplied(numEntries);
-}
-
-void ShardingDataTransformInstanceMetrics::restoreOplogEntriesApplied(int64_t numEntries) {
-    _oplogEntriesApplied.store(numEntries);
 }
 
 void ShardingDataTransformInstanceMetrics::onWriteDuringCriticalSection() {
@@ -376,10 +275,6 @@ Seconds ShardingDataTransformInstanceMetrics::getCopyingElapsedTimeSecs() const 
     return getElapsed<Seconds>(_copyingStartTime, _copyingEndTime, _clockSource);
 }
 
-Seconds ShardingDataTransformInstanceMetrics::getApplyingElapsedTimeSecs() const {
-    return getElapsed<Seconds>(_applyingStartTime, _applyingEndTime, _clockSource);
-}
-
 Seconds ShardingDataTransformInstanceMetrics::getCriticalSectionElapsedTimeSecs() const {
     return getElapsed<Seconds>(_criticalSectionStartTime, _criticalSectionEndTime, _clockSource);
 }
@@ -394,13 +289,8 @@ void ShardingDataTransformInstanceMetrics::onReadDuringCriticalSection() {
     _cumulativeMetrics->onWriteDuringCriticalSection();
 }
 
-void ShardingDataTransformInstanceMetrics::accumulateValues(int64_t insertsApplied,
-                                                            int64_t updatesApplied,
-                                                            int64_t deletesApplied,
-                                                            int64_t writesToStashCollections) {
-    _insertsApplied.fetchAndAdd(insertsApplied);
-    _updatesApplied.fetchAndAdd(updatesApplied);
-    _deletesApplied.fetchAndAdd(deletesApplied);
+void ShardingDataTransformInstanceMetrics::accumulateWritesToStashCollections(
+    int64_t writesToStashCollections) {
     _writesToStashCollections.fetchAndAdd(writesToStashCollections);
 }
 
@@ -416,6 +306,10 @@ void ShardingDataTransformInstanceMetrics::onOplogLocalBatchApplied(Milliseconds
 ShardingDataTransformCumulativeMetrics*
 ShardingDataTransformInstanceMetrics::getCumulativeMetrics() {
     return _cumulativeMetrics;
+}
+
+ClockSource* ShardingDataTransformInstanceMetrics::getClockSource() const {
+    return _clockSource;
 }
 
 void ShardingDataTransformInstanceMetrics::onStarted() {

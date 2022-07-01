@@ -88,6 +88,46 @@ private:
 };
 
 class ShardingDataTransformMetricsTestFixture : public unittest::Test {
+
+public:
+    using Role = ShardingDataTransformMetrics::Role;
+    template <typename T>
+    void runTimeReportTest(const std::string& testName,
+                           const std::initializer_list<Role>& roles,
+                           const std::string& timeField,
+                           const std::function<void(T*)>& beginTimedSection,
+                           const std::function<void(T*)>& endTimedSection) {
+        constexpr auto kIncrement = Milliseconds(5000);
+        const auto kIncrementInSeconds = durationCount<Seconds>(kIncrement);
+        for (const auto& role : roles) {
+            LOGV2(6437400, "", "TestName"_attr = testName, "Role"_attr = role);
+            auto uuid = UUID::gen();
+            const auto& clock = getClockSource();
+            auto metrics = std::make_unique<T>(
+                uuid, kTestCommand, kTestNamespace, role, clock->now(), clock, &_cumulativeMetrics);
+
+            // Reports 0 before timed section entered.
+            clock->advance(kIncrement);
+            auto report = metrics->reportForCurrentOp();
+            ASSERT_EQ(report.getIntField(timeField), 0);
+
+            // Reports time so far during critical section.
+            beginTimedSection(metrics.get());
+            clock->advance(kIncrement);
+            report = metrics->reportForCurrentOp();
+            ASSERT_EQ(report.getIntField(timeField), kIncrementInSeconds);
+            clock->advance(kIncrement);
+            report = metrics->reportForCurrentOp();
+            ASSERT_EQ(report.getIntField(timeField), kIncrementInSeconds * 2);
+
+            // Still reports total time after critical section ends.
+            endTimedSection(metrics.get());
+            clock->advance(kIncrement);
+            report = metrics->reportForCurrentOp();
+            ASSERT_EQ(report.getIntField(timeField), kIncrementInSeconds * 2);
+        }
+    }
+
 protected:
     constexpr static auto kTestMetricsName = "testMetrics";
     constexpr static auto kYoungestTime =
@@ -96,7 +136,6 @@ protected:
     constexpr static auto kOldestTime =
         Date_t::fromMillisSinceEpoch(std::numeric_limits<int64_t>::min());
     constexpr static int64_t kOldestTimeLeft = 3000;
-    using Role = ShardingDataTransformInstanceMetrics::Role;
     const NamespaceString kTestNamespace = NamespaceString("test.source");
     const BSONObj kTestCommand = BSON("command"
                                       << "test");

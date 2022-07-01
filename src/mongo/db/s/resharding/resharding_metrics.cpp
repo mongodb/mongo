@@ -28,7 +28,7 @@
  */
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/exec/document_value/document.h"
-
+#include "mongo/db/s/resharding/resharding_util.h"
 
 namespace mongo {
 namespace {
@@ -84,7 +84,14 @@ ReshardingMetrics::ReshardingMetrics(UUID instanceId,
                                            startTime,
                                            clockSource,
                                            cumulativeMetrics},
-      _state{getDefaultState(role)} {}
+      _state{getDefaultState(role)},
+      _deletesApplied{0},
+      _insertsApplied{0},
+      _updatesApplied{0},
+      _oplogEntriesApplied{0},
+      _oplogEntriesFetched{0},
+      _applyingStartTime{kNoDate},
+      _applyingEndTime{kNoDate} {}
 
 ReshardingMetrics::ReshardingMetrics(const CommonReshardingMetadata& metadata,
                                      Role role,
@@ -102,6 +109,20 @@ std::string ReshardingMetrics::createOperationDescription() const noexcept {
     return fmt::format("ReshardingMetrics{}Service {}",
                        ShardingDataTransformMetrics::getRoleName(_role),
                        _instanceId.toString());
+}
+
+Milliseconds ReshardingMetrics::getRecipientHighEstimateRemainingTimeMillis() const {
+    auto estimate = resharding::estimateRemainingRecipientTime(_applyingStartTime.load() != kNoDate,
+                                                               getBytesCopiedCount(),
+                                                               getApproxBytesToCopyCount(),
+                                                               getCopyingElapsedTimeSecs(),
+                                                               _oplogEntriesApplied.load(),
+                                                               _oplogEntriesFetched.load(),
+                                                               getApplyingElapsedTimeSecs());
+    if (!estimate) {
+        return Milliseconds{0};
+    }
+    return *estimate;
 }
 
 std::unique_ptr<ReshardingMetrics> ReshardingMetrics::makeInstance(UUID instanceId,
@@ -130,13 +151,37 @@ StringData ReshardingMetrics::getStateString() const noexcept {
         _state.load());
 }
 
+BSONObj ReshardingMetrics::reportForCurrentOp() const noexcept {
+    BSONObjBuilder builder;
+    builder.append(kDescription, createOperationDescription());
+    switch (_role) {
+        case Role::kCoordinator:
+            builder.append(kApplyTimeElapsed, getApplyingElapsedTimeSecs().count());
+            break;
+        case Role::kDonor:
+            break;
+        case Role::kRecipient:
+            builder.append(kApplyTimeElapsed, getApplyingElapsedTimeSecs().count());
+            builder.append(kInsertsApplied, _insertsApplied.load());
+            builder.append(kUpdatesApplied, _updatesApplied.load());
+            builder.append(kDeletesApplied, _deletesApplied.load());
+            builder.append(kOplogEntriesApplied, _oplogEntriesApplied.load());
+            builder.append(kOplogEntriesFetched, _oplogEntriesFetched.load());
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+    builder.appendElementsUnique(ShardingDataTransformInstanceMetrics::reportForCurrentOp());
+    return builder.obj();
+}
+
 void ReshardingMetrics::accumulateFrom(const ReshardingOplogApplierProgress& progressDoc) {
     invariant(_role == Role::kRecipient);
+    _insertsApplied.fetchAndAdd(progressDoc.getInsertsApplied());
+    _updatesApplied.fetchAndAdd(progressDoc.getUpdatesApplied());
+    _deletesApplied.fetchAndAdd(progressDoc.getDeletesApplied());
 
-    accumulateValues(progressDoc.getInsertsApplied(),
-                     progressDoc.getUpdatesApplied(),
-                     progressDoc.getDeletesApplied(),
-                     progressDoc.getWritesToStashCollections());
+    accumulateWritesToStashCollections(progressDoc.getWritesToStashCollections());
 }
 
 void ReshardingMetrics::restoreRecipientSpecificFields(
@@ -292,4 +337,64 @@ CoordinatorStateEnum ReshardingMetrics::CoordinatorState::getState() const {
     return _enumVal;
 }
 
+void ReshardingMetrics::onDeleteApplied() {
+    _deletesApplied.addAndFetch(1);
+    getCumulativeMetrics()->onDeleteApplied();
+}
+
+void ReshardingMetrics::onInsertApplied() {
+    _insertsApplied.addAndFetch(1);
+    getCumulativeMetrics()->onInsertApplied();
+}
+
+void ReshardingMetrics::onUpdateApplied() {
+    _updatesApplied.addAndFetch(1);
+    getCumulativeMetrics()->onUpdateApplied();
+}
+
+void ReshardingMetrics::onOplogEntriesFetched(int64_t numEntries, Milliseconds elapsed) {
+    _oplogEntriesFetched.addAndFetch(numEntries);
+    getCumulativeMetrics()->onOplogEntriesFetched(numEntries, elapsed);
+}
+
+void ReshardingMetrics::restoreOplogEntriesFetched(int64_t numEntries) {
+    _oplogEntriesFetched.store(numEntries);
+}
+
+void ReshardingMetrics::onOplogEntriesApplied(int64_t numEntries) {
+    _oplogEntriesApplied.addAndFetch(numEntries);
+    getCumulativeMetrics()->onOplogEntriesApplied(numEntries);
+}
+
+void ReshardingMetrics::restoreOplogEntriesApplied(int64_t numEntries) {
+    _oplogEntriesApplied.store(numEntries);
+}
+
+void ReshardingMetrics::onApplyingBegin() {
+    _applyingStartTime.store(getClockSource()->now());
+}
+
+void ReshardingMetrics::onApplyingEnd() {
+    _applyingEndTime.store(getClockSource()->now());
+}
+
+void ReshardingMetrics::restoreApplyingBegin(Date_t date) {
+    _applyingStartTime.store(date);
+}
+
+void ReshardingMetrics::restoreApplyingEnd(Date_t date) {
+    _applyingEndTime.store(date);
+}
+
+Date_t ReshardingMetrics::getApplyingBegin() const {
+    return _applyingStartTime.load();
+}
+
+Date_t ReshardingMetrics::getApplyingEnd() const {
+    return _applyingEndTime.load();
+}
+
+Seconds ReshardingMetrics::getApplyingElapsedTimeSecs() const {
+    return getElapsed<Seconds>(_applyingStartTime, _applyingEndTime, getClockSource());
+}
 }  // namespace mongo

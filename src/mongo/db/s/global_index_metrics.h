@@ -54,6 +54,8 @@ public:
                                                             bool unique,
                                                             ServiceContext* serviceContext);
 
+    Milliseconds getRecipientHighEstimateRemainingTimeMillis() const;
+
 private:
     std::string createOperationDescription() const noexcept override;
 };
