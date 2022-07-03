@@ -32,6 +32,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -87,6 +88,15 @@ TEST(InternalSchemaMaxPropertiesMatchExpression, MinPropertiesNotEquivalentToMax
     InternalSchemaMinPropertiesMatchExpression minProperties(5);
 
     ASSERT_FALSE(maxProperties.equivalent(&minProperties));
+}
+
+DEATH_TEST_REGEX(InternalSchemaMaxPropertiesMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400216") {
+    InternalSchemaMaxPropertiesMatchExpression maxProperties(5);
+
+    ASSERT_EQ(maxProperties.numChildren(), 0);
+    ASSERT_THROWS_CODE(maxProperties.getChild(0), AssertionException, 6400216);
 }
 
 }  // namespace

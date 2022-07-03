@@ -45,6 +45,7 @@ class InternalSchemaAllElemMatchFromIndexMatchExpression final
     : public ArrayMatchingMatchExpression {
 public:
     static constexpr StringData kName = "$_internalSchemaAllElemMatchFromIndex"_sd;
+    static constexpr int kNumChildren = 1;
 
     InternalSchemaAllElemMatchFromIndexMatchExpression(
         StringData path,
@@ -93,16 +94,16 @@ public:
     }
 
     size_t numChildren() const final {
-        return 1;
+        return kNumChildren;
     }
 
     MatchExpression* getChild(size_t i) const final {
-        invariant(i == 0);
+        tassert(6400200, "Out-of-bounds access to child of MatchExpression.", i < kNumChildren);
         return _expression->getFilter();
     }
 
     void resetChild(size_t i, MatchExpression* other) {
-        tassert(6329407, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
+        tassert(6329407, "Out-of-bounds access to child of MatchExpression.", i < kNumChildren);
         _expression->resetFilter(other);
     };
 

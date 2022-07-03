@@ -31,6 +31,7 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -84,6 +85,15 @@ TEST(InternalSchemaMaxItemsMatchExpression, NestedArraysWorkWithDottedPaths) {
 
     ASSERT(maxItems.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(1)))));
     ASSERT(!maxItems.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(1 << 2 << 3)))));
+}
+
+DEATH_TEST_REGEX(InternalSchemaMaxItemsMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400215") {
+    InternalSchemaMaxItemsMatchExpression maxItems("a", 2);
+
+    ASSERT_EQ(maxItems.numChildren(), 0);
+    ASSERT_THROWS_CODE(maxItems.getChild(0), AssertionException, 6400215);
 }
 
 }  // namespace

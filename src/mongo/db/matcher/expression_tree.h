@@ -61,6 +61,7 @@ public:
     }
 
     MatchExpression* getChild(size_t i) const final {
+        tassert(6400201, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
         return _expressions[i].get();
     }
 
@@ -238,6 +239,7 @@ public:
 
 class NotMatchExpression final : public MatchExpression {
 public:
+    static constexpr int kNumChildren = 1;
     explicit NotMatchExpression(MatchExpression* e,
                                 clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : MatchExpression(NOT, std::move(annotation)), _exp(e) {}
@@ -270,10 +272,11 @@ public:
     bool equivalent(const MatchExpression* other) const final;
 
     size_t numChildren() const final {
-        return 1;
+        return kNumChildren;
     }
 
     MatchExpression* getChild(size_t i) const final {
+        tassert(6400210, "Out-of-bounds access to child of MatchExpression.", i < kNumChildren);
         return _exp.get();
     }
 

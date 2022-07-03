@@ -36,6 +36,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -153,6 +154,18 @@ TEST(ElemMatchObjectMatchExpression, Collation) {
     ASSERT(op.matchesSingleElement(notMatch["a"]));
 }
 
+DEATH_TEST_REGEX(ElemMatchObjectMatchExpression,
+                 GetChildFailsIndexGreaterThanOne,
+                 "Tripwire assertion.*6400204") {
+    auto baseOperand = BSON("c" << 6);
+    auto eq = std::make_unique<EqualityMatchExpression>("c", baseOperand["c"]);
+    auto op = ElemMatchObjectMatchExpression{"a.b", std::move(eq)};
+
+    const size_t numChildren = 1;
+    ASSERT_EQ(op.numChildren(), numChildren);
+    ASSERT_THROWS_CODE(op.getChild(numChildren), AssertionException, 6400204);
+}
+
 /**
 TEST(ElemMatchObjectMatchExpression, MatchesIndexKey) {
     auto baseOperand = BSON("b" << 5);
@@ -243,6 +256,18 @@ TEST(ElemMatchValueMatchExpression, ElemMatchKey) {
     ASSERT(details.hasElemMatchKey());
     // The entry within a parent of the $elemMatch array is reported.
     ASSERT_EQUALS("2", details.elemMatchKey());
+}
+
+DEATH_TEST_REGEX(ElemMatchValueMatchExpression,
+                 GetChildFailsOnIndexLargerThanChildSet,
+                 "Tripwire assertion.*6400205") {
+    auto baseOperand = BSON("$gt" << 6);
+    auto gt = std::make_unique<GTMatchExpression>("", baseOperand["$gt"]);
+    auto op = ElemMatchValueMatchExpression{"a.b", std::unique_ptr<MatchExpression>{std::move(gt)}};
+
+    const size_t numChildren = 1;
+    ASSERT_EQ(op.numChildren(), numChildren);
+    ASSERT_THROWS_CODE(op.getChild(numChildren), AssertionException, 6400205);
 }
 
 /**
@@ -408,6 +433,16 @@ TEST(SizeMatchExpression, Equivalent) {
     ASSERT(e1.equivalent(&e1));
     ASSERT(!e1.equivalent(&e2));
     ASSERT(!e1.equivalent(&e3));
+}
+
+DEATH_TEST_REGEX(SizeMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400206") {
+    auto e1 = SizeMatchExpression{"a", 5};
+
+    const size_t numChildren = 0;
+    ASSERT_EQ(e1.numChildren(), numChildren);
+    ASSERT_THROWS_CODE(e1.getChild(0), AssertionException, 6400206);
 }
 
 /**

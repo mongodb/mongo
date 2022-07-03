@@ -101,6 +101,7 @@ public:
     }
 
     virtual MatchExpression* getChild(size_t i) const {
+        tassert(6400204, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
         return _sub.get();
     }
 
@@ -168,6 +169,7 @@ public:
     }
 
     virtual MatchExpression* getChild(size_t i) const {
+        tassert(6400205, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
         return _subs[i].get();
     }
 
@@ -215,6 +217,7 @@ public:
     }
 
     MatchExpression* getChild(size_t i) const override {
+        tassert(6400206, "SizeMatchExpression does not have any children.", i < numChildren());
         return nullptr;
     }
 

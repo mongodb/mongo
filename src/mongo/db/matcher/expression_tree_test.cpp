@@ -37,6 +37,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/unittest/death_test.h"
 
 namespace mongo {
 
@@ -83,6 +84,17 @@ TEST(NotMatchExpression, SetCollatorPropagatesToChild) {
     ASSERT(!notOp.matchesBSON(BSON("a"
                                    << "string2"),
                               nullptr));
+}
+
+DEATH_TEST_REGEX(NotMatchExpression,
+                 GetChildFailsIndexLargerThanOne,
+                 "Tripwire assertion.*6400210") {
+    auto baseOperand = BSON("$lt" << 5);
+    auto lt = std::make_unique<LTMatchExpression>("a", baseOperand["$lt"]);
+    auto notOp = NotMatchExpression{lt.release()};
+
+    ASSERT_EQ(notOp.numChildren(), 1);
+    ASSERT_THROWS_CODE(notOp.getChild(1), AssertionException, 6400210);
 }
 
 TEST(AndOp, NoClauses) {
@@ -175,6 +187,25 @@ TEST(AndOp, ElemMatchKey) {
     ASSERT(details.hasElemMatchKey());
     // The elem match key for the second $and clause is recorded.
     ASSERT_EQUALS("1", details.elemMatchKey());
+}
+
+DEATH_TEST_REGEX(AndOp, GetChildFailsOnIndexLargerThanChildren, "Tripwire assertion.*6400201") {
+    auto baseOperand1 = BSON("$gt" << 1);
+    auto baseOperand2 = BSON("$lt" << 10);
+    auto baseOperand3 = BSON("$lt" << 100);
+
+    auto sub1 = std::make_unique<GTMatchExpression>("a", baseOperand1["$gt"]);
+    auto sub2 = std::make_unique<LTMatchExpression>("a", baseOperand2["$lt"]);
+    auto sub3 = std::make_unique<LTMatchExpression>("b", baseOperand3["$lt"]);
+
+    auto andOp = AndMatchExpression{};
+    andOp.add(std::move(sub1));
+    andOp.add(std::move(sub2));
+    andOp.add(std::move(sub3));
+
+    const size_t numChildren = 3;
+    ASSERT_EQ(andOp.numChildren(), numChildren);
+    ASSERT_THROWS_CODE(andOp.getChild(numChildren), AssertionException, 6400201);
 }
 
 TEST(OrOp, NoClauses) {
@@ -270,6 +301,24 @@ TEST(OrOp, ElemMatchKey) {
     ASSERT(!details.hasElemMatchKey());
 }
 
+DEATH_TEST_REGEX(OrOp, GetChildFailsOnIndexLargerThanChildren, "Tripwire assertion.*6400201") {
+    auto baseOperand1 = BSON("$gt" << 10);
+    auto baseOperand2 = BSON("$lt" << 0);
+    auto baseOperand3 = BSON("b" << 100);
+    auto sub1 = std::make_unique<GTMatchExpression>("a", baseOperand1["$gt"]);
+    auto sub2 = std::make_unique<LTMatchExpression>("a", baseOperand2["$lt"]);
+    auto sub3 = std::make_unique<EqualityMatchExpression>("b", baseOperand3["b"]);
+
+    auto orOp = OrMatchExpression{};
+    orOp.add(std::move(sub1));
+    orOp.add(std::move(sub2));
+    orOp.add(std::move(sub3));
+
+    const size_t numChildren = 3;
+    ASSERT_EQ(orOp.numChildren(), numChildren);
+    ASSERT_THROWS_CODE(orOp.getChild(numChildren), AssertionException, 6400201);
+}
+
 TEST(NorOp, NoClauses) {
     auto norOp = NorMatchExpression{};
     ASSERT(norOp.matchesBSON(BSONObj{}, nullptr));
@@ -350,4 +399,24 @@ TEST(NorOp, Equivalent) {
     ASSERT(e1.equivalent(&e1));
     ASSERT(!e1.equivalent(&e2));
 }
+
+DEATH_TEST_REGEX(NorOp, GetChildFailsOnIndexLargerThanChildren, "Tripwire assertion.*6400201") {
+    auto baseOperand1 = BSON("$gt" << 10);
+    auto baseOperand2 = BSON("$lt" << 0);
+    auto baseOperand3 = BSON("b" << 100);
+
+    auto sub1 = std::make_unique<GTMatchExpression>("a", baseOperand1["$gt"]);
+    auto sub2 = std::make_unique<LTMatchExpression>("a", baseOperand2["$lt"]);
+    auto sub3 = std::make_unique<EqualityMatchExpression>("b", baseOperand3["b"]);
+
+    auto norOp = NorMatchExpression{};
+    norOp.add(std::move(sub1));
+    norOp.add(std::move(sub2));
+    norOp.add(std::move(sub3));
+
+    const size_t numChildren = 3;
+    ASSERT_EQ(norOp.numChildren(), numChildren);
+    ASSERT_THROWS_CODE(norOp.getChild(numChildren), AssertionException, 6400201);
+}
+
 }  // namespace mongo

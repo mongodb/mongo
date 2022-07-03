@@ -32,6 +32,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -115,5 +116,15 @@ TEST(InternalSchemaUniqueItemsMatchExpression, FindsFirstDuplicateValue) {
     ASSERT_FALSE(uniqueItems.findFirstDuplicateValue(fromjson("[1, 2]}")));
     ASSERT_FALSE(uniqueItems.findFirstDuplicateValue(fromjson("[]}")));
 }
+
+DEATH_TEST_REGEX(InternalSchemaUniqueItemsMatchExpression,
+                 GetChildFailsIndexLargerThanZero,
+                 "Tripwire assertion.*6400219") {
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo");
+
+    ASSERT_EQ(uniqueItems.numChildren(), 0);
+    ASSERT_THROWS_CODE(uniqueItems.getChild(0), AssertionException, 6400219);
+}
+
 }  // namespace
 }  // namespace mongo

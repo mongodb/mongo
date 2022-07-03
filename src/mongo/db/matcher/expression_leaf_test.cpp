@@ -2198,4 +2198,66 @@ TEST(MatchesBSONElement, ArrayEquality) {
     ASSERT_FALSE(filter.matchesBSON(iObjArr));
 }
 
+DEATH_TEST_REGEX(RegexMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400209") {
+    BSONObj match = BSON("a"
+                         << "b");
+    BSONObj notMatch = BSON("a"
+                            << "c");
+    RegexMatchExpression regex("", "b", "");
+
+    ASSERT_EQ(regex.numChildren(), 0);
+    ASSERT_THROWS_CODE(regex.getChild(0), AssertionException, 6400209);
+}
+
+DEATH_TEST_REGEX(ModMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400209") {
+    ModMatchExpression mod("a", 5, 2);
+
+    ASSERT_EQ(mod.numChildren(), 0);
+    ASSERT_THROWS_CODE(mod.getChild(0), AssertionException, 6400209);
+}
+
+DEATH_TEST_REGEX(ExistsMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400209") {
+    ExistsMatchExpression exists("a");
+
+    ASSERT_EQ(exists.numChildren(), 0);
+    ASSERT_THROWS_CODE(exists.getChild(0), AssertionException, 6400209);
+}
+
+DEATH_TEST_REGEX(InMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400209") {
+    InMatchExpression in("a");
+
+    ASSERT_EQ(in.numChildren(), 0);
+    ASSERT_THROWS_CODE(in.getChild(0), AssertionException, 6400209);
+}
+
+DEATH_TEST_REGEX(BitTestMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400209") {
+    long long bitMask = 54;
+
+    BitsAllSetMatchExpression balls("a", bitMask);
+
+    ASSERT_EQ(balls.numChildren(), 0);
+    ASSERT_THROWS_CODE(balls.getChild(0), AssertionException, 6400209);
+}
+
+DEATH_TEST_REGEX(ComparisonMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400209") {
+    BSONObj operand = BSON("a"
+                           << "string");
+    EqualityMatchExpression eq("a", operand["a"]);
+
+    ASSERT_EQ(eq.numChildren(), 0);
+    ASSERT_THROWS_CODE(eq.getChild(0), AssertionException, 6400209);
+}
+
 }  // namespace mongo

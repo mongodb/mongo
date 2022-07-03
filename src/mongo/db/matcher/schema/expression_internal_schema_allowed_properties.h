@@ -149,7 +149,7 @@ public:
     }
 
     MatchExpression* getChild(size_t i) const final {
-        invariant(i < numChildren());
+        tassert(6400212, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
 
         if (i == 0) {
             return _otherwise->getFilter();

@@ -68,7 +68,7 @@ public:
     }
 
     MatchExpression* getChild(size_t i) const final {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(6400213);
     }
 
     void resetChild(size_t, MatchExpression*) override {

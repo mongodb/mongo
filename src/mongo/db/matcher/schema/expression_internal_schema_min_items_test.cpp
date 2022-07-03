@@ -30,6 +30,7 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -83,6 +84,15 @@ TEST(InternalSchemaMinItemsMatchExpression, NestedArraysWorkWithDottedPaths) {
 
     ASSERT(minItems.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(1 << 2)))));
     ASSERT(!minItems.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(1)))));
+}
+
+DEATH_TEST_REGEX(InternalSchemaMinItemsMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400215") {
+    InternalSchemaMinItemsMatchExpression minItems("a", 2);
+
+    ASSERT_EQ(minItems.numChildren(), 0);
+    ASSERT_THROWS_CODE(minItems.getChild(0), AssertionException, 6400215);
 }
 
 }  // namespace

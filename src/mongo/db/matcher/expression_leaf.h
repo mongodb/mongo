@@ -101,7 +101,7 @@ public:
     }
 
     MatchExpression* getChild(size_t i) const override {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(6400209);
     }
 
 

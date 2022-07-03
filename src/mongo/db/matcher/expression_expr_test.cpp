@@ -37,6 +37,7 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -733,6 +734,17 @@ TEST_F(ExprMatchTest, ExpressionEvaluationReturnsResultsCorrectly) {
     auto expressionResult = getExprMatchExpression()->evaluateExpression(&document);
     ASSERT_TRUE(expressionResult.integral());
     ASSERT_EQUALS(-2, expressionResult.coerceToInt());
+}
+
+DEATH_TEST_REGEX(ExprMatchTest, GetChildFailsIndexGreaterThanZero, "Tripwire assertion.*6400207") {
+    BSONObj exprBson = fromjson("{$expr: {$and: [{$eq: ['$a', 1]}, {$eq: ['$b', 2]}]}}");
+
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matchExpr =
+        std::make_unique<ExprMatchExpression>(exprBson.firstElement(), std::move(expCtx));
+
+    ASSERT_EQ(matchExpr->numChildren(), 0);
+    ASSERT_THROWS_CODE(matchExpr->getChild(0), AssertionException, 6400207);
 }
 
 }  // namespace

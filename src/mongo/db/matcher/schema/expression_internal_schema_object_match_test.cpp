@@ -218,8 +218,8 @@ TEST(InternalSchemaObjectMatchExpression, HasSingleChild) {
 }
 
 DEATH_TEST_REGEX(InternalSchemaObjectMatchExpression,
-                 GetChildFailsIndexGreaterThanZero,
-                 "Invariant failure.*i == 0") {
+                 GetChildFailsIndexGreaterThanOne,
+                 "Tripwire assertion.*6400217") {
     auto query = fromjson(
         "    {a: {$_internalSchemaObjectMatch: {"
         "        c: {$eq: 3}"
@@ -228,7 +228,8 @@ DEATH_TEST_REGEX(InternalSchemaObjectMatchExpression,
     auto objMatch = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(objMatch.getStatus());
 
-    objMatch.getValue()->getChild(1);
+    ASSERT_EQ(objMatch.getValue()->numChildren(), 1);
+    ASSERT_THROWS_CODE(objMatch.getValue()->getChild(1), AssertionException, 6400217);
 }
 
 }  // namespace

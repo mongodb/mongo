@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/matcher/expression_always_boolean.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -71,6 +72,24 @@ TEST(AlwaysTrueMatchExpression, EquivalentReturnsCorrectResults) {
 
     AlwaysFalseMatchExpression falseExpr;
     ASSERT_FALSE(trueExpr->equivalent(&falseExpr));
+}
+
+DEATH_TEST_REGEX(AlwaysTrueMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400202") {
+    auto trueExpr = std::make_unique<AlwaysTrueMatchExpression>();
+
+    ASSERT_EQ(trueExpr->numChildren(), 0);
+    ASSERT_THROWS_CODE(trueExpr->getChild(0), AssertionException, 6400202);
+}
+
+DEATH_TEST_REGEX(AlwaysFalseMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400202") {
+    auto falseExpr = std::make_unique<AlwaysFalseMatchExpression>();
+
+    ASSERT_EQ(falseExpr->numChildren(), 0);
+    ASSERT_THROWS_CODE(falseExpr->getChild(0), AssertionException, 6400202);
 }
 
 }  // namespace

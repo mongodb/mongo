@@ -127,13 +127,14 @@ TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, FindsFirstMismatchInArr
 
 DEATH_TEST_REGEX(InternalSchemaAllElemMatchFromIndexMatchExpression,
                  GetChildFailsIndexGreaterThanOne,
-                 "Invariant failure.*i == 0") {
+                 "Tripwire assertion.*6400200") {
     auto query = fromjson("{'a.b': {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto objMatch = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(objMatch.getStatus());
 
-    objMatch.getValue()->getChild(1);
+    ASSERT_EQ(objMatch.getValue()->numChildren(), 1);
+    ASSERT_THROWS_CODE(objMatch.getValue()->getChild(1), AssertionException, 6400200);
 }
 
 }  // namespace

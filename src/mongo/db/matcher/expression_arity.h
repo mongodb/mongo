@@ -90,7 +90,7 @@ public:
     }
 
     MatchExpression* getChild(size_t i) const final {
-        invariant(i < nargs);
+        tassert(6400203, "Out-of-bounds access to child of MatchExpression.", i < nargs);
         return _expressions[i].get();
     }
 

@@ -33,6 +33,7 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_eq.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -137,5 +138,16 @@ TEST(InternalSchemaEqMatchExpression, EquivalentToClone) {
     auto clone = rootDocEq.getMatchExpression()->shallowClone();
     ASSERT_TRUE(rootDocEq.getMatchExpression()->equivalent(clone.get()));
 }
+
+DEATH_TEST_REGEX(InternalSchemaEqMatchExpression,
+                 GetChildFailsLargerThanZero,
+                 "Tripwire assertion.*6400213") {
+    BSONObj operand = BSON("a" << 5);
+    InternalSchemaEqMatchExpression eq("a", operand["a"]);
+
+    ASSERT_EQ(eq.numChildren(), 0);
+    ASSERT_THROWS_CODE(eq.getChild(0), AssertionException, 6400213);
+}
+
 }  // namespace
 }  // namespace mongo

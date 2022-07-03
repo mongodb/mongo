@@ -129,8 +129,8 @@ TEST(InternalSchemaMatchArrayIndexMatchExpression, HasSingleChild) {
 }
 
 DEATH_TEST_REGEX(InternalSchemaMatchArrayIndexMatchExpression,
-                 GetChildFailsIndexGreaterThanZero,
-                 "Invariant failure.*i == 0") {
+                 GetChildFailsIndexGreaterThanOne,
+                 "Tripwire assertion.*6400214") {
     auto query = fromjson(
         "{foo: {$_internalSchemaMatchArrayIndex:"
         "{index: 0, namePlaceholder: 'i', expression: {i: {$type: 'number'}}}}}");
@@ -138,7 +138,8 @@ DEATH_TEST_REGEX(InternalSchemaMatchArrayIndexMatchExpression,
     auto objMatch = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(objMatch.getStatus());
 
-    objMatch.getValue()->getChild(1);
+    ASSERT_EQ(objMatch.getValue()->numChildren(), 1);
+    ASSERT_THROWS_CODE(objMatch.getValue()->getChild(1), AssertionException, 6400214);
 }
 }  // namespace
 }  // namespace mongo
