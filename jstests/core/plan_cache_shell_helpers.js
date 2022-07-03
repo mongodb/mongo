@@ -13,8 +13,9 @@
 // ]
 (function() {
 'use strict';
-load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape.
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
+load("jstests/libs/analyze_plan.js");         // For getPlanCacheKeyFromShape.
+load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
 const isSBEPlanCacheEnabled =
     checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"]);
@@ -79,11 +80,10 @@ assert.eq([{_id: null, count: 4}],
 assert.eq([{count: 4}], planCache.list([{$count: "count"}]), planCache.list());
 
 // Test that we can collect descriptions of all the queries that created cache entries using the
-// list() helper. Also verify that these are listed in order of most recently created to least
-// recently created.
+// list() helper.
 if (isSBEPlanCacheEnabled) {
-    assert.eq(
-        [
+    assertArrayEq({
+        expected: [
             {planCacheKey: getPlanCacheKeyFromShape({query: queryB, collection: coll, db: db})},
             {
                 planCacheKey:
@@ -98,18 +98,20 @@ if (isSBEPlanCacheEnabled) {
                     {query: queryB, projection: projectionB, sort: sortC, collection: coll, db: db})
             },
         ],
-        planCache.list([{$sort: {timeOfCreation: -1}}, {$project: {planCacheKey: 1}}]),
-        planCache.list());
+        actual: planCache.list([{$project: {planCacheKey: 1}}]),
+        extraErrorMsg: planCache.list()
+    });
 } else {
-    assert.eq(
-        [
+    assertArrayEq({
+        expected: [
             {query: queryB, sort: {}, projection: {}},
             {query: queryB, sort: sortC, projection: {}},
             {query: queryB, sort: {}, projection: projectionB},
             {query: queryB, sort: sortC, projection: projectionB}
         ],
-        planCache.list([{$sort: {timeOfCreation: -1}}, {$replaceWith: "$createdFromQuery"}]),
-        planCache.list());
+        actual: planCache.list([{$replaceWith: "$createdFromQuery"}]),
+        extraErrorMsg: planCache.list()
+    });
 }
 
 //
