@@ -1970,7 +1970,7 @@ err:
  *     Discard a cursor range from the tree.
  */
 int
-__wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop, bool *is_col_fix)
+__wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 {
     WT_BTREE *btree;
     WT_DECL_RET;
@@ -2011,7 +2011,6 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop, bool *i
     switch (btree->type) {
     case BTREE_COL_FIX:
         WT_ERR(__cursor_truncate_fix(start, stop, __cursor_col_modify));
-        *is_col_fix = true;
         break;
     case BTREE_COL_VAR:
         WT_ERR(__cursor_truncate(start, stop, __cursor_col_modify));
