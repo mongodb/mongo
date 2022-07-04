@@ -61,18 +61,7 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
-    void _enterPhase(Phase newPhase);
-
     const mongo::ReshardCollectionRequest _request;
-
-    const bool _persistCoordinatorDocument;  // TODO: SERVER-62338 remove this then 6.0 branches out
-};
-
-// TODO: SERVER-62338 remove this then 6.0 branches out
-class ReshardCollectionCoordinator_NORESILIENT : public ReshardCollectionCoordinator {
-public:
-    ReshardCollectionCoordinator_NORESILIENT(ShardingDDLCoordinatorService* service,
-                                             const BSONObj& initialState);
 };
 
 }  // namespace mongo

@@ -52,7 +52,6 @@ enums:
             kSetAllowMigrations: "setAllowMigrations"
             kCollMod: "collMod_V2"
             kReshardCollection: "reshardCollection"
-            kReshardCollectionNoResilient: "reshardCollectionNoResilient"
             kCompactStructuredEncryptionData: "compactStructuredEncryptionData"
 
 types:

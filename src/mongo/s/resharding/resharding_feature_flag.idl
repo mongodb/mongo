@@ -40,11 +40,3 @@ feature_flags:
         cpp_varname: gFeatureFlagResharding
         default: true
         version: 5.0
-
-    featureFlagRecoverableShardsvrReshardCollectionCoordinator:
-        description: When enabled, the db primary shard will use a recoverable
-            ShardingDDLCoordinator that ensures proper serialization of resharding and other DDL
-            operations even in the event of primary shard stepdowns.
-        cpp_varname: gFeatureFlagRecoverableShardsvrReshardCollectionCoordinator
-        default: true
-        version: 5.3

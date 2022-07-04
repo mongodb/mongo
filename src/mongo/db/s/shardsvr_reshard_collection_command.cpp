@@ -32,11 +32,9 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/s/reshard_collection_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -75,28 +73,15 @@ public:
 
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
-            // (Generic FCV reference): To run this command and ensure the consistency of the
-            // metadata we need to make sure we are on a stable state.
-            uassert(
-                ErrorCodes::CommandNotSupported,
-                "Resharding is not supported for this version, please update the FCV to latest.",
-                !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
 
             const auto reshardCollectionCoordinatorCompletionFuture =
                 [&]() -> SharedSemiFuture<void> {
-                FixedFCVRegion fixedFcvRegion(opCtx);
-                const auto coordinatorType =
-                    resharding::gFeatureFlagRecoverableShardsvrReshardCollectionCoordinator
-                        .isEnabled(serverGlobalParams.featureCompatibility)
-                    ? DDLCoordinatorTypeEnum::kReshardCollection
-                    : DDLCoordinatorTypeEnum::kReshardCollectionNoResilient;
-
                 ReshardCollectionRequest reshardCollectionRequest =
                     request().getReshardCollectionRequest();
-
                 auto coordinatorDoc = ReshardCollectionCoordinatorDocument();
                 coordinatorDoc.setReshardCollectionRequest(std::move(reshardCollectionRequest));
-                coordinatorDoc.setShardingDDLCoordinatorMetadata({{ns(), coordinatorType}});
+                coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                    {{ns(), DDLCoordinatorTypeEnum::kReshardCollection}});
 
                 auto service = ShardingDDLCoordinatorService::getService(opCtx);
                 auto reshardCollectionCoordinator =

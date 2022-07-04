@@ -87,7 +87,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/exit.h"
@@ -702,20 +701,6 @@ private:
             newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             LOGV2(5876101, "Completed removal of internal sessions from config.transactions.");
-        }
-
-        // TODO SERVER-62338 Remove when 6.0 branches-out
-        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
-            !resharding::gFeatureFlagRecoverableShardsvrReshardCollectionCoordinator
-                 .isEnabledOnVersion(requestedVersion)) {
-            // No more (recoverable) ReshardCollectionCoordinators will start because we
-            // have already switched the FCV value to kDowngrading. Wait for the ongoing
-            // ReshardCollectionCoordinators to finish. The fact that the the configsvr has already
-            // executed 'abortAllReshardCollection' after switching to kDowngrading FCV ensures that
-            // ReshardCollectionCoordinators will finish (Interrupted) promptly.
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kReshardCollection);
         }
 
         // TODO SERVER-67392: Remove when 7.0 branches-out.
