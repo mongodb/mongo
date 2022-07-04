@@ -194,8 +194,7 @@ function assertQueryHashAndPlanCacheKey(sbe, classic) {
 
     // The query hashes and the plan cache keys ('the keys') are different now because
     // 'internalQueryForceClassicEngine' flag is encoded into query shape, once this
-    // flag is removed  from the query shape encoding the keys will be the same until SERVER-61507
-    // is completed, then the keys will be different forever.
+    // flag is removed from the query shape encoding the keys will be different.
     assertQueryHashAndPlanCacheKey(sbe.queryPlanner, classic.stages[0]["$cursor"].queryPlanner);
 })();
 
@@ -220,8 +219,7 @@ function assertQueryHashAndPlanCacheKey(sbe, classic) {
 
     // The query hashes and the plan cache keys ('the keys') are different now because
     // 'internalQueryForceClassicEngine' flag is encoded into query shape, once this
-    // flag is removed from the query shape encoding the keys will be the same until SERVER-61507
-    // is completed, then the keys will be different forever.
+    // flag is removed from the query shape encoding the keys will be different.
     assertQueryHashAndPlanCacheKey(sbe.queryPlanner, classic.stages[0]["$cursor"].queryPlanner);
 })();
 

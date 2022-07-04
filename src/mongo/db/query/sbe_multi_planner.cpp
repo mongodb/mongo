@@ -130,14 +130,6 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
         winner.root->open(false);
     }
 
-    // If there is a pushed down pipeline that cannot use SBE plan cache, then write a cache entry
-    // before extending the pipeline.
-    // TODO SERVER-61507: Remove this block once $group pushdown is integrated with SBE plan cache.
-    if (!canonical_query_encoder::canUseSbePlanCache(_cq)) {
-        plan_cache_util::updatePlanCache(
-            _opCtx, _collections, _cachingMode, _cq, std::move(decision), candidates);
-    }
-
     // Extend the winning candidate with the agg pipeline and rebuild the execution tree. Because
     // the trial was done with find-only part of the query, we cannot reuse the results. The
     // non-winning plans are only used in 'explain()' so, to save on unnecessary work, we extend
@@ -179,15 +171,9 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
         }
     }
 
-    // If pipeline can use SBE plan cache or there is no pushed down pipeline, then write a cache
-    // entry after extending the pipeline.
-    // TODO SERVER-61507: Remove canUseSbePlanCache check once $group pushdown is
-    // integrated with SBE plan cache.
-    if (canonical_query_encoder::canUseSbePlanCache(_cq)) {
-        // Writes a cache entry for the winning plan to the plan cache if possible.
-        plan_cache_util::updatePlanCache(
-            _opCtx, _collections, _cachingMode, _cq, std::move(decision), candidates);
-    }
+    // Writes a cache entry for the winning plan to the plan cache if possible.
+    plan_cache_util::updatePlanCache(
+        _opCtx, _collections, _cachingMode, _cq, std::move(decision), candidates);
 
     return {std::move(candidates), winnerIdx};
 }

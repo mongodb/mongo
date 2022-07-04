@@ -98,10 +98,7 @@ void generatePlannerInfo(PlanExecutor* exec,
             QuerySettingsDecoration::get(mainCollection->getSharedDecorations());
         if (exec->getCanonicalQuery()->isSbeCompatible() &&
             feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() &&
-            !exec->getCanonicalQuery()->getForceClassicEngine() &&
-            // TODO SERVER-61507: remove canUseSbePlanCache check when $group pushdown is
-            // integrated with SBE plan cache.
-            canonical_query_encoder::canUseSbePlanCache(*exec->getCanonicalQuery())) {
+            !exec->getCanonicalQuery()->getForceClassicEngine()) {
             const auto planCacheKeyInfo =
                 plan_cache_key_factory::make(*exec->getCanonicalQuery(), collections);
             planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();

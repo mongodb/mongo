@@ -114,12 +114,7 @@ CandidatePlans SubPlanner::plan(
     auto [result, recordId, exitedEarly] = status.getValue();
     tassert(5323804, "sub-planner unexpectedly exited early during prepare phase", !exitedEarly);
 
-    // TODO SERVER-61507: do it unconditionally when $group pushdown is integrated with the SBE plan
-    // cache.
-    if (canonical_query_encoder::canUseSbePlanCache(_cq)) {
-        plan_cache_util::updatePlanCache(
-            _opCtx, _collections, _cq, *compositeSolution, *root, data);
-    }
+    plan_cache_util::updatePlanCache(_opCtx, _collections, _cq, *compositeSolution, *root, data);
 
     return {makeVector(plan_ranker::CandidatePlan{
                 std::move(compositeSolution), std::move(root), std::move(data)}),

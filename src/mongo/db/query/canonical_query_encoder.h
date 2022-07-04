@@ -68,11 +68,5 @@ CanonicalQuery::IndexFilterKey encodeForIndexFilters(const CanonicalQuery& cq);
  * Returns a hash of the given key (produced from either a QueryShapeString or a PlanCacheKey).
  */
 uint32_t computeHash(StringData key);
-
-/**
- * Returns whether a plan generated from this query can be stored in the SBE plan cache.
- */
-bool canUseSbePlanCache(const CanonicalQuery& cq);
-
 }  // namespace canonical_query_encoder
 }  // namespace mongo

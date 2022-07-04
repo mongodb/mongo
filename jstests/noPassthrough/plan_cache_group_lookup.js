@@ -102,20 +102,23 @@ const groupStage = {
 
 (function testLoweredPipelineCombination() {
     setupForeignColl();
+    const expectedVersion = sbePlanCacheEnabled ? 2 : 1;
 
     coll.getPlanCache().clear();
     testLoweredPipeline(
-        {pipeline: [multiPlanningQueryStage, lookupStage], version: sbePlanCacheEnabled ? 2 : 1});
-
-    // TODO SERVER-61507: Update tests on $group when it's integrated to the SBE cache.
-    coll.getPlanCache().clear();
-    testLoweredPipeline({pipeline: [multiPlanningQueryStage, groupStage], version: 1});
+        {pipeline: [multiPlanningQueryStage, lookupStage], version: expectedVersion});
 
     coll.getPlanCache().clear();
-    testLoweredPipeline({pipeline: [multiPlanningQueryStage, lookupStage, groupStage], version: 1});
+    testLoweredPipeline(
+        {pipeline: [multiPlanningQueryStage, groupStage], version: expectedVersion});
 
     coll.getPlanCache().clear();
-    testLoweredPipeline({pipeline: [multiPlanningQueryStage, groupStage, lookupStage], version: 1});
+    testLoweredPipeline(
+        {pipeline: [multiPlanningQueryStage, lookupStage, groupStage], version: expectedVersion});
+
+    coll.getPlanCache().clear();
+    testLoweredPipeline(
+        {pipeline: [multiPlanningQueryStage, groupStage, lookupStage], version: expectedVersion});
 })();
 
 (function testPartiallyLoweredPipeline() {

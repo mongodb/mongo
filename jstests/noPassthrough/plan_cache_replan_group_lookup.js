@@ -46,11 +46,11 @@ function assertCacheUsage(multiPlanning,
     const profileObj = getLatestProfilerEntry(db, {op: "command", ns: coll.getFullName()});
     const queryHash = profileObj.queryHash;
     const planCacheKey = profileObj.planCacheKey;
-    assert.eq(multiPlanning, !!profileObj.fromMultiPlanner);
+    assert.eq(multiPlanning, !!profileObj.fromMultiPlanner, profileObj);
 
     const entry = getPlansForCacheEntry({queryHash: queryHash});
-    assert.eq(cacheEntryVersion, entry.version);
-    assert.eq(cacheEntryIsActive, entry.isActive);
+    assert.eq(cacheEntryVersion, entry.version, entry);
+    assert.eq(cacheEntryIsActive, entry.isActive, entry);
 
     // If the entry is active, we should have a plan cache key.
     if (entry.isActive) {
@@ -166,11 +166,12 @@ const aIndexPredicate = [{$match: {a: 1042, b: 1}}];
 // {a: 1} index is used.
 const bIndexPredicate = [{$match: {a: 1, b: 1042}}];
 
+const expectedVersion = sbePlanCacheEnabled ? 2 : 1;
 // $group tests.
 const groupSuffix = [{$group: {_id: "$c"}}, {$count: "n"}];
 testFn(aIndexPredicate.concat(groupSuffix),
        bIndexPredicate.concat(groupSuffix),
-       1 /* cacheEntryVersion */);
+       expectedVersion /* cacheEntryVersion */);
 
 // $lookup tests.
 const lookupStage =
@@ -214,13 +215,10 @@ function verifyCorrectLookupAlgorithmUsed(targetJoinAlgorithm, pipeline, aggOpti
     }
 }
 
-// TODO SERVER-61507: The following test cases are $lookup followed by $group. Update them when
-// $group is integrated with SBE plan cache.
-//
 // NLJ.
 testFn(aLookup,
        bLookup,
-       1 /* cacheEntryVersion */,
+       expectedVersion /* cacheEntryVersion */,
        createLookupForeignColl,
        dropLookupForeignColl,
        (pipeline) =>
@@ -229,7 +227,7 @@ testFn(aLookup,
 // INLJ.
 testFn(aLookup,
        bLookup,
-       1 /* cacheEntryVersion */,
+       expectedVersion /* cacheEntryVersion */,
        () => {
            createLookupForeignColl();
            assert.commandWorked(db[foreignCollName].createIndex({foreignKey: 1}));
@@ -239,7 +237,7 @@ testFn(aLookup,
            verifyCorrectLookupAlgorithmUsed("IndexedLoopJoin", pipeline, {allowDiskUse: false}));
 
 // HJ.
-testFn(aLookup, bLookup, 1 /* cacheEntryVersion */, () => {
+testFn(aLookup, bLookup, expectedVersion /* cacheEntryVersion */, () => {
     createLookupForeignColl();
 }, dropLookupForeignColl, (pipeline) => verifyCorrectLookupAlgorithmUsed("HashJoin", pipeline, {
                               allowDiskUse: true
@@ -252,36 +250,40 @@ testFn(aLookup, bLookup, 1 /* cacheEntryVersion */, () => {
 createLookupForeignColl();
 assert.commandWorked(db[foreignCollName].createIndex({foreignKey: 1}));
 verifyCorrectLookupAlgorithmUsed("IndexedLoopJoin", aLookup, {allowDiskUse: true});
-setUpActiveCacheEntry(aLookup, 1 /* cacheEntryVersion */, "a_1" /* cachedIndexName */);
+setUpActiveCacheEntry(
+    aLookup, expectedVersion /* cacheEntryVersion */, "a_1" /* cachedIndexName */);
 
-// Drop the index. This should result in using the active plan, but switching to HJ.
+// Drop the index. This should result in using HJ.
 assert.commandWorked(db[foreignCollName].dropIndex({foreignKey: 1}));
 verifyCorrectLookupAlgorithmUsed("HashJoin", aLookup, {allowDiskUse: true});
 assert.eq(2, coll.aggregate(aLookup).toArray()[0].n);
-assertCacheUsage(false /*multiPlanning*/,
-                 1 /* cacheEntryVersion */,
-                 true /*cacheEntryIsActive*/,
+// If SBE plan cache is enabled, a new cache entry will be created in the SBE plan cache after
+// invalidation. The corresponding cache entry in SBE plan cache should be inactive because the SBE
+// plan cache is invalidated on index drop.
+assertCacheUsage(sbePlanCacheEnabled /*multiPlanning*/,
+                 expectedVersion /* cacheEntryVersion */,
+                 !sbePlanCacheEnabled /*cacheEntryIsActive*/,
                  "a_1" /*cachedIndexName*/,
                  aLookup);
 
-// Set 'allowDiskUse' to 'false'. This should still result in using the active plan, but switching
-// to NLJ.
+// Set 'allowDiskUse' to 'false'. This should still result in using NLJ.
 verifyCorrectLookupAlgorithmUsed("NestedLoopJoin", aLookup, {allowDiskUse: false});
 assert.eq(2, coll.aggregate(aLookup).toArray()[0].n);
-assertCacheUsage(false /*multiPlanning*/,
-                 1 /* cacheEntryVersion */,
+// Note that multi-planning is expected here when the SBE plan cache is enabled because the
+// 'allowDiskUse' value is part of the SBE plan cache key encoding.
+assertCacheUsage(sbePlanCacheEnabled /*multiPlanning*/,
+                 expectedVersion /* cacheEntryVersion */,
                  true /*cacheEntryIsActive*/,
                  "a_1" /*cachedIndexName*/,
                  aLookup);
 
-// Drop the foreign collection. This should still result in using the active plan with a special
-// empty collection plan.
+// Drop the foreign collection.
 dropLookupForeignColl();
 verifyCorrectLookupAlgorithmUsed("NonExistentForeignCollection", aLookup, {allowDiskUse: true});
 assert.eq(2, coll.aggregate(aLookup).toArray()[0].n);
-assertCacheUsage(false /*multiPlanning*/,
-                 1 /* cacheEntryVersion */,
-                 true /*cacheEntryIsActive*/,
+assertCacheUsage(sbePlanCacheEnabled /*multiPlanning*/,
+                 expectedVersion /* cacheEntryVersion */,
+                 !sbePlanCacheEnabled /*cacheEntryIsActive*/,
                  "a_1" /*cachedIndexName*/,
                  aLookup);
 
@@ -320,7 +322,7 @@ verifyCorrectLookupAlgorithmUsed(
 
 runLookupQuery({allowDiskUse: false});
 assertCacheUsage(true /*multiPlanning*/,
-                 sbePlanCacheEnabled ? 2 : 1 /* cacheEntryVersion */,
+                 expectedVersion /* cacheEntryVersion */,
                  false /*activeCacheEntry*/,
                  "b_1" /*cachedIndexName*/,
                  avoidReplanLookupPipeline,
@@ -328,7 +330,7 @@ assertCacheUsage(true /*multiPlanning*/,
 
 runLookupQuery({allowDiskUse: false});
 assertCacheUsage(true /*multiPlanning*/,
-                 sbePlanCacheEnabled ? 2 : 1 /* cacheEntryVersion */,
+                 expectedVersion /* cacheEntryVersion */,
                  true /*activeCacheEntry*/,
                  "b_1" /*cachedIndexName*/,
                  avoidReplanLookupPipeline,
@@ -507,25 +509,25 @@ if (checkSBEEnabled(db)) {
 // Set up an active cache entry.
 runGroupQuery();
 assertCacheUsage(true /*multiPlanning*/,
-                 1 /* cacheEntryVersion */,
+                 expectedVersion /* cacheEntryVersion */,
                  false /*activeCacheEntry*/,
                  "b_1" /*cachedIndexName*/,
                  avoidReplanGroupPipeline);
 runGroupQuery();
 assertCacheUsage(true /*multiPlanning*/,
-                 1 /* cacheEntryVersion */,
+                 expectedVersion /* cacheEntryVersion */,
                  true /*activeCacheEntry*/,
                  "b_1" /*cachedIndexName*/,
                  avoidReplanGroupPipeline);
 runGroupQuery();
 assertCacheUsage(false /*multiPlanning*/,
-                 1 /* cacheEntryVersion */,
+                 expectedVersion /* cacheEntryVersion */,
                  true /*activeCacheEntry*/,
                  "b_1" /*cachedIndexName*/,
                  avoidReplanGroupPipeline);
 runGroupQuery();
 assertCacheUsage(false /*multiPlanning*/,
-                 1 /* cacheEntryVersion */,
+                 expectedVersion /* cacheEntryVersion */,
                  true /*activeCacheEntry*/,
                  "b_1" /*cachedIndexName*/,
                  avoidReplanGroupPipeline);

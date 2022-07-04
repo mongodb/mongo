@@ -541,11 +541,8 @@ std::string CanonicalQuery::toStringShort() const {
 }
 
 CanonicalQuery::QueryShapeString CanonicalQuery::encodeKey() const {
-    // TODO SERVER-61507: remove 'canUseSbePlanCache' check. Canonical queries with pushed
-    // down $group stages are not compatible with the SBE plan cache until SERVER-61507 is complete.
     return (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() &&
-            !_forceClassicEngine && _sbeCompatible &&
-            canonical_query_encoder::canUseSbePlanCache(*this))
+            !_forceClassicEngine && _sbeCompatible)
         ? canonical_query_encoder::encodeSBE(*this)
         : canonical_query_encoder::encode(*this);
 }

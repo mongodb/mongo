@@ -58,12 +58,8 @@ CandidatePlans CachedSolutionPlanner::plan(
     // only track the number of reads from the local side. Thus, we can use the number of reads the
     // plan was cached with during multiplanning even though multiplanning ran trials of
     // pre-extended plans.
-    //
-    // TODO SERVER-61507: Remove canUseSbePlanCache check once $group pushdown is integrated with
-    // SBE plan cache.
     if (!_cq.pipeline().empty() &&
-        !(feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() &&
-          canonical_query_encoder::canUseSbePlanCache(_cq))) {
+        !feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
         _yieldPolicy->clearRegisteredPlans();
         auto secondaryCollectionsInfo =
             fillOutSecondaryCollectionsInformation(_opCtx, _collections, &_cq);
