@@ -65,7 +65,7 @@ public:
                   const ShardId& toShard,
                   const ChunkVersion& chunkVersion,
                   bool waitForDelete,
-                  const ForceJumbo forceJumbo,
+                  ForceJumbo forceJumbo,
                   const boost::optional<int64_t>& maxChunkSizeBytes,
                   const boost::optional<MigrationSecondaryThrottleOptions>& secondaryTrottle);
 

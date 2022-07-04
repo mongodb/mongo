@@ -63,7 +63,7 @@ MigrationType::MigrationType(
     const ShardId& toShard,
     const ChunkVersion& chunkVersion,
     bool waitForDelete,
-    ForceJumbo forceJumbo,
+    const ForceJumbo forceJumbo,
     const boost::optional<int64_t>& maxChunkSizeBytes,
     const boost::optional<MigrationSecondaryThrottleOptions>& secondaryThrottle)
     : _nss(nss),
