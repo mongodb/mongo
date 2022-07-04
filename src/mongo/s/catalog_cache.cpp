@@ -789,8 +789,9 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
         onRefreshCompleted(status, nullptr);
 
         // It is possible that the metadata is being changed concurrently, so retry the
-        // refresh again
-        if (status == ErrorCodes::ConflictingOperationInProgress &&
+        // refresh again. The QueryPlanKilled error might be triggered by a local read of the SSCCL.
+        if ((status == ErrorCodes::ConflictingOperationInProgress ||
+             status == ErrorCodes::QueryPlanKilled) &&
             refreshAttempt < kMaxInconsistentRoutingInfoRefreshAttempts) {
             _scheduleCollectionRefresh(lk, collEntry, nss, refreshAttempt + 1);
         } else {
