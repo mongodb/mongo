@@ -772,12 +772,11 @@ struct __wt_cursor {
 #define	WT_CURSTD_RAW_SEARCH		0x004000000ull
 #define	WT_CURSTD_VALUE_EXT		0x008000000ull /* Value points out of tree. */
 #define	WT_CURSTD_VALUE_INT		0x010000000ull /* Value points into tree. */
-#define WT_CURSTD_BOUND_ENTRY 		0x020000000ull
-#define WT_CURSTD_BOUND_LOWER    0x040000000ull       /* Lower bound. */
-#define WT_CURSTD_BOUND_LOWER_INCLUSIVE 0x080000000ull /* Inclusive lower bound. */
-#define WT_CURSTD_BOUND_UPPER           0x100000000ull /* Upper bound. */
-#define WT_CURSTD_BOUND_UPPER_INCLUSIVE 0x200000000ull /* Inclusive upper bound. */
-#define WT_CURSTD_VERSION_CURSOR	0x400000000ull /* Version cursor. */
+#define WT_CURSTD_BOUND_LOWER    0x020000000ull       /* Lower bound. */
+#define WT_CURSTD_BOUND_LOWER_INCLUSIVE 0x040000000ull /* Inclusive lower bound. */
+#define WT_CURSTD_BOUND_UPPER           0x080000000ull /* Upper bound. */
+#define WT_CURSTD_BOUND_UPPER_INCLUSIVE 0x100000000ull /* Inclusive upper bound. */
+#define WT_CURSTD_VERSION_CURSOR	0x200000000ull /* Version cursor. */
 /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
 #define	WT_CURSTD_KEY_SET	(WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
 #define	WT_CURSTD_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)

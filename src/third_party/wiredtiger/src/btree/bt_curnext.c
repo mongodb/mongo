@@ -756,26 +756,7 @@ __wt_btcur_next_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
     need_walk = false;
     session = CUR2S(cbt);
     total_skipped = 0;
-    /*
-     * If we have a bound set we should position our cursor appropriately if it isn't already
-     * positioned.
-     *
-     * In one scenario this function returns and needs to walk to the next record. In that case we
-     * set a boolean. We need to be careful that the entry flag isn't set so we don't re-enter
-     * search near.
-     *
-     * This logic must come before the call to __wt_cursor_func_init, as it will set the cbt active
-     * flag which changes the logic flow within the subsequent search near resulting in a
-     * segmentation fault. It is better to not set state prior to calling search near. Additionally
-     * the cursor initialization function does take a snapshot if required as does cursor search
-     * near.
-     */
-    if (F_ISSET(cursor, WT_CURSTD_BOUND_LOWER) && !WT_CURSOR_IS_POSITIONED(cbt) &&
-      !F_ISSET(cursor, WT_CURSTD_BOUND_ENTRY)) {
-        WT_ERR(__wt_btcur_bounds_row_position(session, cbt, true, &need_walk));
-        if (!need_walk)
-            return (0);
-    }
+
     WT_STAT_CONN_DATA_INCR(session, cursor_next);
 
     flags = WT_READ_NO_SPLIT | WT_READ_SKIP_INTL; /* tree walk flags */
@@ -785,6 +766,21 @@ __wt_btcur_next_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
     WT_ERR(__wt_cursor_func_init(cbt, false));
+
+    /*
+     * If we have a bound set we should position our cursor appropriately if it isn't already
+     * positioned. It is possible that the positioning function can directly return the record. For
+     * that to happen, the cursor must be placed on a valid record and must be positioned on the
+     * first record within the bounds. If the record is not valid or is not positioned within the
+     * bounds, continue the next traversal logic.
+     */
+    if (F_ISSET(cursor, WT_CURSTD_BOUND_LOWER) && !WT_CURSOR_IS_POSITIONED(cbt)) {
+        WT_ERR(__wt_btcur_bounds_row_position(session, cbt, true, &need_walk));
+        if (!need_walk) {
+            __wt_value_return(cbt, cbt->upd_value);
+            goto done;
+        }
+    }
 
     /*
      * If we aren't already iterating in the right direction, there's some setup to do.
@@ -899,6 +895,7 @@ __wt_btcur_next_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
         WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND, false);
     }
 
+done:
 err:
     if (total_skipped < 100)
         WT_STAT_CONN_DATA_INCR(session, cursor_next_skip_lt_100);
