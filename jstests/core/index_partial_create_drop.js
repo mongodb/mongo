@@ -13,7 +13,7 @@
 
 // Test partial index creation and drops.
 
-load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/feature_flag_util.js");
 
 (function() {
 "use strict";
@@ -46,7 +46,7 @@ assert.commandFailed(
 assert.commandFailed(coll.createIndex(
     {x: 1}, {partialFilterExpression: {$expr: {$eq: [{$trim: {input: "$x"}}, "hi"]}}}));
 
-if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
+if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
     // Only top-level $and is permitted in a partial filter expression.
     assert.commandFailedWithCode(coll.createIndex({x: 1}, {
         partialFilterExpression:

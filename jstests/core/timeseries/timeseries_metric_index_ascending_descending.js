@@ -11,9 +11,10 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/feature_flag_util.js");
 load("jstests/libs/fixture_helpers.js");
 
-if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
+if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
     jsTestLog(
         "Skipped test as the featureFlagTimeseriesMetricIndexes feature flag is not enabled.");
     return;
@@ -157,7 +158,7 @@ TimeseriesTest.run((insert) => {
     // time-series scalability improvements are enabled, the {meta: 1, time: 1} index gets built by
     // default on the time-series bucket collection.
     const numExtraIndexes = (FixtureHelpers.isSharded(bucketsColl) ? 1 : 0) +
-        (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db) ? 1 : 0);
+        (FeatureFlagUtil.isEnabled(db, "TimeseriesScalabilityImprovements") ? 1 : 0);
 
     userIndexes = coll.getIndexes();
     assert.eq(numExtraIndexes, userIndexes.length);

@@ -12,8 +12,7 @@
 
 // Include helpers for analyzing explain output.
 load("jstests/libs/analyze_plan.js");
-
-load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/feature_flag_util.js");
 
 (function() {
 "use strict";
@@ -135,7 +134,7 @@ const coll = db.index_partial_read_ops;
     assert(isCollscan(db, coll.explain().find({a: {$lt: 0}}).finish()));
 })();
 
-if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
+if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
     jsTest.log(
         "Skipping partialFilterExpression testing for $in, $or and non-top level $and as timeseriesMetricIndexesEnabled is false");
     return;

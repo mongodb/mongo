@@ -12,10 +12,10 @@
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/feature_flag_util.js");
 
-if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
+if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
     jsTestLog(
         "Skipped test as the featureFlagTimeseriesMetricIndexes feature flag is not enabled.");
     return;
@@ -47,7 +47,7 @@ if (FixtureHelpers.isSharded(buckets)) {
     });
 }
 
-if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
+if (FeatureFlagUtil.isEnabled(db, "TimeseriesScalabilityImprovements")) {
     // When enabled, the {meta: 1, time: 1} index gets built by default on the time-series
     // bucket collection.
     extraIndexes.push({

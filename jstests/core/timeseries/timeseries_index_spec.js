@@ -14,6 +14,7 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/feature_flag_util.js");
 
 TimeseriesTest.run(() => {
     const collName = "timeseries_index_spec";
@@ -83,7 +84,7 @@ TimeseriesTest.run(() => {
                                           {name: "time_meta_field_downgradable"}));
     verifyAndDropIndex(/*shouldHaveOriginalSpec=*/false, "time_meta_field_downgradable");
 
-    if (TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
+    if (FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
         assert.commandWorked(coll.createIndex({x: 1}, {name: "x_1"}));
         verifyAndDropIndex(/*shouldHaveOriginalSpec=*/true, "x_1");
 
@@ -108,7 +109,7 @@ TimeseriesTest.run(() => {
     // Creating an index directly on the buckets collection is permitted. However, these types of
     // index creations will not have an "originalSpec" field and rely on the reverse mapping
     // mechanism.
-    if (TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
+    if (FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
         assert.commandWorked(
             bucketsColl.createIndex({"control.min.y": 1, "control.max.y": 1}, {name: "y"}));
 

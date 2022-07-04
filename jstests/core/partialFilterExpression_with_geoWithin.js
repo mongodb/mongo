@@ -1,15 +1,14 @@
 // @tags: [requires_non_retryable_writes, requires_fcv_51]
 
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/feature_flag_util.js");
+
 (function() {
 "use strict";
 const coll = db.partialFilterExpression_with_geoWithin;
 coll.drop();
 
-const isFeatureEnabled = db.adminCommand({getParameter: 1, featureFlagTimeseriesMetricIndexes: 1})
-                             .featureFlagTimeseriesMetricIndexes.value;
-
-if (isFeatureEnabled) {
+if (FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
     // The first collection ensures our changes work with a variety of types (polygon, point,
     // linestring) and guarantees some shapes are not inside our index (bigPoly20).
     var bigPoly20 = {
