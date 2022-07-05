@@ -1023,52 +1023,5 @@ TEST_F(RenameRangeDeletionsTest, IdempotentRenameRangeDeletionsTest) {
     ASSERT_EQ(0, forRenameStore.count(_opCtx, BSONObj()));
 }
 
-TEST_F(RangeDeleterTest,
-       setOrphanCountersOnRangeDeletionTasksUpdatesTaskWithExpectedNumberOfOrphans) {
-    const auto numOrphansInRange = 5;
-    setFilteringMetadataWithUUID(uuid());
-
-    DBDirectClient dbClient(_opCtx);
-    const ChunkRange orphansRange(BSON(kShardKey << 0), BSON(kShardKey << numOrphansInRange));
-    auto t = insertRangeDeletionTask(_opCtx, uuid(), orphansRange);
-    for (auto i = 0; i < numOrphansInRange; ++i) {
-        dbClient.insert(kNss.toString(), BSON(kShardKey << i));  // orphaned documents
-        dbClient.insert(kNss.toString(), BSON(kShardKey << -i));
-    }
-
-    setOrphanCountersOnRangeDeletionTasks(_opCtx);
-
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    ASSERT_EQ(
-        store.count(_opCtx, BSON(RangeDeletionTask::kNumOrphanDocsFieldName << numOrphansInRange)),
-        1);
-}
-
-TEST_F(RangeDeleterTest, setOrphanCountersOnRangeDeletionTasksAddsZeroValueWhenNamespaceNotFound) {
-    NamespaceString unexistentCollection("foo", "iDontExist");
-    auto collUuid = UUID::gen();
-    DBDirectClient dbClient(_opCtx);
-    const ChunkRange orphansRange(BSON(kShardKey << 0), BSON(kShardKey << 20));
-    auto t = insertRangeDeletionTask(_opCtx, unexistentCollection, collUuid, orphansRange, 3);
-
-    setOrphanCountersOnRangeDeletionTasks(_opCtx);
-
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    ASSERT_EQ(store.count(_opCtx, BSON(RangeDeletionTask::kNumOrphanDocsFieldName << 0)), 1);
-}
-
-TEST_F(RangeDeleterTest, clearOrphanCountersFromRangeDeletionTasksRemovesFieldFromAllDocs) {
-    DBDirectClient dbClient(_opCtx);
-    const ChunkRange orphansRange(BSON(kShardKey << 0), BSON(kShardKey << 20));
-    auto t1 = insertRangeDeletionTask(_opCtx, uuid(), orphansRange, 3);
-
-    clearOrphanCountersFromRangeDeletionTasks(_opCtx);
-
-    auto cursor = dbClient.find(FindCommandRequest(NamespaceString::kRangeDeletionNamespace));
-    ASSERT_TRUE(cursor->more());
-    ASSERT_FALSE(cursor->next().hasField(RangeDeletionTask::kNumOrphanDocsFieldName));
-    ASSERT_FALSE(cursor->more());
-}
-
 }  // namespace
 }  // namespace mongo

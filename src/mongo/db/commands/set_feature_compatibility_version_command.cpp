@@ -393,12 +393,6 @@ public:
 
             if (request.getPhase() == SetFCVPhaseEnum::kStart) {
                 invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-                if (actualVersion > requestedVersion &&
-                    !feature_flags::gOrphanTracking.isEnabledOnVersion(requestedVersion)) {
-                    BalancerStatsRegistry::get(opCtx)->terminate();
-                    ScopedRangeDeleterLock rangeDeleterLock(opCtx);
-                    clearOrphanCountersFromRangeDeletionTasks(opCtx);
-                }
 
                 // TODO SERVER-65077: Remove FCV check once 6.0 is released
                 if (actualVersion > requestedVersion &&
@@ -429,29 +423,19 @@ public:
         {
             boost::optional<MigrationBlockingGuard> drainOldMoveChunks;
 
-            bool orphanTrackingCondition =
-                serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
-                !feature_flags::gOrphanTracking.isEnabledOnVersion(actualVersion) &&
-                feature_flags::gOrphanTracking.isEnabledOnVersion(requestedVersion);
             // Drain moveChunks if the actualVersion relies on the old migration protocol but the
             // requestedVersion uses the new one (upgrading), we're persisting the new chunk
             // version format, or we are adding the numOrphans field to range deletion documents.
-            if ((!feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
-                     actualVersion) &&
-                 feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
-                     requestedVersion)) ||
-                orphanTrackingCondition) {
+            if (!feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
+                    actualVersion) &&
+                feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
+                    requestedVersion)) {
                 drainOldMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionUpgrade");
 
                 // At this point, because we are holding the MigrationBlockingGuard, no new
                 // migrations can start and there are no active ongoing ones. Still, there could
                 // be migrations pending recovery. Drain them.
                 migrationutil::drainMigrationsPendingRecovery(opCtx);
-
-                if (orphanTrackingCondition) {
-                    setOrphanCountersOnRangeDeletionTasks(opCtx);
-                    BalancerStatsRegistry::get(opCtx)->initializeAsync(opCtx);
-                }
             }
 
             // Complete transition by updating the local FCV document to the fully upgraded or
