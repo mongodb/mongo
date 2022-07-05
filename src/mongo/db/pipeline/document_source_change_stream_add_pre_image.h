@@ -63,6 +63,9 @@ public:
     static boost::optional<Document> lookupPreImage(boost::intrusive_ptr<ExpressionContext> pExpCtx,
                                                     const Document& preImageId);
 
+    // Removes the internal fields from the event and returns the string representation of it.
+    static std::string makePreImageNotFoundErrorMsg(const Document& event);
+
     DocumentSourceChangeStreamAddPreImage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           FullDocumentBeforeChangeModeEnum mode)
         : DocumentSource(kStageName, expCtx), _fullDocumentBeforeChangeMode(mode) {
