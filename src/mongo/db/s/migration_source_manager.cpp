@@ -134,7 +134,6 @@ MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep4);
 MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep5);
 MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep6);
 
-MONGO_FAIL_POINT_DEFINE(doNotRefreshRecipientAfterCommit);
 MONGO_FAIL_POINT_DEFINE(failMigrationCommit);
 MONGO_FAIL_POINT_DEFINE(hangBeforeLeavingCriticalSection);
 MONGO_FAIL_POINT_DEFINE(migrationCommitNetworkError);
@@ -699,7 +698,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     const ChunkRange range(*_args.getMin(), *_args.getMax());
 
-    if (!_acquireCSOnRecipient && !MONGO_unlikely(doNotRefreshRecipientAfterCommit.shouldFail())) {
+    if (!_acquireCSOnRecipient) {
         // Best-effort make the recipient refresh its routing table to the new collection
         // version.
         refreshRecipientRoutingTable(

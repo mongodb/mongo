@@ -24,13 +24,8 @@ const recipientPrimary = st.rs1.getPrimary();
 
 // Disable the best-effort recipient metadata refresh after migrations and move the chunk
 // between shards so the recipient shard, shard1, is stale.
-assert.commandWorked(sourcePrimary.adminCommand(
-    {configureFailPoint: "doNotRefreshRecipientAfterCommit", mode: "alwaysOn"}));
-// TODO SERVER-60415: After 6.0 is released, no longer accept FailPointSetFailed errors
-assert.commandWorkedOrFailedWithCode(
-    recipientPrimary.adminCommand(
-        {configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "alwaysOn"}),
-    ErrorCodes.FailPointSetFailed);
+assert.commandWorked(recipientPrimary.adminCommand(
+    {configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "alwaysOn"}));
 
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
 
@@ -57,13 +52,9 @@ kCommands.forEach((cmd) => {
                                  "expected to fail with StaleConfig, cmd: " + tojson(cmd));
 });
 
-assert.commandWorked(sourcePrimary.adminCommand(
-    {configureFailPoint: "doNotRefreshRecipientAfterCommit", mode: "off"}));
-// TODO SERVER-60415: After 6.0 is released, no longer accept FailPointSetFailed errors
-assert.commandWorkedOrFailedWithCode(
-    recipientPrimary.adminCommand(
-        {configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "off"}),
-    ErrorCodes.FailPointSetFailed);
+assert.commandWorked(recipientPrimary.adminCommand(
+    {configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "off"}));
+
 assert.commandWorked(recipientPrimary.adminCommand(
     {configureFailPoint: "skipShardFilteringMetadataRefresh", mode: "off"}));
 

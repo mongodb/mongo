@@ -41,19 +41,9 @@ const shard1DB = st.shard1.getDB(jsTestName());
 // Turn off best-effort recipient metadata refresh post-migration commit on both shards because
 // it creates non-determinism for the profiler.
 assert.commandWorked(st.shard0.getDB('admin').runCommand(
-    {configureFailPoint: 'doNotRefreshRecipientAfterCommit', mode: 'alwaysOn'}));
+    {configureFailPoint: 'migrationRecipientFailPostCommitRefresh', mode: 'alwaysOn'}));
 assert.commandWorked(st.shard1.getDB('admin').runCommand(
-    {configureFailPoint: 'doNotRefreshRecipientAfterCommit', mode: 'alwaysOn'}));
-
-// TODO SERVER-60415: After 6.0 is released, no longer accept FailPointSetFailed errors
-assert.commandWorkedOrFailedWithCode(
-    st.shard0.getDB('admin').runCommand(
-        {configureFailPoint: 'migrationRecipientFailPostCommitRefresh', mode: 'alwaysOn'}),
-    ErrorCodes.FailPointSetFailed);
-assert.commandWorkedOrFailedWithCode(
-    st.shard1.getDB('admin').runCommand(
-        {configureFailPoint: 'migrationRecipientFailPostCommitRefresh', mode: 'alwaysOn'}),
-    ErrorCodes.FailPointSetFailed);
+    {configureFailPoint: 'migrationRecipientFailPostCommitRefresh', mode: 'alwaysOn'}));
 
 // Turn off automatic shard refresh in mongos when a stale config error is thrown.
 assert.commandWorked(mongosForAgg.getDB('admin').runCommand(
