@@ -810,6 +810,14 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("prepareConflictDuration", prepareConflictDurationMillis);
     }
 
+    if (databaseVersionRefreshMillis > Milliseconds::zero()) {
+        pAttrs->add("databaseVersionRefreshDuration", databaseVersionRefreshMillis);
+    }
+
+    if (shardVersionRefreshMillis > Milliseconds::zero()) {
+        pAttrs->add("shardVersionRefreshDuration", shardVersionRefreshMillis);
+    }
+
     if (dataThroughputLastSecond) {
         pAttrs->add("dataThroughputLastSecondMBperSec", *dataThroughputLastSecond);
     }

@@ -284,6 +284,14 @@ public:
     // Stores the duration of time spent blocked on prepare conflicts.
     Milliseconds prepareConflictDurationMillis{0};
 
+    // Stores the duration of time spent waiting for the shard to refresh the database and wait for
+    // the database critical section.
+    Milliseconds databaseVersionRefreshMillis{0};
+
+    // Stores the duration of time spent waiting for the shard to refresh the collection and wait
+    // for the collection critical section.
+    Milliseconds shardVersionRefreshMillis{0};
+
     // Stores the amount of the data processed by the throttle cursors in MB/sec.
     boost::optional<float> dataThroughputLastSecond;
     boost::optional<float> dataThroughputAverage;
