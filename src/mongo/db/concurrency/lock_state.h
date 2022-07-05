@@ -35,7 +35,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/ticketholders.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/spin_lock.h"
@@ -382,7 +381,7 @@ private:
     AdmissionContext _admCtx;
 
     // The global ticketholders of the service context.
-    TicketHolders* _ticketHolders;
+    TicketHolder* _ticketHolder;
 
     // This will only be valid when holding a ticket.
     boost::optional<Ticket> _ticket;

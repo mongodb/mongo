@@ -69,8 +69,8 @@ public:
 
 private:
     TickSource::Tick _startProcessingTime{};
-    LockMode _lockMode = MODE_NONE;
     int admissions{};
+    LockMode _lockMode = LockMode::MODE_NONE;
 };
 
 }  // namespace mongo

@@ -30,38 +30,14 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/service_context.h"
-
-#include <memory>
 
 namespace mongo {
 
-class TicketHolder;
-
-class TicketHolders {
+class TickerHolderStorageParams {
 public:
     static Status updateConcurrentWriteTransactions(const int& newWriteTransactions);
 
     static Status updateConcurrentReadTransactions(const int& newReadTransactions);
-
-    static TicketHolders& get(ServiceContext* svcCtx);
-    static TicketHolders& get(ServiceContext& svcCtx);
-    /**
-     * Sets the TicketHolder implementation to use to obtain tickets from 'reading' (for MODE_S and
-     * MODE_IS), and from 'writing' (for MODE_IX) in order to throttle database access. There is no
-     * throttling for MODE_X, as there can only ever be a single locker using this mode. The
-     * throttling is intended to defend against large drops in throughput under high load due to too
-     * much concurrency.
-     */
-    void setGlobalThrottling(std::unique_ptr<TicketHolder> reading,
-                             std::unique_ptr<TicketHolder> writing);
-
-    TicketHolder* getTicketHolder(LockMode mode);
-
-private:
-    std::unique_ptr<TicketHolder> _openWriteTransaction;
-    std::unique_ptr<TicketHolder> _openReadTransaction;
 };
 
 }  // namespace mongo

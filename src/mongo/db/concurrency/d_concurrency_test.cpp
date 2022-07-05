@@ -42,7 +42,6 @@
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/db/storage/ticketholders.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
@@ -68,24 +67,24 @@ const auto kMaxClockJitterMillis = Milliseconds(0);
 
 /**
  * A RAII object that instantiates a TicketHolder that limits number of allowed global lock
- * acquisitions to numTickets. The opCtx must live as long as the UseGlobalThrottling instance.
+ * acquisitions to numTickets. The opCtx must live as long as the UseReaderWriterGlobalThrottling
+ * instance.
  */
-class UseGlobalThrottling {
+class UseReaderWriterGlobalThrottling {
 public:
-    explicit UseGlobalThrottling(OperationContext* opCtx, int numTickets) {
-        auto* svcCtx = opCtx->getServiceContext();
-        auto& ticketHolders = TicketHolders::get(svcCtx);
-        ticketHolders.setGlobalThrottling(
-            std::make_unique<SemaphoreTicketHolder>(numTickets, svcCtx),
-            std::make_unique<SemaphoreTicketHolder>(numTickets, svcCtx));
-        _ticketHolders = &ticketHolders;
+    explicit UseReaderWriterGlobalThrottling(ServiceContext* svcCtx, int numTickets)
+        : _svcCtx(svcCtx) {
+        auto ticketHolder = std::make_unique<ReaderWriterTicketHolder>(
+            std::make_unique<SemaphoreTicketHolder>(numTickets, _svcCtx),
+            std::make_unique<SemaphoreTicketHolder>(numTickets, _svcCtx));
+        TicketHolder::use(_svcCtx, std::move(ticketHolder));
     }
-    ~UseGlobalThrottling() noexcept(false) {
-        _ticketHolders->setGlobalThrottling(nullptr, nullptr);
+    ~UseReaderWriterGlobalThrottling() noexcept(false) {
+        TicketHolder::use(_svcCtx, nullptr);
     }
 
 private:
-    TicketHolders* _ticketHolders;
+    ServiceContext* _svcCtx;
 };
 
 
@@ -1455,10 +1454,10 @@ TEST_F(DConcurrencyTestFixture, ResourceMutexLabels) {
 }
 
 TEST_F(DConcurrencyTestFixture, Throttling) {
+    UseReaderWriterGlobalThrottling throttle(getServiceContext(), 1);
     auto clientOpctxPairs = makeKClientsWithLockers(2);
     auto opctx1 = clientOpctxPairs[0].second.get();
     auto opctx2 = clientOpctxPairs[1].second.get();
-    UseGlobalThrottling throttle(opctx1, 1);
 
     bool overlongWait;
     int tries = 0;
@@ -1491,11 +1490,11 @@ TEST_F(DConcurrencyTestFixture, Throttling) {
 }
 
 TEST_F(DConcurrencyTestFixture, NoThrottlingWhenNotAcquiringTickets) {
+    // Limit the locker to 1 ticket at a time.
+    UseReaderWriterGlobalThrottling throttle(getServiceContext(), 1);
     auto clientOpctxPairs = makeKClientsWithLockers(2);
     auto opctx1 = clientOpctxPairs[0].second.get();
     auto opctx2 = clientOpctxPairs[1].second.get();
-    // Limit the locker to 1 ticket at a time.
-    UseGlobalThrottling throttle(opctx1, 1);
 
     // Prevent the enforcement of ticket throttling.
     opctx1->lockState()->skipAcquireTicket();
@@ -1509,11 +1508,11 @@ TEST_F(DConcurrencyTestFixture, NoThrottlingWhenNotAcquiringTickets) {
 }
 
 TEST_F(DConcurrencyTestFixture, ReleaseAndReacquireTicket) {
+    // Limit the locker to 1 ticket at a time.
+    UseReaderWriterGlobalThrottling throttle(getServiceContext(), 1);
     auto clientOpctxPairs = makeKClientsWithLockers(2);
     auto opctx1 = clientOpctxPairs[0].second.get();
     auto opctx2 = clientOpctxPairs[1].second.get();
-    // Limit the locker to 1 ticket at a time.
-    UseGlobalThrottling throttle(opctx1, 1);
 
     Lock::GlobalRead R1(opctx1, Date_t::now(), Lock::InterruptBehavior::kThrow);
     ASSERT(R1.isLocked());
@@ -1554,10 +1553,11 @@ TEST_F(DConcurrencyTestFixture, LockerWithReleasedTicketCanBeUnlocked) {
 }
 
 TEST_F(DConcurrencyTestFixture, TicketAcquireCanThrowDueToKill) {
+    // Limit the locker to 0 tickets at a time.
+    UseReaderWriterGlobalThrottling throttle(getServiceContext(), 0);
+
     auto clientOpctxPairs = makeKClientsWithLockers(1);
     auto opctx1 = clientOpctxPairs[0].second.get();
-    // Limit the locker to 0 tickets at a time.
-    UseGlobalThrottling throttle(opctx1, 0);
 
     // This thread should block because it cannot acquire a ticket and then get interrupted.
     auto result = runTaskAndKill(opctx1, [&] { Lock::GlobalRead R2(opctx1); });
@@ -1566,10 +1566,10 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireCanThrowDueToKill) {
 }
 
 TEST_F(DConcurrencyTestFixture, TicketAcquireCanThrowDueToMaxLockTimeout) {
+    // Limit the locker to 0 tickets at a time.
+    UseReaderWriterGlobalThrottling throttle(getServiceContext(), 0);
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-
-    UseGlobalThrottling throttle(opCtx, 0);
 
     opCtx->lockState()->setMaxLockTimeout(Milliseconds(100));
     ASSERT_THROWS_CODE(
@@ -1577,10 +1577,11 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireCanThrowDueToMaxLockTimeout) {
 }
 
 TEST_F(DConcurrencyTestFixture, TicketAcquireCanThrowDueToDeadline) {
+    // Limit the locker to 0 tickets at a time.
+    UseReaderWriterGlobalThrottling throttle(getServiceContext(), 0);
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
 
-    UseGlobalThrottling throttle(opCtx, 0);
     ASSERT_THROWS_CODE(
         Lock::GlobalLock(
             opCtx, MODE_IX, Date_t::now() + Milliseconds(1500), Lock::InterruptBehavior::kThrow),
@@ -1589,20 +1590,19 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireCanThrowDueToDeadline) {
 }
 
 TEST_F(DConcurrencyTestFixture, TicketAcquireShouldNotThrowIfBehaviorIsLeaveUnlocked1) {
+    UseReaderWriterGlobalThrottling throttle(getServiceContext(), 0);
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-
-    UseGlobalThrottling throttle(opCtx, 0);
 
     opCtx->lockState()->setMaxLockTimeout(Milliseconds(100));
     Lock::GlobalLock(opCtx, MODE_IX, Date_t::max(), Lock::InterruptBehavior::kLeaveUnlocked);
 }
 
 TEST_F(DConcurrencyTestFixture, TicketAcquireShouldNotThrowIfBehaviorIsLeaveUnlocked2) {
+    UseReaderWriterGlobalThrottling throttle(getServiceContext(), 0);
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
 
-    UseGlobalThrottling throttle(opCtx, 0);
     boost::optional<Lock::GlobalLock> globalLock;
     globalLock.emplace(opCtx,
                        MODE_IX,
@@ -1612,11 +1612,11 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireShouldNotThrowIfBehaviorIsLeaveUnlo
 }
 
 TEST_F(DConcurrencyTestFixture, TicketAcquireWithMaxDeadlineRespectsUninterruptibleLockGuard) {
+    // Limit the locker to 1 ticket at a time.
+    UseReaderWriterGlobalThrottling throttle(getServiceContext(), 1);
     auto clientOpctxPairs = makeKClientsWithLockers(2);
     auto opCtx1 = clientOpctxPairs[0].second.get();
     auto opCtx2 = clientOpctxPairs[1].second.get();
-    // Limit the locker to 1 ticket at a time.
-    UseGlobalThrottling throttle(opCtx1, 1);
 
     // Take the only ticket available.
     boost::optional<Lock::GlobalRead> R1;
@@ -1642,11 +1642,11 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireWithMaxDeadlineRespectsUninterrupti
 }
 
 TEST_F(DConcurrencyTestFixture, TicketReacquireCanBeInterrupted) {
+    // Limit the locker to 1 ticket at a time.
+    UseReaderWriterGlobalThrottling throttle(getServiceContext(), 1);
     auto clientOpctxPairs = makeKClientsWithLockers(2);
     auto opctx1 = clientOpctxPairs[0].second.get();
     auto opctx2 = clientOpctxPairs[1].second.get();
-    // Limit the locker to 1 ticket at a time.
-    UseGlobalThrottling throttle(opctx1, 1);
 
     Lock::GlobalRead R1(opctx1, Date_t::now(), Lock::InterruptBehavior::kThrow);
     ASSERT(R1.isLocked());

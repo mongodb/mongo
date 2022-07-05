@@ -78,7 +78,6 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_repair_observer.h"
-#include "mongo/db/storage/ticketholders.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_column_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
@@ -612,19 +611,8 @@ void WiredTigerKVEngine::notifyStartupComplete() {
 
 void WiredTigerKVEngine::appendGlobalStats(OperationContext* opCtx, BSONObjBuilder& b) {
     BSONObjBuilder bb(b.subobjStart("concurrentTransactions"));
-    auto& ticketHolders = TicketHolders::get(opCtx->getServiceContext());
-    {
-        auto writer = ticketHolders.getTicketHolder(MODE_IX);
-        BSONObjBuilder bbb(bb.subobjStart("write"));
-        writer->appendStats(bbb);
-        bbb.done();
-    }
-    {
-        auto reader = ticketHolders.getTicketHolder(MODE_IS);
-        BSONObjBuilder bbb(bb.subobjStart("read"));
-        reader->appendStats(bbb);
-        bbb.done();
-    }
+    auto ticketHolder = TicketHolder::get(opCtx->getServiceContext());
+    ticketHolder->appendStats(bb);
     bb.done();
 }
 

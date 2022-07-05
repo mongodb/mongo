@@ -41,11 +41,101 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
+namespace {
+const auto ticketHolderDecoration =
+    mongo::ServiceContext::declareDecoration<std::unique_ptr<mongo::TicketHolder>>();
+}
+
 namespace mongo {
 
-TicketHolder::~TicketHolder() = default;
+TicketHolder* TicketHolder::get(ServiceContext* svcCtx) {
+    return ticketHolderDecoration(svcCtx).get();
+}
 
-Status TicketHolder::resize(int newSize) {
+void TicketHolder::use(ServiceContext* svcCtx, std::unique_ptr<TicketHolder> newTicketHolder) {
+    ticketHolderDecoration(svcCtx) = std::move(newTicketHolder);
+}
+
+ReaderWriterTicketHolder::~ReaderWriterTicketHolder(){};
+
+boost::optional<Ticket> ReaderWriterTicketHolder::tryAcquire(AdmissionContext* admCtx) {
+
+    switch (admCtx->getLockMode()) {
+        case MODE_IS:
+        case MODE_S:
+            return _reader->tryAcquire(admCtx);
+        case MODE_IX:
+            return _writer->tryAcquire(admCtx);
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+Ticket ReaderWriterTicketHolder::waitForTicket(OperationContext* opCtx,
+                                               AdmissionContext* admCtx,
+                                               WaitMode waitMode) {
+    switch (admCtx->getLockMode()) {
+        case MODE_IS:
+        case MODE_S:
+            return _reader->waitForTicket(opCtx, admCtx, waitMode);
+        case MODE_IX:
+            return _writer->waitForTicket(opCtx, admCtx, waitMode);
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+boost::optional<Ticket> ReaderWriterTicketHolder::waitForTicketUntil(OperationContext* opCtx,
+                                                                     AdmissionContext* admCtx,
+                                                                     Date_t until,
+                                                                     WaitMode waitMode) {
+    switch (admCtx->getLockMode()) {
+        case MODE_IS:
+        case MODE_S:
+            return _reader->waitForTicketUntil(opCtx, admCtx, until, waitMode);
+        case MODE_IX:
+            return _writer->waitForTicketUntil(opCtx, admCtx, until, waitMode);
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+void ReaderWriterTicketHolder::appendStats(BSONObjBuilder& b) const {
+    invariant(_writer, "Writer queue is not present in the ticketholder");
+    invariant(_reader, "Reader queue is not present in the ticketholder");
+    {
+        BSONObjBuilder bbb(b.subobjStart("write"));
+        _writer->appendStats(bbb);
+        bbb.done();
+    }
+    {
+        BSONObjBuilder bbb(b.subobjStart("read"));
+        _reader->appendStats(bbb);
+        bbb.done();
+    }
+}
+
+void ReaderWriterTicketHolder::_release(AdmissionContext* admCtx) noexcept {
+    switch (admCtx->getLockMode()) {
+        case MODE_IS:
+        case MODE_S:
+            return _reader->_release(admCtx);
+        case MODE_IX:
+            return _writer->_release(admCtx);
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+Status ReaderWriterTicketHolder::resizeReaders(int newSize) {
+    return _reader->resize(newSize);
+}
+
+Status ReaderWriterTicketHolder::resizeWriters(int newSize) {
+    return _writer->resize(newSize);
+}
+
+Status TicketHolderWithQueueingStats::resize(int newSize) {
     stdx::lock_guard<Latch> lk(_resizeMutex);
 
     if (newSize < 5)
@@ -68,7 +158,7 @@ Status TicketHolder::resize(int newSize) {
     return Status::OK();
 }
 
-void TicketHolder::appendStats(BSONObjBuilder& b) const {
+void TicketHolderWithQueueingStats::appendStats(BSONObjBuilder& b) const {
     b.append("out", used());
     b.append("available", available());
     b.append("totalTickets", outof());
@@ -88,24 +178,24 @@ void TicketHolder::appendStats(BSONObjBuilder& b) const {
     _appendImplStats(b);
 }
 
-void TicketHolder::_releaseAndUpdateMetrics(AdmissionContext* admCtx) noexcept {
+void TicketHolderWithQueueingStats::_release(AdmissionContext* admCtx) noexcept {
     _totalFinishedProcessing.fetchAndAddRelaxed(1);
     auto startTime = admCtx->getStartProcessingTime();
     auto tickSource = _serviceContext->getTickSource();
     auto delta = tickSource->spanTo<Microseconds>(startTime, tickSource->getTicks());
     _totalTimeProcessingMicros.fetchAndAddRelaxed(delta.count());
-    _release(admCtx);
+    _releaseQueue(admCtx);
 }
 
-Ticket TicketHolder::waitForTicket(OperationContext* opCtx,
-                                   AdmissionContext* admCtx,
-                                   WaitMode waitMode) {
+Ticket TicketHolderWithQueueingStats::waitForTicket(OperationContext* opCtx,
+                                                    AdmissionContext* admCtx,
+                                                    WaitMode waitMode) {
     auto res = waitForTicketUntil(opCtx, admCtx, Date_t::max(), waitMode);
     invariant(res);
     return std::move(*res);
 }
 
-boost::optional<Ticket> TicketHolder::tryAcquire(AdmissionContext* admCtx) {
+boost::optional<Ticket> TicketHolderWithQueueingStats::tryAcquire(AdmissionContext* admCtx) {
     invariant(admCtx);
 
     auto ticket = _tryAcquireImpl(admCtx);
@@ -121,10 +211,10 @@ boost::optional<Ticket> TicketHolder::tryAcquire(AdmissionContext* admCtx) {
 }
 
 
-boost::optional<Ticket> TicketHolder::waitForTicketUntil(OperationContext* opCtx,
-                                                         AdmissionContext* admCtx,
-                                                         Date_t until,
-                                                         WaitMode waitMode) {
+boost::optional<Ticket> TicketHolderWithQueueingStats::waitForTicketUntil(OperationContext* opCtx,
+                                                                          AdmissionContext* admCtx,
+                                                                          Date_t until,
+                                                                          WaitMode waitMode) {
     invariant(admCtx);
 
     // Attempt a quick acquisition first.
@@ -158,6 +248,7 @@ boost::optional<Ticket> TicketHolder::waitForTicketUntil(OperationContext* opCtx
     }
 }
 
+
 #if defined(__linux__)
 namespace {
 
@@ -190,7 +281,7 @@ void tsFromDate(const Date_t& deadline, struct timespec& ts) {
 }  // namespace
 
 SemaphoreTicketHolder::SemaphoreTicketHolder(int numTickets, ServiceContext* serviceContext)
-    : TicketHolder(numTickets, serviceContext) {
+    : TicketHolderWithQueueingStats(numTickets, serviceContext) {
     check(sem_init(&_sem, 0, numTickets));
 }
 
@@ -256,7 +347,7 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Operation
     return Ticket{this, admCtx};
 }
 
-void SemaphoreTicketHolder::_release(AdmissionContext* admCtx) noexcept {
+void SemaphoreTicketHolder::_releaseQueue(AdmissionContext* admCtx) noexcept {
     check(sem_post(&_sem));
 }
 
@@ -269,7 +360,7 @@ int SemaphoreTicketHolder::available() const {
 #else
 
 SemaphoreTicketHolder::SemaphoreTicketHolder(int numTickets, ServiceContext* svcCtx)
-    : TicketHolder(numTickets, svcCtx), _num(numTickets) {}
+    : TicketHolderWithQueueingStats(numTickets, svcCtx), _numTickets(numTickets) {}
 
 SemaphoreTicketHolder::~SemaphoreTicketHolder() = default;
 
@@ -307,26 +398,26 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Operation
     return Ticket{this, admCtx};
 }
 
-void SemaphoreTicketHolder::_release(AdmissionContext* admCtx) noexcept {
+void SemaphoreTicketHolder::_releaseQueue(AdmissionContext* admCtx) noexcept {
     {
         stdx::lock_guard<Latch> lk(_mutex);
-        _num++;
+        _numTickets++;
     }
     _newTicket.notify_one();
 }
 
 int SemaphoreTicketHolder::available() const {
-    return _num;
+    return _numTickets;
 }
 
 bool SemaphoreTicketHolder::_tryAcquire() {
-    if (_num <= 0) {
-        if (_num < 0) {
+    if (_numTickets <= 0) {
+        if (_numTickets < 0) {
             std::cerr << "DISASTER! in TicketHolder" << std::endl;
         }
         return false;
     }
-    _num--;
+    _numTickets--;
     return true;
 }
 #endif
@@ -336,7 +427,7 @@ void SemaphoreTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
 }
 
 FifoTicketHolder::FifoTicketHolder(int numTickets, ServiceContext* serviceContext)
-    : TicketHolder(numTickets, serviceContext) {
+    : TicketHolderWithQueueingStats(numTickets, serviceContext) {
     _ticketsAvailable.store(numTickets);
     _enqueuedElements.store(0);
 }
@@ -347,7 +438,11 @@ int FifoTicketHolder::available() const {
     return _ticketsAvailable.load();
 }
 
-void FifoTicketHolder::_release(AdmissionContext* admCtx) noexcept {
+int FifoTicketHolder::queued() const {
+    return _enqueuedElements.loadRelaxed();
+}
+
+void FifoTicketHolder::_releaseQueue(AdmissionContext* admCtx) noexcept {
     invariant(admCtx);
 
     stdx::lock_guard lk(_queueMutex);
@@ -436,7 +531,7 @@ boost::optional<Ticket> FifoTicketHolder::_waitForTicketUntilImpl(OperationConte
         if (hasAssignedTicket) {
             // To cover the edge case of getting a ticket assigned before cancelling the ticket
             // request. As we have been granted a ticket we must release it.
-            _release(admCtx);
+            _releaseQueue(admCtx);
         }
     });
 
@@ -475,7 +570,7 @@ void FifoTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
 SchedulingTicketHolder::SchedulingTicketHolder(int numTickets,
                                                unsigned int numQueues,
                                                ServiceContext* serviceContext)
-    : TicketHolder(numTickets, serviceContext), _serviceContext(serviceContext) {
+    : TicketHolderWithQueueingStats(numTickets, serviceContext), _serviceContext(serviceContext) {
     for (std::size_t i = 0; i < numQueues; i++) {
         _queues.emplace_back(this);
     }
@@ -489,7 +584,7 @@ int SchedulingTicketHolder::available() const {
     return _ticketsAvailable.load();
 }
 
-void SchedulingTicketHolder::_release(AdmissionContext* admCtx) noexcept {
+void SchedulingTicketHolder::_releaseQueue(AdmissionContext* admCtx) noexcept {
     invariant(admCtx);
 
     // The idea behind the release mechanism consists of a consistent view of queued elements

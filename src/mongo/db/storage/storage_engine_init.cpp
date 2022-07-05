@@ -160,36 +160,41 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
         writeTransactions = writeTransactions == 0 ? DEFAULT_TICKETS_VALUE : writeTransactions;
 
         auto svcCtx = opCtx->getServiceContext();
-        auto& ticketHolders = TicketHolders::get(svcCtx);
         if (feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCV()) {
             LOGV2_DEBUG(5190400, 1, "Enabling new ticketing policies");
             switch (gTicketQueueingPolicy) {
-                case QueueingPolicyEnum::Semaphore:
+                case QueueingPolicyEnum::Semaphore: {
                     LOGV2_DEBUG(6382201, 1, "Using Semaphore-based ticketing scheduler");
-                    ticketHolders.setGlobalThrottling(
+                    auto ticketHolder = std::make_unique<ReaderWriterTicketHolder>(
                         std::make_unique<SemaphoreTicketHolder>(readTransactions, svcCtx),
                         std::make_unique<SemaphoreTicketHolder>(writeTransactions, svcCtx));
+                    TicketHolder::use(svcCtx, std::move(ticketHolder));
                     break;
-                case QueueingPolicyEnum::FifoQueue:
+                }
+                case QueueingPolicyEnum::FifoQueue: {
                     LOGV2_DEBUG(6382200, 1, "Using FIFO queue-based ticketing scheduler");
-                    ticketHolders.setGlobalThrottling(
+                    auto ticketHolder = std::make_unique<ReaderWriterTicketHolder>(
                         std::make_unique<FifoTicketHolder>(readTransactions, svcCtx),
                         std::make_unique<FifoTicketHolder>(writeTransactions, svcCtx));
+                    TicketHolder::use(svcCtx, std::move(ticketHolder));
                     break;
-                case QueueingPolicyEnum::SchedulingQueue:
+                }
+                case QueueingPolicyEnum::SchedulingQueue: {
                     LOGV2_DEBUG(6615200, 1, "Using Scheduling Queue-based ticketing scheduler");
-                    ticketHolders.setGlobalThrottling(std::make_unique<StochasticTicketHolder>(
-                                                          readTransactions + writeTransactions,
-                                                          readTransactions,
-                                                          writeTransactions,
-                                                          svcCtx),
-                                                      nullptr);
+                    auto ticketHolder = std::make_unique<StochasticTicketHolder>(
+                        readTransactions + writeTransactions,
+                        readTransactions,
+                        writeTransactions,
+                        svcCtx);
+                    TicketHolder::use(svcCtx, std::move(ticketHolder));
                     break;
+                }
             }
         } else {
-            ticketHolders.setGlobalThrottling(
+            auto ticketHolder = std::make_unique<ReaderWriterTicketHolder>(
                 std::make_unique<SemaphoreTicketHolder>(readTransactions, svcCtx),
                 std::make_unique<SemaphoreTicketHolder>(writeTransactions, svcCtx));
+            TicketHolder::use(svcCtx, std::move(ticketHolder));
         }
     }
 
@@ -243,8 +248,8 @@ void shutdownGlobalStorageEngineCleanly(ServiceContext* service,
     auto storageEngine = service->getStorageEngine();
     invariant(storageEngine);
     // We always use 'forRestart' = false here because 'forRestart' = true is only appropriate if
-    // we're going to restart controls on the same storage engine, which we are not here because
-    // we are shutting the storage engine down. Additionally, we need to terminate any background
+    // we're going to restart controls on the same storage engine, which we are not here because we
+    // are shutting the storage engine down. Additionally, we need to terminate any background
     // threads as they may be holding onto an OperationContext, as opposed to pausing them.
     StorageControl::stopStorageControls(service, errorToReport, /*forRestart=*/false);
     storageEngine->cleanShutdown();

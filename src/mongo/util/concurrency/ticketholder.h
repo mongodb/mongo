@@ -47,32 +47,79 @@
 namespace mongo {
 
 class Ticket;
+class ReaderWriterTicketHolder;
 
 class TicketHolder {
     friend class Ticket;
 
 public:
+    virtual ~TicketHolder(){};
+
     /**
      * Wait mode for ticket acquisition: interruptible or uninterruptible.
      */
     enum WaitMode { kInterruptible, kUninterruptible };
 
-    TicketHolder(int numTickets, ServiceContext* svcCtx)
-        : _outof(numTickets), _serviceContext(svcCtx){};
+    static TicketHolder* get(ServiceContext* svcCtx);
 
-    virtual ~TicketHolder() = 0;
+    static void use(ServiceContext* svcCtx, std::unique_ptr<TicketHolder> newTicketHolder);
 
     /**
      * Attempts to acquire a ticket without blocking.
      * Returns a boolean indicating whether the operation was successful or not.
      */
-    boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx);
+    virtual boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx) = 0;
 
     /**
      * Attempts to acquire a ticket. Blocks until a ticket is acquired or the OperationContext
      * 'opCtx' is killed, throwing an AssertionException.
      */
-    Ticket waitForTicket(OperationContext* opCtx, AdmissionContext* admCtx, WaitMode waitMode);
+    virtual Ticket waitForTicket(OperationContext* opCtx,
+                                 AdmissionContext* admCtx,
+                                 WaitMode waitMode) = 0;
+
+    /**
+     * Attempts to acquire a ticket within a deadline, 'until'. Returns 'true' if a ticket is
+     * acquired and 'false' if the deadline is reached, but the operation is retryable. Throws an
+     * AssertionException if the OperationContext 'opCtx' is killed and no waits for tickets can
+     * proceed.
+     */
+    virtual boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
+                                                       AdmissionContext* admCtx,
+                                                       Date_t until,
+                                                       WaitMode waitMode) = 0;
+
+    virtual void appendStats(BSONObjBuilder& b) const = 0;
+
+private:
+    virtual void _release(AdmissionContext* admCtx) noexcept = 0;
+};
+
+class TicketHolderWithQueueingStats : public TicketHolder {
+    friend class ReaderWriterTicketHolder;
+
+public:
+    /**
+     * Wait mode for ticket acquisition: interruptible or uninterruptible.
+     */
+    TicketHolderWithQueueingStats(int numTickets, ServiceContext* svcCtx)
+        : _outof(numTickets), _serviceContext(svcCtx){};
+
+    ~TicketHolderWithQueueingStats() override{};
+
+    /**
+     * Attempts to acquire a ticket without blocking.
+     * Returns a boolean indicating whether the operation was successful or not.
+     */
+    boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx) override;
+
+    /**
+     * Attempts to acquire a ticket. Blocks until a ticket is acquired or the OperationContext
+     * 'opCtx' is killed, throwing an AssertionException.
+     */
+    Ticket waitForTicket(OperationContext* opCtx,
+                         AdmissionContext* admCtx,
+                         TicketHolder::WaitMode waitMode) override;
 
     /**
      * Attempts to acquire a ticket within a deadline, 'until'. Returns 'true' if a ticket is
@@ -83,7 +130,7 @@ public:
     boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
                                                AdmissionContext* admCtx,
                                                Date_t until,
-                                               WaitMode waitMode);
+                                               TicketHolder::WaitMode waitMode) override;
 
     Status resize(int newSize);
 
@@ -93,7 +140,7 @@ public:
         return outof() - available();
     }
 
-    virtual int outof() const {
+    int outof() const {
         return _outof.loadRelaxed();
     }
 
@@ -103,7 +150,7 @@ public:
         return std::max(static_cast<int>(added - removed), 0);
     }
 
-    void appendStats(BSONObjBuilder& b) const;
+    void appendStats(BSONObjBuilder& b) const override;
 
 private:
     virtual boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) = 0;
@@ -111,13 +158,13 @@ private:
     virtual boost::optional<Ticket> _waitForTicketUntilImpl(OperationContext* opCtx,
                                                             AdmissionContext* admCtx,
                                                             Date_t until,
-                                                            WaitMode waitMode) = 0;
+                                                            TicketHolder::WaitMode waitMode) = 0;
 
     virtual void _appendImplStats(BSONObjBuilder& b) const = 0;
 
-    void _releaseAndUpdateMetrics(AdmissionContext* admCtx) noexcept;
+    void _release(AdmissionContext* admCtx) noexcept override;
 
-    virtual void _release(AdmissionContext* admCtx) noexcept = 0;
+    virtual void _releaseQueue(AdmissionContext* admCtx) noexcept = 0;
 
     AtomicWord<std::int64_t> _totalAddedQueue{0};
     AtomicWord<std::int64_t> _totalRemovedQueue{0};
@@ -127,15 +174,67 @@ private:
     AtomicWord<std::int64_t> _totalStartedProcessing{0};
     AtomicWord<std::int64_t> _totalCanceled{0};
 
-    Mutex _resizeMutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "TicketHolder::_resizeMutex");
+    Mutex _resizeMutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2),
+                                          "TicketHolderWithQueueingStats::_resizeMutex");
     AtomicWord<int> _outof;
 
 protected:
     ServiceContext* _serviceContext;
 };
 
-class SemaphoreTicketHolder final : public TicketHolder {
+/**
+ * A TicketHolder implementation that delegates actual ticket management to two underlying
+ * TicketHolderQueues. The routing decision will be based on the lock mode requested by the caller
+ * directing MODE_IS/MODE_S requests to the "Readers" TicketHolderWithQueueingStats and MODE_IX
+ * requests to the "Writers" TicketHolderWithQueueingStats.
+ */
+class ReaderWriterTicketHolder final : public TicketHolder {
+public:
+    ReaderWriterTicketHolder(std::unique_ptr<TicketHolderWithQueueingStats> readerTicketHolder,
+                             std::unique_ptr<TicketHolderWithQueueingStats> writerTicketHolder)
+        : _reader(std::move(readerTicketHolder)), _writer(std::move(writerTicketHolder)){};
+
+    ~ReaderWriterTicketHolder() override final;
+
+    /**
+     * Attempts to acquire a ticket without blocking.
+     * Returns a boolean indicating whether the operation was successful or not.
+     */
+    boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx) override final;
+
+    /**
+     * Attempts to acquire a ticket. Blocks until a ticket is acquired or the OperationContext
+     * 'opCtx' is killed, throwing an AssertionException.
+     */
+    Ticket waitForTicket(OperationContext* opCtx,
+                         AdmissionContext* admCtx,
+                         WaitMode waitMode) override final;
+
+    /**
+     * Attempts to acquire a ticket within a deadline, 'until'. Returns 'true' if a ticket is
+     * acquired and 'false' if the deadline is reached, but the operation is retryable. Throws an
+     * AssertionException if the OperationContext 'opCtx' is killed and no waits for tickets can
+     * proceed.
+     */
+    boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
+                                               AdmissionContext* admCtx,
+                                               Date_t until,
+                                               WaitMode waitMode) override final;
+
+    void appendStats(BSONObjBuilder& b) const override final;
+
+    Status resizeReaders(int newSize);
+    Status resizeWriters(int newSize);
+
+private:
+    void _release(AdmissionContext* admCtx) noexcept override final;
+
+private:
+    std::unique_ptr<TicketHolderWithQueueingStats> _reader;
+    std::unique_ptr<TicketHolderWithQueueingStats> _writer;
+};
+
+class SemaphoreTicketHolder final : public TicketHolderWithQueueingStats {
 public:
     explicit SemaphoreTicketHolder(int numTickets, ServiceContext* serviceContext);
     ~SemaphoreTicketHolder() override final;
@@ -149,8 +248,7 @@ private:
                                                     WaitMode waitMode) override final;
 
     boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) override final;
-
-    void _release(AdmissionContext* admCtx) noexcept override final;
+    void _releaseQueue(AdmissionContext* admCtx) noexcept override final;
 
     void _appendImplStats(BSONObjBuilder& b) const override final;
 
@@ -160,7 +258,7 @@ private:
 #else
     bool _tryAcquire();
 
-    int _num;
+    int _numTickets;
     Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "SemaphoreTicketHolder::_mutex");
     stdx::condition_variable _newTicket;
@@ -175,16 +273,14 @@ private:
  * Any change to the implementation should be paired with a change to the _ticketholder.tla_ file in
  * order to formally verify that the changes won't lead to a deadlock.
  */
-class FifoTicketHolder final : public TicketHolder {
+class FifoTicketHolder final : public TicketHolderWithQueueingStats {
 public:
     explicit FifoTicketHolder(int numTickets, ServiceContext* serviceContext);
     ~FifoTicketHolder() override final;
 
     int available() const override final;
 
-    int queued() const override final {
-        return _enqueuedElements.load();
-    }
+    int queued() const override final;
 
 private:
     boost::optional<Ticket> _waitForTicketUntilImpl(OperationContext* opCtx,
@@ -196,7 +292,7 @@ private:
 
     void _appendImplStats(BSONObjBuilder& b) const override final;
 
-    void _release(AdmissionContext* admCtx) noexcept override final;
+    void _releaseQueue(AdmissionContext* admCtx) noexcept override final;
 
     // Implementation statistics.
     AtomicWord<std::int64_t> _totalTimeQueuedMicros{0};
@@ -222,7 +318,7 @@ private:
  * Waiters will get placed in a specific internal queue according to some logic.
  * Releasers will wake up a waiter from a group chosen according to some logic.
  */
-class SchedulingTicketHolder : public TicketHolder {
+class SchedulingTicketHolder : public TicketHolderWithQueueingStats {
     using QueueMutex = std::shared_mutex;                    // NOLINT
     using ReleaserLockGuard = std::shared_lock<QueueMutex>;  // NOLINT
     using EnqueuerLockGuard = std::unique_lock<QueueMutex>;  // NOLINT
@@ -275,7 +371,7 @@ private:
                                                     Date_t until,
                                                     WaitMode waitMode) override final;
 
-    void _release(AdmissionContext* admCtx) noexcept override final;
+    void _releaseQueue(AdmissionContext* admCtx) noexcept override final;
 
     void _appendImplStats(BSONObjBuilder& b) const override final{};
 
@@ -325,6 +421,8 @@ private:
  */
 class Ticket {
     friend class TicketHolder;
+    friend class ReaderWriterTicketHolder;
+    friend class TicketHolderWithQueueingStats;
     friend class SemaphoreTicketHolder;
     friend class FifoTicketHolder;
     friend class SchedulingTicketHolder;
@@ -349,7 +447,7 @@ public:
 
     ~Ticket() {
         if (_ticketholder) {
-            _ticketholder->_releaseAndUpdateMetrics(_admissionContext);
+            _ticketholder->_release(_admissionContext);
         }
     }
 

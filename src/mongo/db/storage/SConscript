@@ -190,7 +190,7 @@ env.Library(
 env.Library(
     target='storage_engine_parameters',
     source=[
-        'ticketholders.cpp',
+        'ticketholder_storage_parameters.cpp',
         'storage_engine_parameters.cpp',
         'storage_engine_parameters.idl',
     ],
