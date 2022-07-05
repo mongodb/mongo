@@ -713,7 +713,8 @@ void persistUpdatedNumOrphans(OperationContext* opCtx,
     try {
         PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
         ScopedRangeDeleterLock rangeDeleterLock(opCtx, collectionUuid);
-        // TODO SERVER-65996 Remove writeConflictRetry loop
+        // The DBDirectClient will not retry WriteConflictExceptions internally while holding an X
+        // mode lock, so we need to retry at this level.
         writeConflictRetry(
             opCtx, "updateOrphanCount", NamespaceString::kRangeDeletionNamespace.ns(), [&] {
                 store.update(opCtx,
