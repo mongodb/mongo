@@ -329,13 +329,13 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
     auto criticalSectionTimer = std::make_shared<Timer>();
     auto criticalSectionWithoutCatchupTimer = std::make_shared<Timer>();
 
-    _decisionPromise.setWith([&] {
-        const bool shouldRemoveStateDocumentOnRecipient = [&]() {
-            stdx::lock_guard<Latch> lg(_mutex);
-            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-            return serverless::shouldRemoveStateDocumentOnRecipient(opCtx.get(), _stateDoc);
-        }();
+    const bool shouldRemoveStateDocumentOnRecipient = [&]() {
+        stdx::lock_guard<Latch> lg(_mutex);
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+        return serverless::shouldRemoveStateDocumentOnRecipient(opCtx.get(), _stateDoc);
+    }();
 
+    _decisionPromise.setWith([&] {
         if (shouldRemoveStateDocumentOnRecipient) {
             pauseShardSplitBeforeRecipientCleanup.pauseWhileSet();
 
@@ -451,10 +451,33 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
     });
 
     _completionPromise.setWith([&] {
+        if (shouldRemoveStateDocumentOnRecipient) {
+            return ExecutorFuture(**executor)
+                .then([&] { return _decisionPromise.getFuture().semi().ignoreValue(); })
+                .onCompletion(
+                    [this, executor, anchor = shared_from_this(), primaryToken](Status status) {
+                        if (!status.isOK()) {
+                            LOGV2_ERROR(6753100,
+                                        "Failed to cleanup the state document on recipient nodes",
+                                        "id"_attr = _migrationId,
+                                        "abortReason"_attr = _abortReason,
+                                        "status"_attr = status);
+                        } else {
+                            LOGV2(6753101,
+                                  "Successfully cleaned up the state document on recipient nodes.",
+                                  "id"_attr = _migrationId,
+                                  "abortReason"_attr = _abortReason,
+                                  "status"_attr = status);
+                        }
+                    })
+                .unsafeToInlineFuture();
+        }
+
         return ExecutorFuture(**executor)
             .then([&] { return _decisionPromise.getFuture().semi().ignoreValue(); })
             .onCompletion([this, executor, primaryToken](Status status) {
-                // Always remove the split config, whether the operation was aborted or committed.
+                // Always remove the split config, whether the operation was aborted or
+                // committed.
                 auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                 pauseShardSplitBeforeSplitConfigRemoval.pauseWhileSetAndNotCanceled(opCtx.get(),
                                                                                     primaryToken);
