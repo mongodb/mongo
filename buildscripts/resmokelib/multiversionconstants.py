@@ -110,3 +110,12 @@ OLD_VERSIONS = [
     LAST_LTS
 ] if LAST_CONTINUOUS_FCV == LAST_LTS_FCV or LAST_CONTINUOUS_FCV in version_constants.get_eols(
 ) else [LAST_LTS, LAST_CONTINUOUS]
+
+
+def log_constants(exec_log):
+    """Log FCV constants."""
+    exec_log.info("Last LTS FCV: {}".format(LAST_LTS_FCV))
+    exec_log.info("Last Continuous FCV: {}".format(LAST_CONTINUOUS_FCV))
+    exec_log.info("Latest FCV: {}".format(LATEST_FCV))
+    exec_log.info("Requires FCV Tag Latest: {}".format(REQUIRES_FCV_TAG_LATEST))
+    exec_log.info("Requires FCV Tag: {}".format(REQUIRES_FCV_TAG))

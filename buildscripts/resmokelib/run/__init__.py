@@ -220,6 +220,8 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
                 os.path.join(config.CONFIG_DIR, "evg_task_doc", "evg_task_doc.yml"))
 
         self._log_local_resmoke_invocation()
+        from buildscripts.resmokelib import multiversionconstants
+        multiversionconstants.log_constants(self._resmoke_logger)
 
         suites = None
         try:
