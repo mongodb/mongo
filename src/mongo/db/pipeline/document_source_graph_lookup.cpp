@@ -44,8 +44,8 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/sort_reorder_helpers.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/logv2/log.h"
 
@@ -520,6 +520,31 @@ DocumentSource::GetModPathsReturn DocumentSourceGraphLookUp::getModifiedPaths() 
     return {GetModPathsReturn::Type::kFiniteSet, std::move(modifiedPaths), {}};
 }
 
+StageConstraints DocumentSourceGraphLookUp::constraints(Pipeline::SplitState pipeState) const {
+    // If we are in a mongos, the from collection of the graphLookup is sharded, and the
+    // 'featureFlagShardedLookup' flag is enabled, the host type requirement is mongos or
+    // a shard. Otherwise, it's the primary shard.
+    HostTypeRequirement hostRequirement =
+        (pExpCtx->inMongos && pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _from) &&
+         foreignShardedGraphLookupAllowed())
+        ? HostTypeRequirement::kNone
+        : HostTypeRequirement::kPrimaryShard;
+
+    StageConstraints constraints(StreamType::kStreaming,
+                                 PositionRequirement::kNone,
+                                 hostRequirement,
+                                 DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kAllowed,
+                                 TransactionRequirement::kAllowed,
+                                 LookupRequirement::kAllowed,
+                                 UnionRequirement::kAllowed);
+
+    constraints.canSwapWithMatch = true;
+    constraints.canSwapWithSkippingOrLimitingStage = !_unwind;
+
+    return constraints;
+}
+
 Pipeline::SourceContainer::iterator DocumentSourceGraphLookUp::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
@@ -536,6 +561,16 @@ Pipeline::SourceContainer::iterator DocumentSourceGraphLookUp::doOptimizeAt(
         container->erase(std::next(itr));
         return itr;
     }
+
+    // If the following stage is $sort and there is no internal $unwind, consider pushing it ahead
+    // of $graphLookup.
+    if (!_unwind) {
+        itr = tryReorderingWithSort(itr, container);
+        if (*itr != this) {
+            return itr;
+        }
+    }
+
     return std::next(itr);
 }
 

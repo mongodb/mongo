@@ -1867,6 +1867,97 @@ TEST(PipelineOptimizationTest, GraphLookupShouldSwapWithMatch) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+TEST(PipelineOptimizationTest, GraphLookupShouldSwapWithSortNotOnAs) {
+    string inputPipe =
+        "["
+        "   {$graphLookup: {"
+        "       from: 'lookupColl',"
+        "       as: 'out',"
+        "       connectToField: 'to',"
+        "       connectFromField: 'from',"
+        "       startWith: '$start'"
+        "   }},"
+        "   {$sort: {from: 1}}"
+        "]";
+    string outputPipe =
+        "["
+        "   {$sort: {sortKey: {from: 1}}},"
+        "   {$graphLookup: {"
+        "       from: 'lookupColl',"
+        "       as: 'out',"
+        "       connectToField: 'to',"
+        "       connectFromField: 'from',"
+        "       startWith: '$start'"
+        "   }}"
+        "]";
+    string serializedPipe =
+        "["
+        "   {$sort: {from: 1}},"
+        "   {$graphLookup: {"
+        "       from: 'lookupColl',"
+        "       as: 'out',"
+        "       connectToField: 'to',"
+        "       connectFromField: 'from',"
+        "       startWith: '$start'"
+        "   }}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, GraphLookupWithInternalUnwindShouldNotSwapWithSortNotOnAs) {
+    string inputPipe =
+        "["
+        "   {$graphLookup: {"
+        "       from: 'lookupColl',"
+        "       as: 'out',"
+        "       connectToField: 'to',"
+        "       connectFromField: 'from',"
+        "       startWith: '$start'"
+        "   }},"
+        "   {$unwind: {path: '$out', includeArrayIndex: 'index'}},"
+        "   {$sort: {from: 1}}"
+        "]";
+    string outputPipe =
+        "["
+        "   {$graphLookup: {"
+        "       from: 'lookupColl',"
+        "       as: 'out',"
+        "       connectToField: 'to',"
+        "       connectFromField: 'from',"
+        "       startWith: '$start',"
+        "       unwinding: {preserveNullAndEmptyArrays: false, includeArrayIndex: 'index'}"
+        "   }},"
+        "   {$sort: {sortKey: {from: 1}}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, inputPipe);
+}
+
+TEST(PipelineOptimizationTest, GraphLookupShouldNotSwapWithSortOnAs) {
+    string inputPipe =
+        "["
+        "   {$graphLookup: {"
+        "       from: 'lookupColl',"
+        "       as: 'out',"
+        "       connectToField: 'to',"
+        "       connectFromField: 'from',"
+        "       startWith: '$start'"
+        "   }},"
+        "   {$sort: {out: 1}}"
+        "]";
+    string outputPipe =
+        "["
+        "   {$graphLookup: {"
+        "       from: 'lookupColl',"
+        "       as: 'out',"
+        "       connectToField: 'to',"
+        "       connectFromField: 'from',"
+        "       startWith: '$start'"
+        "   }},"
+        "   {$sort: {sortKey: {out: 1}}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, inputPipe);
+}
+
 TEST(PipelineOptimizationTest, ExclusionProjectShouldSwapWithIndependentMatch) {
     string inputPipe = "[{$project: {redacted: 0}}, {$match: {unrelated: 4}}]";
     string outputPipe =

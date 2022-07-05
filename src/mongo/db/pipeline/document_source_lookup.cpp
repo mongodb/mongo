@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/sort_reorder_helpers.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -114,33 +115,6 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
         nss.isConfigDotCacheDotChunks() || nss == NamespaceString::kRsOplogNamespace ||
             nss == NamespaceString::kTenantMigrationOplogView);
     return nss;
-}
-
-/**
- * Checks if a sort stage's pattern is suitable to push the stage before $lookup. The sort stage
- * must not share the same prefix with any field created or modified by the lookup stage.
- */
-bool checkModifiedPathsSortReorder(const SortPattern& sortPattern,
-                                   const DocumentSource::GetModPathsReturn& modPaths) {
-    for (const auto& sortKey : sortPattern) {
-        if (!sortKey.fieldPath.has_value()) {
-            return false;
-        }
-        if (sortKey.fieldPath->getPathLength() < 1) {
-            return false;
-        }
-        auto sortField = sortKey.fieldPath->getFieldName(0);
-        auto it = std::find_if(
-            modPaths.paths.begin(), modPaths.paths.end(), [&sortField](const auto& modPath) {
-                // Finds if the shorter path is a prefix field of or the same as the longer one.
-                return sortField == modPath || expression::isPathPrefixOf(sortField, modPath) ||
-                    expression::isPathPrefixOf(modPath, sortField);
-            });
-        if (it != modPaths.paths.end()) {
-            return false;
-        }
-    }
-    return true;
 }
 
 }  // namespace
@@ -683,16 +657,12 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
         return container->end();
     }
 
-    // If the following stage is $sort, consider pushing it ahead of $lookup.
-    if (auto sortPtr = dynamic_cast<DocumentSourceSort*>(std::next(itr)->get())) {
-        // TODO (SERVER-55417): Conditionally reorder $sort and $lookup depending on whether the
-        // query planner allows for an index-provided sort.
-        if (!_unwindSrc &&
-            checkModifiedPathsSortReorder(sortPtr->getSortKeyPattern(), getModifiedPaths())) {
-            // We have a sort not on as field following this stage. Reorder sort and current doc.
-            std::swap(*itr, *std::next(itr));
-
-            return itr == container->begin() ? itr : std::prev(itr);
+    // If the following stage is $sort and there is no internal $unwind, consider pushing it ahead
+    // of $lookup.
+    if (!_unwindSrc) {
+        itr = tryReorderingWithSort(itr, container);
+        if (*itr != this) {
+            return itr;
         }
     }
 

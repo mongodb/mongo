@@ -104,29 +104,7 @@ public:
      */
     GetModPathsReturn getModifiedPaths() const final;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        // If we are in a mongos, the from collection of the graphLookup is sharded, and the
-        // 'featureFlagShardedLookup' flag is enabled, the host type requirement is mongos or
-        // a shard. Otherwise, it's the primary shard.
-        HostTypeRequirement hostRequirement =
-            (pExpCtx->inMongos &&
-             pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _from) &&
-             foreignShardedGraphLookupAllowed())
-            ? HostTypeRequirement::kNone
-            : HostTypeRequirement::kPrimaryShard;
-
-        StageConstraints constraints(StreamType::kStreaming,
-                                     PositionRequirement::kNone,
-                                     hostRequirement,
-                                     DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kAllowed,
-                                     TransactionRequirement::kAllowed,
-                                     LookupRequirement::kAllowed,
-                                     UnionRequirement::kAllowed);
-
-        constraints.canSwapWithMatch = true;
-        return constraints;
-    }
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
 
