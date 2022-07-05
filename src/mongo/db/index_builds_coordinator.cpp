@@ -2682,9 +2682,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         hangIndexBuildBeforeCommit.pauseWhileSet();
     }
 
-    // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly for lock
-    DatabaseName dbName(boost::none, replState->dbName);
-    Lock::DBLock autoDb(opCtx, dbName, MODE_IX);
+    AutoGetDb autoDb(opCtx, replState->dbName, MODE_IX);
 
     // Unlock RSTL to avoid deadlocks with prepare conflicts and state transitions caused by waiting
     // for a a strong collection lock. See SERVER-42621.
@@ -2762,12 +2760,6 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     try {
         failIndexBuildOnCommit.execute(
             [](const BSONObj&) { uasserted(4698903, "index build aborted due to failpoint"); });
-
-        {
-            auto dss = DatabaseShardingState::get(opCtx, replState->dbName);
-            auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-            dss->checkDbVersion(opCtx, dssLock);
-        }
 
         // If we are no longer primary and a single phase index build started as primary attempts to
         // commit, trigger a self-abort.

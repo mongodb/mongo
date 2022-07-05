@@ -325,7 +325,6 @@ bool indexesAlreadyExist(OperationContext* opCtx,
 void checkDatabaseShardingState(OperationContext* opCtx, const NamespaceString& ns) {
     auto dss = DatabaseShardingState::get(opCtx, ns.db());
     auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-    dss->checkDbVersion(opCtx, dssLock);
 
     Lock::CollectionLock collLock(opCtx, ns, MODE_IS);
     try {
@@ -497,7 +496,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
     boost::optional<UUID> collectionUUID;
     CreateIndexesReply reply;
     {
-        Lock::DBLock dbLock(opCtx, ns.dbName(), MODE_IX);
+        AutoGetDb autoDb(opCtx, ns.db(), MODE_IX);
+
         checkDatabaseShardingState(opCtx, ns);
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
             uasserted(ErrorCodes::NotWritablePrimary,

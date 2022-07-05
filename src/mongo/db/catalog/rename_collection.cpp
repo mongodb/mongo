@@ -295,13 +295,7 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     invariant(source.db() == target.db());
     DisableDocumentValidation validationDisabler(opCtx);
 
-    Lock::DBLock dbWriteLock(opCtx, source.dbName(), MODE_IX);
-
-    {
-        auto dss = DatabaseShardingState::get(opCtx, source.db());
-        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-        dss->checkDbVersion(opCtx, dssLock);
-    }
+    AutoGetDb autoDb(opCtx, source.db(), MODE_IX);
 
     boost::optional<Lock::CollectionLock> sourceLock;
     boost::optional<Lock::CollectionLock> targetLock;
@@ -356,13 +350,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
     invariant(source.db() == target.db());
     DisableDocumentValidation validationDisabler(opCtx);
 
-    Lock::DBLock dbWriteLock(opCtx, source.dbName(), MODE_X);
-
-    {
-        auto dss = DatabaseShardingState::get(opCtx, source.db());
-        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-        dss->checkDbVersion(opCtx, dssLock);
-    }
+    AutoGetDb autoDb(opCtx, source.db(), MODE_X);
 
     auto status = checkSourceAndTargetNamespaces(
         opCtx, source, target, options, /* targetExistsAllowed */ true);
