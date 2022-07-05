@@ -187,7 +187,7 @@ case "$1" in
         log_daemon_msg "Starting $DESC" "$NAME"
         # Check if it's running first
         if running ;  then
-            log_progress_msg "apparently already running"
+            log_success_msg "apparently already running"
             log_end_msg 0
             exit 0
         fi
@@ -217,7 +217,7 @@ case "$1" in
             log_end_msg $errcode
         else
             # If it's not running don't do anything
-            log_progress_msg "apparently not running"
+            log_success_msg "apparently not running"
             log_end_msg 0
             exit 0
         fi
@@ -248,10 +248,10 @@ case "$1" in
 
         log_daemon_msg "Checking status of $DESC" "$NAME"
         if running ;  then
-            log_progress_msg "running"
+            log_successs_msg "running"
             log_end_msg 0
         else
-            log_progress_msg "apparently not running"
+            log_failure_msg "apparently not running"
             log_end_msg 1
             exit 1
         fi
