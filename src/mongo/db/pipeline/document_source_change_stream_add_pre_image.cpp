@@ -97,7 +97,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamAddPreImage::doGetNext()
                 str::stream()
                     << "Change stream was configured to require a pre-image for all update, delete "
                        "and replace events, but pre-image id was not available for event: "
-                    << input.getDocument().toString(),
+                    << makePreImageNotFoundErrorMsg(input.getDocument()),
                 _fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kRequired);
         return input;
     }
@@ -111,7 +111,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamAddPreImage::doGetNext()
         ErrorCodes::NoMatchingDocument,
         str::stream() << "Change stream was configured to require a pre-image for all update, "
                          "delete and replace events, but the pre-image was not found for event: "
-                      << input.getDocument().toString(),
+                      << makePreImageNotFoundErrorMsg(input.getDocument()),
         preImageDoc ||
             _fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kRequired);
 
@@ -163,6 +163,15 @@ Value DocumentSourceChangeStreamAddPreImage::serialize(
         : Value(Document{
               {kStageName,
                DocumentSourceChangeStreamAddPreImageSpec(_fullDocumentBeforeChangeMode).toBSON()}});
+}
+
+std::string DocumentSourceChangeStreamAddPreImage::makePreImageNotFoundErrorMsg(
+    const Document& event) {
+    auto errMsgDoc = Document{{"operationType", event["operationType"]},
+                              {"ns", event["ns"]},
+                              {"clusterTime", event["clusterTime"]},
+                              {"txnNumber", event["txnNumber"]}};
+    return errMsgDoc.toString();
 }
 
 }  // namespace mongo

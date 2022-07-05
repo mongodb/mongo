@@ -48,6 +48,8 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamAddPostImage,
                                   DocumentSourceChangeStreamAddPostImage::createFromBson,
                                   true);
 
+constexpr auto makePostImageNotFoundErrorMsg =
+    &DocumentSourceChangeStreamAddPreImage::makePreImageNotFoundErrorMsg;
 
 Value assertFieldHasType(const Document& fullDoc, StringData fieldName, BSONType expectedType) {
     auto val = fullDoc[fieldName];
@@ -97,12 +99,11 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamAddPostImage::doGetNext(
     const auto postImageDoc = (_fullDocumentMode == FullDocumentModeEnum::kUpdateLookup
                                    ? lookupLatestPostImage(output.peek())
                                    : generatePostImage(output.peek()));
-    uassert(
-        ErrorCodes::NoMatchingDocument,
-        str::stream() << "Change stream was configured to require a post-image for all update, "
-                         "delete and replace events, but the post-image was not found for event: "
-                      << output.peek().toString(),
-        postImageDoc || _fullDocumentMode != FullDocumentModeEnum::kRequired);
+    uassert(ErrorCodes::NoMatchingDocument,
+            str::stream() << "Change stream was configured to require a post-image for all update "
+                             "events, but the post-image was not found for event: "
+                          << makePostImageNotFoundErrorMsg(output.peek()),
+            postImageDoc || _fullDocumentMode != FullDocumentModeEnum::kRequired);
 
     // Even if no post-image was found, we have to populate the 'fullDocument' field.
     output[kFullDocumentFieldName] = (postImageDoc ? Value(*postImageDoc) : Value(BSONNULL));
