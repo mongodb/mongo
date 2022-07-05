@@ -79,7 +79,7 @@ public:
 
     GetModPathsReturn getModifiedPaths() const final {
         // A $sort does not modify any paths.
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
+        return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};
     }
 
     StageConstraints constraints(Pipeline::SplitState) const final {
@@ -102,7 +102,7 @@ public:
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
     bool canRunInParallelBeforeWriteStage(
-        const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const final;
+        const OrderedPathSet& nameOfShardKeyFieldsUponEntryToStage) const final;
 
     /**
      * Returns the sort key pattern.

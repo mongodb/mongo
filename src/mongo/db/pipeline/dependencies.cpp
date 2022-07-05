@@ -37,11 +37,32 @@
 
 namespace mongo {
 
-std::list<std::string> DepsTracker::sortedFields() const {
-    // Use a special comparator to put parent fieldpaths before their children.
-    std::list<std::string> sortedFields(fields.begin(), fields.end());
-    sortedFields.sort(PathPrefixComparator());
-    return sortedFields;
+OrderedPathSet DepsTracker::simplifyDependencies(OrderedPathSet dependencies,
+                                                 TruncateToRootLevel truncateToRootLevel) {
+    // The key operation here is folding dependencies into ancestor dependencies, wherever possible.
+    // This is assisted by a special sort in OrderedPathSet that treats '.'
+    // as the first char and thus places parent paths directly before their children.
+    OrderedPathSet returnSet;
+    std::string last;
+    for (const auto& path : dependencies) {
+        if (!last.empty() && str::startsWith(path, last)) {
+            // We are including a parent of this field, so we can skip this field.
+            continue;
+        }
+
+        // Check that the field requested is a valid field name in the agg language. This
+        // constructor will throw if it isn't.
+        FieldPath fp(path);
+
+        if (truncateToRootLevel == TruncateToRootLevel::yes) {
+            last = fp.front().toString() + '.';
+            returnSet.insert(fp.front().toString());
+        } else {
+            last = path + '.';
+            returnSet.insert(path);
+        }
+    }
+    return returnSet;
 }
 
 BSONObj DepsTracker::toProjectionWithoutMetadata(
@@ -59,35 +80,16 @@ BSONObj DepsTracker::toProjectionWithoutMetadata(
         return bb.obj();
     }
 
-    // Go through dependency fieldpaths to find the minimal set of projections that cover the
-    // dependencies. For example, the dependencies ["a.b", "a.b.c.g", "c", "c.d", "f"] would be
-    // minimally covered by the projection {"a.b": 1, "c": 1, "f": 1}. The key operation here is
-    // folding dependencies into ancestor dependencies, wherever possible. This is assisted by a
-    // special sort in DepsTracker::sortedFields that treats '.' as the first char and thus places
-    // parent paths directly before their children.
+    // Create a projection from the simplified dependencies (absorbing descendants into parents).
+    // For example, the dependencies ["a.b", "a.b.c.g", "c", "c.d", "f"] would be
+    // minimally covered by the projection {"a.b": 1, "c": 1, "f": 1}.
     bool idSpecified = false;
-    std::string last;
-    for (const auto& field : sortedFields()) {
-        if (str::startsWith(field, "_id") && (field.size() == 3 || field[3] == '.')) {
+    for (auto path : simplifyDependencies(fields, truncationBehavior)) {
+        // Remember if _id was specified.  If not, we'll later explicitly add {_id: 0}
+        if (str::startsWith(path, "_id") && (path.size() == 3 || path[3] == '.')) {
             idSpecified = true;
         }
-
-        if (!last.empty() && str::startsWith(field, last)) {
-            // We are including a parent of this field, so we can skip this field.
-            continue;
-        }
-
-        // Check that the field requested is a valid field name in the agg language. This
-        // constructor will throw if it isn't.
-        FieldPath fp(field);
-
-        if (truncationBehavior == TruncateToRootLevel::yes) {
-            last = fp.front().toString() + '.';
-            bb.append(fp.front(), 1);
-        } else {
-            last = field + '.';
-            bb.append(field, 1);
-        }
+        bb.append(path, 1);
     }
 
     if (!idSpecified) {
@@ -109,7 +111,7 @@ void DepsTracker::setNeedsMetadata(DocumentMetadataFields::MetaType type, bool r
 }
 
 // Returns true if the lhs value should sort before the rhs, false otherwise.
-bool PathPrefixComparator::operator()(const std::string& lhs, const std::string& rhs) const {
+bool PathComparator::operator()(const std::string& lhs, const std::string& rhs) const {
     constexpr char dot = '.';
 
     for (size_t pos = 0, len = std::min(lhs.size(), rhs.size()); pos < len; ++pos) {

@@ -47,7 +47,7 @@ public:
 
     GetModPathsReturn getModifiedPaths() const final {
         // This stage neither modifies nor renames any field.
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
+        return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};
     }
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamEnsureResumeTokenPresent> create(

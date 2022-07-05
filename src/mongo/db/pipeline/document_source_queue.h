@@ -75,7 +75,7 @@ public:
      * This stage does not modify anything.
      */
     GetModPathsReturn getModifiedPaths() const override {
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
+        return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};
     }
 
     /**

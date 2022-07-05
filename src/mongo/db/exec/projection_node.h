@@ -102,7 +102,7 @@ public:
     /**
      * Recursively report all paths that are referenced by this projection.
      */
-    void reportProjectedPaths(std::set<std::string>* preservedPaths) const;
+    void reportProjectedPaths(OrderedPathSet* preservedPaths) const;
 
     /**
      * Return an optional number, x, which indicates that it is safe to stop reading the document
@@ -119,7 +119,7 @@ public:
      * 'renamedPaths'. Each entry in 'renamedPaths' maps from the path's new name to its old name
      * prior to application of this projection.
      */
-    void reportComputedPaths(std::set<std::string>* computedPaths,
+    void reportComputedPaths(OrderedPathSet* computedPaths,
                              StringMap<std::string>* renamedPaths) const;
 
     const std::string& getPath() const {

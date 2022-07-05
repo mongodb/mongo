@@ -110,7 +110,7 @@ DepsTracker::State GroupFromFirstDocumentTransformation::addDependencies(DepsTra
 
 DocumentSource::GetModPathsReturn GroupFromFirstDocumentTransformation::getModifiedPaths() const {
     // Replaces the entire root, so all paths are modified.
-    return {DocumentSource::GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}, {}};
+    return {DocumentSource::GetModPathsReturn::Type::kAllPaths, OrderedPathSet{}, {}};
 }
 
 std::unique_ptr<GroupFromFirstDocumentTransformation> GroupFromFirstDocumentTransformation::create(
@@ -369,7 +369,7 @@ DocumentSource::GetModPathsReturn DocumentSourceGroup::getModifiedPaths() const 
     }
 
     return {DocumentSource::GetModPathsReturn::Type::kAllExcept,
-            std::set<std::string>{},  // No fields are preserved.
+            OrderedPathSet{},  // No fields are preserved.
             std::move(renames)};
 }
 
@@ -833,7 +833,7 @@ bool DocumentSourceGroup::pathIncludedInGroupKeys(const std::string& dottedPath)
 }
 
 bool DocumentSourceGroup::canRunInParallelBeforeWriteStage(
-    const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const {
+    const OrderedPathSet& nameOfShardKeyFieldsUponEntryToStage) const {
     if (_doingMerge) {
         return true;  // This is fine.
     }

@@ -7,12 +7,12 @@
 // @tags: [
 //   do_not_wrap_aggregations_in_facets,
 // ]
-load('jstests/aggregation/extras/utils.js');  // For resultsEq.
+load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
 
 (function() {
 "use strict";
 
-var coll = db.groupMissing;
+var coll = db.getCollection(jsTestName());
 coll.drop();
 
 coll.insert({a: null});
@@ -36,17 +36,17 @@ coll.insert({});
 
 // Bug, see SERVER-21992.
 res = coll.aggregate({$group: {_id: {a: "$a"}}});
-assert(resultsEq(res.toArray(), [{_id: {a: null}}]));
+assertArrayEq({actual: res.toArray(), expected: [{_id: {a: null}}]});
 
 // Bug, see SERVER-21992.
 coll.createIndex({a: 1});
 res = coll.aggregate({$group: {_id: {a: "$a"}}});
-assert(resultsEq(res.toArray(), [{_id: {a: null}}]));
+assertArrayEq({actual: res.toArray(), expected: [{_id: {a: null}}]});
 
 // Correct behavior after SERVER-21992 is fixed.
 if (0) {
     res = coll.aggregate({$group: {_id: {a: "$a"}}});
-    assert(resultsEq(res.toArray(), [{_id: {a: null}}, {_id: {}}]));
+    assertArrayEq({actual: res.toArray(), expected: [{_id: {a: null}}, {_id: {}}]});
 }
 
 coll.drop();
@@ -55,17 +55,25 @@ coll.insert({b: 1});
 coll.insert({a: null, b: 1});
 
 res = coll.aggregate({$group: {_id: {a: "$a", b: "$b"}}});
-assert(resultsEq(res.toArray(), [{_id: {b: 1}}, {_id: {a: null, b: 1}}]));
+assertArrayEq({actual: res.toArray(), expected: [{_id: {b: 1}}, {_id: {a: null, b: 1}}]});
 
-// Bug, see SERVER-23229.
 coll.createIndex({a: 1, b: 1});
-res = coll.aggregate({$sort: {a: 1, b: 1}}, {$group: {_id: {a: "$a", b: "$b"}}});
-assert(resultsEq(res.toArray(), [{_id: {a: null, b: 1}}]));
+res = coll.aggregate([{$group: {_id: {a: "$a", b: "$b"}}}, {$sort: {"_id.a": 1, "_id.b": 1}}]);
+// Before fixing SERVER-23229 we were getting [{_id: {a: null, b: 1}}]
+assertArrayEq({actual: res.toArray(), expected: [{_id: {b: 1}}, {_id: {a: null, b: 1}}]});
 
-// Correct behavior after SERVER-23229 is fixed.
-if (0) {
-    coll.createIndex({a: 1, b: 1});
-    res = coll.aggregate({$sort: {a: 1, b: 1}}, {$group: {_id: {a: "$a", b: "$b"}}});
-    assert(resultsEq(res.toArray(), [{_id: {b: 1}}, {_id: {a: null, b: 1}}]));
-}
+// Try another variation of the query that is taken more directly from the bug report SERVER-23229.
+coll.drop();
+coll.insert({a: 1, b: null});
+coll.insert({a: null, b: 1});
+coll.insert({b: 1});
+coll.insert({a: 1});
+
+let preSortResult =
+    coll.aggregate({$sort: {a: 1, b: 1}}, {$group: {_id: {a: "$a", b: "$b"}}}).toArray();
+coll.createIndex({a: 1, b: 1});
+assertArrayEq({
+    actual: preSortResult,
+    expected: coll.aggregate({$group: {_id: {a: "$a", b: "$b"}}}).toArray()
+});
 }());

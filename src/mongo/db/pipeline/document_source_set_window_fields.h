@@ -117,7 +117,7 @@ public:
           _iterator(expCtx.get(), pSource, &_memoryTracker, std::move(partitionBy), _sortBy){};
 
     GetModPathsReturn getModifiedPaths() const final {
-        std::set<std::string> outputPaths;
+        OrderedPathSet outputPaths;
         for (auto&& outputField : _outputFields) {
             outputPaths.insert(outputField.fieldName);
         }

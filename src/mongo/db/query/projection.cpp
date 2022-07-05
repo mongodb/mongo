@@ -49,7 +49,7 @@ struct DepsAnalysisData {
         fieldDependencyTracker.fields.insert(fieldName);
     }
 
-    std::set<std::string> requiredFields() const {
+    OrderedPathSet requiredFields() const {
         return fieldDependencyTracker.fields;
     }
 };

@@ -1771,7 +1771,7 @@ TEST_F(ExpressionDateDiffTest, AddsDependencies) {
     auto depsTracker = dateDiffExpression->getDependencies();
     ASSERT_TRUE(
         (depsTracker.fields ==
-         std::set<std::string>{
+         OrderedPathSet{
              "startDateField", "endDateField", "unitField", "timezoneField", "startOfWeekField"}));
 }
 }  // namespace ExpressionDateDiffTest
@@ -1869,7 +1869,7 @@ TEST_F(ExpressionDateTruncTest, AddsDependencies) {
     const auto depsTracker = dateTruncExpression->getDependencies();
     ASSERT_TRUE(
         (depsTracker.fields ==
-         std::set<std::string>{
+         OrderedPathSet{
              "dateField", "unitField", "binSizeField", "timezoneField", "startOfWeekField"}));
 }
 }  // namespace

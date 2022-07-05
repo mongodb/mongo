@@ -4691,7 +4691,7 @@ public:
      * Returns a description which communicate that this stage modifies nothing.
      */
     GetModPathsReturn getModifiedPaths() const final {
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>(), {}};
+        return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet(), {}};
     }
 };
 
@@ -4768,7 +4768,7 @@ public:
      * Returns a description which communicate that this stage modifies nothing.
      */
     GetModPathsReturn getModifiedPaths() const final {
-        return {GetModPathsReturn::Type::kNotSupported, std::set<std::string>(), {}};
+        return {GetModPathsReturn::Type::kNotSupported, OrderedPathSet(), {}};
     }
 };
 
@@ -4804,7 +4804,7 @@ public:
         return new RenamesAToB(expCtx);
     }
     GetModPathsReturn getModifiedPaths() const final {
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {{"b", "a"}}};
+        return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {{"b", "a"}}};
     }
 };
 
@@ -4928,7 +4928,7 @@ public:
         return new RenamesBToC(expCtx);
     }
     GetModPathsReturn getModifiedPaths() const final {
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {{"c", "b"}}};
+        return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {{"c", "b"}}};
     }
 };
 
@@ -4971,7 +4971,7 @@ public:
         return new RenamesBToA(expCtx);
     }
     GetModPathsReturn getModifiedPaths() const final {
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {{"a", "b"}}};
+        return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {{"a", "b"}}};
     }
 };
 

@@ -54,7 +54,7 @@ public:
     GetModPathsReturn getModifiedPaths() const final {
         // Pretend this stage simply renames the "a" field to be "b", leaving the value of "a" the
         // same. This would be the equivalent of an {$addFields: {b: "$a"}}.
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {{"b", "a"}}};
+        return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {{"b", "a"}}};
     }
 };
 
@@ -132,9 +132,7 @@ public:
         : DocumentSourceTestOptimizations(expCtx) {}
 
     GetModPathsReturn getModifiedPaths() const final {
-        return {GetModPathsReturn::Type::kAllExcept,
-                std::set<std::string>{"e", "f", "g"},
-                {{"d", "c"}}};
+        return {GetModPathsReturn::Type::kAllExcept, OrderedPathSet{"e", "f", "g"}, {{"d", "c"}}};
     }
 };
 
@@ -196,7 +194,7 @@ public:
         : DocumentSourceTestOptimizations(expCtx) {}
 
     GetModPathsReturn getModifiedPaths() const final {
-        return {GetModPathsReturn::Type::kAllExcept, std::set<std::string>{"f.g"}, {{"e", "c.d"}}};
+        return {GetModPathsReturn::Type::kAllExcept, OrderedPathSet{"f.g"}, {{"e", "c.d"}}};
     }
 };
 
@@ -295,7 +293,7 @@ public:
         : DocumentSourceTestOptimizations(expCtx) {}
 
     GetModPathsReturn getModifiedPaths() const final {
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{"c.d"}, {{"x.y", "a"}}};
+        return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{"c.d"}, {{"x.y", "a"}}};
     }
 };
 
@@ -386,7 +384,7 @@ public:
     ModifiesAllPaths(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourceTestOptimizations(expCtx) {}
     GetModPathsReturn getModifiedPaths() const final {
-        return {GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}, {}};
+        return {GetModPathsReturn::Type::kAllPaths, OrderedPathSet{}, {}};
     }
 };
 
@@ -415,7 +413,7 @@ public:
     ModificationsUnknown(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourceTestOptimizations(expCtx) {}
     GetModPathsReturn getModifiedPaths() const final {
-        return {GetModPathsReturn::Type::kNotSupported, std::set<std::string>{}, {}};
+        return {GetModPathsReturn::Type::kNotSupported, OrderedPathSet{}, {}};
     }
 };
 

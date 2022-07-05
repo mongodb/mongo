@@ -93,7 +93,7 @@ private:
     const BSONObj& _rawObj;
 
     // Tracks which paths we've seen to ensure no two paths conflict with each other.
-    std::set<std::string, PathPrefixComparator> _seenPaths;
+    OrderedPathSet _seenPaths;
 };
 
 void ProjectionSpecValidator::uassertValid(const BSONObj& spec) {

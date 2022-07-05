@@ -237,10 +237,10 @@ public:
             return {DocumentSource::GetModPathsReturn::Type::kAllPaths, {}, {}};
         }
 
-        std::set<std::string> preservedPaths;
+        OrderedPathSet preservedPaths;
         _root->reportProjectedPaths(&preservedPaths);
 
-        std::set<std::string> computedPaths;
+        OrderedPathSet computedPaths;
         StringMap<std::string> renamedPaths;
         _root->reportComputedPaths(&computedPaths, &renamedPaths);
 

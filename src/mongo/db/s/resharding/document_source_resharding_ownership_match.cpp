@@ -111,7 +111,7 @@ DepsTracker::State DocumentSourceReshardingOwnershipMatch::getDependencies(
 
 DocumentSource::GetModPathsReturn DocumentSourceReshardingOwnershipMatch::getModifiedPaths() const {
     // This stage does not modify or rename any paths.
-    return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
+    return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};
 }
 
 DocumentSource::GetNextResult DocumentSourceReshardingOwnershipMatch::doGetNext() {

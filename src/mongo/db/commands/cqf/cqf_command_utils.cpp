@@ -392,7 +392,7 @@ private:
 
     template <typename T>
     void checkUnsupportedInclusionExclusion(const T* transformer) {
-        std::set<std::string> computedPaths;
+        OrderedPathSet computedPaths;
         StringMap<std::string> renamedPaths;
         transformer->getRoot()->reportComputedPaths(&computedPaths, &renamedPaths);
 
@@ -402,7 +402,7 @@ private:
             return;
         }
 
-        std::set<std::string> preservedPaths;
+        OrderedPathSet preservedPaths;
         transformer->getRoot()->reportProjectedPaths(&preservedPaths);
 
         for (const std::string& path : preservedPaths) {

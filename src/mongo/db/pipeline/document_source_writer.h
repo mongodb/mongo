@@ -114,7 +114,7 @@ public:
     GetModPathsReturn getModifiedPaths() const override {
         // For purposes of tracking which fields come from where, the writer stage does not modify
         // any fields by default.
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
+        return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
@@ -122,7 +122,7 @@ public:
     }
 
     bool canRunInParallelBeforeWriteStage(
-        const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const override {
+        const OrderedPathSet& nameOfShardKeyFieldsUponEntryToStage) const override {
         return true;
     }
 

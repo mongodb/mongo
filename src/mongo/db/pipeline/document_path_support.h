@@ -63,7 +63,7 @@ StatusWith<Value> extractElementAlongNonArrayPath(const Document& doc, const Fie
 /**
  * Extracts 'paths' from the input document and returns a BSON object containing only those paths.
  */
-BSONObj documentToBsonWithPaths(const Document&, const std::set<std::string>& paths);
+BSONObj documentToBsonWithPaths(const Document&, const OrderedPathSet& paths);
 
 /**
  * Extracts 'paths' from the input document to a flat document.

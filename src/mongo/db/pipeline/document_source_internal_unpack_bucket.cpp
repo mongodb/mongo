@@ -1189,8 +1189,8 @@ DocumentSource::GetModPathsReturn DocumentSourceInternalUnpackBucket::getModifie
         StringMap<std::string> renames;
         renames.emplace(*_bucketUnpacker.bucketSpec().metaField(),
                         timeseries::kBucketMetaFieldName);
-        return {GetModPathsReturn::Type::kAllExcept, std::set<std::string>{}, std::move(renames)};
+        return {GetModPathsReturn::Type::kAllExcept, OrderedPathSet{}, std::move(renames)};
     }
-    return {GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}, {}};
+    return {GetModPathsReturn::Type::kAllPaths, OrderedPathSet{}, {}};
 }
 }  // namespace mongo

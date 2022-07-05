@@ -197,7 +197,7 @@ private:
     void processProjectedPaths(const projection_executor::InclusionNode& node) {
         // For each preserved path, mark that each path element along the field path should be
         // included.
-        std::set<std::string> preservedPaths;
+        OrderedPathSet preservedPaths;
         node.reportProjectedPaths(&preservedPaths);
 
         for (const std::string& preservedPathStr : preservedPaths) {
@@ -217,7 +217,7 @@ private:
     void processComputedPaths(const projection_executor::InclusionNode& node,
                               const std::string& rootProjection,
                               const bool isAddingFields) {
-        std::set<std::string> computedPaths;
+        OrderedPathSet computedPaths;
         StringMap<std::string> renamedPaths;
         node.reportComputedPaths(&computedPaths, &renamedPaths);
 
@@ -295,7 +295,7 @@ private:
     void visitExclusionNode(const projection_executor::ExclusionNode& node) {
         // Handle simple exclusion projections: for each excluded path, mark that the last field
         // path element should be dropped.
-        std::set<std::string> excludedPaths;
+        OrderedPathSet excludedPaths;
         node.reportProjectedPaths(&excludedPaths);
         for (const std::string& excludedPathStr : excludedPaths) {
             assertSupportedPath(excludedPathStr);

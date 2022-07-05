@@ -60,7 +60,7 @@ struct FieldMapEntry {
     // TODO SERVER-66846: Consider maintaining children as a vector of FieldMapEntry's. Then we can
     // remove the _fieldMap member of FieldMapBuilder.
     // Child paths are potentially dotted field paths.
-    std::set<std::string> _childPaths;
+    OrderedPathSet _childPaths;
 };
 
 class FieldMapBuilder {

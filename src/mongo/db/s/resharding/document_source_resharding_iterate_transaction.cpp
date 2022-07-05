@@ -136,7 +136,7 @@ DepsTracker::State DocumentSourceReshardingIterateTransaction::getDependencies(
 
 DocumentSource::GetModPathsReturn DocumentSourceReshardingIterateTransaction::getModifiedPaths()
     const {
-    return {DocumentSource::GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}, {}};
+    return {DocumentSource::GetModPathsReturn::Type::kAllPaths, OrderedPathSet{}, {}};
 }
 
 DocumentSource::GetNextResult DocumentSourceReshardingIterateTransaction::doGetNext() {

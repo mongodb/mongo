@@ -139,7 +139,7 @@ protected:
      * Verifes that the index access method associated with 'indexName' in the collection identified
      * by 'nss' reports 'expectedPaths' as the set of multikey paths.
      */
-    void assertMultikeyPathSetEquals(const std::set<std::string>& expectedPaths,
+    void assertMultikeyPathSetEquals(const OrderedPathSet& expectedPaths,
                                      const NamespaceString& nss = kDefaultNSS,
                                      const std::string& indexName = kDefaultIndexName) {
         // Convert the set of std::string to a set of FieldRef.

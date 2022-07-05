@@ -351,8 +351,8 @@ TEST(DocumentToBsonWithPathsTest, MissingFieldShouldNotAppearInResult) {
 TEST(DocumentToBsonWithPathsTest, ShouldSerializeNothingIfNothingIsNeeded) {
     Document input(fromjson("{a: 1, b: {c: 1}}"));
     BSONObj expected;
-    ASSERT_BSONOBJ_EQ(
-        expected, document_path_support::documentToBsonWithPaths(input, std::set<std::string>{}));
+    ASSERT_BSONOBJ_EQ(expected,
+                      document_path_support::documentToBsonWithPaths(input, OrderedPathSet{}));
 }
 
 TEST(DocumentToBsonWithPathsTest, ShouldExtractEntireArrayFromPrefixOfDottedField) {

@@ -56,7 +56,7 @@ protected:
     }
 
     void addWildcardIndex(BSONObj keyPattern,
-                          const std::set<std::string>& multikeyPathSet = {},
+                          const OrderedPathSet& multikeyPathSet = {},
                           BSONObj wildcardProjection = BSONObj{},
                           MatchExpression* partialFilterExpr = nullptr,
                           CollatorInterface* collator = nullptr,

@@ -149,7 +149,7 @@ public:
             return {DocumentSource::GetModPathsReturn::Type::kAllPaths, {}, {}};
         }
 
-        std::set<std::string> modifiedPaths;
+        OrderedPathSet modifiedPaths;
         _root->reportProjectedPaths(&modifiedPaths);
         return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, std::move(modifiedPaths), {}};
     }

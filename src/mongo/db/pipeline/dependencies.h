@@ -39,6 +39,21 @@
 namespace mongo {
 
 /**
+ * Custom comparator that orders fieldpath strings by path prefix first, then by field.
+ * This ensures that a parent field is ordered directly before its children.
+ */
+struct PathComparator {
+    /* Returns true if the lhs value should sort before the rhs, false otherwise. */
+    bool operator()(const std::string& lhs, const std::string& rhs) const;
+};
+
+/**
+ * Set of field paths strings.  When iterated over, a parent path is seen directly before its
+ * children (or descendants, more generally).  Eg., "a", "a.a", "a.b", "a-plus", "b".
+ */
+typedef std::set<std::string, PathComparator> OrderedPathSet;
+
+/**
  * This struct allows components in an agg pipeline to report what they need from their input.
  */
 struct DepsTracker {
@@ -104,10 +119,21 @@ struct DepsTracker {
     enum class TruncateToRootLevel : bool { no, yes };
 
     /**
-     * Returns a projection object covering the non-metadata dependencies tracked by this class, or
-     * empty BSONObj if the entire document is required. By default, the resulting project will
-     * include the full, dotted field names of the dependencies. If 'truncationBehavior' is set to
-     * TruncateToRootLevel::yes, the project will contain only the root-level field names.
+     * Return the set of dependencies with descendant paths removed.
+     * For example ["a.b", "a.b.f", "c"] --> ["a.b", "c"].
+     *
+     * TruncateToRootLevel::yes requires all dependencies to be top-level.
+     * The example above would return ["a", "c"]
+     */
+    static OrderedPathSet simplifyDependencies(OrderedPathSet dependencies,
+                                               TruncateToRootLevel truncation);
+
+    /**
+     * Returns a projection object covering the non-metadata dependencies tracked by this class,
+     * or empty BSONObj if the entire document is required. By default, the resulting project
+     * will include the full, dotted field names of the dependencies. If 'truncationBehavior' is
+     * set to TruncateToRootLevel::yes, the project will contain only the root-level field
+     * names.
      */
     BSONObj toProjectionWithoutMetadata(
         TruncateToRootLevel truncationBehavior = TruncateToRootLevel::no) const;
@@ -185,11 +211,11 @@ struct DepsTracker {
     }
 
     /**
-     * Return fieldpaths ordered such that a parent is immediately before its children.
+     * Return names of needed fields in dotted notation.  A custom comparator orders the fields
+     * such that a parent is immediately before its children.
      */
-    std::list<std::string> sortedFields() const;
+    OrderedPathSet fields;
 
-    std::set<std::string> fields;    // Names of needed fields in dotted notation.
     std::set<Variables::Id> vars;    // IDs of referenced variables.
     bool needWholeDocument = false;  // If true, ignore 'fields'; the whole document is needed.
 
@@ -207,12 +233,4 @@ private:
     QueryMetadataBitSet _metadataDeps;
 };
 
-
-/** Custom comparator that orders fieldpath strings by path prefix first, then by field.
- * This ensures that a parent field is ordered directly before its children.
- */
-struct PathPrefixComparator {
-    /* Returns true if the lhs value should sort before the rhs, false otherwise. */
-    bool operator()(const std::string& lhs, const std::string& rhs) const;
-};
 }  // namespace mongo

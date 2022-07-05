@@ -49,7 +49,7 @@ struct ProjectionDependencies {
     bool containsElemMatch = false;
 
     // Which fields are necessary to perform the projection, or boost::none if all are required.
-    boost::optional<std::set<std::string>> requiredFields;
+    boost::optional<OrderedPathSet> requiredFields;
 
     bool hasDottedPath = false;
 
@@ -95,7 +95,7 @@ public:
      * Return which fields are required to compute the projection, assuming the entire document is
      * not needed.
      */
-    const std::set<std::string>& getRequiredFields() const {
+    const OrderedPathSet& getRequiredFields() const {
         invariant(_type == ProjectType::kInclusion);
         return *_deps.requiredFields;
     }

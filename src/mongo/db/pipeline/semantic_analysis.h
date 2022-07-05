@@ -57,7 +57,7 @@ enum class Direction { kForward, kBackward };
  * the pipeline, and direction is backward. Say nextStage preserves all the paths but renamed "a" to
  * "b"; we would return a mapping b-->a.
  */
-boost::optional<StringMap<std::string>> renamedPaths(const std::set<std::string>& pathsOfInterest,
+boost::optional<StringMap<std::string>> renamedPaths(const OrderedPathSet& pathsOfInterest,
                                                      const DocumentSource& stage,
                                                      const Direction& traversalDir);
 /**
@@ -72,7 +72,7 @@ boost::optional<StringMap<std::string>> renamedPaths(const std::set<std::string>
 boost::optional<StringMap<std::string>> renamedPaths(
     Pipeline::SourceContainer::const_iterator start,
     Pipeline::SourceContainer::const_iterator end,
-    const std::set<std::string>& pathsOfInterest,
+    const OrderedPathSet& pathsOfInterest,
     boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback =
         boost::none);
 
@@ -89,7 +89,7 @@ boost::optional<StringMap<std::string>> renamedPaths(
 boost::optional<StringMap<std::string>> renamedPaths(
     Pipeline::SourceContainer::const_reverse_iterator start,
     Pipeline::SourceContainer::const_reverse_iterator end,
-    const std::set<std::string>& pathsOfInterest,
+    const OrderedPathSet& pathsOfInterest,
     boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback =
         boost::none);
 
@@ -104,7 +104,7 @@ boost::optional<StringMap<std::string>> renamedPaths(
 std::pair<Pipeline::SourceContainer::const_iterator, StringMap<std::string>>
 findLongestViablePrefixPreservingPaths(Pipeline::SourceContainer::const_iterator start,
                                        Pipeline::SourceContainer::const_iterator end,
-                                       const std::set<std::string>& pathsOfInterest,
+                                       const OrderedPathSet& pathsOfInterest,
                                        boost::optional<std::function<bool(DocumentSource*)>>
                                            additionalStageValidatorCallback = boost::none);
 
@@ -115,10 +115,9 @@ findLongestViablePrefixPreservingPaths(Pipeline::SourceContainer::const_iterator
  * For example, extractModifiedDependencies({'a', 'b', 'c.d', 'e'}, {'a', 'b.c', c'}) returns
  * {'b', 'e'}, since 'b' and 'e' are not preserved (only 'b.c' is preserved).
  */
-std::set<std::string> extractModifiedDependencies(const std::set<std::string>& dependencies,
-                                                  const std::set<std::string>& preservedPaths);
+OrderedPathSet extractModifiedDependencies(const OrderedPathSet& dependencies,
+                                           const OrderedPathSet& preservedPaths);
 
-bool pathSetContainsOverlappingPath(const std::set<std::string>& paths,
-                                    const std::string& targetPath);
+bool pathSetContainsOverlappingPath(const OrderedPathSet& paths, const std::string& targetPath);
 
 }  // namespace mongo::semantic_analysis

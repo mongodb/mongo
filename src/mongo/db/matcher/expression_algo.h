@@ -34,6 +34,7 @@
 #include <set>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -85,17 +86,32 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs);
  * For example, {a: "foo", b: "bar"} is splittable by "b", while
  * {$or: [{a: {$eq: "foo"}}, {b: {$eq: "bar"}}]} is not splittable by "b", due to the $or.
  */
-bool isSplittableBy(const MatchExpression& expr, const std::set<std::string>& pathSet);
+bool isSplittableBy(const MatchExpression& expr, const OrderedPathSet& pathSet);
+
+/**
+ * True if no path in either set is contained by a path in the other.  Does not check for
+ * dependencies within each of the sets, just across sets.  Runs in 0(n) time.
+ *
+ * areIndependent([a.b, b, a], [c]) --> true
+ * areIndependent([a.b, b, a], [a.b.f]) --> false
+ */
+bool areIndependent(const OrderedPathSet& pathSet1, const OrderedPathSet& pathSet2);
+
+/**
+ * Return true if any of the fieldPaths in prefixCandidates are identical to or an ancestor of any
+ * of the fieldpaths in testSet.  The order of the parameters matters -- it's not commutative.
+ */
+bool containsDependency(const OrderedPathSet& testSet, const OrderedPathSet& prefixCandidates);
 
 /**
  * Determine if 'expr' is reliant upon any path from 'pathSet'.
  */
-bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& pathSet);
+bool isIndependentOf(const MatchExpression& expr, const OrderedPathSet& pathSet);
 
 /**
  * Determine if 'expr' is reliant only upon paths from 'pathSet'.
  */
-bool isOnlyDependentOn(const MatchExpression& expr, const std::set<std::string>& pathSet);
+bool isOnlyDependentOn(const MatchExpression& expr, const OrderedPathSet& pathSet);
 
 /**
  * Returns whether the path represented by 'first' is an prefix of the path represented by 'second'.
@@ -122,8 +138,7 @@ bool bidirectionalPathPrefixOf(StringData first, StringData second);
  */
 void mapOver(MatchExpression* expr, NodeTraversalFunc func, std::string path = "");
 
-using ShouldSplitExprFunc =
-    std::function<bool(const MatchExpression&, const std::set<std::string>&)>;
+using ShouldSplitExprFunc = std::function<bool(const MatchExpression&, const OrderedPathSet&)>;
 
 /**
  * Attempt to split 'expr' into two MatchExpressions according to 'func'. 'func' describes the
@@ -146,7 +161,7 @@ using ShouldSplitExprFunc =
  */
 std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>>
 splitMatchExpressionBy(std::unique_ptr<MatchExpression> expr,
-                       const std::set<std::string>& fields,
+                       const OrderedPathSet& fields,
                        const StringMap<std::string>& renames,
                        ShouldSplitExprFunc func = isIndependentOf);
 
