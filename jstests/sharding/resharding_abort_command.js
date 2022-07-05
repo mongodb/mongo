@@ -173,12 +173,6 @@ const runAbortWithFailpoint = (failpointName, failpointNodeType, abortLocation, 
     const topology = DiscoverTopology.findConnectedNodes(mongos);
     const configsvr = new Mongo(topology.configsvr.nodes[0]);
 
-    const status = configsvr.getDB('admin').serverStatus({});
-    // Resharding has not been attempted yet, so resharding metrics will not be reported. This means
-    // shardingStatistics will be empty, and thus not reported. So we assert that the serverStatus
-    // does not have shardingStatistics yet.
-    assert(!status.hasOwnProperty('shardingStatistics'), status);
-
     let expectedAbortErrorCodes = ErrorCodes.OK;
     let expectedReshardingErrorCode = ErrorCodes.ReshardCollectionAborted;
 

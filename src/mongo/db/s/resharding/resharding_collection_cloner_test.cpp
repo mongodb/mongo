@@ -33,9 +33,11 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_util.h"
@@ -76,13 +78,11 @@ private:
 
 class ReshardingCollectionClonerTest : public ShardServerTestFixtureWithCatalogCacheMock {
 protected:
-    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
-        ShardKeyPattern newShardKeyPattern,
-        ShardId recipientShard,
-        std::deque<DocumentSource::GetNextResult> sourceCollectionData,
-        std::deque<DocumentSource::GetNextResult> configCacheChunksData) {
-        auto tempNss = resharding::constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
-
+    void initializePipelineTest(
+        const ShardKeyPattern& newShardKeyPattern,
+        const ShardId& recipientShard,
+        const std::deque<DocumentSource::GetNextResult>& sourceCollectionData,
+        const std::deque<DocumentSource::GetNextResult>& configCacheChunksData) {
         _metrics = ReshardingMetrics::makeInstance(_sourceUUID,
                                                    newShardKeyPattern.toBSON(),
                                                    _sourceNss,
@@ -90,22 +90,23 @@ protected:
                                                    getServiceContext()->getFastClockSource()->now(),
                                                    getServiceContext());
 
-        ReshardingCollectionCloner cloner(_metrics.get(),
-                                          std::move(newShardKeyPattern),
-                                          _sourceNss,
-                                          _sourceUUID,
-                                          std::move(recipientShard),
-                                          Timestamp(1, 0), /* dummy value */
-                                          std::move(tempNss));
+        _cloner = std::make_unique<ReshardingCollectionCloner>(
+            _metrics.get(),
+            ShardKeyPattern(newShardKeyPattern.toBSON()),
+            _sourceNss,
+            _sourceUUID,
+            recipientShard,
+            Timestamp(1, 0), /* dummy value */
+            tempNss);
 
-        auto pipeline = cloner.makePipeline(
-            operationContext(),
-            std::make_shared<MockMongoInterface>(std::move(configCacheChunksData)));
+        getCatalogCacheMock()->setChunkManagerReturnValue(
+            createChunkManager(newShardKeyPattern, configCacheChunksData));
 
-        pipeline->addInitialSource(DocumentSourceMock::createForTest(
-            std::move(sourceCollectionData), pipeline->getContext()));
+        _pipeline = _cloner->makePipeline(
+            operationContext(), std::make_shared<MockMongoInterface>(configCacheChunksData));
 
-        return pipeline;
+        _pipeline->addInitialSource(
+            DocumentSourceMock::createForTest(sourceCollectionData, _pipeline->getContext()));
     }
 
     template <class T>
@@ -116,6 +117,11 @@ protected:
 
     void setUp() override {
         ShardServerTestFixtureWithCatalogCacheMock::setUp();
+
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            operationContext());
+        uassertStatusOK(createCollection(
+            operationContext(), tempNss.db().toString(), BSON("create" << tempNss.coll())));
     }
 
     void tearDown() override {
@@ -157,87 +163,135 @@ protected:
                             boost::none);
     }
 
-private:
+    void runPipelineTest(
+        ShardKeyPattern shardKey,
+        const ShardId& recipientShard,
+        std::deque<DocumentSource::GetNextResult> collectionData,
+        std::deque<DocumentSource::GetNextResult> configData,
+        int64_t expectedDocumentsCount,
+        std::function<void(std::unique_ptr<SeekableRecordCursor>)> verifyFunction) {
+        initializePipelineTest(shardKey, recipientShard, collectionData, configData);
+        auto opCtx = operationContext();
+        AutoGetCollection tempColl{opCtx, tempNss, MODE_IS};
+        while (_cloner->doOneBatch(operationContext(), *_pipeline)) {
+            ASSERT_EQ(tempColl->numRecords(opCtx), _metrics->getDocumentsCopiedCount());
+            ASSERT_EQ(tempColl->dataSize(opCtx), _metrics->getBytesCopiedCount());
+        }
+        ASSERT_EQ(tempColl->numRecords(operationContext()), expectedDocumentsCount);
+        ASSERT_EQ(_metrics->getDocumentsCopiedCount(), expectedDocumentsCount);
+        ASSERT_GT(tempColl->dataSize(opCtx), 0);
+        ASSERT_EQ(tempColl->dataSize(opCtx), _metrics->getBytesCopiedCount());
+        verifyFunction(tempColl->getCursor(opCtx));
+    }
+
+protected:
     const NamespaceString _sourceNss = NamespaceString("test"_sd, "collection_being_resharded"_sd);
+    const NamespaceString tempNss =
+        resharding::constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
     const UUID _sourceUUID = UUID::gen();
     const ReshardingSourceId _sourceId{UUID::gen(), _myShardName};
     const DatabaseVersion _sourceDbVersion{UUID::gen(), Timestamp(1, 1)};
 
     std::unique_ptr<ReshardingMetrics> _metrics;
+    std::unique_ptr<ReshardingCollectionCloner> _cloner;
+    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
 };
 
 TEST_F(ReshardingCollectionClonerTest, MinKeyChunk) {
     ShardKeyPattern sk{fromjson("{x: 1}")};
+    std::deque<DocumentSource::GetNextResult> collectionData{
+        Doc(fromjson("{_id: 1, x: {$minKey: 1}}")),
+        Doc(fromjson("{_id: 2, x: -0.001}")),
+        Doc(fromjson("{_id: 3, x: NumberLong(0)}")),
+        Doc(fromjson("{_id: 4, x: 0.0}")),
+        Doc(fromjson("{_id: 5, x: 0.001}")),
+        Doc(fromjson("{_id: 6, x: {$maxKey: 1}}"))};
     std::deque<DocumentSource::GetNextResult> configData{
         Doc(fromjson("{_id: {x: {$minKey: 1}}, max: {x: 0.0}, shard: 'myShardName'}")),
         Doc(fromjson("{_id: {x: 0.0}, max: {x: {$maxKey: 1}}, shard: 'shard2' }"))};
-    getCatalogCacheMock()->setChunkManagerReturnValue(createChunkManager(sk, configData));
-    auto pipeline = makePipeline(std::move(sk),
-                                 _myShardName,
-                                 {Doc(fromjson("{_id: 1, x: {$minKey: 1}}")),
-                                  Doc(fromjson("{_id: 2, x: -0.001}")),
-                                  Doc(fromjson("{_id: 3, x: NumberLong(0)}")),
-                                  Doc(fromjson("{_id: 4, x: 0.0}")),
-                                  Doc(fromjson("{_id: 5, x: 0.001}")),
-                                  Doc(fromjson("{_id: 6, x: {$maxKey: 1}}"))},
-                                 std::move(configData));
+    constexpr auto kExpectedCopiedCount = 2;
+    const auto verify = [](auto cursor) {
+        auto next = cursor->next();
+        ASSERT(next);
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 1 << "x" << MINKEY << "$sortKey" << BSON_ARRAY(1)),
+                                 next->data.toBson());
 
-    auto next = pipeline->getNext();
-    ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 1 << "x" << MINKEY << "$sortKey" << BSON_ARRAY(1)),
-                             next->toBson());
+        next = cursor->next();
+        ASSERT(next);
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 2 << "x" << -0.001 << "$sortKey" << BSON_ARRAY(2)),
+                                 next->data.toBson());
 
-    next = pipeline->getNext();
-    ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 2 << "x" << -0.001 << "$sortKey" << BSON_ARRAY(2)),
-                             next->toBson());
+        ASSERT_FALSE(cursor->next());
+    };
 
-    ASSERT_FALSE(pipeline->getNext());
+    runPipelineTest(std::move(sk),
+                    _myShardName,
+                    std::move(collectionData),
+                    std::move(configData),
+                    kExpectedCopiedCount,
+                    verify);
 }
 
 TEST_F(ReshardingCollectionClonerTest, MaxKeyChunk) {
     ShardKeyPattern sk{fromjson("{x: 1}")};
+    std::deque<DocumentSource::GetNextResult> collectionData{
+        Doc(fromjson("{_id: 1, x: {$minKey: 1}}")),
+        Doc(fromjson("{_id: 2, x: -0.001}")),
+        Doc(fromjson("{_id: 3, x: NumberLong(0)}")),
+        Doc(fromjson("{_id: 4, x: 0.0}")),
+        Doc(fromjson("{_id: 5, x: 0.001}")),
+        Doc(fromjson("{_id: 6, x: {$maxKey: 1}}"))};
     std::deque<DocumentSource::GetNextResult> configData{
         Doc(fromjson("{_id: {x: {$minKey: 1}}, max: {x: 0.0}, shard: 'myShardName'}")),
         Doc(fromjson("{_id: {x: 0.0}, max: {x: {$maxKey: 1}}, shard: 'shard2' }")),
     };
-    getCatalogCacheMock()->setChunkManagerReturnValue(createChunkManager(sk, configData));
-    auto pipeline = makePipeline(std::move(sk),
-                                 ShardId("shard2"),
-                                 {Doc(fromjson("{_id: 1, x: {$minKey: 1}}")),
-                                  Doc(fromjson("{_id: 2, x: -0.001}")),
-                                  Doc(fromjson("{_id: 3, x: NumberLong(0)}")),
-                                  Doc(fromjson("{_id: 4, x: 0.0}")),
-                                  Doc(fromjson("{_id: 5, x: 0.001}")),
-                                  Doc(fromjson("{_id: 6, x: {$maxKey: 1}}}"))},
-                                 std::move(configData));
+    // TODO SERVER-67529: Change expected documents to 4.
+    constexpr auto kExpectedCopiedCount = 3;
+    const auto verify = [](auto cursor) {
+        auto next = cursor->next();
+        ASSERT(next);
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 3 << "x" << 0LL << "$sortKey" << BSON_ARRAY(3)),
+                                 next->data.toBson());
 
-    auto next = pipeline->getNext();
-    ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 3 << "x" << 0LL << "$sortKey" << BSON_ARRAY(3)),
-                             next->toBson());
+        next = cursor->next();
+        ASSERT(next);
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 4 << "x" << 0.0 << "$sortKey" << BSON_ARRAY(4)),
+                                 next->data.toBson());
 
-    next = pipeline->getNext();
-    ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 4 << "x" << 0.0 << "$sortKey" << BSON_ARRAY(4)),
-                             next->toBson());
+        next = cursor->next();
+        ASSERT(next);
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 5 << "x" << 0.001 << "$sortKey" << BSON_ARRAY(5)),
+                                 next->data.toBson());
 
-    next = pipeline->getNext();
-    ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 5 << "x" << 0.001 << "$sortKey" << BSON_ARRAY(5)),
-                             next->toBson());
+        // TODO SERVER-67529: Enable after ChunkManager can handle documents with $maxKey.
+        // next = cursor->next();
+        // ASSERT(next);
+        // ASSERT_BSONOBJ_BINARY_EQ(
+        //     BSON("_id" << 6 << "x" << MAXKEY << "$sortKey" << BSON_ARRAY(6)),
+        //     next->data.toBson());
 
-    // TODO SERVER-67529: Enable after ChunkManager can handle documents with $maxKey.
-    // next = pipeline->getNext();
-    // ASSERT(next);
-    // ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 6 << "x" << MAXKEY << "$sortKey" << BSON_ARRAY(6)),
-    //                          next->toBson());
+        ASSERT_FALSE(cursor->next());
+    };
 
-    ASSERT_FALSE(pipeline->getNext());
+    runPipelineTest(std::move(sk),
+                    ShardId("shard2"),
+                    std::move(collectionData),
+                    std::move(configData),
+                    kExpectedCopiedCount,
+                    verify);
 }
 
 TEST_F(ReshardingCollectionClonerTest, HashedShardKey) {
     ShardKeyPattern sk{fromjson("{x: 'hashed'}")};
+    std::deque<DocumentSource::GetNextResult> collectionData{
+        Doc(fromjson("{_id: 1, x: {$minKey: 1}}")),
+        Doc(fromjson("{_id: 2, x: -1}")),
+        Doc(fromjson("{_id: 3, x: -0.123}")),
+        Doc(fromjson("{_id: 4, x: 0}")),
+        Doc(fromjson("{_id: 5, x: NumberLong(0)}")),
+        Doc(fromjson("{_id: 6, x: 0.123}")),
+        Doc(fromjson("{_id: 7, x: 1}")),
+        Doc(fromjson("{_id: 8, x: {$maxKey: 1}}"))};
     // Documents in a mock config.cache.chunks collection. Mocked collection boundaries:
     // - [MinKey, hash(0))      : shard1
     // - [hash(0), hash(0) + 1) : shard2
@@ -252,44 +306,50 @@ TEST_F(ReshardingCollectionClonerTest, HashedShardKey) {
         Doc{{"_id", Doc{{"x", getHashedElementValue(0) + 1}}},
             {"max", Doc{{"x", V(MAXKEY)}}},
             {"shard", "shard3"_sd}}};
-    getCatalogCacheMock()->setChunkManagerReturnValue(createChunkManager(sk, configData));
-    auto pipeline = makePipeline(std::move(sk),
-                                 ShardId("shard2"),
-                                 {Doc(fromjson("{_id: 1, x: {$minKey: 1}}")),
-                                  Doc(fromjson("{_id: 2, x: -1}")),
-                                  Doc(fromjson("{_id: 3, x: -0.123}")),
-                                  Doc(fromjson("{_id: 4, x: 0}")),
-                                  Doc(fromjson("{_id: 5, x: NumberLong(0)}")),
-                                  Doc(fromjson("{_id: 6, x: 0.123}")),
-                                  Doc(fromjson("{_id: 7, x: 1}")),
-                                  Doc(fromjson("{_id: 8, x: {$maxKey: 1}}"))},
-                                 std::move(configData));
+    constexpr auto kExpectedCopiedCount = 4;
+    const auto verify = [](auto cursor) {
+        auto next = cursor->next();
+        ASSERT(next);
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 3 << "x" << -0.123 << "$sortKey" << BSON_ARRAY(3)),
+                                 next->data.toBson());
 
-    auto next = pipeline->getNext();
-    ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 3 << "x" << -0.123 << "$sortKey" << BSON_ARRAY(3)),
-                             next->toBson());
+        next = cursor->next();
+        ASSERT(next);
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 4 << "x" << 0 << "$sortKey" << BSON_ARRAY(4)),
+                                 next->data.toBson());
 
-    next = pipeline->getNext();
-    ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 4 << "x" << 0 << "$sortKey" << BSON_ARRAY(4)),
-                             next->toBson());
+        next = cursor->next();
+        ASSERT(next);
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 5 << "x" << 0LL << "$sortKey" << BSON_ARRAY(5)),
+                                 next->data.toBson());
 
-    next = pipeline->getNext();
-    ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 5 << "x" << 0LL << "$sortKey" << BSON_ARRAY(5)),
-                             next->toBson());
+        next = cursor->next();
+        ASSERT(next);
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 6 << "x" << 0.123 << "$sortKey" << BSON_ARRAY(6)),
+                                 next->data.toBson());
 
-    next = pipeline->getNext();
-    ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 6 << "x" << 0.123 << "$sortKey" << BSON_ARRAY(6)),
-                             next->toBson());
+        ASSERT_FALSE(cursor->next());
+    };
 
-    ASSERT_FALSE(pipeline->getNext());
+    runPipelineTest(std::move(sk),
+                    ShardId("shard2"),
+                    std::move(collectionData),
+                    std::move(configData),
+                    kExpectedCopiedCount,
+                    verify);
 }
 
 TEST_F(ReshardingCollectionClonerTest, CompoundHashedShardKey) {
     ShardKeyPattern sk{fromjson("{x: 'hashed', y: 1}")};
+    std::deque<DocumentSource::GetNextResult> collectionData{
+        Doc(fromjson("{_id: 1, x: {$minKey: 1}}")),
+        Doc(fromjson("{_id: 2, x: -1}")),
+        Doc(fromjson("{_id: 3, x: -0.123, y: -1}")),
+        Doc(fromjson("{_id: 4, x: 0, y: 0}")),
+        Doc(fromjson("{_id: 5, x: NumberLong(0), y: 1}")),
+        Doc(fromjson("{_id: 6, x: 0.123}")),
+        Doc(fromjson("{_id: 7, x: 1}")),
+        Doc(fromjson("{_id: 8, x: {$maxKey: 1}}"))};
     // Documents in a mock config.cache.chunks collection. Mocked collection boundaries:
     // - [{x: MinKey, y: MinKey}, {x: hash(0), y: 0}) : shard1
     // - [{x: hash(0), y: 0}, {x: hash(0), y: 1})     : shard2
@@ -304,25 +364,23 @@ TEST_F(ReshardingCollectionClonerTest, CompoundHashedShardKey) {
         Doc{{"_id", Doc{{"x", getHashedElementValue(0)}, {"y", 1}}},
             {"max", Doc{{"x", V(MAXKEY)}, {"y", V(MAXKEY)}}},
             {"shard", "shard3"_sd}}};
-    getCatalogCacheMock()->setChunkManagerReturnValue(createChunkManager(sk, configData));
-    auto pipeline = makePipeline(std::move(sk),
-                                 ShardId("shard2"),
-                                 {Doc(fromjson("{_id: 1, x: {$minKey: 1}}")),
-                                  Doc(fromjson("{_id: 2, x: -1}")),
-                                  Doc(fromjson("{_id: 3, x: -0.123, y: -1}")),
-                                  Doc(fromjson("{_id: 4, x: 0, y: 0}")),
-                                  Doc(fromjson("{_id: 5, x: NumberLong(0), y: 1}")),
-                                  Doc(fromjson("{_id: 6, x: 0.123}")),
-                                  Doc(fromjson("{_id: 7, x: 1}")),
-                                  Doc(fromjson("{_id: 8, x: {$maxKey: 1}}"))},
-                                 std::move(configData));
+    constexpr auto kExpectedCopiedCount = 1;
+    const auto verify = [](auto cursor) {
+        auto next = cursor->next();
+        ASSERT(next);
+        ASSERT_BSONOBJ_BINARY_EQ(
+            BSON("_id" << 4 << "x" << 0 << "y" << 0 << "$sortKey" << BSON_ARRAY(4)),
+            next->data.toBson());
 
-    auto next = pipeline->getNext();
-    ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(
-        BSON("_id" << 4 << "x" << 0 << "y" << 0 << "$sortKey" << BSON_ARRAY(4)), next->toBson());
+        ASSERT_FALSE(cursor->next());
+    };
 
-    ASSERT_FALSE(pipeline->getNext());
+    runPipelineTest(std::move(sk),
+                    ShardId("shard2"),
+                    std::move(collectionData),
+                    std::move(configData),
+                    kExpectedCopiedCount,
+                    verify);
 }
 
 }  // namespace

@@ -48,6 +48,21 @@ const inputCollection = reshardingTest.createShardedCollection({
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 const topology = DiscoverTopology.findConnectedNodes(inputCollection.getMongo());
+let allNodes = [];
+for (let [_, shardReplSet] of Object.entries(topology.shards)) {
+    allNodes.push(shardReplSet.primary);
+}
+allNodes.push(topology.configsvr.primary);
+allNodes.forEach((hostName) => {
+    const status = new Mongo(hostName).getDB('admin').serverStatus({});
+    if (hostName == topology.configsvr.primary) {
+        assert(!status.hasOwnProperty('shardingStatistics'));
+        return;
+    }
+    const shardingStats = status.shardingStatistics;
+    assert(!shardingStats.hasOwnProperty('resharding'));
+});
+
 reshardingTest.withReshardingInBackground(
     {
         newShardKeyPattern: {newKey: 1},
@@ -90,12 +105,6 @@ reshardingTest.withReshardingInBackground(
         assert(curOpSection.hasOwnProperty('totalCriticalSectionTimeElapsedSecs'),
                tojson(curOpSection));
     });
-
-let allNodes = [];
-for (let [_, shardReplSet] of Object.entries(topology.shards)) {
-    allNodes.push(shardReplSet.primary);
-}
-allNodes.push(topology.configsvr.primary);
 
 allNodes.forEach((hostName) => {
     const serverStatus = getServerStatusSection(new Mongo(hostName));
