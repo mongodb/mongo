@@ -85,20 +85,14 @@ public:
                 // The collection is not sharded or doesn't exist.
             }
 
-            // If 'ns()' is a sharded time-series view collection, 'targetNs' is a namespace
-            // for time-series buckets collection. For all other collections, 'targetNs' is equal
-            // to 'ns()'.
-            const auto targeter = ChunkManagerTargeter(opCtx, ns());
-            const auto targetNs = targeter.getNS();
-
             // Since this operation is not directly writing locally we need to force its db
             // profile level increase in order to be logged in "<db>.system.profile"
             CurOp::get(opCtx)->raiseDbProfileLevel(
-                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(targetNs.dbName()));
+                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns().dbName()));
 
             auto coordinatorDoc = DropCollectionCoordinatorDocument();
             coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                {{targetNs, DDLCoordinatorTypeEnum::kDropCollection}});
+                {{ns(), DDLCoordinatorTypeEnum::kDropCollection}});
             coordinatorDoc.setCollectionUUID(request().getCollectionUUID());
 
             auto service = ShardingDDLCoordinatorService::getService(opCtx);

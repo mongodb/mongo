@@ -88,7 +88,7 @@ void CollModCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     const auto& otherReq = otherDoc.getCollModRequest().toBSON();
 
     uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Another collMod for namespace " << nss()
+            str::stream() << "Another collMod for namespace " << originalNss()
                           << " is being executed with different parameters: " << selfReq,
             SimpleBSONObjComparator::kInstance.evaluate(selfReq == otherReq));
 }
@@ -114,9 +114,9 @@ void CollModCoordinator::_performNoopRetryableWriteOnParticipants(
 void CollModCoordinator::_saveCollectionInfoOnCoordinatorIfNecessary(OperationContext* opCtx) {
     if (!_collInfo) {
         CollectionInfo info;
-        info.timeSeriesOptions = timeseries::getTimeseriesOptions(opCtx, nss(), true);
+        info.timeSeriesOptions = timeseries::getTimeseriesOptions(opCtx, originalNss(), true);
         info.nsForTargeting =
-            info.timeSeriesOptions ? nss().makeTimeseriesBucketsNamespace() : nss();
+            info.timeSeriesOptions ? originalNss().makeTimeseriesBucketsNamespace() : originalNss();
         info.isSharded = isShardedColl(opCtx, info.nsForTargeting);
         _collInfo = std::move(info);
     }
@@ -186,9 +186,12 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
 
                 if (_collInfo->isSharded) {
-                    _doc.setCollUUID(
-                        sharding_ddl_util::getCollectionUUID(opCtx, nss(), true /* allowViews */));
-                    sharding_ddl_util::stopMigrations(opCtx, nss(), _doc.getCollUUID());
+                    // TODO SERVER-67686 use the translated namespace `_collInfo->nsForTargeting`
+                    // here so that in case of timeseries collection we block migrations on the
+                    // bucket namespace and not the timeseries view namespace `originalNss()`
+                    _doc.setCollUUID(sharding_ddl_util::getCollectionUUID(
+                        opCtx, originalNss(), true /* allowViews */));
+                    sharding_ddl_util::stopMigrations(opCtx, originalNss(), _doc.getCollUUID());
                 }
 
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
@@ -243,7 +246,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
                 if (_collInfo->isSharded) {
-                    ShardsvrCollModParticipant request(nss(), _request);
+                    ShardsvrCollModParticipant request(originalNss(), _request);
                     bool needsUnblock =
                         _collInfo->timeSeriesOptions && hasTimeSeriesGranularityUpdate(_request);
                     request.setNeedsUnblock(needsUnblock);
@@ -289,11 +292,11 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     _result = builder.obj();
                     sharding_ddl_util::resumeMigrations(opCtx, nss(), _doc.getCollUUID());
                 } else {
-                    CollMod cmd(nss());
+                    CollMod cmd(originalNss());
                     cmd.setCollModRequest(_request);
                     BSONObjBuilder collModResBuilder;
                     uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
-                        opCtx, nss(), cmd, true, &collModResBuilder));
+                        opCtx, originalNss(), cmd, true, &collModResBuilder));
                     auto collModRes = collModResBuilder.obj();
 
                     const auto dbInfo = uassertStatusOK(
@@ -322,7 +325,10 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     auto* opCtx = opCtxHolder.get();
                     getForwardableOpMetadata().setOn(opCtx);
 
-                    sharding_ddl_util::resumeMigrations(opCtx, nss(), _doc.getCollUUID());
+                    // TODO SERVER-67686 use the translated namespace `_collInfo->nsForTargeting`
+                    // here so that in case of timeseries collection we unblock migrations on the
+                    // bucket namespace and not the timeseries view namespace `originalNss()`
+                    sharding_ddl_util::resumeMigrations(opCtx, originalNss(), _doc.getCollUUID());
                 }
             }
             return status;

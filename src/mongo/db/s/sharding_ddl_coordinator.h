@@ -87,8 +87,15 @@ public:
         return _completionPromise.getFuture();
     }
 
-    const NamespaceString& nss() const {
+    const NamespaceString& originalNss() const {
         return _coordId.getNss();
+    }
+
+    const NamespaceString& nss() const {
+        if (const auto& bucketNss = metadata().getBucketNss()) {
+            return bucketNss.get();
+        }
+        return originalNss();
     }
 
     DDLCoordinatorTypeEnum operationType() const {
@@ -110,6 +117,7 @@ protected:
     };
 
     virtual ShardingDDLCoordinatorMetadata const& metadata() const = 0;
+    virtual void setMetadata(ShardingDDLCoordinatorMetadata&& metadata) = 0;
 
     /*
      * Performs a noop write on all shards and the configsvr using the sessionId and txnNumber
@@ -155,6 +163,8 @@ private:
     ExecutorFuture<void> _acquireLockAsync(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                            const CancellationToken& token,
                                            StringData resource);
+    ExecutorFuture<void> _translateTimeseriesNss(
+        std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token);
 
     Mutex _mutex = MONGO_MAKE_LATCH("ShardingDDLCoordinator::_mutex");
     SharedPromise<void> _constructionCompletionPromise;
@@ -185,6 +195,10 @@ protected:
         return _doc.getShardingDDLCoordinatorMetadata();
     }
 
+    void setMetadata(ShardingDDLCoordinatorMetadata&& metadata) override {
+        stdx::lock_guard lk{_docMutex};
+        _doc.setShardingDDLCoordinatorMetadata(std::move(metadata));
+    }
 
     virtual void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {};
 
@@ -193,10 +207,19 @@ protected:
 
         // Append static info
         bob.append("type", "op");
-        bob.append("ns", nss().toString());
+        bob.append("ns", originalNss().toString());
         bob.append("desc", _coordinatorName);
         bob.append("op", "command");
         bob.append("active", true);
+
+        // Append dynamic fields from the state doc
+        {
+            stdx::lock_guard lk{_docMutex};
+            if (const auto& bucketNss = _doc.getBucketNss()) {
+                // Bucket namespace is only present in case the collection is a sharded timeseries
+                bob.append("bucketNamespace", bucketNss.get().toString());
+            }
+        }
 
         // Create command description
         BSONObjBuilder cmdInfoBuilder;

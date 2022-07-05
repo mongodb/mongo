@@ -111,3 +111,7 @@ structs:
             session:
                 type: ShardingDDLSession
                 optional: true
+            bucketNss:
+                description: "In case of sharded timeseries this variable will hold the underlying bucket namespace"
+                type: namespacestring
+                optional: true

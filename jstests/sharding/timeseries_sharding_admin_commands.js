@@ -167,7 +167,7 @@ function assertRangeMatch(savedRange, paramRange) {
     assert.commandFailedWithCode(
         mongo.s0.adminCommand(
             {reshardCollection: viewNss, key: {[metaField]: 1, [controlTimeField]: 1}}),
-        ErrorCodes.NamespaceNotSharded);
+        ErrorCodes.NotImplemented);
     assert.commandFailedWithCode(
         mongo.s0.adminCommand(
             {reshardCollection: bucketNss, key: {[metaField]: 1, [controlTimeField]: 1}}),
@@ -231,14 +231,11 @@ function assertRangeMatch(savedRange, paramRange) {
     dropTimeSeriesColl();
 })();
 
-// Can add control.min.time as the last shard key component on bucket namespace but not view
-// namespace.
+// Can add control.min.time as the last shard key component on the timeseries collection.
 (function checkRefineCollectionShardKeyCommand() {
     createTimeSeriesColl({index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1}});
-    assert.commandFailedWithCode(
-        mongo.s0.adminCommand(
-            {refineCollectionShardKey: viewNss, key: {[metaField]: 1, [controlTimeField]: 1}}),
-        ErrorCodes.NamespaceNotSharded);
+    assert.commandWorked(mongo.s0.adminCommand(
+        {refineCollectionShardKey: viewNss, key: {[metaField]: 1, [controlTimeField]: 1}}));
     assert.commandWorked(mongo.s0.adminCommand(
         {refineCollectionShardKey: bucketNss, key: {[metaField]: 1, [controlTimeField]: 1}}));
     const coll = mongo.s0.getDB(dbName)[collName];
@@ -282,7 +279,7 @@ function assertRangeMatch(savedRange, paramRange) {
     const newViewNss = `${dbName}.${newCollName}`;
     // Rename collection is not supported through view namespace.
     assert.commandFailedWithCode(mongo.s.adminCommand({renameCollection: viewNss, to: newViewNss}),
-                                 ErrorCodes.NamespaceNotFound);
+                                 ErrorCodes.IllegalOperation);
     dropTimeSeriesColl();
 })();
 
