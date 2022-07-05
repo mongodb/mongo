@@ -209,10 +209,6 @@ public:
     void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr) override;
     Status recv(Message& m, int lastRequestId) override;
 
-    bool call(Message& toSend,
-              Message& response,
-              bool assertOk,
-              std::string* actualServer) override;
     ConnectionString::ConnectionType type() const override {
         return ConnectionString::ConnectionType::kStandalone;
     }
@@ -319,6 +315,7 @@ private:
     void handleNotPrimaryResponse(const BSONObj& replyBody, StringData errorMsgFieldName);
     enum FailAction { kSetFlag, kEndSession, kReleaseSession };
     void _markFailed(FailAction action);
+    void _call(Message& toSend, Message& response, std::string* actualServer) override;
 
     // Contains the string for the replica set name of the host this is connected to.
     // Should be empty if this connection is not pointing to a replica set member.

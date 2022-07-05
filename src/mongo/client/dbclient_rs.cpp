@@ -795,10 +795,7 @@ std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> DBClientReplicaSet::r
     return {std::move(out.first), std::move(conn)};
 }
 
-bool DBClientReplicaSet::call(Message& toSend,
-                              Message& response,
-                              bool assertOk,
-                              string* actualServer) {
+void DBClientReplicaSet::_call(Message& toSend, Message& response, string* actualServer) {
     LOGV2_DEBUG(20146,
                 3,
                 "dbclient_rs call to primary node in {replicaSet}",
@@ -809,10 +806,7 @@ bool DBClientReplicaSet::call(Message& toSend,
     if (actualServer)
         *actualServer = m->getServerAddress();
 
-    if (!m->call(toSend, response, assertOk, nullptr))
-        return false;
-
-    return true;
+    m->call(toSend, response);
 }
 
 void DBClientReplicaSet::_invalidateLastSecondaryOkCache(const Status& status) {

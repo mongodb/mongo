@@ -127,7 +127,7 @@ bool DBClientCursor::init() {
     verify(_client);
     Message reply;
     try {
-        _client->call(toSend, reply, true, &_originalHost);
+        _client->call(toSend, reply, &_originalHost);
     } catch (const DBException&) {
         // log msg temp?
         LOGV2(20127, "DBClientCursor::init call() failed");

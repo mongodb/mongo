@@ -123,7 +123,7 @@ int64_t getValidCursorIdFromFindCmd(DBClientBase* conn, const char* collName) {
         OpMsgRequest::fromDBAndBody("testOpLegacy", BSON("find" << collName << "batchSize" << 2))
             .serialize();
     Message findCmdReply;
-    ASSERT(conn->call(findCmdRequest, findCmdReply));
+    conn->call(findCmdRequest, findCmdReply);
     BSONObj findCmdReplyBody = OpMsg::parse(findCmdReply).body;
     auto cr = CursorResponse::parseFromBSON(findCmdReplyBody.getOwned());
     ASSERT_OK(cr.getStatus());
@@ -213,7 +213,7 @@ TEST(OpLegacy, UnsupportedReadOpsCounters) {
                                                            nullptr /*fieldsToReturn*/,
                                                            0 /*queryOptions*/);
     Message opQueryReply;
-    ASSERT(conn->call(opQueryRequest, opQueryReply));
+    conn->call(opQueryRequest, opQueryReply);
     assertFailure(opQueryReply, "OP_QUERY is no longer supported");
 
     const int64_t cursorId = getValidCursorIdFromFindCmd(conn.get(), "UnsupportedReadOpsCounters");
@@ -221,7 +221,7 @@ TEST(OpLegacy, UnsupportedReadOpsCounters) {
     Message opGetMoreRequest =
         makeUnsupportedOpGetMoreMessage(ns, cursorId, 2 /*nToReturn*/, 0 /*flags*/);
     Message opGetMoreReply;
-    ASSERT(conn->call(opGetMoreRequest, opGetMoreReply));
+    conn->call(opGetMoreRequest, opGetMoreReply);
     assertFailure(opGetMoreReply, "OP_GET_MORE is no longer supported");
 
     Message opKillCursorsRequest = makeUnsupportedOpKillCursorsMessage(cursorId);
@@ -322,14 +322,14 @@ void exerciseUnsupportedOps(DBClientBase* conn, const std::string& expectedSever
     ASSERT(wasLogged(conn, "update", expectedSeverity));
 
     Message replyQuery;
-    ASSERT(conn->call(opQuery, replyQuery));
+    conn->call(opQuery, replyQuery);
     ASSERT(wasLogged(conn, "query", expectedSeverity));
 
     int64_t cursorId = getValidCursorIdFromFindCmd(conn, "exerciseUnsupportedOps");
 
     auto opGetMore = makeUnsupportedOpGetMoreMessage(ns, cursorId, 2 /*nToReturn*/, 0 /*flags*/);
     Message replyGetMore;
-    ASSERT(conn->call(opGetMore, replyGetMore));
+    conn->call(opGetMore, replyGetMore);
     ASSERT(wasLogged(conn, "getmore", expectedSeverity));
 
     auto opKillCursors = makeUnsupportedOpKillCursorsMessage(cursorId);
@@ -405,7 +405,7 @@ TEST(OpLegacy, GenericCommandViaOpQuery) {
                                                  nullptr /*fieldsToReturn*/,
                                                  0 /*queryOptions*/);
     Message replyQuery;
-    ASSERT(conn->call(opQuery, replyQuery));
+    conn->call(opQuery, replyQuery);
     QueryResult::ConstView qr = replyQuery.singleData().view2ptr();
     BufReader data(qr.data(), qr.dataLen());
     BSONObj obj = data.read<BSONObj>();
@@ -442,7 +442,7 @@ void testAllowedCommand(const char* command, ErrorCodes::Error code = ErrorCodes
                                                  nullptr /*fieldsToReturn*/,
                                                  0 /*queryOptions*/);
     Message replyQuery;
-    ASSERT(conn->call(opQuery, replyQuery));
+    conn->call(opQuery, replyQuery);
     QueryResult::ConstView qr = replyQuery.singleData().view2ptr();
     BufReader data(qr.data(), qr.dataLen());
     BSONObj obj = data.read<BSONObj>();

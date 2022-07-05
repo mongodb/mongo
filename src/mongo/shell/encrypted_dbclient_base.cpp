@@ -106,11 +106,8 @@ std::string EncryptedDBClientBase::getServerAddress() const {
     return _conn->getServerAddress();
 }
 
-bool EncryptedDBClientBase::call(Message& toSend,
-                                 Message& response,
-                                 bool assertOk,
-                                 std::string* actualServer) {
-    return _conn->call(toSend, response, assertOk, actualServer);
+void EncryptedDBClientBase::_call(Message& toSend, Message& response, std::string* actualServer) {
+    _conn->call(toSend, response, actualServer);
 }
 
 void EncryptedDBClientBase::say(Message& toSend, bool isRetry, std::string* actualServer) {

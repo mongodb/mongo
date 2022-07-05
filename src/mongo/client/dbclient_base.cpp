@@ -223,14 +223,14 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
 
     Message replyMsg;
 
-    // We always want to throw if there was a network error, we do it here
-    // instead of passing 'true' for the 'assertOk' parameter so we can construct a
-    // more helpful error message. Note that call() can itself throw a socket exception.
-    uassert(ErrorCodes::HostUnreachable,
-            str::stream() << "network error while attempting to run "
-                          << "command '" << request.getCommandName() << "' "
-                          << "on host '" << host << "' ",
-            call(requestMsg, replyMsg, false, &host));
+    try {
+        call(requestMsg, replyMsg, &host);
+    } catch (DBException& e) {
+        e.addContext(str::stream() << str::stream() << "network error while attempting to run "
+                                   << "command '" << request.getCommandName() << "' "
+                                   << "on host '" << host << "' ");
+        throw;
+    }
 
     auto commandReply = parseCommandReplyMessage(host, replyMsg);
 

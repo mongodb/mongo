@@ -82,11 +82,6 @@ public:
 
     std::string getServerAddress() const override;
 
-    bool call(Message& toSend,
-              Message& response,
-              bool assertOk = true,
-              std::string* actualServer = nullptr) override;
-
     void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr) override;
 
     long long count(NamespaceStringOrUUID nsOrUuid,
@@ -124,6 +119,8 @@ protected:
     void _auth(const BSONObj& params) override;
 
 private:
+    void _call(Message& toSend, Message& response, std::string* actualServer) override;
+
     OperationContext* _opCtx;
 };
 

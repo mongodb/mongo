@@ -494,10 +494,9 @@ public:
      * 'actualServer' is set to the actual server where they call went if there was a choice (for
      * example SecondaryOk).
      */
-    virtual bool call(Message& toSend,
-                      Message& response,
-                      bool assertOk = true,
-                      std::string* actualServer = nullptr) = 0;
+    void call(Message& toSend, Message& response, std::string* actualServer = nullptr) {
+        _call(toSend, response, actualServer);
+    };
 
     virtual void say(Message& toSend,
                      bool isRetry = false,
@@ -716,6 +715,8 @@ protected:
     std::vector<std::string> _saslMechsForAuth;
 
 private:
+    virtual void _call(Message& toSend, Message& response, std::string* actualServer) = 0;
+
     /**
      * Implementation for getIndexes() and getReadyIndexes().
      */

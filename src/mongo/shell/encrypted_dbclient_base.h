@@ -95,8 +95,6 @@ public:
 
     std::string getServerAddress() const final;
 
-    bool call(Message& toSend, Message& response, bool assertOk, std::string* actualServer) final;
-
     void say(Message& toSend, bool isRetry, std::string* actualServer) final;
 
     using DBClientBase::runCommandWithTarget;
@@ -183,6 +181,8 @@ protected:
     FLEDecryptionFrame createDecryptionFrame(ConstDataRange data);
 
 private:
+    void _call(Message& toSend, Message& response, std::string* actualServer) final;
+
     virtual void encryptMarking(const BSONObj& elem, BSONObjBuilder* builder, StringData elemName);
 
     void decryptPayload(ConstDataRange data, BSONObjBuilder* builder, StringData elemName);

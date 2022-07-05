@@ -194,11 +194,6 @@ public:
     int getMaxWireVersion() final;
     // ---- low level ------
 
-    bool call(Message& toSend,
-              Message& response,
-              bool assertOk,
-              std::string* actualServer) override;
-
     /**
      * Performs a "soft reset" by clearing all states relating to secondary nodes and
      * returning secondary connections to the pool.
@@ -242,6 +237,8 @@ private:
         std::unique_ptr<DBClientCursor> result);
 
     DBClientConnection* checkPrimary();
+
+    void _call(Message& toSend, Message& response, std::string* actualServer) override;
 
     template <typename Authenticate>
     Status _runAuthLoop(Authenticate authCb);

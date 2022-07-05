@@ -94,7 +94,7 @@ TEST(OpMsg, UnknownRequiredFlagClosesConnection) {
     OpMsg::setFlag(&request, 1u << 15);  // This should be the last required flag to be assigned.
 
     Message reply;
-    ASSERT(!conn->call(request, reply, /*assertOK*/ false));
+    ASSERT_THROWS_CODE(conn->call(request, reply), DBException, ErrorCodes::HostUnreachable);
 }
 
 TEST(OpMsg, UnknownOptionalFlagIsIgnored) {
@@ -104,7 +104,7 @@ TEST(OpMsg, UnknownOptionalFlagIsIgnored) {
     OpMsg::setFlag(&request, 1u << 31);  // This should be the last optional flag to be assigned.
 
     Message reply;
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     uassertStatusOK(getStatusFromCommandResult(
         conn->parseCommandReplyMessage(conn->getServerAddress(), reply)->getCommandReply()));
 }
@@ -150,7 +150,7 @@ TEST(OpMsg, DocumentSequenceLargeDocumentMultiInsertWorks) {
 
     Message request = msgBuilder.finishWithoutSizeChecking();
     Message reply;
-    ASSERT_TRUE(conn->call(request, reply, false));
+    conn->call(request, reply);
 
     ASSERT_EQ(conn->count(NamespaceString("test.collection")), 3u);
     conn->dropCollection("test.collection");
@@ -183,7 +183,7 @@ TEST(OpMsg, DocumentSequenceMaxWriteBatchWorks) {
 
     Message request = msgBuilder.finishWithoutSizeChecking();
     Message reply;
-    ASSERT_TRUE(conn->call(request, reply, false));
+    conn->call(request, reply);
 
     ASSERT_EQ(conn->count(NamespaceString("test.collection")), write_ops::kMaxWriteBatchSize);
     conn->dropCollection("test.collection");
@@ -219,7 +219,7 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
         // Round-trip command fails with NotWritablePrimary error. Note that this failure is in
         // command dispatch which ignores w:0.
         Message reply;
-        ASSERT(conn.call(request, reply, /*assertOK*/ true, nullptr));
+        conn.call(request, reply);
         ASSERT_EQ(
             getStatusFromCommandResult(
                 conn.parseCommandReplyMessage(conn.getServerAddress(), reply)->getCommandReply()),
@@ -232,7 +232,7 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
         // conn.call() calculated the request checksum, but setFlag() makes it invalid. Clear the
         // checksum so the next conn.call() recalculates it.
         OpMsg::removeChecksum(&request);
-        ASSERT(!conn.call(request, reply, /*assertOK*/ false, nullptr));
+        ASSERT_THROWS(conn.call(request, reply), ExceptionForCat<ErrorCategory::NetworkError>);
 
         uassertStatusOK(conn.connect(host, "integration_test", boost::none));  // Reconnect.
 
@@ -262,14 +262,14 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
         // Round-trip command claims to succeed due to w:0.
         OpMsg::removeChecksum(&request);
         OpMsg::replaceFlags(&request, 0);
-        ASSERT(conn.call(request, reply, /*assertOK*/ true, nullptr));
+        conn.call(request, reply);
         ASSERT_OK(getStatusFromCommandResult(
             conn.parseCommandReplyMessage(conn.getServerAddress(), reply)->getCommandReply()));
 
         // Fire-and-forget should still close connection.
         OpMsg::setFlag(&request, OpMsg::kMoreToCome);
         OpMsg::removeChecksum(&request);
-        ASSERT(!conn.call(request, reply, /*assertOK*/ false, nullptr));
+        ASSERT_THROWS(conn.call(request, reply), ExceptionForCat<ErrorCategory::NetworkError>);
 
         break;
     }
@@ -284,7 +284,7 @@ TEST(OpMsg, DocumentSequenceReturnsWork) {
     auto request = opMsgRequest.serialize();
 
     Message reply;
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
 
     auto opMsgReply = OpMsg::parse(reply);
     ASSERT_EQ(opMsgReply.sequences.size(), 1u);
@@ -347,7 +347,7 @@ void exhaustGetMoreTest(bool enableChecksum) {
     auto request = opMsgRequest.serialize();
 
     Message reply;
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     auto res = OpMsg::parse(reply).body;
     const long long cursorId = res["cursor"]["id"].numberLong();
     ASSERT(res["cursor"]["firstBatch"].Array().empty());
@@ -365,7 +365,7 @@ void exhaustGetMoreTest(bool enableChecksum) {
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     // Run getMore to initiate the exhaust stream.
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     auto lastRequestId = reply.header().getId();
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     ASSERT_EQ(OpMsg::isFlagSet(reply, OpMsg::kChecksumPresent), enableChecksum);
@@ -434,7 +434,7 @@ TEST(OpMsg, FindIgnoresExhaust) {
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     Message reply;
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     auto res = OpMsg::parse(reply).body;
     ASSERT(res["cursor"]["firstBatch"].Array().empty());
     // The response should not have set moreToCome. We only expect getMore response to set
@@ -465,7 +465,7 @@ TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
     auto request = opMsgRequest.serialize();
 
     Message reply;
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     auto res = OpMsg::parse(reply).body;
     const long long cursorId = res["cursor"]["id"].numberLong();
     ASSERT(res["cursor"]["firstBatch"].Array().empty());
@@ -483,7 +483,7 @@ TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     // Run getMore. This should not start an exhaust stream.
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     // The response should not have set moreToCome.
     ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     res = OpMsg::parse(reply).body;
@@ -513,7 +513,7 @@ TEST(OpMsg, MongosIgnoresExhaustForGetMore) {
     auto request = opMsgRequest.serialize();
 
     Message reply;
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     auto res = OpMsg::parse(reply).body;
     const long long cursorId = res["cursor"]["id"].numberLong();
     ASSERT(res["cursor"]["firstBatch"].Array().empty());
@@ -528,7 +528,7 @@ TEST(OpMsg, MongosIgnoresExhaustForGetMore) {
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     // Run getMore. This should not start an exhaust stream.
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     // The response should not have set moreToCome.
     ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     res = OpMsg::parse(reply).body;
@@ -566,7 +566,7 @@ TEST(OpMsg, ExhaustWorksForAggCursor) {
     auto request = opMsgRequest.serialize();
 
     Message reply;
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     auto res = OpMsg::parse(reply).body;
     const long long cursorId = res["cursor"]["id"].numberLong();
     ASSERT(res["cursor"]["firstBatch"].Array().empty());
@@ -597,7 +597,7 @@ TEST(OpMsg, ExhaustWorksForAggCursor) {
         };
 
     // Run getMore to initiate the exhaust stream.
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     auto lastRequestId = reply.header().getId();
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     assertNextBatch(reply, cursorId, {BSON("_id" << 0), BSON("_id" << 1)});
@@ -634,7 +634,7 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterCorrectly) {
     auto request = opMsgRequest.serialize();
 
     Message reply;
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     auto res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
     auto topologyVersion = res["topologyVersion"].Obj().getOwned();
@@ -649,7 +649,7 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterCorrectly) {
 
     // Run isMaster command to initiate the exhaust stream.
     auto beforeExhaustCommand = clockSource->now();
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     auto afterFirstResponse = clockSource->now();
     // Allow for clock skew when testing the response time.
     ASSERT_GT(duration_cast<Milliseconds>(afterFirstResponse - beforeExhaustCommand),
@@ -696,7 +696,7 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterWithTopologyChange) {
     auto request = opMsgRequest.serialize();
 
     Message reply;
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     auto res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
     auto topologyVersion = res["topologyVersion"].Obj().getOwned();
@@ -714,7 +714,7 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterWithTopologyChange) {
     // Run isMaster command to initiate the exhaust stream. The first response should be received
     // immediately.
     auto beforeExhaustCommand = clockSource->now();
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     auto afterFirstResponse = clockSource->now();
     // Allow for clock skew when testing the response time.
     ASSERT_LT(duration_cast<Milliseconds>(afterFirstResponse - beforeExhaustCommand),
@@ -760,7 +760,7 @@ TEST(OpMsg, ServerRejectsExhaustIsMasterWithoutMaxAwaitTimeMS) {
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     Message reply;
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     auto res = OpMsg::parse(reply).body;
     ASSERT_NOT_OK(getStatusFromCommandResult(res));
 }
@@ -790,7 +790,7 @@ void serverStatusCorrectlyShowsExhaustMetrics(std::string commandName) {
     auto request = opMsgRequest.serialize();
 
     Message reply;
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     auto res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
     auto topologyVersion = res["topologyVersion"].Obj().getOwned();
@@ -802,7 +802,7 @@ void serverStatusCorrectlyShowsExhaustMetrics(std::string commandName) {
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     // Run hello or isMaster command to initiate the exhaust stream.
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
@@ -869,7 +869,7 @@ void exhaustMetricSwitchingCommandNames(bool useLegacyCommandNameAtStart) {
     auto request = opMsgRequest.serialize();
 
     Message reply;
-    ASSERT(conn1->call(request, reply));
+    conn1->call(request, reply);
     auto res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
     auto topologyVersion = res["topologyVersion"].Obj().getOwned();
@@ -881,7 +881,7 @@ void exhaustMetricSwitchingCommandNames(bool useLegacyCommandNameAtStart) {
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     // Run hello or isMaster command to initiate the exhaust stream.
-    ASSERT(conn1->call(request, reply));
+    conn1->call(request, reply);
     auto lastRequestId = reply.header().getId();
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     res = OpMsg::parse(reply).body;
@@ -948,7 +948,7 @@ void exhaustMetricSwitchingCommandNames(bool useLegacyCommandNameAtStart) {
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
-    ASSERT(conn1->call(request, reply));
+    conn1->call(request, reply);
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
@@ -1005,7 +1005,7 @@ void exhaustMetricDecrementsOnNewOpAfterTerminatingExhaustStream(bool useLegacyC
     auto request = opMsgRequest.serialize();
 
     Message reply;
-    ASSERT(conn1->call(request, reply));
+    conn1->call(request, reply);
     auto res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
     auto topologyVersion = res["topologyVersion"].Obj().getOwned();
@@ -1017,7 +1017,7 @@ void exhaustMetricDecrementsOnNewOpAfterTerminatingExhaustStream(bool useLegacyC
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     // Run hello or isMaster command to initiate the exhaust stream.
-    ASSERT(conn1->call(request, reply));
+    conn1->call(request, reply);
     auto lastRequestId = reply.header().getId();
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     res = OpMsg::parse(reply).body;
@@ -1118,7 +1118,7 @@ void exhaustMetricOnNewExhaustAfterTerminatingExhaustStream(bool useLegacyComman
     auto request = opMsgRequest.serialize();
 
     Message reply;
-    ASSERT(conn1->call(request, reply));
+    conn1->call(request, reply);
     auto res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
     auto topologyVersion = res["topologyVersion"].Obj().getOwned();
@@ -1130,7 +1130,7 @@ void exhaustMetricOnNewExhaustAfterTerminatingExhaustStream(bool useLegacyComman
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     // Run hello or isMaster command to initiate the exhaust stream.
-    ASSERT(conn1->call(request, reply));
+    conn1->call(request, reply);
     auto lastRequestId = reply.header().getId();
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     res = OpMsg::parse(reply).body;
@@ -1190,7 +1190,7 @@ void exhaustMetricOnNewExhaustAfterTerminatingExhaustStream(bool useLegacyComman
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     // Run hello or isMaster command on conn1 to initiate a new exhaust stream.
-    ASSERT(conn1->call(request, reply));
+    conn1->call(request, reply);
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
@@ -1282,7 +1282,7 @@ void checksumTest(bool enableChecksum) {
     auto request = opMsgRequest.serialize();
 
     Message reply;
-    ASSERT(conn->call(request, reply));
+    conn->call(request, reply);
 
     auto opMsgReply = OpMsg::parse(reply);
     ASSERT_EQ(OpMsg::isFlagSet(reply, OpMsg::kChecksumPresent), enableChecksum);
@@ -1315,7 +1315,7 @@ TEST(OpMsg, ServerHandlesReallyLargeMessagesGracefully) {
     auto requestMsg = request.serializeWithoutSizeChecking();
 
     Message replyMsg;
-    ASSERT(conn->call(requestMsg, replyMsg));
+    conn->call(requestMsg, replyMsg);
 
     auto reply = OpMsg::parse(replyMsg);
     auto replyStatus = getStatusFromCommandResult(reply.body);

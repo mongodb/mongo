@@ -141,10 +141,6 @@ public:
                 bool removeMany = true,
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
-    bool call(mongo::Message& toSend,
-              mongo::Message& response,
-              bool assertOk,
-              std::string* actualServer) override;
     Status recv(mongo::Message& m, int lastRequestId) override;
 
     void shutdown() override;
@@ -181,6 +177,9 @@ public:
              std::string* actualServer = nullptr) override;
 
 private:
+    void _call(mongo::Message& toSend,
+               mongo::Message& response,
+               std::string* actualServer) override;
     void checkConnection() override;
 
     std::unique_ptr<DBClientCursor> bsonArrayToCursor(BSONArray results,

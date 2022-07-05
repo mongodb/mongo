@@ -678,29 +678,9 @@ Status DBClientConnection::recv(Message& m, int lastRequestId) {
     return Status::OK();
 }
 
-bool DBClientConnection::call(Message& toSend,
-                              Message& response,
-                              bool assertOk,
-                              string* actualServer) {
+void DBClientConnection::_call(Message& toSend, Message& response, string* actualServer) {
     checkConnection();
     ScopeGuard killSessionOnError([this] { _markFailed(kEndSession); });
-    auto maybeThrow = [&](const auto& errStatus) {
-        // TODO SERVER-65946 Remove the following log statement.
-        if (TestingProctor::instance().isEnabled()) {
-            LOGV2(6599701,
-                  "DBClient failed to communicate with the server",
-                  "error"_attr = errStatus,
-                  "server"_attr = getServerAddress(),
-                  "local"_attr = _session->local(),
-                  "remote"_attr = _session->remote());
-        }
-
-        if (assertOk)
-            uassertStatusOKWithContext(errStatus,
-                                       str::stream() << "dbclient error communicating with server "
-                                                     << getServerAddress());
-        return false;
-    };
 
     toSend.header().setId(nextMessageId());
     toSend.header().setResponseToMsgId(0);
@@ -723,7 +703,9 @@ bool DBClientConnection::call(Message& toSend,
               "DBClientConnection failed to send message",
               "connString"_attr = getServerAddress(),
               "error"_attr = redact(sinkStatus));
-        return maybeThrow(sinkStatus);
+        uassertStatusOKWithContext(sinkStatus,
+                                   str::stream() << "dbclient error communicating with server "
+                                                 << getServerAddress());
     }
 
     swm = _session->sourceMessage();
@@ -735,7 +717,9 @@ bool DBClientConnection::call(Message& toSend,
               "DBClientConnection failed to receive message",
               "connString"_attr = getServerAddress(),
               "error"_attr = redact(swm.getStatus()));
-        return maybeThrow(swm.getStatus());
+        uassertStatusOKWithContext(swm.getStatus(),
+                                   str::stream() << "dbclient error communicating with server "
+                                                 << getServerAddress());
     }
 
     if (response.operation() == dbCompressed) {
@@ -743,7 +727,6 @@ bool DBClientConnection::call(Message& toSend,
     }
 
     killSessionOnError.dismiss();
-    return true;
 }
 
 void DBClientConnection::setParentReplSetName(const string& replSetName) {

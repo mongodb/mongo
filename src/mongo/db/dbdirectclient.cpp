@@ -134,12 +134,10 @@ DbResponse loopbackBuildResponse(OperationContext* const opCtx, Message& toSend)
 }
 }  // namespace
 
-bool DBDirectClient::call(Message& toSend, Message& response, bool assertOk, string* actualServer) {
+void DBDirectClient::_call(Message& toSend, Message& response, string* actualServer) {
     auto dbResponse = loopbackBuildResponse(_opCtx, toSend);
     invariant(!dbResponse.response.empty());
     response = std::move(dbResponse.response);
-
-    return true;
 }
 
 void DBDirectClient::say(Message& toSend, bool isRetry, string* actualServer) {

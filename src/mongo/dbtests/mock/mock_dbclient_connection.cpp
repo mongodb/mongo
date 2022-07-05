@@ -195,10 +195,9 @@ void MockDBClientConnection::killCursor(const NamespaceString& ns, long long cur
     // It is not worth the bother of killing the cursor in the mock.
 }
 
-bool MockDBClientConnection::call(mongo::Message& toSend,
-                                  mongo::Message& response,
-                                  bool assertOk,
-                                  string* actualServer) {
+void MockDBClientConnection::_call(mongo::Message& toSend,
+                                   mongo::Message& response,
+                                   string* actualServer) {
     // Here we check for a getMore command, and if it is that, we respond with the next
     // reply message from the previous command that returned a cursor response.
     // This allows us to mock commands with implicit cursors (e.g. listCollections).
@@ -215,7 +214,7 @@ bool MockDBClientConnection::call(mongo::Message& toSend,
             parsedMsg.body.firstElement().fieldName() == "getMore"_sd) {
             auto reply = runCommandWithTarget(*_lastCursorMessage).first;
             response = reply.releaseMessage();
-            return true;
+            return;
         }
     }
 
@@ -242,7 +241,6 @@ bool MockDBClientConnection::call(mongo::Message& toSend,
     const auto& swResponse = *_callIter;
     _callIter++;
     response = uassertStatusOK(swResponse);
-    return true;
 }
 
 Status MockDBClientConnection::recv(mongo::Message& m, int lastRequestId) {
