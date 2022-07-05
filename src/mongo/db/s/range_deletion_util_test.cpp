@@ -264,64 +264,6 @@ TEST_F(RangeDeleterTest,
     ASSERT_EQUALS(dbclient.count(kNss, BSONObj()), 0);
 }
 
-TEST_F(RangeDeleterTest, RemoveDocumentsInRangeInsertsDocumentToNotifySecondariesOfRangeDeletion) {
-    const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
-    auto queriesComplete = SemiFuture<void>::makeReady();
-
-    setFilteringMetadataWithUUID(uuid());
-    auto task = insertRangeDeletionTask(_opCtx, uuid(), range, 1);
-    DBDirectClient dbclient(_opCtx);
-    dbclient.insert(kNss.toString(), BSON(kShardKey << 5));
-
-    auto cleanupComplete =
-        removeDocumentsInRange(executor(),
-                               std::move(queriesComplete),
-                               kNss,
-                               uuid(),
-                               kShardKeyPattern,
-                               range,
-                               task.getId(),
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
-
-    cleanupComplete.get();
-
-    ASSERT_EQUALS(dbclient.count(NamespaceString::kServerConfigurationNamespace,
-                                 BSON(kShardKey << "startRangeDeletion")),
-                  1);
-}
-
-TEST_F(
-    RangeDeleterTest,
-    RemoveDocumentsInRangeOnlyInsertsStartRangeDeletionDocumentOnceWhenSeveralBatchesAreRequired) {
-    const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
-    // More documents than the batch size.
-    const auto numDocsToInsert = 3;
-    auto queriesComplete = SemiFuture<void>::makeReady();
-
-    // Insert documents in range.
-    setFilteringMetadataWithUUID(uuid());
-    auto task = insertRangeDeletionTask(_opCtx, uuid(), range, numDocsToInsert);
-    DBDirectClient dbclient(_opCtx);
-    for (auto i = 0; i < numDocsToInsert; ++i) {
-        dbclient.insert(kNss.toString(), BSON(kShardKey << i));
-    }
-
-    auto cleanupComplete =
-        removeDocumentsInRange(executor(),
-                               std::move(queriesComplete),
-                               kNss,
-                               uuid(),
-                               kShardKeyPattern,
-                               range,
-                               task.getId(),
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
-
-    cleanupComplete.get();
-    ASSERT_EQUALS(dbclient.count(NamespaceString::kServerConfigurationNamespace,
-                                 BSON(kShardKey << "startRangeDeletion")),
-                  1);
-}
-
 TEST_F(RangeDeleterTest,
        RemoveDocumentsInRangeDoesNotRemoveDocumentsWithKeysLowerThanMinKeyOfRange) {
     const auto numDocsToInsert = 3;

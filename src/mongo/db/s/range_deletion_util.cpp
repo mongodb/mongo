@@ -394,28 +394,6 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
         .ignoreValue();
 }
 
-/**
- * Notify the secondaries that this range is being deleted. Secondaries will watch for this update,
- * and kill any queries that may depend on documents in the range -- excepting any queries with a
- * read-concern option 'ignoreChunkMigration'.
- */
-void notifySecondariesThatDeletionIsOccurring(const NamespaceString& nss,
-                                              const UUID& collectionUuid,
-                                              const ChunkRange& range) {
-    withTemporaryOperationContext(
-        [&](OperationContext* opCtx) {
-            AutoGetCollection autoAdmin(
-                opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IX);
-            Helpers::upsert(opCtx,
-                            NamespaceString::kServerConfigurationNamespace.ns(),
-                            BSON("_id"
-                                 << "startRangeDeletion"
-                                 << "ns" << nss.ns() << "uuid" << collectionUuid << "min"
-                                 << range.getMin() << "max" << range.getMax()));
-        },
-        nss);
-}
-
 void removePersistentRangeDeletionTask(const NamespaceString& nss, UUID migrationId) {
     withTemporaryOperationContext(
         [&](OperationContext* opCtx) {
@@ -548,8 +526,6 @@ SharedSemiFuture<void> removeDocumentsInRange(
                         "Beginning deletion of documents",
                         "namespace"_attr = nss.ns(),
                         "range"_attr = redact(range.toString()));
-
-            notifySecondariesThatDeletionIsOccurring(nss, collectionUuid, range);
 
             return deleteRangeInBatches(
                        executor, nss, collectionUuid, keyPattern, range, migrationId)
