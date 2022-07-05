@@ -10,11 +10,30 @@
  */
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropRoles
 
+// UMC commands are not supported in transactions.
+TestData.runInsideTransaction = false;
+
 var $config = (function() {
     const kTestUserPassword = 'secret';
     const kMaxCmdTimeMs = 60000;
     const kMaxTxnLockReqTimeMs = 100;
     const kDefaultTxnLockReqTimeMs = 5;
+
+    function doRetry(cb) {
+        const kNumRetries = 5;
+        const kRetryInterval = 5 * 1000;
+
+        assert.retry(function() {
+            try {
+                cb();
+                return true;
+            } catch (e) {
+                jsTest.log("Caught exception performing: " + tojson(cb) +
+                           ", exception was: " + tojson(e));
+                return false;
+            }
+        }, "Failed performing: " + tojson(cb), kNumRetries, kRetryInterval);
+    }
 
     const states = (function() {
         let roleWithDB = {};
@@ -38,7 +57,7 @@ var $config = (function() {
                 privilege.resource = {db: db.getName(), collection: ''};
                 const roleName = this.getRoleName(this.tid);
                 roleWithDB = {role: roleName, db: db.getName()};
-                db.createRole({role: roleName, privileges: [privilege], roles: []});
+                doRetry(() => db.createRole({role: roleName, privileges: [privilege], roles: []}));
             },
 
             mutate: function(db, collName) {
@@ -46,31 +65,31 @@ var $config = (function() {
                 // then give that, now empty, role to the user.
                 const roleName = this.getRoleName(this.tid);
 
-                db.runCommand({
+                doRetry(() => assert.commandWorked(db.runCommand({
                     revokePrivilegesFromRole: roleName,
                     privileges: [privilege],
                     maxTimeMS: kMaxCmdTimeMs
-                });
+                })));
 
-                db.runCommand({
+                doRetry(() => assert.commandWorked(db.runCommand({
                     grantRolesToUser: this.getUserName(),
                     roles: [roleWithDB],
                     maxTimeMS: kMaxCmdTimeMs
-                });
+                })));
 
                 // Take the role away from the user, and give it privs.
 
-                db.runCommand({
+                doRetry(() => assert.commandWorked(db.runCommand({
                     revokeRolesFromUser: this.getUserName(),
                     roles: [roleWithDB],
                     maxTimeMS: kMaxCmdTimeMs
-                });
+                })));
 
-                db.runCommand({
+                doRetry(() => assert.commandWorked(db.runCommand({
                     grantPrivilegesToRole: roleName,
                     privileges: [privilege],
                     maxTimeMS: kMaxCmdTimeMs
-                });
+                })));
             },
 
             observeInit: function(db, collName) {

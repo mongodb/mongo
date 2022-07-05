@@ -7,6 +7,9 @@
  */
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropUsers
 
+// UMC commands are not supported in transactions.
+TestData.runInsideTransaction = false;
+
 var $config = (function() {
     var data = {
         // Use the workload name as a prefix for the username,
@@ -24,8 +27,23 @@ var $config = (function() {
         }
 
         function createUser(db, collName) {
-            var username = uniqueUsername(this.prefix, this.tid, this.num++);
-            db.createUser({user: username, pwd: 'password', roles: ['readWrite', 'dbAdmin']});
+            const username = uniqueUsername(this.prefix, this.tid, this.num++);
+            const kCreateUserRetries = 5;
+            const kCreateUserRetryInterval = 5 * 1000;
+            assert.retry(
+                function() {
+                    try {
+                        db.createUser(
+                            {user: username, pwd: 'password', roles: ['readWrite', 'dbAdmin']});
+                        return true;
+                    } catch (e) {
+                        jsTest.log("Caught createUser exception: " + tojson(e));
+                        return false;
+                    }
+                },
+                "Failed creating user: '" + username + "'",
+                kCreateUserRetries,
+                kCreateUserRetryInterval);
 
             // Verify the newly created user exists, as well as all previously created users
             for (var i = 0; i < this.num; ++i) {

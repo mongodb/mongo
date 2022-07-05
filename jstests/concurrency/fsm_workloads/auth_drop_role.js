@@ -8,6 +8,9 @@
  */
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropRoles
 
+// UMC commands are not supported in transactions.
+TestData.runInsideTransaction = false;
+
 var $config = (function() {
     const kMaxCmdTimeMs = 60000;
     const kMaxTxnLockReqTimeMs = 100;
@@ -31,13 +34,29 @@ var $config = (function() {
         function createAndDropRole(db, collName) {
             var roleName = uniqueRoleName(this.prefix, this.tid, this.num++);
 
-            db.runCommand({
-                createRole: roleName,
-                privileges:
-                    [{resource: {db: db.getName(), collection: collName}, actions: ['remove']}],
-                roles: [{role: 'read', db: db.getName()}],
-                maxTimeMS: kMaxCmdTimeMs
-            });
+            const kCreateRoleRetries = 5;
+            const kCreateRoleRetryInterval = 5 * 1000;
+            assert.retry(
+                function() {
+                    try {
+                        assert.commandWorked(db.runCommand({
+                            createRole: roleName,
+                            privileges: [{
+                                resource: {db: db.getName(), collection: collName},
+                                actions: ['remove']
+                            }],
+                            roles: [{role: 'read', db: db.getName()}],
+                            maxTimeMS: kMaxCmdTimeMs
+                        }));
+                        return true;
+                    } catch (e) {
+                        jsTest.log("Caught createRole exception: " + tojson(e));
+                        return false;
+                    }
+                },
+                "Failed creating role '" + roleName + "'",
+                kCreateRoleRetries,
+                kCreateRoleRetryInterval);
 
             var res = db.getRole(roleName);
 
@@ -47,20 +66,24 @@ var $config = (function() {
 
             // Some test machines may hit high contention during these concurrency tests
             // allow for occaisional failure with retries.
-            for (var i = 3; i >= 0; --i) {
-                let dropResult = db.runCommand({dropRole: roleName, maxTimeMS: kMaxCmdTimeMs});
-
-                if (dropResult === true) {
-                    // Success
-                    break;
-                } else if (i > 0) {
-                    // Failure, try again
-                    print("Retrying a dropRole() which resulted in: " + tojson(dropResult));
-                } else {
-                    // Out of do-overs, just die.
-                    assertAlways(dropResult);
+            const kDropRoleRetries = 5;
+            const kDropRoleSnapshotUnavailableIntervalMS = 5 * 1000;
+            const kDropRoleRetryInterval = 0;
+            assert.retry(function() {
+                let cmdResult;
+                try {
+                    cmdResult = db.runCommand({dropRole: roleName, maxTimeMS: kMaxCmdTimeMs});
+                    assert.commandWorked(cmdResult);
+                    return true;
+                } catch (e) {
+                    jsTest.log("Caught dropRole exception: " + tojson(e));
+                    if (cmdResult.code == ErrorCodes.SnapshotUnavailable) {
+                        // Give pending catalog changes a chance to catch up.
+                        sleep(kDropRoleSnapshotUnavailableIntervalMS);
+                    }
+                    return false;
                 }
-            }
+            }, "Failed dropping role '" + roleName + "'", kDropRoleRetries, kDropRoleRetryInterval);
 
             assertAlways.isnull(db.getRole(roleName), "role '" + roleName + "' should not exist");
         }
