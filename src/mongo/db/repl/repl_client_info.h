@@ -101,6 +101,9 @@ public:
      *
      * Setting the lastOp to the latest OpTime is necessary when doing no-op writes, as we need to
      * set the client's lastOp to a proper value for write concern wait to work.
+     *
+     * An exception to this are multi-document transactions, which do a noop write at commit time
+     * and advance the client's lastOp in case the transaction resulted in a no-op.
      */
     void setLastOpToSystemLastOpTime(OperationContext* opCtx);
 

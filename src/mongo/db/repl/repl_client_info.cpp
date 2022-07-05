@@ -71,6 +71,31 @@ void ReplClientInfo::setLastOp(OperationContext* opCtx, const OpTime& ot) {
 void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* opCtx) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
     if (replCoord->isReplEnabled() && opCtx->writesAreReplicated()) {
+        // If a multi-document transaction or regular write actually performs a write op, the
+        // lastOp in the client is enough for write concern and there is no need to call
+        // setLastOpToSystemLastOpTime.
+
+        // On the other hand, if a transaction is a no-op and we are using speculative majority read
+        // concern, there is risk of a transaction reading data that might not have yet been
+        // majority commited, and later waiting for write concern on a lastApplied which is older
+        // than the timestamp to which the read corresponds. This is possible due to the fact
+        // that lastApplied is advanced in an onCommit hook AFTER commiting writes (and making them
+        // visible), leaving a small window of time where a concurrent transaction might
+        // speculatively read local data, and then wait on a lastApplied which has yet to be
+        // advanced.
+
+        // Multi-doc transactions perform a no-op write on commit time and advance the lastOp. So it
+        // is no longer necessary for transactions to update the client's lastOp (calling
+        // setLastOpToSystemLastOpTime).
+
+        // Non-transaction operations resulting in no-op suffer from the same issue as transactions,
+        // but there is no built-in mechanism to advance the lastOp and client's lastOp has to be
+        // updated.
+
+        // Due to this, the lastOp has to be updated directly from the oplog's top entry instead of
+        // the lastApplied in the ReplicationCoordinator. This works because the oplog entry is
+        // commited together with the write op itself.
+
         auto latestWriteOpTimeSW = replCoord->getLatestWriteOpTime(opCtx);
         auto status = latestWriteOpTimeSW.getStatus();
         OpTime systemOpTime;

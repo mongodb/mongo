@@ -582,8 +582,10 @@ public:
 
     /**
      * If supported, this method returns the timestamp value for the latest storage engine committed
-     * oplog document. Note that this method will not include uncommitted writes on the input
-     * OperationContext. A new transaction may be created and destroyed to service this call.
+     * oplog document. Note that this method should not be called within a UnitOfWork.
+     *
+     * If there is an active transaction, that transaction is used and its snapshot determines
+     * visibility. Otherwise, a new transaction will be created and destroyed to service this call.
      *
      * Unsupported RecordStores return the OplogOperationUnsupported error code.
      */

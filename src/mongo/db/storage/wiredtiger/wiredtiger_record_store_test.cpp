@@ -963,33 +963,30 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
     op1->recoveryUnit()->beginUnitOfWork(op1->readOnly());
     // Don't save the return value because the compiler complains about unused variables.
     _oplogOrderInsertOplog(op1.get(), rs, 2);
-    // Querying with the recovery unit with a snapshot will not return the uncommitted value.
-    ASSERT_EQ(tsOne, wtrs->getLatestOplogTimestamp(op1.get()));
 
     // Store the client with an uncommitted transaction. Create a new, concurrent client.
     auto client1 = Client::releaseCurrent();
     Client::initThread("client2");
 
     ServiceContext::UniqueOperationContext op2(harnessHelper->newOperationContext());
+    // Should not see uncommited write from op1.
+    ASSERT_EQ(tsOne, wtrs->getLatestOplogTimestamp(op2.get()));
+
     op2->recoveryUnit()->beginUnitOfWork(op2->readOnly());
     Timestamp tsThree = Timestamp(
         static_cast<unsigned long long>(_oplogOrderInsertOplog(op2.get(), rs, 3).getLong()));
-    // Before committing, the query still only sees timestamp "1".
-    ASSERT_EQ(tsOne, wtrs->getLatestOplogTimestamp(op2.get()));
     op2->recoveryUnit()->commitUnitOfWork();
     // After committing, three is the top of oplog.
     ASSERT_EQ(tsThree, wtrs->getLatestOplogTimestamp(op2.get()));
 
-    // Destroy client2.
+    // Switch to client 1.
     op2.reset();
-    Client::releaseCurrent();
-    // Reinstall client 1.
+    auto client2 = Client::releaseCurrent();
     Client::setCurrent(std::move(client1));
 
-    // A new query with client 1 will see timestamp "3".
-    ASSERT_EQ(tsThree, wtrs->getLatestOplogTimestamp(op1.get()));
     op1->recoveryUnit()->commitUnitOfWork();
-    // Committing the write at timestamp "2" does not change the top of oplog result.
+    // Committing the write at timestamp "2" does not change the top of oplog result. A new query
+    // with client 1 will see timestamp "3".
     ASSERT_EQ(tsThree, wtrs->getLatestOplogTimestamp(op1.get()));
 }
 

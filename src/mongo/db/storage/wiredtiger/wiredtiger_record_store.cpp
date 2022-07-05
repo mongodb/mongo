@@ -1463,13 +1463,29 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
     invariant(_keyFormat == KeyFormat::Long);
     dassert(opCtx->lockState()->isReadLocked());
 
-    WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
-    auto sessRaii = cache->getSession();
-    WT_CURSOR* cursor = writeConflictRetry(opCtx, "getLatestOplogTimestamp", "local.oplog.rs", [&] {
-        auto cachedCursor = sessRaii->getCachedCursor(_tableId, "");
-        return cachedCursor ? cachedCursor : sessRaii->getNewCursor(_uri);
+    // Using this function inside a UOW is not supported because the main reason to call it is to
+    // synchronize to the last op before waiting for write concern, so it makes little sense to do
+    // so in a UOW. This also ensures we do not return uncommited entries.
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+
+    auto wtRu = WiredTigerRecoveryUnit::get(opCtx);
+    bool ruWasActive = wtRu->isActive();
+
+    // getSession will open a txn if there was no txn active.
+    auto session = wtRu->getSession();
+
+    ON_BLOCK_EXIT([&] {
+        if (!ruWasActive) {
+            // In case the RU was inactive, leave it in that state.
+            wtRu->abandonSnapshot();
+        }
     });
-    ON_BLOCK_EXIT([&] { sessRaii->releaseCursor(_tableId, cursor, ""); });
+
+    WT_CURSOR* cursor = writeConflictRetry(opCtx, "getLatestOplogTimestamp", "local.oplog.rs", [&] {
+        auto cachedCursor = session->getCachedCursor(_tableId, "");
+        return cachedCursor ? cachedCursor : session->getNewCursor(_uri);
+    });
+    ON_BLOCK_EXIT([&] { session->releaseCursor(_tableId, cursor, ""); });
     int ret = cursor->prev(cursor);
     if (ret == WT_NOTFOUND) {
         return Status(ErrorCodes::CollectionIsEmpty, "oplog is empty");

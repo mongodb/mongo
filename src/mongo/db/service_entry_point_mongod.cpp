@@ -137,11 +137,21 @@ public:
             CommandHelpers::appendCommandWCStatus(commandResponseBuilder, waitForWCStatus, res);
         };
 
+        // If lastOp has changed, then a write has been done by this client. This timestamp is
+        // sufficient for waiting for write concern.
         if (lastOpAfterRun != lastOpBeforeRun) {
             invariant(lastOpAfterRun > lastOpBeforeRun);
             waitForWriteConcernAndAppendStatus();
             return;
         }
+
+        // If an error occurs after performing a write but before waiting for write concern and
+        // returning to the client, the driver may retry an operation that has already been
+        // completed, resulting in a no-op. The no-op has to wait for the write concern nonetheless,
+        // because acknowledgement from secondaries might still be pending. Given that the timestamp
+        // of the original operation that performed the write is not available, the best
+        // approximation is to use the system’s last op time, which is guaranteed to be >= than the
+        // original op time.
 
         // Ensures that if we tried to do a write, we wait for write concern, even if that write was
         // a noop. We do not need to update this for multi-document transactions as read-only/noop
