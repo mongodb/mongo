@@ -556,12 +556,6 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
         .getAsync([](auto) {});
 }
 
-void dropRangeDeletionsCollection(OperationContext* opCtx) {
-    DBDirectClient client(opCtx);
-    client.dropCollection(NamespaceString::kRangeDeletionNamespace.toString(),
-                          WriteConcerns::kMajorityWriteConcernShardingTimeout);
-}
-
 template <typename Callable>
 void forEachOrphanRange(OperationContext* opCtx, const NamespaceString& nss, Callable&& handler) {
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
@@ -604,72 +598,6 @@ void forEachOrphanRange(OperationContext* opCtx, const NamespaceString& nss, Cal
         handler(*range);
 
         startingKey = range->getMax();
-    }
-}
-
-void submitOrphanRanges(OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid) {
-    try {
-
-        onShardVersionMismatch(opCtx, nss, boost::none);
-
-        LOGV2_DEBUG(22031,
-                    2,
-                    "Upgrade: Cleaning up existing orphans",
-                    "namespace"_attr = nss,
-                    "uuid"_attr = uuid);
-
-        std::vector<RangeDeletionTask> deletions;
-        forEachOrphanRange(opCtx, nss, [&deletions, &opCtx, &nss, &uuid](const auto& range) {
-            // Since this is not part of an active migration, the migration UUID and the donor shard
-            // are set to unused values so that they don't conflict.
-            RangeDeletionTask task(
-                UUID::gen(), nss, uuid, ShardId("fromFCVUpgrade"), range, CleanWhenEnum::kDelayed);
-            const auto currentTime = VectorClock::get(opCtx)->getTime();
-            task.setTimestamp(currentTime.clusterTime().asTimestamp());
-            deletions.emplace_back(task);
-        });
-
-        if (deletions.empty())
-            return;
-
-        PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-
-        for (const auto& task : deletions) {
-            LOGV2_DEBUG(22032,
-                        2,
-                        "Upgrade: Submitting chunk range for cleanup",
-                        "range"_attr = redact(task.getRange().toString()),
-                        "namespace"_attr = nss);
-            store.add(opCtx, task);
-        }
-    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& e) {
-        LOGV2(22033,
-              "Upgrade: Failed to clean up orphans because the namespace was not found; the "
-              "collection must have been dropped",
-              "namespace"_attr = nss,
-              "error"_attr = redact(e.what()));
-    }
-}
-
-void submitOrphanRangesForCleanup(OperationContext* opCtx) {
-    auto catalog = CollectionCatalog::get(opCtx);
-    const auto& dbNames = catalog->getAllDbNames();
-
-    for (const auto& dbName : dbNames) {
-        if (dbName.db() == NamespaceString::kLocalDb)
-            continue;
-
-        for (auto collIt = catalog->begin(opCtx, dbName); collIt != catalog->end(opCtx); ++collIt) {
-            auto uuid = collIt.uuid().get();
-            auto nss = catalog->lookupNSSByUUID(opCtx, uuid).get();
-            LOGV2_DEBUG(22034,
-                        2,
-                        "Upgrade: Processing collection for orphaned range cleanup",
-                        "namespace"_attr = nss);
-            if (!nss.isNamespaceAlwaysUnsharded()) {
-                submitOrphanRanges(opCtx, nss, uuid);
-            }
-        }
     }
 }
 
