@@ -1,5 +1,8 @@
 'use strict';
 
+// UMC commands are not supported in transactions.
+TestData.runInsideTransaction = false;
+
 /**
  * auth_drop_user.js
  *
@@ -23,15 +26,41 @@ var $config = (function() {
         }
 
         function createAndDropUser(db, collName) {
-            var username = uniqueUsername(this.prefix, this.tid, this.num++);
-            db.createUser({user: username, pwd: 'password', roles: ['readWrite', 'dbAdmin']});
+            const username = uniqueUsername(this.prefix, this.tid, this.num++);
 
-            var res = db.getUser(username);
+            const kCreateUserRetries = 5;
+            const kCreateUserRetryInterval = 5 * 1000;
+            assert.retry(
+                function() {
+                    try {
+                        db.createUser(
+                            {user: username, pwd: 'password', roles: ['readWrite', 'dbAdmin']});
+                        return true;
+                    } catch (e) {
+                        jsTest.log("Caught createUser exception: " + tojson(e));
+                        return false;
+                    }
+                },
+                "Failed creating user '" + username + "'",
+                kCreateUserRetries,
+                kCreateUserRetryInterval);
+
+            const res = db.getUser(username);
             assertAlways(res !== null, "user '" + username + "' should exist");
             assertAlways.eq(username, res.user);
             assertAlways.eq(db.getName(), res.db);
 
-            assertAlways(db.dropUser(username));
+            const kDropUserRetries = 5;
+            const kDropUserRetryInterval = 5 * 1000;
+            assert.retry(function() {
+                try {
+                    db.dropUser(username);
+                    return true;
+                } catch (e) {
+                    jsTest.log("Caught dropUser exception: " + tojson(e));
+                    return false;
+                }
+            }, "Failed dropping user '" + username + "'", kDropUserRetries, kDropUserRetryInterval);
             assertAlways.isnull(db.getUser(username), "user '" + username + "' should not exist");
         }
 

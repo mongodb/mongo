@@ -7,6 +7,9 @@
  */
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropRoles
 
+// UMC commands are not supported in transactions.
+TestData.runInsideTransaction = false;
+
 var $config = (function() {
     var data = {
         // Use the workload name as a prefix for the role name,
@@ -24,13 +27,29 @@ var $config = (function() {
         }
 
         function createRole(db, collName) {
-            var roleName = uniqueRoleName(this.prefix, this.tid, this.num++);
-            db.createRole({
-                role: roleName,
-                privileges:
-                    [{resource: {db: db.getName(), collection: collName}, actions: ['update']}],
-                roles: [{role: 'read', db: db.getName()}]
-            });
+            const roleName = uniqueRoleName(this.prefix, this.tid, this.num++);
+            const kCreateRoleRetries = 5;
+            const kCreateRoleRetryInterval = 5 * 1000;
+            assert.retry(
+                function() {
+                    try {
+                        db.createRole({
+                            role: roleName,
+                            privileges: [{
+                                resource: {db: db.getName(), collection: collName},
+                                actions: ['update']
+                            }],
+                            roles: [{role: 'read', db: db.getName()}]
+                        });
+                        return true;
+                    } catch (e) {
+                        jsTest.log("Caught createRole exception: " + tojson(e));
+                        return false;
+                    }
+                },
+                "Failed creating role '" + roleName + "'",
+                kCreateRoleRetries,
+                kCreateRoleRetryInterval);
 
             // Verify the newly created role exists, as well as all previously created roles
             for (var i = 0; i < this.num; ++i) {
