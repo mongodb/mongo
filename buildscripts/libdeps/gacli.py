@@ -159,6 +159,10 @@ def setup_args_parser():
         + "nodes,.")
 
     parser.add_argument(
+        '--symbol-depends', nargs='+', action='append', default=[],
+        help="[from_node] [to_node]: Print symbols defined in from_node used by to_node.")
+
+    parser.add_argument(
         '--indegree-one', action='store_true', default=False, help=
         "Find candidate nodes for merging by searching the graph for nodes with only one node which depends on them."
     )
@@ -174,6 +178,11 @@ def setup_args_parser():
         if len(arg_list) != 2:
             parser.error(
                 f'Must pass two args for --critical-edges, [from_node] [to_node], not {arg_list}')
+
+    for arg_list in args.symbol_depends:
+        if len(arg_list) != 2:
+            parser.error(
+                f'Must pass two args for --symbol-depends, [from_node] [to_node], not {arg_list}')
 
     return parser.parse_args()
 
@@ -234,6 +243,12 @@ def main():
         analysis.append(
             libdeps_analyzer.GraphPaths(libdeps_graph, strip_build_dir(build_dir, analyzer_args[0]),
                                         strip_build_dir(build_dir, analyzer_args[1])))
+
+    for analyzer_args in args.symbol_depends:
+        analysis.append(
+            libdeps_analyzer.SymbolDependents(libdeps_graph,
+                                              strip_build_dir(build_dir, analyzer_args[0]),
+                                              strip_build_dir(build_dir, analyzer_args[1])))
 
     for analyzer_args in args.critical_edges:
         analysis.append(

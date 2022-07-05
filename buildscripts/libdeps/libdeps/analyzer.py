@@ -38,6 +38,7 @@ import functools
 from pathlib import Path
 
 import networkx
+import cxxfilt
 
 from libdeps.graph import CountTypes, DependsReportTypes, LinterTypes, EdgeProps, NodeProps
 
@@ -529,6 +530,33 @@ class GraphPaths(Analyzer):
                                                            self._to_node])] = self.run()
 
 
+class SymbolDependents(Analyzer):
+    """Find all symbol dependents between the two nodes in the graph."""
+
+    def __init__(self, dependency_graph, from_node, to_node):
+        """Store graph and strip the nodes."""
+
+        super().__init__(dependency_graph)
+        self._from_node, self._to_node = from_node, to_node
+
+    @schema_check(schema_version=1)
+    def run(self):
+        """Find all symbol dependents between the two nodes in the graph."""
+
+        edge = self._dependents_graph.get_edge_data(u=self._from_node, v=self._to_node)
+        if 'symbols' in edge:
+            return edge['symbols'].split()
+        return []
+
+    def report(self, report):
+        """Add the symbol dependents list to the report."""
+
+        if DependsReportTypes.SYMBOL_DEPENDS.name not in report:
+            report[DependsReportTypes.SYMBOL_DEPENDS.name] = {}
+        report[DependsReportTypes.SYMBOL_DEPENDS.name][tuple([self._from_node,
+                                                              self._to_node])] = self.run()
+
+
 class CriticalEdges(Analyzer):
     """Finds all edges between two nodes, where removing those edges disconnects the two nodes."""
 
@@ -818,6 +846,16 @@ class GaPrettyPrinter(GaPrinter):
             print("\nLibrary nodes with 1 or 0 dependers:")
             for count, nodes in enumerate(results[DependsReportTypes.IN_DEGREE_ONE.name], start=1):
                 print(f"    {count}: '{nodes[0]}' <- '{nodes[1]}'")
+
+        if DependsReportTypes.SYMBOL_DEPENDS.name in results:
+            print("\nSymbol dependents:")
+            for nodes in results[DependsReportTypes.SYMBOL_DEPENDS.name]:
+                symbols = results[DependsReportTypes.SYMBOL_DEPENDS.name][nodes]
+                print(
+                    f"{len(symbols)} symbols defined in '{nodes[0]}' which are used in '{nodes[1]}'"
+                )
+                for symbol in symbols:
+                    print(f"\t{cxxfilt.demangle(symbol)}")
 
     def print(self):
         """Print the result data."""

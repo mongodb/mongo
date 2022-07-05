@@ -67,6 +67,7 @@ class DependsReportTypes(Enum):
     GRAPH_PATHS = auto()
     CRITICAL_EDGES = auto()
     IN_DEGREE_ONE = auto()
+    SYMBOL_DEPENDS = auto()
 
 
 class LinterTypes(Enum):
