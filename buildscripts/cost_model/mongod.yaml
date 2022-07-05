@@ -1,0 +1,10 @@
+storage:
+  engine: inMemory
+  dbPath: /home/ubuntu/data/inmemorydb
+  journal:
+    enabled: false
+setParameter:
+  featureFlagCommonQueryFramework: true
+  internalQueryEnableCascadesOptimizer: true
+  internalQueryForceClassicEngine: false
+  internalMeasureQueryExecutionTimeInMicroseconds: true

@@ -1,0 +1,39 @@
+{
+    "database": {
+        "connectionString": "mongodb://localhost",
+        "databaseName": "abt_calibration",
+        "dumpPath": "~/data/dump",
+        "restoreFromDump": "onlyNew",
+        "dumpOnExit": true
+    },
+    "dataGenerator": {
+        "enabled": true,
+        "stringLength": 64,
+        "collectionCardinalities": [
+            100,
+            200
+        ],
+        "collectionFieldsCounts": [
+            1,
+            5,
+            10
+        ],
+        "dataTypes": [
+            "int",
+            "str",
+            "arr"
+        ]
+    },
+    "abtCalibrator": {
+        "enabled": true,
+        "test_size": 0.2,
+        "inputCollectionName": "calibrationData"
+    },
+    "workloadExecution": {
+        "enabled": true,
+        "outputCollectionName": "calibrationData",
+        "writeMode": "append",
+        "warmupRuns": 1,
+        "runs": 20
+    }
+}
