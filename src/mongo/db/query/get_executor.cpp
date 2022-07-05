@@ -1687,7 +1687,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     // TODO (SERVER-64506): support change streams' pre- and post-images.
     // TODO (SERVER-66079): allow batched deletions in the config.* namespace.
-    const bool batchDelete = feature_flags::gBatchMultiDeletes.isEnabledAndIgnoreFCV() &&
+    const bool batchDelete =
+        feature_flags::gBatchMultiDeletes.isEnabled(serverGlobalParams.featureCompatibility) &&
         gBatchUserMultiDeletes.load() &&
         (opCtx->recoveryUnit()->getState() == RecoveryUnit::State::kInactive ||
          opCtx->recoveryUnit()->getState() == RecoveryUnit::State::kActiveNotInUnitOfWork) &&
