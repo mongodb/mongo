@@ -225,7 +225,7 @@ MONGO_COMPILER_NOINLINE void fassertFailedNoTraceWithLocation(int msgid,
                          "line"_attr = line);
     breakpoint();
     LOGV2_FATAL_CONTINUE(23092, "\n\n***aborting after fassert() failure\n\n");
-    quickExit(EXIT_ABRUPT);
+    quickExit(ExitCode::abrupt);
 }
 
 MONGO_COMPILER_NORETURN void fassertFailedWithStatusWithLocation(int msgid,
@@ -257,7 +257,7 @@ MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgi
                          "line"_attr = line);
     breakpoint();
     LOGV2_FATAL_CONTINUE(23096, "\n\n***aborting after fassert() failure\n\n");
-    quickExit(EXIT_ABRUPT);
+    quickExit(ExitCode::abrupt);
 }
 
 MONGO_COMPILER_NOINLINE void uassertedWithLocation(const Status& status,

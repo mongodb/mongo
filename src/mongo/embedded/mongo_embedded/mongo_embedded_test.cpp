@@ -46,6 +46,7 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
@@ -679,14 +680,14 @@ int main(const int argc, const char* const* const argv) {
     auto ret = mongo::embedded::addMongoEmbeddedTestOptions(&options);
     if (!ret.isOK()) {
         std::cerr << ret << std::endl;
-        return EXIT_FAILURE;
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     ret = moe::OptionsParser().run(
         options, std::vector<std::string>(argv, argv + argc), &environment);
     if (!ret.isOK()) {
         std::cerr << options.helpString();
-        return EXIT_FAILURE;
+        return static_cast<int>(mongo::ExitCode::fail);
     }
     if (environment.count("tempPath")) {
         ::mongo::unittest::TempDir::setTempPath(environment["tempPath"].as<std::string>());
@@ -709,13 +710,13 @@ int main(const int argc, const char* const* const argv) {
     ret = mongo::runGlobalInitializers(std::vector<std::string>{argv, argv + argc});
     if (!ret.isOK()) {
         std::cerr << "Global initilization failed";
-        return EXIT_FAILURE;
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     ret = mongo::runGlobalDeinitializers();
     if (!ret.isOK()) {
         std::cerr << "Global deinitilization failed";
-        return EXIT_FAILURE;
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     // Check so we can initialize the library without providing init params
@@ -724,14 +725,14 @@ int main(const int argc, const char* const* const argv) {
         std::cerr << "mongo_embedded_v1_init() failed with "
                   << mongo_embedded_v1_status_get_error(status.get()) << ": "
                   << mongo_embedded_v1_status_get_explanation(status.get()) << std::endl;
-        return EXIT_FAILURE;
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     if (mongo_embedded_v1_lib_fini(lib, status.get()) != MONGO_EMBEDDED_V1_SUCCESS) {
         std::cerr << "mongo_embedded_v1_fini() failed with "
                   << mongo_embedded_v1_status_get_error(status.get()) << ": "
                   << mongo_embedded_v1_status_get_explanation(status.get()) << std::endl;
-        return EXIT_FAILURE;
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     // Initialize the library with a log callback and test so we receive at least one callback
@@ -784,7 +785,7 @@ int main(const int argc, const char* const* const argv) {
 
     if (!receivedCallback) {
         std::cerr << "Did not get a log callback." << std::endl;
-        return EXIT_FAILURE;
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     const auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", "", 1);

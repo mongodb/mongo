@@ -34,6 +34,7 @@
 #include "mongo/db/commands/shutdown.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -79,7 +80,7 @@ void finishShutdown(OperationContext* opCtx,
                 return;
             }
 #endif
-            shutdown(EXIT_CLEAN, shutdownArgs);  // this never returns
+            shutdown(ExitCode::clean, shutdownArgs);  // this never returns
         })
             .detach();
     }

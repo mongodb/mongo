@@ -103,7 +103,7 @@ void endProcessWithSignal(int signalNum) {
         RaiseException(STATUS_EXIT_ABRUPT, EXCEPTION_NONCONTINUABLE, 0, nullptr);
     } __except (sehExceptionFilter(GetExceptionCode(), GetExceptionInformation())) {
         // The exception filter exits the process
-        quickExit(EXIT_ABRUPT);
+        quickExit(ExitCode::abrupt);
     }
 }
 
@@ -181,7 +181,7 @@ class MallocFreeOStreamGuard {
 public:
     explicit MallocFreeOStreamGuard() : _lk(_streamMutex, stdx::defer_lock) {
         if (terminateDepth++) {
-            quickExit(EXIT_ABRUPT);
+            quickExit(ExitCode::abrupt);
         }
         _lk.lock();
     }
@@ -362,7 +362,7 @@ void reportOutOfMemoryErrorAndExit() {
     mallocFreeOStream << "out of memory.";
     writeMallocFreeStreamToLog();
     printStackTraceNoRecursion();
-    quickExit(EXIT_ABRUPT);
+    quickExit(ExitCode::abrupt);
 }
 
 void clearSignalMask() {

@@ -49,7 +49,7 @@ MONGO_STARTUP_OPTIONS_PARSE(StartupOptions)(InitializerContext* context) {
         std::cerr << ret.reason() << std::endl;
         // TODO: Figure out if there's a use case for this help message ever being different
         std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;
-        quickExit(EXIT_BADOPTIONS);
+        quickExit(ExitCode::badOptions);
     }
 }
 
@@ -62,7 +62,7 @@ MONGO_INITIALIZER_GENERAL(OutputConfig,
         uassertStatusOK(startupOptionsParsed.get(Key("outputConfig"), &output));
         if (output) {
             std::cout << startupOptionsParsed.toYAML() << std::endl;
-            quickExit(EXIT_CLEAN);
+            quickExit(ExitCode::clean);
         }
     }
 }

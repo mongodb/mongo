@@ -55,6 +55,7 @@
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/quick_exit.h"
 
@@ -457,7 +458,7 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
 
     if (MONGO_unlikely(exitBeforeDataRepair.shouldFail())) {
         LOGV2(21006, "Exiting because 'exitBeforeDataRepair' fail point was set.");
-        quickExit(EXIT_ABRUPT);
+        quickExit(ExitCode::abrupt);
     }
 
     // Repair, restore, and initialize the featureCompatibilityVersion document before allowing
@@ -511,7 +512,7 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
 
     if (MONGO_unlikely(exitBeforeRepairInvalidatesConfig.shouldFail())) {
         LOGV2(21008, "Exiting because 'exitBeforeRepairInvalidatesConfig' fail point was set.");
-        quickExit(EXIT_ABRUPT);
+        quickExit(ExitCode::abrupt);
     }
 
     auto repairObserver = StorageRepairObserver::get(opCtx->getServiceContext());

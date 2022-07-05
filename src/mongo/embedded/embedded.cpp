@@ -72,6 +72,7 @@
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/time_support.h"
@@ -303,7 +304,7 @@ ServiceContext* initialize(const char* yaml_config) {
                             logv2::LogOptions(LogComponent::kControl, logv2::FatalMode::kContinue),
                             "** IMPORTANT: {error_toStatus_reason}",
                             "error_toStatus_reason"_attr = error.toStatus().reason());
-        quickExit(EXIT_NEED_DOWNGRADE);
+        quickExit(ExitCode::needDowngrade);
     }
 
     // Ensure FCV document exists and is initialized in-memory. Fatally asserts if there is an
@@ -316,7 +317,7 @@ ServiceContext* initialize(const char* yaml_config) {
 
     if (storageGlobalParams.upgrade) {
         LOGV2(22553, "finished checking dbs");
-        exitCleanly(EXIT_CLEAN);
+        exitCleanly(ExitCode::clean);
     }
 
     // This is for security on certain platforms (nonce generation)

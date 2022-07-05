@@ -69,7 +69,7 @@ namespace mongo::initialize_server_global_state {
 #ifndef _WIN32
 static void croak(StringData prefix, int savedErr = errno) {
     std::cout << prefix << ": " << errorMessage(posixError(savedErr)) << std::endl;
-    quickExit(EXIT_ABRUPT);
+    quickExit(ExitCode::abrupt);
 }
 
 void signalForkSuccess() {
@@ -92,7 +92,7 @@ void signalForkSuccess() {
                               "Write to child pipe failed",
                               "errno"_attr = ec.value(),
                               "errnoDesc"_attr = errorMessage(ec));
-                quickExit(1);
+                quickExit(ExitCode::fail);
             }
         } else if (nw == 0) {
             continue;
@@ -190,22 +190,22 @@ static bool forkServer() {
     std::cout << "about to fork child process, waiting until server is ready for connections."
               << std::endl;
 
-    auto waitAndPropagate = [&](pid_t pid, int signalCode, bool verbose) {
+    auto waitAndPropagate = [&](pid_t pid, ExitCode signalCode, bool verbose) {
         int pstat;
         if (waitpid(pid, &pstat, 0) == -1)
             croak("waitpid");
         if (!WIFEXITED(pstat))
-            quickExit(signalCode);  // child died from a signal
+            quickExit(signalCode);
         if (int ec = WEXITSTATUS(pstat)) {
             if (verbose)
                 std::cout << "ERROR: child process failed, exited with " << ec << std::endl
                           << "To see additional information in this output, start without "
                           << "the \"--fork\" option." << std::endl;
-            quickExit(ec);
+            quickExit(ExitCode::fail);
         }
         if (verbose)
             std::cout << "child process started successfully, parent exiting" << std::endl;
-        quickExit(0);
+        quickExit(ExitCode::clean);
     };
 
     // Start in the <launcher> process.
@@ -215,7 +215,7 @@ static bool forkServer() {
             break;
         default:
             // In the <launcher> process
-            waitAndPropagate(middle, 50, true);
+            waitAndPropagate(middle, ExitCode::launcherMiddleError, true);
             break;
         case 0:
             break;
@@ -250,8 +250,8 @@ static bool forkServer() {
             if (nr == 0)
                 // pipe reached eof without the daemon signalling readiness.
                 // Wait for <daemon> to exit, and exit with its exit code.
-                waitAndPropagate(daemon, 51, false);
-            quickExit(0);
+                waitAndPropagate(daemon, ExitCode::launcherError, false);
+            quickExit(ExitCode::clean);
         } break;
         case 0:
             break;
@@ -287,7 +287,7 @@ static bool forkServer() {
 
 void forkServerOrDie() {
     if (!forkServer())
-        quickExit(EXIT_FAILURE);
+        quickExit(ExitCode::fail);
 }
 
 namespace {
@@ -398,12 +398,12 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
  * Mongo server processes cannot safely call ::exit() or std::exit(), but
  * some third-party libraries may call one of those functions.  In that
  * case, to avoid static-destructor problems in the server, this exits the
- * process immediately with code EXIT_FAILURE.
+ * process immediately with code ExitCode::fail.
  *
  * TODO: Remove once exit() executes safely in mongo server processes.
  */
 static void shortCircuitExit() {
-    quickExit(EXIT_FAILURE);
+    quickExit(ExitCode::fail);
 }
 
 MONGO_INITIALIZER(RegisterShortCircuitExitHandler)(InitializerContext*) {

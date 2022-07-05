@@ -36,6 +36,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/bson/json.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 
@@ -637,13 +638,13 @@ int main(const int argc, const char* const* const argv) {
     auto ret = mongo::runGlobalInitializers(std::vector<std::string>{argv, argv + argc});
     if (!ret.isOK()) {
         std::cerr << "Global initilization failed";
-        return EXIT_FAILURE;
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     ret = mongo::runGlobalDeinitializers();
     if (!ret.isOK()) {
         std::cerr << "Global deinitilization failed";
-        return EXIT_FAILURE;
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     const auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", "", 1);

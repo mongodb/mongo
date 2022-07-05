@@ -40,6 +40,7 @@
 #include "mongo/logv2/json_formatter.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/shared_access_fstream.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/string_map.h"
@@ -209,7 +210,7 @@ void FileRotateSink::consume(const boost::log::record_view& rec,
         }
 
         printStackTrace(std::cerr);
-        quickExitWithoutLogging(EXIT_FAILURE);
+        quickExitWithoutLogging(ExitCode::fail);
     }
 }
 

@@ -44,7 +44,7 @@ MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(FrameworkOptions)(InitializerContext* con
 
 MONGO_STARTUP_OPTIONS_VALIDATE(FrameworkOptions)(InitializerContext* context) {
     if (!handlePreValidationTestFrameworkOptions(moe::startupOptionsParsed, context->args())) {
-        quickExit(EXIT_SUCCESS);
+        quickExit(ExitCode::clean);
     }
     uassertStatusOK(moe::startupOptionsParsed.validate());
 }
@@ -54,7 +54,7 @@ MONGO_STARTUP_OPTIONS_STORE(FrameworkOptions)(InitializerContext* context) {
     if (!ret.isOK()) {
         std::cerr << ret.toString() << std::endl;
         std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;
-        quickExit(EXIT_BADOPTIONS);
+        quickExit(ExitCode::badOptions);
     }
 }
 

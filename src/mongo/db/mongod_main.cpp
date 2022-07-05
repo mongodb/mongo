@@ -203,6 +203,7 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fast_clock_source_factory.h"
 #include "mongo/util/latch_analyzer.h"
@@ -415,7 +416,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                         "Error setting up listener: {error}",
                         "Error setting up listener",
                         "error"_attr = res);
-            return EXIT_NET_ERROR;
+            return ExitCode::netError;
         }
         serviceContext->setTransportLayer(std::move(tl));
     }
@@ -437,7 +438,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
     if (EncryptionHooks::get(serviceContext)->restartRequired()) {
-        exitCleanly(EXIT_CLEAN);
+        exitCleanly(ExitCode::clean);
     }
 #endif
 
@@ -472,14 +473,14 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                     "are not using --profile",
                     "Running the selected storage engine with profiling is not supported",
                     "storageEngine"_attr = storageGlobalParams.engine);
-        exitCleanly(EXIT_BADOPTIONS);
+        exitCleanly(ExitCode::badOptions);
     }
 
     if (storageGlobalParams.repair && replSettings.usingReplSets()) {
         LOGV2_ERROR(5019200,
                     "Cannot specify both repair and replSet at the same time (remove --replSet to "
                     "be able to --repair)");
-        exitCleanly(EXIT_BADOPTIONS);
+        exitCleanly(ExitCode::badOptions);
     }
 
     logMongodStartupWarnings(storageGlobalParams, serverGlobalParams, serviceContext);
@@ -506,7 +507,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             "** IMPORTANT: {error}",
             "Wrong mongod version",
             "error"_attr = error.toStatus().reason());
-        exitCleanly(EXIT_NEED_DOWNGRADE);
+        exitCleanly(ExitCode::needDowngrade);
     }
 
     // Ensure FCV document exists and is initialized in-memory. Fatally asserts if there is an
@@ -538,7 +539,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     if (storageGlobalParams.upgrade) {
         LOGV2(20537, "Finished checking dbs");
-        exitCleanly(EXIT_CLEAN);
+        exitCleanly(ExitCode::clean);
     }
 
     // Start up health log writer thread.
@@ -562,12 +563,12 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                           "Unable to verify system indexes",
                           "error"_attr = redact(status));
             if (status == ErrorCodes::AuthSchemaIncompatible) {
-                exitCleanly(EXIT_NEED_UPGRADE);
+                exitCleanly(ExitCode::needUpgrade);
             } else if (status == ErrorCodes::NotWritablePrimary) {
                 // Try creating the indexes if we become primary.  If we do not become primary,
                 // the master will create the indexes and we will replicate them.
             } else {
-                quickExit(EXIT_FAILURE);
+                quickExit(ExitCode::fail);
             }
         }
 
@@ -588,7 +589,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                   "To manually repair the 'authSchema' document in the admin.system.version "
                   "collection, start up with --setParameter "
                   "startupAuthSchemaValidation=false to disable validation");
-            exitCleanly(EXIT_NEED_UPGRADE);
+            exitCleanly(ExitCode::needUpgrade);
         }
 
         if (foundSchemaVersion <= AuthorizationManager::schemaVersion26Final) {
@@ -598,11 +599,11 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                 "removed from MongoDB 4.0. In order to upgrade the auth schema, first downgrade "
                 "MongoDB binaries to version 3.6 and then run the authSchemaUpgrade command. See "
                 "http://dochub.mongodb.org/core/3.0-upgrade-to-scram-sha-1");
-            exitCleanly(EXIT_NEED_UPGRADE);
+            exitCleanly(ExitCode::needUpgrade);
         }
     } else if (globalAuthzManager->isAuthEnabled()) {
         LOGV2_ERROR(20569, "Auth must be disabled when starting without auth schema validation");
-        exitCleanly(EXIT_BADOPTIONS);
+        exitCleanly(ExitCode::badOptions);
     } else {
         // If authSchemaValidation is disabled and server is running without auth,
         // warn the user and continue startup without authSchema metadata checks.
@@ -808,7 +809,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                     "Error starting service entry point: {error}",
                     "Error starting service entry point",
                     "error"_attr = start);
-        return EXIT_NET_ERROR;
+        return ExitCode::netError;
     }
 
     if (!storageGlobalParams.repair) {
@@ -818,12 +819,12 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                         "Error starting listener: {error}",
                         "Error starting listener",
                         "error"_attr = start);
-            return EXIT_NET_ERROR;
+            return ExitCode::netError;
         }
     }
 
     if (!initialize_server_global_state::writePidFile()) {
-        quickExit(EXIT_FAILURE);
+        quickExit(ExitCode::fail);
     }
 
     // Startup options are written to the audit log at the end of startup so that cluster server
@@ -843,7 +844,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     if (MONGO_unlikely(shutdownAtStartup.shouldFail())) {
         LOGV2(20556, "Starting clean exit via failpoint");
-        exitCleanly(EXIT_CLEAN);
+        exitCleanly(ExitCode::clean);
     }
 
     MONGO_IDLE_THREAD_BLOCK;
@@ -858,22 +859,22 @@ ExitCode initAndListen(ServiceContext* service, int listenPort) {
                     "Exception in initAndListen: {error}, terminating",
                     "DBException in initAndListen, terminating",
                     "error"_attr = e.toString());
-        return EXIT_UNCAUGHT;
+        return ExitCode::uncaught;
     } catch (std::exception& e) {
         LOGV2_ERROR(20558,
                     "Exception in initAndListen std::exception: {error}, terminating",
                     "std::exception in initAndListen, terminating",
                     "error"_attr = e.what());
-        return EXIT_UNCAUGHT;
+        return ExitCode::uncaught;
     } catch (int& n) {
         LOGV2_ERROR(20559,
                     "Exception in initAndListen int: {reason}, terminating",
                     "Exception in initAndListen, terminating",
                     "reason"_attr = n);
-        return EXIT_UNCAUGHT;
+        return ExitCode::uncaught;
     } catch (...) {
         LOGV2_ERROR(20560, "Exception in initAndListen, terminating");
-        return EXIT_UNCAUGHT;
+        return ExitCode::uncaught;
     }
 }
 
@@ -969,19 +970,19 @@ void startupConfigActions(const std::vector<std::string>& args) {
 
         if (command[0].compare("dbpath") == 0) {
             std::cout << storageGlobalParams.dbpath << endl;
-            quickExit(EXIT_SUCCESS);
+            quickExit(ExitCode::clean);
         }
 
         if (command[0].compare("run") != 0) {
             std::cout << "Invalid command: " << command[0] << endl;
             printMongodHelp(moe::startupOptions);
-            quickExit(EXIT_FAILURE);
+            quickExit(ExitCode::fail);
         }
 
         if (command.size() > 1) {
             std::cout << "Too many parameters to 'run' command" << endl;
             printMongodHelp(moe::startupOptions);
-            quickExit(EXIT_FAILURE);
+            quickExit(ExitCode::fail);
         }
     }
 
@@ -999,10 +1000,10 @@ void startupConfigActions(const std::vector<std::string>& args) {
         auto status = shutdownProcessByDBPathPidFile(storageGlobalParams.dbpath);
         if (!status.isOK()) {
             std::cerr << status.reason() << std::endl;
-            quickExit(EXIT_FAILURE);
+            quickExit(ExitCode::fail);
         }
 
-        quickExit(EXIT_SUCCESS);
+        quickExit(ExitCode::clean);
     }
 #endif
 }
@@ -1473,7 +1474,7 @@ int mongod_main(int argc, char* argv[]) {
             "Error during global initialization: {error}",
             "Error during global initialization",
             "error"_attr = status);
-        quickExit(EXIT_FAILURE);
+        quickExit(ExitCode::fail);
     }
 
     auto* service = [] {
@@ -1491,7 +1492,7 @@ int mongod_main(int argc, char* argv[]) {
                 "Error creating service context: {error}",
                 "Error creating service context",
                 "error"_attr = redact(cause));
-            quickExit(EXIT_FAILURE);
+            quickExit(ExitCode::fail);
         }
     }();
 
@@ -1514,7 +1515,7 @@ int mongod_main(int argc, char* argv[]) {
         Status err = mongo::exceptionToStatus();
         LOGV2(6169900, "Error rotating audit log", "error"_attr = err);
 
-        quickExit(ExitCode::EXIT_AUDIT_ROTATE_ERROR);
+        quickExit(ExitCode::auditRotateError);
     }
 
     setUpCollectionShardingState(service);
@@ -1531,7 +1532,7 @@ int mongod_main(int argc, char* argv[]) {
     cmdline_utils::censorArgvArray(argc, argv);
 
     if (!initialize_server_global_state::checkSocketPath())
-        quickExit(EXIT_FAILURE);
+        quickExit(ExitCode::fail);
 
     // There is no single-threaded guarantee beyond this point.
     ThreadSafetyContext::getThreadSafetyContext()->allowMultiThreading();

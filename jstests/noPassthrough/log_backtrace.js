@@ -69,9 +69,9 @@ m = MongoRunner.runMongod({
 });
 
 if (_isWindows()) {
-    waitFailedToStart(m.pid, 14);
+    waitFailedToStart(m.pid, 14);  // MongoRunner.EXIT_ABORT
 } else {
-    waitFailedToStart(m.pid, -6);
+    waitFailedToStart(m.pid, 6);  // MongoRunner.EXIT_ABORT
 }
 
 // Check we have one log line

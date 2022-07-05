@@ -42,6 +42,7 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/unittest/unittest_options_gen.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
@@ -77,7 +78,7 @@ int main(int argc, char** argv) {
     Status status = mongo::unittest::addUnitTestOptions(&options);
     if (!status.isOK()) {
         std::cerr << status;
-        return EXIT_FAILURE;
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     moe::OptionsParser parser;
@@ -85,7 +86,7 @@ int main(int argc, char** argv) {
     Status ret = parser.run(options, argVec, &environment);
     if (!ret.isOK()) {
         std::cerr << options.helpString();
-        return EXIT_FAILURE;
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     bool list = false;
@@ -116,7 +117,7 @@ int main(int argc, char** argv) {
         std::cerr << "The string for the --verbose option cannot contain characters other than 'v'"
                   << std::endl;
         std::cerr << options.helpString();
-        return EXIT_FAILURE;
+        return static_cast<int>(mongo::ExitCode::fail);
     }
     mongo::unittest::setMinimumLoggedSeverity(mongo::logv2::LogSeverity::Debug(verbose.size()));
 
@@ -125,7 +126,7 @@ int main(int argc, char** argv) {
         for (auto name : suiteNames) {
             std::cout << name << std::endl;
         }
-        return EXIT_SUCCESS;
+        return static_cast<int>(mongo::ExitCode::clean);
     }
 
     auto result = ::mongo::unittest::Suite::run(suites, filter, fileNameFilter, repeat);

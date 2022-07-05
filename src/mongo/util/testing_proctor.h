@@ -61,7 +61,7 @@ public:
     void setEnabled(bool enable);
 
     /**
-     * Quick exits with EXIT_ABRUPT if any deferred errors have occurred.
+     * Quick exits with ExitCode::abrupt if any deferred errors have occurred.
      */
     void exitAbruptlyIfDeferredErrors(bool verbose = true) const;
 

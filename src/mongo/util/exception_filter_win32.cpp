@@ -193,7 +193,7 @@ LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS* excPointers) {
     // Don't go through normal shutdown procedure. It may make things worse.
     // Do not go through _exit or ExitProcess(), terminate immediately
     LOGV2_FATAL_CONTINUE(23137, "*** immediate exit due to unhandled exception");
-    TerminateProcess(GetCurrentProcess(), EXIT_ABRUPT);
+    TerminateProcess(GetCurrentProcess(), static_cast<UINT>(ExitCode::abrupt));
 
     // We won't reach here
     return EXCEPTION_EXECUTE_HANDLER;

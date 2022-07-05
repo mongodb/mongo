@@ -41,6 +41,7 @@
 #include "mongo/base/status.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/str.h"
 
@@ -220,7 +221,7 @@ Status runGlobalDeinitializers() {
 void runGlobalInitializersOrDie(const std::vector<std::string>& argv) {
     if (Status status = runGlobalInitializers(argv); !status.isOK()) {
         std::cerr << "Failed global initialization: " << status << std::endl;
-        quickExit(1);
+        quickExit(ExitCode::fail);
     }
 }
 

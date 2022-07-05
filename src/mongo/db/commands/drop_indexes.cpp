@@ -251,7 +251,7 @@ public:
 
         if (MONGO_unlikely(reIndexCrashAfterDrop.shouldFail())) {
             LOGV2(20458, "Exiting because 'reIndexCrashAfterDrop' fail point was set");
-            quickExit(EXIT_ABRUPT);
+            quickExit(ExitCode::abrupt);
         }
 
         // The following function performs its own WriteConflict handling, so don't wrap it in a

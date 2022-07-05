@@ -66,7 +66,7 @@ class Value;
  *  Status ret = parser.run(options, argv, env, &environment);
  *  if (!ret.isOK()) {
  *      cerr << options.helpString() << std::endl;
- *      exit(EXIT_FAILURE);
+ *      exit(ExitCode::fail);
  *  }
  *
  *  bool displayHelp;
@@ -74,11 +74,11 @@ class Value;
  *  if (!ret.isOK()) {
  *      // Help is a switch, so it should always be set
  *      cout << "Should not get here" << std::endl;
- *      exit(EXIT_FAILURE);
+ *      exit(ExitCode::fail);
  *  }
  *  if (displayHelp) {
  *      cout << options.helpString() << std::endl;
- *      exit(EXIT_SUCCESS);
+ *      exit(ExitCode::clean);
  *  }
  *
  *  // Get the value of port from the environment

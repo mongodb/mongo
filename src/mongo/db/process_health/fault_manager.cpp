@@ -192,7 +192,7 @@ FaultManager::FaultManager(ServiceContext* svcCtx,
                       "Fault manager progress monitor is terminating the server",
                       "cause"_attr = cause);
           // This calls the exit_group syscall on Linux
-          ::_exit(ExitCode::EXIT_PROCESS_HEALTH_CHECK);
+          ::_exit(static_cast<int>(ExitCode::processHealthCheck));
       }) {
     invariant(_svcCtx);
     invariant(_svcCtx->getFastClockSource());

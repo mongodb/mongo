@@ -509,16 +509,16 @@ int bridgeMain(int argc, char** argv) {
 
     if (auto status = serviceContext->getTransportLayer()->setup(); !status.isOK()) {
         LOGV2(22922, "Error setting up transport layer", "error"_attr = status);
-        return EXIT_NET_ERROR;
+        return static_cast<int>(ExitCode::netError);
     }
 
     if (auto status = serviceContext->getTransportLayer()->start(); !status.isOK()) {
         LOGV2(22923, "Error starting transport layer", "error"_attr = status);
-        return EXIT_NET_ERROR;
+        return static_cast<int>(ExitCode::netError);
     }
 
     serviceContext->notifyStartupComplete();
-    return waitForShutdown();
+    return static_cast<int>(waitForShutdown());
 }
 
 }  // namespace mongo

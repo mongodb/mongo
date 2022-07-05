@@ -30,10 +30,12 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/platform/visibility_test_lib2.h"
+#include "mongo/util/exit_code.h"
 
 #include <cstdlib>
 
 int main(int argc, char* argv[]) {
     mongo::visibility_test_lib2::Derived d("hello", argc);
-    return (d.value() == argc) ? EXIT_SUCCESS : EXIT_FAILURE;
+    return (d.value() == argc) ? static_cast<int>(mongo::ExitCode::clean)
+                               : static_cast<int>(mongo::ExitCode::fail);
 }

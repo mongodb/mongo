@@ -168,7 +168,7 @@ void WatchdogPeriodicThread::doLoop() {
                         23415,
                         "Watchdog was interrupted, shutting down, reason: {e_toStatus}",
                         "e_toStatus"_attr = e.toStatus());
-                    exitCleanly(ExitCode::EXIT_ABRUPT);
+                    exitCleanly(ExitCode::abrupt);
                 }
 
                 // This interruption ends the WatchdogPeriodicThread. This means it is possible to
@@ -452,7 +452,7 @@ void checkFile(OperationContext* opCtx, const boost::filesystem::path& file) {
 }
 
 void watchdogTerminate() {
-    ::TerminateProcess(::GetCurrentProcess(), ExitCode::EXIT_WATCHDOG);
+    ::TerminateProcess(::GetCurrentProcess(), static_cast<UINT>(ExitCode::watchdog));
 }
 
 #else
@@ -583,7 +583,7 @@ void checkFile(OperationContext* opCtx, const boost::filesystem::path& file) {
 
 void watchdogTerminate() {
     // This calls the exit_group syscall on Linux
-    ::_exit(ExitCode::EXIT_WATCHDOG);
+    ::_exit(static_cast<int>(ExitCode::watchdog));
 }
 #endif
 

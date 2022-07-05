@@ -37,6 +37,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/str.h"
 
@@ -325,7 +326,7 @@ DEATH_TEST_REGEX(TassertTerminationTest,
                  tassertUncleanLogMsg,
                  "4457002.*Detected prior failed tripwire assertions") {
     doTassert();
-    quickExit(EXIT_ABRUPT);
+    quickExit(ExitCode::abrupt);
 }
 
 DEATH_TEST(TassertTerminationTest, mongoUnreachableNonFatal, "Hit a MONGO_UNREACHABLE_TASSERT!") {

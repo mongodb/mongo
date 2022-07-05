@@ -32,6 +32,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/config.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/exit_code.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
@@ -75,7 +77,7 @@ namespace {
 stdx::mutex* const quickExitMutex = new stdx::mutex;
 }  // namespace
 
-void quickExitWithoutLogging(int code) {
+void quickExitWithoutLogging(ExitCode code) {
     // Ensure that only one thread invokes the last rites here. No
     // RAII here - we never want to unlock this.
     if (quickExitMutex)
@@ -103,9 +105,9 @@ void quickExitWithoutLogging(int code) {
     // multiple threads. Each call to _exit shuts down the CRT, and so subsequent calls into the
     // CRT result in undefined behavior. Bypass _exit CRT shutdown code and call TerminateProcess
     // directly instead to match GLibc's _exit which calls the syscall exit_group.
-    ::TerminateProcess(GetCurrentProcess(), code);
+    ::TerminateProcess(GetCurrentProcess(), static_cast<UINT>(code));
 #else
-    ::_exit(code);
+    ::_exit(static_cast<int>(code));
 #endif
 }
 

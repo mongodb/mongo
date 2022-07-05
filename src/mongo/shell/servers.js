@@ -1085,7 +1085,7 @@ MongoRunner.StopError.prototype.constructor = MongoRunner.StopError;
 
 // Constants for exit codes of MongoDB processes
 // On Windows, std::abort causes the process to exit with return code 14.
-MongoRunner.EXIT_ABORT = _isWindows() ? 14 : -6;
+MongoRunner.EXIT_ABORT = _isWindows() ? 14 : 6;
 MongoRunner.EXIT_CLEAN = 0;
 MongoRunner.EXIT_BADOPTIONS = 2;
 MongoRunner.EXIT_REPLICATION_ERROR = 3;
@@ -1093,7 +1093,7 @@ MongoRunner.EXIT_NEED_UPGRADE = 4;
 MongoRunner.EXIT_SHARDING_ERROR = 5;
 // SIGKILL is translated to TerminateProcess() on Windows, which causes the program to
 // terminate with exit code 1.
-MongoRunner.EXIT_SIGKILL = _isWindows() ? 1 : -9;
+MongoRunner.EXIT_SIGKILL = _isWindows() ? 1 : 9;
 MongoRunner.EXIT_KILL = 12;
 MongoRunner.EXIT_ABRUPT = 14;
 MongoRunner.EXIT_NTSERVICE_ERROR = 20;
@@ -1143,7 +1143,7 @@ var stopMongoProgram = function(conn, signal, opts, waitpid) {
                         "it is usually the object returned from MongoRunner.runMongod/s");
     }
 
-    signal = parseInt(signal) || 15;
+    signal = parseInt(signal) || SIGTERM;
     opts = opts || {};
     waitpid = (waitpid === undefined) ? true : waitpid;
 

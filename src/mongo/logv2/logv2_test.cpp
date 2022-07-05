@@ -63,6 +63,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
@@ -396,7 +397,7 @@ public:
         } else {
             // Reentrance of consume(), which could cause deadlock. Exit normally, causing the death
             // test to fail.
-            exit(0);
+            exit(static_cast<int>(ExitCode::clean));
         }
     }
 

@@ -72,6 +72,7 @@
 #include "mongo/util/ctype.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
@@ -304,7 +305,7 @@ bool ProgramRegistry::waitForPid(const ProcessId pid, const bool block, int* con
         if (WIFEXITED(status)) {
             code = WEXITSTATUS(status);
         } else if (WIFSIGNALED(status)) {
-            code = -WTERMSIG(status);
+            code = WTERMSIG(status);
         } else {
             MONGO_UNREACHABLE;
         }
@@ -821,7 +822,7 @@ void ProgramRunner::launchProcess(int child_stdout) {
         if (dup2(child_stdout, STDOUT_FILENO) == -1 || dup2(child_stdout, STDERR_FILENO) == -1) {
             // Async signal unsafe code reporting a terminal error condition.
             perror("Unable to dup2 child output: ");
-            _exit(-1);  // do not pass go, do not call atexit handlers
+            _exit(static_cast<int>(ExitCode::fail));  // do not pass go, do not call atexit handlers
         }
 
         execve(argvStorage[0],
@@ -831,7 +832,7 @@ void ProgramRunner::launchProcess(int child_stdout) {
         // Async signal unsafe code reporting a terminal error condition.
         perror(execErrMsg.c_str());
 
-        _exit(-1);
+        _exit(static_cast<int>(ExitCode::fail));
     }
 
 #endif
@@ -1146,13 +1147,13 @@ int killDb(int port, ProcessId _pid, int signal, const BSONObj& opt, bool waitPi
         return 0;
     }
 
-    int exitCode = EXIT_FAILURE;
+    int exitCode = static_cast<int>(ExitCode::fail);
     try {
         LOGV2_INFO(22819, "Waiting for process to terminate.", "pid"_attr = pid);
         registry.waitForPid(pid, true, &exitCode);
     } catch (...) {
         LOGV2_WARNING(22828, "Process failed to terminate.", "pid"_attr = pid);
-        return EXIT_FAILURE;
+        return static_cast<int>(ExitCode::fail);
     }
 
     if (signal == SIGKILL) {
@@ -1244,11 +1245,11 @@ BSONObj ConvertTrafficRecordingToBSON(const BSONObj& a, void* data) {
 int KillMongoProgramInstances() {
     vector<ProcessId> pids;
     registry.getRegisteredPids(pids);
-    int returnCode = EXIT_SUCCESS;
+    int returnCode = static_cast<int>(ExitCode::clean);
     for (auto&& pid : pids) {
         int port = registry.portForPid(pid);
         int code = killDb(port != -1 ? port : 0, pid, SIGTERM);
-        if (code != EXIT_SUCCESS) {
+        if (code != static_cast<int>(ExitCode::clean)) {
             LOGV2_INFO(
                 22823, "Process exited with error code", "pid"_attr = pid, "code"_attr = code);
             returnCode = code;

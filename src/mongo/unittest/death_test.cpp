@@ -292,7 +292,7 @@ void DeathTestBase::Subprocess::monitorChild(FILE* pf) {
     if (WIFSIGNALED(stat) || (WIFEXITED(stat) && WEXITSTATUS(stat) != 0)) {
         // Exited with a signal or non-zero code. Validate the expected message.
 #if defined(TSAN_ENABLED_)
-        if (WEXITSTATUS(stat) == EXIT_THREAD_SANITIZER) {
+        if (WEXITSTATUS(stat) == static_cast<int>(ExitCode::threadSanitizer)) {
             FAIL(
                 "Death test exited with Thread Sanitizer exit code, search test output for "
                 "'ThreadSanitizer' for more information");
@@ -330,7 +330,7 @@ void DeathTestBase::Subprocess::prepareChild(int (&pipes)[2]) {
     // Our callback handler exits with the default TSAN exit code so we can check in the death test
     // framework Without this, the use could override the exit code and get a false positive that
     // the test passes in TSAN builds.
-    __sanitizer_set_death_callback(+[] { _exit(EXIT_THREAD_SANITIZER); });
+    __sanitizer_set_death_callback(+[] { _exit(static_cast<int>(ExitCode::threadSanitizer)); });
 #endif
 }
 
@@ -347,7 +347,7 @@ void DeathTestBase::Subprocess::invokeTest() {
     }
     // To fail the test, we must exit with a successful error code, because the parent process
     // is checking for the child to die with an exit code indicating an error.
-    quickExit(EXIT_SUCCESS);
+    quickExit(ExitCode::clean);
 }
 #endif  // DEATH_TEST_ENABLED
 

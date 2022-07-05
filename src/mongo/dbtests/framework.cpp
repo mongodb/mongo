@@ -58,6 +58,7 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/version.h"
@@ -71,7 +72,7 @@ namespace dbtests {
 int runDbTests(int argc, char** argv) {
     if (frameworkGlobalParams.suites.empty()) {
         LOGV2_ERROR(5733802, "The [suite] argument is required for dbtest and not specified here.");
-        return EXIT_FAILURE;
+        return static_cast<int>(ExitCode::fail);
     }
 
     frameworkGlobalParams.perfHist = 1;

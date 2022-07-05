@@ -203,7 +203,7 @@ ServiceContext::ConstructorActionRegisterer SASLServerMechanismRegistryValidatio
                             "mechanism"_attr = mech);
 
                 // Quick Exit since we are in the middle of setting up ServiceContext
-                quickExit(EXIT_BADOPTIONS);
+                quickExit(ExitCode::badOptions);
             }
         }
     }};

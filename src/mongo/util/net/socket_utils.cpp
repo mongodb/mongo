@@ -76,7 +76,7 @@ const struct WinsockInit {
                   "ERROR: wsastartup failed {error}",
                   "ERROR: wsastartup failed",
                   "error"_attr = errorMessage(systemError(e)));
-            quickExit(EXIT_NTSERVICE_ERROR);
+            quickExit(ExitCode::ntServiceError);
         }
     }
 } winsock_init;

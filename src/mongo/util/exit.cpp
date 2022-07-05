@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/exit.h"
+#include "mongo/util/exit_code.h"
 
 #include <boost/optional.hpp>
 #include <functional>
@@ -40,6 +41,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/quick_exit.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
@@ -173,7 +175,7 @@ void shutdownNoTerminate(const ShutdownTaskArgs& shutdownArgs) {
     {
         stdx::lock_guard<Latch> lock(shutdownMutex);
         shutdownTasksInProgress = false;
-        shutdownExitCode.emplace(EXIT_CLEAN);
+        shutdownExitCode.emplace(ExitCode::clean);
     }
 
     shutdownTasksComplete.notify_all();
