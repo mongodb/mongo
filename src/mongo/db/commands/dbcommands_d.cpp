@@ -424,30 +424,5 @@ public:
 
 } cmdFileMD5;
 
-class AvailableQueryOptions : public BasicCommand {
-public:
-    AvailableQueryOptions() : BasicCommand("availableQueryOptions", "availablequeryoptions") {}
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
-        return Status::OK();
-    }
-
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        result << "options" << QueryOption_AllSupported;
-        return true;
-    }
-} availableQueryOptionsCmd;
-
 }  // namespace
 }  // namespace mongo

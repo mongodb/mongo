@@ -227,7 +227,6 @@ let testCases = {
     applyOps: {skip: "internal command"},
     authenticate: {skip: "does not accept read or write concern"},
     autoSplitVector: {skip: "internal command"},
-    availableQueryOptions: {skip: "internal command"},
     balancerCollectionStatus: {skip: "does not accept read or write concern"},
     balancerStart: {skip: "does not accept read or write concern"},
     balancerStatus: {skip: "does not accept read or write concern"},
@@ -760,7 +759,7 @@ let testCases = {
 };
 
 commandsRemovedFromMongodSinceLastLTS.forEach(function(cmd) {
-    testCases[cmd] = {skip: "must define test coverage for 4.4 backwards compatibility"};
+    testCases[cmd] = {skip: "must define test coverage for backwards compatibility"};
 });
 
 // Running setDefaultRWConcern in the middle of a scenario would define defaults when there

@@ -185,10 +185,6 @@ let MongosAPIParametersUtil = (function() {
             skip: "executes locally on mongos (not sent to any remote node)"
         },
         {
-            commandName: "availableQueryOptions",
-            skip: "executes locally on mongos (not sent to any remote node)"
-        },
-        {
             commandName: "balancerCollectionStatus",
             skip: "executes locally on mongos (not sent to any remote node)"
         },

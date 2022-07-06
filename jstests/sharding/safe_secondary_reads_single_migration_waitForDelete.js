@@ -113,7 +113,6 @@ let testCases = {
     applyOps: {skip: "primary only"},
     authenticate: {skip: "does not return user data"},
     authSchemaUpgrade: {skip: "primary only"},
-    availableQueryOptions: {skip: "does not return user data"},
     balancerCollectionStatus: {skip: "primary only"},
     balancerStart: {skip: "primary only"},
     balancerStatus: {skip: "primary only"},
@@ -370,7 +369,7 @@ let testCases = {
 };
 
 commandsRemovedFromMongosSinceLastLTS.forEach(function(cmd) {
-    testCases[cmd] = {skip: "must define test coverage for 4.4 backwards compatibility"};
+    testCases[cmd] = {skip: "must define test coverage for backwards compatibility"};
 });
 
 // Set the secondaries to priority 0 to prevent the primaries from stepping down.

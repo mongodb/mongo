@@ -340,7 +340,6 @@ TenantMigrationConcurrentWriteUtil.testCases = {
     appendOplogNote: {skip: isNotRunOnUserDatabase},
     applyOps: {skip: isNotSupportedInServerless},
     authenticate: {skip: isAuthCommand},
-    availableQueryOptions: {skip: isNotWriteCommand},
     buildInfo: {skip: isNotWriteCommand},
     captrunc: {
         skip: isNotWriteCommand,           // TODO (SERVER-49834)

@@ -117,7 +117,6 @@ const allCommands = {
     applyOps: {skip: isPrimaryOnly},
     authenticate: {skip: isNotAUserDataRead},
     autoSplitVector: {skip: isPrimaryOnly},
-    availableQueryOptions: {skip: isNotAUserDataRead},
     buildInfo: {skip: isNotAUserDataRead},
     captrunc: {skip: isPrimaryOnly},
     checkShardingIndex: {skip: isPrimaryOnly},
