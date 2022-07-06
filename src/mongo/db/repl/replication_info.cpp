@@ -250,11 +250,11 @@ public:
         BSONObjBuilder result;
         result.append("latestOptime", replCoord->getMyLastAppliedOpTime().getTimestamp());
 
-        auto earliestOplogTimestampFetch = [&]() -> StatusWith<Timestamp> {
+        auto earliestOplogTimestampFetch = [&]() -> Timestamp {
             auto oplog = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
                 opCtx, NamespaceString::kRsOplogNamespace);
             if (!oplog) {
-                return StatusWith<Timestamp>(ErrorCodes::NamespaceNotFound, "oplog doesn't exist");
+                return Timestamp();
             }
 
             // Try to get the lock. If it's already locked, immediately return null timestamp.
@@ -283,13 +283,13 @@ public:
                     return o["ts"].timestamp();
                 }
             }
-
-            return swEarliestOplogTimestamp;
+            if (!swEarliestOplogTimestamp.isOK()) {
+                return Timestamp();
+            }
+            return swEarliestOplogTimestamp.getValue();
         }();
 
-        uassert(
-            17347, "Problem reading earliest entry from oplog", earliestOplogTimestampFetch.isOK());
-        result.append("earliestOptime", earliestOplogTimestampFetch.getValue());
+        result.append("earliestOptime", earliestOplogTimestampFetch);
 
         return result.obj();
     }
