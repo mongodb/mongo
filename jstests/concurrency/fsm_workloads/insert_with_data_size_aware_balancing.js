@@ -9,7 +9,6 @@
  *   requires_sharding,
  *   assumes_balancer_on,
  *   featureFlagBalanceAccordingToDataSize,
- *   does_not_support_stepdowns,
  *   requires_fcv_61,
  *  ]
  */
