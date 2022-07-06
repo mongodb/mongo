@@ -309,10 +309,12 @@ function getAggPlanStage(root, stage, useQueryPlannerSection = false) {
 
 /**
  * Given the root stage of agg explain's JSON representation of a query plan ('root'), returns
- * whether the plan as stage called 'stage'.
+ * whether the plan has a stage called 'stage'. It could have more than one to allow for sharded
+ * explain plans, and it can search for a query planner stage like "FETCH" or an agg stage like
+ * "$group."
  */
 function aggPlanHasStage(root, stage) {
-    return getAggPlanStage(root, stage) !== null;
+    return getAggPlanStages(root, stage).length > 0;
 }
 
 /**

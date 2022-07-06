@@ -93,7 +93,7 @@ public:
 
     /**
      * Return which fields are required to compute the projection, assuming the entire document is
-     * not needed.
+     * not needed. Includes _id explicitly if it is required - implicitily or explicitly.
      */
     const OrderedPathSet& getRequiredFields() const {
         invariant(_type == ProjectType::kInclusion);

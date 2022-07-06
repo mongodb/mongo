@@ -126,7 +126,7 @@ public:
      * set of the GroupNode. If that condition is met the ProjectionNodeSimple is redundant and can
      * thus be elimiated to improve performance of the plan. Otherwise, this is a noop.
      */
-    static std::unique_ptr<QuerySolution> removeProjectSimpleBelowGroup(
+    static std::unique_ptr<QuerySolution> removeInclusionProjectionBelowGroup(
         std::unique_ptr<QuerySolution> soln);
 
     /**

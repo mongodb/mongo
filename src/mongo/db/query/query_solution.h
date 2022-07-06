@@ -526,8 +526,8 @@ struct ColumnIndexScanNode : public QuerySolutionNode {
         return false;
     }
     FieldAvailability getFieldAvailability(const std::string& field) const {
-        return allFields.find(field) != allFields.end() ? FieldAvailability::kFullyProvided
-                                                        : FieldAvailability::kNotProvided;
+        return outputFields.find(field) != outputFields.end() ? FieldAvailability::kFullyProvided
+                                                              : FieldAvailability::kNotProvided;
     }
     bool sortedByDiskLoc() const {
         return true;

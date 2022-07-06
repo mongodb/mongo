@@ -41,8 +41,10 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/planner_ixselect.h"
+#include "mongo/db/query/projection.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/query_solution.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -368,57 +370,97 @@ std::unique_ptr<QuerySolutionNode> addSortKeyGeneratorStageIfNeeded(
 }
 
 /**
- * When projection needs to be added to the solution tree, this function chooses between the default
- * implementation and one of the fast paths.
+ * Returns a pointer to a COLUMN_SCAN node if there is one. Returns nullptr if it cannot be found or
+ * if there is any branching in the tree that would lead to more than one leaf node.
  */
-std::unique_ptr<ProjectionNode> analyzeProjection(const CanonicalQuery& query,
-                                                  std::unique_ptr<QuerySolutionNode> solnRoot,
-                                                  const bool hasSortStage) {
+const ColumnIndexScanNode* treeSourceIsColumnScan(const QuerySolutionNode* root) {
+    if (root->getType() == StageType::STAGE_COLUMN_SCAN) {
+        return static_cast<const ColumnIndexScanNode*>(root);
+    }
+
+    // Non-branching trees only, intentionally ignore >1 child.
+    if (root->children.size() == 1) {
+        return treeSourceIsColumnScan(root->children[0].get());
+    }
+    return nullptr;
+}
+
+/**
+ * When a projection needs to be added to the solution tree, this function chooses between the
+ * default implementation and one of the fast paths.
+ */
+std::unique_ptr<QuerySolutionNode> analyzeProjection(const CanonicalQuery& query,
+                                                     std::unique_ptr<QuerySolutionNode> solnRoot,
+                                                     const bool hasSortStage) {
     LOGV2_DEBUG(20949, 5, "PROJECTION: Current plan", "plan"_attr = redact(solnRoot->toString()));
+
+    const auto& projection = *query.getProj();
 
     // If the projection requires the entire document we add a fetch stage if not present. Otherwise
     // we add a fetch stage if we are not covered.
     if (!solnRoot->fetched() &&
-        (query.getProj()->requiresDocument() ||
-         (!providesAllFields(query.getProj()->getRequiredFields(), *solnRoot)))) {
+        (projection.requiresDocument() ||
+         !providesAllFields(projection.getRequiredFields(), *solnRoot))) {
         auto fetch = std::make_unique<FetchNode>();
         fetch->children.push_back(std::move(solnRoot));
         solnRoot = std::move(fetch);
     }
 
-    // There are two projection fast paths available for simple inclusion projections that don't
-    // need a sort key, don't have any dotted-path inclusions, don't have a positional projection,
-    // and don't have the 'requiresDocument' property: the ProjectionNodeSimple fast-path for plans
-    // that have a fetch stage and the ProjectionNodeCovered for plans with an index scan that the
-    // projection can cover. Plans that don't meet all the requirements for these fast path
-    // projections will all use ProjectionNodeDefault, which is able to handle all projections,
-    // covered or otherwise.
-    if (query.getProj()->isSimple()) {
-        // If the projection is simple, but not covered, use 'ProjectionNodeSimple'.
-        if (solnRoot->fetched()) {
+    // With the previous fetch analysis we know we have all the required fields. We know we have a
+    // projection specified, so we may need a projection node in the tree for any or multiple of the
+    // following reasons:
+    // - We have provided too many fields. Maybe we have the full document from a FETCH, or the
+    //   index scan is compound and has an extra field or two, or maybe some fields were needed
+    //   internally that the client didn't request.
+    // - We have a projection which computes new values using expressions - a "computed projection".
+    // - Finally, we could have the right data, but not in the format required to return to the
+    //   client. As one example: The format of data returned in index keys is meant for internal
+    //   consumers and is not returnable to a user.
+
+    // A generic "ProjectionNodeDefault" will take care of any of the three, but is slower due to
+    // its generic nature. We will attempt to avoid that for some "fast paths" first.
+    // All fast paths can only apply to "simple" projections - see the implementation for details.
+    if (projection.isSimple()) {
+        // First fast path: We have a COLUMN_SCAN providing the data, there are no computed
+        // expressions, and the requested fields are provided exactly. For 'simple' projections
+        // which must have only top-level fields, A COLUMN_SCAN can provide data in a format safe to
+        // return to the client, so it is safe to elide any projection if the COLUMN_SCAN is
+        // outputting exactly the set of fields that the user required. This may not be the case all
+        // the time if say we needed an extra field for a sort or for shard filtering.
+        const auto* columnScan = treeSourceIsColumnScan(solnRoot.get());
+        if (columnScan &&
+            columnScan->outputFields.size() == projection.getRequiredFields().size()) {
+            // No projection needed. We already checked that all necessary fields are provided, so
+            // if the set sizes match, they match exactly.
+            return solnRoot;
+        }
+
+        // Next fast path: A ProjectionNodeSimple fast-path for plans that have a materialized
+        // object from a FETCH or COLUMN_SCAN stage.
+        if (solnRoot->fetched() || columnScan != nullptr) {
+            // COLUMN_SCAN may fall into this case if it provided all the necessary data but had
+            // too many fields output, so we need to trim them down.
             return std::make_unique<ProjectionNodeSimple>(
                 addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
                 *query.root(),
-                *query.getProj());
-        } else {
-            // If we're here we're not fetched so we're covered. Let's see if we can get out of
-            // using the default projType. If 'solnRoot' is an index scan we can use the faster
-            // covered impl.
-            BSONObj coveredKeyObj = produceCoveredKeyObj(solnRoot.get());
-            if (!coveredKeyObj.isEmpty()) {
-                return std::make_unique<ProjectionNodeCovered>(
-                    addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
-                    *query.root(),
-                    *query.getProj(),
-                    std::move(coveredKeyObj));
-            }
+                projection);
+        } else if (auto coveredKeyObj = produceCoveredKeyObj(solnRoot.get());
+                   !coveredKeyObj.isEmpty()) {
+            // Final fast path: ProjectionNodeCovered for plans with an index scan that the
+            // projection can cover.
+            return std::make_unique<ProjectionNodeCovered>(
+                addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
+                *query.root(),
+                projection,
+                std::move(coveredKeyObj));
         }
     }
 
+    // No fast path available, we need to add this generic projection node.
     return std::make_unique<ProjectionNodeDefault>(
         addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
         *query.root(),
-        *query.getProj());
+        projection);
 }
 
 /**
@@ -541,8 +583,20 @@ bool canUseSimpleSort(const QuerySolutionNode& solnRoot,
         !(plannerParams.options & QueryPlannerParams::PRESERVE_RECORD_ID);
 }
 
+boost::optional<const projection_ast::Projection*> attemptToGetProjectionFromQuerySolution(
+    const QuerySolutionNode& projectNodeCandidate) {
+    switch (projectNodeCandidate.getType()) {
+        case StageType::STAGE_PROJECTION_DEFAULT:
+            return &static_cast<const ProjectionNodeDefault*>(&projectNodeCandidate)->proj;
+        case StageType::STAGE_PROJECTION_SIMPLE:
+            return &static_cast<const ProjectionNodeSimple*>(&projectNodeCandidate)->proj;
+        default:
+            return boost::none;
+    }
+}
+
 /**
- * Returns true if 'setS' is a non-strict subset of 'setT'.
+ * Returns true if 'setL' is a non-strict subset of 'setR'.
  *
  * The types of the sets are permitted to be different to allow checking something with compatible
  * but different types e.g. std::set<std::string> and StringDataUnorderedMap.
@@ -555,7 +609,7 @@ bool isSubset(const SetL& setL, const SetR& setR) {
            });
 }
 
-void removeProjectSimpleBelowGroupRecursive(QuerySolutionNode* solnRoot) {
+void removeInclusionProjectionBelowGroupRecursive(QuerySolutionNode* solnRoot) {
     if (solnRoot == nullptr) {
         return;
     }
@@ -569,28 +623,23 @@ void removeProjectSimpleBelowGroupRecursive(QuerySolutionNode* solnRoot) {
         QuerySolutionNode* projectNodeCandidate = groupNode->children[0].get();
         if (projectNodeCandidate->getType() == StageType::STAGE_GROUP) {
             // Multiple $group stages may be pushed down. So, if the child is a GROUP, then recurse.
-            removeProjectSimpleBelowGroupRecursive(projectNodeCandidate);
-            return;
-        } else if (projectNodeCandidate->getType() != StageType::STAGE_PROJECTION_SIMPLE) {
-            // There's no PROJECTION_SIMPLE sitting below root and we don't expect another pattern
-            // in the sub-tree, so bail out of the recursion. If we ran into a case of a computed
-            // projection, it would have type PROJECTION_DEFAULT.
-            return;
-        }
-        // Check to see if the projectNode's field set is a super set of the groupNodes.
-        if (!isSubset(groupNode->requiredFields,
-                      checked_cast<ProjectionNodeSimple*>(projectNodeCandidate)
-                          ->proj.getRequiredFields())) {
-            // The dependency set of the GROUP stage is wider than the projectNode field set.
-            return;
-        }
+            return removeInclusionProjectionBelowGroupRecursive(projectNodeCandidate);
+        } else if (auto projection = attemptToGetProjectionFromQuerySolution(*projectNodeCandidate);
+                   projection && projection.get()->isInclusionOnly()) {
+            // Check to see if the projectNode's field set is a super set of the groupNodes.
+            if (!isSubset(groupNode->requiredFields, projection.get()->getRequiredFields())) {
+                // The dependency set of the GROUP stage is wider than the projectNode field set.
+                return;
+            }
 
-        // Attach the projectNode's child to the groupNode's child.
-        groupNode->children[0] = std::move(projectNodeCandidate->children[0]);
+            // Attach the projectNode's child directly as the groupNode's child, eliminating the
+            // project node.
+            groupNode->children[0] = std::move(projectNodeCandidate->children[0]);
+        }
     } else {
         // Keep traversing the tree in search of a GROUP stage.
         for (size_t i = 0; i < solnRoot->children.size(); ++i) {
-            removeProjectSimpleBelowGroupRecursive(solnRoot->children[i].get());
+            removeInclusionProjectionBelowGroupRecursive(solnRoot->children[i].get());
         }
     }
 }
@@ -619,11 +668,11 @@ bool isIndexEligibleForRightSideOfLookupPushdown(const IndexEntry& index,
 }  // namespace
 
 // static
-std::unique_ptr<QuerySolution> QueryPlannerAnalysis::removeProjectSimpleBelowGroup(
+std::unique_ptr<QuerySolution> QueryPlannerAnalysis::removeInclusionProjectionBelowGroup(
     std::unique_ptr<QuerySolution> soln) {
     auto root = soln->extractRoot();
 
-    removeProjectSimpleBelowGroupRecursive(root.get());
+    removeInclusionProjectionBelowGroupRecursive(root.get());
 
     soln->setRoot(std::move(root));
     return soln;

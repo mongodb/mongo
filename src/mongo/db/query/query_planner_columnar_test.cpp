@@ -95,11 +95,32 @@ TEST_F(QueryPlannerColumnarTest, InclusionProjectionUsesColumnarIndex) {
 
     assertNumSolutions(1U);
     assertSolutionExists(R"({
+        column_scan: {
+            filtersByPath: {a: {a: {$gt: 3}}},
+            outputFields: ['a'],
+            matchFields: ['a']
+        }
+    })");
+}
+
+TEST_F(QueryPlannerColumnarTest, ComputedProjectionUsesColumnarIndex) {
+    addColumnarIndexAndEnableFilterSplitting();
+
+    runQuerySortProj(
+        BSON("a" << BSON("$gt" << 3)),
+        BSONObj(),
+        BSON("a" << 1 << "foo" << BSON("$add" << BSON_ARRAY("$foo" << 1)) << "_id" << 0));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
         proj: {
-            spec: {a: 1, _id: 0},
+            spec: {a: 1, foo: {$add: ["$foo", 1]}, _id: 0},
             node: {
-                column_scan:
-                    {filtersByPath: {a: {a: {$gt: 3}}}, outputFields: ['a'], matchFields: ['a']}
+                column_scan: {
+                    filtersByPath: {a: {a: {$gt: 3}}},
+                    outputFields: ['a', 'foo'],
+                    matchFields: ['a']
+                }
             }
         }
     })");
@@ -137,15 +158,10 @@ TEST_F(QueryPlannerColumnarTest, ImplicitlyIncludedIdIsIncludedInProjectedFields
 
     assertNumSolutions(1U);
     assertSolutionExists(R"({
-        proj: {
-            spec: {a: 1},
-            node: {
-                column_scan: {
-                    filtersByPath: {a: {a: {$gt: 3}}},
-                    outputFields: ['a', '_id'],
-                    matchFields: ['a']
-                }
-            }
+        column_scan: {
+            filtersByPath: {a: {a: {$gt: 3}}},
+            outputFields: ['a', '_id'],
+            matchFields: ['a']
         }
     })");
 }
@@ -160,12 +176,7 @@ TEST_F(QueryPlannerColumnarTest, InclusionProjectionWithSortUsesColumnarIndexAnd
         sort: {
             pattern: {a: 1},
             limit: 0,
-            node: {
-                proj: {
-                    spec: {a: 1, _id: 0},
-                    node: {column_scan: {outputFields: ['a'], matchFields: []}}
-                }
-            }
+            node: {column_scan: {outputFields: ['a'], matchFields: []}}
         }
     })");
 }
@@ -244,8 +255,7 @@ TEST_F(QueryPlannerColumnarTest, ProjectionWithJustEnoughFieldsDoesUseColumnarIn
     // Without the '_id' this should be eligible.
     runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1 << "b" << 1 << "_id" << 0));
     assertNumSolutions(1U);
-    assertSolutionExists(R"(
-        {proj: {spec: {a: 1, b: 1, _id: 0}, node: {column_scan: {outputFields: ['a', 'b']}}}})");
+    assertSolutionExists("{column_scan: {outputFields: ['a', 'b']}}");
 }
 
 TEST_F(QueryPlannerColumnarTest, DottedProjectionTooManyFieldsDoesNotUseColumnarIndex) {
@@ -285,16 +295,11 @@ TEST_F(QueryPlannerColumnarTest, IneligiblePredicateNeedsToBeAppliedAfterAssembl
     runQuerySortProj(BSON("a" << BSONNULL), BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertNumSolutions(1U);
     assertSolutionExists(R"({
-        proj: {
-            spec: {a: 1, _id: 0},
-            node: {
-                column_scan: {
-                    filtersByPath: {},
-                    outputFields: ['a'],
-                    matchFields: ['a'],
-                    postAssemblyFilter: {a: {$eq: null}}
-                }
-            }
+        column_scan: {
+            filtersByPath: {},
+            outputFields: ['a'],
+            matchFields: ['a'],
+            postAssemblyFilter: {a: {$eq: null}}
         }
     })");
 }
@@ -305,15 +310,10 @@ TEST_F(QueryPlannerColumnarTest, MultiplePredicatesAllowedWithColumnarIndex) {
     runQuerySortProj(BSON("a" << 2 << "b" << 3), BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertNumSolutions(1U);
     assertSolutionExists(R"({
-        proj: {
-            spec: {a: 1, _id: 0},
-            node: {
-                column_scan: {
-                    filtersByPath: {a: {a: {$eq: 2}}, b: {b: {$eq: 3}}},
-                    outputFields: ['a'],
-                    matchFields: ['a', 'b']
-                }
-            }
+        column_scan: {
+            filtersByPath: {a: {a: {$eq: 2}}, b: {b: {$eq: 3}}},
+            outputFields: ['a'],
+            matchFields: ['a', 'b']
         }
     })");
 }
@@ -374,15 +374,10 @@ TEST_F(QueryPlannerColumnarTest, NumberOfFieldsComputedUsingSetSize) {
                      BSON("a" << 1 << "b" << 1 << "_id" << 0));
     assertNumSolutions(1U);
     assertSolutionExists(R"({
-        proj: {
-            spec: {a: 1, b: 1, _id: 0},
-            node: {
-                column_scan: {
-                    filtersByPath: {a: {a: {$eq: 2}}, b: {b: {$eq: 3}}, c: {c: {$eq: 4}}},
-                    outputFields: ['a', 'b'],
-                    matchFields: ['a', 'b', 'c']
-                }
-            }
+        column_scan: {
+            filtersByPath: {a: {a: {$eq: 2}}, b: {b: {$eq: 3}}, c: {c: {$eq: 4}}},
+            outputFields: ['a', 'b'],
+            matchFields: ['a', 'b', 'c']
         }
     })");
 }
@@ -398,20 +393,15 @@ TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitDemo) {
     runQuerySortProj(complexPredicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertNumSolutions(1U);
     assertSolutionExists(R"({
-        proj: {
-            spec: {a: 1, _id: 0},
-            node: {
-                column_scan: {
-                    filtersByPath: {
-                        a: {$and: [{a: {$gte: 0}}, {a: {$lt: 10}}]},
-                        'addresses.zip': {'addresses.zip': {$in: ['12345', '01234']}},
-                        unsubscribed: {unsubscribed: {$eq: false}},
-                        specialAddress: {specialAddress: {$exists: true}}
-                    },
-                    outputFields: ['a'],
-                    matchFields: ['a', 'addresses.zip', 'unsubscribed', 'specialAddress']
-                }
-            }
+        column_scan: {
+            filtersByPath: {
+                a: {$and: [{a: {$gte: 0}}, {a: {$lt: 10}}]},
+                'addresses.zip': {'addresses.zip': {$in: ['12345', '01234']}},
+                unsubscribed: {unsubscribed: {$eq: false}},
+                specialAddress: {specialAddress: {$exists: true}}
+            },
+            outputFields: ['a'],
+            matchFields: ['a', 'addresses.zip', 'unsubscribed', 'specialAddress']
         }
     })");
 }
@@ -429,24 +419,19 @@ TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitsIntoParts) {
     })");
     runQuerySortProj(complexPredicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertSolutionExists(R"({
-        proj: {
-            spec: {a: 1, _id: 0},
-            node: {
-                column_scan: {
-                    filtersByPath: {
-                        a: {a: {$gte: 0, $lt: 10}},
-                        "addresses.zip": {"addresses.zip": {$in: ['12345', '01234']}},
-                        unsubscribed: {unsubscribed: false}
-                    },
-                    outputFields: ['a'],
-                    postAssemblyFilter: {
-                        specialAddress: {$exists: false},
-                        doNotContact: {$exists: false}
-                    },
-                    matchFields:
-                        ['a', 'addresses.zip', 'unsubscribed', 'specialAddress', 'doNotContact']
-                }
-            }
+        column_scan: {
+            filtersByPath: {
+                a: {a: {$gte: 0, $lt: 10}},
+                "addresses.zip": {"addresses.zip": {$in: ['12345', '01234']}},
+                unsubscribed: {unsubscribed: false}
+            },
+            outputFields: ['a'],
+            postAssemblyFilter: {
+                specialAddress: {$exists: false},
+                doNotContact: {$exists: false}
+            },
+            matchFields:
+                ['a', 'addresses.zip', 'unsubscribed', 'specialAddress', 'doNotContact']
         }
     })");
 }
@@ -456,12 +441,8 @@ TEST_F(QueryPlannerColumnarTest, EmptyQueryPredicateIsEligible) {
 
     runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertNumSolutions(1U);
-    assertSolutionExists(R"({
-        proj: {
-            spec: {a: 1, _id: 0},
-            node: {column_scan: {filtersByPath: {}, outputFields: ['a'], matchFields: []}}
-        }
-    })");
+    assertSolutionExists(
+        "{column_scan: {filtersByPath: {}, outputFields: ['a'], matchFields: []}}");
 }
 
 TEST_F(QueryPlannerColumnarTest, GroupTest) {
@@ -474,8 +455,20 @@ TEST_F(QueryPlannerColumnarTest, GroupTest) {
 
     assertNumSolutions(1U);
     assertSolutionExists(R"({
-        proj: {
-            spec: {foo: 1, x: 1, _id: 0},
+        column_scan: {
+            filtersByPath: {},
+            outputFields: ['foo', 'x'],
+            matchFields: []
+        }
+    })");
+
+    ASSERT(!cq->pipeline().empty());
+    auto solution =
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
+    ASSERT_OK(QueryPlannerTestLib::solutionMatches(R"({
+        group: {
+            key: {_id: '$foo'},
+            accs: [{s: {$sum: '$x'}}],
             node: {
                 column_scan: {
                     filtersByPath: {},
@@ -484,18 +477,8 @@ TEST_F(QueryPlannerColumnarTest, GroupTest) {
                 }
             }
         }
-    })");
-
-    ASSERT(!cq->pipeline().empty());
-    auto solution =
-        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
-    // TODO SERVER-66061: The project stage should be removed.
-    ASSERT_OK(QueryPlannerTestLib::solutionMatches(
-        "{group: {key: {_id: '$foo'}, accs: [{s: {$sum: '$x'}}], node: "
-        "{proj: {spec: {foo:1, x:1, _id: 0}, node: "
-        "{column_scan: {filtersByPath: {}, outputFields: ['foo', 'x'], matchFields: []}}"
-        "}}}}",
-        solution->root()))
+    })",
+                                                   solution->root()))
         << solution->root()->toString();
 }
 
@@ -510,23 +493,31 @@ TEST_F(QueryPlannerColumnarTest, MatchGroupTest) {
                          makeInnerPipelineStages(*pipeline));
 
     assertNumSolutions(1U);
-    assertSolutionExists(R"(
-        {proj: {spec: {foo: 1, x: 1, _id: 0}, node:
-        {column_scan: {filtersByPath: {name: {name: {$eq: 'bob'}}},
-                         outputFields: ['foo', 'x'],
-                         matchFields: ['name']}}}})");
+    assertSolutionExists(R"({
+        column_scan: {
+            filtersByPath: {name: {name: {$eq: 'bob'}}},
+            outputFields: ['foo', 'x'],
+            matchFields: ['name']
+        }
+    })");
 
     ASSERT(!cq->pipeline().empty());
     auto solution =
         QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
-    // TODO SERVER-66061: The project stage should be removed.
-    ASSERT_OK(QueryPlannerTestLib::solutionMatches(
-        "{group: {key: {_id: '$foo'}, accs: [{s: {$sum: '$x'}}], node: "
-        "{proj: {spec: {foo:1, x:1, _id: 0}, node: "
-        "{column_scan: {filtersByPath: {name: {name: {$eq: 'bob'}}}, outputFields: ['foo', 'x'], "
-        "matchFields: ['name']}}"
-        "}}}}",
-        solution->root()))
+    ASSERT_OK(QueryPlannerTestLib::solutionMatches(R"({
+        group: {
+            key: {_id: '$foo'},
+            accs: [{s: {$sum: '$x'}}],
+            node: {
+                column_scan: {
+                    filtersByPath: {name: {name: {$eq: 'bob'}}},
+                    outputFields: ['foo', 'x'], 
+                    matchFields: ['name']
+                }
+            }
+        }
+    })",
+                                                   solution->root()))
         << solution->root()->toString();
 }
 
@@ -542,24 +533,104 @@ TEST_F(QueryPlannerColumnarTest, MatchGroupWithOverlappingFieldsTest) {
                          makeInnerPipelineStages(*pipeline));
 
     assertNumSolutions(1U);
-    assertSolutionExists(R"(
-    {proj: {spec: {foo: 1, x: 1, name:1, _id: 0}, node:
-    {column_scan: {filtersByPath: {name: {name: {$eq: 'bob'}}},
-                     outputFields: ['foo', 'x', 'name'],
-                     matchFields: ['name']}}}})");
+    assertSolutionExists(R"({
+        column_scan: {
+            filtersByPath: {name: {name: {$eq: 'bob'}}},
+            outputFields: ['foo', 'x', 'name'],
+            matchFields: ['name']
+        }
+    })");
 
     ASSERT(!cq->pipeline().empty());
     auto solution =
         QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
-    // TODO SERVER-66061: The project stage should be removed.
-    ASSERT_OK(QueryPlannerTestLib::solutionMatches(
-        "{group: {key: {_id: '$foo'}, accs: [{s: {$sum: '$x'}}, {name: {$first: '$name'}}], node: "
-        "{proj: {spec: {foo:1, x:1, name:1, _id: 0}, node: "
-        "{column_scan: {filtersByPath: {name: {name: {$eq: 'bob'}}}, outputFields: ['foo', 'x', "
-        "'name'], "
-        "matchFields: ['name']}}"
-        "}}}}",
-        solution->root()))
+    ASSERT_OK(QueryPlannerTestLib::solutionMatches(R"({
+            group: {
+                key: {_id: '$foo'},
+                accs: [{s: {$sum: '$x'}}, {name: {$first: '$name'}}],
+                node: {
+                    column_scan: {
+                        filtersByPath: {name: {name: {$eq: 'bob'}}},
+                        outputFields: ['foo', 'x', 'name'], 
+                        matchFields: ['name']
+                    }
+                }
+            }
+        })",
+                                                   solution->root()))
+        << solution->root()->toString();
+}
+
+// Test that if a dotted path is requested then we need to add a PROJECTION_DEFAULT stage on top of
+// the COLUMN_SCAN.
+TEST_F(QueryPlannerColumnarTest, DottedFieldsRequireProjectionStage) {
+    addColumnarIndexAndEnableFilterSplitting();
+
+    runQuerySortProj(
+        BSON("a" << BSON("$gt" << 3)), BSONObj(), BSON("a" << 1 << "b.c" << 1 << "_id" << 0));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        proj: {
+            spec: {a: 1, 'b.c': 1, _id: 0},
+            node: {
+                column_scan: {
+                    filtersByPath: {a: {a: {$gt: 3}}},
+                    outputFields: ['a', 'b.c'],
+                    matchFields: ['a']
+                }
+            }
+        }
+    })");
+}
+
+// As an exception to the above rule, a projection which is only including fields under a $group
+// stage does not need the projection. The COLUMN_SCAN stage will output data in a format that is
+// non-ambiguous for field path expressions like in a $group stage, but is not fully correct for a
+// normal projection. This o
+TEST_F(QueryPlannerColumnarTest, DottedFieldsWithGroupStageDoesNotRequireProjection) {
+    addColumnarIndexAndEnableFilterSplitting();
+
+    auto pipeline = Pipeline::parse(
+        {fromjson("{$group: {_id: '$foo.bar', s: {$sum: '$x.y'}, name: {$first: '$name'}}}")},
+        expCtx);
+
+    runQueryWithPipeline(BSON("name"
+                              << "bob"),
+                         BSON("foo.bar" << 1 << "x.y" << 1 << "name" << 1 << "_id" << 0),
+                         makeInnerPipelineStages(*pipeline));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        proj: {
+            spec: {'foo.bar': 1, 'x.y': 1, name: 1, _id: 0},
+            node: {
+                column_scan: {
+                    filtersByPath: {name: {name: {$eq: 'bob'}}},
+                    outputFields: ['foo.bar', 'x.y', 'name'],
+                    matchFields: ['name']
+                }
+            }
+        }
+    })");
+
+    ASSERT(!cq->pipeline().empty());
+    auto solution =
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
+    ASSERT_OK(QueryPlannerTestLib::solutionMatches(R"({
+            group: {
+                key: {_id: '$foo.bar'},
+                accs: [{s: {$sum: '$x.y'}}, {name: {$first: '$name'}}],
+                node: {
+                    column_scan: {
+                        filtersByPath: {name: {name: {$eq: 'bob'}}},
+                        outputFields: ['foo.bar', 'x.y', 'name'], 
+                        matchFields: ['name']
+                    }
+                }
+            }
+        })",
+                                                   solution->root()))
         << solution->root()->toString();
 }
 
@@ -574,8 +645,7 @@ TEST_F(QueryPlannerColumnarTest, ShardKeyFieldsIncluded) {
                      BSON("foo" << 1 << "x" << 1 << "name" << 1 << "_id" << 0));
 
     assertNumSolutions(1U);
-    assertSolutionExists(R"(
-    {
+    assertSolutionExists(R"({
         proj: {
             spec: {foo: 1, x: 1, name:1, _id: 0},
             node: {
@@ -632,16 +702,14 @@ TEST_F(QueryPlannerColumnarTest, FullPredicateOption) {
     })");
     runQuerySortProj(predicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertSolutionExists(R"({
-        proj: {
-            spec: {a: 1, _id: 0},
-            node: {
-                column_scan: {
-                    outputFields: ['a'],
-                    postAssemblyFilter: {
-                        specialAddress: {$exists: true},
-                        doNotContact: {$exists: true}
-                    },
-                    matchFields:
-                        ['specialAddress', 'doNotContact']}}}})");
+        column_scan: {
+            outputFields: ['a'],
+            matchFields: ['specialAddress', 'doNotContact'],
+            postAssemblyFilter: {
+                specialAddress: {$exists: true},
+                doNotContact: {$exists: true}
+            }
+        }
+    })");
 }
 }  // namespace mongo

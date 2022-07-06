@@ -405,12 +405,12 @@ std::unique_ptr<Result> Suite::run(const std::string& filter,
 
     for (const auto& tc : _tests) {
         if (filterRe && !filterRe->matchView(tc.name)) {
-            LOGV2_DEBUG(23057, 1, "skipped due to filter", "test"_attr = tc.name);
+            LOGV2_DEBUG(23057, 3, "skipped due to filter", "test"_attr = tc.name);
             continue;
         }
 
         if (fileNameFilterRe && !fileNameFilterRe->matchView(tc.fileName)) {
-            LOGV2_DEBUG(23058, 1, "skipped due to fileNameFilter", "testFile"_attr = tc.fileName);
+            LOGV2_DEBUG(23058, 3, "skipped due to fileNameFilter", "testFile"_attr = tc.fileName);
             continue;
         }
 
