@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,41 +29,25 @@
 
 #pragma once
 
-#include "mongo/db/s/drop_database_coordinator_document_gen.h"
-#include "mongo/db/s/sharding_ddl_coordinator.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/s/database_version.h"
 
-namespace mongo {
+namespace mongo::catalog_helper {
 
-class DropDatabaseCoordinator final
-    : public RecoverableShardingDDLCoordinator<DropDatabaseCoordinatorDocument,
-                                               DropDatabaseCoordinatorPhaseEnum> {
+/**
+ * Checks that the cached database version matches the one attached to the operation, which means
+ * that the operation is routed to the right shard (database owner).
+ *
+ * Throws `StaleDbRoutingVersion` exception when the critical section is taken, there is no cached
+ * database version, or the cached database version does not match the one sent by the client.
+ */
+void assertMatchingDbVersion(OperationContext* opCtx, const StringData& dbName);
 
-public:
-    using StateDoc = DropDatabaseCoordinatorDocument;
-    using Phase = DropDatabaseCoordinatorPhaseEnum;
+/**
+ * Checks that the current shard server is the primary for the given database, throwing
+ * `IllegalOperation` if it is not.
+ */
+void assertIsPrimaryShardForDb(OperationContext* opCtx, const StringData& dbName);
 
-    DropDatabaseCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
-        : RecoverableShardingDDLCoordinator(service, "DropDatabaseCoordinator", initialState),
-          _dbName(nss().db()) {}
-    ~DropDatabaseCoordinator() = default;
-
-    void checkIfOptionsConflict(const BSONObj& doc) const final {}
-
-private:
-    StringData serializePhase(const Phase& phase) const override {
-        return DropDatabaseCoordinatorPhase_serializer(phase);
-    }
-
-    ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                  const CancellationToken& token) noexcept override;
-
-    void _dropShardedCollection(OperationContext* opCtx,
-                                const CollectionType& coll,
-                                std::shared_ptr<executor::ScopedTaskExecutor> executor);
-
-    void _clearDatabaseInfoOnSecondaries(OperationContext* opCtx);
-
-    StringData _dbName;
-};
-
-}  // namespace mongo
+}  // namespace mongo::catalog_helper

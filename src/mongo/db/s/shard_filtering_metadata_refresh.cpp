@@ -79,9 +79,7 @@ void onDbVersionMismatch(OperationContext* opCtx,
         if (clientDbVersion) {
             // TODO SERVER-67440 Use dbName directly
             Lock::DBLock dbLock(opCtx, DatabaseName(boost::none, dbName), MODE_IS);
-            auto dss = DatabaseShardingState::get(opCtx, dbName);
-            auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-            const auto serverDbVersion = dss->getDbVersion(opCtx, dssLock);
+            const auto serverDbVersion = DatabaseHolder::get(opCtx)->getDbVersion(opCtx, dbName);
             if (clientDbVersion <= serverDbVersion) {
                 // The client was stale
                 return;
@@ -498,8 +496,7 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
         // db has been dropped, set the db version to boost::none
         // TODO SERVER-67440 Use dbName directly
         Lock::DBLock dbLock(opCtx, DatabaseName(boost::none, dbName), MODE_X);
-        auto dss = DatabaseShardingState::get(opCtx, dbName);
-        dss->clearDatabaseInfo(opCtx);
+        DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, dbName);
         return;
     }
 
@@ -514,10 +511,7 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
         // into checkDbVersion().
         // TODO SERVER-67440 Use dbName directly
         Lock::DBLock dbLock(opCtx, DatabaseName(boost::none, dbName), MODE_IS);
-        auto dss = DatabaseShardingState::get(opCtx, dbName);
-        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-
-        const auto cachedDbVersion = dss->getDbVersion(opCtx, dssLock);
+        const auto cachedDbVersion = DatabaseHolder::get(opCtx)->getDbVersion(opCtx, dbName);
         if (cachedDbVersion && *cachedDbVersion >= refreshedDBVersion) {
             LOGV2_DEBUG(5369130,
                         2,
@@ -533,10 +527,8 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
     // The cached version is older than the refreshed version; update the cached version.
     // TODO SERVER-67440 Use dbName directly
     Lock::DBLock dbLock(opCtx, DatabaseName(boost::none, dbName), MODE_X);
-    auto dss = DatabaseShardingState::get(opCtx, dbName);
-    auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
-
-    dss->setDatabaseInfo(opCtx, DatabaseType(*refreshedDbInfo), dssLock);
+    DatabaseHolder::get(opCtx)->openDb(opCtx, dbName);
+    DatabaseHolder::get(opCtx)->setDbInfo(opCtx, dbName, *refreshedDbInfo);
 }
 
 }  // namespace mongo

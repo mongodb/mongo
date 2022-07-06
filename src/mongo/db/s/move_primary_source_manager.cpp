@@ -30,6 +30,7 @@
 #include "mongo/db/s/move_primary_source_manager.h"
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
@@ -281,8 +282,8 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
             }
 
             if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, getNss())) {
-                auto dss = DatabaseShardingState::get(opCtx, getNss().db());
-                dss->clearDatabaseInfo(opCtx);
+                DatabaseHolder::get(opCtx)->clearDbInfo(
+                    opCtx, DatabaseName(boost::none, getNss().toString()));
                 uassertStatusOK(validateStatus.withContext(
                     str::stream() << "Unable to verify movePrimary commit for database: "
                                   << getNss().ns()
@@ -446,7 +447,8 @@ void MovePrimarySourceManager::_cleanup(OperationContext* opCtx) {
 
         auto dss = DatabaseShardingState::get(opCtx, getNss().db());
         dss->clearMovePrimarySourceManager(opCtx);
-        dss->clearDatabaseInfo(opCtx);
+        DatabaseHolder::get(opCtx)->clearDbInfo(opCtx,
+                                                DatabaseName(boost::none, getNss().toString()));
         // Leave the critical section if we're still registered.
         dss->exitCriticalSection(opCtx, _critSecReason);
     }

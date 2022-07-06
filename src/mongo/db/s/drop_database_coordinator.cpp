@@ -31,6 +31,7 @@
 #include "mongo/db/s/drop_database_coordinator.h"
 
 #include "mongo/db/api_parameters.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/shard_metadata_util.h"
@@ -148,13 +149,6 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     // than all of the drops.
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
         opCtx, nss, {primaryShardId}, **executor, getCurrentSession());
-}
-
-void DropDatabaseCoordinator::_clearDatabaseInfoOnPrimary(OperationContext* opCtx) {
-    // TODO SERVER-67438 Use _dbName directly once it's of type DatabaseName
-    Lock::DBLock dbLock(opCtx, DatabaseName(boost::none, _dbName), MODE_X);
-    auto dss = DatabaseShardingState::get(opCtx, _dbName);
-    dss->clearDatabaseInfo(opCtx);
 }
 
 void DropDatabaseCoordinator::_clearDatabaseInfoOnSecondaries(OperationContext* opCtx) {
@@ -297,7 +291,6 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     // Clear the database sharding state info before exiting the critical section so
                     // that all subsequent write operations with the old database version will fail
                     // due to StaleDbVersion.
-                    _clearDatabaseInfoOnPrimary(opCtx);
                     _clearDatabaseInfoOnSecondaries(opCtx);
 
                     removeDatabaseMetadataFromConfig(

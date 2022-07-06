@@ -34,6 +34,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -81,10 +82,8 @@ public:
             BSONObj versionObj;
             AutoGetDb autoDb(opCtx, _targetDb(), MODE_IS);
 
-            const auto dss = DatabaseShardingState::get(opCtx, _targetDb());
-            auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-
-            if (auto dbVersion = dss->getDbVersion(opCtx, dssLock)) {
+            if (const auto dbVersion =
+                    DatabaseHolder::get(opCtx)->getDbVersion(opCtx, _targetDb())) {
                 versionObj = dbVersion->toBSON();
             }
             result->getBodyBuilder().append("dbVersion", versionObj);

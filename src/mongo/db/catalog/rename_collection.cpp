@@ -33,6 +33,7 @@
 #include "mongo/db/catalog/rename_collection.h"
 
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
+#include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -480,11 +481,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
         targetDBLock.emplace(opCtx, target.dbName(), MODE_X);
     }
 
-    {
-        auto dss = DatabaseShardingState::get(opCtx, source.db());
-        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-        dss->checkDbVersion(opCtx, dssLock);
-    }
+    catalog_helper::assertMatchingDbVersion(opCtx, source.db());
 
     DisableDocumentValidation validationDisabler(opCtx);
 

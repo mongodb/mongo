@@ -32,6 +32,7 @@
 #include "mongo/db/commands/internal_rename_if_options_and_indexes_match_gen.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
@@ -80,7 +81,7 @@ public:
             }
 
             // Check if the receiving shard is still the primary for the database
-            DatabaseShardingState::checkIsPrimaryShardForDb(opCtx, fromNss.db());
+            catalog_helper::assertIsPrimaryShardForDb(opCtx, fromNss.db());
 
             // Acquiring the local part of the distributed locks for involved namespaces allows:
             // - Serialize with sharded DDLs, ensuring no concurrent modifications of the

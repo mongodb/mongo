@@ -33,6 +33,7 @@
 #include "mongo/db/s/shard_server_op_observer.h"
 
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/s/balancer_stats_registry.h"
@@ -395,8 +396,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             // block.
             AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
             AutoGetDb autoDb(opCtx, db, MODE_X);
-            auto dss = DatabaseShardingState::get(opCtx, db);
-            dss->clearDatabaseInfo(opCtx);
+            DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, DatabaseName(boost::none, db));
         }
     }
 
@@ -492,8 +492,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
         AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
         AutoGetDb autoDb(opCtx, deletedDatabase, MODE_X);
-        auto dss = DatabaseShardingState::get(opCtx, deletedDatabase);
-        dss->clearDatabaseInfo(opCtx);
+        DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, DatabaseName(boost::none, deletedDatabase));
     }
 
     if (nss == NamespaceString::kServerConfigurationNamespace) {

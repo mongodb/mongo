@@ -32,6 +32,7 @@
 
 #include "mongo/db/db_raii.h"
 
+#include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/locker.h"
@@ -1003,9 +1004,7 @@ AutoGetDbForReadLockFree::AutoGetDbForReadLockFree(OperationContext* opCtx,
             // Note: this must always be checked, regardless of whether the collection exists, so
             // that the dbVersion of this node or the caller gets updated quickly in case either is
             // stale.
-            auto dss = DatabaseShardingState::getSharedForLockFreeReads(opCtx, dbName);
-            auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss.get());
-            dss->checkDbVersion(opCtx, dssLock);
+            catalog_helper::assertMatchingDbVersion(opCtx, dbName);
             return std::make_pair(&fakeColl, /* isView */ false);
         },
         /* ResetFunc */

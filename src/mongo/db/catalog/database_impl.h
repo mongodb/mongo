@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/database_name.h"
+#include "mongo/s/catalog/type_database_gen.h"
 
 namespace mongo {
 
@@ -120,6 +121,8 @@ public:
     void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) const final;
 
 private:
+    friend class DatabaseHolderImpl;
+
     /**
      * Throws if there is a reason 'ns' cannot be created as a user collection. Namespace pattern
      * matching checks should be added to userAllowedCreateNS().
@@ -153,6 +156,9 @@ private:
     // collections may be created in this Database.
     // This variable may only be read/written while the database is locked in MODE_X.
     AtomicWord<bool> _dropPending{false};
+
+    // Node's cached database info.
+    boost::optional<DatabaseType> _info;
 };
 
 }  // namespace mongo

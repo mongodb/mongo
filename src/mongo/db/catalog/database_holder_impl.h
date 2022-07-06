@@ -60,6 +60,18 @@ public:
 
     std::vector<DatabaseName> getNames() override;
 
+    void setDbInfo(OperationContext* opCtx,
+                   const DatabaseName& dbName,
+                   const DatabaseType& dbInfo) override;
+
+    void clearDbInfo(OperationContext* opCtx, const DatabaseName& dbName) override;
+
+    boost::optional<DatabaseVersion> getDbVersion(OperationContext* opCtx,
+                                                  const DatabaseName& dbName) const override;
+
+    boost::optional<ShardId> getDbPrimary(OperationContext* opCtx,
+                                          const DatabaseName& dbName) const override;
+
 private:
     std::set<DatabaseName> _getNamesWithConflictingCasing_inlock(const DatabaseName& dbName);
 

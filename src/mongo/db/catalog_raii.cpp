@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog_raii.h"
 
+#include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -177,9 +178,7 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, 
           return databaseHolder->getDb(opCtx, tenantDbName);
       }()) {
     // The 'primary' database must be version checked for sharding.
-    auto dss = DatabaseShardingState::get(opCtx, dbName);
-    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-    dss->checkDbVersion(opCtx, dssLock);
+    catalog_helper::assertMatchingDbVersion(opCtx, _dbName);
 }
 
 Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
@@ -191,9 +190,7 @@ Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
     const DatabaseName dbName(boost::none, _dbName);
     _db = databaseHolder->openDb(opCtx, dbName, nullptr);
 
-    auto dss = DatabaseShardingState::get(opCtx, _dbName);
-    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-    dss->checkDbVersion(opCtx, dssLock);
+    catalog_helper::assertMatchingDbVersion(opCtx, _dbName);
 
     return _db;
 }
@@ -379,14 +376,10 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
             return _collection.get();
         });
 
-    {
-        // Check that the sharding database version matches our read.
-        // Note: this must always be checked, regardless of whether the collection exists, so that
-        // the dbVersion of this node or the caller gets updated quickly in case either is stale.
-        auto dss = DatabaseShardingState::getSharedForLockFreeReads(opCtx, _resolvedNss.db());
-        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss.get());
-        dss->checkDbVersion(opCtx, dssLock);
-    }
+    // Check that the sharding database version matches our read.
+    // Note: this must always be checked, regardless of whether the collection exists, so that the
+    // dbVersion of this node or the caller gets updated quickly in case either is stale.
+    catalog_helper::assertMatchingDbVersion(opCtx, _resolvedNss.db());
 
     hangBeforeAutoGetCollectionLockFreeShardedStateAccess.executeIf(
         [&](auto&) { hangBeforeAutoGetCollectionLockFreeShardedStateAccess.pauseWhileSet(opCtx); },

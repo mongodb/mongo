@@ -64,6 +64,22 @@ public:
     std::vector<DatabaseName> getNames() override {
         return {};
     }
+
+    void setDbInfo(OperationContext* opCtx,
+                   const DatabaseName& dbName,
+                   const DatabaseType& dbInfo) override {}
+
+    void clearDbInfo(OperationContext* opCtx, const DatabaseName& dbName) override {}
+
+    boost::optional<DatabaseVersion> getDbVersion(OperationContext* opCtx,
+                                                  const DatabaseName& dbName) const override {
+        return boost::none;
+    }
+
+    boost::optional<ShardId> getDbPrimary(OperationContext* opCtx,
+                                          const DatabaseName& dbName) const override {
+        return boost::none;
+    }
 };
 
 }  // namespace mongo

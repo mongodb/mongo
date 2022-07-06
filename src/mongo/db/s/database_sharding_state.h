@@ -74,16 +74,6 @@ public:
                                                                             StringData dbName);
 
     /**
-     * Checks if this shard is the primary shard for the given DB.
-     *
-     * Throws an IllegalOperation exception otherwise.
-     *
-     * Assumes the operation context has a DB version attached to it for the given @dbName.
-     */
-    static void checkIsPrimaryShardForDb(OperationContext* opCtx, StringData dbName);
-
-
-    /**
      * Methods to control the databases's critical section. Must be called with the database X lock
      * held.
      */
@@ -95,38 +85,9 @@ public:
         return _critSec.getSignal(op);
     }
 
-    /**
-     * Returns this shard server's cached dbVersion, if one is cached.
-     *
-     * Invariants that the caller holds the DBLock in X or IS.
-     */
-    boost::optional<DatabaseVersion> getDbVersion(OperationContext* opCtx, DSSLock&) const;
-
-    /**
-     * Sets this shard server's cached database info.
-     *
-     * Invariants that the caller holds the DBLock in X mode.
-     */
-    void setDatabaseInfo(OperationContext* opCtx, DatabaseType&& newDatabaseInfo, DSSLock&);
-
-    /**
-     * Resets this shard server's cached database info.
-     */
-    void clearDatabaseInfo(OperationContext* opCtx);
-
-    /**
-     * Returns this shard server's cached database info.
-     * Internally performs the same checks of checkDbVersion(),
-     * so it will throws for the same reasons.
-     */
-    DatabaseType getDatabaseInfo(OperationContext* opCtx, DSSLock&) const;
-
-    /**
-     * If _critSecSignal is non-null, always throws StaleDbVersion.
-     * Otherwise, if there is a client dbVersion on the OperationContext, compares it with this
-     * shard server's cached dbVersion and throws StaleDbVersion if they do not match.
-     */
-    void checkDbVersion(OperationContext* opCtx, DSSLock&) const;
+    auto getCriticalSectionReason(DSSLock&) const {
+        return _critSec.getReason() ? _critSec.getReason()->toString() : "Unknown";
+    }
 
     /**
      * Returns the active movePrimary source manager, if one is available.
@@ -163,9 +124,6 @@ private:
     // DBLock in some mode).
 
     ShardingMigrationCriticalSection _critSec;
-
-    // This shard server's cached database info. If boost::none
-    boost::optional<DatabaseType> _optDatabaseInfo;
 
     // If this database is serving as a source shard for a movePrimary, the source manager will be
     // non-null. To write this value, there needs to be X-lock on the database in order to
