@@ -215,6 +215,8 @@ all:
     test_file: jstests/change_streams/show_raw_update_description_v1_oplog.js
   - ticket: SERVER-63159
     test_file: jstests/core/internal_apply_oplog_update.js
+  - ticket: SERVER-67532
+    test_file: jstests/replsets/optime.js
 
 
 suites:
