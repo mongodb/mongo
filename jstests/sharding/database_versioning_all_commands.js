@@ -268,6 +268,8 @@ let testCases = {
             }
         }
     },
+    analyze:
+        {skip: "unimplemented. Serves only as a stub."},  // TODO SERVER-67655: Test db versioning
     appendOplogNote: {skip: "unversioned and executes on all shards"},
     authenticate: {skip: "does not forward command to primary shard"},
     balancerCollectionStatus: {skip: "does not forward command to primary shard"},

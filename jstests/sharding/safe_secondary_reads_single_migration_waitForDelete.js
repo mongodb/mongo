@@ -109,6 +109,7 @@ let testCases = {
         },
         behavior: "versioned"
     },
+    analyze: {skip: "primary only"},
     appendOplogNote: {skip: "primary only"},
     applyOps: {skip: "primary only"},
     authenticate: {skip: "does not return user data"},

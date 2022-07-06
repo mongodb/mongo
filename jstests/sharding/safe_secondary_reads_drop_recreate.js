@@ -106,6 +106,7 @@ let testCases = {
         },
         behavior: "versioned"
     },
+    analyze: {skip: "primary only"},
     appendOplogNote: {skip: "primary only"},
     applyOps: {skip: "primary only"},
     authSchemaUpgrade: {skip: "primary only"},

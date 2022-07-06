@@ -216,6 +216,7 @@ let testCases = {
         checkReadConcern: true,
         checkWriteConcern: true,
     },
+    analyze: {skip: "TODO SERVER-67772"},
     appendOplogNote: {
         command: {appendOplogNote: 1, data: {foo: 1}},
         checkReadConcern: false,

@@ -191,6 +191,7 @@ let viewsCommandTests = {
     addShard: {skip: isUnrelated},
     addShardToZone: {skip: isUnrelated},
     aggregate: {command: {aggregate: "view", pipeline: [{$match: {}}], cursor: {}}},
+    analyze: {skip: isUnrelated},
     appendOplogNote: {skip: isUnrelated},
     applyOps: {
         command: {applyOps: [{op: "i", o: {_id: 1}, ns: "test.view"}]},

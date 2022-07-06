@@ -556,6 +556,7 @@ TEST_F(MongodbCAPITest, RunListCommands) {
     std::vector<std::string> allowlist = {"_hashBSONElement",
                                           "_killOperations",
                                           "aggregate",
+                                          "analyze",
                                           "buildInfo",
                                           "collMod",
                                           "collStats",

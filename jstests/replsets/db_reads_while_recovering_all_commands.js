@@ -113,6 +113,7 @@ const allCommands = {
         expectFailure: true,
         expectedErrorCode: ErrorCodes.NotPrimaryOrSecondary,
     },
+    analyze: {skip: isPrimaryOnly},
     appendOplogNote: {skip: isPrimaryOnly},
     applyOps: {skip: isPrimaryOnly},
     authenticate: {skip: isNotAUserDataRead},
