@@ -279,8 +279,7 @@ public:
                 // Note that getSingleton will take a global IS lock, but this won't block because
                 // we are already holding the global IS lock.
                 BSONObj o;
-                if (Helpers::getSingleton(
-                        opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), o)) {
+                if (Helpers::getSingleton(opCtx, NamespaceString::kRsOplogNamespace, o)) {
                     return o["ts"].timestamp();
                 }
             }

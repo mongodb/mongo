@@ -86,7 +86,7 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
 
     auto recordStore = collection->getRecordStore();
 
-    OldClientContext ctx(opCtx, collectionNss.ns());
+    OldClientContext ctx(opCtx, collectionNss);
 
     if (!recordStore->compactSupported())
         return Status(ErrorCodes::CommandNotSupported,

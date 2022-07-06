@@ -213,7 +213,7 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
         try {
             Lock::CollectionLock systemViewsLock(
                 opCtx,
-                NamespaceString(_name.db(), NamespaceString::kSystemDotViewsCollectionName),
+                NamespaceString(_name, NamespaceString::kSystemDotViewsCollectionName),
                 MODE_IS);
             ViewsForDatabase viewsForDb{std::make_unique<DurableViewCatalogImpl>(this)};
             Status reloadStatus = viewsForDb.reload(opCtx);
@@ -466,7 +466,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
         return Status::OK();
     }
 
-    invariant(nss.db() == _name.db());
+    invariant(nss.dbName() == _name);
 
     // Returns true if the supplied namespace 'nss' is a system collection that can be dropped,
     // false otherwise.
@@ -653,7 +653,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 void DatabaseImpl::_dropCollectionIndexes(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           Collection* collection) const {
-    invariant(_name.db() == nss.db());
+    invariant(_name == nss.dbName());
     LOGV2_DEBUG(
         20316, 1, "dropCollection: {namespace} - dropAllIndexes start", "namespace"_attr = nss);
     collection->getIndexCatalog()->dropAllIndexes(opCtx, collection, true, {});
@@ -703,8 +703,8 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(fromNss, MODE_X));
     invariant(opCtx->lockState()->isCollectionLockedForMode(toNss, MODE_X));
 
-    invariant(fromNss.db() == _name.db());
-    invariant(toNss.db() == _name.db());
+    invariant(fromNss.dbName() == _name);
+    invariant(toNss.dbName() == _name);
     if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toNss)) {
         return Status(ErrorCodes::NamespaceExists,
                       str::stream() << "Cannot rename '" << fromNss << "' to '" << toNss
@@ -990,7 +990,7 @@ StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
                        collectionName.begin(),
                        replacePercentSign);
 
-        NamespaceString nss(_name.db(), collectionName);
+        NamespaceString nss(_name, collectionName);
         if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
             return nss;
         }

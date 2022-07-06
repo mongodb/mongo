@@ -162,8 +162,7 @@ Status insertStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& st
                                  << stateDoc.getId() << ShardSplitDonorDocument::kExpireAtFieldName
                                  << BSON("$exists" << false));
         const auto updateMod = BSON("$setOnInsert" << stateDoc.toBSON());
-        auto updateResult =
-            Helpers::upsert(opCtx, nss.ns(), filter, updateMod, /*fromMigrate=*/false);
+        auto updateResult = Helpers::upsert(opCtx, nss, filter, updateMod, /*fromMigrate=*/false);
 
         invariant(!updateResult.numDocsModified);
         if (updateResult.upsertedId.isEmpty()) {
@@ -185,8 +184,7 @@ Status updateStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& st
     }
 
     return writeConflictRetry(opCtx, "updateShardSplitStateDoc", nss.ns(), [&]() -> Status {
-        auto updateResult =
-            Helpers::upsert(opCtx, nss.ns(), stateDoc.toBSON(), /*fromMigrate=*/false);
+        auto updateResult = Helpers::upsert(opCtx, nss, stateDoc.toBSON(), /*fromMigrate=*/false);
         if (updateResult.numMatched == 0) {
             return {ErrorCodes::NoSuchKey,
                     str::stream() << "Existing shard split state document not found for id: "

@@ -282,7 +282,7 @@ bool hasReplSetConfigDoc(OperationContext* opCtx) {
 
     databaseHolder->openDb(opCtx, nss.dbName());
     BSONObj config;
-    return Helpers::getSingleton(opCtx, nss.ns().c_str(), config);
+    return Helpers::getSingleton(opCtx, nss, config);
 }
 
 /**

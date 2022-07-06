@@ -510,7 +510,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
             WriteUnitOfWork wuow(opCtx);
 
             // This is necessary to check shard version.
-            OldClientContext ctx(opCtx, (*collection)->ns().ns());
+            OldClientContext ctx(opCtx, (*collection)->ns());
 
             // Iterate through all the aborted indexes and drop any indexes that are ready in
             // the index catalog. This would indicate that while we yielded our locks during the
@@ -574,7 +574,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
             WriteUnitOfWork wunit(opCtx);
 
             // This is necessary to check shard version.
-            OldClientContext ctx(opCtx, (*collection)->ns().ns());
+            OldClientContext ctx(opCtx, (*collection)->ns());
             dropReadyIndexes(
                 opCtx, collection->getWritableCollection(opCtx), indexNames, &reply, false);
             wunit.commit();
@@ -623,7 +623,7 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
         WriteUnitOfWork wunit(opCtx);
 
         // This is necessary to check shard version.
-        OldClientContext ctx(opCtx, nss.ns());
+        OldClientContext ctx(opCtx, nss);
 
         DropIndexesReply ignoredReply;
         dropReadyIndexes(opCtx,

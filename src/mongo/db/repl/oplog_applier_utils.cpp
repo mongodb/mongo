@@ -221,7 +221,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                     uassert(ErrorCodes::NamespaceNotFound,
                             str::stream() << "missing database (" << nss.db() << ")",
                             db);
-                    OldClientContext ctx(opCtx, autoColl.getNss().ns(), db);
+                    OldClientContext ctx(opCtx, autoColl.getNss(), db);
 
                     // We convert updates to upserts in secondary mode when the
                     // oplogApplicationEnforcesSteadyStateConstraints parameter is false, to avoid

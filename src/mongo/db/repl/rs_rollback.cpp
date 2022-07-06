@@ -1737,7 +1737,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                 // TODO: Lots of overhead in context. This can be faster.
                 const NamespaceString docNss(doc.ns);
                 Lock::DBLock docDbLock(opCtx, docNss.dbName(), MODE_X);
-                OldClientContext ctx(opCtx, doc.ns.toString());
+                OldClientContext ctx(opCtx, docNss);
                 CollectionWriter collection(opCtx, uuid);
 
                 // Adds the doc to our rollback file if the collection was not dropped while
@@ -1957,7 +1957,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
         Lock::DBLock oplogDbLock(opCtx, oplogNss.dbName(), MODE_IX);
         Lock::CollectionLock oplogCollectionLoc(opCtx, oplogNss, MODE_X);
-        OldClientContext ctx(opCtx, oplogNss.ns());
+        OldClientContext ctx(opCtx, oplogNss);
         auto oplogCollection =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, oplogNss);
         if (!oplogCollection) {

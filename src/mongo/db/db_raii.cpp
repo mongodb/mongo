@@ -885,11 +885,11 @@ AutoGetCollectionForReadCommandLockFree::AutoGetCollectionForReadCommandLockFree
     }
 }
 
-OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& ns, bool doVersion)
+OldClientContext::OldClientContext(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   bool doVersion)
     : _opCtx(opCtx) {
-    // TODO SERVER-65488 Grab the DatabaseName from the NamespaceString passed in
-    const auto db = nsToDatabaseSubstring(ns);
-    const DatabaseName dbName(boost::none, db);
+    const auto dbName = nss.dbName();
     _db = DatabaseHolder::get(opCtx)->getDb(opCtx, dbName);
 
     if (!_db) {
@@ -906,14 +906,13 @@ OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& n
             case dbDelete:   // path, so no need to check them here as well
                 break;
             default:
-                CollectionShardingState::get(_opCtx, NamespaceString(ns))
-                    ->checkShardVersionOrThrow(_opCtx);
+                CollectionShardingState::get(_opCtx, nss)->checkShardVersionOrThrow(_opCtx);
                 break;
         }
     }
 
     stdx::lock_guard<Client> lk(*_opCtx->getClient());
-    currentOp->enter_inlock(ns.c_str(),
+    currentOp->enter_inlock(nss.toString().c_str(),
                             CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_db->name()));
 }
 

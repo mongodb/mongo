@@ -169,7 +169,7 @@ public:
 
         // Assert that findByIdAndNoopUpdate did not generate an oplog entry.
         BSONObj oplogEntry;
-        Helpers::getLast(opCtx1.get(), NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntry);
+        Helpers::getLast(opCtx1.get(), NamespaceString::kRsOplogNamespace, oplogEntry);
         ASSERT_BSONOBJ_NE(oplogEntry, BSONObj());
         ASSERT_TRUE(oplogEntry.getStringField("op") == "i"_sd);
 
@@ -223,7 +223,7 @@ private:
 
         // Assert that findByIdAndNoopUpdate did not generate an oplog entry.
         BSONObj oplogEntry;
-        Helpers::getLast(opCtx2, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntry);
+        Helpers::getLast(opCtx2, NamespaceString::kRsOplogNamespace, oplogEntry);
         ASSERT_BSONOBJ_NE(oplogEntry, BSONObj());
         ASSERT_TRUE(oplogEntry.getStringField("op") == "i"_sd);
     }

@@ -68,7 +68,7 @@ bool collectionExists(OperationContext* opCtx, OldClientContext* ctx, const stri
 
 void createCollection(OperationContext* opCtx, const NamespaceString& nss) {
     Lock::DBLock dbXLock(opCtx, nss.dbName(), MODE_X);
-    OldClientContext ctx(opCtx, nss.ns());
+    OldClientContext ctx(opCtx, nss);
     {
         WriteUnitOfWork uow(opCtx);
         ASSERT(!collectionExists(opCtx, &ctx, nss.ns()));
@@ -170,7 +170,7 @@ public:
         dropDatabase(&opCtx, nss);
 
         Lock::DBLock dbXLock(&opCtx, nss.dbName(), MODE_X);
-        OldClientContext ctx(&opCtx, ns);
+        OldClientContext ctx(&opCtx, nss);
         {
             WriteUnitOfWork uow(&opCtx);
             ASSERT(!collectionExists(&opCtx, &ctx, ns));
@@ -207,7 +207,7 @@ public:
         dropDatabase(&opCtx, nss);
 
         Lock::DBLock dbXLock(&opCtx, nss.dbName(), MODE_X);
-        OldClientContext ctx(&opCtx, ns);
+        OldClientContext ctx(&opCtx, nss);
         {
             WriteUnitOfWork uow(&opCtx);
             ASSERT(!collectionExists(&opCtx, &ctx, ns));
@@ -256,7 +256,7 @@ public:
         dropDatabase(&opCtx, target);
 
         Lock::GlobalWrite globalWriteLock(&opCtx);
-        OldClientContext ctx(&opCtx, source.ns());
+        OldClientContext ctx(&opCtx, source);
 
         {
             WriteUnitOfWork uow(&opCtx);
@@ -310,7 +310,7 @@ public:
         dropDatabase(&opCtx, target);
 
         Lock::GlobalWrite globalWriteLock(&opCtx);
-        OldClientContext ctx(&opCtx, source.ns());
+        OldClientContext ctx(&opCtx, source);
 
         BSONObj sourceDoc = BSON("_id"
                                  << "source");
@@ -378,7 +378,7 @@ public:
         dropDatabase(&opCtx, nss);
 
         Lock::DBLock dbXLock(&opCtx, nss.dbName(), MODE_X);
-        OldClientContext ctx(&opCtx, nss.ns());
+        OldClientContext ctx(&opCtx, nss);
 
         BSONObj oldDoc = BSON("_id"
                               << "old");
@@ -436,7 +436,7 @@ public:
         dropDatabase(&opCtx, nss);
 
         Lock::DBLock dbXLock(&opCtx, nss.dbName(), MODE_X);
-        OldClientContext ctx(&opCtx, nss.ns());
+        OldClientContext ctx(&opCtx, nss);
 
         BSONObj doc = BSON("_id"
                            << "foo");
@@ -628,7 +628,7 @@ public:
         dropDatabase(&opCtx, nss);
 
         Lock::DBLock dbXLock(&opCtx, nss.dbName(), MODE_X);
-        OldClientContext ctx(&opCtx, nss.ns());
+        OldClientContext ctx(&opCtx, nss);
 
         string idxNameA = "indexA";
         string idxNameB = "indexB";

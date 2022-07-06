@@ -75,7 +75,7 @@ Status insertStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
                                      << BSON("$exists" << false));
             const auto updateMod = BSON("$setOnInsert" << stateDoc.toBSON());
             auto updateResult =
-                Helpers::upsert(opCtx, nss.ns(), filter, updateMod, /*fromMigrate=*/false);
+                Helpers::upsert(opCtx, nss, filter, updateMod, /*fromMigrate=*/false);
 
             // '$setOnInsert' update operator can no way modify the existing on-disk state doc.
             invariant(!updateResult.numDocsModified);
@@ -102,7 +102,7 @@ Status updateStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
     return writeConflictRetry(
         opCtx, "updateTenantMigrationRecipientStateDoc", nss.ns(), [&]() -> Status {
             auto updateResult =
-                Helpers::upsert(opCtx, nss.ns(), stateDoc.toBSON(), /*fromMigrate=*/false);
+                Helpers::upsert(opCtx, nss, stateDoc.toBSON(), /*fromMigrate=*/false);
             if (updateResult.numMatched == 0) {
                 return {ErrorCodes::NoSuchKey,
                         str::stream()

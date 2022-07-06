@@ -1279,8 +1279,7 @@ Timestamp StorageInterfaceImpl::getEarliestOplogTimestamp(OperationContext* opCt
         BSONObj oplogEntryBSON;
         tassert(5869100,
                 "Failed reading the earliest oplog entry",
-                Helpers::getSingleton(
-                    opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntryBSON));
+                Helpers::getSingleton(opCtx, NamespaceString::kRsOplogNamespace, oplogEntryBSON));
 
         auto optime = OpTime::parseFromOplogEntry(oplogEntryBSON);
         tassert(5869101,
@@ -1312,8 +1311,7 @@ Timestamp StorageInterfaceImpl::getLatestOplogTimestamp(OperationContext* opCtx)
         // Helpers::getLast will bypass the oplog visibility rules by doing a backwards collection
         // scan.
         BSONObj oplogEntryBSON;
-        invariant(Helpers::getLast(
-            opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntryBSON));
+        invariant(Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntryBSON));
 
         auto optime = OpTime::parseFromOplogEntry(oplogEntryBSON);
         invariant(optime.isOK(),

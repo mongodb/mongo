@@ -73,7 +73,7 @@ Status upsert(OperationContext* opCtx, const IndexBuildEntry& indexBuildEntry) {
 
                                   WriteUnitOfWork wuow(opCtx);
                                   Helpers::upsert(opCtx,
-                                                  NamespaceString::kIndexBuildEntryNamespace.ns(),
+                                                  NamespaceString::kIndexBuildEntryNamespace,
                                                   indexBuildEntry.toBSON(),
                                                   /*fromMigrate=*/false);
                                   wuow.commit();
@@ -128,7 +128,7 @@ Status upsert(OperationContext* opCtx, const BSONObj& filter, const BSONObj& upd
 
                                   WriteUnitOfWork wuow(opCtx);
                                   Helpers::upsert(opCtx,
-                                                  NamespaceString::kIndexBuildEntryNamespace.ns(),
+                                                  NamespaceString::kIndexBuildEntryNamespace,
                                                   filter,
                                                   updateMod,
                                                   /*fromMigrate=*/false);
@@ -153,7 +153,7 @@ Status update(OperationContext* opCtx, const BSONObj& filter, const BSONObj& upd
 
                                   WriteUnitOfWork wuow(opCtx);
                                   Helpers::update(opCtx,
-                                                  NamespaceString::kIndexBuildEntryNamespace.ns(),
+                                                  NamespaceString::kIndexBuildEntryNamespace,
                                                   filter,
                                                   updateMod,
                                                   /*fromMigrate=*/false);

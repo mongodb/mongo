@@ -505,7 +505,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
                            return BSON("$setOnInsert" << _stateDoc.toBSON());
                        }();
                        auto updateResult = Helpers::upsert(
-                           opCtx, _stateDocumentsNS.ns(), filter, updateMod, /*fromMigrate=*/false);
+                           opCtx, _stateDocumentsNS, filter, updateMod, /*fromMigrate=*/false);
 
                        // '$setOnInsert' update operator can never modify an existing on-disk state
                        // doc.
@@ -660,7 +660,7 @@ TenantMigrationDonorService::Instance::_markStateDocAsGarbageCollectable(
                            return _stateDoc.toBSON();
                        }();
                        auto updateResult = Helpers::upsert(
-                           opCtx, _stateDocumentsNS.ns(), filter, updateMod, /*fromMigrate=*/false);
+                           opCtx, _stateDocumentsNS, filter, updateMod, /*fromMigrate=*/false);
 
                        invariant(updateResult.numDocsModified == 1);
                    });

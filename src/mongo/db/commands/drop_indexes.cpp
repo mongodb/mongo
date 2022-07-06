@@ -177,7 +177,7 @@ public:
             collection->uuid());
 
         // This is necessary to set up CurOp and update the Top stats.
-        OldClientContext ctx(opCtx, toReIndexNss.ns());
+        OldClientContext ctx(opCtx, toReIndexNss);
 
         const auto defaultIndexVersion = IndexDescriptor::getDefaultIndexVersion();
 

@@ -431,8 +431,7 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                {
                                    // Writes to 'local.system.replset' must be untimestamped.
                                    WriteUnitOfWork wuow(opCtx);
-                                   Helpers::putSingleton(
-                                       opCtx, configCollectionNS.ns().c_str(), config);
+                                   Helpers::putSingleton(opCtx, configCollectionNS, config);
                                    wuow.commit();
                                }
                                {
@@ -576,7 +575,7 @@ StatusWith<BSONObj> ReplicationCoordinatorExternalStateImpl::loadLocalConfigDocu
         return writeConflictRetry(
             opCtx, "load replica set config", configCollectionNS.ns(), [opCtx] {
                 BSONObj config;
-                if (!Helpers::getSingleton(opCtx, configCollectionNS.ns().c_str(), config)) {
+                if (!Helpers::getSingleton(opCtx, configCollectionNS, config)) {
                     return StatusWith<BSONObj>(
                         ErrorCodes::NoMatchingDocument,
                         "Did not find replica set configuration document in {}"_format(
@@ -598,7 +597,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
                 // Writes to 'local.system.replset' must be untimestamped.
                 WriteUnitOfWork wuow(opCtx);
                 Lock::DBLock dbWriteLock(opCtx, configDatabaseName, MODE_X);
-                Helpers::putSingleton(opCtx, configCollectionNS.ns().c_str(), config);
+                Helpers::putSingleton(opCtx, configCollectionNS, config);
                 wuow.commit();
             }
 
@@ -628,7 +627,7 @@ Status ReplicationCoordinatorExternalStateImpl::replaceLocalConfigDocument(
         WriteUnitOfWork wuow(opCtx);
         Lock::DBLock dbWriteLock(opCtx, configDatabaseName, MODE_X);
         Helpers::emptyCollection(opCtx, configCollectionNS);
-        Helpers::putSingleton(opCtx, configCollectionNS.ns().c_str(), config);
+        Helpers::putSingleton(opCtx, configCollectionNS, config);
         wuow.commit();
     });
     return Status::OK();
@@ -656,12 +655,12 @@ Status ReplicationCoordinatorExternalStateImpl::createLocalLastVoteCollection(
             [opCtx] {
                 AutoGetCollection coll(opCtx, NamespaceString::kLastVoteNamespace, MODE_X);
                 BSONObj result;
-                bool exists = Helpers::getSingleton(
-                    opCtx, NamespaceString::kLastVoteNamespace.ns().c_str(), result);
+                bool exists =
+                    Helpers::getSingleton(opCtx, NamespaceString::kLastVoteNamespace, result);
                 if (!exists) {
                     LastVote lastVote{OpTime::kInitialTerm, -1};
                     Helpers::putSingleton(
-                        opCtx, NamespaceString::kLastVoteNamespace.ns().c_str(), lastVote.toBSON());
+                        opCtx, NamespaceString::kLastVoteNamespace, lastVote.toBSON());
                 }
             });
     } catch (const DBException& ex) {
@@ -680,9 +679,8 @@ StatusWith<LastVote> ReplicationCoordinatorExternalStateImpl::loadLocalLastVoteD
             NamespaceString::kLastVoteNamespace.toString(),
             [opCtx] {
                 BSONObj lastVoteObj;
-                if (!Helpers::getSingleton(opCtx,
-                                           NamespaceString::kLastVoteNamespace.toString().c_str(),
-                                           lastVoteObj)) {
+                if (!Helpers::getSingleton(
+                        opCtx, NamespaceString::kLastVoteNamespace, lastVoteObj)) {
                     return StatusWith<LastVote>(
                         ErrorCodes::NoMatchingDocument,
                         str::stream() << "Did not find replica set lastVote document in "
@@ -728,16 +726,15 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
                 // operations. We have already ensured at startup time that there is an old
                 // document.
                 BSONObj result;
-                bool exists = Helpers::getSingleton(
-                    opCtx, NamespaceString::kLastVoteNamespace.ns().c_str(), result);
+                bool exists =
+                    Helpers::getSingleton(opCtx, NamespaceString::kLastVoteNamespace, result);
                 fassert(51241, exists);
                 StatusWith<LastVote> oldLastVoteDoc = LastVote::readFromLastVote(result);
                 if (!oldLastVoteDoc.isOK()) {
                     return oldLastVoteDoc.getStatus();
                 }
                 if (lastVote.getTerm() > oldLastVoteDoc.getValue().getTerm()) {
-                    Helpers::putSingleton(
-                        opCtx, NamespaceString::kLastVoteNamespace.ns().c_str(), lastVoteObj);
+                    Helpers::putSingleton(opCtx, NamespaceString::kLastVoteNamespace, lastVoteObj);
                 }
                 wunit.commit();
                 return Status::OK();
@@ -782,8 +779,7 @@ StatusWith<OpTimeAndWallTime> ReplicationCoordinatorExternalStateImpl::loadLastO
 
         if (!writeConflictRetry(
                 opCtx, "Load last opTime", NamespaceString::kRsOplogNamespace.ns().c_str(), [&] {
-                    return Helpers::getLast(
-                        opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntry);
+                    return Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntry);
                 })) {
             return StatusWith<OpTimeAndWallTime>(ErrorCodes::NoMatchingDocument,
                                                  str::stream()

@@ -197,7 +197,7 @@ public:
             repl::createOplog(opCtx.get());
             {
                 Lock::GlobalWrite lk(opCtx.get());
-                OldClientContext ctx(opCtx.get(), NamespaceString::kRsOplogNamespace.ns());
+                OldClientContext ctx(opCtx.get(), NamespaceString::kRsOplogNamespace);
                 tenant_migration_util::createOplogViewForTenantMigrations(opCtx.get(), ctx.db());
             }
 

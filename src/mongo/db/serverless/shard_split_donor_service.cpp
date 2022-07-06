@@ -993,7 +993,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                            return BSON("$set" << _stateDoc.toBSON());
                        }();
                        auto updateResult = Helpers::upsert(opCtx,
-                                                           _stateDocumentsNS.ns(),
+                                                           _stateDocumentsNS,
                                                            filter,
                                                            updatedStateDocBson,
                                                            /*fromMigrate=*/false);

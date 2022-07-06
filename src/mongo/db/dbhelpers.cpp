@@ -223,10 +223,10 @@ const CollectionPtr& getCollectionForRead(
     }
 }
 
-bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& result) {
+bool Helpers::getSingleton(OperationContext* opCtx, const NamespaceString& nss, BSONObj& result) {
     boost::optional<AutoGetCollectionForReadCommand> autoColl;
     boost::optional<AutoGetOplog> autoOplog;
-    const auto& collection = getCollectionForRead(opCtx, NamespaceString(ns), autoColl, autoOplog);
+    const auto& collection = getCollectionForRead(opCtx, nss, autoColl, autoOplog);
     if (!collection) {
         return false;
     }
@@ -248,10 +248,10 @@ bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& res
     return false;
 }
 
-bool Helpers::getLast(OperationContext* opCtx, const char* ns, BSONObj& result) {
+bool Helpers::getLast(OperationContext* opCtx, const NamespaceString& nss, BSONObj& result) {
     boost::optional<AutoGetCollectionForReadCommand> autoColl;
     boost::optional<AutoGetOplog> autoOplog;
-    const auto& collection = getCollectionForRead(opCtx, NamespaceString(ns), autoColl, autoOplog);
+    const auto& collection = getCollectionForRead(opCtx, nss, autoColl, autoOplog);
     if (!collection) {
         return false;
     }
@@ -272,25 +272,24 @@ bool Helpers::getLast(OperationContext* opCtx, const char* ns, BSONObj& result) 
 }
 
 UpdateResult Helpers::upsert(OperationContext* opCtx,
-                             const string& ns,
+                             const NamespaceString& nss,
                              const BSONObj& o,
                              bool fromMigrate) {
     BSONElement e = o["_id"];
     verify(e.type());
     BSONObj id = e.wrap();
-    return upsert(opCtx, ns, id, o, fromMigrate);
+    return upsert(opCtx, nss, id, o, fromMigrate);
 }
 
 UpdateResult Helpers::upsert(OperationContext* opCtx,
-                             const string& ns,
+                             const NamespaceString& nss,
                              const BSONObj& filter,
                              const BSONObj& updateMod,
                              bool fromMigrate) {
-    OldClientContext context(opCtx, ns);
+    OldClientContext context(opCtx, nss);
 
-    const NamespaceString requestNs(ns);
     auto request = UpdateRequest();
-    request.setNamespaceString(requestNs);
+    request.setNamespaceString(nss);
 
     request.setQuery(filter);
     request.setUpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(updateMod));
@@ -304,15 +303,14 @@ UpdateResult Helpers::upsert(OperationContext* opCtx,
 }
 
 void Helpers::update(OperationContext* opCtx,
-                     const string& ns,
+                     const NamespaceString& nss,
                      const BSONObj& filter,
                      const BSONObj& updateMod,
                      bool fromMigrate) {
-    OldClientContext context(opCtx, ns);
+    OldClientContext context(opCtx, nss);
 
-    const NamespaceString requestNs(ns);
     auto request = UpdateRequest();
-    request.setNamespaceString(requestNs);
+    request.setNamespaceString(nss);
 
     request.setQuery(filter);
     request.setUpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(updateMod));
@@ -324,12 +322,11 @@ void Helpers::update(OperationContext* opCtx,
     ::mongo::update(opCtx, context.db(), request);
 }
 
-void Helpers::putSingleton(OperationContext* opCtx, const char* ns, BSONObj obj) {
-    OldClientContext context(opCtx, ns);
+void Helpers::putSingleton(OperationContext* opCtx, const NamespaceString& nss, BSONObj obj) {
+    OldClientContext context(opCtx, nss);
 
-    const NamespaceString requestNs(ns);
     auto request = UpdateRequest();
-    request.setNamespaceString(requestNs);
+    request.setNamespaceString(nss);
 
     request.setUpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(obj));
     request.setUpsert();
@@ -356,7 +353,7 @@ BSONObj Helpers::inferKeyPattern(const BSONObj& o) {
 }
 
 void Helpers::emptyCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    OldClientContext context(opCtx, nss.ns());
+    OldClientContext context(opCtx, nss);
     repl::UnreplicatedWritesBlock uwb(opCtx);
     CollectionPtr collection = context.db()
         ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)

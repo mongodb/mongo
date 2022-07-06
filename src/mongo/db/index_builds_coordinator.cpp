@@ -361,8 +361,7 @@ repl::OpTime getLatestOplogOpTime(OperationContext* opCtx) {
     // exceptions and we must protect it from unanticipated write conflicts from reads.
     writeConflictRetry(
         opCtx, "getLatestOplogOpTime", NamespaceString::kRsOplogNamespace.ns(), [&]() {
-            invariant(Helpers::getLast(
-                opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntryBSON));
+            invariant(Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntryBSON));
         });
 
     auto optime = repl::OpTime::parseFromOplogEntry(oplogEntryBSON);

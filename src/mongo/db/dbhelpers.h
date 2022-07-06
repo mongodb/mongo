@@ -110,18 +110,18 @@ struct Helpers {
      *
      * Returns false if there is no such object.
      */
-    static bool getSingleton(OperationContext* opCtx, const char* ns, BSONObj& result);
+    static bool getSingleton(OperationContext* opCtx, const NamespaceString& nss, BSONObj& result);
 
     /**
      * Same as getSingleton, but with a reverse natural-order scan on "ns".
      */
-    static bool getLast(OperationContext* opCtx, const char* ns, BSONObj& result);
+    static bool getLast(OperationContext* opCtx, const NamespaceString& nss, BSONObj& result);
 
     /**
      * Performs an upsert of "obj" into the collection "ns", with an empty update predicate.
      * Callers must have "ns" locked.
      */
-    static void putSingleton(OperationContext* opCtx, const char* ns, BSONObj obj);
+    static void putSingleton(OperationContext* opCtx, const NamespaceString& nss, BSONObj obj);
 
     /**
      * Callers are expected to hold the collection lock.
@@ -129,7 +129,7 @@ struct Helpers {
      * o has to have an _id field or will assert
      */
     static UpdateResult upsert(OperationContext* opCtx,
-                               const std::string& ns,
+                               const NamespaceString& nss,
                                const BSONObj& o,
                                bool fromMigrate = false);
 
@@ -140,7 +140,7 @@ struct Helpers {
      * on the same storage snapshot.
      */
     static UpdateResult upsert(OperationContext* opCtx,
-                               const std::string& ns,
+                               const NamespaceString& nss,
                                const BSONObj& filter,
                                const BSONObj& updateMod,
                                bool fromMigrate = false);
@@ -152,7 +152,7 @@ struct Helpers {
      * on the same storage snapshot.
      */
     static void update(OperationContext* opCtx,
-                       const std::string& ns,
+                       const NamespaceString& nss,
                        const BSONObj& filter,
                        const BSONObj& updateMod,
                        bool fromMigrate = false);

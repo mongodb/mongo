@@ -152,7 +152,7 @@ Status _applyOps(OperationContext* opCtx,
             // Malformed operations should have already been caught and retried in non-atomic mode.
             invariant(entry.isOK());
 
-            OldClientContext ctx(opCtx, nss.ns());
+            OldClientContext ctx(opCtx, nss);
 
             const auto& op = entry.getValue();
             const bool isDataConsistent = true;
@@ -226,7 +226,7 @@ Status _applyOps(OperationContext* opCtx,
                                           << nss.ns() << ": " << mongo::redact(opObj));
                         }
 
-                        OldClientContext ctx(opCtx, nss.ns());
+                        OldClientContext ctx(opCtx, nss);
 
                         // We return the status rather than merely aborting so failure of CRUD
                         // ops doesn't stop the applyOps from trying to process the rest of the

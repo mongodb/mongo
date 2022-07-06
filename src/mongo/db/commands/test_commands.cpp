@@ -99,7 +99,7 @@ public:
         // TODO SERVER-66561 Use DatabaseName obj passed in
         DatabaseName dbName(boost::none, dbname);
         Lock::DBLock lk(opCtx, dbName, MODE_X);
-        OldClientContext ctx(opCtx, nss.ns());
+        OldClientContext ctx(opCtx, nss);
         Database* db = ctx.db();
 
         WriteUnitOfWork wunit(opCtx);

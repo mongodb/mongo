@@ -462,7 +462,7 @@ void createCollection(OperationContext* opCtx,
         Lock::DBLock dbLk(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLk(opCtx, nss, MODE_X);
 
-        OldClientContext ctx(opCtx, nss.ns());
+        OldClientContext ctx(opCtx, nss);
         auto db = ctx.db();
         ASSERT_TRUE(db);
 

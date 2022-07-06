@@ -991,7 +991,7 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
 
         WriteUnitOfWork wuow(opCtx.get());
         Helpers::update(opCtx.get(),
-                        nss.toString(),
+                        nss,
                         BSON(ReshardingDonorDocument::kReshardingUUIDFieldName
                              << _metadata.getReshardingUUID()),
                         BSON("$set" << BSON(ReshardingDonorDocument::kMutableStateFieldName

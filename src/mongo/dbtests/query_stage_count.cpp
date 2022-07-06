@@ -59,7 +59,7 @@ class CountStageTest {
 public:
     CountStageTest()
         : _dbLock(&_opCtx, nss().dbName(), MODE_X),
-          _ctx(&_opCtx, ns()),
+          _ctx(&_opCtx, nss()),
           _expCtx(make_intrusive<ExpressionContext>(&_opCtx, nullptr, kTestNss)),
           _coll(nullptr) {}
 

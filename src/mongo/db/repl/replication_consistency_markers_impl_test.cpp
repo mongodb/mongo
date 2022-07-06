@@ -67,7 +67,7 @@ BSONObj getMinValidDocument(OperationContext* opCtx, const NamespaceString& minV
         Lock::DBLock dblk(opCtx, minValidNss.dbName(), MODE_IS);
         Lock::CollectionLock lk(opCtx, minValidNss, MODE_IS);
         BSONObj mv;
-        if (Helpers::getSingleton(opCtx, minValidNss.ns().c_str(), mv)) {
+        if (Helpers::getSingleton(opCtx, minValidNss, mv)) {
             return mv;
         }
         return mv;

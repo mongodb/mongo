@@ -530,8 +530,7 @@ void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* o
             // Perform an untimestamped write so that it will not be rolled back on recovering
             // to the 'stableTimestamp' if we were to crash. This is safe because this update is
             // meant to be consistent with the 'stableTimestamp' and not the common point.
-            Helpers::upsert(
-                opCtx, nss.ns(), filter, sessionTxnRecord.toBSON(), /*fromMigrate=*/false);
+            Helpers::upsert(opCtx, nss, filter, sessionTxnRecord.toBSON(), /*fromMigrate=*/false);
         });
     }
     // Take a stable checkpoint so that writes to the 'config.transactions' table are

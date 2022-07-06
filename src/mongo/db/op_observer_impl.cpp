@@ -325,8 +325,8 @@ void writeToImageCollection(OperationContext* opCtx,
         opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
     auto curOp = CurOp::get(opCtx);
     const std::string existingNs = curOp->getNS();
-    UpdateResult res = Helpers::upsert(
-        opCtx, NamespaceString::kConfigImagesNamespace.toString(), imageEntry.toBSON());
+    UpdateResult res =
+        Helpers::upsert(opCtx, NamespaceString::kConfigImagesNamespace, imageEntry.toBSON());
     {
         stdx::lock_guard<Client> clientLock(*opCtx->getClient());
         curOp->setNS_inlock(existingNs);

@@ -57,7 +57,7 @@ private:
 
 OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx)
     : _oplogRead(opCtx, OplogAccessMode::kRead),
-      _ctx(opCtx, NamespaceString::kRsOplogNamespace.ns()),
+      _ctx(opCtx, NamespaceString::kRsOplogNamespace),
       _exec(_oplogRead.getCollection()
                 ? InternalPlanner::collectionScan(opCtx,
                                                   &_oplogRead.getCollection(),

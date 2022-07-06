@@ -260,7 +260,7 @@ protected:
                    const BSONObj& update,
                    const ReshardingEnv& env) {
         AutoGetCollection coll(opCtx, nss, MODE_IX);
-        Helpers::update(opCtx, nss.toString(), filter, update);
+        Helpers::update(opCtx, nss, filter, update);
     }
 
     void deleteDoc(OperationContext* opCtx,

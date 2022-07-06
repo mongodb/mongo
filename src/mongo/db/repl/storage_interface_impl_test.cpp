@@ -123,7 +123,7 @@ void createCollection(OperationContext* opCtx,
                       const CollectionOptions& options = generateOptionsWithUuid()) {
     writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
         Lock::DBLock dblk(opCtx, nss.dbName(), MODE_X);
-        OldClientContext ctx(opCtx, nss.ns());
+        OldClientContext ctx(opCtx, nss);
         auto db = ctx.db();
         ASSERT_TRUE(db);
         mongo::WriteUnitOfWork wuow(opCtx);

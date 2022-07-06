@@ -158,7 +158,7 @@ void StorageRepairObserver::_invalidateReplConfigIfNeeded(OperationContext* opCt
     // If this node is a standalone, this would lead to a confusing error message if it were
     // added to a replica set later on.
     BSONObj config;
-    if (!Helpers::getSingleton(opCtx, kConfigNss.ns().c_str(), config)) {
+    if (!Helpers::getSingleton(opCtx, kConfigNss, config)) {
         return;
     }
     if (config.hasField(repl::ReplSetConfig::kRepairedFieldName)) {
@@ -166,7 +166,7 @@ void StorageRepairObserver::_invalidateReplConfigIfNeeded(OperationContext* opCt
     }
     BSONObjBuilder configBuilder(config);
     configBuilder.append(repl::ReplSetConfig::kRepairedFieldName, true);
-    Helpers::putSingleton(opCtx, kConfigNss.ns().c_str(), configBuilder.obj());
+    Helpers::putSingleton(opCtx, kConfigNss, configBuilder.obj());
 
     JournalFlusher::get(opCtx)->waitForJournalFlush();
 }

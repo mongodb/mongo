@@ -72,7 +72,7 @@ protected:
 
     void insertDocument(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
         AutoGetCollection coll(opCtx, nss, MODE_IX);
-        auto updateResult = Helpers::upsert(opCtx, nss.toString(), doc);
+        auto updateResult = Helpers::upsert(opCtx, nss, doc);
         ASSERT_EQ(0, updateResult.numDocsModified);
     }
 

@@ -68,12 +68,14 @@ public:
     void createMockReplConfig(OperationContext* opCtx) {
         BSONObj replConfig;
         Lock::DBLock dbLock(opCtx, DatabaseName(boost::none, "local"), MODE_X);
-        Helpers::putSingleton(opCtx, "local.system.replset", replConfig);
+        Helpers::putSingleton(
+            opCtx, NamespaceString(boost::none, "local.system.replset"), replConfig);
     }
 
     void assertReplConfigValid(OperationContext* opCtx, bool valid) {
         BSONObj replConfig;
-        ASSERT(Helpers::getSingleton(opCtx, "local.system.replset", replConfig));
+        ASSERT(Helpers::getSingleton(
+            opCtx, NamespaceString(boost::none, "local.system.replset"), replConfig));
         if (valid) {
             ASSERT(!replConfig.hasField("repaired"));
         } else {
@@ -84,7 +86,8 @@ public:
     bool hasReplConfig(OperationContext* opCtx) {
         BSONObj replConfig;
         Lock::DBLock dbLock(opCtx, DatabaseName(boost::none, "local"), MODE_IS);
-        return Helpers::getSingleton(opCtx, "local.system.replset", replConfig);
+        return Helpers::getSingleton(
+            opCtx, NamespaceString(boost::none, "local.system.replset"), replConfig);
     }
 
     path repairFilePath() {

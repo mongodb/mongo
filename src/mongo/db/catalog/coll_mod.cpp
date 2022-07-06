@@ -770,7 +770,7 @@ Status _collModInternal(OperationContext* opCtx,
 
     // This is necessary to set up CurOp, update the Top stats, and check shard version if the
     // operation is not on a view.
-    OldClientContext ctx(opCtx, nss.ns(), !view);
+    OldClientContext ctx(opCtx, nss, !view);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss);

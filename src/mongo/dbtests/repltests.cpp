@@ -198,7 +198,7 @@ protected:
     }
     int count() const {
         Lock::GlobalWrite lk(&_opCtx);
-        OldClientContext ctx(&_opCtx, ns());
+        OldClientContext ctx(&_opCtx, nss());
         Database* db = ctx.db();
         CollectionPtr coll =
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
@@ -240,7 +240,7 @@ protected:
             }
         }
 
-        OldClientContext ctx(&_opCtx, ns());
+        OldClientContext ctx(&_opCtx, nss());
         for (vector<BSONObj>::iterator i = ops.begin(); i != ops.end(); ++i) {
             if (0) {
                 LOGV2(22501, "op: {i}", "i"_attr = *i);
@@ -270,7 +270,7 @@ protected:
         ::mongo::writeConflictRetry(&_opCtx, "deleteAll", ns, [&] {
             NamespaceString nss(ns);
             Lock::GlobalWrite lk(&_opCtx);
-            OldClientContext ctx(&_opCtx, ns);
+            OldClientContext ctx(&_opCtx, nss);
             WriteUnitOfWork wunit(&_opCtx);
             Database* db = ctx.db();
             Collection* coll =
@@ -293,7 +293,7 @@ protected:
     }
     void insert(const BSONObj& o) const {
         Lock::GlobalWrite lk(&_opCtx);
-        OldClientContext ctx(&_opCtx, ns());
+        OldClientContext ctx(&_opCtx, nss());
         WriteUnitOfWork wunit(&_opCtx);
         Database* db = ctx.db();
         CollectionPtr coll =

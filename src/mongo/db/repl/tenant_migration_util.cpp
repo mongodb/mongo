@@ -96,7 +96,7 @@ repl::OpTime storeExternalClusterTimeKeyDocs(std::vector<ExternalKeysCollectionD
             const auto updateMod = keyDoc.toBSON();
 
             Helpers::upsert(opCtx,
-                            nss.ns(),
+                            nss,
                             filter,
                             updateMod,
                             /*fromMigrate=*/false);

@@ -45,7 +45,7 @@ namespace PdfileTests {
 namespace Insert {
 class Base {
 public:
-    Base() : _lk(&_opCtx), _context(&_opCtx, nss().ns()) {}
+    Base() : _lk(&_opCtx), _context(&_opCtx, nss()) {}
 
     virtual ~Base() {
         if (!collection())

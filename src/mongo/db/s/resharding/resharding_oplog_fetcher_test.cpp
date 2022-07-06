@@ -95,7 +95,7 @@ public:
 
         {
             Lock::GlobalWrite lk(_opCtx);
-            OldClientContext ctx(_opCtx, NamespaceString::kRsOplogNamespace.ns());
+            OldClientContext ctx(_opCtx, NamespaceString::kRsOplogNamespace);
         }
 
         _metrics = ReshardingMetrics::makeInstance(_reshardingUUID,

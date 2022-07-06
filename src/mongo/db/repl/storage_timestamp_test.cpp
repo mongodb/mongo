@@ -485,7 +485,7 @@ public:
     Timestamp getTopOfOplog() {
         OneOffRead oor(_opCtx, Timestamp::min());
         BSONObj ret;
-        ASSERT_TRUE(Helpers::getLast(_opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), ret));
+        ASSERT_TRUE(Helpers::getLast(_opCtx, NamespaceString::kRsOplogNamespace, ret));
         return ret["ts"].timestamp();
     }
 
@@ -856,7 +856,7 @@ TEST_F(StorageTimestampTest, SecondaryInsertTimes) {
         OneOffRead oor(_opCtx, firstInsertTime.addTicks(idx).asTimestamp());
 
         BSONObj result;
-        ASSERT(Helpers::getLast(_opCtx, nss.ns().c_str(), result)) << " idx is " << idx;
+        ASSERT(Helpers::getLast(_opCtx, nss, result)) << " idx is " << idx;
         ASSERT_EQ(0, SimpleBSONObjComparator::kInstance.compare(result, BSON("_id" << idx)))
             << "Doc: " << result.toString() << " Expected: " << BSON("_id" << idx);
     }
@@ -914,7 +914,7 @@ TEST_F(StorageTimestampTest, SecondaryArrayInsertTimes) {
         OneOffRead oor(_opCtx, firstInsertTime.addTicks(idx).asTimestamp());
 
         BSONObj result;
-        ASSERT(Helpers::getLast(_opCtx, nss.ns().c_str(), result)) << " idx is " << idx;
+        ASSERT(Helpers::getLast(_opCtx, nss, result)) << " idx is " << idx;
         ASSERT_EQ(0, SimpleBSONObjComparator::kInstance.compare(result, BSON("_id" << idx)))
             << "Doc: " << result.toString() << " Expected: " << BSON("_id" << idx);
     }
@@ -1357,7 +1357,7 @@ TEST_F(StorageTimestampTest, PrimaryCreateCollectionInApplyOps) {
     { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
 
     BSONObj result;
-    ASSERT(Helpers::getLast(_opCtx, NamespaceString::kRsOplogNamespace.toString().c_str(), result));
+    ASSERT(Helpers::getLast(_opCtx, NamespaceString::kRsOplogNamespace, result));
     repl::OplogEntry op(result);
     ASSERT(op.getOpType() == repl::OpTypeEnum::kCommand) << op.toBSONForLogging();
     // The next logOp() call will get 'futureTs', which will be the timestamp at which we do
@@ -2779,7 +2779,7 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
 
     // Update one documents to be valid, and delete the other. These modifications are written
     // to the side writes table and must be drained.
-    Helpers::upsert(_opCtx, collection->ns().ns(), BSON("_id" << 0 << "a" << 1 << "b" << 1));
+    Helpers::upsert(_opCtx, collection->ns(), BSON("_id" << 0 << "a" << 1 << "b" << 1));
     {
         RecordId badRecord = Helpers::findOne(_opCtx, collection.get(), BSON("_id" << 1));
         WriteUnitOfWork wuow(_opCtx);

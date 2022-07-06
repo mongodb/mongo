@@ -723,7 +723,7 @@ void createOplog(OperationContext* opCtx,
 
     const ReplSettings& replSettings = ReplicationCoordinator::get(opCtx)->getSettings();
 
-    OldClientContext ctx(opCtx, oplogCollectionName.ns());
+    OldClientContext ctx(opCtx, oplogCollectionName);
     CollectionPtr collection =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, oplogCollectionName);
 

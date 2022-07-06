@@ -76,7 +76,7 @@ using std::vector;
 
 class Base {
 public:
-    Base() : _lk(&_opCtx), _context(&_opCtx, ns()) {
+    Base() : _lk(&_opCtx), _context(&_opCtx, nss()) {
         {
             WriteUnitOfWork wunit(&_opCtx);
             _database = _context.db();
@@ -203,7 +203,7 @@ public:
         // We don't normally allow empty objects in the database, but test that we can find
         // an empty object (one might be allowed inside a reserved namespace at some point).
         Lock::GlobalWrite lk(&_opCtx);
-        OldClientContext ctx(&_opCtx, "unittests.querytests");
+        OldClientContext ctx(&_opCtx, NamespaceString(boost::none, "unittests.querytests"));
 
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -1150,7 +1150,7 @@ class DirectLocking : public ClientBase {
 public:
     void run() {
         Lock::GlobalWrite lk(&_opCtx);
-        OldClientContext ctx(&_opCtx, "unittests.DirectLocking");
+        OldClientContext ctx(&_opCtx, NamespaceString(boost::none, "unittests.DirectLocking"));
         _client.remove("a.b", BSONObj());
         ASSERT_EQUALS("unittests", ctx.db()->name().db());
     }
@@ -1685,7 +1685,7 @@ public:
         coll_opts.uuid = UUID::gen();
         {
             Lock::GlobalWrite lk(&_opCtx);
-            OldClientContext context(&_opCtx, ns());
+            OldClientContext context(&_opCtx, nss());
             WriteUnitOfWork wunit(&_opCtx);
             context.db()->createCollection(&_opCtx, nss(), coll_opts, false);
             wunit.commit();
@@ -1714,7 +1714,7 @@ public:
         coll_opts.uuid = UUID::gen();
         {
             Lock::GlobalWrite lk(&_opCtx);
-            OldClientContext context(&_opCtx, ns());
+            OldClientContext context(&_opCtx, nss());
             WriteUnitOfWork wunit(&_opCtx);
             context.db()->createCollection(&_opCtx, nss(), coll_opts, false);
             wunit.commit();
@@ -1741,7 +1741,7 @@ public:
         coll_opts.uuid = UUID::gen();
         {
             Lock::GlobalWrite lk(&_opCtx);
-            OldClientContext context(&_opCtx, ns());
+            OldClientContext context(&_opCtx, nss());
             WriteUnitOfWork wunit(&_opCtx);
             context.db()->createCollection(&_opCtx, nss(), coll_opts, true);
             wunit.commit();
@@ -1777,7 +1777,7 @@ public:
         const char* ns1 = "unittestsdb1.querytests.coll1";
         {
             Lock::GlobalWrite lk(&_opCtx);
-            OldClientContext context(&_opCtx, ns1);
+            OldClientContext context(&_opCtx, NamespaceString(boost::none, ns1));
             WriteUnitOfWork wunit(&_opCtx);
             context.db()->createCollection(&_opCtx, NamespaceString(ns1));
             wunit.commit();
@@ -1790,9 +1790,9 @@ public:
         const char* ns2 = "unittestsdb2.querytests.coll2";
         {
             Lock::GlobalWrite lk(&_opCtx);
-            OldClientContext context(&_opCtx, ns2);
+            OldClientContext context(&_opCtx, NamespaceString(boost::none, ns2));
             WriteUnitOfWork wunit(&_opCtx);
-            context.db()->createCollection(&_opCtx, NamespaceString(ns2));
+            context.db()->createCollection(&_opCtx, NamespaceString(boost::none, ns2));
             wunit.commit();
         }
         insert(ns2, BSON("b" << 2));
@@ -1803,9 +1803,9 @@ public:
         const char* ns3 = "unittestsdb3.querytests.coll3";
         {
             Lock::GlobalWrite lk(&_opCtx);
-            OldClientContext context(&_opCtx, ns3);
+            OldClientContext context(&_opCtx, NamespaceString(boost::none, ns3));
             WriteUnitOfWork wunit(&_opCtx);
-            context.db()->createCollection(&_opCtx, NamespaceString(ns3));
+            context.db()->createCollection(&_opCtx, NamespaceString(boost::none, ns3));
             wunit.commit();
         }
         insert(ns3, BSON("c" << 3));
@@ -1829,7 +1829,7 @@ public:
     CollectionInternalBase(const char* nsLeaf)
         : CollectionBase(nsLeaf),
           _lk(&_opCtx, DatabaseName(boost::none, "unittests"), MODE_X),
-          _ctx(&_opCtx, ns()) {}
+          _ctx(&_opCtx, nss()) {}
 
 private:
     Lock::DBLock _lk;

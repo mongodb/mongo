@@ -1839,7 +1839,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
 
             // We are in write lock here, so sure we aren't killing
             writeConflictRetry(opCtx, "transferModsUpdates", _nss.ns(), [&] {
-                auto res = Helpers::upsert(opCtx, _nss.ns(), updatedDoc, true);
+                auto res = Helpers::upsert(opCtx, _nss, updatedDoc, true);
                 if (!res.upsertedId.isEmpty()) {
                     changeInOrphans++;
                 }

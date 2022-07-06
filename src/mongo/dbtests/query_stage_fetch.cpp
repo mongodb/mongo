@@ -167,7 +167,7 @@ class FetchStageFilter : public QueryStageFetchBase {
 public:
     void run() {
         Lock::DBLock lk(&_opCtx, nss().dbName(), MODE_X);
-        OldClientContext ctx(&_opCtx, ns());
+        OldClientContext ctx(&_opCtx, nss());
         Database* db = ctx.db();
         CollectionPtr coll =
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());

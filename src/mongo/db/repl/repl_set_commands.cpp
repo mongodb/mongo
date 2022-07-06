@@ -728,7 +728,7 @@ bool replHasDatabases(OperationContext* opCtx) {
 
         // we have a local database.  return true if oplog isn't empty
         BSONObj o;
-        if (Helpers::getSingleton(opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), o)) {
+        if (Helpers::getSingleton(opCtx, NamespaceString::kRsOplogNamespace, o)) {
             return true;
         }
     }

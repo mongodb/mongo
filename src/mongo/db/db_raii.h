@@ -541,7 +541,7 @@ class OldClientContext {
     OldClientContext& operator=(const OldClientContext&) = delete;
 
 public:
-    OldClientContext(OperationContext* opCtx, const std::string& ns, bool doVersion = true);
+    OldClientContext(OperationContext* opCtx, const NamespaceString& nss, bool doVersion = true);
     ~OldClientContext();
 
     Database* db() const {

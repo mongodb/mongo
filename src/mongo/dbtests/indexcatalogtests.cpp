@@ -60,7 +60,7 @@ public:
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         Lock::DBLock lk(&opCtx, _nss.dbName(), MODE_X);
-        OldClientContext ctx(&opCtx, _nss.ns());
+        OldClientContext ctx(&opCtx, _nss);
         WriteUnitOfWork wuow(&opCtx);
 
         ctx.db()->createCollection(&opCtx, _nss);
@@ -71,7 +71,7 @@ public:
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         Lock::DBLock lk(&opCtx, _nss.dbName(), MODE_X);
-        OldClientContext ctx(&opCtx, _nss.ns());
+        OldClientContext ctx(&opCtx, _nss);
         WriteUnitOfWork wuow(&opCtx);
 
         ctx.db()->dropCollection(&opCtx, _nss).transitional_ignore();
@@ -118,7 +118,7 @@ public:
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         Lock::DBLock lk(&opCtx, _nss.dbName(), MODE_X);
-        OldClientContext ctx(&opCtx, _nss.ns());
+        OldClientContext ctx(&opCtx, _nss);
         WriteUnitOfWork wuow(&opCtx);
 
         ctx.db()->createCollection(&opCtx, _nss);
@@ -164,7 +164,7 @@ public:
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         Lock::DBLock lk(&opCtx, _nss.dbName(), MODE_X);
-        OldClientContext ctx(&opCtx, _nss.ns());
+        OldClientContext ctx(&opCtx, _nss);
         WriteUnitOfWork wuow(&opCtx);
 
         ctx.db()->createCollection(&opCtx, _nss);
@@ -175,7 +175,7 @@ public:
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         Lock::DBLock lk(&opCtx, _nss.dbName(), MODE_X);
-        OldClientContext ctx(&opCtx, _nss.ns());
+        OldClientContext ctx(&opCtx, _nss);
         WriteUnitOfWork wuow(&opCtx);
 
         ctx.db()->dropCollection(&opCtx, _nss).transitional_ignore();
