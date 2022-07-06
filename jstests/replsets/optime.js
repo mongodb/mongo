@@ -62,8 +62,11 @@ var replTest = new ReplSetTest(
 
 const nodes = replTest.startSet();
 
-// Tests that serverStatus oplog returns an error if the oplog collection doesn't exist.
-assert.commandFailedWithCode(nodes[0].getDB('admin').serverStatus({oplog: true}), 17347);
+// Tests that serverStatus oplog returns null timestamps if the oplog collection doesn't exist.
+const zeroTs = new Timestamp(0, 0);
+const oplogStatus = nodes[0].getDB('admin').serverStatus({oplog: true}).oplog;
+assert.eq(oplogStatus.earliestOptime, zeroTs);
+assert.eq(oplogStatus.latestOptime, zeroTs);
 
 replTest.initiate();
 var primary = replTest.getPrimary();
