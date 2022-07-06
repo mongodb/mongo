@@ -22,11 +22,19 @@ const ocsp_options = {
 };
 
 // Because waitForConnect is off, we need to wait for the process to create the
-// mongod logfile, hence the sleep.
+// mongod logfile, hence the waitForServer.
 const conn = MongoRunner.runMongod(ocsp_options);
-sleep(5000);
+waitForServer(conn);
 
 const failedToStapleID = 5512202;
+assert.soon(() => {
+    try {
+        cat(logPath);
+        return true;
+    } catch (e) {
+        return false;
+    }
+});
 assert.soon(() => {
     return cat(logPath).trim().split("\n").some((line) => JSON.parse(line).id === failedToStapleID);
 });
