@@ -65,7 +65,7 @@ public:
                         uint64_t maxSizeBytes,
                         uint64_t currSizeBytes,
                         bool isDraining,
-                        std::set<std::string> shardTags,
+                        std::set<std::string> shardZones,
                         std::string mongoVersion,
                         use_bytes_t t);
 
@@ -73,7 +73,7 @@ public:
                         uint64_t maxSizeMB,
                         uint64_t currSizeMB,
                         bool isDraining,
-                        std::set<std::string> shardTags,
+                        std::set<std::string> shardZones,
                         std::string mongoVersion);
 
         /**
@@ -81,11 +81,6 @@ public:
          * the per-shard data size limit.
          */
         bool isSizeMaxed() const;
-
-        /**
-         * Returns BSON representation of this shard's statistics, for reporting purposes.
-         */
-        BSONObj toBSON() const;
 
         // The id of the shard for which this statistic applies
         ShardId shardId;
@@ -99,8 +94,8 @@ public:
         // Whether the shard is in draining mode
         bool isDraining{false};
 
-        // Set of tags for the shard
-        std::set<std::string> shardTags;
+        // Set of zones for the shard
+        std::set<std::string> shardZones;
 
         // Version of mongod, which runs on this shard's primary
         std::string mongoVersion;

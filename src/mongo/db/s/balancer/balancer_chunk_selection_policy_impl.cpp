@@ -45,7 +45,6 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/get_stats_for_balancing_gen.h"
@@ -90,15 +89,15 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
         return true;
     });
 
-    DistributionStatus distribution(nss, std::move(shardToChunksMap));
-
     const auto& keyPattern = chunkMgr.getShardKeyPattern().getKeyPattern();
 
-    // Cache the collection tags
-    auto status = ZoneInfo::addTagsFromCatalog(opCtx, nss, keyPattern, distribution.zoneInfo());
-    if (!status.isOK()) {
-        return status;
+    // Cache the collection zones
+    auto swZoneInfo = ZoneInfo::getZonesForCollection(opCtx, nss, keyPattern);
+    if (!swZoneInfo.isOK()) {
+        return swZoneInfo.getStatus();
     }
+
+    DistributionStatus distribution(nss, std::move(shardToChunksMap), swZoneInfo.getValue());
 
     return {std::move(distribution)};
 }
@@ -244,36 +243,36 @@ private:
 };
 
 /**
- * Populates splitCandidates with chunk and splitPoint pairs for chunks that violate tag
+ * Populates splitCandidates with chunk and splitPoint pairs for chunks that violate zone
  * range boundaries.
  */
-void getSplitCandidatesToEnforceTagRanges(const ChunkManager& cm,
-                                          const DistributionStatus& distribution,
-                                          SplitCandidatesBuffer* splitCandidates) {
+void getSplitCandidatesToEnforceZoneRanges(const ChunkManager& cm,
+                                           const DistributionStatus& distribution,
+                                           SplitCandidatesBuffer* splitCandidates) {
     const auto& globalMax = cm.getShardKeyPattern().getKeyPattern().globalMax();
 
-    // For each tag range, find chunks that need to be split.
-    for (const auto& tagRangeEntry : distribution.tagRanges()) {
-        const auto& tagRange = tagRangeEntry.second;
+    // For each zone range, find chunks that need to be split.
+    for (const auto& zoneRangeEntry : distribution.zoneRanges()) {
+        const auto& zoneRange = zoneRangeEntry.second;
 
-        const auto chunkAtZoneMin = cm.findIntersectingChunkWithSimpleCollation(tagRange.min);
-        invariant(chunkAtZoneMin.getMax().woCompare(tagRange.min) > 0);
+        const auto chunkAtZoneMin = cm.findIntersectingChunkWithSimpleCollation(zoneRange.min);
+        invariant(chunkAtZoneMin.getMax().woCompare(zoneRange.min) > 0);
 
-        if (chunkAtZoneMin.getMin().woCompare(tagRange.min)) {
-            splitCandidates->addSplitPoint(chunkAtZoneMin, tagRange.min);
+        if (chunkAtZoneMin.getMin().woCompare(zoneRange.min)) {
+            splitCandidates->addSplitPoint(chunkAtZoneMin, zoneRange.min);
         }
 
         // The global max key can never fall in the middle of a chunk.
-        if (!tagRange.max.woCompare(globalMax))
+        if (!zoneRange.max.woCompare(globalMax))
             continue;
 
-        const auto chunkAtZoneMax = cm.findIntersectingChunkWithSimpleCollation(tagRange.max);
+        const auto chunkAtZoneMax = cm.findIntersectingChunkWithSimpleCollation(zoneRange.max);
 
         // We need to check that both the chunk's minKey does not match the zone's max and also that
         // the max is not equal, which would only happen in the case of the zone ending in MaxKey.
-        if (chunkAtZoneMax.getMin().woCompare(tagRange.max) &&
-            chunkAtZoneMax.getMax().woCompare(tagRange.max)) {
-            splitCandidates->addSplitPoint(chunkAtZoneMax, tagRange.max);
+        if (chunkAtZoneMax.getMin().woCompare(zoneRange.max) &&
+            chunkAtZoneMax.getMax().woCompare(zoneRange.max)) {
+            splitCandidates->addSplitPoint(chunkAtZoneMax, zoneRange.max);
         }
     }
 }
@@ -374,8 +373,8 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
             } else {
                 LOGV2_WARNING(
                     21852,
-                    "Unable to enforce tag range policy for collection {namespace}: {error}",
-                    "Unable to enforce tag range policy for collection",
+                    "Unable to enforce zone range policy for collection {namespace}: {error}",
+                    "Unable to enforce zone range policy for collection",
                     "namespace"_attr = nss.ns(),
                     "error"_attr = candidatesStatus.getStatus());
             }
@@ -592,7 +591,7 @@ Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* opCt
     }
 
     return BalancerPolicy::isShardSuitableReceiver(*newShardIterator,
-                                                   distribution.getTagForChunk(chunk));
+                                                   distribution.getZoneForChunk(chunk));
 }
 
 StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidatesForCollection(
@@ -616,15 +615,15 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
     SplitCandidatesBuffer splitCandidates(nss, cm.getVersion());
 
     if (nss == NamespaceString::kLogicalSessionsNamespace) {
-        if (!distribution.tags().empty()) {
+        if (!distribution.zones().empty()) {
             LOGV2_WARNING(4562401,
                           "Ignoring zones for the sessions collection",
-                          "tags"_attr = distribution.tags());
+                          "zones"_attr = distribution.zones());
         }
 
         getSplitCandidatesForSessionsCollection(opCtx, cm, &splitCandidates);
     } else {
-        getSplitCandidatesToEnforceTagRanges(cm, distribution, &splitCandidates);
+        getSplitCandidatesToEnforceZoneRanges(cm, distribution, &splitCandidates);
     }
 
     return splitCandidates.done();
@@ -654,15 +653,15 @@ BalancerChunkSelectionPolicyImpl::_getMigrateCandidatesForCollection(
 
     const DistributionStatus& distribution = collInfoStatus.getValue();
 
-    for (const auto& tagRangeEntry : distribution.tagRanges()) {
-        const auto& tagRange = tagRangeEntry.second;
+    for (const auto& zoneRangeEntry : distribution.zoneRanges()) {
+        const auto& zoneRange = zoneRangeEntry.second;
 
-        const auto chunkAtZoneMin = cm.findIntersectingChunkWithSimpleCollation(tagRange.min);
+        const auto chunkAtZoneMin = cm.findIntersectingChunkWithSimpleCollation(zoneRange.min);
 
-        if (chunkAtZoneMin.getMin().woCompare(tagRange.min)) {
+        if (chunkAtZoneMin.getMin().woCompare(zoneRange.min)) {
             return {ErrorCodes::IllegalOperation,
                     str::stream()
-                        << "Tag boundaries " << tagRange.toString()
+                        << "Zone boundaries " << zoneRange.toString()
                         << " fall in the middle of an existing chunk "
                         << ChunkRange(chunkAtZoneMin.getMin(), chunkAtZoneMin.getMax()).toString()
                         << ". Balancing for collection " << nss.ns()
@@ -670,18 +669,18 @@ BalancerChunkSelectionPolicyImpl::_getMigrateCandidatesForCollection(
         }
 
         // The global max key can never fall in the middle of a chunk
-        if (!tagRange.max.woCompare(shardKeyPattern.globalMax()))
+        if (!zoneRange.max.woCompare(shardKeyPattern.globalMax()))
             continue;
 
-        const auto chunkAtZoneMax = cm.findIntersectingChunkWithSimpleCollation(tagRange.max);
+        const auto chunkAtZoneMax = cm.findIntersectingChunkWithSimpleCollation(zoneRange.max);
 
         // We need to check that both the chunk's minKey does not match the zone's max and also that
         // the max is not equal, which would only happen in the case of the zone ending in MaxKey.
-        if (chunkAtZoneMax.getMin().woCompare(tagRange.max) &&
-            chunkAtZoneMax.getMax().woCompare(tagRange.max)) {
+        if (chunkAtZoneMax.getMin().woCompare(zoneRange.max) &&
+            chunkAtZoneMax.getMax().woCompare(zoneRange.max)) {
             return {ErrorCodes::IllegalOperation,
                     str::stream()
-                        << "Tag boundaries " << tagRange.toString()
+                        << "Zone boundaries " << zoneRange.toString()
                         << " fall in the middle of an existing chunk "
                         << ChunkRange(chunkAtZoneMax.getMin(), chunkAtZoneMax.getMax()).toString()
                         << ". Balancing for collection " << nss.ns()

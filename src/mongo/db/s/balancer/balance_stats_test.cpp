@@ -44,8 +44,8 @@ public:
         return ChunkType(_uuid, ChunkRange(minKey, maxKey), _nextVersion, shard);
     }
 
-    ShardType makeShard(const std::string& name, std::vector<std::string> tags = {}) {
-        return ShardType(name, name, tags);
+    ShardType makeShard(const std::string& name, std::vector<std::string> zones = {}) {
+        return ShardType(name, name, zones);
     }
 
     ChunkManager makeRoutingInfo(const KeyPattern& shardKeyPattern,

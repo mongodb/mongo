@@ -52,8 +52,8 @@ int64_t getMaxChunkImbalanceCount(const ChunkManager& routingInfo,
     for (const auto& shard : allShards) {
         chunkDistributionPerZone[""][shard.getName()] = 0;
 
-        for (const auto& tag : shard.getTags()) {
-            chunkDistributionPerZone[tag][shard.getName()] = 0;
+        for (const auto& zone : shard.getTags()) {
+            chunkDistributionPerZone[zone][shard.getName()] = 0;
         }
     }
 

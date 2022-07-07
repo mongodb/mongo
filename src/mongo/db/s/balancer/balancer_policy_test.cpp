@@ -46,7 +46,7 @@ using std::vector;
 
 using ShardStatistics = ClusterStatistics::ShardStatistics;
 
-const auto emptyTagSet = std::set<std::string>();
+const auto emptyZoneSet = std::set<std::string>();
 const std::string emptyShardVersion = "";
 const auto kShardId0 = ShardId("shard0");
 const auto kShardId1 = ShardId("shard1");
@@ -121,9 +121,9 @@ MigrateInfosWithReason balanceChunks(const ShardStatisticsVector& shardStats,
 
 TEST(BalancerPolicy, Basic) {
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4},
-         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0},
-         {ShardStatistics(kShardId2, kNoMaxSize, 3, false, emptyTagSet, emptyShardVersion), 3}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 4, false, emptyZoneSet, emptyShardVersion), 4},
+         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 0},
+         {ShardStatistics(kShardId2, kNoMaxSize, 3, false, emptyZoneSet, emptyShardVersion), 3}});
 
     const auto [migrations, reason] =
         balanceChunks(cluster.first, DistributionStatus(kNamespace, cluster.second), false, false);
@@ -137,9 +137,9 @@ TEST(BalancerPolicy, Basic) {
 
 TEST(BalancerPolicy, SmallClusterShouldBePerfectlyBalanced) {
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 1, false, emptyTagSet, emptyShardVersion), 1},
-         {ShardStatistics(kShardId1, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion), 2},
-         {ShardStatistics(kShardId2, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 1, false, emptyZoneSet, emptyShardVersion), 1},
+         {ShardStatistics(kShardId1, kNoMaxSize, 2, false, emptyZoneSet, emptyShardVersion), 2},
+         {ShardStatistics(kShardId2, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 0}});
 
     const auto [migrations, reason] =
         balanceChunks(cluster.first, DistributionStatus(kNamespace, cluster.second), false, false);
@@ -153,8 +153,8 @@ TEST(BalancerPolicy, SmallClusterShouldBePerfectlyBalanced) {
 
 TEST(BalancerPolicy, SingleChunkShouldNotMove) {
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 1, false, emptyTagSet, emptyShardVersion), 1},
-         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 1, false, emptyZoneSet, emptyShardVersion), 1},
+         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 0}});
     {
         auto [migrations, reason] = balanceChunks(
             cluster.first, DistributionStatus(kNamespace, cluster.second), true, false);
@@ -171,10 +171,10 @@ TEST(BalancerPolicy, SingleChunkShouldNotMove) {
 
 TEST(BalancerPolicy, BalanceThresholdObeyed) {
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion), 2},
-         {ShardStatistics(kShardId1, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion), 2},
-         {ShardStatistics(kShardId2, kNoMaxSize, 1, false, emptyTagSet, emptyShardVersion), 1},
-         {ShardStatistics(kShardId3, kNoMaxSize, 1, false, emptyTagSet, emptyShardVersion), 1}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyZoneSet, emptyShardVersion), 2},
+         {ShardStatistics(kShardId1, kNoMaxSize, 2, false, emptyZoneSet, emptyShardVersion), 2},
+         {ShardStatistics(kShardId2, kNoMaxSize, 1, false, emptyZoneSet, emptyShardVersion), 1},
+         {ShardStatistics(kShardId3, kNoMaxSize, 1, false, emptyZoneSet, emptyShardVersion), 1}});
 
     {
         auto [migrations, reason] = balanceChunks(
@@ -192,10 +192,10 @@ TEST(BalancerPolicy, BalanceThresholdObeyed) {
 
 TEST(BalancerPolicy, ParallelBalancing) {
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4},
-         {ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4},
-         {ShardStatistics(kShardId2, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0},
-         {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 4, false, emptyZoneSet, emptyShardVersion), 4},
+         {ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyZoneSet, emptyShardVersion), 4},
+         {ShardStatistics(kShardId2, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 0},
+         {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 0}});
 
     const auto [migrations, reason] =
         balanceChunks(cluster.first, DistributionStatus(kNamespace, cluster.second), false, false);
@@ -215,12 +215,12 @@ TEST(BalancerPolicy, ParallelBalancing) {
 
 TEST(BalancerPolicy, ParallelBalancingDoesNotPutChunksOnShardsAboveTheOptimal) {
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 100, false, emptyTagSet, emptyShardVersion), 100},
-         {ShardStatistics(kShardId1, kNoMaxSize, 90, false, emptyTagSet, emptyShardVersion), 90},
-         {ShardStatistics(kShardId2, kNoMaxSize, 90, false, emptyTagSet, emptyShardVersion), 90},
-         {ShardStatistics(kShardId3, kNoMaxSize, 80, false, emptyTagSet, emptyShardVersion), 80},
-         {ShardStatistics(kShardId4, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0},
-         {ShardStatistics(kShardId5, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 100, false, emptyZoneSet, emptyShardVersion), 100},
+         {ShardStatistics(kShardId1, kNoMaxSize, 90, false, emptyZoneSet, emptyShardVersion), 90},
+         {ShardStatistics(kShardId2, kNoMaxSize, 90, false, emptyZoneSet, emptyShardVersion), 90},
+         {ShardStatistics(kShardId3, kNoMaxSize, 80, false, emptyZoneSet, emptyShardVersion), 80},
+         {ShardStatistics(kShardId4, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 0},
+         {ShardStatistics(kShardId5, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 0}});
 
     const auto [migrations, reason] =
         balanceChunks(cluster.first, DistributionStatus(kNamespace, cluster.second), false, false);
@@ -240,10 +240,10 @@ TEST(BalancerPolicy, ParallelBalancingDoesNotPutChunksOnShardsAboveTheOptimal) {
 
 TEST(BalancerPolicy, ParallelBalancingDoesNotMoveChunksFromShardsBelowOptimal) {
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 100, false, emptyTagSet, emptyShardVersion), 100},
-         {ShardStatistics(kShardId1, kNoMaxSize, 30, false, emptyTagSet, emptyShardVersion), 30},
-         {ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 5},
-         {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 100, false, emptyZoneSet, emptyShardVersion), 100},
+         {ShardStatistics(kShardId1, kNoMaxSize, 30, false, emptyZoneSet, emptyShardVersion), 30},
+         {ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyZoneSet, emptyShardVersion), 5},
+         {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 0}});
 
     const auto [migrations, reason] =
         balanceChunks(cluster.first, DistributionStatus(kNamespace, cluster.second), false, false);
@@ -258,10 +258,10 @@ TEST(BalancerPolicy, ParallelBalancingDoesNotMoveChunksFromShardsBelowOptimal) {
 
 TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNecessary) {
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 8, false, emptyTagSet, emptyShardVersion), 8},
-         {ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4},
-         {ShardStatistics(kShardId2, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0},
-         {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 8, false, emptyZoneSet, emptyShardVersion), 8},
+         {ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyZoneSet, emptyShardVersion), 4},
+         {ShardStatistics(kShardId2, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 0},
+         {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 0}});
 
     // Here kShardId0 would have been selected as a donor
     stdx::unordered_set<ShardId> usedShards{kShardId0};
@@ -282,10 +282,10 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNe
 
 TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNotNecessary) {
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 12, false, emptyTagSet, emptyShardVersion), 12},
-         {ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4},
-         {ShardStatistics(kShardId2, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0},
-         {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 12, false, emptyZoneSet, emptyShardVersion), 12},
+         {ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyZoneSet, emptyShardVersion), 4},
+         {ShardStatistics(kShardId2, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 0},
+         {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 0}});
 
     // Here kShardId0 would have been selected as a donor
     stdx::unordered_set<ShardId> usedShards{kShardId0};
@@ -300,10 +300,10 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNo
 
 TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseDestinationShards) {
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4},
-         {ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4},
-         {ShardStatistics(kShardId2, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0},
-         {ShardStatistics(kShardId3, kNoMaxSize, 1, false, emptyTagSet, emptyShardVersion), 1}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 4, false, emptyZoneSet, emptyShardVersion), 4},
+         {ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyZoneSet, emptyShardVersion), 4},
+         {ShardStatistics(kShardId2, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 0},
+         {ShardStatistics(kShardId3, kNoMaxSize, 1, false, emptyZoneSet, emptyShardVersion), 1}});
 
     // Here kShardId2 would have been selected as a recipient
     stdx::unordered_set<ShardId> usedShards{kShardId2};
@@ -324,8 +324,8 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseDestinationShards) {
 
 TEST(BalancerPolicy, JumboChunksNotMoved) {
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion), 4},
-         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyZoneSet, emptyShardVersion), 4},
+         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 0}});
 
     cluster.second[kShardId0][0].setJumbo(true);
     cluster.second[kShardId0][1].setJumbo(false);  // Only chunk 1 is not jumbo
@@ -344,10 +344,10 @@ TEST(BalancerPolicy, JumboChunksNotMoved) {
 
 TEST(BalancerPolicy, JumboChunksNotMovedParallel) {
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion), 4},
-         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0},
-         {ShardStatistics(kShardId2, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion), 4},
-         {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyZoneSet, emptyShardVersion), 4},
+         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 0},
+         {ShardStatistics(kShardId2, kNoMaxSize, 2, false, emptyZoneSet, emptyShardVersion), 4},
+         {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 0}});
 
     cluster.second[kShardId0][0].setJumbo(true);
     cluster.second[kShardId0][1].setJumbo(false);  // Only chunk 1 is not jumbo
@@ -378,8 +378,8 @@ TEST(BalancerPolicy, JumboChunksNotMovedParallel) {
 TEST(BalancerPolicy, DrainingSingleChunk) {
     // shard0 is draining and chunks will go to shard1, even though it has a lot more chunks
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 2, true, emptyTagSet, emptyShardVersion), 1},
-         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 5}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 2, true, emptyZoneSet, emptyShardVersion), 1},
+         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 5}});
 
     const auto [migrations, reason] =
         balanceChunks(cluster.first, DistributionStatus(kNamespace, cluster.second), false, false);
@@ -394,10 +394,10 @@ TEST(BalancerPolicy, DrainingSingleChunk) {
 TEST(BalancerPolicy, DrainingSingleChunkPerShard) {
     // shard0 and shard2 are draining and chunks will go to shard1 and shard3 in parallel
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 2, true, emptyTagSet, emptyShardVersion), 1},
-         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 5},
-         {ShardStatistics(kShardId2, kNoMaxSize, 2, true, emptyTagSet, emptyShardVersion), 1},
-         {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 5}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 2, true, emptyZoneSet, emptyShardVersion), 1},
+         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 5},
+         {ShardStatistics(kShardId2, kNoMaxSize, 2, true, emptyZoneSet, emptyShardVersion), 1},
+         {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 5}});
 
     const auto [migrations, reason] =
         balanceChunks(cluster.first, DistributionStatus(kNamespace, cluster.second), false, false);
@@ -418,8 +418,8 @@ TEST(BalancerPolicy, DrainingSingleChunkPerShard) {
 TEST(BalancerPolicy, DrainingWithTwoChunksFirstOneSelected) {
     // shard0 is draining and chunks will go to shard1, even though it has a lot more chunks
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 2, true, emptyTagSet, emptyShardVersion), 2},
-         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 5}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 2, true, emptyZoneSet, emptyShardVersion), 2},
+         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyZoneSet, emptyShardVersion), 5}});
 
     const auto [migrations, reason] =
         balanceChunks(cluster.first, DistributionStatus(kNamespace, cluster.second), false, false);
@@ -435,9 +435,9 @@ TEST(BalancerPolicy, DrainingMultipleShardsFirstOneSelected) {
     // shard0 and shard1 are both draining with very little chunks in them and chunks will go to
     // shard2, even though it has a lot more chunks that the other two
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 5, true, emptyTagSet, emptyShardVersion), 1},
-         {ShardStatistics(kShardId1, kNoMaxSize, 5, true, emptyTagSet, emptyShardVersion), 2},
-         {ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 16}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 5, true, emptyZoneSet, emptyShardVersion), 1},
+         {ShardStatistics(kShardId1, kNoMaxSize, 5, true, emptyZoneSet, emptyShardVersion), 2},
+         {ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyZoneSet, emptyShardVersion), 16}});
 
     const auto [migrations, reason] =
         balanceChunks(cluster.first, DistributionStatus(kNamespace, cluster.second), false, false);
@@ -453,16 +453,16 @@ TEST(BalancerPolicy, DrainingMultipleShardsFirstOneSelected) {
 TEST(BalancerPolicy, DrainingMultipleShardsWontAcceptChunks) {
     // shard0 has many chunks, but can't move them to shard1 or shard2 because they are draining
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion), 4},
-         {ShardStatistics(kShardId1, kNoMaxSize, 0, true, emptyTagSet, emptyShardVersion), 0},
-         {ShardStatistics(kShardId2, kNoMaxSize, 0, true, emptyTagSet, emptyShardVersion), 0}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyZoneSet, emptyShardVersion), 4},
+         {ShardStatistics(kShardId1, kNoMaxSize, 0, true, emptyZoneSet, emptyShardVersion), 0},
+         {ShardStatistics(kShardId2, kNoMaxSize, 0, true, emptyZoneSet, emptyShardVersion), 0}});
 
     const auto [migrations, reason] =
         balanceChunks(cluster.first, DistributionStatus(kNamespace, cluster.second), false, false);
     ASSERT(migrations.empty());
 }
 
-TEST(BalancerPolicy, DrainingSingleAppropriateShardFoundDueToTag) {
+TEST(BalancerPolicy, DrainingSingleAppropriateShardFoundDueToZone) {
     auto cluster = generateCluster(
         {{ShardStatistics(kShardId0, kNoMaxSize, 2, false, {"NYC"}, emptyShardVersion), 4},
          {ShardStatistics(kShardId1, kNoMaxSize, 2, false, {"LAX"}, emptyShardVersion), 4},
@@ -481,7 +481,7 @@ TEST(BalancerPolicy, DrainingSingleAppropriateShardFoundDueToTag) {
     ASSERT_EQ(MigrationReason::drain, reason);
 }
 
-TEST(BalancerPolicy, DrainingNoAppropriateShardsFoundDueToTag) {
+TEST(BalancerPolicy, DrainingNoAppropriateShardsFoundDueToZone) {
     auto cluster = generateCluster(
         {{ShardStatistics(kShardId0, kNoMaxSize, 2, false, {"NYC"}, emptyShardVersion), 4},
          {ShardStatistics(kShardId1, kNoMaxSize, 2, false, {"LAX"}, emptyShardVersion), 4},
@@ -498,9 +498,9 @@ TEST(BalancerPolicy, DrainingNoAppropriateShardsFoundDueToTag) {
 TEST(BalancerPolicy, NoBalancingDueToAllNodesEitherDrainingOrMaxedOut) {
     // shard0 and shard2 are draining, shard1 is maxed out
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 2, true, emptyTagSet, emptyShardVersion), 1},
-         {ShardStatistics(kShardId1, 1, 1, false, emptyTagSet, emptyShardVersion), 6},
-         {ShardStatistics(kShardId2, kNoMaxSize, 1, true, emptyTagSet, emptyShardVersion), 1}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 2, true, emptyZoneSet, emptyShardVersion), 1},
+         {ShardStatistics(kShardId1, 1, 1, false, emptyZoneSet, emptyShardVersion), 6},
+         {ShardStatistics(kShardId2, kNoMaxSize, 1, true, emptyZoneSet, emptyShardVersion), 1}});
 
     const auto [migrations, reason] =
         balanceChunks(cluster.first, DistributionStatus(kNamespace, cluster.second), false, false);
@@ -512,9 +512,9 @@ TEST(BalancerPolicy, BalancerRespectsMaxShardSizeOnlyBalanceToNonMaxed) {
     // shards have maxSize = 0 = unset. Even though the overloaded shard has the least number of
     // less chunks, we shouldn't move chunks to that shard.
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, 1, 3, false, emptyTagSet, emptyShardVersion), 2},
-         {ShardStatistics(kShardId1, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 5},
-         {ShardStatistics(kShardId2, kNoMaxSize, 10, false, emptyTagSet, emptyShardVersion), 10}});
+        {{ShardStatistics(kShardId0, 1, 3, false, emptyZoneSet, emptyShardVersion), 2},
+         {ShardStatistics(kShardId1, kNoMaxSize, 5, false, emptyZoneSet, emptyShardVersion), 5},
+         {ShardStatistics(kShardId2, kNoMaxSize, 10, false, emptyZoneSet, emptyShardVersion), 10}});
 
     const auto [migrations, reason] =
         balanceChunks(cluster.first, DistributionStatus(kNamespace, cluster.second), false, false);
@@ -530,16 +530,16 @@ TEST(BalancerPolicy, BalancerRespectsMaxShardSizeWhenAllBalanced) {
     // shards have maxSize = 0 = unset. We check that being over the maxSize is NOT equivalent to
     // draining, we don't want to empty shards for no other reason than they are over this limit.
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, 1, 4, false, emptyTagSet, emptyShardVersion), 4},
-         {ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4},
-         {ShardStatistics(kShardId2, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4}});
+        {{ShardStatistics(kShardId0, 1, 4, false, emptyZoneSet, emptyShardVersion), 4},
+         {ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyZoneSet, emptyShardVersion), 4},
+         {ShardStatistics(kShardId2, kNoMaxSize, 4, false, emptyZoneSet, emptyShardVersion), 4}});
 
     const auto [migrations, reason] =
         balanceChunks(cluster.first, DistributionStatus(kNamespace, cluster.second), false, false);
     ASSERT(migrations.empty());
 }
 
-TEST(BalancerPolicy, BalancerRespectsTagsWhenDraining) {
+TEST(BalancerPolicy, BalancerRespectsZonesWhenDraining) {
     // shard1 drains the proper chunk to shard0, even though it is more loaded than shard2
     auto cluster = generateCluster(
         {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 6},
@@ -559,13 +559,13 @@ TEST(BalancerPolicy, BalancerRespectsTagsWhenDraining) {
     ASSERT_EQ(MigrationReason::drain, reason);
 }
 
-TEST(BalancerPolicy, BalancerRespectsTagPolicyBeforeImbalance) {
+TEST(BalancerPolicy, BalancerRespectsZonePolicyBeforeImbalance) {
     // There is a large imbalance between shard0 and shard1, but the balancer must first fix the
-    // chunks, which are on a wrong shard due to tag policy
+    // chunks, which are on a wrong shard due to zone policy
     auto cluster = generateCluster(
         {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 2},
          {ShardStatistics(kShardId1, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 6},
-         {ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 2}});
+         {ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyZoneSet, emptyShardVersion), 2}});
 
     DistributionStatus distribution(kNamespace, cluster.second);
     ASSERT_OK(distribution.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << 100), "a")));
@@ -579,7 +579,7 @@ TEST(BalancerPolicy, BalancerRespectsTagPolicyBeforeImbalance) {
     ASSERT_EQ(MigrationReason::zoneViolation, reason);
 }
 
-TEST(BalancerPolicy, BalancerFixesIncorrectTagsWithCrossShardViolationOfTags) {
+TEST(BalancerPolicy, BalancerFixesIncorrectZonesWithCrossShardViolationOfZones) {
     // The zone policy dictates that the same shard must donate and also receive chunks. The test
     // validates that the same shard is not used as a donor and recipient as part of the same round.
     auto cluster = generateCluster(
@@ -600,12 +600,12 @@ TEST(BalancerPolicy, BalancerFixesIncorrectTagsWithCrossShardViolationOfTags) {
     ASSERT_EQ(MigrationReason::zoneViolation, reason);
 }
 
-TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedCluster) {
-    // Chunks are balanced across shards, but there are wrong tags, which need to be fixed
+TEST(BalancerPolicy, BalancerFixesIncorrectZonesInOtherwiseBalancedCluster) {
+    // Chunks are balanced across shards, but there are wrong zones, which need to be fixed
     auto cluster = generateCluster(
         {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 3},
          {ShardStatistics(kShardId1, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 3},
-         {ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 3}});
+         {ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyZoneSet, emptyShardVersion), 3}});
 
     DistributionStatus distribution(kNamespace, cluster.second);
     ASSERT_OK(distribution.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << 10), "a")));
@@ -619,8 +619,8 @@ TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedCluster) {
     ASSERT_EQ(MigrationReason::zoneViolation, reason);
 }
 
-TEST(BalancerPolicy, BalancerTagAlreadyBalanced) {
-    // Chunks are balanced across shards for the tag.
+TEST(BalancerPolicy, BalancerZoneAlreadyBalanced) {
+    // Chunks are balanced across shards for the zone.
     auto cluster = generateCluster(
         {{ShardStatistics(kShardId0, kNoMaxSize, 3, false, {"a"}, emptyShardVersion), 2},
          {ShardStatistics(kShardId1, kNoMaxSize, 2, false, {"a"}, emptyShardVersion), 2}});
@@ -630,9 +630,9 @@ TEST(BalancerPolicy, BalancerTagAlreadyBalanced) {
     ASSERT(balanceChunks(cluster.first, distribution, false, false).first.empty());
 }
 
-TEST(BalancerPolicy, BalancerMostOverLoadShardHasMultipleTags) {
+TEST(BalancerPolicy, BalancerMostOverLoadShardHasMultipleZones) {
     // shard0 has chunks [MinKey, 1), [1, 2), [2, 3), [3, 4), [4, 5), so two chunks each
-    // for tag "b" and "c". So [1, 2) is expected to be moved to shard1 in round 1.
+    // for zones "b" and "c". So [1, 2) is expected to be moved to shard1 in round 1.
     auto cluster = generateCluster(
         {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a", "b", "c"}, emptyShardVersion), 5},
          {ShardStatistics(kShardId1, kNoMaxSize, 1, false, {"b"}, emptyShardVersion), 1},
@@ -652,9 +652,9 @@ TEST(BalancerPolicy, BalancerMostOverLoadShardHasMultipleTags) {
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][1].getMax(), *migrations[0].maxKey);
 }
 
-TEST(BalancerPolicy, BalancerMostOverLoadShardHasMultipleTagsSkipTagWithShardInUse) {
+TEST(BalancerPolicy, BalancerMostOverLoadShardHasMultipleZonesSkipZoneWithShardInUse) {
     // shard0 has chunks [MinKey, 1), [1, 2), [2, 3), [3, 4), [4, 5), so two chunks each
-    // for tag "b" and "c". So [3, 4) is expected to be moved to shard2 because shard1 is
+    // for zones "b" and "c". So [3, 4) is expected to be moved to shard2 because shard1 is
     // in use.
     auto cluster = generateCluster(
         {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a", "b", "c"}, emptyShardVersion), 5},
@@ -677,13 +677,13 @@ TEST(BalancerPolicy, BalancerMostOverLoadShardHasMultipleTagsSkipTagWithShardInU
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][3].getMax(), *migrations[0].maxKey);
 }
 
-TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedClusterParallel) {
-    // Chunks are balanced across shards, but there are wrong tags, which need to be fixed
+TEST(BalancerPolicy, BalancerFixesIncorrectZonesInOtherwiseBalancedClusterParallel) {
+    // Chunks are balanced across shards, but there are wrong zones, which need to be fixed
     auto cluster = generateCluster(
         {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 3},
          {ShardStatistics(kShardId1, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 3},
-         {ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 3},
-         {ShardStatistics(kShardId3, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 3}});
+         {ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyZoneSet, emptyShardVersion), 3},
+         {ShardStatistics(kShardId3, kNoMaxSize, 5, false, emptyZoneSet, emptyShardVersion), 3}});
 
     DistributionStatus distribution(kNamespace, cluster.second);
     ASSERT_OK(distribution.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << 20), "a")));
@@ -704,10 +704,10 @@ TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedClusterParalle
     ASSERT_EQ(MigrationReason::zoneViolation, reason);
 }
 
-TEST(BalancerPolicy, BalancerHandlesNoShardsWithTag) {
+TEST(BalancerPolicy, BalancerHandlesNoShardsWithZone) {
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 2},
-         {ShardStatistics(kShardId1, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 2}});
+        {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, emptyZoneSet, emptyShardVersion), 2},
+         {ShardStatistics(kShardId1, kNoMaxSize, 5, false, emptyZoneSet, emptyShardVersion), 2}});
 
     DistributionStatus distribution(kNamespace, cluster.second);
     ASSERT_OK(
@@ -716,10 +716,10 @@ TEST(BalancerPolicy, BalancerHandlesNoShardsWithTag) {
     ASSERT(balanceChunks(cluster.first, distribution, false, false).first.empty());
 }
 
-TEST(DistributionStatus, AddTagRangeOverlap) {
+TEST(DistributionStatus, AddZoneRangeOverlap) {
     DistributionStatus d(kNamespace, ShardToChunksMap{});
 
-    // Note that there is gap between 10 and 20 for which there is no tag
+    // Note that there is gap between 10 and 20 for which there is no zone
     ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << 1), BSON("x" << 10), "a")));
     ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << 20), BSON("x" << 30), "b")));
 
@@ -739,7 +739,7 @@ TEST(DistributionStatus, AddTagRangeOverlap) {
               d.addRangeToZone(ZoneRange(BSON("x" << 25), kMaxBSONKey, "d")));
 }
 
-TEST(DistributionStatus, ChunkTagsSelectorWithRegularKeys) {
+TEST(DistributionStatus, ChunkZonesSelectorWithRegularKeys) {
     DistributionStatus d(kNamespace, ShardToChunksMap{});
 
     ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << 1), BSON("x" << 10), "a")));
@@ -750,67 +750,67 @@ TEST(DistributionStatus, ChunkTagsSelectorWithRegularKeys) {
         ChunkType chunk;
         chunk.setMin(kMinBSONKey);
         chunk.setMax(BSON("x" << 1));
-        ASSERT_EQUALS("", d.getTagForChunk(chunk));
+        ASSERT_EQUALS("", d.getZoneForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 0));
         chunk.setMax(BSON("x" << 1));
-        ASSERT_EQUALS("", d.getTagForChunk(chunk));
+        ASSERT_EQUALS("", d.getZoneForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 1));
         chunk.setMax(BSON("x" << 5));
-        ASSERT_EQUALS("a", d.getTagForChunk(chunk));
+        ASSERT_EQUALS("a", d.getZoneForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 10));
         chunk.setMax(BSON("x" << 20));
-        ASSERT_EQUALS("b", d.getTagForChunk(chunk));
+        ASSERT_EQUALS("b", d.getZoneForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 15));
         chunk.setMax(BSON("x" << 20));
-        ASSERT_EQUALS("b", d.getTagForChunk(chunk));
+        ASSERT_EQUALS("b", d.getZoneForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 25));
         chunk.setMax(BSON("x" << 30));
-        ASSERT_EQUALS("c", d.getTagForChunk(chunk));
+        ASSERT_EQUALS("c", d.getZoneForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 35));
         chunk.setMax(BSON("x" << 40));
-        ASSERT_EQUALS("", d.getTagForChunk(chunk));
+        ASSERT_EQUALS("", d.getZoneForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 30));
         chunk.setMax(kMaxBSONKey);
-        ASSERT_EQUALS("", d.getTagForChunk(chunk));
+        ASSERT_EQUALS("", d.getZoneForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 40));
         chunk.setMax(kMaxBSONKey);
-        ASSERT_EQUALS("", d.getTagForChunk(chunk));
+        ASSERT_EQUALS("", d.getZoneForChunk(chunk));
     }
 }
 
-TEST(DistributionStatus, ChunkTagsSelectorWithMinMaxKeys) {
+TEST(DistributionStatus, ChunkZonesSelectorWithMinMaxKeys) {
     DistributionStatus d(kNamespace, ShardToChunksMap{});
 
     ASSERT_OK(d.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << -100), "a")));
@@ -821,49 +821,49 @@ TEST(DistributionStatus, ChunkTagsSelectorWithMinMaxKeys) {
         ChunkType chunk;
         chunk.setMin(kMinBSONKey);
         chunk.setMax(BSON("x" << -100));
-        ASSERT_EQUALS("a", d.getTagForChunk(chunk));
+        ASSERT_EQUALS("a", d.getZoneForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << -100));
         chunk.setMax(BSON("x" << -11));
-        ASSERT_EQUALS("", d.getTagForChunk(chunk));
+        ASSERT_EQUALS("", d.getZoneForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << -10));
         chunk.setMax(BSON("x" << 0));
-        ASSERT_EQUALS("b", d.getTagForChunk(chunk));
+        ASSERT_EQUALS("b", d.getZoneForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 0));
         chunk.setMax(BSON("x" << 10));
-        ASSERT_EQUALS("b", d.getTagForChunk(chunk));
+        ASSERT_EQUALS("b", d.getZoneForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 10));
         chunk.setMax(BSON("x" << 20));
-        ASSERT_EQUALS("", d.getTagForChunk(chunk));
+        ASSERT_EQUALS("", d.getZoneForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 10));
         chunk.setMax(BSON("x" << 100));
-        ASSERT_EQUALS("", d.getTagForChunk(chunk));
+        ASSERT_EQUALS("", d.getZoneForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 200));
         chunk.setMax(kMaxBSONKey);
-        ASSERT_EQUALS("c", d.getTagForChunk(chunk));
+        ASSERT_EQUALS("c", d.getZoneForChunk(chunk));
     }
 }
 

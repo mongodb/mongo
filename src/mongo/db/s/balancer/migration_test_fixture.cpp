@@ -84,24 +84,24 @@ ChunkType MigrationTestFixture::setUpChunk(const UUID& collUUID,
     return chunk;
 }
 
-void MigrationTestFixture::setUpTags(const NamespaceString& collName,
-                                     const StringMap<ChunkRange>& tagChunkRanges) {
-    for (auto const& tagChunkRange : tagChunkRanges) {
-        BSONObjBuilder tagDocBuilder;
-        tagDocBuilder.append(
+void MigrationTestFixture::setUpZones(const NamespaceString& collName,
+                                      const StringMap<ChunkRange>& zoneChunkRanges) {
+    for (auto const& zoneChunkRange : zoneChunkRanges) {
+        BSONObjBuilder zoneDocBuilder;
+        zoneDocBuilder.append(
             "_id",
-            BSON(TagsType::ns(collName.ns()) << TagsType::min(tagChunkRange.second.getMin())));
-        tagDocBuilder.append(TagsType::ns(), collName.ns());
-        tagDocBuilder.append(TagsType::min(), tagChunkRange.second.getMin());
-        tagDocBuilder.append(TagsType::max(), tagChunkRange.second.getMax());
-        tagDocBuilder.append(TagsType::tag(), tagChunkRange.first);
+            BSON(TagsType::ns(collName.ns()) << TagsType::min(zoneChunkRange.second.getMin())));
+        zoneDocBuilder.append(TagsType::ns(), collName.ns());
+        zoneDocBuilder.append(TagsType::min(), zoneChunkRange.second.getMin());
+        zoneDocBuilder.append(TagsType::max(), zoneChunkRange.second.getMax());
+        zoneDocBuilder.append(TagsType::tag(), zoneChunkRange.first);
 
         ASSERT_OK(catalogClient()->insertConfigDocument(
-            operationContext(), TagsType::ConfigNS, tagDocBuilder.obj(), kMajorityWriteConcern));
+            operationContext(), TagsType::ConfigNS, zoneDocBuilder.obj(), kMajorityWriteConcern));
     }
 }
 
-void MigrationTestFixture::removeAllTags(const NamespaceString& collName) {
+void MigrationTestFixture::removeAllZones(const NamespaceString& collName) {
     const auto query = BSON("ns" << collName.ns());
     ASSERT_OK(catalogClient()->removeConfigDocuments(
         operationContext(), TagsType::ConfigNS, query, kMajorityWriteConcern));

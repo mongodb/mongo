@@ -61,8 +61,8 @@ public:
 
 private:
     /**
-     * Synchronous method, which iterates the collection's chunks and uses the tags information to
-     * figure out whether some of them validate the tag range boundaries and need to be split.
+     * Synchronous method, which iterates the collection's chunks and uses the zones information to
+     * figure out whether some of them validate the zone range boundaries and need to be split.
      */
     StatusWith<SplitInfoVector> _getSplitCandidatesForCollection(
         OperationContext* opCtx,

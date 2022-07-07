@@ -780,7 +780,7 @@ void Balancer::_mainThread() {
                                   "Failed to split chunks",
                                   "error"_attr = status);
                 } else {
-                    LOGV2_DEBUG(21861, 1, "Done enforcing tag range boundaries.");
+                    LOGV2_DEBUG(21861, 1, "Done enforcing zone range boundaries.");
                 }
 
                 stdx::unordered_set<ShardId> usedShards;

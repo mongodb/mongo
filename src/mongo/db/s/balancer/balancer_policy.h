@@ -258,12 +258,11 @@ public:
     }
 
     /**
-     * read all tags for collection via the catalog client and add to the zoneInfo
+     * Retrieves the collection zones from the catalog client
      */
-    static Status addTagsFromCatalog(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     const KeyPattern& keyPattern,
-                                     ZoneInfo& zoneInfo);
+    static StatusWith<ZoneInfo> getZonesForCollection(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      const KeyPattern& keyPattern);
 
 private:
     // Map of zone max key to the zone description
@@ -285,7 +284,9 @@ class DistributionStatus final {
     DistributionStatus& operator=(const DistributionStatus&) = delete;
 
 public:
-    DistributionStatus(NamespaceString nss, ShardToChunksMap shardToChunksMap);
+    DistributionStatus(NamespaceString nss,
+                       ShardToChunksMap shardToChunksMap,
+                       ZoneInfo zoneInfo = {});
     DistributionStatus(DistributionStatus&&) = default;
     ~DistributionStatus() {}
 
@@ -311,7 +312,7 @@ public:
      * Returns the total number of chunks across all shards, which fall into the specified zone's
      * range.
      */
-    size_t totalChunksWithTag(const std::string& tag) const;
+    size_t totalChunksInZone(const std::string& zone) const;
 
     /**
      * Returns number of chunks in the specified shard.
@@ -319,9 +320,9 @@ public:
     size_t numberOfChunksInShard(const ShardId& shardId) const;
 
     /**
-     * Returns number of chunks in the specified shard, which have the given tag.
+     * Returns number of chunks in the specified shard, which also belong to the give zone.
      */
-    size_t numberOfChunksInShardWithTag(const ShardId& shardId, const std::string& tag) const;
+    size_t numberOfChunksInShardWithZone(const ShardId& shardId, const std::string& zone) const;
 
     /**
      * Returns all chunks for the specified shard.
@@ -329,16 +330,16 @@ public:
     const std::vector<ChunkType>& getChunks(const ShardId& shardId) const;
 
     /**
-     * Returns all tag ranges defined for the collection.
+     * Returns all zone ranges defined for the collection.
      */
-    const BSONObjIndexedMap<ZoneRange>& tagRanges() const {
+    const BSONObjIndexedMap<ZoneRange>& zoneRanges() const {
         return _zoneInfo.zoneRanges();
     }
 
     /**
-     * Returns all tags defined for the collection.
+     * Returns all zones defined for the collection.
      */
-    const std::set<std::string>& tags() const {
+    const std::set<std::string>& zones() const {
         return _zoneInfo.allZones();
     }
 
@@ -350,16 +351,10 @@ public:
     }
 
     /**
-     * Using the set of tags defined for the collection, returns what tag corresponds to the
-     * specified chunk. If the chunk doesn't fall into any tag returns the empty string.
+     * Using the set of zones defined for the collection, returns what zone corresponds to the
+     * specified chunk. If the chunk doesn't fall into any zone returns the empty string.
      */
-    std::string getTagForChunk(const ChunkType& chunk) const;
-
-    /**
-     * Returns a BSON/string representation of this distribution status.
-     */
-    void report(BSONObjBuilder* builder) const;
-    std::string toString() const;
+    std::string getZoneForChunk(const ChunkType& chunk) const;
 
 private:
     // Namespace for which this distribution applies
@@ -376,11 +371,11 @@ class BalancerPolicy {
 public:
     /**
      * Determines whether a shard with the specified utilization statistics would be able to accept
-     * a chunk with the specified tag. According to the policy a shard cannot accept chunks if its
-     * size is maxed out and if the chunk's tag conflicts with the tag of the shard.
+     * a chunk with the specified zone. According to the policy a shard cannot accept chunks if its
+     * size is maxed out and if the chunk's zone conflicts with the zone of the shard.
      */
     static Status isShardSuitableReceiver(const ClusterStatistics::ShardStatistics& stat,
-                                          const std::string& chunkTag);
+                                          const std::string& chunkZone);
 
     /**
      * Returns a suggested set of chunks or ranges to move within a collection's shards, given the
@@ -414,7 +409,7 @@ public:
 
 private:
     /*
-     * Only considers shards with the specified tag, all shards in case the tag is empty.
+     * Only considers shards with the specified zone, all shards in case the zone is empty.
      *
      * Returns a tuple <ShardID, number of chunks> referring the shard with less chunks.
      *
@@ -425,11 +420,11 @@ private:
         const ShardStatisticsVector& shardStats,
         const DistributionStatus& distribution,
         const boost::optional<CollectionDataSizeInfoForBalancing>& collDataSizeInfo,
-        const std::string& tag,
+        const std::string& zone,
         const stdx::unordered_set<ShardId>& excludedShards);
 
     /**
-     * Only considers shards with the specified tag, all shards in case the tag is empty.
+     * Only considers shards with the specified zone, all shards in case the zone is empty.
      *
      * If balancing based on number of chunks:
      *  - Returns a tuple <ShardID, number of chunks> referring the shard with more chunks.
@@ -441,7 +436,7 @@ private:
         const ShardStatisticsVector& shardStats,
         const DistributionStatus& distribution,
         const boost::optional<CollectionDataSizeInfoForBalancing>& collDataSizeInfo,
-        const std::string& chunkTag,
+        const std::string& zone,
         const stdx::unordered_set<ShardId>& excludedShards);
 
     /**
@@ -454,8 +449,8 @@ private:
      */
     static bool _singleZoneBalanceBasedOnChunks(const ShardStatisticsVector& shardStats,
                                                 const DistributionStatus& distribution,
-                                                const std::string& tag,
-                                                size_t totalNumberOfShardsWithTag,
+                                                const std::string& zone,
+                                                size_t totalNumberOfShardsWithZone,
                                                 std::vector<MigrateInfo>* migrations,
                                                 stdx::unordered_set<ShardId>* usedShards,
                                                 ForceJumbo forceJumbo);
@@ -472,7 +467,7 @@ private:
         const ShardStatisticsVector& shardStats,
         const DistributionStatus& distribution,
         const CollectionDataSizeInfoForBalancing& collDataSizeInfo,
-        const std::string& tag,
+        const std::string& zone,
         std::vector<MigrateInfo>* migrations,
         stdx::unordered_set<ShardId>* usedShards,
         ForceJumbo forceJumbo);

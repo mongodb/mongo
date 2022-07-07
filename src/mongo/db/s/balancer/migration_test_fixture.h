@@ -88,15 +88,15 @@ protected:
                          const ChunkVersion& version);
 
     /**
-     * Inserts a document into the config.tags collection so that the tag defined by the
+     * Inserts a document into the config.tags collection so that the zone defined by the
      * parameters exists.
      */
-    void setUpTags(const NamespaceString& collName, const StringMap<ChunkRange>& tagChunkRanges);
+    void setUpZones(const NamespaceString& collName, const StringMap<ChunkRange>& zoneChunkRanges);
 
     /**
      * Removes all document in the config.tags for the collection.
      */
-    void removeAllTags(const NamespaceString& collName);
+    void removeAllZones(const NamespaceString& collName);
 
     /**
      * Removes all document in the config.chunks for the collection.

@@ -59,7 +59,7 @@ public:
     /**
      * Potentially blocking method, which gives out a set of chunks, which need to be split because
      * they violate the policy for some reason. The reason is decided by the policy and may include
-     * chunk is too big or chunk straddles a tag range.
+     * chunk is too big or chunk straddles a zone range.
      */
     virtual StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* opCtx) = 0;
 

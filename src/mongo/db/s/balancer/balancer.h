@@ -245,7 +245,7 @@ private:
      * calculates split points that evenly partition the key space into N ranges (where N is
      * minNumChunksForSessionsCollection rounded up the next power of 2), and splits any chunks that
      * straddle those split points. If the collection is any other collection, splits any chunks
-     * that straddle tag boundaries.
+     * that straddle zone boundaries.
      */
     Status _splitChunksIfNeeded(OperationContext* opCtx);
 

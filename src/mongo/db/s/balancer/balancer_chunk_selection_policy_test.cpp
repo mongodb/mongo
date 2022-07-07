@@ -100,16 +100,17 @@ protected:
     }
 
     /**
-     * Returns a new BSON object with the tags appended.
+     * Returns a new BSON object with the zone encoded using the legacy field "tags"
+     * (to mimic the expected schema of config.shards)
      */
-    BSONObj appendTags(const BSONObj shardBSON, std::vector<std::string> tags) {
+    BSONObj appendZones(const BSONObj shardBSON, std::vector<std::string> zones) {
         BSONObjBuilder appendedShardBSON(shardBSON);
-        BSONArrayBuilder tagsBuilder;
-        for (auto& tag : tags) {
-            tagsBuilder.append(tag);
+        BSONArrayBuilder zonesBuilder;
+        for (auto& zone : zones) {
+            zonesBuilder.append(zone);
         }
-        tagsBuilder.done();
-        appendedShardBSON.append("tags", tagsBuilder.arr());
+        zonesBuilder.done();
+        appendedShardBSON.append("tags", zonesBuilder.arr());
         return appendedShardBSON.obj();
     }
 
@@ -118,7 +119,7 @@ protected:
     std::unique_ptr<BalancerChunkSelectionPolicy> _chunkSelectionPolicy;
 };
 
-TEST_F(BalancerChunkSelectionTest, TagRangesOverlap) {
+TEST_F(BalancerChunkSelectionTest, ZoneRangesOverlap) {
     // Set up two shards in the metadata.
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     NamespaceString::kConfigsvrShardsNamespace,
@@ -140,9 +141,9 @@ TEST_F(BalancerChunkSelectionTest, TagRangesOverlap) {
         setUpChunk(collUUID, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
 
     auto assertRangeOverlapConflictWhenMoveChunk =
-        [this, &chunk](const StringMap<ChunkRange>& tagChunkRanges) {
+        [this, &chunk](const StringMap<ChunkRange>& zoneChunkRanges) {
             // Set up two zones whose ranges overlap.
-            setUpTags(kNamespace, tagChunkRanges);
+            setUpZones(kNamespace, zoneChunkRanges);
 
             auto future = launchAsync([this, &chunk] {
                 ThreadClient tc(getServiceContext());
@@ -161,7 +162,7 @@ TEST_F(BalancerChunkSelectionTest, TagRangesOverlap) {
 
             expectGetStatsCommands(2);
             future.default_timed_get();
-            removeAllTags(kNamespace);
+            removeAllZones(kNamespace);
         };
 
     assertRangeOverlapConflictWhenMoveChunk(
@@ -175,17 +176,17 @@ TEST_F(BalancerChunkSelectionTest, TagRangesOverlap) {
          {"B", {BSON(kPattern << -15), kKeyPattern.globalMax()}}});
 }
 
-TEST_F(BalancerChunkSelectionTest, TagRangeMaxNotAlignedWithChunkMax) {
+TEST_F(BalancerChunkSelectionTest, ZoneRangeMaxNotAlignedWithChunkMax) {
     RAIIServerParameterControllerForTest featureFlagBalanceAccordingToDataSize{
         "featureFlagBalanceAccordingToDataSize", false};
     // Set up two shards in the metadata.
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     NamespaceString::kConfigsvrShardsNamespace,
-                                                    appendTags(kShard0, {"A"}),
+                                                    appendZones(kShard0, {"A"}),
                                                     kMajorityWriteConcern));
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     NamespaceString::kConfigsvrShardsNamespace,
-                                                    appendTags(kShard1, {"A"}),
+                                                    appendZones(kShard1, {"A"}),
                                                     kMajorityWriteConcern));
 
     // Set up a database and a sharded collection in the metadata.
@@ -195,7 +196,7 @@ TEST_F(BalancerChunkSelectionTest, TagRangeMaxNotAlignedWithChunkMax) {
     setUpCollection(kNamespace, collUUID, version);
 
     // Set up the zone.
-    setUpTags(kNamespace, {{"A", {kKeyPattern.globalMin(), BSON(kPattern << -10)}}});
+    setUpZones(kNamespace, {{"A", {kKeyPattern.globalMin(), BSON(kPattern << -10)}}});
 
     auto assertErrorWhenMoveChunk =
         [this, &version, &collUUID](const std::vector<ChunkRange>& chunkRanges) {
@@ -237,14 +238,14 @@ TEST_F(BalancerChunkSelectionTest, TagRangeMaxNotAlignedWithChunkMax) {
 }
 
 TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCanBeAutoSplitted) {
-    // Set up two shards in the metadata, each one with its own tag
+    // Set up two shards in the metadata, each one with its own zone
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     NamespaceString::kConfigsvrShardsNamespace,
-                                                    appendTags(kShard0, {"A"}),
+                                                    appendZones(kShard0, {"A"}),
                                                     kMajorityWriteConcern));
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     NamespaceString::kConfigsvrShardsNamespace,
-                                                    appendTags(kShard1, {"B"}),
+                                                    appendZones(kShard1, {"B"}),
                                                     kMajorityWriteConcern));
 
     // Set up a database and a sharded collection in the metadata.
@@ -257,11 +258,11 @@ TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCanBeAutoSplitted
     setUpCollection(kNamespace, collUUID, version, std::move(tsFields));
 
     // Set up two zones
-    setUpTags(kNamespace,
-              {
-                  {"A", {kKeyPattern.globalMin(), BSON(kPattern << 0)}},
-                  {"B", {BSON(kPattern << 0), kKeyPattern.globalMax()}},
-              });
+    setUpZones(kNamespace,
+               {
+                   {"A", {kKeyPattern.globalMin(), BSON(kPattern << 0)}},
+                   {"B", {BSON(kPattern << 0), kKeyPattern.globalMax()}},
+               });
 
     // Create just one chunk covering the whole space
     setUpChunk(collUUID, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);

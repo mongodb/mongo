@@ -162,17 +162,17 @@ StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::_getStats(
                   "error"_attr = mongoDVersionStatus.getStatus());
         }
 
-        std::set<std::string> shardTags;
+        std::set<std::string> shardZones;
 
-        for (const auto& shardTag : shard.getTags()) {
-            shardTags.insert(shardTag);
+        for (const auto& shardZone : shard.getTags()) {
+            shardZones.insert(shardZone);
         }
 
         stats.emplace_back(shard.getName(),
                            shard.getMaxSizeMB() * 1024 * 1024,
                            shardSizeStatus.getValue(),
                            shard.getDraining(),
-                           std::move(shardTags),
+                           std::move(shardZones),
                            std::move(mongoDVersion),
                            ShardStatistics::use_bytes_t{});
     }

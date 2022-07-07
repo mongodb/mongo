@@ -53,27 +53,27 @@ ClusterStatistics::ShardStatistics::ShardStatistics(ShardId inShardId,
                                                     uint64_t inMaxSizeBytes,
                                                     uint64_t inCurrSizeBytes,
                                                     bool inIsDraining,
-                                                    std::set<std::string> inShardTags,
+                                                    std::set<std::string> inShardZones,
                                                     std::string inMongoVersion,
                                                     use_bytes_t t)
     : shardId(std::move(inShardId)),
       maxSizeBytes(inMaxSizeBytes),
       currSizeBytes(inCurrSizeBytes),
       isDraining(inIsDraining),
-      shardTags(std::move(inShardTags)),
+      shardZones(std::move(inShardZones)),
       mongoVersion(std::move(inMongoVersion)) {}
 
 ClusterStatistics::ShardStatistics::ShardStatistics(ShardId inShardId,
                                                     uint64_t inMaxSizeMB,
                                                     uint64_t inCurrSizeMB,
                                                     bool inIsDraining,
-                                                    std::set<std::string> inShardTags,
+                                                    std::set<std::string> inShardZones,
                                                     std::string inMongoVersion)
     : ShardStatistics(inShardId,
                       convertMBToBytes(inMaxSizeMB),
                       convertMBToBytes(inCurrSizeMB),
                       inIsDraining,
-                      std::move(inShardTags),
+                      std::move(inShardZones),
                       std::move(inMongoVersion),
                       use_bytes_t{}) {}
 
@@ -83,21 +83,6 @@ bool ClusterStatistics::ShardStatistics::isSizeMaxed() const {
     }
 
     return currSizeBytes >= maxSizeBytes;
-}
-
-BSONObj ClusterStatistics::ShardStatistics::toBSON() const {
-    BSONObjBuilder builder;
-    builder.append("id", shardId.toString());
-    builder.append("maxSizeMB", static_cast<long long>(maxSizeBytes / 1024 / 1024));
-    builder.append("currSizeMB", static_cast<long long>(currSizeBytes / 1024 / 1024));
-    builder.append("draining", isDraining);
-    if (!shardTags.empty()) {
-        BSONArrayBuilder arrayBuilder(builder.subarrayStart("tags"));
-        arrayBuilder.append(shardTags);
-    }
-
-    builder.append("version", mongoVersion);
-    return builder.obj();
 }
 
 }  // namespace mongo
