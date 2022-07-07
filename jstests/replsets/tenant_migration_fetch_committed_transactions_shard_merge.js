@@ -9,7 +9,7 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
- *   incompatible_with_shard_merge,
+ *   featureFlagShardMerge,
  *   requires_fcv_53
  * ]
  */
@@ -24,12 +24,13 @@ load("jstests/replsets/rslib.js");
 load("jstests/libs/uuid_util.js");
 
 const tenantId = "testTenantId";
+const otherTenantId = "otherTestTenantId";
 const transactionsNS = "config.transactions";
 const collName = "testColl";
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 const tenantDB = tenantMigrationTest.tenantDB(tenantId, "testDB");
-const nonTenantDB = tenantMigrationTest.nonTenantDB(tenantId, "testDB");
+const otherTenantDB = tenantMigrationTest.tenantDB(otherTenantId, "testDB");
 const tenantNS = `${tenantDB}.${collName}`;
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
@@ -100,10 +101,12 @@ assert.eq(1, donorPrimary.getCollection(transactionsNS).find().itcount());
 
 assert.eq(2, donorPrimary.getCollection(transactionsNS).find().itcount());
 
+let sessionIdForOtherTenant;
 {
-    jsTestLog("Run and commit a transaction that does not belong to the tenant");
+    jsTestLog("Run and commit a transaction for a different tenant");
     const session = donorPrimary.startSession({causalConsistency: false});
-    const sessionDb = session.getDatabase(nonTenantDB);
+    sessionIdForOtherTenant = session.getSessionId();
+    const sessionDb = session.getDatabase(otherTenantDB);
     const sessionColl = sessionDb.getCollection(collName);
 
     session.startTransaction({writeConcern: {w: "majority"}});
@@ -115,9 +118,11 @@ assert.eq(2, donorPrimary.getCollection(transactionsNS).find().itcount());
 assert.eq(3, donorPrimary.getCollection(transactionsNS).find().itcount());
 
 jsTestLog("Running a migration");
+
 const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
+    // TODO(SERVER-63454): Remove tenantId when it is no longer required for shard merge.
     tenantId,
 };
 
@@ -128,15 +133,16 @@ assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
 fpAfterFetchingCommittedTransactions.wait();
 
-// Verify that the recipient has fetched and written the committed transaction entry
-// belonging to the migrating tenant from the donor.
-assert.eq(1, recipientPrimary.getCollection(transactionsNS).find().itcount());
+// Verify that the recipient has fetched and written all committed transaction entries
+// from the donor.
+assert.eq(2, recipientPrimary.getCollection(transactionsNS).find().itcount());
 
 fpAfterFetchingCommittedTransactions.off();
 
 TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
 validateTransactionEntryonRecipient(sessionIdBeforeMigration);
+validateTransactionEntryonRecipient(sessionIdForOtherTenant);
 
 tenantMigrationTest.stop();
 })();

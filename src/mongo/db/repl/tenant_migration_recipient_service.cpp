@@ -1262,7 +1262,7 @@ TenantMigrationRecipientService::Instance::_makeCommittedTransactionsAggregation
     {
         stdx::lock_guard lk(_mutex);
         invariant(_stateDoc.getStartApplyingDonorOpTime());
-        startApplyingDonorOpTime = _stateDoc.getStartApplyingDonorOpTime().get().getTimestamp();
+        startApplyingDonorOpTime = _stateDoc.getStartApplyingDonorOpTime()->getTimestamp();
     }
 
     auto serializedPipeline =
@@ -1420,6 +1420,58 @@ TenantMigrationRecipientService::Instance::_fetchCommittedTransactionsBeforeStar
         }
     }
 
+    std::unique_ptr<DBClientCursor> cursor;
+    if (_protocol == MigrationProtocolEnum::kShardMerge) {
+        cursor = _openCommittedTransactionsFindCursor();
+    } else {
+        cursor = _openCommittedTransactionsAggregationCursor();
+    }
+
+    while (cursor->more()) {
+        auto transactionEntry = cursor->next();
+        _processCommittedTransactionEntry(transactionEntry);
+
+        stdx::lock_guard lk(_mutex);
+        if (_taskState.isInterrupted()) {
+            uassertStatusOK(_taskState.getInterruptStatus());
+        }
+    }
+
+
+    stdx::lock_guard lk(_mutex);
+    _stateDoc.setCompletedUpdatingTransactionsBeforeStartOpTime(true);
+    return ExecutorFuture(**_scopedExecutor)
+        .then([this, self = shared_from_this(), stateDoc = _stateDoc] {
+            auto opCtx = cc().makeOperationContext();
+            uassertStatusOK(
+                tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), stateDoc));
+        })
+        .semi();
+}
+
+std::unique_ptr<DBClientCursor>
+TenantMigrationRecipientService::Instance::_openCommittedTransactionsFindCursor() {
+    Timestamp startApplyingDonorTimestamp;
+    {
+        stdx::lock_guard lk(_mutex);
+        invariant(_stateDoc.getStartApplyingDonorOpTime());
+        startApplyingDonorTimestamp = _stateDoc.getStartApplyingDonorOpTime()->getTimestamp();
+    }
+
+    FindCommandRequest findCommandRequest{NamespaceString::kSessionTransactionsTableNamespace};
+    findCommandRequest.setFilter(BSON("state"
+                                      << "committed"
+                                      << "lastWriteOpTime.ts"
+                                      << BSON("$lte" << startApplyingDonorTimestamp)));
+    findCommandRequest.setReadConcern(
+        ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    findCommandRequest.setHint(BSON("$natural" << 1));
+
+    return _client->find(std::move(findCommandRequest), _readPreference, ExhaustMode::kOn);
+}
+
+std::unique_ptr<DBClientCursor>
+TenantMigrationRecipientService::Instance::_openCommittedTransactionsAggregationCursor() {
     auto aggRequest = _makeCommittedTransactionsAggregation();
 
     auto statusWith = DBClientCursor::fromAggregationRequest(
@@ -1431,26 +1483,7 @@ TenantMigrationRecipientService::Instance::_fetchCommittedTransactionsBeforeStar
         uassertStatusOK(statusWith.getStatus());
     }
 
-    auto cursor = statusWith.getValue().get();
-    while (cursor->more()) {
-        auto transactionEntry = cursor->next();
-        _processCommittedTransactionEntry(transactionEntry);
-
-        stdx::lock_guard lk(_mutex);
-        if (_taskState.isInterrupted()) {
-            uassertStatusOK(_taskState.getInterruptStatus());
-        }
-    }
-
-    stdx::lock_guard lk(_mutex);
-    _stateDoc.setCompletedUpdatingTransactionsBeforeStartOpTime(true);
-    return ExecutorFuture(**_scopedExecutor)
-        .then([this, self = shared_from_this(), stateDoc = _stateDoc] {
-            auto opCtx = cc().makeOperationContext();
-            uassertStatusOK(
-                tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), stateDoc));
-        })
-        .semi();
+    return std::move(statusWith.getValue());
 }
 
 void TenantMigrationRecipientService::Instance::_createOplogBuffer(WithLock,

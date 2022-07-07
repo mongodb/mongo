@@ -419,10 +419,20 @@ public:
         SemiFuture<void> _fetchRetryableWritesOplogBeforeStartOpTime();
 
         /**
-         * Runs the aggregation from '_makeCommittedTransactionsAggregation()' and migrates the
-         * resulting committed transactions entries into 'config.transactions'.
+         * Migrates committed transactions entries into 'config.transactions'.
          */
         SemiFuture<void> _fetchCommittedTransactionsBeforeStartOpTime();
+
+        /**
+         * Opens and returns a cursor for all entries with 'lastWriteOpTime' <=
+         * 'startApplyingDonorOpTime' and state 'committed'.
+         */
+        std::unique_ptr<DBClientCursor> _openCommittedTransactionsFindCursor();
+
+        /**
+         * Opens and returns a cursor for entries from '_makeCommittedTransactionsAggregation()'.
+         */
+        std::unique_ptr<DBClientCursor> _openCommittedTransactionsAggregationCursor();
 
         /**
          * Creates an aggregation pipeline to fetch transaction entries with 'lastWriteOpTime' <

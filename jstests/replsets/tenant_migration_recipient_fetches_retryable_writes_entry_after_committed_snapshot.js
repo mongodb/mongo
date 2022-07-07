@@ -196,7 +196,7 @@ assert.eq(startFetchingDonorOpTime.ts, stmtMajorityCommitted.ts);
 
 // At this point, the recipient should have fetched retryable writes and put them into the
 // oplog buffer.
-const kOplogBufferNS = "config.repl.migration.oplog_" + migrationOpts.migrationIdString;
+const kOplogBufferNS = `config.repl.migration.oplog_${migrationOpts.migrationIdString}`;
 const recipientOplogBuffer = recipientPrimary.getCollection(kOplogBufferNS);
 jsTestLog(`oplog buffer ns: ${kOplogBufferNS}`);
 

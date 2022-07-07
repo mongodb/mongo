@@ -1,15 +1,7 @@
 /**
  * Tests that the client can retry commitTransaction on the tenant migration recipient.
  *
- * TODO SERVER-65820: For shard merge protocol, we no longer generate session no-op oplog entries
- * with tenant namespace. As a result, we would miss fetching committed transaction entries from
- * config.transactions table when doing back-to-back migration, leading to this test failure.
- * So, temporarily blacklisting this test. SERVER-65820 will fetch all committed transaction
- * entries and doesn't do tenant filtering for shard merge protocol. So, SERVER-65820 should
- * remove this temporary tag 'incompatible_with_shard_merge' tag.
- *
  * @tags: [
- *   incompatible_with_shard_merge,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
