@@ -35,7 +35,9 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -74,7 +76,7 @@ public:
     }
 
     bool isBackground() const {
-        return _mode == ValidateMode::kBackground;
+        return _mode == ValidateMode::kBackground || _mode == ValidateMode::kBackgroundCheckBSON;
     }
 
     bool shouldEnforceFastCount() const;
@@ -86,6 +88,14 @@ public:
 
     bool isFullIndexValidation() const {
         return isFullValidation() || _mode == ValidateMode::kForegroundFullIndexOnly;
+    }
+
+    bool isCheckingBSONConsistencies() const {
+        return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            feature_flags::gExtendValidateCommand.isEnabled(
+                serverGlobalParams.featureCompatibility) &&
+            (_mode == ValidateMode::kForegroundCheckBSON ||
+             _mode == ValidateMode::kBackgroundCheckBSON || isFullValidation());
     }
 
     bool isCollectionSchemaViolated() const {

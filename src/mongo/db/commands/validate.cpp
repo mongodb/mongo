@@ -35,7 +35,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
@@ -71,6 +73,7 @@ stdx::condition_variable _validationNotifier;
  *       validate: "collectionNameWithoutTheDBPart",
  *       full: <bool>  // If true, a more thorough (and slower) collection validation is performed.
  *       background: <bool>  // If true, performs validation on the checkpoint of the collection.
+ *       checkBSONConsistency: <bool> // If true, validates BSON documents more thoroughly.
  *       metadata: <bool>  // If true, performs a faster validation only on metadata.
  *   }
  */
@@ -83,13 +86,15 @@ public:
     }
 
     std::string help() const override {
-        return str::stream() << "Validate contents of a namespace by scanning its data structures "
-                             << "for correctness.\nThis is a slow operation.\n"
-                             << "\tAdd {full: true} option to do a more thorough check.\n"
-                             << "\tAdd {background: true} to validate in the background.\n"
-                             << "\tAdd {repair: true} to run repair mode.\n"
-                             << "\tAdd {metadata: true} to only check collection metadata.\n"
-                             << "Cannot specify both {full: true, background: true}.";
+        return str::stream()
+            << "Validate contents of a namespace by scanning its data structures "
+            << "for correctness.\nThis is a slow operation.\n"
+            << "\tAdd {full: true} option to do a more thorough check.\n"
+            << "\tAdd {background: true} to validate in the background.\n"
+            << "\tAdd {repair: true} to run repair mode.\n"
+            << "\tAdd {checkBSONConsistency: true} to validate BSON documents more thoroughly.\n"
+            << "\tAdd {metadata: true} to only check collection metadata.\n"
+            << "Cannot specify both {full: true, background: true}.";
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -142,6 +147,22 @@ public:
                                     << " and { enforceFastCount: true } is not supported.");
         }
 
+        const auto rawCheckBSONConsistency = cmdObj["checkBSONConsistency"];
+        const bool checkBSONConsistency = rawCheckBSONConsistency.trueValue();
+        if (rawCheckBSONConsistency &&
+            !feature_flags::gExtendValidateCommand.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream() << "The 'checkBSONConsistency' option is not supported by the "
+                                       "validate command.");
+        }
+        if (rawCheckBSONConsistency && !checkBSONConsistency &&
+            (fullValidate || enforceFastCount)) {
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream() << "Cannot explicitly set 'checkBSONConsistency: false' with "
+                                       "full validation set.");
+        }
+
         const bool repair = cmdObj["repair"].trueValue();
         if (opCtx->readOnly() && repair) {
             uasserted(ErrorCodes::InvalidOptions,
@@ -159,6 +180,12 @@ public:
                           << "Running the validate command with both { enforceFastCount: true }"
                           << " and { repair: true } is not supported.");
         }
+        if (checkBSONConsistency && repair) {
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream()
+                          << "Running the validate command with both { checkBSONConsistency: true }"
+                          << " and { repair: true } is not supported.");
+        }
         repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (repair && replCoord->isReplEnabled()) {
             uasserted(ErrorCodes::InvalidOptions,
@@ -168,7 +195,8 @@ public:
         }
 
         const bool metadata = cmdObj["metadata"].trueValue();
-        if (metadata && (background || fullValidate || enforceFastCount || repair)) {
+        if (metadata &&
+            (background || fullValidate || enforceFastCount || checkBSONConsistency || repair)) {
             uasserted(ErrorCodes::InvalidOptions,
                       str::stream() << "Running the validate command with { metadata: true } is not"
                                     << " supported with any other options");
@@ -181,6 +209,7 @@ public:
                   "background"_attr = background,
                   "full"_attr = fullValidate,
                   "enforceFastCount"_attr = enforceFastCount,
+                  "checkBSONConsistency"_attr = checkBSONConsistency,
                   "repair"_attr = repair);
         }
 
@@ -209,14 +238,24 @@ public:
         });
 
         auto mode = [&] {
-            if (metadata)
+            if (metadata) {
                 return CollectionValidation::ValidateMode::kMetadata;
-            if (background)
+            }
+            if (background) {
+                if (checkBSONConsistency) {
+                    return CollectionValidation::ValidateMode::kBackgroundCheckBSON;
+                }
                 return CollectionValidation::ValidateMode::kBackground;
-            if (enforceFastCount)
+            }
+            if (enforceFastCount) {
                 return CollectionValidation::ValidateMode::kForegroundFullEnforceFastCount;
-            if (fullValidate)
+            }
+            if (fullValidate) {
                 return CollectionValidation::ValidateMode::kForegroundFull;
+            }
+            if (checkBSONConsistency) {
+                return CollectionValidation::ValidateMode::kForegroundCheckBSON;
+            }
             return CollectionValidation::ValidateMode::kForeground;
         }();
 
@@ -227,6 +266,7 @@ public:
             }
             switch (mode) {
                 case CollectionValidation::ValidateMode::kForeground:
+                case CollectionValidation::ValidateMode::kForegroundCheckBSON:
                 case CollectionValidation::ValidateMode::kForegroundFull:
                 case CollectionValidation::ValidateMode::kForegroundFullIndexOnly:
                     // Foreground validation may not repair data while running as a replica set node

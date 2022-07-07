@@ -48,6 +48,8 @@ enum class ValidateMode {
     // Does the above, plus checks a collection's data and indexes for correctness in a non-blocking
     // manner using an intent collection lock.
     kBackground,
+    // Does the above, plus checks BSON documents more thoroughly.
+    kBackgroundCheckBSON,
     // Does the above, but in a blocking manner using an exclusive collection lock.
     kForeground,
 
@@ -58,13 +60,18 @@ enum class ValidateMode {
     // This mode is only used by repair to avoid revalidating the record store.
     kForegroundFullIndexOnly,
 
-    // The full index validation above, plus a full validation of the underlying record store using
-    // the storage engine's validation functionality. For WiredTiger, this results in a call to
+    // The standard foreground validation above, plus a more thorough BSON document validation.
+    kForegroundCheckBSON,
+
+    // The full index validation and more thorough BSON document validation above, plus a full
+    // validation of the underlying record store using the storage engine's validation
+    // functionality. For WiredTiger, this results in a call to
     // verify().
     kForegroundFull,
 
-    // The full index and record store validation above, plus enforce that the fast count is equal
-    // to the number of records (as opposed to correcting the fast count if it is incorrect).
+    // The full index, BSON document, and record store validation above, plus enforce that the fast
+    // count is equal to the number of records (as opposed to correcting the fast count if it is
+    // incorrect).
     kForegroundFullEnforceFastCount,
 };
 
