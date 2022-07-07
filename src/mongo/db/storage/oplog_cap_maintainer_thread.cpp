@@ -95,7 +95,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
                             "Error in OplogCapMaintainerThread",
                             "error"_attr = e.what());
     } catch (...) {
-        fassertFailedNoTrace(!"unknown error in OplogCapMaintainerThread");
+        LOGV2_FATAL_NOTRACE(5184100, "Unknown error in OplogCapMaintainerThread");
     }
     return true;
 }
