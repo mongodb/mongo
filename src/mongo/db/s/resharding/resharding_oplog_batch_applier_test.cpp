@@ -36,7 +36,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/op_observer_registry.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"

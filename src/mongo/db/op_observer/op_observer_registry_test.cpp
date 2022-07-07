@@ -29,9 +29,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/op_observer_registry.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
 
-#include "mongo/db/op_observer_noop.h"
+#include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/unittest/death_test.h"

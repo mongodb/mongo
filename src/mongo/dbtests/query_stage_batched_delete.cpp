@@ -38,7 +38,7 @@
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
-#include "mongo/db/op_observer_noop.h"
+#include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"

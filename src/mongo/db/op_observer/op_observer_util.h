@@ -27,44 +27,42 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/op_observer.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
 
-#include "mongo/db/operation_context.h"
+namespace mongo::repl {
+BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
+                          const CollectionOptions& oldCollOptions,
+                          boost::optional<IndexCollModInfo> indexInfo);
 
-namespace mongo {
-namespace {
-const auto getOpObserverTimes = OperationContext::declareDecoration<OpObserver::Times>();
-}  // namespace
-
-auto OpObserver::Times::get(OperationContext* const opCtx) -> Times& {
-    return getOpObserverTimes(opCtx);
-}
-
-OpObserver::ReservedTimes::ReservedTimes(OperationContext* const opCtx)
-    : _times(Times::get(opCtx)) {
-    // Every time that a `ReservedTimes` scope object is instantiated, we have to track if there was
-    // a potentially recursive call. When there was no `OpObserver` chain being executed before this
-    // instantiation, we should have an empty `reservedOpTimes` vector.
-    if (!_times._recursionDepth++) {
-        invariant(_times.reservedOpTimes.empty());
+class DocumentKey {
+public:
+    DocumentKey(BSONObj id, boost::optional<BSONObj> _shardKey)
+        : _id(id.getOwned()), _shardKey(std::move(_shardKey)) {
+        invariant(!id.isEmpty());
     }
 
-    invariant(_times._recursionDepth > 0);
-    invariant(_times._recursionDepth == 1 || !opCtx->writesAreReplicated());
-}
+    BSONObj getId() const;
 
-OpObserver::ReservedTimes::~ReservedTimes() {
-    // Every time the `ReservedTimes` guard goes out of scope, this indicates one fewer level of
-    // recursion in the `OpObserver` registered chain.
-    if (!--_times._recursionDepth) {
-        // When the depth hits 0, the `OpObserver` is considered to have finished, and therefore the
-        // `reservedOpTimes` state needs to be reset.
-        _times.reservedOpTimes.clear();
-    }
+    BSONObj getShardKeyAndId() const;
 
-    invariant(_times._recursionDepth >= 0);
-}
+private:
+    BSONObj _id;
+    boost::optional<BSONObj> _shardKey;
+};
 
-}  // namespace mongo
+/**
+ * Returns a DocumentKey constructed from the shard key fields, if the collection is sharded,
+ * and the _id field, of the given document.
+ */
+DocumentKey getDocumentKey(OperationContext* opCtx, NamespaceString const& nss, BSONObj const& doc);
+
+/**
+ * Provides access to the DocumentKey attached to this OperationContext.
+ */
+extern const OperationContext::Decoration<boost::optional<repl::DocumentKey>> documentKeyDecoration;
+
+}  // namespace mongo::repl

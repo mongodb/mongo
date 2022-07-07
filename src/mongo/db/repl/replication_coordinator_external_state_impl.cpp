@@ -58,7 +58,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/logical_time_validator.h"
-#include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/bgsync.h"

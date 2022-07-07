@@ -54,7 +54,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/get_executor.h"

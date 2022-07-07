@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/platform/mutex.h"
 
 namespace mongo {

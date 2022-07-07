@@ -40,7 +40,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"

@@ -46,7 +46,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_build_entry_helpers.h"
-#include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/cloner_utils.h"
 #include "mongo/db/repl/member_state.h"

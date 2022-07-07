@@ -86,7 +86,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/op_observer',
+        '$BUILD_DIR/mongo/db/op_observer/op_observer',
         'cluster_server_parameter_initializer',
     ],
 )

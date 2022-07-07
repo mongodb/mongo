@@ -34,8 +34,8 @@
 #include <utility>
 
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/op_observer_noop.h"
-#include "mongo/db/op_observer_registry.h"
+#include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/persistent_task_store.h"

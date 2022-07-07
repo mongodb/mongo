@@ -31,7 +31,7 @@
 
 #include <string>
 
-#include "mongo/db/op_observer_registry.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {

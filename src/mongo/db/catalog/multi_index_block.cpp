@@ -43,7 +43,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/multi_key_path_tracker.h"
-#include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/repl/repl_set_config.h"

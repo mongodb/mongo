@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,37 +29,66 @@
 
 #pragma once
 
-#include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer/op_observer.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 
-class OpObserverNoop : public OpObserver {
+/**
+ * OpObserver for Feature Compatibility Version (FCV).
+ * Observes all writes to the FCV document under admin.system.version and sets the in-memory FCV
+ * value.
+ */
+class FcvOpObserver final : public OpObserver {
+    FcvOpObserver(const FcvOpObserver&) = delete;
+    FcvOpObserver& operator=(const FcvOpObserver&) = delete;
+
 public:
+    FcvOpObserver() = default;
+    ~FcvOpObserver() = default;
+
+    // FcvOpObserver overrides.
+
+    void onInserts(OperationContext* opCtx,
+                   const NamespaceString& nss,
+                   const UUID& uuid,
+                   std::vector<InsertStatement>::const_iterator first,
+                   std::vector<InsertStatement>::const_iterator last,
+                   bool fromMigrate) final;
+
+    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) final;
+
+    void onDelete(OperationContext* opCtx,
+                  const NamespaceString& nss,
+                  const UUID& uuid,
+                  StmtId stmtId,
+                  const OplogDeleteEntryArgs& args) final;
+
+    // Noop overrides.
+
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
                        const UUID& uuid,
                        BSONObj indexDoc,
-                       bool fromMigrate) override {}
+                       bool fromMigrate) final {}
 
     void onStartIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const UUID& collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
-                           bool fromMigrate) override {}
+                           bool fromMigrate) final {}
 
-    void onStartIndexBuildSinglePhase(OperationContext* opCtx,
-                                      const NamespaceString& nss) override {}
+    void onStartIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) final {}
 
-    void onAbortIndexBuildSinglePhase(OperationContext* opCtx,
-                                      const NamespaceString& nss) override {}
+    void onAbortIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) final {}
 
     void onCommitIndexBuild(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const UUID& collUUID,
                             const UUID& indexBuildUUID,
                             const std::vector<BSONObj>& indexes,
-                            bool fromMigrate) override {}
+                            bool fromMigrate) final {}
 
     void onAbortIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
@@ -67,24 +96,12 @@ public:
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
                            const Status& cause,
-                           bool fromMigrate) override {}
+                           bool fromMigrate) final {}
 
-    void onInserts(OperationContext* opCtx,
-                   const NamespaceString& nss,
-                   const UUID& uuid,
-                   std::vector<InsertStatement>::const_iterator begin,
-                   std::vector<InsertStatement>::const_iterator end,
-                   bool fromMigrate) override {}
-    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override{};
     void aboutToDelete(OperationContext* opCtx,
                        const NamespaceString& nss,
                        const UUID& uuid,
-                       const BSONObj& doc) override {}
-    void onDelete(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  const UUID& uuid,
-                  StmtId stmtId,
-                  const OplogDeleteEntryArgs& args) override {}
+                       const BSONObj& doc) final {}
     void onInternalOpMessage(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const boost::optional<UUID>& uuid,
@@ -93,34 +110,34 @@ public:
                              const boost::optional<repl::OpTime> preImageOpTime,
                              const boost::optional<repl::OpTime> postImageOpTime,
                              const boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
-                             const boost::optional<OplogSlot> slot) override {}
+                             const boost::optional<OplogSlot> slot) final {}
     void onCreateCollection(OperationContext* opCtx,
                             const CollectionPtr& coll,
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
                             const BSONObj& idIndex,
                             const OplogSlot& createOpTime,
-                            bool fromMigrate) override {}
+                            bool fromMigrate) final {}
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,
                    const UUID& uuid,
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
-                   boost::optional<IndexCollModInfo> indexInfo) override {}
-    void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override {}
+                   boost::optional<IndexCollModInfo> indexInfo) final {}
+    void onDropDatabase(OperationContext* opCtx, const std::string& dbName) final {}
     using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  const CollectionDropType dropType) override {
+                                  const CollectionDropType dropType) final {
         return {};
     }
     void onDropIndex(OperationContext* opCtx,
                      const NamespaceString& nss,
                      const UUID& uuid,
                      const std::string& indexName,
-                     const BSONObj& idxDescriptor) override {}
+                     const BSONObj& idxDescriptor) final {}
     using OpObserver::onRenameCollection;
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
@@ -128,7 +145,7 @@ public:
                             const UUID& uuid,
                             const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
-                            bool stayTemp) override {}
+                            bool stayTemp) final {}
     void onImportCollection(OperationContext* opCtx,
                             const UUID& importUUID,
                             const NamespaceString& nss,
@@ -136,7 +153,7 @@ public:
                             long long dataSize,
                             const BSONObj& catalogEntry,
                             const BSONObj& storageMetadata,
-                            bool isDryRun) override {}
+                            bool isDryRun) final {}
     using OpObserver::preRenameCollection;
     repl::OpTime preRenameCollection(OperationContext* opCtx,
                                      const NamespaceString& fromCollection,
@@ -144,7 +161,7 @@ public:
                                      const UUID& uuid,
                                      const boost::optional<UUID>& dropTargetUUID,
                                      std::uint64_t numRecords,
-                                     bool stayTemp) override {
+                                     bool stayTemp) final {
         return {};
     }
     void postRenameCollection(OperationContext* opCtx,
@@ -152,47 +169,68 @@ public:
                               const NamespaceString& toCollection,
                               const UUID& uuid,
                               const boost::optional<UUID>& dropTargetUUID,
-                              bool stayTemp) override {}
+                              bool stayTemp) final {}
     void onApplyOps(OperationContext* opCtx,
                     const std::string& dbName,
-                    const BSONObj& applyOpCmd) override {}
+                    const BSONObj& applyOpCmd) final {}
     void onEmptyCapped(OperationContext* opCtx,
                        const NamespaceString& collectionName,
-                       const UUID& uuid) override {}
+                       const UUID& uuid) final {}
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
                                        std::vector<repl::ReplOperation>* statements,
-                                       size_t numberOfPrePostImagesToWrite) override {}
-    void onBatchedWriteStart(OperationContext* opCtx) final {}
-    void onBatchedWriteCommit(OperationContext* opCtx) final {}
-    void onBatchedWriteAbort(OperationContext* opCtx) final {}
+                                       size_t numberOfPrePostImagesToWrite) final {}
+
     void onPreparedTransactionCommit(
         OperationContext* opCtx,
         OplogSlot commitOplogEntryOpTime,
         Timestamp commitTimestamp,
-        const std::vector<repl::ReplOperation>& statements) noexcept override{};
+        const std::vector<repl::ReplOperation>& statements) noexcept final{};
     std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
         OperationContext* opCtx,
         const std::vector<OplogSlot>& reservedSlots,
         size_t numberOfPrePostImagesToWrite,
         Date_t wallClockTime,
-        std::vector<repl::ReplOperation>* statements) override {
+        std::vector<repl::ReplOperation>* statements) final {
         return nullptr;
     }
+
     void onTransactionPrepare(
         OperationContext* opCtx,
         const std::vector<OplogSlot>& reservedSlots,
         std::vector<repl::ReplOperation>* statements,
         const ApplyOpsOplogSlotAndOperationAssignment* applyOpsOperationAssignment,
         size_t numberOfPrePostImagesToWrite,
-        Date_t wallClockTime) override{};
+        Date_t wallClockTime) final{};
+
     void onTransactionAbort(OperationContext* opCtx,
-                            boost::optional<OplogSlot> abortOplogEntryOpTime) override{};
+                            boost::optional<OplogSlot> abortOplogEntryOpTime) final{};
+
+    void onBatchedWriteStart(OperationContext* opCtx) final {}
+
+    void onBatchedWriteCommit(OperationContext* opCtx) final {}
+
+    void onBatchedWriteAbort(OperationContext* opCtx) final {}
+
     void onMajorityCommitPointUpdate(ServiceContext* service,
-                                     const repl::OpTime& newCommitPoint) override {}
+                                     const repl::OpTime& newCommitPoint) final {}
 
 private:
-    void _onReplicationRollback(OperationContext* opCtx,
-                                const RollbackObserverInfo& rbInfo) override {}
+    /**
+     * Set the FCV to newVersion, making sure to close any outgoing connections with incompatible
+     * servers and closing open transactions if necessary. Increments the server TopologyVersion.
+     */
+    static void _setVersion(OperationContext* opCtx,
+                            multiversion::FeatureCompatibilityVersion newVersion,
+                            boost::optional<Timestamp> commitTs = boost::none);
+
+    /**
+     * Examines a document inserted or updated in the server configuration collection
+     * (admin.system.version). If it is the featureCompatibilityVersion document, validates the
+     * document and on commit, updates the server parameter.
+     */
+    static void _onInsertOrUpdate(OperationContext* opCtx, const BSONObj& doc);
+
+    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 };
 
 }  // namespace mongo

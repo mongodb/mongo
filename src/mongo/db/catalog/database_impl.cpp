@@ -54,7 +54,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/introspect.h"
-#include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"

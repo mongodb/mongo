@@ -44,7 +44,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_access_method_factory_impl.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
-#include "mongo/db/op_observer_registry.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"

@@ -32,7 +32,7 @@
 
 #include "mongo/db/storage/write_unit_of_work.h"
 
-#include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"

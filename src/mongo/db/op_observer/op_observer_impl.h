@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/op_observer.h"
-#include "mongo/db/op_observer_util.h"
+#include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {

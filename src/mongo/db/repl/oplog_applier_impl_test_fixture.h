@@ -33,7 +33,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/op_observer_noop.h"
+#include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/service_context_d_test_fixture.h"

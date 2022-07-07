@@ -32,7 +32,7 @@
 #include <functional>
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/roll_back_local_operations.h"
 #include "mongo/db/repl/rollback.h"

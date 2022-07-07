@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/op_observer_util.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/index/index_descriptor.h"

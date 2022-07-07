@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/user_write_block_mode_op_observer.h"
+#include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
 
 #include "mongo/db/s/global_user_write_block_state.h"
 #include "mongo/db/s/user_writes_critical_section_document_gen.h"

@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/op_observer_util.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/operation_sharding_state.h"
