@@ -1201,7 +1201,7 @@ consistent. When a DDL request is received by a router, it gets forwarded to the
 of the targeted database. For the sake of clarity, createDatabase is the only DDL operation that cannot possibly get forwarded to the
 database primary but is instead routed to the config server, as the database may not exist yet.
 
-##### Serialization and joinability of DDL operations 
+##### Serialization and joinability of DDL operations
 When a primary shard receives a DDL request, it tries to construct a DDL coordinator performing the following steps:
 - Acquire the [distributed lock for the database](https://github.com/mongodb/mongo/blob/908e394d39b223ce498fde0d40e18c9200c188e2/src/mongo/db/s/sharding_ddl_coordinator.cpp#L155). This ensures that at most one DDL operation at a time will run for namespaces belonging to the same database on that particular primary node.
 - Acquire the distributed lock for the [collection](https://github.com/mongodb/mongo/blob/908e394d39b223ce498fde0d40e18c9200c188e2/src/mongo/db/s/sharding_ddl_coordinator.cpp#L171) (or [collections](https://github.com/mongodb/mongo/blob/908e394d39b223ce498fde0d40e18c9200c188e2/src/mongo/db/s/sharding_ddl_coordinator.cpp#L181)) involved in the operation.
@@ -1214,7 +1214,7 @@ on the shard in order to join the ongoing operation if the options match (same o
 Once the distributed locks have been acquired, it is guaranteed that no other concurrent DDLs are happening for the same database,
 hence a DDL coordinator can safely start [executing the operation](https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/sharding_ddl_coordinator.cpp#L207).
 
-As first step, each coordinator is required to [majority commit a document](https://github.com/mongodb/mongo/blob/2ae2bcedfb7d48e64843dd56b9e4f107c56944b6/src/mongo/db/s/sharding_ddl_coordinator.h#L105-L116) - 
+As first step, each coordinator is required to [majority commit a document](https://github.com/mongodb/mongo/blob/2ae2bcedfb7d48e64843dd56b9e4f107c56944b6/src/mongo/db/s/sharding_ddl_coordinator.h#L105-L116) -
 that we will refer to as state document - containing all information regarding the running operation such as name of the DDL, namespaces
 involved and other metadata identifying the original request. At this point, the coordinator is entitled to start making both local and
 remote catalog modifications, eventually after blocking CRUD operations on the changing namespaces; when the execution reaches relevant
