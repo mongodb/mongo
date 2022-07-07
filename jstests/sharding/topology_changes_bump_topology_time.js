@@ -32,6 +32,7 @@ function printConfigShards(st, msg) {
 (function() {
 
 'use strict';
+load('jstests/sharding/libs/remove_shard_util.js');
 
 var st = new ShardingTest({shards: 1, rs: {nodes: 1}, config: 3});
 
@@ -52,11 +53,9 @@ assertTopologyGt(topologyTimeAfterAddShard,
                  initialTopology,
                  "Current topologyTime should change after add shard, but it did not");
 
-assert.commandWorked(st.s.adminCommand({removeShard: "rs1"}));
-printConfigShards(st, "config.shards after first remove shard ");
+removeShard(st, "rs1");
 
-assert.commandWorked(st.s.adminCommand({removeShard: "rs1"}));
-printConfigShards(st, "config.shards after second remove shard ");
+printConfigShards(st, "config.shards after remove shard ");
 
 let topologyTimeAfterRemoveShard = getTopologyTime(st);
 
