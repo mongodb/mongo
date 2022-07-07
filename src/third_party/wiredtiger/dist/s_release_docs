@@ -63,7 +63,7 @@ echo "Rebuild documentation root"
 (cd "$TOPDIR/dist" && sh s_docs -l > /dev/null)
 
 # Copy the new files into the documentation repository
-(cd $TOPDIR && cp docs/top/* $DOC_DIR/)
+(cd $TOPDIR && cp -r docs/top/* $DOC_DIR/)
 
 # Unpack the documentation into the right location
 (mkdir -p $DOC_DIR/$pkgver && cd $RELEASE_DIR && \
