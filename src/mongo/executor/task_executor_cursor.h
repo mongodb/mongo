@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <memory>
 #include <vector>
 
 #include "mongo/base/status_with.h"
@@ -41,8 +42,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/producer_consumer_queue.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 namespace executor {
@@ -162,8 +162,10 @@ public:
      * Return the callback that this cursor is waiting on. Can be used to block on getting a
      * response to this request. Can be boost::none.
      */
-    auto getCallbackHandle() {
-        return _cbHandle;
+    boost::optional<TaskExecutor::CallbackHandle> getCallbackHandle() {
+        if (_cmdState)
+            return _cmdState->cbHandle;
+        return {};
     }
 
 private:
@@ -184,13 +186,12 @@ private:
      */
     void _processResponse(OperationContext* opCtx, CursorResponse&& response);
 
-
     /**
      * Create a new request, annotating with lsid and current opCtx
      */
     const RemoteCommandRequest& _createRequest(OperationContext* opCtx, const BSONObj& cmd);
 
-    executor::TaskExecutor* _executor;
+    executor::TaskExecutor* const _executor;
 
     // Used as a scratch pad for the successive scheduleRemoteCommand calls
     RemoteCommandRequest _rcr;
@@ -200,8 +201,20 @@ private:
     // If the opCtx is in our initial request, re-use it for all subsequent operations
     boost::optional<LogicalSessionId> _lsid;
 
-    // Stash the callbackhandle for the current outstanding operation
-    boost::optional<TaskExecutor::CallbackHandle> _cbHandle;
+    struct CommandState {
+        TaskExecutor::CallbackHandle cbHandle;
+        SharedPromise<BSONObj> promise;
+    };
+
+    /**
+     * Maintains the state for the in progress command (if there is any):
+     * - Handle for the task scheduled on `_executor`.
+     * - A promise that will be emplaced by the result of running the command.
+     *
+     * The state may outlive `TaskExecutorCursor` and is shared with the callback that runs on
+     * `_executor` upon completion of the remote command.
+     */
+    std::shared_ptr<CommandState> _cmdState;
 
     CursorId _cursorId = kUnitializedCursorId;
 
@@ -221,10 +234,6 @@ private:
     std::vector<BSONObj> _batch;
     decltype(_batch)::iterator _batchIter;
     long long _batchNum = 0;
-
-    // Multi producer because we hold onto the producer side in this object, as well as placing it
-    // into callbacks for the task executor
-    MultiProducerSingleConsumerQueue<StatusWith<BSONObj>>::Pipe _pipe;
 
     // Cursors built from the responses returned alongside the results for this cursor.
     std::vector<TaskExecutorCursor> _additionalCursors;
