@@ -60,12 +60,6 @@ feature_flags:
       default: true
       version: 6.0
 
-    featureFlagSearchMeta:
-      description: "Feature flag for allowing use of search collectors alongside search results"
-      cpp_varname: gFeatureFlagSearchMeta
-      default: true
-      version: 5.1
-
     featureFlagSbePlanCache:
       description: "Feature flag for enabling use of the SBE plan cache"
       cpp_varname: gFeatureFlagSbePlanCache

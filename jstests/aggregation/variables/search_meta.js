@@ -10,12 +10,6 @@
  */
 (function() {
 "use strict";
-const getSearchMetaParam = db.adminCommand({getParameter: 1, featureFlagSearchMeta: 1});
-const isSearchMetaEnabled = getSearchMetaParam.hasOwnProperty("featureFlagSearchMeta") &&
-    getSearchMetaParam.featureFlagSearchMeta.value;
-if (!isSearchMetaEnabled) {
-    return;
-}
 
 const coll = db.searchCollector;
 coll.drop();
