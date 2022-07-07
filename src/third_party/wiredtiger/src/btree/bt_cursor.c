@@ -676,10 +676,11 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
     WT_CURSOR *cursor;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    bool leaf_found, valid;
+    bool key_out_of_bounds, leaf_found, valid;
 
     btree = CUR2BT(cbt);
     cursor = &cbt->iface;
+    key_out_of_bounds = false;
     session = CUR2S(cbt);
 
     WT_STAT_CONN_DATA_INCR(session, cursor_search);
@@ -697,6 +698,21 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
     __cursor_novalue(cursor);
     __cursor_state_save(cursor, &state);
 
+    /*
+     * Check that the provided search key is within bounds. If not, return WT_NOTFOUND and early
+     * exit.
+     */
+    if (btree->type == BTREE_ROW && WT_CURSOR_BOUNDS_SET(cursor)) {
+        WT_ERR(__wt_btcur_bounds_early_exit(session, cbt, true, &key_out_of_bounds));
+
+        if (!key_out_of_bounds)
+            WT_ERR(__wt_btcur_bounds_early_exit(session, cbt, false, &key_out_of_bounds));
+
+        if (key_out_of_bounds) {
+            WT_STAT_CONN_DATA_INCR(session, cursor_bounds_search_early_exit);
+            WT_ERR(WT_NOTFOUND);
+        }
+    }
     /*
      * If we have a page pinned, search it; if we don't have a page pinned, or the search of the
      * pinned page doesn't find an exact match, search from the root.

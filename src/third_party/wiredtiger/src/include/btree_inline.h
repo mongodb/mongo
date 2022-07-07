@@ -2125,17 +2125,22 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32
  */
 static inline int
 __wt_btcur_bounds_early_exit(
-  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, bool next, bool *key_out_of_bounds)
+  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, bool next, bool *key_out_of_boundsp)
 {
+    uint64_t bound_flag;
+
+    bound_flag = next ? WT_CURSTD_BOUND_UPPER : WT_CURSTD_BOUND_LOWER;
+
+    if (!WT_CURSOR_BOUNDS_SET(&cbt->iface))
+        return (0);
+    if (!F_ISSET((&cbt->iface), bound_flag))
+        return (0);
+
     WT_RET(__wt_row_compare_bounds(
-      session, &cbt->iface, S2BT(session)->collator, next, key_out_of_bounds));
-    if (*key_out_of_bounds) {
-        if (next)
-            WT_STAT_CONN_DATA_INCR(session, cursor_bounds_next_early_exit);
-        else
-            WT_STAT_CONN_DATA_INCR(session, cursor_bounds_prev_early_exit);
+      session, &cbt->iface, S2BT(session)->collator, next, key_out_of_boundsp));
+    if (*key_out_of_boundsp)
         return (WT_NOTFOUND);
-    }
+
     return (0);
 }
 

@@ -145,7 +145,7 @@ __wt_prefix_match(const WT_ITEM *prefix, const WT_ITEM *tree_item)
  */
 static inline int
 __wt_row_compare_bounds(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_COLLATOR *collator,
-  bool next, bool *key_out_of_bounds)
+  bool next, bool *key_out_of_boundsp)
 {
     int cmpp;
 
@@ -153,16 +153,16 @@ __wt_row_compare_bounds(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_COLLATOR
         WT_ASSERT(session, WT_DATA_IN_ITEM(&cursor->upper_bound));
         WT_RET(__wt_compare(session, collator, &cursor->key, &cursor->upper_bound, &cmpp));
         if (F_ISSET(cursor, WT_CURSTD_BOUND_UPPER_INCLUSIVE))
-            *key_out_of_bounds = (cmpp > 0);
+            *key_out_of_boundsp = (cmpp > 0);
         else
-            *key_out_of_bounds = (cmpp >= 0);
+            *key_out_of_boundsp = (cmpp >= 0);
     } else {
         WT_ASSERT(session, WT_DATA_IN_ITEM(&cursor->lower_bound));
         WT_RET(__wt_compare(session, collator, &cursor->key, &cursor->lower_bound, &cmpp));
         if (F_ISSET(cursor, WT_CURSTD_BOUND_LOWER_INCLUSIVE))
-            *key_out_of_bounds = (cmpp < 0);
+            *key_out_of_boundsp = (cmpp < 0);
         else
-            *key_out_of_bounds = (cmpp <= 0);
+            *key_out_of_boundsp = (cmpp <= 0);
     }
     return (0);
 }

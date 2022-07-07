@@ -519,9 +519,10 @@ restart_read:
  */
 static inline int
 __cursor_row_prev(
-  WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp, bool *key_out_of_bounds)
+  WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp, bool *key_out_of_boundsp)
 {
     WT_CELL_UNPACK_KV kpack;
+    WT_DECL_RET;
     WT_INSERT *ins;
     WT_ITEM *key;
     WT_PAGE *page;
@@ -592,8 +593,10 @@ restart_read_insert:
              * If a lower bound has been set ensure that the key is within the range, otherwise
              * early exit.
              */
-            if (F_ISSET(&cbt->iface, WT_CURSTD_BOUND_LOWER))
-                WT_RET(__wt_btcur_bounds_early_exit(session, cbt, false, key_out_of_bounds));
+            if ((ret = __wt_btcur_bounds_early_exit(session, cbt, false, key_out_of_boundsp)) ==
+              WT_NOTFOUND)
+                WT_STAT_CONN_DATA_INCR(session, cursor_bounds_prev_early_exit);
+            WT_RET(ret);
 
             WT_RET(__wt_txn_read_upd_list(session, cbt, ins->upd));
             if (cbt->upd_value->type == WT_UPDATE_INVALID) {
@@ -647,8 +650,11 @@ restart_read_page:
          * If a lower bound has been set ensure that the key is within the range, otherwise early
          * exit.
          */
-        if (F_ISSET(&cbt->iface, WT_CURSTD_BOUND_LOWER))
-            WT_RET(__wt_btcur_bounds_early_exit(session, cbt, false, key_out_of_bounds));
+        if ((ret = __wt_btcur_bounds_early_exit(session, cbt, false, key_out_of_boundsp)) ==
+          WT_NOTFOUND)
+            WT_STAT_CONN_DATA_INCR(session, cursor_bounds_prev_early_exit);
+        WT_RET(ret);
+
         /*
          * Read the on-disk value and/or history. Pass an update list: the update list may contain
          * the base update for a modify chain after rollback-to-stable, required for correctness.
