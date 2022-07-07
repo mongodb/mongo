@@ -10,7 +10,7 @@
 (function() {
 "use strict";
 
-// TODO SERVER-66632 replace this with change stream disablement command. Extend the test cases for
+// TODO SERVER-66631 replace this with change stream disablement command. Extend the test cases for
 // enablement/disablement combinations.
 function disableChangeStream(connection) {
     const configDB = connection.getDB("config");
