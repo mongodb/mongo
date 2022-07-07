@@ -3833,6 +3833,17 @@ tasks:
           --detect-odr-violations
           --separate-debug
           PREFIX=dist-test
+    - command: shell.exec
+      params:
+        binary: bash
+        add_expansions_to_env: true
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          ${activate_virtualenv}
+          $python evergreen/macos_notary.py mongodb-binaries.${ext|tgz}
 
     - command: archive.targz_pack
       params:
