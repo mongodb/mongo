@@ -876,7 +876,7 @@ public:
         : CommandInvocation(command),
           _command(command),
           _request(request),
-          _dbName(_request.getDatabase().toString()) {}
+          _dbName(_request.getValidatedTenantId(), _request.getDatabase().toString()) {}
 
 private:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
@@ -905,7 +905,7 @@ private:
     }
 
     NamespaceString ns() const override {
-        return NamespaceString(_command->parseNs(_dbName, cmdObj()));
+        return NamespaceString(_dbName.tenantId(), _command->parseNs(_dbName.toString(), cmdObj()));
     }
 
     bool supportsWriteConcern() const override {
@@ -945,7 +945,7 @@ private:
 
     BasicCommandWithReplyBuilderInterface* const _command;
     const OpMsgRequest _request;
-    const std::string _dbName;
+    const DatabaseName _dbName;
 };
 
 Command::~Command() = default;

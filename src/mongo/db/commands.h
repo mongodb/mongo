@@ -856,7 +856,7 @@ public:
      * Runs the given command. Returns true upon success.
      */
     virtual bool runWithReplyBuilder(OperationContext* opCtx,
-                                     const std::string& db,
+                                     const DatabaseName& dbName,
                                      const BSONObj& cmdObj,
                                      rpc::ReplyBuilderInterface* replyBuilder) = 0;
 
@@ -864,9 +864,10 @@ public:
      * Provides a future that may run the command asynchronously. By default, it falls back to
      * runWithReplyBuilder.
      */
-    virtual Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec, std::string db) {
+    virtual Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec,
+                                  const DatabaseName& dbName) {
         if (!runWithReplyBuilder(
-                rec->getOpCtx(), db, rec->getRequest().body, rec->getReplyBuilder()))
+                rec->getOpCtx(), dbName, rec->getRequest().body, rec->getReplyBuilder()))
             return Status(ErrorCodes::FailedToRunWithReplyBuilder,
                           fmt::format("Failed to run command: {}", rec->getCommand()->getName()));
         return Status::OK();
@@ -1002,11 +1003,12 @@ public:
                      BSONObjBuilder& result) = 0;
 
     bool runWithReplyBuilder(OperationContext* opCtx,
-                             const std::string& db,
+                             const DatabaseName& dbName,
                              const BSONObj& cmdObj,
                              rpc::ReplyBuilderInterface* replyBuilder) override {
         auto result = replyBuilder->getBodyBuilder();
-        return run(opCtx, db, cmdObj, result);
+        // TODO SERVER-67459 change BasicCommand::run to take in DatabaseName
+        return run(opCtx, dbName.toStringWithTenantId(), cmdObj, result);
     }
 };
 
@@ -1066,7 +1068,7 @@ protected:
     BasicCommandWithRequestParser(StringData name) : BasicCommandWithReplyBuilderInterface(name) {}
 
     bool runWithReplyBuilder(OperationContext* opCtx,
-                             const std::string& db,
+                             const DatabaseName& dbName,
                              const BSONObj& cmdObj,
                              rpc::ReplyBuilderInterface* replyBuilder) final {
         auto result = replyBuilder->getBodyBuilder();
@@ -1074,7 +1076,8 @@ protected:
         // To enforce API versioning
         auto requestParser = RequestParser(opCtx, cmdObj);
 
-        auto cmdDone = runWithRequestParser(opCtx, db, cmdObj, requestParser, result);
+        auto cmdDone = runWithRequestParser(
+            opCtx, dbName.toStringWithTenantId(), cmdObj, requestParser, result);
 
         // Only validate results in test mode so that we don't expose users to errors if we
         // construct an invalid reply.

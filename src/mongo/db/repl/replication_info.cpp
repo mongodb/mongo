@@ -343,7 +343,7 @@ public:
                                std::vector<Privilege>* out) const final {}  // No auth required
 
     bool runWithReplyBuilder(OperationContext* opCtx,
-                             const string&,
+                             const DatabaseName& dbName,
                              const BSONObj& cmdObj,
                              rpc::ReplyBuilderInterface* replyBuilder) final {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
@@ -537,7 +537,7 @@ public:
             }
         }
 
-        handleHelloAuth(opCtx, cmd, &result);
+        handleHelloAuth(opCtx, dbName, cmd, &result);
 
         if (getTestCommandsEnabled()) {
             validateResult(&result);

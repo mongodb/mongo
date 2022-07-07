@@ -107,7 +107,7 @@ public:
         return true;
     }
 
-    Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec, std::string) final {
+    Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec, const DatabaseName&) final {
         auto opCtx = rec->getOpCtx();
         return ClusterBuildInfoExecutor::get(opCtx->getServiceContext())->schedule(std::move(rec));
     }

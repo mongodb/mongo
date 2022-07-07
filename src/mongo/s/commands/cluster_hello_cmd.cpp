@@ -115,7 +115,7 @@ public:
     }
 
     bool runWithReplyBuilder(OperationContext* opCtx,
-                             const std::string& dbname,
+                             const DatabaseName& dbName,
                              const BSONObj& cmdObj,
                              rpc::ReplyBuilderInterface* replyBuilder) final {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
@@ -256,7 +256,7 @@ public:
             }
         }
 
-        handleHelloAuth(opCtx, cmd, &result);
+        handleHelloAuth(opCtx, dbName, cmd, &result);
 
         if (getTestCommandsEnabled()) {
             validateResult(&result);

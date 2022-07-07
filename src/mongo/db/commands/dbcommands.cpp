@@ -696,7 +696,7 @@ public:
         } else {
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                // TODO SERVER-66561: For getDatabaseProfileLevel, takes the passed in "const
+                // TODO SERVER-67459: For getDatabaseProfileLevel, takes the passed in "const
                 // DatabaseName& dbname" directly.
                 // TODO: OldClientContext legacy, needs to be removed
                 CurOp::get(opCtx)->enter_inlock(
@@ -777,7 +777,7 @@ public:
         return true;
     }
 
-    Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec, std::string) final {
+    Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec, const DatabaseName&) final {
         auto opCtx = rec->getOpCtx();
         return BuildInfoExecutor::get(opCtx->getServiceContext())->schedule(std::move(rec));
     }
