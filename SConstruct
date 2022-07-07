@@ -733,7 +733,7 @@ add_option(
     'build-metrics',
     metavar="FILE",
     const='build-metrics.json',
-    default='build-metrics.json',
+    default='',
     help='Enable tracking of build performance and output data as json.'
     ' Use "-" to output json to stdout, or supply a path to the desired'
     ' file to output to. If no argument is supplied, the default log'
