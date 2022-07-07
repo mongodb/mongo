@@ -239,7 +239,7 @@ inline void ResourceConsumption::MetricsCollector::_doIfCollecting(Func&& func) 
     func();
 }
 
-void ResourceConsumption::MetricsCollector::incrementOneDocRead(std::string uri,
+void ResourceConsumption::MetricsCollector::incrementOneDocRead(StringData uri,
                                                                 size_t docBytesRead) {
     _doIfCollecting([&]() {
         LOGV2_DEBUG(6523900,
@@ -251,7 +251,7 @@ void ResourceConsumption::MetricsCollector::incrementOneDocRead(std::string uri,
     });
 }
 
-void ResourceConsumption::MetricsCollector::incrementOneIdxEntryRead(std::string uri,
+void ResourceConsumption::MetricsCollector::incrementOneIdxEntryRead(StringData uri,
                                                                      size_t bytesRead) {
     _doIfCollecting([&]() {
         LOGV2_DEBUG(6523901,
@@ -284,7 +284,7 @@ void ResourceConsumption::MetricsCollector::incrementSorterSpills(size_t spills)
 }
 
 void ResourceConsumption::MetricsCollector::incrementDocUnitsReturned(
-    std::string ns, DocumentUnitCounter docUnits) {
+    StringData ns, DocumentUnitCounter docUnits) {
     _doIfCollecting([&]() {
         LOGV2_DEBUG(6523904,
                     1,
@@ -295,7 +295,7 @@ void ResourceConsumption::MetricsCollector::incrementDocUnitsReturned(
     });
 }
 
-void ResourceConsumption::MetricsCollector::incrementOneDocWritten(std::string uri,
+void ResourceConsumption::MetricsCollector::incrementOneDocWritten(StringData uri,
                                                                    size_t bytesWritten) {
     _doIfCollecting([&] {
         LOGV2_DEBUG(6523905,
@@ -308,7 +308,7 @@ void ResourceConsumption::MetricsCollector::incrementOneDocWritten(std::string u
     });
 }
 
-void ResourceConsumption::MetricsCollector::incrementOneIdxEntryWritten(std::string uri,
+void ResourceConsumption::MetricsCollector::incrementOneIdxEntryWritten(StringData uri,
                                                                         size_t bytesWritten) {
     _doIfCollecting([&] {
         LOGV2_DEBUG(6523906,
@@ -344,7 +344,7 @@ bool ResourceConsumption::MetricsCollector::endScopedCollecting() {
     return wasCollecting;
 }
 
-void ResourceConsumption::MetricsCollector::incrementOneCursorSeek(std::string uri) {
+void ResourceConsumption::MetricsCollector::incrementOneCursorSeek(StringData uri) {
     _doIfCollecting([&] {
         LOGV2_DEBUG(6523907,
                     1,

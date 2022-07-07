@@ -344,13 +344,13 @@ public:
          * This should be called once per document read with the number of bytes read for that
          * document.  This is a no-op when metrics collection is disabled on this operation.
          */
-        void incrementOneDocRead(std::string uri, size_t docBytesRead);
+        void incrementOneDocRead(StringData uri, size_t docBytesRead);
 
         /**
          * This should be called once per index entry read with the number of bytes read for that
          * entry. This is a no-op when metrics collection is disabled on this operation.
          */
-        void incrementOneIdxEntryRead(std::string uri, size_t idxEntryBytesRead);
+        void incrementOneIdxEntryRead(StringData uri, size_t idxEntryBytesRead);
 
         /**
          * Increments the number of keys sorted for a query operation. This is a no-op when metrics
@@ -367,7 +367,7 @@ public:
         /**
          * Increments the number of document units returned in the command response.
          */
-        void incrementDocUnitsReturned(std::string ns, DocumentUnitCounter docUnitsReturned);
+        void incrementDocUnitsReturned(StringData ns, DocumentUnitCounter docUnitsReturned);
 
         /**
          * This should be called once per document written with the number of bytes written for that
@@ -375,13 +375,13 @@ public:
          * function should not be called when the operation is a write to the oplog. The metrics are
          * only for operations that are not oplog writes.
          */
-        void incrementOneDocWritten(std::string uri, size_t docBytesWritten);
+        void incrementOneDocWritten(StringData uri, size_t docBytesWritten);
 
         /**
          * This should be called once per index entry written with the number of bytes written for
          * that entry. This is a no-op when metrics collection is disabled on this operation.
          */
-        void incrementOneIdxEntryWritten(std::string uri, size_t idxEntryBytesWritten);
+        void incrementOneIdxEntryWritten(StringData uri, size_t idxEntryBytesWritten);
 
         /**
          * This should be called once every time the storage engine successfully does a cursor seek.
@@ -389,7 +389,7 @@ public:
          * only be called once. If the seek does not find anything, this function should not be
          * called.
          */
-        void incrementOneCursorSeek(std::string uri);
+        void incrementOneCursorSeek(StringData uri);
 
     private:
         // Privatize copy constructors to prevent callers from accidentally copying when this is
