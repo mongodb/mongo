@@ -1327,7 +1327,9 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     _updateWriteAbilityFromTopologyCoordinator(lk, opCtx);
     _updateMemberStateFromTopologyCoordinator(lk);
 
-    LOGV2(21331, "Transition to primary complete; database writes are now permitted");
+    LOGV2(21331,
+          "Transition to primary complete; database writes are now permitted",
+          "term"_attr = _termShadow.load());
     _externalState->startNoopWriter(_getMyLastAppliedOpTime_inlock());
 }
 

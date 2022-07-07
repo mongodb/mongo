@@ -2943,6 +2943,14 @@ bool TopologyCoordinator::advanceLastCommittedOpTimeAndWallTime(OpTimeAndWallTim
         return false;
     }
 
+    if (committedOpTime.opTime.getTerm() != _lastCommittedOpTimeAndWallTime.opTime.getTerm()) {
+        LOGV2(6795400,
+              "Advancing committed opTime to a new term",
+              "newCommittedOpTime"_attr = committedOpTime.opTime,
+              "newCommittedWallime"_attr = committedOpTime.wallTime,
+              "oldTerm"_attr = _lastCommittedOpTimeAndWallTime.opTime.getTerm());
+    }
+
     LOGV2_DEBUG(21826,
                 2,
                 "Updating _lastCommittedOpTimeAndWallTime to {_lastCommittedOpTimeAndWallTime}",
