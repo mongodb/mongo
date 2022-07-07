@@ -428,8 +428,8 @@ private:
             maybeComposePath(result, _ctx.pop());
         }
         if constexpr (!isValueElemMatch) {
-            // Make sure we consider only objects as elements of the array.
-            maybeComposePath(result, make<PathObj>());
+            // Make sure we consider only objects or arrays as elements of the array.
+            maybeComposePath(result, make<PathComposeA>(make<PathObj>(), make<PathArr>()));
         }
         result = make<PathTraverse>(std::move(result));
 

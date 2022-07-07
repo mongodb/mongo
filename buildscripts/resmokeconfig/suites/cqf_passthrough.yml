@@ -38,8 +38,6 @@ selector:
   # TODO SERVER-62407 translate to ABT directly from find.
   - jstests/core/currentop_cursors.js
   - jstests/core/profile_getmore.js
-  # TODO SERVER-67503
-  - jstests/core/elemmatch_object.js
   # TODO SERVER-67517
   - jstests/core/field_name_empty.js
   - jstests/core/field_name_validation.js

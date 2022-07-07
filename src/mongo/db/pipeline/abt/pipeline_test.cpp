@@ -143,6 +143,34 @@ TEST(ABTTranslate, MatchWithInDuplicateElementsRemoved) {
         listIn);
 }
 
+TEST(ABTTranslate, EmptyElemMatch) {
+    ABT emptyElemMatch = translatePipeline("[{$match: {'a': {$elemMatch: {}}}}]");
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       scan_0\n"
+        "|   RefBlock: \n"
+        "|       Variable [scan_0]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathArr []\n"
+        "|   PathTraverse []\n"
+        "|   PathComposeM []\n"
+        "|   |   PathComposeA []\n"
+        "|   |   |   PathArr []\n"
+        "|   |   PathObj []\n"
+        "|   PathConstant []\n"
+        "|   Const [true]\n"
+        "Scan [collection]\n"
+        "    BindBlock:\n"
+        "        [scan_0]\n"
+        "            Source []\n",
+        emptyElemMatch);
+}
+
 TEST(ABTTranslate, MatchWithElemMatchAndIn) {
     ABT elemMatchIn = translatePipeline("[{$match: {'a.b': {$elemMatch: {$in: [1, 2, 3]}}}}]");
 
