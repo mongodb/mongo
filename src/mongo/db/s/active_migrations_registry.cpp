@@ -239,7 +239,7 @@ void ActiveMigrationsRegistry::_clearReceiveChunk() {
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(_activeReceiveChunkState);
     LOGV2(5004703,
-          "clearReceiveChunk ",
+          "clearReceiveChunk",
           "currentKeys"_attr = ChunkRange(_activeReceiveChunkState->range.getMin(),
                                           _activeReceiveChunkState->range.getMax())
                                    .toString());
