@@ -33,20 +33,15 @@
 
 namespace mongo {
 namespace SnapshotHelper {
-struct ReadSourceChange {
-    boost::optional<RecoveryUnit::ReadSource> newReadSource;
-    bool shouldReadAtLastApplied;
-};
 
 /**
- * Returns a ReadSourceChange containing data necessary to decide if we need to change read source.
+ * Changes the read source in the recovery unit if needed depending on server state. If reading at
+ * last applied is needed and we already have that read source set, refresh the lastApplied
+ * timestamp.
  *
- * For Lock-Free Reads, the decisions made within this function based on replication state may
- * become invalid after it returns and multiple calls may yield different answers. Higher level code
- * must validate the relevance of the outcome based on replication state before and after calling
- * this function.
+ * Returns true if the state is such that we should read at last applied, false otherwise.
  */
-ReadSourceChange shouldChangeReadSource(OperationContext* opCtx, const NamespaceString& nss);
+bool changeReadSourceIfNeeded(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
  * Returns true if 'collectionMin' is not compatible with 'readTimestamp'. They are incompatible

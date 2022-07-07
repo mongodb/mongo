@@ -497,12 +497,9 @@ AutoGetCollectionForReadBase<AutoGetCollectionType, EmplaceAutoCollFunc>::
 
         // Once we have our locks, check whether or not we should override the ReadSource that was
         // set before acquiring locks.
-        auto [newReadSource, shouldReadAtLastApplied] =
-            SnapshotHelper::shouldChangeReadSource(opCtx, nss);
-        if (newReadSource) {
-            opCtx->recoveryUnit()->setTimestampReadSource(*newReadSource);
-            readSource = *newReadSource;
-        }
+        const bool shouldReadAtLastApplied = SnapshotHelper::changeReadSourceIfNeeded(opCtx, nss);
+        // Update readSource in case it was updated.
+        readSource = opCtx->recoveryUnit()->getTimestampReadSource();
 
         const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
         if (readTimestamp && afterClusterTime) {
@@ -702,11 +699,7 @@ void AutoGetCollectionForReadLockFree::EmplaceHelper::emplace(
                     // replication state may have changed, invalidating our current choice of
                     // ReadSource. Using the same preconditions, change our ReadSource if necessary.
                     if (coll) {
-                        auto [newReadSource, _] =
-                            SnapshotHelper::shouldChangeReadSource(opCtx, coll->ns());
-                        if (newReadSource) {
-                            opCtx->recoveryUnit()->setTimestampReadSource(*newReadSource);
-                        }
+                        SnapshotHelper::changeReadSourceIfNeeded(opCtx, coll->ns());
                     }
 
                     return std::make_pair(coll, /* isView */ false);
