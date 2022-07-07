@@ -30,14 +30,10 @@ import time
 from jsonschema import validate
 import psutil
 
+from .util import add_meta_data, get_build_metric_dict
+import build_metrics.memory
+
 _SEC_TO_NANOSEC_FACTOR = 1000000000.0
-
-_BUILD_METRIC_DATA = {}
-
-
-def get_build_metric_dict():
-    global _BUILD_METRIC_DATA
-    return _BUILD_METRIC_DATA
 
 
 # This section is an excerpt of the original
@@ -54,6 +50,8 @@ class CaptureAtexits:
 def finalize_build_metrics(env):
     metrics = get_build_metric_dict()
     metrics['end_time'] = time.time_ns()
+    for m in _METRICS_COLLECTORS:
+        m.finalize()
 
     with open(os.path.join(os.path.dirname(__file__), "build_metrics_format.schema")) as f:
         validate(metrics, json.load(f))
@@ -66,11 +64,11 @@ def finalize_build_metrics(env):
             json.dump(metrics, f, indent=4, sort_keys=True)
 
 
-def add_meta_data(env, key, value):
-    get_build_metric_dict()[key] = value
+_METRICS_COLLECTORS = []
 
 
 def generate(env, **kwargs):
+    global _METRICS_COLLECTORS
 
     # This will force our at exit to the of the stack ensuring
     # that it is the last thing called when exiting.
@@ -90,6 +88,8 @@ def generate(env, **kwargs):
 
     metrics['start_time'] = int(p.create_time() * _SEC_TO_NANOSEC_FACTOR)
     metrics['scons_command'] = " ".join([sys.executable] + sys.argv)
+
+    _METRICS_COLLECTORS = [memory.MemoryMonitor(psutil.Process().memory_info().vms)]
 
 
 def exists(env):

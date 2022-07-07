@@ -1,10 +1,38 @@
 {
+    "$defs": {
+        "timestamp": {
+            "type": "integer",
+            "description": "Nanoseconds since Unix epoch"
+        },
+        "memory": {
+            "type": "integer",
+            "description": "Virtual memory used in bytes"
+        }
+    },
     "type" : "object",
     "properties" : {
-        "start_time" : {"type" : "integer"},
-        "end_time" : {"type" : "integer"},
+        "start_time" : { "$ref": "#/$defs/timestamp" },
+        "end_time" : { "$ref": "#/$defs/timestamp" },
         "evg_id" : {"type" : "string"},
         "variant" : {"type" : "string"},
-        "scons_command" : {"type" : "string"}
+        "scons_command" : {"type" : "string"},
+        "system_memory": {
+            "type": "object",
+            "properties": {
+                "mem_over_time": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "timestamp": { "$ref": "#/$defs/timestamp" },
+                            "memory": { "$ref": "#/$defs/memory" }
+                        }
+                    }
+                },
+                "max": { "$ref": "#/$defs/memory" },
+                "arithmetic_mean": {"type": "number"},
+                "start_mem": { "$ref": "#/$defs/memory" }
+            }
+        }
     }
 }
