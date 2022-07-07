@@ -245,13 +245,19 @@ std::unique_ptr<Pipeline, PipelineDeleter> createCommittedTransactionsPipelineFo
 /**
  * Creates a pipeline that can be serialized into a query for fetching retryable writes oplog
  * entries before `startFetchingTimestamp`. We use `tenantId` to fetch entries specific to a
- * particular set of tenant databases.
+ * particular set of tenant databases. This is for the multi-tenant migration protocol.
  */
-std::unique_ptr<Pipeline, PipelineDeleter>
-createRetryableWritesOplogFetchingPipelineForTenantMigrations(
+std::unique_ptr<Pipeline, PipelineDeleter> createRetryableWritesOplogFetchingPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const Timestamp& startFetchingTimestamp,
     const std::string& tenantId);
+
+/**
+ * Creates a pipeline that can be serialized into a query for fetching retryable writes oplog
+ * entries before `startFetchingTimestamp` for all tenants. This is for shard merge protocol.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> createRetryableWritesOplogFetchingPipelineForAllTenants(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const Timestamp& startFetchingTimestamp);
 
 /**
  * Returns a new BSONObj created from 'stateDoc' with sensitive fields redacted.

@@ -1557,12 +1557,18 @@ TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStart
                 "tenantId"_attr = getTenantId(),
                 "migrationId"_attr = getMigrationUUID());
 
-    // Fetch the oplog chains of all retryable writes that occurred before startFetchingTimestamp
-    // on this tenant.
-    auto serializedPipeline =
-        tenant_migration_util::createRetryableWritesOplogFetchingPipelineForTenantMigrations(
-            expCtx, startFetchingTimestamp, getTenantId())
-            ->serializeToBson();
+    // Fetch the oplog chains of all retryable writes that occurred before startFetchingTimestamp.
+    std::vector<BSONObj> serializedPipeline;
+    if (MigrationProtocolEnum::kShardMerge == getProtocol()) {
+        serializedPipeline =
+            tenant_migration_util::createRetryableWritesOplogFetchingPipelineForAllTenants(
+                expCtx, startFetchingTimestamp)
+                ->serializeToBson();
+    } else {
+        serializedPipeline = tenant_migration_util::createRetryableWritesOplogFetchingPipeline(
+                                 expCtx, startFetchingTimestamp, getTenantId())
+                                 ->serializeToBson();
+    }
 
     AggregateCommandRequest aggRequest(NamespaceString::kSessionTransactionsTableNamespace,
                                        std::move(serializedPipeline));

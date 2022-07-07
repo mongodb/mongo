@@ -2,14 +2,9 @@
  * Tests that the tenant migration recipient correctly fetches retryable writes oplog entries
  * and adds them to its oplog buffer.
  *
- * TODO SERVER-63517: incompatible_with_shard_merge, this tests specific implementation
- * details related to MT Migrations. Retryable write behavior is tested in various other
- * tests for shard merge.
- *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
- *   incompatible_with_shard_merge,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
@@ -24,26 +19,25 @@ load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
 load("jstests/libs/parallelTester.js");   // For Thread.
 
 const kMaxBatchSize = 1;
-const kParams = {
-    // Set the delay before a donor state doc is garbage collected to be short to speed up
-    // the test.
-    tenantMigrationGarbageCollectionDelayMS: 3 * 1000,
-
-    // Set the TTL monitor to run at a smaller interval to speed up the test.
-    ttlMonitorSleepSecs: 1,
-
-    // Decrease internal max batch size so we can still show writes are batched without inserting
-    // hundreds of documents.
-    internalInsertMaxBatchSize: kMaxBatchSize,
-};
 
 function runTest({storeFindAndModifyImagesInSideCollection = false}) {
-    const tenantMigrationTest = new TenantMigrationTest(
-        {name: jsTestName(), sharedOptions: {nodes: 1, setParameter: kParams}});
+    const tenantMigrationTest = new TenantMigrationTest({
+        name: jsTestName(),
+        quickGarbageCollection: true,
+        sharedOptions: {
+            nodes: 1,
+            setParameter: {
+                // Decrease internal max batch size so we can still show writes are batched without
+                // inserting hundreds of documents.
+                internalInsertMaxBatchSize: kMaxBatchSize,
+            }
+        }
+    });
 
     const kTenantId = "testTenantId";
-    const kDbName = kTenantId + "_" +
-        "testDb";
+    const kTenantId2 = "testTenantId2";
+    const kDbName = `${kTenantId}_testDb`;
+    const kDbName2 = `${kTenantId2}_testDb`;
     const kCollName = "testColl";
 
     const donorRst = tenantMigrationTest.getDonorRst();
@@ -57,10 +51,6 @@ function runTest({storeFindAndModifyImagesInSideCollection = false}) {
     recipientPrimary.adminCommand(setParam);
     const rsConn = new Mongo(donorRst.getURL());
 
-    // Create a collection on a database that isn't prefixed with `kTenantId`.
-    const session = rsConn.startSession({retryWrites: true});
-    const collection = session.getDatabase("test")["collection"];
-
     const tenantSession = rsConn.startSession({retryWrites: true});
     const tenantCollection = tenantSession.getDatabase(kDbName)[kCollName];
 
@@ -70,11 +60,18 @@ function runTest({storeFindAndModifyImagesInSideCollection = false}) {
     const tenantSession3 = rsConn.startSession({retryWrites: true});
     const tenantCollection3 = tenantSession3.getDatabase(kDbName)[kCollName];
 
+    // Create a collection on a database that isn't prefixed with `kTenantId`.
+    const secondTenantSession = rsConn.startSession({retryWrites: true});
+    const secondTenantCollection = secondTenantSession.getDatabase(kDbName2)[kCollName];
+
+    const isShardMergeEnabled =
+        TenantMigrationUtil.isShardMergeEnabled(donorRst.getPrimary().getDB("adminDB"));
+
     jsTestLog("Run retryable writes prior to the migration");
 
     // Retryable insert, but not on correct tenant database. This write should not show up in the
-    // oplog buffer.
-    assert.commandWorked(collection.insert({_id: "retryableWrite1"}));
+    // oplog buffer for the tenant migration protocol. It will however for the shard merge protocol.
+    assert.commandWorked(secondTenantCollection.insert({_id: "retryableWrite1"}));
 
     // The following retryable writes should occur on the correct tenant database, so they should
     // all be retrieved by the pipeline.
@@ -166,18 +163,20 @@ function runTest({storeFindAndModifyImagesInSideCollection = false}) {
     const recipientOplogBuffer = recipientPrimary.getDB("config")[kOplogBufferNS];
     jsTestLog({"oplog buffer ns": kOplogBufferNS});
 
-    // We expect to see retryableWrite2, retryableWrite3, retryableWrite3's postImage, and
-    // bulkRetryableWrite0 (bulk insert batch size is 1).
-    const findRes = recipientOplogBuffer.find().toArray();
-    assert.eq(findRes.length, 4, `Incorrect number of oplog entries in buffer: ${tojson(findRes)}`);
+    // We expect to see retryableWrite2, retryableWrite3, retryableWrite3's postImage,
+    // and bulkRetryableWrite0 (bulk insert batch size is 1).
     assert.eq(1, recipientOplogBuffer.find({"entry.o._id": "retryableWrite2"}).itcount());
     assert.eq(1, recipientOplogBuffer.find({"entry.o._id": "retryableWrite3"}).itcount());
     assert.eq(1, recipientOplogBuffer.find({"entry.o2._id": "retryableWrite3"}).itcount());
     assert.eq(1, recipientOplogBuffer.find({"entry.o._id": "bulkRetryableWrite0"}).itcount());
 
+    // Only for shardMerge we expect to have the other tenantId. Otherwise only for the provided
+    // tenantId.
+    assert.eq(isShardMergeEnabled ? 1 : 0,
+              recipientOplogBuffer.find({"entry.o._id": "retryableWrite1"}).itcount());
+
     // Ensure the retryable write oplog entries that should not be in `kOplogBufferNS` are in fact
     // not.
-    assert.eq(0, recipientOplogBuffer.find({"entry.o._id": "retryableWrite1"}).itcount());
     assert.eq(0, recipientOplogBuffer.find({"entry.o._id": "retryableWrite4"}).itcount());
     assert.eq(0, recipientOplogBuffer.find({"entry.o2._id": "retryableWrite4"}).itcount());
     assert.eq(0, recipientOplogBuffer.find({"entry.o._id": "bulkRetryableWrite1"}).itcount());
