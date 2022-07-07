@@ -5039,7 +5039,7 @@ tasks:
 
 - <<: *task_template
   name: replica_sets_kill_secondaries_jscore_passthrough
-  tags: ["replica_sets", "san", "large", "non_live_record"]
+  tags: ["replica_sets", "san", "large", "non_live_record", "ignore_on_code_coverage"]
   commands:
   - func: "do setup"
   - func: "run tests"
