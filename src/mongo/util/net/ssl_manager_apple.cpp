@@ -1889,8 +1889,26 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))
     kMongoDBRolesOID = ::CFStringCreateWithCString(
         nullptr, mongodbRolesOID.identifier.c_str(), ::kCFStringEncodingUTF8);
 
+    // TODO SERVER-67419 This retry logic is a workaround; reconsider this approach after
+    // investigation.
+    constexpr int kMaxRetries = 10;
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
-        theSSLManagerCoordinator = new SSLManagerCoordinator();
+        for (int i = 0; i < kMaxRetries; i++) {
+            try {
+                theSSLManagerCoordinator = new SSLManagerCoordinator();
+                return;
+            } catch (const ExceptionFor<ErrorCodes::InvalidSSLConfiguration>& e) {
+                bool isRetriableError = nullptr != strstr(e.what(), "No keychain is available.");
+                if (!isRetriableError || i == kMaxRetries - 1) {
+                    // Rethrow if a different error or we fail on final iteration
+                    throw;
+                }
+                LOGV2_INFO(6741800,
+                           "Caught exception during apple SSLManagerCoordinator creation, retrying",
+                           "try"_attr = i,
+                           "error"_attr = e.what());
+            }
+        }
     }
 }
 
