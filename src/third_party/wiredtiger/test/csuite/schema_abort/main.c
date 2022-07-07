@@ -97,8 +97,9 @@ static pthread_rwlock_t flush_lock;
     "create,"                                                 \
     "eviction_updates_trigger=95,eviction_updates_target=80," \
     "log=(enabled,file_max=10M,remove=false)"
-#define ENV_CONFIG_TIER \
-    ",tiered_storage=(bucket=./bucket,bucket_prefix=pfx-,local_retention=2,name=dir_store)"
+#define ENV_CONFIG_TIER          \
+    ",tiered_storage=(bucket=./" \
+    "bucket,bucket_prefix=pfx-,local_retention=2,name=dir_store)"
 #define ENV_CONFIG_TIER_EXT                                   \
     ",extensions=(../../../../ext/storage_sources/dir_store/" \
     "libwiredtiger_dir_store.so=(early_load=true))"
@@ -353,7 +354,7 @@ test_create_unique(THREAD_DATA *td, int force)
     WT_DECL_RET;
     WT_SESSION *session;
     uint64_t my_uid;
-    char new_uri[64];
+    char dropconf[128], new_uri[64];
 
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
@@ -370,7 +371,12 @@ test_create_unique(THREAD_DATA *td, int force)
     __wt_yield();
     if (use_txn)
         testutil_check(session->begin_transaction(session, NULL));
-    while ((ret = session->drop(session, new_uri, force ? "force" : NULL)) != 0)
+
+    testutil_check(__wt_snprintf(dropconf, sizeof(dropconf), "force=%s", force ? "true" : "false"));
+    /* For testing we want to remove objects too. */
+    if (tiered)
+        strcat(dropconf, ",remove_shared=true");
+    while ((ret = session->drop(session, new_uri, dropconf)) != 0)
         if (ret != EBUSY)
             testutil_die(ret, "session.drop: %s", new_uri);
     if (use_txn && (ret = session->commit_transaction(session, NULL)) != 0 && ret != EINVAL)
@@ -388,12 +394,17 @@ test_drop(THREAD_DATA *td, int force)
 {
     WT_DECL_RET;
     WT_SESSION *session;
+    char dropconf[128];
 
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
     if (use_txn)
         testutil_check(session->begin_transaction(session, NULL));
-    if ((ret = session->drop(session, uri, force ? "force" : NULL)) != 0)
+    testutil_check(__wt_snprintf(dropconf, sizeof(dropconf), "force=%s", force ? "true" : "false"));
+    /* For testing we want to remove objects too. */
+    if (tiered)
+        strcat(dropconf, ",remove_shared=true");
+    if ((ret = session->drop(session, uri, dropconf)) != 0)
         if (ret != ENOENT && ret != EBUSY)
             testutil_die(ret, "session.drop");
 
@@ -619,7 +630,7 @@ thread_flush_run(void *arg)
             if (ret != EBUSY)
                 testutil_die(ret, "session.flush_tier");
         } else
-            printf("Flush tier %" PRIu32 " completed.\n", ++i);
+            printf("Flush tier %" PRIu32 " completed.\n", i);
         testutil_check(pthread_rwlock_unlock(&flush_lock));
         fflush(stdout);
     }

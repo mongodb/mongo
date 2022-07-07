@@ -546,6 +546,7 @@ conn_stats = [
     StorageStat('tiered_retention', 'tiered storage local retention time (secs)', 'no_clear,no_scale,size'),
     StorageStat('tiered_work_units_created', 'tiered operations scheduled'),
     StorageStat('tiered_work_units_dequeued', 'tiered operations dequeued and processed'),
+    StorageStat('tiered_work_units_removed', 'tiered operations removed without processing'),
 
     ##########################################
     # Thread Count statistics

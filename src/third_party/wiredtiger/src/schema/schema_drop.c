@@ -177,13 +177,16 @@ static int
 __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char *cfg[])
 {
     WT_CONFIG_ITEM cval;
+    WT_CONNECTION_IMPL *conn;
     WT_DATA_HANDLE *tier;
     WT_DECL_RET;
     WT_TIERED *tiered;
     u_int i;
     const char *filename, *name;
-    bool exist, remove_files, remove_shared;
+    bool exist, locked, remove_files, remove_shared;
 
+    conn = S2C(session);
+    locked = false;
     WT_RET(__wt_config_gets(session, cfg, "remove_files", &cval));
     remove_files = cval.val != 0;
     WT_RET(__wt_config_gets(session, cfg, "remove_shared", &cval));
@@ -262,6 +265,14 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
     }
 
     /*
+     * We are about to close the dhandle. If that is successful we need to remove any tiered work
+     * from the queue relating to that dhandle. But if closing the dhandle has an error we don't
+     * remove the work. So hold the tiered lock for the duration so that the worker thread cannot
+     * race and process work for this handle.
+     */
+    __wt_spin_lock(session, &conn->tiered_lock);
+    locked = true;
+    /*
      * Close all btree handles associated with this table. This must be done after we're done using
      * the tiered structure because that is from the dhandle.
      */
@@ -270,11 +281,18 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
       session, ret = __wt_conn_dhandle_close_all(session, uri, true, force));
     WT_ERR(ret);
 
+    /* If everything is successful, remove any tiered work associated with this tiered handle. */
+    __wt_tiered_remove_work(session, tiered, locked);
+    __wt_spin_unlock(session, &conn->tiered_lock);
+    locked = false;
+
     __wt_verbose(session, WT_VERB_TIERED, "DROP_TIERED: remove tiered table %s from metadata", uri);
     ret = __wt_metadata_remove(session, uri);
 
 err:
     __wt_free(session, name);
+    if (locked)
+        __wt_spin_unlock(session, &conn->tiered_lock);
     return (ret);
 }
 

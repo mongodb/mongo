@@ -59,9 +59,14 @@ __tiered_name_check(WT_SESSION_IMPL *session, WT_TIERED *tiered)
          */
         len = strlen(obj_files[i]);
         if (len == obj_len) {
+            /*
+             * While we want to return EEXIST if we find the object exists, we only want to return
+             * the error, and not give a message. Otherwise cases that are commonly handled can give
+             * a lot of spurious error messages.
+             */
             __wt_verbose(
               session, WT_VERB_TIERED, "EEXIST %s already exists on shared storage", obj_files[i]);
-            WT_ERR_MSG(session, EEXIST, "%s already exists on shared storage", obj_files[i]);
+            WT_ERR(EEXIST);
         }
     }
 

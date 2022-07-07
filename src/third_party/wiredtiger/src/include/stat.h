@@ -787,6 +787,7 @@ struct __wt_connection_stats {
     int64_t session_table_verify_fail;
     int64_t session_table_verify_success;
     int64_t tiered_work_units_dequeued;
+    int64_t tiered_work_units_removed;
     int64_t tiered_work_units_created;
     int64_t tiered_retention;
     int64_t thread_fsync_active;
