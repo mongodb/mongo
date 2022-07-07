@@ -290,7 +290,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         CommandHelpers::appendSimpleCommandStatus(builder, ok, errmsg);
                     }
                     _result = builder.obj();
-                    sharding_ddl_util::resumeMigrations(opCtx, nss(), _doc.getCollUUID());
+                    sharding_ddl_util::resumeMigrations(opCtx, originalNss(), _doc.getCollUUID());
                 } else {
                     CollMod cmd(originalNss());
                     cmd.setCollModRequest(_request);
