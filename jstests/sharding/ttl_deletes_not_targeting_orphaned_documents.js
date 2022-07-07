@@ -41,11 +41,10 @@ assert.commandWorked(bulk.execute());
 assert.commandWorked(
     st.s.adminCommand({moveChunk: collName, find: {_id: 0}, to: st.shard1.shardName}));
 
-// Optimistically wait 15 seconds (10 seconds TTL index delay followed by 5 rounds of TTL monitor)
-sleep(15000);
-
 // Verify that TTL index worked properly on owned documents
-assert.eq(coll.countDocuments({}), 0);
+assert.soon(function() {
+    return coll.countDocuments({}) == 0;
+}, "Failed to move all documents", 60000 /* 60 seconds */, 5000 /* 5 seconds */);
 
 // Verify that TTL index did not delete orphaned documents
 assert.eq(nDocs, st.rs0.getPrimary().getCollection(collName).countDocuments({}));
