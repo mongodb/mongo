@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/executor/task_executor_cursor.h"
@@ -35,11 +34,11 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/kill_cursors_gen.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
 
 namespace mongo {
 namespace executor {
@@ -72,12 +71,11 @@ TaskExecutorCursor::TaskExecutorCursor(TaskExecutorCursor&& other)
       _rcr(other._rcr),
       _options(std::move(other._options)),
       _lsid(other._lsid),
-      _cbHandle(std::move(other._cbHandle)),
+      _cmdState(std::move(other._cmdState)),
       _cursorId(other._cursorId),
       _millisecondsWaiting(other._millisecondsWaiting),
       _ns(other._ns),
       _batchNum(other._batchNum),
-      _pipe(std::move(other._pipe)),
       _additionalCursors(std::move(other._additionalCursors)) {
     // Copy the status of the batch.
     auto batchIterIndex = other._batchIter - other._batch.begin();
@@ -93,30 +91,43 @@ TaskExecutorCursor::TaskExecutorCursor(TaskExecutorCursor&& other)
     }
     // Other is no longer responsible for this cursor id.
     other._cursorId = 0;
-    // Other should not cancel the callback on destruction.
-    other._cbHandle = boost::none;
+
+    // Other no longer owns the state for the in progress command (if there is any).
+    other._cmdState.reset();
 }
 
 TaskExecutorCursor::~TaskExecutorCursor() {
     try {
-        if (_cbHandle) {
-            _executor->cancel(*_cbHandle);
+        if (_cursorId < kMinLegalCursorId) {
+            // The initial find to establish the cursor has to be canceled to avoid leaking cursors.
+            // Once the cursor is established, killing the cursor will interrupt any ongoing
+            // `getMore` operation.
+            if (_cmdState) {
+                _executor->cancel(_cmdState->cbHandle);
+            }
+
+            return;
         }
 
-        if (_cursorId >= kMinLegalCursorId) {
-            // We deliberately ignore failures to kill the cursor.  This "best effort" is acceptable
-            // because some timeout mechanism on the remote host can be expected to reap it later.
-            //
-            // That timeout mechanism could be the default cursor timeout, or the logical session
-            // timeout if an lsid is used.
-            _executor
-                ->scheduleRemoteCommand(
-                    _createRequest(nullptr,
-                                   KillCursorsCommandRequest(_ns, {_cursorId}).toBSON(BSONObj{})),
-                    [](const auto&) {})
-                .isOK();
-        }
-    } catch (const DBException&) {
+        // We deliberately ignore failures to kill the cursor. This "best effort" is acceptable
+        // because some timeout mechanism on the remote host can be expected to reap it later.
+        //
+        // That timeout mechanism could be the default cursor timeout, or the logical session
+        // timeout if an lsid is used.
+        //
+        // Killing the cursor also interrupts any ongoing getMore operations on this cursor. Avoid
+        // canceling the remote command through its callback handle as that may close the underlying
+        // connection.
+        _executor
+            ->scheduleRemoteCommand(
+                _createRequest(nullptr,
+                               KillCursorsCommandRequest(_ns, {_cursorId}).toBSON(BSONObj{})),
+                [](const auto&) {})
+            .isOK();
+    } catch (const DBException& ex) {
+        LOGV2(6531704,
+              "Encountered an error while destroying a cursor executor",
+              "error"_attr = ex.toStatus());
     }
 }
 
@@ -138,7 +149,7 @@ void TaskExecutorCursor::populateCursor(OperationContext* opCtx) {
             _cursorId == kUnitializedCursorId);
     tassert(6253503,
             "populateCursors should only be called after a remote command has been run",
-            _cbHandle);
+            _cmdState);
     // We really only care about populating the cursor "first batch" fields, but at some point we'll
     // have to do all of the work done by this function anyway. This would have been called by
     // getNext() the first time it was called.
@@ -169,21 +180,18 @@ const RemoteCommandRequest& TaskExecutorCursor::_createRequest(OperationContext*
 }
 
 void TaskExecutorCursor::_runRemoteCommand(const RemoteCommandRequest& rcr) {
-    _cbHandle = uassertStatusOK(_executor->scheduleRemoteCommand(
-        rcr, [p = _pipe.producer](const TaskExecutor::RemoteCommandCallbackArgs& args) {
-            try {
-                if (args.response.isOK()) {
-                    p.push(args.response.data);
-                } else {
-                    p.push(args.response.status);
-                }
-            } catch (const DBException&) {
-                // If anything goes wrong, make sure we close the pipe to wake the caller of
-                // getNext()
-                p.close();
+    auto state = std::make_shared<CommandState>();
+    state->cbHandle = uassertStatusOK(_executor->scheduleRemoteCommand(
+        rcr, [state](const TaskExecutor::RemoteCommandCallbackArgs& args) {
+            if (args.response.isOK()) {
+                state->promise.emplaceValue(args.response.data);
+            } else {
+                state->promise.setError(args.response.status);
             }
         }));
+    _cmdState.swap(state);
 }
+
 void TaskExecutorCursor::_processResponse(OperationContext* opCtx, CursorResponse&& response) {
     // If this was our first batch.
     if (_cursorId == kUnitializedCursorId) {
@@ -207,14 +215,14 @@ void TaskExecutorCursor::_processResponse(OperationContext* opCtx, CursorRespons
 }
 
 void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
-    invariant(_cbHandle, "_getNextBatch() requires an async request to have already been sent.");
+    invariant(_cmdState, "_getNextBatch() requires an async request to have already been sent.");
     invariant(_cursorId != kClosedCursorId);
 
     auto clock = opCtx->getServiceContext()->getPreciseClockSource();
     auto dateStart = clock->now();
     // pull out of the pipe before setting cursor id so we don't spoil this object if we're opCtx
     // interrupted
-    auto out = _pipe.consumer.pop(opCtx);
+    auto out = _cmdState->promise.getFuture().getNoThrow(opCtx);
     auto dateEnd = clock->now();
     _millisecondsWaiting += std::max(Milliseconds(0), dateEnd - dateStart);
     uassertStatusOK(out);
@@ -228,7 +236,7 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
 
     // if we've received a response from our last request (initial or getmore), our remote operation
     // is done.
-    _cbHandle.reset();
+    _cmdState.reset();
 
     // Parse into a vector in case the remote sent back multiple cursors.
     auto cursorResponses = CursorResponse::parseFromBSONMany(out.getValue());

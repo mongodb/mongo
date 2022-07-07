@@ -322,6 +322,12 @@ TEST_F(TaskExecutorCursorFixture, EarlyReturnKillsCursor) {
         ASSERT(tec.getNext(opCtx.get()));
     }
 
+    // Black hole the pending `getMore` operation scheduled by the `TaskExecutorCursor`.
+    {
+        NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        getNet()->blackHole(getNet()->getFrontOfUnscheduledQueue());
+    }
+
     ASSERT_BSONOBJ_EQ(BSON("killCursors"
                            << "test"
                            << "cursors" << BSON_ARRAY(1)),
