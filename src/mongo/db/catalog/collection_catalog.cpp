@@ -1550,10 +1550,7 @@ const Collection* LookupCollectionForYieldRestore::operator()(OperationContext* 
     // state. After a query yields its locks, the replication state may have changed, invalidating
     // our current choice of ReadSource. Using the same preconditions, change our ReadSource if
     // necessary.
-    auto [newReadSource, _] = SnapshotHelper::shouldChangeReadSource(opCtx, collection->ns());
-    if (newReadSource) {
-        opCtx->recoveryUnit()->setTimestampReadSource(*newReadSource);
-    }
+    SnapshotHelper::changeReadSourceIfNeeded(opCtx, collection->ns());
 
     return collection.get();
 }

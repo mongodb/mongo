@@ -257,10 +257,11 @@ private:
     Timestamp _beginTransactionAtNoOverlapTimestamp(WT_SESSION* session);
 
     /**
-     * Starts a transaction at the lastApplied timestamp. Returns the timestamp at which the
-     * transaction was started.
+     * Starts a transaction at the lastApplied timestamp stored in '_readAtTimestamp'. Sets
+     * '_readAtTimestamp' to the actual timestamp used by the storage engine in case rounding
+     * occured.
      */
-    Timestamp _beginTransactionAtLastAppliedTimestamp(WT_SESSION* session);
+    void _beginTransactionAtLastAppliedTimestamp(WT_SESSION* session);
 
     /**
      * Returns the timestamp at which the current transaction is reading.

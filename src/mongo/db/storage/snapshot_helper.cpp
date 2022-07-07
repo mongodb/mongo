@@ -130,61 +130,121 @@ bool shouldReadAtLastApplied(OperationContext* opCtx,
 
     return true;
 }
+
 }  // namespace
 
 namespace SnapshotHelper {
 
-ReadSourceChange shouldChangeReadSource(OperationContext* opCtx, const NamespaceString& nss) {
+bool changeReadSourceIfNeeded(OperationContext* opCtx, const NamespaceString& nss) {
     std::string reason;
-    const bool readAtLastApplied = shouldReadAtLastApplied(opCtx, nss, &reason);
+    // Write to the reason string if debug logging is enabled. This avoids writing this string every
+    // time we check if we should read at last applied. This string itself is only used in logging
+    // with the same debug level as this check.
+    std::string* reasonWriter =
+        logv2::shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(2)) ? &reason
+                                                                                      : nullptr;
+    bool readAtLastApplied = shouldReadAtLastApplied(opCtx, nss, reasonWriter);
 
     if (!canReadAtLastApplied(opCtx)) {
-        return {boost::none, readAtLastApplied};
+        return readAtLastApplied;
     }
 
-    const auto existing = opCtx->recoveryUnit()->getTimestampReadSource();
+    const auto originalReadSource = opCtx->recoveryUnit()->getTimestampReadSource();
     if (opCtx->recoveryUnit()->isReadSourcePinned()) {
         LOGV2_DEBUG(5863601,
                     2,
                     "Not changing readSource as it is pinned",
-                    "current"_attr = RecoveryUnit::toString(existing),
+                    "current"_attr = RecoveryUnit::toString(originalReadSource),
                     "rejected"_attr = readAtLastApplied
                         ? RecoveryUnit::toString(RecoveryUnit::ReadSource::kLastApplied)
                         : RecoveryUnit::toString(RecoveryUnit::ReadSource::kNoTimestamp));
-        return {boost::none, false};
+        return false;
     }
 
-    if (existing == RecoveryUnit::ReadSource::kNoTimestamp) {
-        // Shifting from reading without a timestamp to reading with a timestamp can be dangerous
-        // because writes will appear to vanish. This case is intended for new reads on secondaries
-        // and query yield recovery after state transitions from primary to secondary.
+    // We may only change to kLastApplied if we were reading without a timestamp (or if kLastApplied
+    // is already set)
+    if (originalReadSource != RecoveryUnit::ReadSource::kNoTimestamp &&
+        originalReadSource != RecoveryUnit::ReadSource::kLastApplied) {
+        return readAtLastApplied;
+    }
 
-        // If a query recovers from a yield and the node is no longer primary, it must start reading
-        // at the lastApplied point because reading without a timestamp is not safe.
-        if (readAtLastApplied) {
-            LOGV2_DEBUG(4452901, 2, "Changing ReadSource to kLastApplied", logAttrs(nss));
-            return {RecoveryUnit::ReadSource::kLastApplied, readAtLastApplied};
-        }
-    } else if (existing == RecoveryUnit::ReadSource::kLastApplied) {
-        // For some reason, we can no longer read at lastApplied.
-        // An operation that yields a timestamped snapshot must restore a snapshot with at least as
-        // large of a timestamp, or with proper consideration of rollback scenarios, no timestamp.
-        // Given readers do not survive rollbacks, it's okay to go from reading with a timestamp to
-        // reading without one. More writes will become visible.
-        if (!readAtLastApplied) {
-            LOGV2_DEBUG(4452902,
-                        2,
-                        "Changing ReadSource to kNoTimestamp",
-                        logAttrs(nss),
-                        "reason"_attr = reason);
-            // This shift to kNoTimestamp assumes that callers will not make future attempts to
-            // manipulate their ReadSources after performing reads at an un-timetamped snapshot. The
-            // only exception is callers of this function that may need to change from kNoTimestamp
-            // to kLastApplied in the event of a catalog conflict or query yield.
-            return {RecoveryUnit::ReadSource::kNoTimestamp, readAtLastApplied};
+    // Helper to set read source to the recovery unit and remember our current setting
+    auto currentReadSource = originalReadSource;
+    auto setReadSource = [&](RecoveryUnit::ReadSource readSource) {
+        opCtx->recoveryUnit()->setTimestampReadSource(readSource);
+        currentReadSource = readSource;
+    };
+
+    // Set read source based on current setting and readAtLastApplied decision.
+    if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied && !readAtLastApplied) {
+        setReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+    } else if (readAtLastApplied) {
+        // Shifting from reading without a timestamp to reading with a timestamp can be
+        // dangerous because writes will appear to vanish.
+        //
+        // If a query recovers from a yield and the node is no longer primary, it must start
+        // reading at the lastApplied point because reading without a timestamp is not safe.
+        //
+        // An operation that yields a timestamped snapshot must restore a snapshot with at least
+        // as large of a timestamp, or with proper consideration of rollback scenarios, no
+        // timestamp. Given readers do not survive rollbacks, it's okay to go from reading with
+        // a timestamp to reading without one. More writes will become visible.
+        //
+        // If we already had kLastApplied as our read source then this call will refresh the
+        // timestamp.
+        setReadSource(RecoveryUnit::ReadSource::kLastApplied);
+
+        // We need to make sure the decision if we need to read at last applied is not changing
+        // concurrently with setting the read source with its read timestamp to the recovery unit.
+        //
+        // When the timestamp is being selected we might have transitioned into PRIMARY that is
+        // accepting writes. The lastApplied timestamp can have oplog holes behind it, in PRIMARY
+        // mode, making it unsafe as a read timestamp as concurrent writes could commit at earlier
+        // timestamps.
+        //
+        // This is handled by re-verifying the conditions if we need to read at last applied after
+        // determining the timestamp but before opening the storage snapshot. If the conditions do
+        // not match what we recorded at the beginning of the operation, we set the read source back
+        // to kNoTimestamp and read without a timestamp.
+        //
+        // The above mainly applies for Lock-free reads that is not holding the RSTL which protects
+        // against state changes.
+        reason.clear();
+        if (!shouldReadAtLastApplied(opCtx, nss, reasonWriter)) {
+            // State changed concurrently with setting the read source and we should no longer read
+            // at lastApplied.
+            setReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+            readAtLastApplied = false;
         }
     }
-    return {boost::none, readAtLastApplied};
+
+    // All done, log if we made a change to the read source
+    if (originalReadSource == RecoveryUnit::ReadSource::kNoTimestamp &&
+        currentReadSource == RecoveryUnit::ReadSource::kLastApplied) {
+        LOGV2_DEBUG(4452901,
+                    2,
+                    "Changed ReadSource to kLastApplied",
+                    logAttrs(nss),
+                    "ts"_attr = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx));
+    } else if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied &&
+               currentReadSource == RecoveryUnit::ReadSource::kLastApplied) {
+        LOGV2_DEBUG(6730500,
+                    2,
+                    "ReadSource kLastApplied updated timestamp",
+                    logAttrs(nss),
+                    "ts"_attr = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx));
+    } else if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied &&
+               currentReadSource == RecoveryUnit::ReadSource::kNoTimestamp) {
+        LOGV2_DEBUG(4452902,
+                    2,
+                    "Changed ReadSource to kNoTimestamp",
+                    logAttrs(nss),
+                    "reason"_attr = reason);
+    }
+
+    // Return if we need to read at last applied to the caller in case further checks need to be
+    // performed.
+    return readAtLastApplied;
 }
 
 bool collectionChangesConflictWithRead(boost::optional<Timestamp> collectionMin,
