@@ -138,7 +138,7 @@ LogicalSessionIdSet removeExpiredTransactionSessionsNotInUseFromMemory(
     // Find the possibly expired logical session ids in the in-memory catalog.
     LogicalSessionIdSet possiblyExpiredLogicalSessionIds;
     // Skip child transaction sessions since they correspond to the same logical session as their
-    // parent transaction session so they have the same last check-out time as the the parent's.
+    // parent transaction session so they have the same last check-out time as the parent's.
     catalog->scanParentSessions([&](const ObservableSession& session) {
         const auto sessionId = session.getSessionId();
         invariant(isParentSessionId(sessionId));
@@ -286,9 +286,9 @@ int removeSessionsTransactionRecordsFromDisk(OperationContext* opCtx,
 }
 
 /**
- * Removes the the config.transactions and the config.image_collection entries for the transaction
- * sessions in 'expiredTransactionSessionIdsNotInUse' that are safe to reap. Returns the number
- * of transaction sessions whose entries were removed.
+ * Removes the config.transactions and the config.image_collection entries for the transaction
+ * sessions in 'expiredTransactionSessionIdsNotInUse' whose logical sessions have expired. Returns
+ * the number of transaction sessions whose entries were removed.
  */
 int removeSessionsTransactionRecordsIfExpired(
     OperationContext* opCtx,
@@ -298,48 +298,26 @@ int removeSessionsTransactionRecordsIfExpired(
         return 0;
     }
 
-    // From the expired transaction session ids that are no longer in use, find the ones that are
-    // safe to reap.
+    // From the expired transaction session ids that are no longer in use, find the ones whose
+    // logical sessions have been removed from from the config.system.sessions collection.
     LogicalSessionIdSet transactionSessionIdsToReap;
     {
         LogicalSessionIdSet possiblyExpiredLogicalSessionIds;
-        LogicalSessionIdMap<LogicalSessionIdSet>
-            transactionSessionIdsToReapIfLogicalSessionsExpired;
+        for (const auto& transactionSessionId : expiredTransactionSessionIdsNotInUse) {
+            const auto logicalSessionId = isParentSessionId(transactionSessionId)
+                ? transactionSessionId
+                : *getParentSessionId(transactionSessionId);
+            possiblyExpiredLogicalSessionIds.insert(std::move(logicalSessionId));
+        }
+        auto expiredLogicalSessionIds =
+            sessionsCollection.findRemovedSessions(opCtx, possiblyExpiredLogicalSessionIds);
 
         for (const auto& transactionSessionId : expiredTransactionSessionIdsNotInUse) {
-            if (isInternalSessionForRetryableWrite(transactionSessionId)) {
-                // It is safe to reap an internal transaction session for retryable write if it
-                // its transaction record has already expired since by design internal transaction
-                // sessions for retryable write are never reused and reaping them would not
-                // interrupt operations on other transaction sessions for the logical sessions that
-                // they correspond to.
+            const auto logicalSessionId = isParentSessionId(transactionSessionId)
+                ? transactionSessionId
+                : *getParentSessionId(transactionSessionId);
+            if (expiredLogicalSessionIds.find(logicalSessionId) != expiredLogicalSessionIds.end()) {
                 transactionSessionIdsToReap.insert(transactionSessionId);
-            } else {
-                // It not safe to reap an internal transaction session for non-retryable write until
-                // the logical session that it corresponds to has expired, even if its transaction
-                // record has already expired. The reason is that each internal transaction session
-                // for non-retryable write is kept in the internal session pool and is reusable
-                // as long as the logical session that its correspond to has not expired and so
-                // reaping it would interrupt any operation that is running on it. The same applies
-                // to a parent transaction session since reaping it would interrupt all operations
-                // on that logical session.
-                auto logicalSessionId = castToParentSessionId(transactionSessionId);
-                possiblyExpiredLogicalSessionIds.insert(logicalSessionId);
-                transactionSessionIdsToReapIfLogicalSessionsExpired[logicalSessionId].insert(
-                    transactionSessionId);
-            }
-        }
-
-        if (!transactionSessionIdsToReapIfLogicalSessionsExpired.empty()) {
-            auto expiredLogicalSessionIds =
-                sessionsCollection.findRemovedSessions(opCtx, possiblyExpiredLogicalSessionIds);
-            for (const auto& [logicalSessionId, transactionSessionIds] :
-                 transactionSessionIdsToReapIfLogicalSessionsExpired) {
-                if (expiredLogicalSessionIds.find(logicalSessionId) !=
-                    expiredLogicalSessionIds.end()) {
-                    transactionSessionIdsToReap.insert(transactionSessionIds.begin(),
-                                                       transactionSessionIds.end());
-                }
             }
         }
     }

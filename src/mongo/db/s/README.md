@@ -855,7 +855,7 @@ or yield the session.
 Checking out an internal/child session additionally checks out its parent session (the session with the same `id` and `uid` value in the lsid, but without a `txnNumber` or `txnUUID` value), and vice versa.
 
 The runtime state for a session consists of the last checkout time and operation, the number of operations
-waiting to check out the session, and the number of kills requested. Retryable internal sessions are reaped from the logical session catalog [eagerly](https://github.com/mongodb/mongo/blob/67e37f8e806a6a5d402e20eee4b3097e2b11f820/src/mongo/db/session_catalog.cpp#L342), meaning that if a transaction session with a higher transaction number has successfully started, sessions with lower txnNumbers are removed from the session catalog and inserted into an in-memory buffer by the [InternalTransactionsReapService](https://github.com/mongodb/mongo/blob/67e37f8e806a6a5d402e20eee4b3097e2b11f820/src/mongo/db/internal_transactions_reap_service.h#L42) until a configurable threshold is met (1000 by default), after which they are deleted from the transactions table (`config.transactions`) and `config.image_collection` all at once. Eager reaping is best-effort, in that the in-memory buffer is cleared on stepdown or restart. Any missed sessions will be reaped once the session expires or their `config.transactions` entries have not been written to for `TransactionRecordMinimumLifetimeMinutes` minutes.
+waiting to check out the session, and the number of kills requested. Retryable internal sessions are reaped from the logical session catalog [eagerly](https://github.com/mongodb/mongo/blob/67e37f8e806a6a5d402e20eee4b3097e2b11f820/src/mongo/db/session_catalog.cpp#L342), meaning that if a transaction session with a higher transaction number has successfully started, sessions with lower txnNumbers are removed from the session catalog and inserted into an in-memory buffer by the [InternalTransactionsReapService](https://github.com/mongodb/mongo/blob/67e37f8e806a6a5d402e20eee4b3097e2b11f820/src/mongo/db/internal_transactions_reap_service.h#L42) until a configurable threshold is met (1000 by default), after which they are deleted from the transactions table (`config.transactions`) and `config.image_collection` all at once. Eager reaping is best-effort, in that the in-memory buffer is cleared on stepdown or restart.
 
 The last checkout time is used by
 the [periodic job inside the logical session cache](#periodic-cleanup-of-the-session-catalog-and-transactions-table)
@@ -1289,7 +1289,7 @@ consistent. When a DDL request is received by a router, it gets forwarded to the
 of the targeted database. For the sake of clarity, createDatabase is the only DDL operation that cannot possibly get forwarded to the
 database primary but is instead routed to the config server, as the database may not exist yet.
 
-##### Serialization and joinability of DDL operations 
+##### Serialization and joinability of DDL operations
 When a primary shard receives a DDL request, it tries to construct a DDL coordinator performing the following steps:
 - Acquire the [distributed lock for the database](https://github.com/mongodb/mongo/blob/908e394d39b223ce498fde0d40e18c9200c188e2/src/mongo/db/s/sharding_ddl_coordinator.cpp#L155). This ensures that at most one DDL operation at a time will run for namespaces belonging to the same database on that particular primary node.
 - Acquire the distributed lock for the [collection](https://github.com/mongodb/mongo/blob/908e394d39b223ce498fde0d40e18c9200c188e2/src/mongo/db/s/sharding_ddl_coordinator.cpp#L171) (or [collections](https://github.com/mongodb/mongo/blob/908e394d39b223ce498fde0d40e18c9200c188e2/src/mongo/db/s/sharding_ddl_coordinator.cpp#L181)) involved in the operation.
@@ -1302,7 +1302,7 @@ on the shard in order to join the ongoing operation if the options match (same o
 Once the distributed locks have been acquired, it is guaranteed that no other concurrent DDLs are happening for the same database,
 hence a DDL coordinator can safely start [executing the operation](https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/sharding_ddl_coordinator.cpp#L207).
 
-As first step, each coordinator is required to [majority commit a document](https://github.com/mongodb/mongo/blob/2ae2bcedfb7d48e64843dd56b9e4f107c56944b6/src/mongo/db/s/sharding_ddl_coordinator.h#L105-L116) - 
+As first step, each coordinator is required to [majority commit a document](https://github.com/mongodb/mongo/blob/2ae2bcedfb7d48e64843dd56b9e4f107c56944b6/src/mongo/db/s/sharding_ddl_coordinator.h#L105-L116) -
 that we will refer to as state document - containing all information regarding the running operation such as name of the DDL, namespaces
 involved and other metadata identifying the original request. At this point, the coordinator is entitled to start making both local and
 remote catalog modifications, eventually after blocking CRUD operations on the changing namespaces; when the execution reaches relevant
