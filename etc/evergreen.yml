@@ -3327,6 +3327,17 @@ tasks:
           mv mongodb-*.${ext|tgz} mongodb-binaries.tgz
           mv mh-*.${ext|tgz} mh-binaries.${ext|tgz} || true
 
+    - command: shell.exec
+      params:
+        binary: bash
+        add_expansions_to_env: true
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          ${activate_virtualenv}
+          $python evergreen/macos_notary.py mongodb-binaries.${ext|tgz}
+
     # Tar unstripped dbtest, to be archived in case of failure
     - command: archive.targz_pack
       params:
