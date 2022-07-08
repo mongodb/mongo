@@ -51,72 +51,49 @@ TranslatedCell translateCell(PathView path, const SplitCellView& splitCellView) 
 
 ColumnScanStage::ColumnScanStage(UUID collectionUuid,
                                  StringData columnIndexName,
-                                 value::SlotVector fieldSlots,
                                  std::vector<std::string> paths,
-                                 boost::optional<value::SlotId> recordSlot,
                                  boost::optional<value::SlotId> recordIdSlot,
-                                 std::unique_ptr<EExpression> recordExpr,
-                                 std::vector<std::unique_ptr<EExpression>> pathExprs,
+                                 boost::optional<value::SlotId> reconstuctedRecordSlot,
                                  value::SlotId rowStoreSlot,
+                                 std::unique_ptr<EExpression> rowStoreExpr,
                                  PlanYieldPolicy* yieldPolicy,
                                  PlanNodeId nodeId,
                                  bool participateInTrialRunTracking)
     : PlanStage("COLUMN_SCAN"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
       _collUuid(collectionUuid),
       _columnIndexName(columnIndexName),
-      _fieldSlots(std::move(fieldSlots)),
       _paths(std::move(paths)),
-      _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
-      _recordExpr(std::move(recordExpr)),
-      _pathExprs(std::move(pathExprs)),
-      _rowStoreSlot(rowStoreSlot) {
-    invariant(_fieldSlots.size() == _paths.size());
-    invariant(_fieldSlots.size() == _pathExprs.size());
-}
+      _reconstructedRecordSlot(reconstuctedRecordSlot),
+      _rowStoreSlot(rowStoreSlot),
+      _rowStoreExpr(std::move(rowStoreExpr)) {}
 
 std::unique_ptr<PlanStage> ColumnScanStage::clone() const {
     std::vector<std::unique_ptr<EExpression>> pathExprs;
-    for (auto& expr : _pathExprs) {
-        pathExprs.emplace_back(expr->clone());
-    }
     return std::make_unique<ColumnScanStage>(_collUuid,
                                              _columnIndexName,
-                                             _fieldSlots,
                                              _paths,
-                                             _recordSlot,
                                              _recordIdSlot,
-                                             _recordExpr ? _recordExpr->clone() : nullptr,
-                                             std::move(pathExprs),
+                                             _reconstructedRecordSlot,
                                              _rowStoreSlot,
+                                             _rowStoreExpr ? _rowStoreExpr->clone() : nullptr,
                                              _yieldPolicy,
                                              _commonStats.nodeId,
                                              _participateInTrialRunTracking);
 }
 
 void ColumnScanStage::prepare(CompileCtx& ctx) {
-    _outputFields.resize(_fieldSlots.size());
-
-    for (size_t idx = 0; idx < _outputFields.size(); ++idx) {
-        auto [it, inserted] = _outputFieldsMap.emplace(_fieldSlots[idx], &_outputFields[idx]);
-        uassert(6610212, str::stream() << "duplicate slot: " << _fieldSlots[idx], inserted);
-    }
-
-    if (_recordSlot) {
-        _recordAccessor = std::make_unique<value::OwnedValueAccessor>();
+    if (_reconstructedRecordSlot) {
+        _reconstructedRecordAccessor = std::make_unique<value::OwnedValueAccessor>();
     }
     if (_recordIdSlot) {
         _recordIdAccessor = std::make_unique<value::OwnedValueAccessor>();
     }
 
     _rowStoreAccessor = std::make_unique<value::OwnedValueAccessor>();
-    if (_recordExpr) {
+    if (_rowStoreExpr) {
         ctx.root = this;
-        _recordExprCode = _recordExpr->compile(ctx);
-    }
-    for (auto& expr : _pathExprs) {
-        ctx.root = this;
-        _pathExprsCode.emplace_back(expr->compile(ctx));
+        _rowStoreExprCode = _rowStoreExpr->compile(ctx);
     }
 
     tassert(6610200, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
@@ -132,16 +109,12 @@ void ColumnScanStage::prepare(CompileCtx& ctx) {
 }
 
 value::SlotAccessor* ColumnScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
-    if (_recordSlot && slot == *_recordSlot) {
-        return _recordAccessor.get();
+    if (_reconstructedRecordSlot && slot == *_reconstructedRecordSlot) {
+        return _reconstructedRecordAccessor.get();
     }
 
     if (_recordIdSlot && slot == *_recordIdSlot) {
         return _recordIdAccessor.get();
-    }
-
-    if (auto it = _outputFieldsMap.find(slot); it != _outputFieldsMap.end()) {
-        return it->second;
     }
 
     if (_rowStoreSlot == slot) {
@@ -247,7 +220,7 @@ void ColumnScanStage::open(bool reOpen) {
 
     if (_open) {
         tassert(6610203, "reopened ColumnScanStage but reOpen=false", reOpen);
-        tassert(6610204, "ColumnScanStage is open but _coll is not null", _coll);
+        tassert(6610204, "ColumnScanStage is open but _coll is null", _coll);
         tassert(6610205, "ColumnScanStage is open but don't have _rowStoreCursor", _rowStoreCursor);
     } else {
         tassert(6610206, "first open to ColumnScanStage but reOpen=true", !reOpen);
@@ -263,7 +236,7 @@ void ColumnScanStage::open(bool reOpen) {
     }
 
     if (!_rowStoreCursor) {
-        _rowStoreCursor = _coll->getCursor(_opCtx, true);
+        _rowStoreCursor = _coll->getCursor(_opCtx, true /* forward */);
     }
 
     if (_columnCursors.empty()) {
@@ -298,13 +271,11 @@ void ColumnScanStage::open(bool reOpen) {
 
 void ColumnScanStage::readParentsIntoObj(StringData path,
                                          value::Object* outObj,
-                                         StringDataSet* pathsReadSetOut,
-                                         bool first) {
+                                         StringDataSet* pathsReadSetOut) {
     auto parent = ColumnStore::getParentPath(path);
 
     // If a top-level path doesn't exist, it just doesn't exist. It can't exist in some places
     // within a document but not others. No further inspection is necessary.
-
     if (!parent) {
         return;
     }
@@ -329,9 +300,10 @@ void ColumnScanStage::readParentsIntoObj(StringData path,
                 static_cast<bool>(entry));
         auto iam = static_cast<ColumnStoreAccessMethod*>(entry->accessMethod());
 
-        it->second = std::make_unique<ColumnCursor>(
-            iam->storage()->newCursor(_opCtx, *parent),
-            _specificStats.parentCursorStats.emplace_back(parent->toString(), false));
+        it->second =
+            std::make_unique<ColumnCursor>(iam->storage()->newCursor(_opCtx, *parent),
+                                           _specificStats.parentCursorStats.emplace_back(
+                                               parent->toString(), false /* includeInOutput */));
     }
 
     boost::optional<SplitCellView> splitCellView;
@@ -342,7 +314,7 @@ void ColumnScanStage::readParentsIntoObj(StringData path,
     pathsReadSetOut->insert(*parent);
     if (!splitCellView || splitCellView->isSparse) {
         // We need this cell's parent too.
-        readParentsIntoObj(*parent, outObj, pathsReadSetOut, false);
+        readParentsIntoObj(*parent, outObj, pathsReadSetOut);
     }
 
     if (splitCellView) {
@@ -350,7 +322,6 @@ void ColumnScanStage::readParentsIntoObj(StringData path,
         addCellToObject(translatedCell, *outObj);
     }
 }
-
 
 PlanState ColumnScanStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
@@ -423,23 +394,23 @@ PlanState ColumnScanStage::getNext() {
                                  value::TypeTags::bsonObject,
                                  value::bitcastFrom<const char*>(record->data.data()));
 
-        if (_recordExpr) {
-            auto [owned, tag, val] = _bytecode.run(_recordExprCode.get());
-            _recordAccessor->reset(owned, tag, val);
+        if (_reconstructedRecordAccessor) {
+            // TODO: in absence of record expression set the reconstructed record to be the same as
+            // the record, retrieved from the row store.
+            invariant(_rowStoreExpr);
+            auto [owned, tag, val] = _bytecode.run(_rowStoreExprCode.get());
+            _reconstructedRecordAccessor->reset(owned, tag, val);
         }
     } else {
-        _recordAccessor->reset(true, outTag, outVal);
+        if (_reconstructedRecordAccessor) {
+            _reconstructedRecordAccessor->reset(true, outTag, outVal);
+        }
         materializedObjGuard.reset();
     }
 
     if (_recordIdAccessor) {
         _recordIdAccessor->reset(
             false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_recordId));
-    }
-
-    for (size_t idx = 0; idx < _outputFields.size(); ++idx) {
-        auto [owned, tag, val] = _bytecode.run(_pathExprsCode[idx].get());
-        _outputFields[idx].reset(owned, tag, val);
     }
 
     if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumReads>(1)) {
@@ -499,7 +470,6 @@ std::unique_ptr<PlanStageStats> ColumnScanStage::getStats(bool includeDebugInfo)
         parentColumns.done();
 
         bob.append("paths", _paths);
-        bob.append("outputSlots", _fieldSlots.begin(), _fieldSlots.end());
 
         ret->debugInfo = bob.obj();
     }
@@ -513,19 +483,8 @@ const SpecificStats* ColumnScanStage::getSpecificStats() const {
 std::vector<DebugPrinter::Block> ColumnScanStage::debugPrint() const {
     auto ret = PlanStage::debugPrint();
 
-    // Print out output slots.
-    ret.emplace_back(DebugPrinter::Block("[`"));
-    for (size_t idx = 0; idx < _fieldSlots.size(); ++idx) {
-        if (idx) {
-            ret.emplace_back(DebugPrinter::Block("`,"));
-        }
-
-        DebugPrinter::addIdentifier(ret, _fieldSlots[idx]);
-    }
-    ret.emplace_back(DebugPrinter::Block("`]"));
-
-    if (_recordSlot) {
-        DebugPrinter::addIdentifier(ret, _recordSlot.get());
+    if (_reconstructedRecordSlot) {
+        DebugPrinter::addIdentifier(ret, _reconstructedRecordSlot.get());
     } else {
         DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
@@ -560,7 +519,6 @@ std::vector<DebugPrinter::Block> ColumnScanStage::debugPrint() const {
 
 size_t ColumnScanStage::estimateCompileTimeSize() const {
     size_t size = sizeof(*this);
-    size += size_estimator::estimate(_fieldSlots);
     size += size_estimator::estimate(_paths);
     size += size_estimator::estimate(_specificStats);
     return size;

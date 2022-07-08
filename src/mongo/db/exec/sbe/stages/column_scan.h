@@ -39,20 +39,26 @@
 namespace mongo {
 namespace sbe {
 /**
- * A stage that scans provided columnar index. A set of paths is retrieved from the index and values
- * are put in output slots.
+ * A stage that scans provided columnar index.
+ *
+ * Currently the stage produces an object into the 'recordSlot' such that accessing any of the given
+ * paths in it would be equivalent to accessing the paths in the corresponding object from the
+ * associated row store. In the future the stage will be extended to produce separate outputs for
+ * each path without materializing this intermediate object unless requested by the client.
+ *
+ * Debug string representation:
+ *
+ *  COLUMN_SCAN recordSlot|none recordIdSlot|none [path_1, ..., path_n] collectionUuid indexName
  */
 class ColumnScanStage final : public PlanStage {
 public:
     ColumnScanStage(UUID collectionUuid,
                     StringData columnIndexName,
-                    value::SlotVector fieldSlots,
                     std::vector<std::string> paths,
-                    boost::optional<value::SlotId> recordSlot,
                     boost::optional<value::SlotId> recordIdSlot,
-                    std::unique_ptr<EExpression> internalExpr,
-                    std::vector<std::unique_ptr<EExpression>> pathExprs,
-                    value::SlotId internalSlot,
+                    boost::optional<value::SlotId> reconstructedRecordSlot,
+                    value::SlotId rowStoreSlot,
+                    std::unique_ptr<EExpression> rowStoreExpr,
                     PlanYieldPolicy* yieldPolicy,
                     PlanNodeId planNodeId,
                     bool participateInTrialRunTracking = true);
@@ -176,50 +182,54 @@ private:
         ColumnScanStats::CursorStats& _stats;
     };
 
-    void readParentsIntoObj(StringData path,
-                            value::Object* out,
-                            StringDataSet* pathsReadSetOut,
-                            bool first = true);
+    void readParentsIntoObj(StringData path, value::Object* out, StringDataSet* pathsReadSetOut);
 
+    // The columnar index this stage is scanning and the associated row store collection.
     const UUID _collUuid;
     const std::string _columnIndexName;
-    const value::SlotVector _fieldSlots;
+    CollectionPtr _coll;
+    boost::optional<NamespaceString> _collName;  // These two members are initialized in 'prepare()'
+    boost::optional<uint64_t> _catalogEpoch;     // and are not changed afterwards.
+    std::weak_ptr<const IndexCatalogEntry> _weakIndexCatalogEntry;
+
+    // Paths to be read from the index.
     const std::vector<std::string> _paths;
-    const boost::optional<value::SlotId> _recordSlot;
+
+    // The record id in the row store that is used to connect the per-path entries in the columnar
+    // index and to retrieve the full record from the row store, if necessary. Because we put into
+    // the slot the address of record id, we must guarantee that its lifetime is as long as the
+    // stage's.
+    RecordId _recordId;
     const boost::optional<value::SlotId> _recordIdSlot;
 
-    // An optional expression used to reconstruct the output document.
-    const std::unique_ptr<EExpression> _recordExpr;
-    // Expressions to get values from the row store document.
-    const std::vector<std::unique_ptr<EExpression>> _pathExprs;
-    // An internal slot that points to the row store document.
+    // The object that is equivalent to the record from the associated row store when accessing
+    // the provided paths. The object might be reconstructed from the index or it might be retrieved
+    // from the row store (in which case it can be transformed with '_rowStoreExpr').
+    // It's optional because in the future the stage will expose slots with results for individual
+    // paths which would make materializing the reconstructed record unnecesary in many cases.
+    const boost::optional<value::SlotId> _reconstructedRecordSlot;
+
+    // Sometimes, populating the outputs from the index isn't possible and instead the full record
+    // is retrieved from the collection this index is for, that is, from the associated "row store".
+    // This full record is placed into the '_rowStoreSlot' and can be transformed using
+    // '_rowStoreExpr' before producing the outputs. The client is responsible for ensuring that the
+    // outputs after the transformation still satisfy the equivalence requirement for accessing the
+    // paths on them vs on the original record.
     const value::SlotId _rowStoreSlot;
+    const std::unique_ptr<EExpression> _rowStoreExpr;
 
-    std::vector<value::OwnedValueAccessor> _outputFields;
-    value::SlotAccessorMap _outputFieldsMap;
-    std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
+    std::unique_ptr<value::OwnedValueAccessor> _reconstructedRecordAccessor;
     std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
-
-    std::unique_ptr<vm::CodeFragment> _recordExprCode;
-    std::vector<std::unique_ptr<vm::CodeFragment>> _pathExprsCode;
     std::unique_ptr<value::OwnedValueAccessor> _rowStoreAccessor;
 
     vm::ByteCode _bytecode;
+    std::unique_ptr<vm::CodeFragment> _rowStoreExprCode;
 
-    // These members are default constructed to boost::none and are initialized when 'prepare()'
-    // is called. Once they are set, they are never modified again.
-    boost::optional<NamespaceString> _collName;
-    boost::optional<uint64_t> _catalogEpoch;
-
-    CollectionPtr _coll;
-
-    std::weak_ptr<const IndexCatalogEntry> _weakIndexCatalogEntry;
-    std::unique_ptr<SeekableRecordCursor> _rowStoreCursor;
-
+    // Cursors to simultaneously read from the sections of the index for each path (and, possibly,
+    // auxiliary sections) and from the row store.
     std::vector<ColumnCursor> _columnCursors;
     StringMap<std::unique_ptr<ColumnCursor>> _parentPathCursors;
-
-    RecordId _recordId;
+    std::unique_ptr<SeekableRecordCursor> _rowStoreCursor;
 
     bool _open{false};
 
