@@ -54,6 +54,8 @@ protected:
 
     using StripeNumber = std::uint8_t;
 
+    using EraCountMap = stdx::unordered_map<uint64_t, uint64_t>;
+
     struct BucketHandle {
         const OID id;
         const StripeNumber stripe;
@@ -520,6 +522,31 @@ protected:
     };
 
     /**
+     * A helper class to maintain global state about the catalog era used to support asynchronous
+     * 'clear' operations. Provides thread-safety by taking the catalog '_mutex' for all operations.
+     */
+    class EraManager {
+    public:
+        EraManager(Mutex* m);
+        uint64_t getEra();
+        void incrementEra();
+        uint64_t getEraAndIncrementCount();
+        void decrementCountForEra(uint64_t value);
+        uint64_t getCountForEra(uint64_t value);
+
+    private:
+        // Pointer to 'BucketCatalog::_mutex'.
+        Mutex* _mutex;
+
+        // Global number tracking the current number of eras that have passed. Incremented each time
+        // a bucket is cleared.
+        uint64_t _era;
+
+        // Mapping of era to counts of how many buckets are associated with that era.
+        EraCountMap _countMap;
+    };
+
+    /**
      * The in-memory representation of a time-series bucket document. Maintains all the information
      * needed to add additional measurements, but does not generally store the full contents of the
      * document that have already been committed to disk.
@@ -529,7 +556,9 @@ protected:
     public:
         friend class BucketCatalog;
 
-        Bucket(const OID& id, StripeNumber stripe, BucketKey::Hash hash, uint64_t era);
+        Bucket(const OID& id, StripeNumber stripe, BucketKey::Hash hash, EraManager* eraManager);
+
+        ~Bucket();
 
         uint64_t era() const;
 
@@ -567,6 +596,11 @@ protected:
         uint32_t numMeasurements() const;
 
         /**
+         * Sets the namespace of the bucket.
+         */
+        void setNamespace(const NamespaceString& ns);
+
+        /**
          * Determines if the schema for an incoming measurement is incompatible with those already
          * stored in the bucket.
          *
@@ -600,6 +634,8 @@ protected:
     protected:
         // The era number of the last log operation the bucket has caught up to
         uint64_t _lastCheckedEra;
+
+        EraManager* _eraManager;
 
     private:
         // The bucket ID for the underlying document
@@ -742,7 +778,7 @@ protected:
         const TimeseriesOptions& options,
         ExecutionStatsController stats,
         boost::optional<BucketToReopen> bucketToReopen,
-        boost::optional<const BucketKey&> expectedKey) const;
+        boost::optional<const BucketKey&> expectedKey);
 
     /**
      * Given a rehydrated 'bucket', passes ownership of that bucket to the catalog, marking the
@@ -911,6 +947,8 @@ protected:
     static long long _marginalMemoryUsageForArchivedBucket(const ArchivedBucket& bucket,
                                                            bool onlyEntryForMatchingMetaHash);
 
+    EraManager _eraManager = {&_mutex};
+
     static constexpr std::size_t kNumberOfStripes = 32;
     std::array<Stripe, kNumberOfStripes> _stripes;
 
@@ -930,10 +968,6 @@ protected:
 
     // Approximate memory usage of the bucket catalog.
     AtomicWord<uint64_t> _memoryUsage;
-
-    // Global number tracking the current number of eras that have passed. Incremented each time a
-    // bucket is cleared
-    uint64_t _era = 0;
 
     class ServerStatus;
 };

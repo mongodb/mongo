@@ -37,6 +37,11 @@ namespace {
 class BucketCatalogEraTest : public BucketCatalog, public unittest::Test {
 public:
     BucketCatalogEraTest() {}
+    Bucket* createBucket(const CreationInfo& info) {
+        auto ptr = _allocateBucket(&_stripes[info.stripe], withLock, info);
+        ptr->setNamespace(info.key.ns);
+        return ptr;
+    }
 
     Stripe stripe;
     WithLock withLock = WithLock::withoutLock();
@@ -50,8 +55,10 @@ public:
     TimeseriesOptions options;
     ExecutionStatsController stats = _getExecutionStats(ns1);
     ClosedBuckets closedBuckets;
-    BucketCatalog::CreationInfo info1{bucketKey1, 0, date, options, stats, &closedBuckets};
-    BucketCatalog::CreationInfo info2{bucketKey2, 0, date, options, stats, &closedBuckets};
+    BucketCatalog::CreationInfo info1{
+        bucketKey1, _getStripeNumber(bucketKey1), date, options, stats, &closedBuckets};
+    BucketCatalog::CreationInfo info2{
+        bucketKey2, _getStripeNumber(bucketKey2), date, options, stats, &closedBuckets};
 };
 
 
@@ -61,31 +68,65 @@ TEST_F(BucketCatalogEraTest, EraAdvancesAsExpected) {
                                                     true};
 
     // When allocating new buckets, we expect their era value to match the BucketCatalog's era.
-    ASSERT_EQ(_era, 0);
-    auto bucket1 = _allocateBucket(&stripe, withLock, info1);
-    ASSERT_EQ(_era, 0);
+    ASSERT_EQ(_eraManager.getEra(), 0);
+    auto bucket1 = createBucket(info1);
+    ASSERT_EQ(_eraManager.getEra(), 0);
     ASSERT_EQ(bucket1->era(), 0);
 
     // When clearing buckets, we expect the BucketCatalog's era value to increase while the cleared
     // bucket era values should remain unchanged.
     clear(ns1);
-    ASSERT_EQ(_era, 1);
+    ASSERT_EQ(_eraManager.getEra(), 1);
     // TODO (SERVER-66698): Add checks on the buckets' era values.
     // ASSERT_EQ(b1->era(), 0);
 
     // When clearing buckets of one namespace, we expect the era of buckets of any other namespace
     // to not change.
-    auto bucket2 = _allocateBucket(&stripe, withLock, info1);
-    auto bucket3 = _allocateBucket(&stripe, withLock, info2);
-    ASSERT_EQ(_era, 1);
+    auto bucket2 = createBucket(info1);
+    auto bucket3 = createBucket(info2);
+    ASSERT_EQ(_eraManager.getEra(), 1);
     ASSERT_EQ(bucket2->era(), 1);
     ASSERT_EQ(bucket3->era(), 1);
     clear(ns1);
-    ASSERT_EQ(_era, 2);
+    ASSERT_EQ(_eraManager.getEra(), 2);
     ASSERT_EQ(bucket3->era(), 1);
     // TODO (SERVER-66698): Add checks on the buckets' era values.
     // ASSERT_EQ(b1->era(), 0);
     // ASSERT_EQ(b2->era(), 1);
+}
+
+TEST_F(BucketCatalogEraTest, EraCountMapUpdatedCorrectly) {
+    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
+                                                    true};
+
+    // TODO (SERVER-66698): Change count assertions now that Buckets are cleared lazily.
+    // Creating a bucket in a new era should add a counter for that era to the map.
+    auto bucket1 = createBucket(info1);
+    ASSERT_EQ(bucket1->era(), 0);
+    ASSERT_EQ(_eraManager.getCountForEra(0), 1);
+    clear(ns1);
+
+    // When the last bucket in an era is destructed, the counter in the map should be removed.
+    ASSERT_EQ(_eraManager.getCountForEra(0), 0);
+
+    // If there are still buckets in the era, however, the counter should still exist in the
+    // map.
+    auto bucket2 = createBucket(info1);
+    auto bucket3 = createBucket(info2);
+    ASSERT_EQ(bucket2->era(), 1);
+    ASSERT_EQ(bucket3->era(), 1);
+    ASSERT_EQ(_eraManager.getCountForEra(1), 2);
+    clear(ns2);
+    ASSERT_EQ(_eraManager.getCountForEra(1), 1);
+
+    // A bucket in one era being destroyed and the counter decrementing should not affect a
+    // different era's counter.
+    auto bucket4 = createBucket(info2);
+    ASSERT_EQ(bucket4->era(), 2);
+    ASSERT_EQ(_eraManager.getCountForEra(2), 1);
+    clear(ns2);
+    ASSERT_EQ(_eraManager.getCountForEra(2), 0);
+    ASSERT_EQ(_eraManager.getCountForEra(1), 1);
 }
 
 

@@ -311,11 +311,63 @@ void BucketCatalog::ExecutionStatsController::incNumBucketsKeptOpenDueToLargeMea
     _globalStats->numBucketsKeptOpenDueToLargeMeasurements.fetchAndAddRelaxed(increment);
 }
 
+BucketCatalog::EraManager::EraManager(Mutex* m) : _mutex(m), _era(0) {}
+
+uint64_t BucketCatalog::EraManager::getEra() {
+    stdx::lock_guard lk{*_mutex};
+    return _era;
+}
+
+void BucketCatalog::EraManager::incrementEra() {
+    stdx::lock_guard lk{*_mutex};
+    ++_era;
+}
+
+uint64_t BucketCatalog::EraManager::getEraAndIncrementCount() {
+    stdx::lock_guard lk{*_mutex};
+    auto it = _countMap.find(_era);
+    if (it == _countMap.end()) {
+        (_countMap)[_era] = 1;
+    } else {
+        ++it->second;
+    }
+    return _era;
+}
+
+void BucketCatalog::EraManager::decrementCountForEra(uint64_t value) {
+    stdx::lock_guard lk{*_mutex};
+    auto it = _countMap.find(value);
+    invariant(it != _countMap.end());
+    if (it->second == 1) {
+        _countMap.erase(it);
+    } else {
+        --it->second;
+    }
+}
+
+uint64_t BucketCatalog::EraManager::getCountForEra(uint64_t value) {
+    stdx::lock_guard lk{*_mutex};
+    auto it = _countMap.find(value);
+    if (it == _countMap.end()) {
+        return uint64_t(0);
+    } else {
+        return it->second;
+    }
+}
+
 BucketCatalog::Bucket::Bucket(const OID& id,
                               StripeNumber stripe,
                               BucketKey::Hash hash,
-                              uint64_t era)
-    : _lastCheckedEra(era), _id(id), _stripe(stripe), _keyHash(hash) {}
+                              EraManager* eraManager)
+    : _lastCheckedEra(eraManager->getEraAndIncrementCount()),
+      _eraManager(eraManager),
+      _id(id),
+      _stripe(stripe),
+      _keyHash(hash) {}
+
+BucketCatalog::Bucket::~Bucket() {
+    _eraManager->decrementCountForEra(era());
+}
 
 uint64_t BucketCatalog::Bucket::era() const {
     return _lastCheckedEra;
@@ -347,6 +399,10 @@ bool BucketCatalog::Bucket::allCommitted() const {
 
 uint32_t BucketCatalog::Bucket::numMeasurements() const {
     return _numMeasurements;
+}
+
+void BucketCatalog::Bucket::setNamespace(const NamespaceString& ns) {
+    _ns = ns;
 }
 
 bool BucketCatalog::Bucket::schemaIncompatible(const BSONObj& input,
@@ -744,10 +800,7 @@ void BucketCatalog::clear(const OID& oid) {
 }
 
 void BucketCatalog::clear(const std::function<bool(const NamespaceString&)>& shouldClear) {
-    {
-        stdx::unique_lock<Mutex> lk(_mutex);
-        ++_era;
-    }
+    _eraManager.incrementEra();
 
     for (auto& stripe : _stripes) {
         stdx::lock_guard stripeLock{stripe.mutex};
@@ -977,7 +1030,7 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
     const TimeseriesOptions& options,
     ExecutionStatsController stats,
     boost::optional<BucketToReopen> bucketToReopen,
-    boost::optional<const BucketKey&> expectedKey) const {
+    boost::optional<const BucketKey&> expectedKey) {
     if (!bucketToReopen) {
         // Nothing to rehydrate.
         return {ErrorCodes::BadValue, "No bucket to rehydrate"};
@@ -1015,10 +1068,10 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
 
     auto bucketId = bucketIdElem.OID();
     std::unique_ptr<Bucket> bucket =
-        std::make_unique<Bucket>(bucketId, stripeNumber, key.hash, _era);
+        std::make_unique<Bucket>(bucketId, stripeNumber, key.hash, &_eraManager);
 
     // Initialize the remaining member variables from the bucket document.
-    bucket->_ns = ns;
+    bucket->setNamespace(ns);
     bucket->_metadata = key.metadata;
     bucket->_timeField = options.getTimeField().toString();
     bucket->_size = bucketDoc.objsize();
@@ -1215,7 +1268,7 @@ std::shared_ptr<BucketCatalog::WriteBatch> BucketCatalog::_insertIntoBucket(
     bucket->_size += sizeToBeAdded;
     if (isNewlyOpenedBucket) {
         // The namespace and metadata only need to be set if this bucket was newly created.
-        bucket->_ns = info->key.ns;
+        bucket->setNamespace(info->key.ns);
         bucket->_metadata = info->key.metadata;
 
         // The namespace is stored two times: the bucket itself and openBuckets.
@@ -1465,7 +1518,7 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
     auto [bucketId, roundedTime] = generateBucketId(info.time, info.options);
 
     auto [it, inserted] = stripe->allBuckets.try_emplace(
-        bucketId, std::make_unique<Bucket>(bucketId, info.stripe, info.key.hash, _era));
+        bucketId, std::make_unique<Bucket>(bucketId, info.stripe, info.key.hash, &_eraManager));
     tassert(6130900, "Expected bucket to be inserted", inserted);
     Bucket* bucket = it->second.get();
     stripe->openBuckets[info.key] = bucket;
