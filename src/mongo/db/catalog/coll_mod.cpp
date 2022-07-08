@@ -159,13 +159,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
     }
 
     if (cmr.getCappedSize() || cmr.getCappedMax()) {
-        // TODO (SERVER-64042): Remove FCV check once 6.1 is released.
-        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            serverGlobalParams.featureCompatibility.isLessThan(
-                multiversion::FeatureCompatibilityVersion::kVersion_6_0)) {
-            return {ErrorCodes::InvalidOptions,
-                    "Cannot change the size limits of a capped collection."};
-        } else if (!coll->isCapped()) {
+        if (!coll->isCapped()) {
             return {ErrorCodes::InvalidOptions, "Collection must be capped."};
         } else if (coll->ns().isOplog()) {
             return {ErrorCodes::InvalidOptions,
