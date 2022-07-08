@@ -54,7 +54,8 @@ class test_tiered05(wttest.WiredTigerTestCase):
           'tiered_storage=(auth_token=%s,' % self.auth_token + \
           'bucket=%s,' % self.bucket + \
           'bucket_prefix=%s,' % self.bucket_prefix + \
-          'name=%s)' % self.extension_name
+          'name=%s,' % self.extension_name + \
+          'object_target_size=20M)'
 
     # Test calling the flush_tier API with a tiered manager. Should get an error.
     def test_tiered(self):
