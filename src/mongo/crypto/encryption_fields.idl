@@ -30,6 +30,7 @@ global:
 
 imports:
     - "mongo/idl/basic_types.idl"
+    - "mongo/db/pipeline/value.idl"
 
 enums:
     QueryType:
@@ -37,6 +38,7 @@ enums:
         type: string
         values:
             Equality: "equality"
+            Range: "range"
 
 feature_flags:
     featureFlagFLE2:
@@ -66,6 +68,22 @@ structs:
                 default: 4
                 unstable: true
                 validator: { gte: 0 }
+            min:
+                description: "Defines the lower bound for field values. Only applicable for queryType range"
+                type: Value
+                optional: true
+                unstable: true
+            max:
+                description: "Defines the upper bound for field values. Only applicable for queryType range"
+                type: Value
+                optional: true
+                unstable: true
+            sparsity:
+                description: "Lower value - higher storage overhead, faster query."
+                type: int
+                default: 0
+                unstable: true
+                validator: { gte: 0, lte: 3 }
 
     EncryptedField:
         description: "Information about encrypted fields"

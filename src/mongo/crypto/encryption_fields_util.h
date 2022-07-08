@@ -76,6 +76,11 @@ inline bool isFLE2EqualityIndexedSupportedType(BSONType type) {
     }
 }
 
+
+inline bool isFLE2RangeIndexedSupportedType(BSONType type) {
+    return true;
+}
+
 inline bool isFLE2UnindexedSupportedType(BSONType type) {
     switch (type) {
         case BinData:

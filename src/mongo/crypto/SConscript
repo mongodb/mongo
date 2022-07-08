@@ -81,6 +81,7 @@ env.Library(
         "encryption_fields.idl",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/pipeline/value_idl',
         '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],

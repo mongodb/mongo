@@ -161,6 +161,8 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'find-reply-invalidated',
     'getMore-reply-partialResultsReturned',
     'getMore-reply-invalidated',
+    'create-param-min',
+    'create-param-max',
 ]
 
 # Do not add user visible fields already released in earlier versions.

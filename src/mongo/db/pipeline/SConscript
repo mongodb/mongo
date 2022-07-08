@@ -475,7 +475,6 @@ env.Library(
         'exchange_spec.idl',
         'resume_token.cpp',
         'storage_stats_spec.idl',
-        'value.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -484,6 +483,18 @@ env.Library(
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/s/common_s',
         'runtime_constants_idl',
+        'value_idl',
+    ],
+)
+
+env.Library(
+    target='value_idl',
+    source=[
+        'value.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
+        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 
