@@ -82,6 +82,7 @@
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/oplog_cap_maintainer_thread.h"
+#include "mongo/db/storage/storage_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
@@ -342,8 +343,6 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
     boost::optional<AutoGetOplog> autoOplog;
     const CollectionPtr* collection;
 
-    bool shouldWriteToChangeCollections = false;
-
     auto nss = nsOrUUID.nss();
     if (nss && nss->isOplog()) {
         // Simplify locking rules for oplog collection.
@@ -352,9 +351,6 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
         if (!*collection) {
             return {ErrorCodes::NamespaceNotFound, "Oplog collection does not exist"};
         }
-
-        shouldWriteToChangeCollections =
-            ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive();
     } else {
         autoColl.emplace(opCtx, nsOrUUID, MODE_IX);
         auto collectionResult = getCollection(
@@ -372,17 +368,6 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
         return status;
     }
 
-    // Insert oplog entries to change collections if we are running in the serverless and the 'nss'
-    // is 'local.oplog.rs'.
-    if (shouldWriteToChangeCollections) {
-        auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
-        status = changeCollectionManager.insertDocumentsToChangeCollection(
-            opCtx, begin, end, nullOpDebug);
-        if (!status.isOK()) {
-            return status;
-        }
-    }
-
     wunit.commit();
 
     return Status::OK();
@@ -393,35 +378,10 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
 Status StorageInterfaceImpl::insertDocuments(OperationContext* opCtx,
                                              const NamespaceStringOrUUID& nsOrUUID,
                                              const std::vector<InsertStatement>& docs) {
-    if (docs.size() > 1U) {
-        try {
-            if (insertDocumentsSingleBatch(opCtx, nsOrUUID, docs.cbegin(), docs.cend()).isOK()) {
-                return Status::OK();
-            }
-        } catch (...) {
-            // Ignore this failure and behave as-if we never tried to do the combined batch insert.
-            // The loop below will handle reporting any non-transient errors.
-        }
-    }
-
-    // Try to insert the batch one-at-a-time because the batch failed all-at-once inserting.
-    for (auto it = docs.cbegin(); it != docs.cend(); ++it) {
-        auto status = writeConflictRetry(
-            opCtx, "StorageInterfaceImpl::insertDocuments", nsOrUUID.toString(), [&] {
-                auto status = insertDocumentsSingleBatch(opCtx, nsOrUUID, it, it + 1);
-                if (!status.isOK()) {
-                    return status;
-                }
-
-                return Status::OK();
-            });
-
-        if (!status.isOK()) {
-            return status;
-        }
-    }
-
-    return Status::OK();
+    return storage_helpers::insertBatchAndHandleRetry(
+        opCtx, nsOrUUID, docs, [&](auto* opCtx, auto begin, auto end) {
+            return insertDocumentsSingleBatch(opCtx, nsOrUUID, begin, end);
+        });
 }
 
 Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {

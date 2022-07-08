@@ -474,12 +474,15 @@ private:
  * A RAII-style class to acquire lock to a particular tenant's change collection.
  *
  * A change collection can be accessed in the following modes:
- *   kWrite - This mode assumes that the global IX lock is already held before writing to the change
- *            collection.
+ *   kWriteInOplogContext - perform writes to the change collection by taking the IX lock on a
+ *                          tenant's change collection. The change collection is written along with
+ *                          the oplog in the same 'WriteUnitOfWork' and assumes that the global IX
+ *                          lock is already held.
+ *   kWrite - takes the IX lock on a tenant's change collection to perform any writes.
  */
 class AutoGetChangeCollection {
 public:
-    enum class AccessMode { kWrite };
+    enum class AccessMode { kWriteInOplogContext, kWrite };
 
     AutoGetChangeCollection(OperationContext* opCtx,
                             AccessMode mode,

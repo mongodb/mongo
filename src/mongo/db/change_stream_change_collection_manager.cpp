@@ -71,6 +71,8 @@ BSONObj createChangeCollectionEntryFromOplog(const BSONObj& oplogEntry) {
  */
 class ChangeCollectionsWriter {
 public:
+    explicit ChangeCollectionsWriter(const AutoGetChangeCollection::AccessMode& accessMode)
+        : _accessMode{accessMode} {}
     /**
      * Adds the insert statement for the provided tenant that will be written to the change
      * collection when the 'write()' method is called.
@@ -88,7 +90,7 @@ public:
     Status write(OperationContext* opCtx, OpDebug* opDebug) {
         for (auto&& [tenantId, insertStatements] : _tenantStatementsMap) {
             AutoGetChangeCollection tenantChangeCollection(
-                opCtx, AutoGetChangeCollection::AccessMode::kWrite, boost::none /* tenantId */);
+                opCtx, _accessMode, boost::none /* tenantId */);
 
             // The change collection does not exist for a particular tenant because either the
             // change collection is not enabled or is in the process of enablement. Ignore this
@@ -142,6 +144,9 @@ private:
 
         return true;
     }
+
+    // Mode required to access change collections.
+    const AutoGetChangeCollection::AccessMode _accessMode;
 
     // Maps inserts statements for each tenant.
     stdx::unordered_map<TenantId, std::vector<InsertStatement>, TenantId::Hasher>
@@ -220,7 +225,8 @@ void ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
     // commiting the unit of work.
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
-    ChangeCollectionsWriter changeCollectionsWriter;
+    ChangeCollectionsWriter changeCollectionsWriter{
+        AutoGetChangeCollection::AccessMode::kWriteInOplogContext};
 
     for (size_t idx = 0; idx < oplogRecords.size(); idx++) {
         auto& record = oplogRecords[idx];
@@ -248,8 +254,18 @@ Status ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
     OperationContext* opCtx,
     std::vector<InsertStatement>::const_iterator beginOplogEntries,
     std::vector<InsertStatement>::const_iterator endOplogEntries,
+    bool isGlobalIXLockAcquired,
     OpDebug* opDebug) {
-    ChangeCollectionsWriter changeCollectionsWriter;
+    // This method must be called within a 'WriteUnitOfWork'. The caller must be responsible for
+    // commiting the unit of work.
+    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+
+    // If the global IX lock is already acquired, then change collections entries will be written
+    // within the oplog context as such acquire the correct access mode for change collections.
+    const auto changeCollAccessMode = isGlobalIXLockAcquired
+        ? AutoGetChangeCollection::AccessMode::kWriteInOplogContext
+        : AutoGetChangeCollection::AccessMode::kWrite;
+    ChangeCollectionsWriter changeCollectionsWriter{changeCollAccessMode};
 
     // Transform oplog entries to change collections entries and group them by tenant id.
     for (auto oplogEntryIter = beginOplogEntries; oplogEntryIter != endOplogEntries;

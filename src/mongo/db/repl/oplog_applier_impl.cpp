@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/logical_session_id.h"
@@ -46,6 +47,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/control/journal_flusher.h"
+#include "mongo/db/storage/storage_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/basic.h"
 #include "mongo/util/fail_point.h"
@@ -124,6 +126,47 @@ void _addOplogChainOpsToWriterVectors(OperationContext* opCtx,
     // Transaction entries cannot have different session updates.
     OplogApplierUtils::addDerivedOps(
         opCtx, &derivedOps->back(), writerVectors, collPropertiesCache, shouldSerialize);
+}
+
+Status _insertDocumentsToOplogAndChangeCollections(
+    OperationContext* opCtx,
+    std::vector<InsertStatement>::const_iterator begin,
+    std::vector<InsertStatement>::const_iterator end,
+    bool skipWritesToOplog) {
+    WriteUnitOfWork wunit(opCtx);
+
+    if (!skipWritesToOplog) {
+        AutoGetOplog autoOplog(opCtx, OplogAccessMode::kWrite);
+        auto& oplogColl = autoOplog.getCollection();
+        if (!oplogColl) {
+            return {ErrorCodes::NamespaceNotFound, "Oplog collection does not exist"};
+        }
+
+        auto status = oplogColl->insertDocuments(
+            opCtx, begin, end, nullptr /* OpDebug */, false /* fromMigrate */);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
+    // Write the corresponding oplog entries to tenants respective change
+    // collections in the serverless.
+    if (ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive()) {
+        auto status =
+            ChangeStreamChangeCollectionManager::get(opCtx).insertDocumentsToChangeCollection(
+                opCtx,
+                begin,
+                end,
+                !skipWritesToOplog /* hasAcquiredGlobalIXLock */,
+                nullptr /* OpDebug */);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
+    wunit.commit();
+
+    return Status::OK();
 }
 
 }  // namespace
@@ -365,19 +408,27 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
 }
 
 
-// Schedules the writes to the oplog for 'ops' into threadPool. The caller must guarantee that
-// 'ops' stays valid until all scheduled work in the thread pool completes.
-void scheduleWritesToOplog(OperationContext* opCtx,
-                           StorageInterface* storageInterface,
-                           ThreadPool* writerPool,
-                           const std::vector<OplogEntry>& ops) {
-    auto makeOplogWriterForRange = [storageInterface, &ops](size_t begin, size_t end) {
-        // The returned function will be run in a separate thread after this returns. Therefore all
-        // captures other than 'ops' must be by value since they will not be available. The caller
-        // guarantees that 'ops' will stay in scope until the spawned threads complete.
-        return [storageInterface, &ops, begin, end](auto status) {
-            invariant(status);
+// Schedules the writes to the oplog and the change collection for 'ops' into threadPool. The caller
+// must guarantee that 'ops' stays valid until all scheduled work in the thread pool completes.
+void scheduleWritesToOplogAndChangeCollection(OperationContext* opCtx,
+                                              StorageInterface* storageInterface,
+                                              ThreadPool* writerPool,
+                                              const std::vector<OplogEntry>& ops,
+                                              bool skipWritesToOplog) {
+    // Skip performing any writes during the startup recovery when running in the non-serverless
+    // environment.
+    if (skipWritesToOplog &&
+        !ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive()) {
+        return;
+    }
 
+    auto makeOplogWriterForRange = [storageInterface, &ops, skipWritesToOplog](size_t begin,
+                                                                               size_t end) {
+        // The returned function will be run in a separate thread after this returns. Therefore
+        // all captures other than 'ops' must be by value since they will not be available. The
+        // caller guarantees that 'ops' will stay in scope until the spawned threads complete.
+        return [storageInterface, &ops, begin, end, skipWritesToOplog](auto status) {
+            invariant(status);
             auto opCtx = cc().makeOperationContext();
 
             // This code path is only executed on secondaries and initial syncing nodes, so it is
@@ -396,9 +447,23 @@ void scheduleWritesToOplog(OperationContext* opCtx,
                                                   ops[i].getOpTime().getTerm()});
             }
 
-            fassert(40141,
-                    storageInterface->insertDocuments(
-                        opCtx.get(), NamespaceString::kRsOplogNamespace, docs));
+            // TODO SERVER-67168 the 'nsOrUUID' is used only to log the debug message when retrying
+            // inserts on the oplog and change collections. The 'writeConflictRetry' assumes
+            // operations are done on a single namespace. But the method
+            // '_insertDocumentsToOplogAndChangeCollections' can perform inserts on the oplog and
+            // multiple change collections, ie. several namespaces. As such 'writeConflictRetry'
+            // will not log the correct namespace when retrying. Refactor this code to log the
+            // correct namespace in the log message.
+            NamespaceStringOrUUID nsOrUUID = !skipWritesToOplog
+                ? NamespaceString::kRsOplogNamespace
+                : NamespaceString::makeChangeCollectionNSS(boost::none /* tenantId */);
+
+            fassert(6663400,
+                    storage_helpers::insertBatchAndHandleRetry(
+                        opCtx.get(), nsOrUUID, docs, [&](auto* opCtx, auto begin, auto end) {
+                            return _insertDocumentsToOplogAndChangeCollections(
+                                opCtx, begin, end, skipWritesToOplog);
+                        }));
         };
     };
 
@@ -463,8 +528,10 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
         if (!getOptions().skipWritesToOplog) {
             _consistencyMarkers->setOplogTruncateAfterPoint(
                 opCtx, _replCoord->getMyLastAppliedOpTime().getTimestamp());
-            scheduleWritesToOplog(opCtx, _storageInterface, _writerPool, ops);
         }
+
+        scheduleWritesToOplogAndChangeCollection(
+            opCtx, _storageInterface, _writerPool, ops, getOptions().skipWritesToOplog);
 
         // Holds 'pseudo operations' generated by secondaries to aid in replication.
         // Keep in scope until all operations in 'ops' and 'derivedOps' have been applied.
@@ -520,8 +587,8 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
 
                     auto opCtx = cc().makeOperationContext();
 
-                    // This code path is only executed on secondaries and initial syncing nodes,
-                    // so it is safe to exclude any writes from Flow Control.
+                    // This code path is only executed on secondaries and initial syncing nodes, so
+                    // it is safe to exclude any writes from Flow Control.
                     opCtx->setShouldParticipateInFlowControl(false);
                     opCtx->setEnforceConstraints(false);
 

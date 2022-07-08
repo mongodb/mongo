@@ -572,17 +572,19 @@ AutoGetChangeCollection::AutoGetChangeCollection(OperationContext* opCtx,
                                                  AutoGetChangeCollection::AccessMode mode,
                                                  boost::optional<TenantId> tenantId,
                                                  Date_t deadline) {
-    auto nss = NamespaceString::makeChangeCollectionNSS(tenantId);
-    if (mode == AccessMode::kWrite) {
+    if (mode == AccessMode::kWriteInOplogContext) {
         // The global lock must already be held.
         invariant(opCtx->lockState()->isWriteLocked());
-
-        // TODO SERVER-66715 avoid taking 'AutoGetCollection' and remove
-        // 'AllowLockAcquisitionOnTimestampedUnitOfWork'.
-        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
-        _coll.emplace(
-            opCtx, nss, LockMode::MODE_IX, AutoGetCollectionViewMode::kViewsForbidden, deadline);
     }
+
+    // TODO SERVER-66715 avoid taking 'AutoGetCollection' and remove
+    // 'AllowLockAcquisitionOnTimestampedUnitOfWork'.
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+    _coll.emplace(opCtx,
+                  NamespaceString::makeChangeCollectionNSS(tenantId),
+                  LockMode::MODE_IX,
+                  AutoGetCollectionViewMode::kViewsForbidden,
+                  deadline);
 }
 
 const Collection* AutoGetChangeCollection::operator->() const {

@@ -115,6 +115,7 @@ public:
         OperationContext* opCtx,
         std::vector<InsertStatement>::const_iterator beginOplogEntries,
         std::vector<InsertStatement>::const_iterator endOplogEntries,
+        bool isGlobalIXLockAcquired,
         OpDebug* opDebug);
 };
 
