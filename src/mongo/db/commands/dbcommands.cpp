@@ -553,6 +553,16 @@ public:
                               const RequestParser& requestParser,
                               BSONObjBuilder& result) final {
         const auto* cmd = &requestParser.request();
+
+        // Targeting the underlying buckets collection directly would make the time-series
+        // Collection out of sync with the time-series view document. Additionally, we want to
+        // ultimately obscure/hide the underlying buckets collection from the user, so we're
+        // disallowing targetting it.
+        uassert(
+            ErrorCodes::InvalidNamespace,
+            "collMod on a time-series collection's underlying buckets collection is not supported.",
+            !cmd->getNamespace().isTimeseriesBucketsCollection());
+
         const auto isChangeStreamPreAndPostImagesEnabled =
             (cmd->getChangeStreamPreAndPostImages() &&
              cmd->getChangeStreamPreAndPostImages()->getEnabled());

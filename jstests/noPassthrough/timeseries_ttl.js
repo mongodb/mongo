@@ -145,7 +145,7 @@ testCase((coll, bucketsColl) => {
     // Make the collection TTL and expect the data to be deleted because the bucket minimum is past
     // the expiry plus the maximum bucket range.
     assert.commandWorked(testDB.runCommand({
-        collMod: 'system.buckets.ts',
+        collMod: 'ts',
         expireAfterSeconds: expireAfterSeconds,
     }));
 

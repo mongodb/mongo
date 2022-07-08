@@ -56,4 +56,11 @@ assert.commandWorked(db.runCommand({"collMod": collName, "expireAfterSeconds": 6
 // Successfully sets the granularity for a time-series collection.
 assert.commandWorked(
     db.runCommand({"collMod": collName, "timeseries": {"granularity": "minutes"}}));
+
+// collMod against the underlying buckets collection should fail: not allowed to target the buckets
+// collection.
+assert.commandFailedWithCode(
+    db.runCommand(
+        {"collMod": ("system.buckets." + collName), "timeseries": {"granularity": "hours"}}),
+    [ErrorCodes.InvalidNamespace, 6201808 /* mongos error code */]);
 })();

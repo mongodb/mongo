@@ -1,6 +1,5 @@
 /**
- * Tests that collMod can change the expireAfterSeconds option on both a time-series collection and
- * the underlying bucket collection.
+ * Tests that collMod can change the expireAfterSeconds option on a time-series collection.
  *
  * @tags: [
  *   does_not_support_stepdowns,
@@ -35,22 +34,6 @@ assert.commandFailedWithCode(db.runCommand({collMod: coll.getName(), expireAfter
 assert.commandFailedWithCode(db.runCommand({collMod: coll.getName(), expireAfterSeconds: {}}),
                              ErrorCodes.TypeMismatch);
 assert.commandFailedWithCode(db.runCommand({collMod: coll.getName(), expireAfterSeconds: -10}),
-                             ErrorCodes.InvalidOptions);
-
-// Check for invalid input on the underlying bucket collection.
-assert.commandFailedWithCode(
-    db.runCommand({collMod: bucketsColl.getName(), expireAfterSeconds: "10"}),
-    ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(
-    db.runCommand({collMod: bucketsColl.getName(), expireAfterSeconds: {}}),
-    ErrorCodes.TypeMismatch);
-assert.commandFailedWithCode(
-    db.runCommand({collMod: bucketsColl.getName(), expireAfterSeconds: -10}),
-    ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(db.runCommand({
-    collMod: bucketsColl.getName(),
-    expireAfterSeconds: NumberLong("4611686018427387904"),
-}),
                              ErrorCodes.InvalidOptions);
 
 let res = assert.commandWorked(
@@ -94,18 +77,4 @@ runTest(coll, 'off');
 
 // Enable expireAfterSeconds again.
 runTest(coll, 100);
-
-// Tests for collMod on the underlying bucket collection.
-
-// Change expireAfterSeconds to 10.
-runTest(bucketsColl, 10);
-
-// Change expireAfterSeconds to 0.
-runTest(bucketsColl, 0);
-
-// Disable expireAfterSeconds.
-runTest(bucketsColl, 'off');
-
-// Enable expireAfterSeconds again.
-runTest(bucketsColl, 100);
 })();
