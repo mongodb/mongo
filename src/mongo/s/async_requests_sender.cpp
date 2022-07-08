@@ -172,9 +172,10 @@ AsyncRequestsSender::RemoteData::RemoteData(AsyncRequestsSender* ars,
                                             BSONObj cmdObj)
     : _ars(ars), _shardId(std::move(shardId)), _cmdObj(std::move(cmdObj)) {}
 
-std::shared_ptr<Shard> AsyncRequestsSender::RemoteData::getShard() {
-    // TODO: Pass down an OperationContext* to use here.
-    return Grid::get(getGlobalServiceContext())->shardRegistry()->getShardNoReload(_shardId);
+SemiFuture<std::shared_ptr<Shard>> AsyncRequestsSender::RemoteData::getShard() noexcept {
+    return Grid::get(getGlobalServiceContext())
+        ->shardRegistry()
+        ->getShard(*_ars->_subBaton, _shardId);
 }
 
 void AsyncRequestsSender::RemoteData::executeRequest() {
@@ -194,7 +195,12 @@ void AsyncRequestsSender::RemoteData::executeRequest() {
 
 auto AsyncRequestsSender::RemoteData::scheduleRequest()
     -> SemiFuture<RemoteCommandOnAnyCallbackArgs> {
-    return resolveShardIdToHostAndPorts(_ars->_readPreference)
+    return getShard()
+        .thenRunOn(*_ars->_subBaton)
+        .then([this](auto&& shard) {
+            return shard->getTargeter()->findHosts(_ars->_readPreference,
+                                                   CancellationToken::uncancelable());
+        })
         .thenRunOn(*_ars->_subBaton)
         .then([this](auto&& hostAndPorts) {
             _shardHostAndPort.emplace(hostAndPorts.front());
@@ -202,17 +208,6 @@ auto AsyncRequestsSender::RemoteData::scheduleRequest()
         })
         .then([this](auto&& rcr) { return handleResponse(std::move(rcr)); })
         .semi();
-}
-
-SemiFuture<std::vector<HostAndPort>> AsyncRequestsSender::RemoteData::resolveShardIdToHostAndPorts(
-    const ReadPreferenceSetting& readPref) {
-    const auto shard = getShard();
-    if (!shard) {
-        return Status(ErrorCodes::ShardNotFound,
-                      str::stream() << "Could not find shard " << _shardId);
-    }
-
-    return shard->getTargeter()->findHosts(readPref, CancellationToken::uncancelable());
 }
 
 auto AsyncRequestsSender::RemoteData::scheduleRemoteCommand(std::vector<HostAndPort>&& hostAndPorts)
@@ -277,43 +272,47 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandOnAnyCallbackA
     }
 
     // There was an error with either the response or the command.
-    auto shard = getShard();
-    if (!shard) {
-        uasserted(ErrorCodes::ShardNotFound, str::stream() << "Could not find shard " << _shardId);
-    } else {
-        std::vector<HostAndPort> failedTargets;
+    return getShard()
+        .thenRunOn(*_ars->_subBaton)
+        .then([this, status = std::move(status), rcr = std::move(rcr)](
+                  std::shared_ptr<mongo::Shard>&& shard) {
+            std::vector<HostAndPort> failedTargets;
 
-        if (rcr.response.target) {
-            failedTargets = {*rcr.response.target};
-        } else {
-            failedTargets = rcr.request.target;
-        }
+            if (rcr.response.target) {
+                failedTargets = {*rcr.response.target};
+            } else {
+                failedTargets = rcr.request.target;
+            }
 
-        shard->updateReplSetMonitor(failedTargets.front(), status);
-        bool isStartingTransaction = _cmdObj.getField("startTransaction").booleanSafe();
-        if (!_ars->_stopRetrying && shard->isRetriableError(status.code(), _ars->_retryPolicy) &&
-            _retryCount < kMaxNumFailedHostRetryAttempts && !isStartingTransaction) {
+            shard->updateReplSetMonitor(failedTargets.front(), status);
+            bool isStartingTransaction = _cmdObj.getField("startTransaction").booleanSafe();
+            if (!_ars->_stopRetrying &&
+                shard->isRetriableError(status.code(), _ars->_retryPolicy) &&
+                _retryCount < kMaxNumFailedHostRetryAttempts && !isStartingTransaction) {
 
-            LOGV2_DEBUG(4615637,
-                        1,
-                        "Command to remote {shardId} for hosts {hosts} failed with retryable error "
-                        "{error} and will be retried",
-                        "Command to remote shard failed with retryable error and will be retried",
-                        "shardId"_attr = _shardId,
-                        "hosts"_attr = failedTargets,
-                        "error"_attr = redact(status));
-            ++_retryCount;
-            _shardHostAndPort.reset();
-            // retry through recursion
-            return scheduleRequest();
-        }
-    }
+                LOGV2_DEBUG(
+                    4615637,
+                    1,
+                    "Command to remote {shardId} for hosts {hosts} failed with retryable error "
+                    "{error} and will be retried",
+                    "Command to remote shard failed with retryable error and will be retried",
+                    "shardId"_attr = _shardId,
+                    "hosts"_attr = failedTargets,
+                    "error"_attr = redact(status));
+                ++_retryCount;
+                _shardHostAndPort.reset();
+                // retry through recursion
+                return scheduleRequest();
+            }
 
-    // Status' in the response.status field that aren't retried get converted to top level errors
-    uassertStatusOK(rcr.response.status);
+            // Status' in the response.status field that aren't retried get converted to top level
+            // errors
+            uassertStatusOK(rcr.response.status);
 
-    // We're not okay (on the remote), but still not going to retry
-    return std::move(rcr);
+            // We're not okay (on the remote), but still not going to retry
+            return Future<RemoteCommandOnAnyCallbackArgs>::makeReady(std::move(rcr)).semi();
+        })
+        .semi();
 };
 
 }  // namespace mongo

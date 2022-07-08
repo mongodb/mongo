@@ -179,9 +179,15 @@ private:
         RemoteData(AsyncRequestsSender* ars, ShardId shardId, BSONObj cmdObj);
 
         /**
-         * Returns the Shard object associated with this remote.
+         * Returns a SemiFuture containing a shard object associated with this remote.
+         *
+         * This will return a SemiFuture with a ShardNotFound error status in case the shard is not
+         * found.
+         *
+         * Additionally this call can trigger a refresh of the ShardRegistry so it could possibly
+         * return other network error status related to the refresh.
          */
-        std::shared_ptr<Shard> getShard();
+        SemiFuture<std::shared_ptr<Shard>> getShard() noexcept;
 
         /**
          * Returns true if we've already queued a response from the remote.
