@@ -639,15 +639,15 @@ class MongoPrettyPrinterCollection(gdb.printing.PrettyPrinter):
 
         index = find_match_brackets(lookup_tag)
 
-        # Ignore subtypes of classes
-        # We do not want HashTable<T>::iterator as an example, just HashTable<T>
-        if index == -1 or index + 1 == len(lookup_tag):
-            for printer in self.subprinters:
-                if not printer.enabled:
-                    continue
-                if ((not printer.is_template or lookup_tag.find(printer.prefix) != 0)
-                        and (printer.is_template or lookup_tag != printer.prefix)):
-                    continue
+        for printer in self.subprinters:
+            if not printer.enabled:
+                continue
+            # Ignore subtypes of templated classes.
+            # We do not want HashTable<T>::iterator as an example, just HashTable<T>
+            if printer.is_template:
+                if (index + 1 == len(lookup_tag) and lookup_tag.find(printer.prefix) == 0):
+                    return printer.printer(val)
+            elif lookup_tag == printer.prefix:
                 return printer.printer(val)
 
         return None
@@ -925,7 +925,11 @@ def register_abt_printers(pp):
     try:
         # ABT printer.
         abt_type = gdb.lookup_type("mongo::optimizer::ABT").strip_typedefs()
-        pp.add('ABT', abt_type.name, True, ABTPrinter)
+        pp.add('ABT', abt_type.name, False, ABTPrinter)
+
+        abt_ref_type = gdb.lookup_type(abt_type.name + "::Reference").strip_typedefs()
+        # We can re-use the same printer since an ABT is contructable from an ABT::Reference.
+        pp.add('ABT::Reference', abt_ref_type.name, False, ABTPrinter)
 
         # IntervalRequirement printer.
         pp.add("Interval", "mongo::optimizer::IntervalRequirement", False, IntervalPrinter)
