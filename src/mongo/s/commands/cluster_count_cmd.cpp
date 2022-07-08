@@ -293,7 +293,7 @@ private:
         }
 
         if (l.isNumber()) {
-            long long limit = l.numberLong();
+            auto limit = l.safeNumberLong();
             if (limit < 0) {
                 limit = -limit;
             }
