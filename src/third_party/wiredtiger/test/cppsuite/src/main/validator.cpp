@@ -35,8 +35,8 @@
 
 namespace test_harness {
 void
-validator::validate(const std::string &operation_table_name, const std::string &schema_table_name,
-  const std::vector<uint64_t> &known_collection_ids)
+validator::validate(
+  const std::string &operation_table_name, const std::string &schema_table_name, database &db)
 {
     WT_DECL_RET;
     wt_timestamp_t tracked_timestamp;
@@ -50,6 +50,8 @@ validator::validate(const std::string &operation_table_name, const std::string &
 
     scoped_session session = connection_manager::instance().create_session();
     scoped_cursor cursor = session.open_scoped_cursor(operation_table_name);
+
+    const std::vector<uint64_t> known_collection_ids = db.get_collection_ids();
 
     /*
      * Default validation depends on specific fields being present in the tracking table. If the

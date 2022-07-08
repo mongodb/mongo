@@ -406,10 +406,10 @@ database_operation::update_operation(thread_worker *tc)
 }
 
 void
-database_operation::validate(const std::string &operation_table_name,
-  const std::string &schema_table_name, const std::vector<uint64_t> &known_collection_ids)
+database_operation::validate(
+  const std::string &operation_table_name, const std::string &schema_table_name, database &db)
 {
     validator wv;
-    wv.validate(operation_table_name, schema_table_name, known_collection_ids);
+    wv.validate(operation_table_name, schema_table_name, db);
 }
 } // namespace test_harness

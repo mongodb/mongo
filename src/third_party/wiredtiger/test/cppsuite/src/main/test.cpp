@@ -170,8 +170,7 @@ test::run()
     if (_operation_tracker->enabled()) {
         std::unique_ptr<configuration> tracking_config(_config->get_subconfig(OPERATION_TRACKER));
         this->validate(_operation_tracker->get_operation_table_name(),
-          _operation_tracker->get_schema_table_name(),
-          _workload_manager->get_database().get_collection_ids());
+          _operation_tracker->get_schema_table_name(), _workload_manager->get_database());
     }
 
     /* Log perf stats. */

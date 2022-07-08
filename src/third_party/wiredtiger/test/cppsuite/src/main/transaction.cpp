@@ -126,6 +126,12 @@ transaction::try_rollback(const std::string &config)
         rollback(config);
 }
 
+int64_t
+transaction::get_target_op_count() const
+{
+    return _target_op_count;
+}
+
 /*
  * FIXME: WT-9198 We're concurrently doing a transaction that contains a bunch of operations while
  * moving the stable timestamp. Eat the occasional EINVAL from the transaction's first commit

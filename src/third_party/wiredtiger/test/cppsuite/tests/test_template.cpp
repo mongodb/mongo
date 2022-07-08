@@ -115,7 +115,7 @@ class test_template : public test {
     }
 
     void
-    validate(const std::string &, const std::string &, const std::vector<uint64_t> &) override final
+    validate(const std::string &, const std::string &, database &) override final
     {
         logger::log_msg(LOG_WARN, "validate: nothing done");
     }

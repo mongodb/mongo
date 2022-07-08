@@ -54,8 +54,8 @@ class validator {
      * - operation_table_name: Table that contains all the operations performed on keys.
      * - schema_table_name: Table that contains all the schema operations performed.
      */
-    void validate(const std::string &operation_table_name, const std::string &schema_table_name,
-      const std::vector<uint64_t> &known_collection_ids);
+    void validate(
+      const std::string &operation_table_name, const std::string &schema_table_name, database &db);
 
     private:
     /*

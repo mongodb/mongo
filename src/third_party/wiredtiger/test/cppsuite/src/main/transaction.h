@@ -71,6 +71,8 @@ class transaction {
      * of the transaction.
      */
     bool can_rollback();
+    /* Get the number of operations this transaction needs before it can commit */
+    int64_t get_target_op_count() const;
 
     private:
     bool _in_txn = false;

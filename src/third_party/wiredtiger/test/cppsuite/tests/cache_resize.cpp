@@ -168,8 +168,8 @@ class cache_resize : public test {
     }
 
     void
-    validate(const std::string &operation_table_name, const std::string &,
-      const std::vector<uint64_t> &) override final
+    validate(
+      const std::string &operation_table_name, const std::string &, database &) override final
     {
         bool first_record = true;
         int ret;

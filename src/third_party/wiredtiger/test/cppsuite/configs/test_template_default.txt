@@ -1,4 +1,3 @@
-# Example configuration file, as default are added automatically only non default configurations
-# need to be defined.
+# Example configuration file, as default are added automatically only non default configurations need to be defined.
 duration_seconds=5,
 cache_size_mb=250
