@@ -87,6 +87,9 @@ __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
 
     counter = hs_counter = 0;
 
+    /* Verify that the timestamps are in increasing order. */
+    WT_ASSERT(session, tw->stop_ts >= tw->start_ts && tw->durable_stop_ts >= tw->durable_start_ts);
+
     /*
      * We might be entering this code from application thread's context. We should make sure that we
      * are not using snapshot associated with application session to perform visibility checks on
@@ -613,12 +616,14 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
                  * current update is at the head of the stack. We need to check both cases because
                  * if there is a tombstone older than the out of order timestamp, we would not pop
                  * it because we skip the tombstone. Pop it when we are inserting it instead.
+                 *
+                 * Here it is assumed that the out of order update is equal to the oldest update
+                 * among the multiple out of order consecutive updates that have same timestamps.
+                 * For instance, U1@10 -> U2@10 -> U3@10 -> U4@20, U3 which is the oldest update
+                 * will be the out of order update.
                  */
                 if (out_of_order_ts_upd != NULL &&
-                  ((out_of_order_ts_upd->txnid == prev_upd->txnid &&
-                     out_of_order_ts_upd->start_ts == prev_upd->start_ts) ||
-                    (out_of_order_ts_upd->txnid == upd->txnid &&
-                      out_of_order_ts_upd->start_ts == upd->start_ts))) {
+                  (out_of_order_ts_upd == prev_upd || out_of_order_ts_upd == upd)) {
                     __wt_update_vector_pop(&out_of_order_ts_updates, &out_of_order_ts_upd);
                     out_of_order_ts_upd = NULL;
                 }
