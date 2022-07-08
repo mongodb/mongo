@@ -244,6 +244,19 @@ env.Library(
 )
 
 env.Library(
+    target='remote_command_runner',
+    source=[
+        'remote_command_runner.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/rpc/command_status',
+        'remote_command',
+        'task_executor_interface',
+    ],
+)
+
+env.Library(
     target='thread_pool_task_executor_test_fixture',
     source=[
         'thread_pool_task_executor_test_fixture.cpp',
@@ -300,14 +313,18 @@ env.CppUnitTest(
         'mock_network_fixture_test.cpp',
         'network_interface_mock_test.cpp',
         'network_interface_mock_test_fixture.cpp',
+        'remote_command_runner_test.cpp',
         'scoped_task_executor_test.cpp',
         'task_executor_cursor_test.cpp',
         'thread_pool_task_executor_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/repl/hello_command',
         'connection_pool_executor',
         'egress_tag_closer_manager',
         'network_interface_mock',
+        'network_test_env',
+        'remote_command_runner',
         'scoped_task_executor',
         'task_executor_cursor',
         'thread_pool_task_executor',
