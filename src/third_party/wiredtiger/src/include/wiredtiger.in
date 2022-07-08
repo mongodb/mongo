@@ -3009,20 +3009,26 @@ struct __wt_connection {
  * subsystem., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the
  * maximum size of log files., an integer between 100KB and 2GB; default \c 100MB.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;os_cache_dirty_pct, maximum dirty system buffer cache usage\, as
- * a percentage of the log's \c file_max.  If non-zero\, schedule writes for dirty blocks belonging
- * to the log in the system buffer cache after that percentage of the log has been written into the
- * buffer cache without an intervening file sync., an integer between 0 and 100; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the name of a directory into which log files are written.
- * The directory must already exist.  If the value is not an absolute path\, the path is relative to
- * the database home (see @ref absolute_path for more information)., a string; default \c ".".}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate log files., a boolean flag; default \c
- * true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery or error if recovery needs to run
- * after an unclean shutdown., a string\, chosen from the following options: \c "error"\, \c "on";
- * default \c on.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write zeroes into log files.,
- * a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;force_write_wait, enable code that interrupts the usual timing of
+ * flushing the log from the internal log server thread with a goal of uncovering race conditions.
+ * This option is intended for use with internal stress testing of WiredTiger., an integer between 1
+ * and 60; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;os_cache_dirty_pct, maximum dirty system
+ * buffer cache usage\, as a percentage of the log's \c file_max.  If non-zero\, schedule writes for
+ * dirty blocks belonging to the log in the system buffer cache after that percentage of the log has
+ * been written into the buffer cache without an intervening file sync., an integer between 0 and
+ * 100; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the name of a directory into which log
+ * files are written.  The directory must already exist.  If the value is not an absolute path\, the
+ * path is relative to the database home (see @ref absolute_path for more information)., a string;
+ * default \c ".".}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate log files., a boolean
+ * flag; default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery or error if
+ * recovery needs to run after an unclean shutdown., a string\, chosen from the following options:
+ * \c "error"\, \c "on"; default \c on.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write
+ * zeroes into log files., a boolean flag; default \c false.}
  * @config{ ),,}
  * @config{lsm_manager = (, configure database wide options for LSM tree management.  The LSM
  * manager is started automatically the first time an LSM tree is opened.  The LSM manager uses a
@@ -6310,59 +6316,61 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TARGET	1494
 /*! transaction: transaction checkpoint scrub time (msecs) */
 #define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TIME		1495
+/*! transaction: transaction checkpoint stop timing stress active */
+#define	WT_STAT_CONN_TXN_CHECKPOINT_STOP_STRESS_ACTIVE	1496
 /*! transaction: transaction checkpoint total time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1496
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1497
 /*! transaction: transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1497
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1498
 /*! transaction: transaction checkpoints due to obsolete pages */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_OBSOLETE_APPLIED	1498
+#define	WT_STAT_CONN_TXN_CHECKPOINT_OBSOLETE_APPLIED	1499
 /*!
  * transaction: transaction checkpoints skipped because database was
  * clean
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SKIPPED		1499
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SKIPPED		1500
 /*! transaction: transaction failures due to history store */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1500
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1501
 /*!
  * transaction: transaction fsync calls for checkpoint after allocating
  * the transaction ID
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1501
+#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1502
 /*!
  * transaction: transaction fsync duration for checkpoint after
  * allocating the transaction ID (usecs)
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1502
+#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1503
 /*! transaction: transaction range of IDs currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_RANGE			1503
+#define	WT_STAT_CONN_TXN_PINNED_RANGE			1504
 /*! transaction: transaction range of IDs currently pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1504
+#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1505
 /*! transaction: transaction range of timestamps currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP		1505
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP		1506
 /*! transaction: transaction range of timestamps pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_CHECKPOINT	1506
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_CHECKPOINT	1507
 /*!
  * transaction: transaction range of timestamps pinned by the oldest
  * active read timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_READER	1507
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_READER	1508
 /*!
  * transaction: transaction range of timestamps pinned by the oldest
  * timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	1508
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	1509
 /*! transaction: transaction read timestamp of the oldest active reader */
-#define	WT_STAT_CONN_TXN_TIMESTAMP_OLDEST_ACTIVE_READ	1509
+#define	WT_STAT_CONN_TXN_TIMESTAMP_OLDEST_ACTIVE_READ	1510
 /*! transaction: transaction rollback to stable currently running */
-#define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE_RUNNING	1510
+#define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE_RUNNING	1511
 /*! transaction: transaction walk of concurrent sessions */
-#define	WT_STAT_CONN_TXN_WALK_SESSIONS			1511
+#define	WT_STAT_CONN_TXN_WALK_SESSIONS			1512
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1512
+#define	WT_STAT_CONN_TXN_COMMIT				1513
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1513
+#define	WT_STAT_CONN_TXN_ROLLBACK			1514
 /*! transaction: update conflicts */
-#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1514
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1515
 
 /*!
  * @}
